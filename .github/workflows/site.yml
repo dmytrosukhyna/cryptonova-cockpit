@@ -58,7 +58,6 @@ jobs:
           git pull --rebase --autostash origin main || true
           git push || true
       - uses: actions/configure-pages@v5
-        with: { enablement: true }
       - uses: actions/upload-pages-artifact@v3
         with: { path: web }
 

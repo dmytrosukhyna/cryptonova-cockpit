@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+data/*
+!data/agents.sqlite
+!data/.gitkeep
+web/*.bak

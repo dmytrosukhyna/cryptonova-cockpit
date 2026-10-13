@@ -1,0 +1,65 @@
+"""Telegram notifications (server side, stdlib only).
+
+Env: CNQ_TG_TOKEN, CNQ_TG_CHAT. Sends the daily brief and alerts on new events.
+Alerts are de-duplicated with a small state file so a cron run never re-sends."""
+from __future__ import annotations
+
+import json
+import os
+import urllib.request
+
+STATE = "data/notified.json"
+
+
+def send(text: str, token: str | None = None, chat: str | None = None, parse_mode: str | None = None) -> bool:
+    token = token or os.environ.get("CNQ_TG_TOKEN"); chat = chat or os.environ.get("CNQ_TG_CHAT")
+    if not token or not chat:
+        return False
+    body = {"chat_id": chat, "text": text[:4000], "disable_web_page_preview": True}
+    if parse_mode:
+        body["parse_mode"] = parse_mode
+    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",
+                                 data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.loads(r.read().decode()).get("ok", False)
+
+
+def _fmt(p: float) -> str:
+    return f"{p:,.0f}".replace(",", " ") if p >= 1000 else (f"{p:.2f}" if p >= 1 else f"{p:.4f}")
+
+
+def event_text(e: dict) -> str:
+    sym = e["symbol"].replace("USDT", "")
+    if e["kind"] == "SETUP":
+        st = {"ATTENTION": "следить", "WAIT_CONFIRMATION": "готовиться", "READY": "готов", "CALL": "СИГНАЛ", "POSITION_OPEN": "в позиции"}.get(e["status"], e["status"])
+        risk = abs(e["entry"] - e["stop"]) / e["entry"] * 100
+        return (f"⚡ {sym} {e['family']} {e['direction']} — {st}\nВход {_fmt(e['entry'])} · стоп {_fmt(e['stop'])} · риск {risk:.2f}%\n"
+                f"Лимитка на краю зоны, одна цель 1–1.5R, только мейкер.")
+    if e["kind"] == "LIQUIDATION_CASCADE":
+        side = "вынос лонгов" if e["side"] == "LONG_LIQUIDATIONS" else "вынос шортов"
+        return (f"💥 {sym}: {side} {e['ret_pct']}% за 15 мин, ликвидации ${e['liq_usd']/1e6:.1f}M. "
+                f"Хвост {'есть — кандидат на fade' if e['wick_ok'] else 'слабый — не трогать'}. Диапазон {_fmt(e['low'])}–{_fmt(e['high'])}.")
+    if e["kind"] == "FUNDING_EXTREME":
+        return (f"📊 {sym}: funding {e['funding_pct']:+.4f}% — {round(e['rank']*100)}-й перцентиль за 90 дней. "
+                f"{'Лонги переполнены, риск сквиза вниз.' if e['rank'] >= 0.5 else 'Шорты переполнены, риск сквиза вверх.'}")
+    return json.dumps(e, ensure_ascii=False)
+
+
+def alert_new_events(report: dict, token: str | None = None, chat: str | None = None) -> int:
+    """Send every event not yet notified. Returns number sent."""
+    try:
+        seen = set(json.load(open(STATE)))
+    except Exception:  # noqa: BLE001
+        seen = set()
+    sent = 0
+    for e in report.get("events", []):
+        key = f"{e['kind']}|{e['symbol']}|{e['time']}|{e.get('status','')}"
+        if key in seen:
+            continue
+        if e["kind"] == "SETUP" and e["status"] not in ("CALL", "READY", "WAIT_CONFIRMATION"):
+            continue
+        if send(event_text(e), token, chat):
+            seen.add(key); sent += 1
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    json.dump(sorted(seen)[-2000:], open(STATE, "w"))
+    return sent

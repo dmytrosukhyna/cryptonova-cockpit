@@ -1,0 +1,96 @@
+"""LLM client (Anthropic Messages API, stdlib only) + a deterministic mock for tests.
+
+Env: ANTHROPIC_API_KEY, CNQ_LLM_MODEL (default claude-sonnet-5-5).
+Every agent asks for JSON and validates it; a bad or missing answer degrades to the
+rule-based fallback, never to invented numbers."""
+from __future__ import annotations
+
+import json
+import os
+import re
+import urllib.request
+
+API = "https://api.anthropic.com/v1/messages"
+
+
+class LLM:
+    def __init__(self, model: str | None = None, api_key: str | None = None, max_tokens: int = 2000):
+        self.model = model or os.environ.get("CNQ_LLM_MODEL", "claude-sonnet-5-5")
+        self.key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        self.max_tokens = max_tokens
+        self.calls = 0
+
+    @property
+    def available(self) -> bool:
+        return bool(self.key)
+
+    def complete(self, system: str, user: str, temperature: float = 0.2) -> str:
+        if not self.key:
+            raise RuntimeError("ANTHROPIC_API_KEY not set")
+        body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": temperature,
+                "system": system, "messages": [{"role": "user", "content": user}]}
+        req = urllib.request.Request(API, data=json.dumps(body).encode(),
+                                     headers={"x-api-key": self.key, "anthropic-version": "2023-06-01",
+                                              "content-type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            msg = json.loads(r.read().decode())
+        self.calls += 1
+        return "".join(b.get("text", "") for b in msg.get("content", []) if b.get("type") == "text")
+
+    def json(self, system: str, user: str) -> dict | list | None:
+        """Ask for strict JSON; tolerate code fences; return None on failure."""
+        try:
+            txt = self.complete(system + "\nОтвечай ТОЛЬКО валидным JSON без пояснений.", user)
+        except Exception:  # noqa: BLE001
+            return None
+        return parse_json(txt)
+
+
+def parse_json(txt: str):
+    txt = txt.strip()
+    m = re.search(r"```(?:json)?\s*(.*?)```", txt, re.S)
+    if m:
+        txt = m.group(1)
+    try:
+        return json.loads(txt)
+    except json.JSONDecodeError:
+        # last resort: first {...} or [...] block
+        m = re.search(r"(\{.*\}|\[.*\])", txt, re.S)
+        if m:
+            try:
+                return json.loads(m.group(1))
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
+class MockLLM(LLM):
+    """Deterministic stand-in: keyword rules instead of a model. Used in tests and when
+    no key is configured, so the pipeline always runs end to end."""
+
+    def __init__(self):
+        super().__init__(model="mock", api_key="mock")
+
+    def complete(self, system: str, user: str, temperature: float = 0.2) -> str:
+        self.calls += 1
+        if "NEWS_ANALYST" in system:
+            items = parse_json(user) or []
+            out = []
+            for it in items if isinstance(items, list) else []:
+                h = (it.get("title", "") + " " + it.get("summary", "")).lower()
+                cat, d, mag = "other", "neutral", 1
+                for k, c, dd, mm in (("etf", "etf_flows", "bull", 3), ("sec", "regulation", "bear", 3), ("ban", "regulation", "bear", 4),
+                                     ("hack", "hack", "bear", 4), ("exploit", "hack", "bear", 4), ("fomc", "macro", "neutral", 3),
+                                     ("cpi", "macro", "neutral", 3), ("rate cut", "macro", "bull", 3), ("listing", "listing", "bull", 2),
+                                     ("unlock", "unlock", "bear", 2), ("upgrade", "tech", "bull", 2), ("partnership", "adoption", "bull", 1),
+                                     ("lawsuit", "regulation", "bear", 3), ("approval", "regulation", "bull", 3), ("outage", "tech", "bear", 2)):
+                    if k in h:
+                        cat, d, mag = c, dd, mm
+                        break
+                out.append({"id": it.get("id"), "assets": it.get("assets_hint", ["BTC"]), "category": cat, "direction": d,
+                            "horizon": "days", "magnitude": mag, "confidence": 0.4 if cat != "other" else 0.2,
+                            "reasoning": "mock: keyword rule", "confirm": "цена закрепится за ближайшим уровнем в сторону оценки"})
+            return json.dumps(out, ensure_ascii=False)
+        if "EDITOR" in system:
+            return ""  # empty → orchestrator uses the rule-based brief
+        return "{}"

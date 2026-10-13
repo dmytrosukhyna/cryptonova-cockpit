@@ -1,0 +1,158 @@
+"""cnq — CRYPTO NOVΛ quant CLI.
+
+  python -m cnq.cli backfill [--days 120]     fetch candles + funding into SQLite
+  python -m cnq.cli stream                    record trades/order book/OI 24/7
+  python -m cnq.cli status                    data coverage + quality log
+  python -m cnq.cli levels [--interval 15m]   current levels for the symbol
+  python -m cnq.cli replay [--interval 15m] [--mode STRICT_CRYPTO_NOVA] [--risk 1.0]
+  python -m cnq.cli ev                        arithmetic of the TP ladder
+  python -m cnq.cli binance-sync [--days 90] [--aggtrades]   Binance research datasets → SQLite
+  python -m cnq.cli binance-peek              print first rows of each Binance dataset (format check)
+  python -m cnq.cli terminal [--out web]      build web/terminal.json from stored candles (BingX universe)
+  python -m cnq.cli brief                     print the daily brief (and send it: --send)
+  python -m cnq.cli alerts                    send not-yet-sent events to Telegram
+  python -m cnq.cli fx-gaps [--send]          Monday weekend-gap signals for FX (Twelve Data key) → Telegram
+  python -m cnq.cli agents [--send]           run departments (news/fundamentals/risk/editor) → web/decision.json (+post to Telegram)
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import logging
+import sys
+import time
+
+from .config import Config
+from .store.db import Store
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="cnq")
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps"])
+    ap.add_argument("--symbol")
+    ap.add_argument("--db")
+    ap.add_argument("--days", type=int)
+    ap.add_argument("--interval", default="15m")
+    ap.add_argument("--mode", default="STRICT_CRYPTO_NOVA")
+    ap.add_argument("--risk", type=float, default=1.0)
+    ap.add_argument("--balance", type=float, default=10_000)
+    ap.add_argument("--min-score", type=float, default=60.0)
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--aggtrades", action="store_true")
+    ap.add_argument("--binance-symbol", default="BTCUSDT")
+    ap.add_argument("--cache", default="data/binance")
+    ap.add_argument("--out", default="web")
+    ap.add_argument("--send", action="store_true")
+    args = ap.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    cfg = Config()
+    if args.symbol:
+        cfg = Config(symbol=args.symbol)
+    store = Store(args.db or cfg.db_path)
+
+    if args.cmd == "backfill":
+        from .collector.backfill import backfill
+        print(json.dumps(backfill(cfg, store, days=args.days), indent=2))
+    elif args.cmd == "stream":
+        from .collector.stream import run_stream
+        asyncio.run(run_stream(cfg, store))
+    elif args.cmd == "status":
+        from .collector.quality import coverage
+        out = {}
+        for iv in cfg.intervals:
+            out[iv] = coverage(store.candles(cfg.symbol, iv), iv)
+        q = store.conn.execute("SELECT kind, COUNT(*) FROM quality_log GROUP BY kind").fetchall()
+        out["quality_log"] = dict(q)
+        for tbl in ("trades", "depth_snapshots", "open_interest", "funding", "paper_trades"):
+            out[tbl] = store.conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0]
+        print(json.dumps(out, indent=2))
+    elif args.cmd == "levels":
+        from .features.levels import build_levels
+        candles = store.candles(cfg.symbol, args.interval, limit=600)
+        if not candles:
+            print("no candles — run backfill first"); return 1
+        for L in build_levels(candles)[:15]:
+            print(f"{L.status:9} {L.kind:10} {L.lo:>12.2f} – {L.hi:<12.2f} touches={L.touch_count} score={L.score}")
+        print(f"last close {candles[-1].close:.2f}")
+    elif args.cmd == "replay":
+        from .collector.quality import coverage
+        from .paper.replay import run_replay
+        candles = store.candles(cfg.symbol, args.interval)
+        if not candles:
+            print("no candles — run backfill first"); return 1
+        cov = coverage(candles, args.interval)["coverage"]
+        funding = [{"time": t, "rate": r} for t, r in store.conn.execute(
+            "SELECT time, rate FROM funding WHERE symbol=? ORDER BY time", (cfg.symbol,))]
+        t0 = time.time()
+        res = run_replay(cfg.symbol, candles, args.interval, args.balance, args.risk, args.mode,
+                         store=store, min_score=args.min_score, coverage=cov, funding=funding)
+        res["summary"]["seconds"] = round(time.time() - t0, 1)
+        print(json.dumps(res["summary"], indent=2))
+        if not args.json:
+            for t in res["trades"][-10:]:
+                print(f"{t['direction']:5} entry={t['entry']:.2f} stop={t['stop']:.2f} "
+                      f"tps={t['tps_hit']} exit={t['exit_kind']:6} {t['result_r']:+.2f}R")
+    elif args.cmd == "ev":
+        from .risk.ev import breakeven_p_tp1, ev_table, outcomes
+        for m in ("STRICT_CRYPTO_NOVA", "CRYPTO_NOVA_RUNNER", "LEVEL_3R"):
+            print(m, "outcomes by TPs hit:", {o["tps_hit"]: o["result_r"] for o in outcomes(m)})
+            for pn in (0.6, 0.75, 0.9):
+                print(f"  p_next={pn}: break-even P(TP1) = {breakeven_p_tp1(m, pn):.0%}",
+                      {r['p_tp1']: r['ev_r'] for r in ev_table(m, p_next=pn)})
+    elif args.cmd == "binance-sync":
+        from .binance.load import sync_all
+        print(json.dumps(sync_all(store, args.binance_symbol, args.days or 90, args.cache, args.aggtrades), indent=2))
+    elif args.cmd == "binance-peek":
+        from datetime import date, timedelta
+        from .binance import public_data as pd_
+        d = date.today() - timedelta(days=2)
+        for kind, iv in (("klines", "1m"), ("aggTrades", None), ("bookDepth", None), ("metrics", None)):
+            p = pd_.download(pd_.file_url(kind, args.binance_symbol, d, iv), f"{args.cache}/peek")
+            print(f"== {kind} {d}: {p}")
+            if p:
+                for i, r in enumerate(pd_.read_rows(p, kind)):
+                    print("  ", r)
+                    if i >= 2:
+                        break
+    elif args.cmd == "fx-gaps":
+        from .fx.gaps import run as fx_run
+        res = fx_run(send=args.send)
+        print(f"{len(res)} gap signals")
+    elif args.cmd in ("terminal", "brief", "alerts", "agents"):
+        import os
+        from .terminal.report import build_report, write_report
+        from .terminal import notify
+        # Universe = BingX symbols with ≥60 days of 15m candles in the store (run `backfill` per symbol first)
+        universe = {}
+        for bx, _ in cfg.universe:
+            cs = store.candles(bx, "15m")
+            if len(cs) >= 96 * 60:
+                universe[bx] = cs
+        if not universe:
+            print("no 15m candles in the store — run: CNQ_SYMBOL=BTC-USDT python -m cnq.cli backfill (per symbol)"); return 1
+        rep = build_report(universe)
+        os.makedirs(args.out, exist_ok=True)
+        write_report(rep, os.path.join(args.out, "terminal.json"))
+        if args.cmd == "terminal":
+            print(f"written {args.out}/terminal.json: {len(rep['coins'])} coins, {len(rep['events'])} events")
+        elif args.cmd == "agents":
+            from .agents.orchestrator import Orchestrator
+            orc = Orchestrator(db_path="data/agents.sqlite")
+            d = orc.run(rep)
+            write_report(d, os.path.join(args.out, "decision.json"))
+            print(f"decision.json: llm={d['news']['llm']} news={len(d['news']['items'])} impacts={len(d['news']['impacts'])} "
+                  f"blackout={d['risk']['blackout_assets']} post={d['post_source']} ({len(d['post'])} chars)")
+            if args.send:
+                print("sent" if notify.send(d["post"]) else "not sent (CNQ_TG_TOKEN/CNQ_TG_CHAT missing?)")
+        elif args.cmd == "brief":
+            print(rep["brief"])
+            if args.send:
+                print("sent" if notify.send(rep["brief"]) else "not sent (CNQ_TG_TOKEN/CNQ_TG_CHAT missing?)")
+        else:
+            print("alerts sent:", notify.alert_new_events(rep))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

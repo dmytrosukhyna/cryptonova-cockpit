@@ -276,7 +276,8 @@ def market_note(btc_bull: bool, btc: dict | None, pk: dict, state: dict) -> str:
         lines.append(f"BTC {'в бычьем режиме' if btc_bull else 'в медвежьем режиме'}: за 7 дней {btc.get('chg7', 0) or 0:+.1f}%, за 30 дней {btc.get('chg30', 0) or 0:+.1f}%, от максимума {btc.get('ath_chg', 0) or 0:+.0f}%.")
     lines.append(f"Портфель: инвестировано {state['invested_pct']}%, в кэше {state['cash_pct']}%, индекс {state['index']:.1f} (старт 100).")
     if state["actions"]:
-        lines.append("Сегодня: " + "; ".join(f"{a['action'].lower()} {a['symbol']} ({a['weight']*100:.0f}%)" for a in state["actions"][:6]) + ".")
+        ru = {"BUY": "купить", "ADD": "добавить", "TRIM": "зафиксировать часть", "SELL": "продать"}
+        lines.append("Сегодня: " + "; ".join(f"{ru.get(a['action'], a['action'])} {a['symbol']}" + (f" ({a['weight']*100:.0f}%)" if a['weight'] else "") for a in state["actions"][:6]) + ".")
     else:
         lines.append("Сегодня действий нет — правила не сработали, держим.")
     if pk["short"]:

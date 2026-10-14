@@ -105,13 +105,13 @@ main{display:grid;grid-template-columns:230px minmax(0,1fr) 340px;gap:12px;paddi
 .banner{padding:8px 12px;border-radius:4px;background:rgba(255,179,64,.12);border:1px solid rgba(255,179,64,.4);color:var(--amber);font-weight:600;font-size:13px}
 details summary{cursor:pointer;color:var(--muted);font-size:12px}
 @media (prefers-reduced-motion:reduce){ .led.on,.pick .sig{animation:none} }
-.hud{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
+.hud{display:grid;gap:10px;align-items:center}
 .hud svg{width:150px;height:150px;overflow:visible}
 .hud .ring{fill:none;stroke:var(--cyan);stroke-width:1}
 .hud .r1{animation:spin 24s linear infinite;transform-origin:100px 100px}.hud .r2{animation:spin 40s linear infinite reverse;transform-origin:100px 100px}.hud .r3{animation:spin 14s linear infinite;transform-origin:100px 100px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .hud .core{text-align:center;font-family:var(--display)}.hud .core b{display:block;font-size:24px;letter-spacing:.08em;color:var(--cyan);text-shadow:0 0 16px rgba(25,211,255,.8)}.hud .core small{display:block;color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase}
-.hud .rows{display:flex;flex-direction:column;gap:6px;font-size:12px}.hud .rows div{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}.hud .rows small{color:var(--muted);text-transform:uppercase;letter-spacing:.14em;font-size:10px;font-family:var(--display)}.hud .rows .ln{height:1px;background:linear-gradient(90deg,var(--line2),transparent)}.hud .rows b{font-family:var(--mono);font-weight:500;color:var(--fg)}
+.hud .rows{display:flex;flex-direction:column;gap:6px;font-size:11.5px;min-width:0}.hud .rows div{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}.hud .rows small{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:9.5px;font-family:var(--display);white-space:nowrap}.hud .rows .ln{height:1px;background:linear-gradient(90deg,var(--line2),transparent)}.hud .rows b{font-family:var(--mono);font-weight:500;color:var(--fg)}
 @media (prefers-reduced-motion:reduce){ .hud .r1,.hud .r2,.hud .r3{animation:none} }
 /* verdict */
 .verdict{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px 22px}
@@ -138,6 +138,30 @@ details summary{cursor:pointer;color:var(--muted);font-size:12px}
 @keyframes flow{to{stroke-dashoffset:-96}}
 .pipe .n{fill:rgba(8,26,50,.9);stroke:var(--cyan);stroke-width:1}.pipe .n.hot{animation:beat 2s infinite}.pipe text{fill:#cfe3f2;font-family:var(--display);font-size:9.5px;letter-spacing:.08em;text-anchor:middle;text-transform:uppercase}.pipe .st{fill:var(--muted);font-size:8.5px;letter-spacing:.04em;font-family:var(--mono)}
 @media (prefers-reduced-motion:reduce){ .pipe .f,.pipe .n.hot{animation:none} }
+/* 3D stage */
+html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+main{perspective:1800px;perspective-origin:50% 30%}
+.card{transform-style:preserve-3d;transform:translateY(var(--fy,0px)) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateZ(var(--tz,0px));transition:transform .6s cubic-bezier(.2,.7,.2,1);will-change:transform}
+.card:hover{--tz:14px}
+.card::before{transition:opacity .3s}.card:hover::before{opacity:1}
+/* holographic globe */
+.globe{display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:center;overflow:visible}
+.gstage{position:relative;width:170px;height:170px;transform-style:preserve-3d}
+.gstage canvas{position:absolute;inset:0;width:170px;height:170px}
+.gstage .orb{position:absolute;left:50%;top:50%;width:190px;height:190px;margin:-95px 0 0 -95px;border-radius:50%;border:1px solid rgba(25,211,255,.35);transform:rotateX(72deg) rotateZ(0deg);animation:orbit 22s linear infinite;box-shadow:0 0 12px rgba(25,211,255,.25)}
+.gstage .orb.b{width:212px;height:212px;margin:-106px 0 0 -106px;border-color:rgba(46,230,197,.25);border-style:dashed;animation-duration:36s;animation-direction:reverse;transform:rotateX(66deg) rotateY(12deg)}
+.gstage .orb i{position:absolute;top:-3px;left:50%;width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+@keyframes orbit{to{transform:rotateX(72deg) rotateZ(360deg)}}
+.gstage .core{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:var(--display);pointer-events:none}
+.gstage .core b{font-size:22px;letter-spacing:.1em;color:#fff;text-shadow:0 0 18px rgba(25,211,255,.9)}.gstage .core small{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.glegend{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:10.5px;color:var(--muted);margin-top:6px}.glegend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle}
+/* extruded (3D) gauges */
+.gauge .trk,.press .trk{transform:rotateX(28deg);transform-origin:50% 100%;box-shadow:0 6px 0 rgba(3,9,20,.9),0 8px 0 rgba(25,211,255,.18),0 14px 24px rgba(0,0,0,.45)}
+.gauge .trk i{box-shadow:0 0 12px var(--cyan),0 6px 0 rgba(255,255,255,.25)}
+.kpi>div{transform:translateZ(6px)}
+/* floor reflection under the chart */
+.chartwrap{position:relative}.chartwrap::after{content:"";position:absolute;left:4%;right:4%;bottom:-14px;height:14px;background:radial-gradient(50% 100% at 50% 0%,rgba(25,211,255,.35),transparent 70%);filter:blur(4px);pointer-events:none}
+@media (prefers-reduced-motion:reduce){ .gstage .orb{animation:none} .card{transition:none} }
 [hidden]{display:none!important}
 </style>
 </head>
@@ -170,7 +194,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:12px}
         <details class="indmore" style="position:relative"><summary class="btnx" style="list-style:none;display:inline-block">Индикаторы ▾</summary><div style="position:absolute;z-index:5;top:34px;left:0;display:flex;flex-wrap:wrap;gap:4px;padding:8px;background:rgba(6,19,39,.97);border:1px solid var(--line2);width:360px">
           <button class="btnx ind" data-ind="profile" aria-pressed="true">Профиль объёма</button><button class="btnx ind" data-ind="vol" aria-pressed="true">Объём</button><button class="btnx ind" data-ind="ema" aria-pressed="false">EMA</button><button class="btnx ind" data-ind="vwap" aria-pressed="false">VWAP</button><button class="btnx ind" data-ind="fib" aria-pressed="false">Фибо</button><button class="btnx ind" data-ind="rsi" aria-pressed="false">RSI</button><button class="btnx ind" data-ind="macd" aria-pressed="false">MACD</button></div></details>
       </div>
-      <canvas id="chart"></canvas>
+      <div class="chartwrap"><canvas id="chart"></canvas></div>
       <div class="legend"><span><b style="background:var(--teal)"></b>поддержка + тень ликвидности</span><span><b style="background:var(--red)"></b>сопротивление</span><span><b style="background:var(--cyan)"></b>прогноз: сценарий A / B</span><span><b style="background:var(--amber)"></b>▲▼ вход</span><span class="muted">справа — живой стакан, пунктир через весь график — стена крупных заявок</span></div>
     </div>
     <div class="card" id="verdictCard"><h2>Вывод CRYPTO NOVΛ <span class="r muted" id="vMeta" style="font-size:11px"></span></h2><div class="verdict" id="verdict"></div></div>
@@ -189,16 +213,8 @@ details summary{cursor:pointer;color:var(--muted);font-size:12px}
   </section>
 
   <aside class="right">
-    <div class="card hud"><svg viewBox="0 0 200 200" aria-hidden="true">
-      <circle class="ring" cx="100" cy="100" r="92" stroke-opacity=".25"/>
-      <circle class="ring r1" cx="100" cy="100" r="84" stroke-dasharray="40 18 6 18" stroke-width="2"/>
-      <circle class="ring r2" cx="100" cy="100" r="70" stroke-dasharray="3 6" stroke-opacity=".7"/>
-      <circle class="ring r3" cx="100" cy="100" r="58" stroke-dasharray="120 60" stroke-width="3" stroke="var(--teal)" stroke-opacity=".8"/>
-      <circle class="ring" cx="100" cy="100" r="46" stroke-opacity=".35"/>
-      <circle cx="100" cy="100" r="40" fill="rgba(25,211,255,.06)"/>
-      <line x1="0" y1="100" x2="200" y2="100" stroke="var(--cyan)" stroke-opacity=".15"/><line x1="100" y1="0" x2="100" y2="200" stroke="var(--cyan)" stroke-opacity=".15"/>
-      <foreignObject x="48" y="62" width="104" height="80"><div xmlns="http://www.w3.org/1999/xhtml" class="core"><b id="coreTxt">—</b><small id="coreSub">режим</small></div></foreignObject>
-    </svg><div class="rows" id="coreRows"></div></div>
+    <div class="card hud globe"><div class="gstage"><div class="orb"><i></i></div><div class="orb b"><i></i></div><canvas id="globe" aria-label="Голографическая карта рынка"></canvas><div class="core"><b id="coreTxt">—</b><small id="coreSub">режим</small></div></div>
+      <div><div class="rows" id="coreRows"></div><div class="glegend"><span><i style="background:var(--teal)"></i>бычий режим</span><span><i style="background:var(--red)"></i>медвежий</span><span><i style="background:var(--amber)"></i>сигнал / у зоны</span></div></div></div>
     <div class="card"><h2>Киты <span class="r muted" id="whMeta" style="font-size:11px"></span></h2><div id="whales" style="display:grid;gap:6px"></div>
       <div class="addw"><input id="whAddr" placeholder="0x… адрес кошелька (Hyperliquid)" autocomplete="off"><button class="btnx" id="whAdd">Следить</button><button class="btnx" id="whTop" title="Лидеры по доходности за месяц">Лидеры</button></div>
       <div class="hint">Публичные позиции на Hyperliquid (бессрочные контракты, без ключа). Кошельки на централизованных биржах не видны никому.</div></div>
@@ -258,7 +274,7 @@ async function loadKlines(sym, tf, limit){
 }
 function agg(bars,n){ const out=[]; for(let i=0;i+n<=bars.length;i+=n){ const g=bars.slice(i,i+n); out.push({t:g[0].t,o:g[0].o,h:Math.max(...g.map(x=>x.h)),l:Math.min(...g.map(x=>x.l)),c:g[g.length-1].c,v:g.reduce((a,x)=>a+x.v,0),tb:g.reduce((a,x)=>a+x.tb,0)}); } return out; }
 async function ensure(sym,tf){ K[sym]=K[sym]||{}; if(!K[sym][tf]){ if(INS[sym].prov==='twelve'&&tf==='4h'&&K[sym]['1h']) K[sym]['4h']=agg(K[sym]['1h'],4); else K[sym][tf]=await loadKlines(sym,tf,TFS[tf][1]); } return K[sym][tf]; }
-function fromSnapshot(sym){ if(!SNAP) return false; const c=SNAP.coins.find(x=>x.symbol===sym); if(!c) return false; K[sym]=K[sym]||{}; K[sym]['15m']=c.candles.map(k=>({t:k[0],o:k[1],h:k[2],l:k[3],c:k[4],v:k[5],tb:k[5]/2})); K[sym]['1d']=c.candles_1d.map(k=>({t:k[0],o:k[1],h:k[2],l:k[3],c:k[4],v:k[5],tb:k[5]/2})); K[sym]['4h']=agg(K[sym]['15m'],16); K[sym]['1h']=agg(K[sym]['15m'],4); return true; }
+function fromSnapshot(sym){ if(!SNAP) return false; const c=SNAP.coins.find(x=>x.symbol.replace('-','')===sym); if(!c||!c.candles||!c.candles.length) return false; K[sym]=K[sym]||{}; K[sym]['15m']=c.candles.map(k=>({t:k[0],o:k[1],h:k[2],l:k[3],c:k[4],v:k[5],tb:k[5]/2})); K[sym]['1d']=c.candles_1d.map(k=>({t:k[0],o:k[1],h:k[2],l:k[3],c:k[4],v:k[5],tb:k[5]/2})); K[sym]['4h']=agg(K[sym]['15m'],16); K[sym]['1h']=agg(K[sym]['15m'],4); return true; }
 async function loadMeta(sym){ if(INS[sym].prov!=='binance') return; try{ const p=await rest(`/fapi/v1/premiumIndex?symbol=${sym}`); const oi=await rest(`/fapi/v1/openInterest?symbol=${sym}`); let oih=null; try{ oih=await rest(`/futures/data/openInterestHist?symbol=${sym}&period=1h&limit=25`);}catch(e){} META[sym]={funding:+p.lastFundingRate,mark:+p.markPrice,oi:+oi.openInterest,oi24:oih&&oih.length>1?(+oih[oih.length-1].sumOpenInterest/+oih[0].sumOpenInterest-1):null}; }catch(e){} }
 
 // ---------------------------------------------------------------- math
@@ -365,7 +381,7 @@ function draw(){
   if(view.ind.fib){ const iH=vis.reduce((m,b,i)=>b.h>vis[m].h?i:m,0),iL=vis.reduce((m,b,i)=>b.l<vis[m].l?i:m,0); const h=vis[iH].h,l=vis[iL].l; const up=iL<iH; [0,.236,.382,.5,.618,.786,1].forEach(f=>{ const p=up?h-(h-l)*f:l+(h-l)*f; ctx.strokeStyle='rgba(155,123,255,.7)'; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(padL,Y(p)); ctx.lineTo(W-padR,Y(p)); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle=css('--violet'); ctx.fillText(`фибо ${(f*100).toFixed(1)}% ${fmtP(p)}`, W-padR-120, Y(p)-3); }); }
   // setup markers
   const s=(SETUPS[cur]||[])[0];
-  if(view.ind.marks&&s){ const hl=(p,col,txt,dash)=>{ ctx.strokeStyle=col; ctx.setLineDash(dash||[]); ctx.lineWidth=1.5; ctx.shadowColor=col; ctx.shadowBlur=8; ctx.beginPath(); ctx.moveTo(padL,Y(p)); ctx.lineTo(W-padR,Y(p)); ctx.stroke(); ctx.shadowBlur=0; ctx.setLineDash([]); ctx.fillStyle=col; ctx.font='bold 11px '+css('--display'); ctx.fillText(txt+' '+fmtP(p), padL+6, Y(p)+13); ctx.font='11px '+css('--mono'); };
+  if(view.ind.marks&&s){ const hl=(p,col,txt,dash)=>{ ctx.strokeStyle=col; ctx.setLineDash(dash||[]); ctx.lineWidth=1.5; ctx.shadowColor=col; ctx.shadowBlur=8; ctx.beginPath(); ctx.moveTo(padL,Y(p)); ctx.lineTo(W-padR,Y(p)); ctx.stroke(); ctx.shadowBlur=0; ctx.setLineDash([]); ctx.fillStyle=col; ctx.font='bold 11px '+css('--display'); ctx.fillText(txt+' '+fmtP(p), padL+plotW*0.36, Y(p)+13); ctx.font='11px '+css('--mono'); };
     hl(s.entry,css('--amber'),(s.dir==='LONG'?'▲ ВХОД ЛОНГ':'▼ ВХОД ШОРТ')+' · класс '+s.grade,[6,3]); hl(s.stop,css('--red'),'■ СТОП'); s.tps.slice(0,s.kind==='GAP_FADE'?1:3).forEach((tp,i)=>hl(tp,css('--lime'),'◆ ЦЕЛЬ '+(i+1),[2,2]));
     // triangle marker at the right edge
     const xr=W-padR-14, ye=Y(s.entry); ctx.fillStyle=css('--amber'); ctx.shadowColor=css('--amber'); ctx.shadowBlur=12+8*Math.sin(phase); ctx.beginPath(); if(s.dir==='LONG'){ ctx.moveTo(xr,ye+8); ctx.lineTo(xr+10,ye+8); ctx.lineTo(xr+5,ye); } else { ctx.moveTo(xr,ye-8); ctx.lineTo(xr+10,ye-8); ctx.lineTo(xr+5,ye); } ctx.closePath(); ctx.fill(); ctx.shadowBlur=0; }
@@ -545,10 +561,25 @@ async function boot(){ try{ await rest('/fapi/v1/time'); live.ok=true; }catch(e)
   if(!live.ok){ $('#led').className='led off'; $('#status').textContent='нет доступа к Binance'; $('#banner').hidden=false; $('#banner').textContent=SNAP?`Живые данные недоступны из этого окна. Показан архив на ${fmtT(SNAP.asof)}. Откройте файл cockpit.html у себя — там всё онлайн.`:'Нет данных. Откройте cockpit.html с вашего сервера.'; for(const s of UNIVERSE) fromSnapshot(s); }
   else { $('#status').textContent='загрузка…'; await ensure('BTCUSDT','1d'); BTC_BULL=regime(K.BTCUSDT['1d']).long==='BULL'; for(const s of UNIVERSE){ if(INS[s].prov!=='binance') continue; try{ await Promise.all([ensure(s,'15m'),ensure(s,'4h'),ensure(s,'1d')]); SETUPS[s]=findSetups(s); }catch(e){} renderPicks($('#search').value); }
     setInterval(async()=>{ for(const s of UNIVERSE){ if(INS[s].prov!=='binance') continue; try{ K[s]['4h']=await loadKlines(s,'4h',TFS['4h'][1]); K[s]['1d']=await loadKlines(s,'1d',TFS['1d'][1]); const before=(SETUPS[s]||[]).filter(x=>x.state==='СИГНАЛ').length; SETUPS[s]=findSetups(s); if((SETUPS[s]||[]).filter(x=>x.state==='СИГНАЛ').length>before) alert_(`Новый сигнал: ${nm(s)} ${SETUPS[s][0].dir} класс ${SETUPS[s][0].grade}`); }catch(e){} } BTC_BULL=regime(K.BTCUSDT['1d']).long==='BULL'; renderPulse(); renderSetups(); },5*60*1000); }
-  if(SNAP&&!live.ok){ const b=regime(K.BTCUSDT['1d']); BTC_BULL=b?b.long==='BULL':true; for(const s of UNIVERSE) if(K[s]&&K[s]['4h']) SETUPS[s]=findSetups(s); }
+  if(SNAP&&!live.ok&&K.BTCUSDT&&K.BTCUSDT['1d']){ const b=regime(K.BTCUSDT['1d']); BTC_BULL=b?b.long==='BULL':true; for(const s of UNIVERSE) if(K[s]&&K[s]['4h']) SETUPS[s]=findSetups(s); }
   if(TD_KEY) loadFx();
   renderPicks(); await select('BTCUSDT'); renderPulse(); renderSetups(); setInterval(renderPulse,30000); renderWhales(); $('#pipeMeta').textContent=DEC?'последний прогон '+fmtT(DEC.asof||Date.now()):'сервер отделов не подключён'; }
 document.addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT') return; if(e.key==='/'){ e.preventDefault(); $('#search').focus(); } if(e.key==='ArrowRight'||e.key==='ArrowLeft'){ const list=UNIVERSE.filter(s=>seg==='crypto'?INS[s].group==='crypto':INS[s].group!=='crypto'); const i=list.indexOf(cur); select(list[(i+(e.key==='ArrowRight'?1:list.length-1))%list.length]); } });
+// holographic globe: dotted sphere + coins as glowing markers (colour = regime, pulse = signal)
+(function globe(){ const c=$('#globe'); const x=c.getContext('2d'); const N=520; const P=[]; const g=(Math.sqrt(5)-1)/2; for(let i=0;i<N;i++){ const y=1-(i/(N-1))*2; const r=Math.sqrt(1-y*y); const th=2*Math.PI*i*g; P.push([r*Math.cos(th),y,r*Math.sin(th)]); }
+  const coins=['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','LTCUSDT','PAXGUSDT','SUIUSDT','DOTUSDT','NEARUSDT']; const CP=coins.map((s,i)=>{ const y=0.75-(i/(coins.length-1))*1.5; const r=Math.sqrt(1-y*y); const th=2*Math.PI*i*g*3.1; return {s,p:[r*Math.cos(th),y,r*Math.sin(th)]}; });
+  let ang=0; const tilt=0.38; const rot=(p,a)=>{ const [px,py,pz]=p; const x1=px*Math.cos(a)+pz*Math.sin(a), z1=-px*Math.sin(a)+pz*Math.cos(a); const y2=py*Math.cos(tilt)-z1*Math.sin(tilt), z2=py*Math.sin(tilt)+z1*Math.cos(tilt); return [x1,y2,z2]; };
+  function frame(){ const S=170*devicePixelRatio; if(c.width!==S){ c.width=c.height=S; } x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); x.clearRect(0,0,170,170); const cx=85,cy=85,R=62; ang+=0.006;
+    x.fillStyle='rgba(25,211,255,.05)'; x.beginPath(); x.arc(cx,cy,R,0,6.28); x.fill();
+    for(const p of P){ const [px,py,pz]=rot(p,ang); if(pz<-0.15) continue; const a=0.15+0.6*(pz+0.15)/1.15; x.fillStyle=`rgba(25,211,255,${a})`; x.fillRect(cx+px*R,cy-py*R,1.2,1.2); }
+    for(const k of CP){ const [px,py,pz]=rot(k.p,ang); if(pz<-0.1) continue; const d=K[k.s]&&K[k.s]['1d']; const r=d?regime(d):null; const st=(SETUPS[k.s]||[])[0]; const col=st&&(st.state==='СИГНАЛ'||st.state==='ГОТОВИТЬСЯ')?css('--amber'):r?(r.long==='BULL'?css('--teal'):css('--red')):css('--muted'); const X=cx+px*R,Y=cy-py*R; const sz=(k.s==='BTCUSDT'?3.2:2.2)*(0.6+0.5*pz); x.shadowColor=col; x.shadowBlur=8; x.fillStyle=col; x.beginPath(); x.arc(X,Y,sz,0,6.28); x.fill(); x.shadowBlur=0; if(st&&st.state!=='СЛЕДИТЬ'){ x.strokeStyle=col; x.globalAlpha=0.5+0.5*Math.sin(phase); x.beginPath(); x.arc(X,Y,sz+4+2*Math.sin(phase),0,6.28); x.stroke(); x.globalAlpha=1; } if(pz>0.35){ x.fillStyle='rgba(230,246,255,.85)'; x.font='9px '+css('--display'); x.fillText(nm(k.s),X+sz+2,Y+3); } }
+    x.strokeStyle='rgba(25,211,255,.25)'; x.beginPath(); x.arc(cx,cy,R,0,6.28); x.stroke(); }
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches) frame(); else setInterval(frame,60); })();
+// parallax tilt: cards lean toward the cursor, drift when idle
+(function tilt(){ const cards=[...document.querySelectorAll('.card')]; if(matchMedia('(prefers-reduced-motion:reduce)').matches) return; let mx=innerWidth/2,my=innerHeight/2,raf=null;
+  setInterval(()=>{ const t=performance.now()/1000; cards.forEach((c,i)=>c.style.setProperty('--fy',(Math.sin(t/(3+i%4)+i)*3.5).toFixed(2)+'px')); },90);
+  function apply(){ raf=null; for(const c of cards){ const r=c.getBoundingClientRect(); if(r.bottom<0||r.top>innerHeight) continue; const dx=(mx-(r.left+r.width/2))/innerWidth, dy=(my-(r.top+r.height/2))/innerHeight; c.style.setProperty('--ry',(dx*3).toFixed(2)+'deg'); c.style.setProperty('--rx',(-dy*3).toFixed(2)+'deg'); } }
+  addEventListener('mousemove',e=>{ mx=e.clientX; my=e.clientY; if(!raf) raf=requestAnimationFrame(apply); },{passive:true}); addEventListener('scroll',()=>{ if(!raf) raf=requestAnimationFrame(apply); },{passive:true}); })();
 (function stars(){ const c=$('#stars'); const x=c.getContext('2d'); let S=[]; function size(){ c.width=innerWidth*devicePixelRatio; c.height=innerHeight*devicePixelRatio; S=Array.from({length:Math.round(c.width*c.height/9000)},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:(Math.random()*1.3+.3)*devicePixelRatio,p:Math.random()*6.28,v:.3+Math.random()*.7})); }
   function frame(t){ x.clearRect(0,0,c.width,c.height); for(const s of S){ const a=.35+.45*Math.sin(t/1400*s.v+s.p); x.fillStyle=`rgba(${s.v>.8?'180,240,255':'220,235,255'},${a})`; x.beginPath(); x.arc(s.x,s.y,s.r,0,6.28); x.fill(); } }
   size(); addEventListener('resize',size); if(matchMedia('(prefers-reduced-motion:reduce)').matches) frame(0); else setInterval(()=>frame(performance.now()),120); })();

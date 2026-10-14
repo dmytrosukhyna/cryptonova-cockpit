@@ -57,12 +57,21 @@ jobs:
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           git pull --rebase --autostash origin main || true
           git push || true
+      - name: Publish web/ to gh-pages branch (works without any Pages setting)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web
+          force_orphan: true
       - uses: actions/configure-pages@v5
+        continue-on-error: true
       - uses: actions/upload-pages-artifact@v3
+        continue-on-error: true
         with: { path: web }
 
   deploy:
     needs: refresh
+    continue-on-error: true
     runs-on: ubuntu-latest
     environment:
       name: github-pages

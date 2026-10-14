@@ -1,6 +1,7 @@
 """Tiny executor HTTP server for the Live panel's «Исполнить» button (stdlib only).
 
   CNQ_EXEC_KEY=secret BINGX_API_KEY=... BINGX_API_SECRET=... python -m cnq.execution.server [port]
+  CNQ_VENUE=bybit BYBIT_API_KEY=... BYBIT_API_SECRET=... python -m cnq.execution.server   # Bybit demo / prop-firm account
 
 POST /execute  {symbol, side, entry, stop, targets, parts, qty, leverage, order}  header X-CNQ-Key
 → {ok, mode, ...}. CORS is open so the panel can call it from any origin (the key is the guard).
@@ -15,6 +16,9 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from .bingx_trade import BingXTrader
+from .bybit_trade import BybitTrader
+
+VENUE = os.environ.get("CNQ_VENUE", "bingx").lower()   # bingx | bybit (prop firms on Bybit, e.g. HyroTrader)
 
 KEY = os.environ.get("CNQ_EXEC_KEY", "")
 LOG = "data/executions.jsonl"
@@ -44,7 +48,8 @@ class H(BaseHTTPRequestHandler):
             for k in ("symbol", "side", "entry", "stop", "targets", "qty", "leverage"):
                 if k not in sig:
                     raise ValueError(f"missing {k}")
-            res = BingXTrader().execute_signal(sig)
+            venue = (sig.get("venue") or VENUE).lower()
+            res = (BybitTrader() if venue == "bybit" else BingXTrader()).execute_signal(sig)
         except Exception as e:  # noqa: BLE001
             res = {"ok": False, "error": str(e)}
         os.makedirs("data", exist_ok=True)
@@ -58,6 +63,6 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8787
-    mode = "LIVE" if os.environ.get("CNQ_LIVE_TRADING", "no").lower() == "yes" else "VST-DEMO"
-    print(f"executor on :{port}  mode={mode}  key={'set' if KEY else 'NONE (open!)'}")
+    mode = "LIVE" if os.environ.get("CNQ_LIVE_TRADING", "no").lower() == "yes" else "DEMO"
+    print(f"executor on :{port}  venue={VENUE}  mode={mode}  key={'set' if KEY else 'NONE (open!)'}")
     HTTPServer(("0.0.0.0", port), H).serve_forever()

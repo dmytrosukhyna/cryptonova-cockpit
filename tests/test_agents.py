@@ -81,3 +81,12 @@ def test_executor_rejects_bad_key_and_missing_fields():
     code, res = post({"symbol": "BTC-USDT"}, "s3cret")
     assert code == 400 and "missing" in res["error"]
     httpd.shutdown()
+
+
+def test_bybit_signing_and_rounding():
+    from cnq.execution.bybit_trade import BybitTrader
+    t = BybitTrader(api_key="k", secret="s", live=False)
+    assert t.mode == "BYBIT-DEMO" and t.base.startswith("https://api-demo")
+    import hashlib, hmac
+    assert t.sign("1700000000000", '{"a":1}') == hmac.new(b"s", b'1700000000000k5000{"a":1}', hashlib.sha256).hexdigest()
+    assert t._round_step(0.12345, 0.001) == 0.123 and t._round_step(81917.37, 0.1) == 81917.4

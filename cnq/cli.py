@@ -29,7 +29,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -141,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
         from .fx.gaps import run as fx_run
         res = fx_run(send=args.send)
         print(f"{len(res)} gap signals")
-    elif args.cmd in ("terminal", "brief", "alerts", "agents"):
+    elif args.cmd in ("terminal", "brief", "alerts", "agents", "paper"):
         import os
         from .terminal.report import build_report, write_report
         from .terminal import notify
@@ -158,6 +158,13 @@ def main(argv: list[str] | None = None) -> int:
         write_report(rep, os.path.join(args.out, "terminal.json"))
         if args.cmd == "terminal":
             print(f"written {args.out}/terminal.json: {len(rep['coins'])} coins, {len(rep['events'])} events")
+        elif args.cmd == "paper":
+            import sqlite3
+            from .agents import paper_desk
+            conn = sqlite3.connect("data/agents.sqlite")
+            res = paper_desk.run(conn, rep)
+            write_report(res, os.path.join(args.out, "paper.json"))
+            print(f"paper.json: equity={res['equity']} open={len(res['open'])} pending={len(res['pending'])} closed={res['stats']['trades']} events={res['events'][:3]}")
         elif args.cmd == "agents":
             from .agents.orchestrator import Orchestrator
             orc = Orchestrator(db_path="data/agents.sqlite")

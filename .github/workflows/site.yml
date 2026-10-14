@@ -39,6 +39,9 @@ jobs:
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
           CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
         run: python -m cnq.cli agents --out web
+      - name: Paper desk ($10k demo futures account) → web/paper.json
+        continue-on-error: true
+        run: python -m cnq.cli paper --out web
       - name: Spot portfolio department → web/portfolio.json
         continue-on-error: true
         env:
@@ -57,7 +60,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          git add web/terminal.json web/decision.json web/portfolio.json data/agents.sqlite 2>/dev/null || true
+          git add web/terminal.json web/decision.json web/portfolio.json web/paper.json data/agents.sqlite 2>/dev/null || true
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           git pull --rebase --autostash origin main || true
           git push || true

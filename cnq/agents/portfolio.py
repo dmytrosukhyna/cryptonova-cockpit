@@ -158,7 +158,7 @@ def picks(rows: list[dict], n: int = 8) -> dict[str, list[dict]]:
     for h in HORIZONS:
         pool = [r for r in rows if r["symbol"] not in CORE]
         if h == "mid":
-            pool = [r for r in pool if r["mcap"] >= 3e8]
+            pool = [r for r in pool if r["mcap"] >= 3e8 and (r.get("age_days") is None or r["age_days"] >= 180)]
         if h == "long":
             pool = [r for r in pool if r["mcap"] >= 1e9]
         pool.sort(key=lambda r: -r["score"][h])

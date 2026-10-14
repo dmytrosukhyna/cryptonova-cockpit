@@ -29,7 +29,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -115,6 +115,28 @@ def main(argv: list[str] | None = None) -> int:
                     print("  ", r)
                     if i >= 2:
                         break
+    elif args.cmd == "portfolio":
+        import os
+        import sqlite3
+        from .agents import portfolio as pf
+        from .agents.llm import LLM
+        from .terminal.report import write_report
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/agents.sqlite")
+        btc_bull = None
+        try:
+            from .terminal.report import build_report
+            cs = store.candles("BTC-USDT", "15m")
+            if len(cs) >= 96 * 60:
+                btc_bull = build_report({"BTC-USDT": cs})["coins"][0]["regime"]["long"] == "BULL"
+        except Exception:  # noqa: BLE001
+            pass
+        llm = LLM()
+        res = pf.run(conn, btc_bull=btc_bull, llm=llm if llm.available() else None)
+        os.makedirs(args.out, exist_ok=True)
+        write_report(res, os.path.join(args.out, "portfolio.json"))
+        print(f"portfolio.json: available={res.get('available')} universe={res.get('universe')} hl={res.get('hyperliquid')} "
+              f"positions={len(res.get('portfolio', {}).get('positions', []))} actions={len(res.get('portfolio', {}).get('actions', []))} note={res.get('note_source')}")
     elif args.cmd == "fx-gaps":
         from .fx.gaps import run as fx_run
         res = fx_run(send=args.send)

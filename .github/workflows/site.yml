@@ -41,6 +41,12 @@ jobs:
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
           CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
         run: python -m cnq.cli agents --out web
+      - name: Spot portfolio department → web/portfolio.json
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
+        run: python -m cnq.cli portfolio --out web
       - name: Monday gaps (FX, class A)
         if: github.event.schedule == '5 22 * * 0'
         continue-on-error: true
@@ -53,7 +59,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          git add web/terminal.json web/decision.json data/agents.sqlite 2>/dev/null || true
+          git add web/terminal.json web/decision.json web/portfolio.json data/agents.sqlite 2>/dev/null || true
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           git pull --rebase --autostash origin main || true
           git push || true

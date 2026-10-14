@@ -2,7 +2,7 @@
 import sys, traceback, importlib, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 ok = fail = 0
-for mod in ("test_all", "test_agents"):
+for mod in ("test_all", "test_agents", "test_portfolio"):
   m = importlib.import_module(mod)
   for name in sorted(n for n in dir(m) if n.startswith("test_")):
     try:

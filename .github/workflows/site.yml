@@ -22,12 +22,16 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install numpy
-      - name: Restore candle store
+      - name: Restore candle store and department state
         uses: actions/cache@v4
         with:
-          path: data/cnq.sqlite
-          key: cnq-db-${{ github.run_id }}
-          restore-keys: cnq-db-
+          path: |
+            data/cnq.sqlite
+            data/agents.sqlite
+          key: cnq-state-${{ github.run_id }}
+          restore-keys: |
+            cnq-state-
+            cnq-db-
       - name: Candles (BingX, 15m, 400 days)
         continue-on-error: true
         run: python scripts/ci_refresh.py
@@ -56,14 +60,16 @@ jobs:
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
           CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
         run: python -m cnq.cli fx-gaps --send
-      - name: Commit refreshed data
+      - name: Status file for the panel
+        run: python scripts/ci_status.py
+      - name: Commit refreshed data (state also survives in the cache)
+        continue-on-error: true
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          git add web/terminal.json web/decision.json web/portfolio.json web/paper.json data/agents.sqlite 2>/dev/null || true
+          git add web/terminal.json web/decision.json web/portfolio.json web/paper.json web/status.json data/agents.sqlite 2>/dev/null || true
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
-          git pull --rebase --autostash origin main || true
-          git push || true
+          for i in 1 2 3; do git fetch origin main && git rebase origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done
       - name: Publish web/ to gh-pages branch (works without any Pages setting)
         uses: peaceiris/actions-gh-pages@v4
         with:

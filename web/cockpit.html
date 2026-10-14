@@ -421,9 +421,9 @@ function spikeText(b,a,sup,res){ const rng=b.h-b.l; if(rng<=0) return null; cons
   if(nearR&&delta>=0&&b.c>=b.o) return {up:true,zone:true,txt:'покупатели у сопротивления — ждём пробой или отбой'}; if(nearS&&delta<0&&b.c<b.o) return {up:false,zone:true,txt:'продавцы у поддержки — риск пробоя'};
   return {up:delta>=0,zone:false,txt:''}; }
 // spot buy/sell marks (daily rules of the portfolio consultant, drawn on any timeframe)
-function spotMarks(sym){ const d=K[sym]&&K[sym]['1d']; if(!d||d.length<230) return {marks:[],now:null}; const c=d.map(x=>x.c); const out=[]; let lastB=null; let inPos=false;
+function spotMarks(sym){ const d=K[sym]&&K[sym]['1d']; if(!d||d.length<60) return {marks:[],now:null}; const c=d.map(x=>x.c); const out=[]; let lastB=null; let inPos=false;
   const sma=i=>c.slice(Math.max(0,i-199),i+1).reduce((a,x)=>a+x,0)/Math.min(200,i+1);
-  for(let i=210;i<d.length;i++){ const hh=Math.max(...d.slice(i-20,i).map(x=>x.h)), ll=Math.min(...d.slice(i-20,i).map(x=>x.l)); const bull=c[i]>sma(i); const r5=c[i]/c[i-5]-1;
+  for(let i=Math.max(25,d.length-260);i<d.length;i++){ const hh=Math.max(...d.slice(i-20,i).map(x=>x.h)), ll=Math.min(...d.slice(i-20,i).map(x=>x.l)); const bull=c[i]>sma(i); const r5=c[i]/c[i-5]-1;
     if(!inPos&&bull&&c[i]>hh){ out.push({t:d[i].t,k:'B',p:c[i],why:`закрытие дня выше максимума 20 дней (${fmtP(hh)}) при цене выше средней за 200 дней — тренд подтверждён`}); lastB=c[i]; inPos=true; continue; }
     if(inPos){ const ret=c[i]/lastB-1; if(c[i]<ll){ out.push({t:d[i].t,k:'S',p:c[i],why:`закрытие дня ниже минимума 20 дней (${fmtP(ll)}) — тренд сломан, выходим (${(ret*100).toFixed(0)}% от покупки)`}); inPos=false; }
       else if(ret>=0.4&&r5<0){ out.push({t:d[i].t,k:'S',p:c[i],why:`+${(ret*100).toFixed(0)}% от покупки и импульс угас — фиксируем половину, стоп на вход`}); lastB=c[i]*0.999; }

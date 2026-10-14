@@ -132,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:  # noqa: BLE001
             pass
         llm = LLM()
-        res = pf.run(conn, btc_bull=btc_bull, llm=llm if llm.available() else None)
+        res = pf.run(conn, btc_bull=btc_bull, llm=llm if llm.available else None)
         os.makedirs(args.out, exist_ok=True)
         write_report(res, os.path.join(args.out, "portfolio.json"))
         print(f"portfolio.json: available={res.get('available')} universe={res.get('universe')} hl={res.get('hyperliquid')} "

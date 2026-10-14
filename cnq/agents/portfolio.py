@@ -304,7 +304,7 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
     state = SpotPortfolio(conn).step(rows, pk, btc_bull, now)
     note = market_note(btc_bull, btc, pk, state)
     llm_note = ""
-    if llm is not None and getattr(llm, "available", lambda: False)():
+    if llm is not None and bool(getattr(llm, "available", False)):
         try:
             llm_note = llm.complete(PORTFOLIO_SYSTEM, json.dumps({"btc_bull": btc_bull, "btc": btc, "picks": {h: pk[h][:5] for h in HORIZONS},
                                                                   "portfolio": {k: state[k] for k in ("positions", "cash_pct", "invested_pct", "index", "actions")}},

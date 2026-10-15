@@ -109,3 +109,24 @@ for cs in (0.08, 0.12):
         if r is not None: bd[dt.datetime.utcfromtimestamp(times[i] / 1000).strftime('%Y-%m-%d')].append(r)
     dr = np.array([np.mean(v) for v in bd.values()]) * 100
     print(f"catastrophe stop {cs*100:.0f}%: days={len(dr)} avg={dr.mean():+.2f}% WR={(dr>0).mean()*100:.0f}% worst day={dr.min():+.1f}%")
+
+# ---- robustness grid (python scripts/exhaustion_long.py --grid): drop / volume / breadth / hold, day-baskets ----
+if '--grid' in sys.argv:
+    def grid(drop, vol, bth, hold):
+        bd = collections.defaultdict(list)
+        for k in range(len(syms)):
+            d_ = C[k, 1:] / O[k, 1:] - 1
+            for i in np.where((d_ <= drop) & (V[k, 1:] >= vol * VAVG[k, 1:]) & (breadth[1:] >= bth))[0] + 1:
+                if i < 200 or i > T - 200: continue
+                r = trade(k, i, O[k, i + 1] * 0.88, None, hold)
+                if r is not None: bd[dt.datetime.utcfromtimestamp(times[i] / 1000).strftime('%Y-%m-%d')].append(r)
+        dr = np.array([np.mean(v) for v in bd.values()]) * 100 if bd else np.array([0.0])
+        oos = np.array([np.mean(v) for d, v in bd.items() if d >= '2024-09']) * 100 if bd else np.array([0.0])
+        return len(dr), dr.mean(), (dr > 0).mean() * 100, dr.min(), oos.mean() if len(oos) else float('nan')
+    print("\nGRID (catastrophe stop 12%, day-baskets): drop vol breadth hold → days avg WR worst OOS(2024-09→)")
+    for drop in (-0.01, -0.015, -0.02):
+        for vol in (2.0, 3.0, 4.0):
+            for bth in (0.6, 0.7, 0.8):
+                for hold in (48, 96, 144):
+                    n, a, w, mn, o = grid(drop, vol, bth, hold)
+                    print(f"{drop:+.3f} {vol:.0f}x {bth:.1f} {hold//4:3d}h → days={n:4d} avg={a:+.2f}% WR={w:3.0f}% worst={mn:+.1f}% OOS={o:+.2f}%")

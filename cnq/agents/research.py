@@ -210,7 +210,10 @@ class Research:
                 continue
             j = _get(f"{CG}/coins/{m['id']}?localization=false&tickers=false&market_data=false&community_data=true&developer_data=true&sparkline=false")
             if not j:
-                time.sleep(2.0)
+                fails = locals().get("fails", 0) + 1
+                time.sleep(12.0)
+                if fails >= 2:      # rate-limited: stop for this run, the next run continues the rotation
+                    break
                 continue
             gd = j.get("genesis_date")
             age = None
@@ -229,7 +232,7 @@ class Research:
             self.conn.execute("INSERT OR REPLACE INTO coin_cards VALUES(?,?,?,?)", (m["id"], m["symbol"], now, json.dumps(det, ensure_ascii=False)))
             self.conn.commit()
             n += 1
-            time.sleep(2.5)
+            time.sleep(7.0)
         return n
 
 

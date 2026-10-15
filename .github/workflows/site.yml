@@ -67,6 +67,15 @@ jobs:
       - name: Forecast calibration (A/B записывается и проверяется) → web/calibration.json
         continue-on-error: true
         run: python -m cnq.cli calibrate --out web
+      - name: Channel editor → @crypto_nova_news (morning / midday / evening, Kyiv time)
+        continue-on-error: true
+        env:
+          CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}
+          CNQ_LLM_PROVIDER: ${{ vars.CNQ_LLM_PROVIDER }}
+          CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
+          CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
+          CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
+        run: python -m cnq.cli channel --out web --send
       - name: Weekly review (Fridays; first run writes one so the panel is not empty) → web/weekly.json
         continue-on-error: true
         env:

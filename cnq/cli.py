@@ -29,7 +29,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -45,6 +45,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default="web")
     ap.add_argument("--force", action="store_true", help="weekly: rebuild and send even if it is not Friday")
     ap.add_argument("--send", action="store_true")
+    ap.add_argument("--slot", help="channel: morning|midday|evening|intro (default: by Kyiv time)")
+    ap.add_argument("--print", action="store_true", help="channel: print the post instead of sending")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     cfg = Config()
@@ -157,6 +159,20 @@ def main(argv: list[str] | None = None) -> int:
         d = whales.run(conn)
         write_report(d, os.path.join(args.out, "whales.json"))
         print(f"whales.json: available={d.get('available')} whales={len(d.get('whales', []))} coins={len(d.get('coins', []))} changes={len(d.get('changes', []))} bias={(d.get('summary') or {}).get('bias')}")
+    elif args.cmd == "channel":
+        import os, sqlite3
+        from .agents.channel import Channel, kyiv_now
+        from .agents.llm import LLM
+        from .terminal import notify
+        conn = sqlite3.connect("data/agents.sqlite")
+        ch = Channel(conn, args.out)
+        llm = LLM(); llm = llm if llm.available else None
+        if args.print:
+            print(ch.post(args.slot or "morning")); return 0
+        send = notify.send if args.send else (lambda t: (print(t), True)[1])
+        send_html = (lambda t: notify.send(t, parse_mode="HTML")) if args.send else send
+        res = ch.run(send_html, llm=llm, force_slot=args.slot)
+        print(f"channel: slot={res.get('slot')} sent={res.get('sent')} {res.get('why', '')} kyiv={kyiv_now():%H:%M}")
     elif args.cmd == "fx-gaps":
         from .fx.gaps import run as fx_run
         res = fx_run(send=args.send)

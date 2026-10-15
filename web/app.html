@@ -213,7 +213,7 @@ body.locked>*:not(#gate):not(#stars):not(#grid):not(#boot){filter:blur(6px);poin
 #briefWin{position:fixed;z-index:60;right:28px;top:84px;width:min(520px,92vw);background:linear-gradient(180deg,rgba(12,22,40,.96),rgba(8,14,27,.96));border:1px solid rgba(124,196,255,.35);border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 60px rgba(124,196,255,.12);backdrop-filter:blur(14px);transform:translateX(120%) rotateY(-12deg);opacity:0;transition:transform .8s cubic-bezier(.2,.8,.2,1),opacity .6s;transform-origin:100% 50%}
 #briefWin.in{transform:none;opacity:1}#briefWin[hidden]{display:none}
 #briefWin .bh{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}#briefWin .bh b{letter-spacing:.14em;font-size:12px;text-transform:uppercase}#briefWin .bh .lamp{margin-left:auto}
-#briefWin .orb{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#7cc4ff 50%,rgba(124,196,255,.15));box-shadow:0 0 20px rgba(124,196,255,.7);animation:bcore 1.8s ease-in-out infinite;flex:none}
+#briefWin .orbcv{width:76px;height:76px;flex:none;margin:-16px -6px -16px -10px}.chat .orbcv{width:44px;height:44px;flex:none;margin:-8px 0 -8px -6px}#briefWin.in .bh{animation:bhglow 2.4s ease-in-out infinite}@keyframes bhglow{0%,100%{box-shadow:inset 0 -1px 0 rgba(124,196,255,.15)}50%{box-shadow:inset 0 -1px 0 rgba(124,196,255,.6)}}#briefWin{perspective:900px}#briefWin.in{animation:winfloat 6s ease-in-out infinite 1s}@keyframes winfloat{0%,100%{transform:translateY(0) rotateY(0)}50%{transform:translateY(-4px) rotateY(-1.5deg)}}
 #briefWin .bt{padding:14px 16px;font-size:14px;line-height:1.55;min-height:120px;max-height:46vh;overflow:auto;color:#dfeaf7}#briefWin .bt .cur{display:inline-block;width:8px;height:15px;background:#7cc4ff;vertical-align:-2px;animation:blink 1s infinite;margin-left:2px}
 #briefWin .ba{display:flex;gap:8px;padding:10px 14px 14px;flex-wrap:wrap}
 /* onboarding tour */
@@ -267,7 +267,7 @@ body.locked>*:not(#gate):not(#stars):not(#grid):not(#boot){filter:blur(6px);poin
 </defs></svg>
 <canvas id="stars" aria-hidden="true"></canvas><div id="grid" aria-hidden="true"></div>
 <div id="boot"><div class="bgrid"></div><div class="bscan"></div><div class="bwrap"><div class="blogo">CRYPTO NOVA<small>ЗАКРЫТАЯ СИСТЕМА УПРАВЛЕНИЯ</small></div><div class="bring"><i></i><i></i><i></i><b></b></div><div class="bsteps" id="bsteps"></div><div class="bbar"><i id="bbar"></i></div><div class="muted" id="bmsg" style="font-size:11px;letter-spacing:.14em"></div></div><div class="bskip" id="bskip">ПРОПУСТИТЬ ›</div></div>
-<div id="briefWin" hidden><div class="bh"><div class="orb"></div><b>Ассистент · доклад</b><span class="lamp"></span></div><div class="bt" id="briefTxt"></div><div class="ba"><button class="ib" id="briefOk">Понял, к работе</button><button class="ib" id="briefTour">Показать, как всё устроено</button><button class="ib sm" id="briefAsk">Спросить</button><button class="ib sm" id="briefMute" title="Остановить голос">тихо</button></div></div>
+<div id="briefWin" hidden><div class="bh"><canvas class="orbcv" id="briefOrb" width="64" height="64"></canvas><b>Ассистент · доклад</b><span class="lamp"></span></div><div class="bt" id="briefTxt"></div><div class="ba"><button class="ib" id="briefOk">Понял, к работе</button><button class="ib" id="briefTour">Показать, как всё устроено</button><button class="ib sm" id="briefAsk">Спросить</button><button class="ib sm" id="briefMute" title="Остановить голос">тихо</button></div></div>
 <div id="tourHole" hidden></div><div id="tourBox" hidden><div class="ts" id="tourStep"></div><div class="tp"><i id="tourProg"></i></div><h4 id="tourTitle"></h4><p id="tourText"></p><div class="ta"><button class="ib sm" id="tourPrev">← Назад</button><button class="ib sm" id="tourNext">Далее →</button><span class="sp"></span><button class="ib sm" id="tourAsk">Спросить ассистента</button><button class="ib sm" id="tourEnd">Завершить</button></div></div>
 <header class="top">
   <div class="logo">CRYPTO NOVA</div>
@@ -350,7 +350,7 @@ body.locked>*:not(#gate):not(#stars):not(#grid):not(#boot){filter:blur(6px);poin
 <div class="overlay" id="radarOv" hidden><div class="ohead"><button class="ib" id="radarClose">← Назад</button><b>Радар зон</b></div><canvas id="radar2" style="display:block;width:min(80vh,900px);aspect-ratio:1;margin:0 auto"></canvas></div>
 
 <button class="analyst" id="analystBtn" title="Аналитик CRYPTO NOVA — спросить (можно перетащить)"><i class="ring2"></i><svg class="ico"><use href="#i-robot"/></svg><span>NOVA AI</span></button>
-<div class="chat" id="chat"><div class="h">Аналитик CRYPTO NOVΛ <small id="chatMode"></small><button class="ib sm" id="chatClose">✕</button></div><div class="m" id="chatMsgs"></div><div class="q" id="chatQ"></div><form id="chatForm"><input id="chatIn" placeholder="Спросите: что по SOL? где покупать? что с рынком?" autocomplete="off"><button class="ib">→</button></form></div>
+<div class="chat" id="chat"><div class="h"><canvas class="orbcv" id="chatOrb" width="64" height="64"></canvas>Аналитик CRYPTO NOVΛ <small id="chatMode"></small><button class="ib sm" id="chatClose">✕</button></div><div class="m" id="chatMsgs"></div><div class="q" id="chatQ"></div><form id="chatForm"><input id="chatIn" placeholder="Спросите: что по SOL? где покупать? что с рынком?" autocomplete="off"><button class="ib">→</button></form></div>
 <div class="toasts" id="toasts"></div>
 <script>
 (async function(){
@@ -1280,6 +1280,23 @@ let typing=null; function typeInto(el,text,speed){ if(typing) clearInterval(typi
 function briefWindow(text){ const w=$('#briefWin'); if(!w) return; w.hidden=false; requestAnimationFrame(()=>requestAnimationFrame(()=>w.classList.add('in'))); setTimeout(()=>typeInto($('#briefTxt'),text,22),700); const m=$('#chatMsgs'); if(m&&![...m.children].some(x=>x.textContent===text)){ const a=document.createElement('div'); a.className='a'; a.textContent=text; m.appendChild(a); } }
 function briefClose(){ const w=$('#briefWin'); if(!w) return; w.classList.remove('in'); setTimeout(()=>{ w.hidden=true; },700); if(typing){ clearInterval(typing); typing=null; } }
 (function briefInit(){ const ok=$('#briefOk'); if(!ok) return; ok.addEventListener('click',()=>{ briefClose(); if(!TOUR.done&&TOUR.step===0) setTimeout(()=>toast('Обучение можно запустить в любой момент — кнопка «?» в шапке.'),600); }); $('#briefTour').addEventListener('click',()=>{ briefClose(); setTimeout(()=>tourStart(0),500); }); $('#briefAsk').addEventListener('click',()=>{ briefClose(); $('#chat').classList.add('open'); chatMode(); $('#chatIn').focus(); }); $('#briefMute').addEventListener('click',()=>{ try{ speechSynthesis.cancel(); }catch(e){} }); })();
+
+// ---------------------------------------------------------------- assistant orb: a living core with orbiting spheres; it speeds up while the assistant speaks or types
+function orbRun(c){ if(!c) return; const g=c.getContext('2d'); let t=0; const S=Array.from({length:7},(_,i)=>({a:i*0.9,r:0.62+0.3*Math.sin(i*2.1),sp:0.9+i*0.17,tilt:0.5+i*0.4,sz:1.2+(i%3)*0.6}));
+  function f(){ if(c.offsetParent===null){ setTimeout(f,400); return; } const W=64,H=64,cx=32,cy=32; const busy=(typing!=null)||(typeof speaking!=='undefined'&&speaking)||(('speechSynthesis' in window)&&speechSynthesis.speaking); t+=busy?0.05:0.016; g.clearRect(0,0,W,H);
+    const R=9+1.2*Math.sin(t*2)+(busy?1.5*Math.abs(Math.sin(t*7)):0);
+    const haze=g.createRadialGradient(cx,cy,R*0.4,cx,cy,30); haze.addColorStop(0,'rgba(124,196,255,.35)'); haze.addColorStop(1,'rgba(124,196,255,0)'); g.fillStyle=haze; g.fillRect(0,0,W,H);
+    // back spheres
+    const pts=S.map(s=>{ const a=s.a+t*s.sp; const x=Math.cos(a)*22*s.r, z=Math.sin(a)*22*s.r; const y=z*Math.sin(s.tilt)*0.6; return {x:cx+x,y:cy+y,z:Math.cos(s.tilt)*z,sz:s.sz}; });
+    const draw=p=>{ const k=(p.z+22)/44; g.fillStyle=`rgba(${k>0.5?'234,246,255':'124,196,255'},${0.35+0.6*k})`; g.shadowColor='rgba(124,196,255,.9)'; g.shadowBlur=4+6*k; g.beginPath(); g.arc(p.x,p.y,p.sz*(0.6+0.8*k),0,6.28); g.fill(); g.shadowBlur=0; };
+    pts.filter(p=>p.z<0).forEach(draw);
+    const cg=g.createRadialGradient(cx-3,cy-3,1,cx,cy,R); cg.addColorStop(0,'#fff'); cg.addColorStop(0.45,'#9ed3ff'); cg.addColorStop(1,'rgba(124,196,255,.25)'); g.fillStyle=cg; g.shadowColor='#7cc4ff'; g.shadowBlur=14+(busy?8:0); g.beginPath(); g.arc(cx,cy,R,0,6.28); g.fill(); g.shadowBlur=0;
+    // two thin rotating rings
+    for(let i=0;i<2;i++){ g.strokeStyle=`rgba(234,246,255,${0.35+0.2*i})`; g.lineWidth=0.8; g.beginPath(); g.ellipse(cx,cy,19+i*5,(19+i*5)*Math.abs(Math.sin(t*(0.7+i*0.4)+i)),t*(0.5-i*0.3),0,6.28); g.stroke(); }
+    pts.filter(p=>p.z>=0).forEach(draw);
+    requestAnimationFrame(f); }
+  f(); }
+orbRun($('#briefOrb')); orbRun($('#chatOrb'));
 // ---------------------------------------------------------------- onboarding tour: dims everything, cuts a window around the element, explains, can be finished, resumed, or asked about
 const TOUR={step:+load('cnq_tour_step','0')||0,done:!!load('cnq_tour_done',''),on:false};
 const TOUR_STEPS=[

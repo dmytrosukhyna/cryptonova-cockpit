@@ -194,6 +194,12 @@ body.locked>*:not(#gate):not(#stars):not(#grid):not(#boot){filter:blur(6px);poin
 @keyframes blogo{from{opacity:0;letter-spacing:.9em;filter:blur(8px)}to{opacity:1;letter-spacing:.36em;filter:blur(0)}}
 #boot .bring{width:150px;height:150px;margin:26px auto 22px;position:relative;transform-style:preserve-3d;perspective:600px}
 #boot .bring i{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(124,196,255,.55);box-shadow:0 0 18px rgba(124,196,255,.25) inset,0 0 14px rgba(124,196,255,.2)}
+#boot .bring{animation:bspin 14s linear infinite}@keyframes bspin{to{transform:rotate(360deg)}}
+#boot .bring i::after{content:"";position:absolute;top:-4px;left:calc(50% - 4px);width:8px;height:8px;border-radius:50%;background:#eaf6ff;box-shadow:0 0 12px #7cc4ff,0 0 4px #fff}
+#boot .bring i:nth-child(2)::after{background:#b9f3d2;box-shadow:0 0 12px #6fcf97}
+body.locked #boot{place-items:start center;padding-top:6vh}body.locked #boot .bsteps,body.locked #boot .bbar,body.locked #boot #bmsg,body.locked #boot .bskip{display:none}
+body.locked #boot .bring{width:190px;height:190px;margin:34px auto 0}
+#boot:not([hidden]) ~ #gate .gatelogo{display:none}
 #boot .bring i:nth-child(1){animation:r1 3.2s linear infinite}#boot .bring i:nth-child(2){animation:r2 4.1s linear infinite;border-color:rgba(111,207,151,.5)}#boot .bring i:nth-child(3){animation:r3 5s linear infinite;border-color:rgba(234,246,255,.45)}
 #boot .bring b{position:absolute;inset:38%;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#7cc4ff 45%,rgba(124,196,255,.2));box-shadow:0 0 40px rgba(124,196,255,.8);animation:bcore 1.6s ease-in-out infinite}
 @keyframes r1{from{transform:rotateX(70deg) rotateZ(0)}to{transform:rotateX(70deg) rotateZ(360deg)}}@keyframes r2{from{transform:rotateY(70deg) rotateZ(0)}to{transform:rotateY(70deg) rotateZ(-360deg)}}@keyframes r3{from{transform:rotate3d(1,1,0,60deg) rotateZ(0)}to{transform:rotate3d(1,1,0,60deg) rotateZ(360deg)}}

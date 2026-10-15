@@ -40,7 +40,7 @@ def test_channel_templates_slots_and_guard():
     r3 = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=15))
     assert not r3["sent"] and r3["why"] == "nothing worth posting"                    # the only strong news is used up
     ev = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=20))
-    assert ev["sent"] and "Итоги дня" in sent[-1] and "утром ставили сценарий A (78%)" in sent[-1]
+    assert ev["sent"] and "Итоги дня" in sent[-1] and "Утром ставили сценарий A (78%)" in sent[-1]
     # number guard: an invented figure is rejected, faithful text passes
     facts = ch.facts(ch.ctx(), now)
     assert not ch.guard("<b>Рынок:</b> биткоин $80 984, а завтра будет 95 000. " + "x" * 200, facts)

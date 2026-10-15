@@ -128,3 +128,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./web
           force_orphan: true
+          cname: cryptonova.vip

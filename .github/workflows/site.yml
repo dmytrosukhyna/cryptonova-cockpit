@@ -79,6 +79,9 @@ jobs:
         run: python -m cnq.cli fx-gaps --send
       - name: Version stamp (panel shows build time; offers reload when a new build is published)
         run: python scripts/ci_version.py
+      - name: Order-book snapshots (BingX) → web/books.json
+        continue-on-error: true
+        run: python scripts/ci_books.py
       - name: Status file for the panel
         run: python scripts/ci_status.py
       - name: Commit refreshed data (state also survives in the cache)
@@ -86,7 +89,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/weekly.json web/calibration.json web/markets.json web/research.json web/whales.json web/version.json web/status.json data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/weekly.json web/calibration.json web/markets.json web/research.json web/whales.json web/books.json web/version.json web/status.json data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done

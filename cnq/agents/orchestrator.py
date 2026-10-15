@@ -71,7 +71,8 @@ class Orchestrator:
         decision = {"time": now_ms, "asof": report["asof"], "portfolio": report.get("portfolio"),
                     "coins": [{k: c[k] for k in ("symbol", "price", "chg24", "regime", "levels", "setups", "derivatives", "brief")} for c in report["coins"]],
                     "news": {"items": recent[:25], "impacts": all_impacts, "calibration": calibration,
-                             "available": bool(recent), "llm": self.llm.model},
+                             "available": bool(recent), "llm": self.llm.model, "llm_error": getattr(self.llm, "last_error", None),
+                             "fresh": len(fresh), "analyzed": len(impacts)},
                     "fundamentals": fundamentals, "risk": risk}
         post = self._edit(decision)
         decision["post"] = post or market_brief(report["coins"], report["asof"], report.get("portfolio"))
@@ -96,6 +97,7 @@ class Orchestrator:
                          "denied": [v["symbol"] for v in decision["risk"]["verdicts"] if not v["allow_long"]]}}
         try:
             txt = self.llm.complete(EDITOR_SYSTEM, json.dumps(slim, ensure_ascii=False, default=str))
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            decision["post_error"] = str(e)[:300]
             return ""
         return txt.strip() if txt and len(txt.strip()) > 200 else ""

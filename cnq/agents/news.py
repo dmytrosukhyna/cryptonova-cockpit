@@ -118,7 +118,7 @@ class NewsAnalyst:
         if not items:
             return []
         # token diet for free tiers: 25 items, summaries trimmed to 280 chars
-        payload = [{k: ((it[k][:280] if k == "summary" and isinstance(it[k], str) else it[k])) for k in ("id", "source", "title", "summary", "published", "assets_hint")} for it in items[:25]]
+        payload = [{k: ((it[k][:280] if k == "summary" and isinstance(it[k], str) else it[k])) for k in ("id", "source", "title", "summary", "published", "assets_hint")} for it in items[:15]]
         res = self.llm.json(NEWS_SYSTEM, json.dumps(payload, ensure_ascii=False))
         if not isinstance(res, list):
             return []

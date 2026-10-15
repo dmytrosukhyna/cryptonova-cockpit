@@ -234,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
             orc = Orchestrator(db_path="data/agents.sqlite")
             d = orc.run(rep)
             write_report(d, os.path.join(args.out, "decision.json"))
-            print(f"decision.json: llm={d['news']['llm']} news={len(d['news']['items'])} impacts={len(d['news']['impacts'])} "
+            print(f"decision.json: llm={d['news']['llm']} fresh={d['news'].get('fresh')} analyzed={d['news'].get('analyzed')} llm_error={d['news'].get('llm_error')} post_error={d.get('post_error')} news={len(d['news']['items'])} impacts={len(d['news']['impacts'])} "
                   f"blackout={d['risk']['blackout_assets']} post={d['post_source']} ({len(d['post'])} chars)")
             if args.send:
                 print("sent" if notify.send(d["post"]) else "not sent (CNQ_TG_TOKEN/CNQ_TG_CHAT missing?)")

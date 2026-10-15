@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.error
 import urllib.request
 
 PROVIDERS = {
@@ -29,6 +30,7 @@ class LLM:
         self.key = api_key or os.environ.get("CNQ_LLM_KEY") or (os.environ.get("ANTHROPIC_API_KEY") if self.provider == "anthropic" else None)
         self.max_tokens = max_tokens
         self.calls = 0
+        self.last_error = None
 
     @property
     def available(self) -> bool:
@@ -47,8 +49,18 @@ class LLM:
                     "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
             headers = {"authorization": "Bearer " + self.key, "content-type": "application/json"}
         req = urllib.request.Request(P["url"], data=json.dumps(body).encode(), headers=headers)
-        with urllib.request.urlopen(req, timeout=120) as r:
-            msg = json.loads(r.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                msg = json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:   # surface the provider's message (model name, quota, auth)
+            body_txt = ""
+            try:
+                body_txt = e.read().decode()[:300]
+            except Exception:  # noqa: BLE001
+                pass
+            self.last_error = f"HTTP {e.code}: {body_txt}"
+            raise RuntimeError(self.last_error) from None
+        self.last_error = None
         self.calls += 1
         if P["style"] == "anthropic":
             return "".join(b.get("text", "") for b in msg.get("content", []) if b.get("type") == "text")
@@ -56,12 +68,20 @@ class LLM:
         return ((ch.get("message") or {}).get("content")) or ""
 
     def json(self, system: str, user: str) -> dict | list | None:
-        """Ask for strict JSON; tolerate code fences; return None on failure."""
+        """Ask for strict JSON; tolerate code fences; return None on failure (reason in last_error)."""
+        keep = self.max_tokens
+        self.max_tokens = max(keep, 6000)          # JSON lists are long; a truncated answer is a lost answer
         try:
             txt = self.complete(system + "\nОтвечай ТОЛЬКО валидным JSON без пояснений.", user)
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            self.last_error = str(e)[:300]
             return None
-        return parse_json(txt)
+        finally:
+            self.max_tokens = keep
+        out = parse_json(txt)
+        if out is None:
+            self.last_error = "JSON parse failed: " + (txt or "")[:160]
+        return out
 
 
 def parse_json(txt: str):

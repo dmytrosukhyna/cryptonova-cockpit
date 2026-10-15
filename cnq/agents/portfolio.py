@@ -349,8 +349,25 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
         except Exception:  # noqa: BLE001
             llm_note = ""
     hl_spot_list = sorted(hl.get("spot", {}).items(), key=lambda kv: -kv[1]["vol24"])[:15]
+    # the other two risk profiles (conservative / high risk) run on the same prices; research cards come from web/research.json
+    from .spot_profiles import RiskPortfolio, PROFILES as RP
+    cards = []
+    try:
+        with open("web/research.json", encoding="utf-8") as f:
+            cards = json.load(f).get("cards") or []
+    except Exception:  # noqa: BLE001
+        cards = []
+    price = {r["symbol"]: r["price"] for r in markets if r.get("price")}
+    hl_movers = [{"symbol": k, **v} for k, v in hl_spot_list]
+    profiles = {"mod": {"key": "mod", "name": "Умеренный", "about": "Ядро BTC/ETH + до 5 среднесрочных идей по 8 % и до 3 коротких по 5 %; стоп −15 %, фиксация половины на +40 %, кэш ≥ 10 %.",
+                        **{k: state[k] for k in ("positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions")}}}
+    for key in RP:
+        try:
+            profiles[key] = RiskPortfolio(conn, key).step(dict(price), cards, hl_movers, now)
+        except Exception as e:  # noqa: BLE001
+            profiles[key] = {"key": key, "name": RP[key]["name"], "about": RP[key]["about"], "error": str(e), "positions": [], "index": 100, "cash_pct": 100, "invested_pct": 0, "history": [], "actions": [], "recent_actions": []}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),
-            "picks": pk, "portfolio": state, "note": llm_note or note, "note_source": "llm" if llm_note else "rules",
+            "picks": pk, "portfolio": state, "portfolios": profiles, "note": llm_note or note, "note_source": "llm" if llm_note else "rules",
             "hl_spot_top": [{"symbol": k, "vol24": v["vol24"], "price": v["price"], "chg24": v["chg24"],
                              "score": next((r["score"] for r in rows if r["symbol"] == k), None)} for k, v in hl_spot_list],
             "sources": ["CoinGecko /coins/markets", "Hyperliquid info API"]}

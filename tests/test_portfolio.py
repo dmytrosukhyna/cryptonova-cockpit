@@ -62,3 +62,19 @@ def test_state_machine_buys_core_then_stops_and_trims():
     assert not [p for p in st3["positions"] if p["bucket"] == "short"]
     note = pf.market_note(False, rows[0], pk, st3)
     assert "медвежьем" in note and "Портфель" in note
+
+
+def test_risk_profiles_cash_ledger():
+    import sqlite3
+    from cnq.agents.spot_profiles import RiskPortfolio
+    conn = sqlite3.connect(":memory:"); now = 1_700_000_000_000
+    c = RiskPortfolio(conn, "cons"); st = c.step({"BTC": 100, "ETH": 10, "SOL": 1}, [], [], now)
+    assert st["index"] == 100.0 and st["cash_pct"] == 10 and len(st["positions"]) == 3
+    assert c.step({"BTC": 120, "ETH": 10, "SOL": 1}, [], [], now + 86400000)["index"] == 110.0
+    h = RiskPortfolio(conn, "high"); cards = [{"symbol": "WOW", "risk": "high", "rating": 70, "chg7": 30, "on_hl": True}]
+    st = h.step({"WOW": 1.0}, cards, [{"symbol": "NEKO", "chg24": 12, "vol24": 9e6, "price": 5.0}], now)
+    assert [p["symbol"] for p in st["positions"]] == ["WOW", "NEKO"] and st["cash_pct"] == 90
+    st = h.step({"WOW": 2.1, "NEKO": 5.0}, cards, [], now + 2 * 86400000)
+    assert st["index"] == 105.5 and st["positions"][0]["fixes"] == 1 and st["actions"][0]["action"] == "TRIM"
+    st = h.step({"WOW": 3.2, "NEKO": 3.4}, cards, [], now + 3 * 86400000)
+    assert st["index"] == 106.65 and [p["symbol"] for p in st["positions"]] == ["WOW"]

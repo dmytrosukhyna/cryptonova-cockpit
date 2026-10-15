@@ -48,15 +48,15 @@ jobs:
       - name: Paper desk ($10k demo futures account) → web/paper.json
         continue-on-error: true
         run: python -m cnq.cli paper --out web
+      - name: Coin research (анкета, топ-100, страх/жадность, капитализация) → web/markets.json, web/research.json
+        continue-on-error: true
+        run: python -m cnq.cli research --out web
       - name: Spot portfolio department → web/portfolio.json
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
         run: python -m cnq.cli portfolio --out web
-      - name: Coin research (анкета, топ-100, страх/жадность, капитализация) → web/markets.json, web/research.json
-        continue-on-error: true
-        run: python -m cnq.cli research --out web
       - name: Forecast calibration (A/B записывается и проверяется) → web/calibration.json
         continue-on-error: true
         run: python -m cnq.cli calibrate --out web

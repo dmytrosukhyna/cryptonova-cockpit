@@ -29,7 +29,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -142,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         from .fx.gaps import run as fx_run
         res = fx_run(send=args.send)
         print(f"{len(res)} gap signals")
-    elif args.cmd in ("terminal", "brief", "alerts", "agents", "paper", "weekly"):
+    elif args.cmd in ("terminal", "brief", "alerts", "agents", "paper", "weekly", "calibrate"):
         import os
         from .terminal.report import build_report, write_report
         from .terminal import notify
@@ -170,6 +170,18 @@ def main(argv: list[str] | None = None) -> int:
             res = paper_desk.run(conn, rep)
             write_report(res, os.path.join(args.out, "paper.json"))
             print(f"paper.json: equity={res['equity']} open={len(res['open'])} pending={len(res['pending'])} closed={res['stats']['trades']} events={res['events'][:3]}")
+        elif args.cmd == "calibrate":
+            import sqlite3
+            from .agents import calibration
+            conn = sqlite3.connect("data/agents.sqlite")
+            news = []
+            try:
+                news = json.load(open(os.path.join(args.out, "decision.json"), encoding="utf-8"))["news"]["impacts"]
+            except Exception:
+                pass
+            doc = calibration.run(conn, rep, news)
+            write_report(doc, os.path.join(args.out, "calibration.json"))
+            print(f"calibration.json: recorded {doc['recorded']}, resolved {doc['resolved']}, stats n={doc['stats'].get('n')} hit={doc['stats'].get('hit_rate')} brier={doc['stats'].get('brier')}")
         elif args.cmd == "weekly":
             import sqlite3
             from .agents import weekly

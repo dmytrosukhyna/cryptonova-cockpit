@@ -44,7 +44,14 @@ def p_up(coin: dict, btc_bull: bool, stress: int, news: list[dict], now: int) ->
     comp = {"mid": MID.get(r.get("mid"), 0.0), "short": SHORT.get(r.get("short"), 0.0), "long": .03 if r.get("long") == "BULL" else -.03}
     base = coin["symbol"].replace("-USDT", "")
     comp["btc"] = 0.0 if base == "BTC" else (.03 if btc_bull else -.05)
-    comp["stress"] = -0.08 * stress
+    # stress pulls every coin down, but a coin that already dumped inside the sell-off tends to be bought over the next
+    # day (docs/research/exhaustion_long.md) — so the stress term is halved and a mean-reversion term is added per coin
+    comp["stress"] = -0.04 * stress
+    cs = coin.get("candles") or []
+    r24 = cs[-1][4] / cs[-97][4] - 1 if len(cs) > 97 else 0.0
+    comp["mr"] = (0.06 if r24 <= -0.05 else 0.03 if r24 <= -0.03 else 0.0) if stress >= 2 else 0.0
+    # the coin's own 7-day momentum (coin-specific, not BTC-driven)
+    comp["mom7"] = 0.03 if (r.get("r7") or 0) > 0.03 else -0.03 if (r.get("r7") or 0) < -0.03 else 0.0
     bull = bear = 0
     for i in news:
         if i.get("magnitude", 0) >= 4 and i.get("asset") in (base, "MARKET") and now - (i.get("created") or 0) < 36 * 3600_000:

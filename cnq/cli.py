@@ -29,7 +29,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -43,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--binance-symbol", default="BTCUSDT")
     ap.add_argument("--cache", default="data/binance")
     ap.add_argument("--out", default="web")
+    ap.add_argument("--force", action="store_true", help="weekly: rebuild and send even if it is not Friday")
     ap.add_argument("--send", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -141,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
         from .fx.gaps import run as fx_run
         res = fx_run(send=args.send)
         print(f"{len(res)} gap signals")
-    elif args.cmd in ("terminal", "brief", "alerts", "agents", "paper"):
+    elif args.cmd in ("terminal", "brief", "alerts", "agents", "paper", "weekly"):
         import os
         from .terminal.report import build_report, write_report
         from .terminal import notify
@@ -165,6 +166,18 @@ def main(argv: list[str] | None = None) -> int:
             res = paper_desk.run(conn, rep)
             write_report(res, os.path.join(args.out, "paper.json"))
             print(f"paper.json: equity={res['equity']} open={len(res['open'])} pending={len(res['pending'])} closed={res['stats']['trades']} events={res['events'][:3]}")
+        elif args.cmd == "weekly":
+            import sqlite3
+            from .agents import weekly
+            conn = sqlite3.connect("data/agents.sqlite")
+            path = os.path.join(args.out, "weekly.json")
+            why = weekly.should_run(path) or ("forced" if args.force else None)
+            if not why:
+                print("weekly: not Friday yet / already written this week"); return 0
+            doc = weekly.run(conn, rep, path)
+            print(f"weekly.json written ({why}): {doc['week']['from']}–{doc['week']['to']}, paper {doc['paper']['n']} trades {doc['paper']['sum_r']:+.2f}R")
+            if args.send and why in ("friday", "forced"):
+                print("sent" if notify.send(doc["post"]) else "not sent (CNQ_TG_TOKEN/CNQ_TG_CHAT missing?)")
         elif args.cmd == "agents":
             from .agents.orchestrator import Orchestrator
             orc = Orchestrator(db_path="data/agents.sqlite")

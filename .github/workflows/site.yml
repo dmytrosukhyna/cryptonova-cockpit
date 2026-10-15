@@ -5,6 +5,7 @@ on:
   schedule:
     - cron: "*/30 * * * *"      # данные + отдел новостей каждые 30 минут (UTC)
     - cron: "5 22 * * 0"        # гэпы понедельника по валютам, воскресенье 22:05 UTC
+    - cron: "5 17 * * 5"        # недельный обзор, пятница 17:05 UTC (20:05 Афины)
   workflow_dispatch:
 
 permissions:
@@ -52,6 +53,12 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
         run: python -m cnq.cli portfolio --out web
+      - name: Weekly review (Fridays; first run writes one so the panel is not empty) → web/weekly.json
+        continue-on-error: true
+        env:
+          CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
+          CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
+        run: python -m cnq.cli weekly --out web --send
       - name: Monday gaps (FX, class A)
         if: github.event.schedule == '5 22 * * 0'
         continue-on-error: true
@@ -67,7 +74,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/status.json data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/weekly.json web/status.json data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done

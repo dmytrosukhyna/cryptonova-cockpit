@@ -78,6 +78,14 @@ jobs:
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
           CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
         run: python -m cnq.cli channel --out web --send
+      - name: Bot mailbox (answers /start and messages, remembers chats)
+        continue-on-error: true
+        env:
+          CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}
+          CNQ_LLM_PROVIDER: ${{ vars.CNQ_LLM_PROVIDER }}
+          CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
+          CNQ_TG_OWNER: ${{ vars.CNQ_TG_OWNER }}
+        run: python -m cnq.cli botmail
       - name: Weekly review (Fridays; first run writes one so the panel is not empty) → web/weekly.json
         continue-on-error: true
         env:

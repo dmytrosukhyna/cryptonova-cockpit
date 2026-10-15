@@ -29,7 +29,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -174,6 +174,13 @@ def main(argv: list[str] | None = None) -> int:
         photo = (lambda path, cap: notify.send_photo(path, cap)) if args.send else (lambda path, cap: print('photo:', path))
         res = ch.run(send_html, llm=llm, force_slot=args.slot, photo_fn=photo)
         print(f"channel: slot={res.get('slot')} sent={res.get('sent')} {res.get('why', '')} kyiv={kyiv_now():%H:%M}")
+    elif args.cmd == "botmail":
+        import sqlite3
+        from .agents import botmail
+        from .agents.llm import LLM
+        conn = sqlite3.connect("data/agents.sqlite")
+        llm = LLM(); llm = llm if llm.available else None
+        print("botmail:", botmail.run(conn, llm=llm))
     elif args.cmd == "fx-gaps":
         from .fx.gaps import run as fx_run
         res = fx_run(send=args.send)

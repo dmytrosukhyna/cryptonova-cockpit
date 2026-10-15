@@ -112,7 +112,7 @@ def test_cli_candles_long_conversion_from_store_objects():
     from cnq.bingx.rest import Candle
     from cnq.agents.paper_desk import agg4h
     t0 = 1_700_000_000_000 - (1_700_000_000_000 % 14_400_000)
-    cs = [Candle(open_time=t0 + i * 900_000, open=1.0, high=1.1, low=0.9, close=1.0, volume=1.0, close_time=t0 + i * 900_000 + 899_999, quote_volume=1.0) for i in range(32)]
+    cs = [Candle(open_time=t0 + i * 900_000, open=1.0, high=1.1, low=0.9, close=1.0, volume=1.0, close_time=t0 + i * 900_000 + 899_999, quote_volume=1.0, trades=1, taker_buy_volume=0.5, taker_buy_quote=0.5) for i in range(32)]
     rows = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs]
     b4 = agg4h(rows)
     assert len(b4) == 2 and b4[0][5] == 16.0 and b4[0][2] == 1.1

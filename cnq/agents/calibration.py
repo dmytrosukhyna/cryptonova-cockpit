@@ -52,12 +52,19 @@ def p_up(coin: dict, btc_bull: bool, stress: int, news: list[dict], now: int) ->
     comp["mr"] = (0.06 if r24 <= -0.05 else 0.03 if r24 <= -0.03 else 0.0) if stress >= 2 else 0.0
     # the coin's own 7-day momentum (coin-specific, not BTC-driven)
     comp["mom7"] = 0.03 if (r.get("r7") or 0) > 0.03 else -0.03 if (r.get("r7") or 0) < -0.03 else 0.0
-    bull = bear = 0
+    # news: each story counts once (not once per run/asset row); market-wide only for macro / regulation / ETF flows;
+    # capped at ±0.06 — on 15.10 nine duplicated bearish rows (−0.27) pinned every forecast at 22 % and the hit rate fell to 39 %
+    seen: dict[str, int] = {}
     for i in news:
-        if i.get("magnitude", 0) >= 4 and i.get("asset") in (base, "MARKET") and now - (i.get("created") or 0) < 36 * 3600_000:
-            if i.get("direction") == "bull": bull += 1
-            elif i.get("direction") == "bear": bear += 1
-    comp["news"] = 0.03 * (bull - bear)
+        if i.get("magnitude", 0) < 4 or now - (i.get("created") or 0) > 36 * 3600_000:
+            continue
+        a = i.get("asset")
+        if not (a == base or (a == "MARKET" and i.get("category") in ("macro", "regulation", "etf_flows"))):
+            continue
+        d = 1 if i.get("direction") == "bull" else -1 if i.get("direction") == "bear" else 0
+        if d:
+            seen[str(i.get("news_id") or i.get("title"))] = d
+    comp["news"] = max(-0.06, min(0.06, 0.03 * sum(seen.values())))
     p = 0.5 + sum(comp.values())
     return max(.22, min(.78, p)), comp
 

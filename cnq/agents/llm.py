@@ -48,6 +48,9 @@ class LLM:
             body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": temperature,
                     "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
             headers = {"authorization": "Bearer " + self.key, "content-type": "application/json"}
+        # Groq sits behind Cloudflare, which rejects the default Python user agent (error 1010) — send a browser-like one
+        headers["user-agent"] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 cryptonova/1.0"
+        headers["accept"] = "application/json"
         req = urllib.request.Request(P["url"], data=json.dumps(body).encode(), headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=120) as r:

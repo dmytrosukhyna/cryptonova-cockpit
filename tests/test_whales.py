@@ -11,6 +11,8 @@ def test_whales_aggregate_and_changes(monkeypatch=None):
     W.leaders = lambda n=20: lb
     W.positions = lambda addr: book[addr]
     W.time.sleep = lambda s: None
+    W.book_walls = lambda coin, min_usd=1.5e6: {'coin': coin, 'mid': 100.0, 'walls': [{'side': 'BID', 'px': 99.0, 'usd': 4000000, 'dist_pct': -1.0}], 'depth_bid_3pct': 9e6, 'depth_ask_3pct': 3e6, 'imbalance': 0.5}
+    W.user_fills = lambda addr, since: [{'coin': 'ETH', 'side': 'BUY', 'usd': 900000, 'n': 3, 'last': since}] if addr == '0xa' else []
     d = W.Whales(conn).run(1_700_000_000_000)
     eth = next(c for c in d["coins"] if c["coin"] == "ETH")
     assert eth["long_n"] == 2 and eth["lean"] == "LONG" and d["summary"]["bias"] == "LONG" and d["changes"] == []
@@ -18,3 +20,4 @@ def test_whales_aggregate_and_changes(monkeypatch=None):
     d2 = W.Whales(conn).run(1_700_000_000_000 + 1800_000)
     kinds = {(c["coin"], c["kind"]) for c in d2["changes"]}
     assert ("BTC", "FLIP") in kinds and ("ETH", "CLOSE") in kinds and d2["whales"][1]["name"].startswith("лидер")
+    assert d2["books"][0]["walls"][0]["seen"] == 2 and d2["wall_alerts"][0]["kind"] == "держится" and d2["fills"][0]["usd"] == 900000

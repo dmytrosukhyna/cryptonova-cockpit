@@ -66,12 +66,92 @@ def positions(addr: str) -> list[dict]:
     return out
 
 
+def book_walls(coin: str, min_usd: float = 1.5e6) -> dict | None:
+    """Large resting orders in the Hyperliquid book: levels whose notional ≥ max(min_usd, 4× median level) within 3 % of mid."""
+    b = _get(HL, {"type": "l2Book", "coin": coin}) or {}
+    lv = b.get("levels")
+    if not lv or len(lv) != 2:
+        return None
+    try:
+        bids = [(float(x["px"]), float(x["sz"])) for x in lv[0]]
+        asks = [(float(x["px"]), float(x["sz"])) for x in lv[1]]
+    except Exception:  # noqa: BLE001
+        return None
+    if not bids or not asks:
+        return None
+    mid = (bids[0][0] + asks[0][0]) / 2
+    rows = [("BID", px, px * sz) for px, sz in bids if px >= mid * 0.97] + [("ASK", px, px * sz) for px, sz in asks if px <= mid * 1.03]
+    if not rows:
+        return None
+    usd = sorted(r[2] for r in rows)
+    med = usd[len(usd) // 2]
+    thr = max(min_usd, 4 * med)
+    walls = [{"side": sd, "px": px, "usd": round(u), "dist_pct": round((px / mid - 1) * 100, 2)} for sd, px, u in rows if u >= thr]
+    depth_bid = sum(r[2] for r in rows if r[0] == "BID"); depth_ask = sum(r[2] for r in rows if r[0] == "ASK")
+    return {"coin": coin, "mid": mid, "walls": sorted(walls, key=lambda w: -w["usd"])[:6], "depth_bid_3pct": round(depth_bid), "depth_ask_3pct": round(depth_ask),
+            "imbalance": round((depth_bid - depth_ask) / (depth_bid + depth_ask), 2) if depth_bid + depth_ask else 0}
+
+
+def user_fills(addr: str, since_ms: int) -> list[dict]:
+    """Recent fills of a whale (what they actually bought/sold), aggregated per coin & side since `since_ms`."""
+    j = _get(HL, {"type": "userFills", "user": addr}) or []
+    agg: dict[tuple[str, str], dict] = {}
+    for f in j:
+        try:
+            t = int(f.get("time") or 0)
+            if t < since_ms:
+                continue
+            coin = f.get("coin"); side = "BUY" if f.get("side") == "B" else "SELL"
+            usd = float(f.get("px") or 0) * float(f.get("sz") or 0)
+        except Exception:  # noqa: BLE001
+            continue
+        a = agg.setdefault((coin, side), {"coin": coin, "side": side, "usd": 0.0, "n": 0, "last": 0})
+        a["usd"] += usd; a["n"] += 1; a["last"] = max(a["last"], t)
+    return [dict(v, usd=round(v["usd"])) for v in agg.values()]
+
+
 class Whales:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
         conn.execute("CREATE TABLE IF NOT EXISTS whale_snapshots(time INTEGER, addr TEXT, coin TEXT, side TEXT, notional REAL, entry REAL, lev REAL, PRIMARY KEY(time, addr, coin))")
         conn.execute("CREATE TABLE IF NOT EXISTS whale_meta(k TEXT PRIMARY KEY, v TEXT)")
+        conn.execute("CREATE TABLE IF NOT EXISTS whale_orders(time INTEGER, coin TEXT, side TEXT, px REAL, usd REAL, seen INTEGER, PRIMARY KEY(time, coin, side, px))")
         conn.commit()
+
+    def walls_with_memory(self, coins: list[str], now: int, prev_t: int | None) -> tuple[list[dict], list[dict]]:
+        """Walls per coin + how many consecutive cycles each wall has been standing (persistent = real liquidity, one-cycle = possible spoof)."""
+        prev = {}
+        if prev_t:
+            for coin, side, px, usd, seen in self.conn.execute("SELECT coin, side, px, usd, seen FROM whale_orders WHERE time=?", (prev_t,)).fetchall():
+                prev.setdefault(coin, []).append((side, px, usd, seen))
+        out, alerts = [], []
+        for coin in coins:
+            bw = book_walls(coin)
+            time.sleep(0.3)
+            if not bw:
+                continue
+            for w in bw["walls"]:
+                seen = 1
+                for sd, px, usd, sn in prev.get(coin, []):
+                    if sd == w["side"] and abs(px / w["px"] - 1) < 0.001 and 0.6 <= (usd / w["usd"] if w["usd"] else 0) <= 1.6:
+                        seen = sn + 1; break
+                w["seen"] = seen
+                w["kind"] = "стена" if seen >= 3 else "новая" if seen == 1 else "держится"
+                self.conn.execute("INSERT OR REPLACE INTO whale_orders VALUES(?,?,?,?,?,?)", (now, coin, w["side"], w["px"], w["usd"], seen))
+            # walls that vanished without price reaching them → spoof suspects
+            gone = 0
+            for sd, px, usd, sn in prev.get(coin, []):
+                still = any(x["side"] == sd and abs(x["px"] / px - 1) < 0.001 for x in bw["walls"])
+                reached = (sd == "BID" and bw["mid"] <= px * 1.001) or (sd == "ASK" and bw["mid"] >= px * 0.999)
+                if not still and not reached:
+                    gone += 1
+            bw["vanished"] = gone
+            out.append(bw)
+            for w in bw["walls"][:2]:
+                if w["usd"] >= 3e6:
+                    alerts.append({"coin": coin, "side": w["side"], "px": w["px"], "usd": w["usd"], "seen": w["seen"], "kind": w["kind"], "dist_pct": w["dist_pct"]})
+        self.conn.commit()
+        return out, alerts
 
     def last_time(self) -> int | None:
         r = self.conn.execute("SELECT MAX(time) FROM whale_snapshots").fetchone()
@@ -140,7 +220,25 @@ class Whales:
                 changes.append({"addr": key[0], "name": names.get(key[0], ""), "coin": key[1], "kind": "CLOSE", "side": q["side"], "notional": round(q["notional"]), "entry": q["entry"]})
         changes.sort(key=lambda c: -c["notional"])
         total_long = sum(c["long_usd"] for c in coins); total_short = sum(c["short_usd"] for c in coins)
+        # order-book walls for the coins whales care about + majors, with persistence memory (spoof awareness)
+        book_coins = []
+        for c in ["BTC", "ETH", "SOL", "HYPE"] + [c["coin"] for c in coins]:
+            if c not in book_coins:
+                book_coins.append(c)
+        books, wall_alerts = self.walls_with_memory(book_coins[:10], now, prev_t)
+        # what the whales actually traded in the last 3 hours (fills ≥ $500k)
+        fills = []
+        for w in whales[:12]:
+            for f in user_fills(w["addr"], now - 3 * 3600_000):
+                if f["usd"] >= 5e5:
+                    fills.append({**f, "addr": w["addr"], "name": w["name"]})
+            time.sleep(0.3)
+        fills.sort(key=lambda f: -f["usd"])
         return {"asof": now, "available": True, "prev_time": prev_t, "whales": whales, "coins": coins[:30], "changes": changes[:25],
+                "books": books, "wall_alerts": sorted(wall_alerts, key=lambda a: -a["usd"])[:10], "fills": fills[:20],
+                "trap_note": "Стена в стакане — не обещание: маркетмейкеры ставят и снимают крупные заявки, чтобы увести толпу. Верим стене, которая стоит несколько циклов "
+                             "(«стена»), и настороженно смотрим на «новую»; если стены исчезают до прихода цены (vanished) — рынок играет в спуфинг. "
+                             "Много мелких заявок с одной стороны (глубина 3%) важнее одной крупной.",
                 "summary": {"n_whales": len(whales), "total_long_usd": round(total_long), "total_short_usd": round(total_short),
                             "bias": "LONG" if total_long > total_short * 1.3 else "SHORT" if total_short > total_long * 1.3 else "MIXED"},
                 "note": "Топ-20 счетов лидерборда Hyperliquid по доходности за 30 дней (≥ $1M, плюс за всё время). Это контекст, не сигнал: "

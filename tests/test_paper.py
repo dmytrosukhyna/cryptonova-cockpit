@@ -89,3 +89,19 @@ def test_retest_scan_and_signal():
     r = [x for x in sigs if x["grade"] == "R"]
     assert len(r) == 1 and r[0]["side"] == "LONG" and abs(r[0]["stop"] - (101.0 - rt["atr"])) < 1e-9 and r[0]["order"] == "MARKET"
     assert agg4h(c15)[-1][0] == b4[-1][0]
+
+
+def test_three_profiles_share_signals_but_differ():
+    """Same market: aggressive trades a class-C zone limit, balanced and conservative don't; run() returns all three."""
+    conn = sqlite3.connect(":memory:")
+    t0 = 1_700_000_000_000
+    flat = [10.0] * 300
+    c = coin("BTC-USDT", flat, [{"id": "L1", "kind": "support", "lo": 9.96, "hi": 9.99, "center": 9.975, "touches": 3, "status": "ACTIVE"}])
+    c["regime"] = {"long": "BULL"}
+    out = pd.run(conn, {"coins": [c]}, now=t0 + 300 * 900_000)
+    assert set(out["profiles"]) == {"cons", "bal", "aggr"} and out["profile"] == "bal"
+    assert out["profiles"]["aggr"]["pending"] and not out["profiles"]["bal"]["pending"] and not out["profiles"]["cons"]["pending"]
+    assert out["profiles"]["cons"]["rules"].startswith("риск 0.5%")
+    # tables are separate per profile
+    names = {r[0] for r in conn.execute("select name from sqlite_master where type='table'")}
+    assert {"paper_orders", "paper_bal_orders", "paper_cons_orders"} <= names

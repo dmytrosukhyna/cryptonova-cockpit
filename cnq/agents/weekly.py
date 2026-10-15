@@ -64,12 +64,14 @@ def market_block(rep: dict, now_ms: int) -> dict:
             "best": rows[:3], "worst": rows[-3:][::-1] if rows else []}
 
 
-def paper_block(conn: sqlite3.Connection, now_ms: int) -> dict:
+def paper_block(conn: sqlite3.Connection, now_ms: int, prefix: str = "paper_bal_") -> dict:
     since = now_ms - WEEK_MS
-    closed = conn.execute("select symbol, side, grade, kind, entry, stop, exit_kind, pnl_r, pnl_usd, opened, closed, reason from paper_trades "
+    if not _has_col(conn, prefix + "trades", "id"):
+        return {"trades": [], "n": 0, "sum_r": 0.0, "usd": 0.0, "wins": 0, "by_grade": {}, "open": [], "equity_start": None, "equity_end": None}
+    closed = conn.execute(f"select symbol, side, grade, kind, entry, stop, exit_kind, pnl_r, pnl_usd, opened, closed, reason from {prefix}trades "
                           "where closed is not null and closed >= ? order by closed", (since,)).fetchall()
-    openp = conn.execute("select symbol, side, grade, entry, stop_now, opened from paper_trades where closed is null").fetchall()
-    eq = conn.execute("select time, equity from paper_equity order by time").fetchall()
+    openp = conn.execute(f"select symbol, side, grade, entry, stop_now, opened from {prefix}trades where closed is null").fetchall()
+    eq = conn.execute(f"select time, equity from {prefix}equity order by time").fetchall()
     eq_start = next((e for t, e in eq if t >= since), eq[0][1] if eq else None)
     eq_end = eq[-1][1] if eq else None
     by = {}
@@ -155,7 +157,11 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
     else:
         L.append("- Дней широкого падения не было.")
     L.append("")
-    L.append("## Демо-счёт фьючерсы ($10 000, сигналы системы)")
+    L.append("## Демо-счета фьючерсы (три стратегии по $10 000)")
+    for st in paper.get("strategies", []):
+        L.append(f"- {st['name']}: {st['n']} сделок, {st['sum_r']:+.2f}R" + (f", счёт {_fmt(st['equity_end'])} $" if st.get("equity_end") else ""))
+    L.append("")
+    L.append("### Сбалансированная — подробно")
     if paper["n"]:
         L.append(f"- Закрыто сделок: {paper['n']}, в плюс {paper['wins']}, итог {paper['sum_r']:+.2f}R ({paper['usd']:+.0f} $). "
                  f"Счёт {_fmt(paper['equity_start'])} → {_fmt(paper['equity_end'])} $." if paper["equity_start"] and paper["equity_end"] else
@@ -235,7 +241,9 @@ def run(conn: sqlite3.Connection, rep: dict, out_path: str, now_ms: int | None =
             prev_doc = None
     week = {"from": _d(now_ms - WEEK_MS), "to": _d(now_ms), "end_ms": now_ms}
     market = market_block(rep, now_ms)
-    paper = paper_block(conn, now_ms)
+    from .paper_desk import PROFILES, DEFAULT_PROFILE
+    paper = paper_block(conn, now_ms, PROFILES[DEFAULT_PROFILE]["prefix"])
+    paper["strategies"] = [{"key": k, "name": p["name"], **{kk: vv for kk, vv in paper_block(conn, now_ms, p["prefix"]).items() if kk in ("n", "sum_r", "usd", "wins", "equity_end")}} for k, p in PROFILES.items()]
     spot = spot_block(conn, now_ms)
     nxt = next_week(rep)
     last = verify_last(prev_doc, market) if prev_doc and prev_doc.get("week", {}).get("end_ms", 0) < now_ms - 3 * 86400000 else (prev_doc.get("said_last_time") if prev_doc else None)

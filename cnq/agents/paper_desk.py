@@ -1,4 +1,5 @@
-"""Paper desk — a $10 000 demo futures account that trades the panel's signals automatically, 24/7 on the server.
+"""Paper desk — three $10 000 demo futures accounts (Осторожная / Сбалансированная / Агрессивная, see PROFILES) that trade the
+panel's signals automatically, 24/7 on the server, so the strategies can be compared on the same market.
 
 Mirrors the panel's signal classes so what you see is what is tracked:
   C  LEVEL_LIMIT        limit at the edge of a tested 4h zone (≤ 0.3 ATR away), stop beyond zone + 0.25 ATR,
@@ -22,6 +23,21 @@ import time
 
 START_EQUITY = 10_000.0
 RISK = 0.01
+
+# Three strategies = three demo accounts running in parallel on the same signals. One formula, three settings:
+#   classes  — which signal classes the account trades (A gap fade, B cascade, R retest, C level-limit ≈ 0 after costs)
+#   confirm  — R longs need a second breakout after the retest (history: +0.085R/trade vs +0.04R, half the trades)
+#   risk     — share of equity risked per trade;  max_open — positions + pending limits
+#   tgt_r    — R-class target in R;  riskoff — what is allowed while ≥70 % of coins fall: 'none' | 'shorts'
+PROFILES = {
+    "cons": {"name": "Осторожная", "classes": {"A", "R"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "none",
+             "prefix": "paper_cons_", "about": "Только проверенные входы (гэп FX, ретест с повторным пробоем), риск 0.5%, не больше 2 позиций, в режиме риска не торгует."},
+    "bal":  {"name": "Сбалансированная", "classes": {"A", "B", "R"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
+             "prefix": "paper_bal_", "about": "Гэп FX, откуп каскада, ретест; риск 1%, до 4 позиций, в режиме риска только шорты."},
+    "aggr": {"name": "Агрессивная", "classes": {"A", "B", "R", "C"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
+             "prefix": "paper_", "about": "Всё, включая лимитки от зон (класс C ≈ 0 на истории); риск 1.5%, до 6 позиций, в режиме риска шорты."},
+}
+DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
 HOLD_C_H = 48
@@ -76,7 +92,16 @@ def retest_scan(b4: list[list], n_break: int = 30, wait: int = 24) -> dict | Non
                 if bj[2] >= lvl - 0.5 * a and bj[4] < lvl: ret = j; break
         if failed:
             return None
-        return {"side": side, "level": lvl, "atr": a, "i_break": i, "i_retest": ret, "bars_since_retest": None if ret is None else n - 1 - ret}
+        conf = None
+        if ret is not None:
+            ext = b4[ret][2] if side == "LONG" else b4[ret][3]
+            for q in range(ret + 1, min(n, ret + 7)):
+                if (side == "LONG" and b4[q][4] < lvl - 0.5 * a) or (side == "SHORT" and b4[q][4] > lvl + 0.5 * a):
+                    return None
+                if (side == "LONG" and b4[q][4] > ext) or (side == "SHORT" and b4[q][4] < ext):
+                    conf = q; break
+        return {"side": side, "level": lvl, "atr": a, "i_break": i, "i_retest": ret, "bars_since_retest": None if ret is None else n - 1 - ret,
+                "i_confirm": conf, "bars_since_confirm": None if conf is None else n - 1 - conf}
     return None
 
 
@@ -100,32 +125,36 @@ def _atr(c: list[list], n: int = 14) -> float:
 
 
 class PaperDesk:
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, profile: str = "aggr"):
         self.conn = conn
-        conn.executescript("""
-        CREATE TABLE IF NOT EXISTS paper_orders(id TEXT PRIMARY KEY, symbol TEXT, side TEXT, grade TEXT, kind TEXT, entry REAL, stop REAL,
+        self.profile = profile
+        self.P = PROFILES[profile]
+        px = self.P["prefix"]
+        self.T_ORD, self.T_TR, self.T_EQ = px + "orders", px + "trades", px + "equity"
+        conn.executescript(f"""
+        CREATE TABLE IF NOT EXISTS {self.T_ORD}(id TEXT PRIMARY KEY, symbol TEXT, side TEXT, grade TEXT, kind TEXT, entry REAL, stop REAL,
             tps TEXT, parts TEXT, qty REAL, risk_usd REAL, created INTEGER, expires INTEGER, status TEXT, reason TEXT);
-        CREATE TABLE IF NOT EXISTS paper_trades(id TEXT PRIMARY KEY, symbol TEXT, side TEXT, grade TEXT, kind TEXT, entry REAL, stop REAL, stop_now REAL,
+        CREATE TABLE IF NOT EXISTS {self.T_TR}(id TEXT PRIMARY KEY, symbol TEXT, side TEXT, grade TEXT, kind TEXT, entry REAL, stop REAL, stop_now REAL,
             tps TEXT, parts TEXT, qty REAL, qty_left REAL, risk_usd REAL, opened INTEGER, expires INTEGER, closed INTEGER, exit_kind TEXT,
             pnl_usd REAL, pnl_r REAL, tps_hit INTEGER, reason TEXT, last_bar INTEGER);
-        CREATE TABLE IF NOT EXISTS paper_equity(time INTEGER PRIMARY KEY, equity REAL);
+        CREATE TABLE IF NOT EXISTS {self.T_EQ}(time INTEGER PRIMARY KEY, equity REAL);
         CREATE TABLE IF NOT EXISTS paper_meta(k TEXT PRIMARY KEY, v TEXT);""")
         conn.commit()
 
     # ------------------------------------------------------------------ helpers
     def equity(self) -> float:
-        row = self.conn.execute("SELECT equity FROM paper_equity ORDER BY time DESC LIMIT 1").fetchone()
+        row = self.conn.execute(f"SELECT equity FROM {self.T_EQ} ORDER BY time DESC LIMIT 1").fetchone()
         return row[0] if row else START_EQUITY
 
     def _open(self) -> list[dict]:
         keys = ("id", "symbol", "side", "grade", "kind", "entry", "stop", "stop_now", "tps", "parts", "qty", "qty_left", "risk_usd", "opened",
                 "expires", "closed", "exit_kind", "pnl_usd", "pnl_r", "tps_hit", "reason", "last_bar")
-        rows = self.conn.execute("SELECT * FROM paper_trades WHERE closed IS NULL").fetchall()
+        rows = self.conn.execute(f"SELECT * FROM {self.T_TR} WHERE closed IS NULL").fetchall()
         return [dict(zip(keys, r)) for r in rows]
 
     def _pending(self) -> list[dict]:
         keys = ("id", "symbol", "side", "grade", "kind", "entry", "stop", "tps", "parts", "qty", "risk_usd", "created", "expires", "status", "reason")
-        return [dict(zip(keys, r)) for r in self.conn.execute("SELECT * FROM paper_orders WHERE status='PENDING'").fetchall()]
+        return [dict(zip(keys, r)) for r in self.conn.execute(f"SELECT * FROM {self.T_ORD} WHERE status='PENDING'").fetchall()]
 
     # ------------------------------------------------------------------ signals (same rules as the panel)
     def signals(self, coin: dict, btc_bull: bool, now: int) -> list[dict]:
@@ -161,18 +190,22 @@ class PaperDesk:
         cutoff = now - (now % 14_400_000)
         b4 = [x for x in b4_all if x[0] < cutoff]
         rt = retest_scan(b4)
-        if rt and rt["i_retest"] is not None and rt["bars_since_retest"] == 0:
+        confirm = self.P["confirm"]
+        fire = rt and ((not confirm and rt["i_retest"] is not None and rt["bars_since_retest"] == 0) or
+                       (confirm and rt["i_confirm"] is not None and rt["bars_since_confirm"] == 0))
+        if fire:
             side = rt["side"]; sgn = 1 if side == "LONG" else -1
             if not (side == "LONG" and not btc_bull and base != "BTC"):
                 entry = price
                 stop = rt["level"] - sgn * rt["atr"]
                 r = sgn * (entry - stop)
+                tgt = self.P["tgt_r"]
                 if r > 0 and r / entry <= 0.08:
                     out.append({"id": f"R-{base}-{b4[rt['i_retest']][0]}", "symbol": base, "side": side, "grade": "R", "kind": "RETEST",
-                                "entry": entry, "stop": stop, "tps": [entry + sgn * 2 * r] * 3, "parts": [1.0, 0.0, 0.0],
+                                "entry": entry, "stop": stop, "tps": [entry + sgn * tgt * r] * 3, "parts": [1.0, 0.0, 0.0],
                                 "order": "MARKET", "hold_h": HOLD_R_H,
                                 "reason": f"Пробой {'сопротивления' if side == 'LONG' else 'поддержки'} {rt['level']:.6g} на объёме и ретест: свеча 4ч вернулась к уровню и закрылась "
-                                          f"{'выше' if side == 'LONG' else 'ниже'}. Вход по рынку, стоп {stop:.6g}, цель 2R, до 8 дней."})
+                                          f"{'выше' if side == 'LONG' else 'ниже'}{' , затем повторный пробой (подтверждение)' if confirm else ''}. Вход по рынку, стоп {stop:.6g}, цель {tgt:g}R, до 8 дней."})
         # cascade long: last closed 15m candle
         rets = [c15[i][4] / c15[i - 1][4] - 1 for i in range(max(1, len(c15) - 96 * 30), len(c15) - 1)]
         sig = math.sqrt(sum(x * x for x in rets) / len(rets)) if rets else 0
@@ -208,28 +241,28 @@ class PaperDesk:
         events: list[str] = []
         eq = self.equity()
         # 1. new signals → orders / market fills
-        known = {r[0] for r in self.conn.execute("SELECT id FROM paper_orders")} | {r[0] for r in self.conn.execute("SELECT id FROM paper_trades")}
+        known = {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_ORD}")} | {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_TR}")}
         open_syms = {t["symbol"] for t in self._open()} | {o["symbol"] for o in self._pending()}
         for base, coin in by_sym.items():
             for s in self.signals(coin, btc_bull, now):
-                if s["id"] in known or base in open_syms:
+                if s["id"] in known or base in open_syms or s["grade"] not in self.P["classes"]:
                     continue
-                if risk_off and s["side"] == "LONG" and s["grade"] == "C":
-                    events.append(f"пропуск лонга {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
+                if risk_off and ((s["side"] == "LONG" and s["grade"] != "B") or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
+                    events.append(f"пропуск {'лонга' if s['side'] == 'LONG' else 'шорта'} {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
                     continue
-                if len(self._open()) + len(self._pending()) >= MAX_OPEN:
+                if len(self._open()) + len(self._pending()) >= self.P["max_open"]:
                     break
-                risk_usd = eq * RISK
+                risk_usd = eq * self.P["risk"]
                 r = abs(s["entry"] - s["stop"])
                 qty = risk_usd / (r + s["entry"] * (2 * FEE + SLIP))
                 if s["order"] == "MARKET":
                     fill = s["entry"] * (1 + SLIP)
-                    self.conn.execute("INSERT INTO paper_trades VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    self.conn.execute(f"INSERT INTO {self.T_TR} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (s["id"], base, s["side"], s["grade"], s["kind"], fill, s["stop"], s["stop"], json.dumps(s["tps"]), json.dumps(s["parts"]),
                                        qty, qty, risk_usd, now, now + s["hold_h"] * 3_600_000, None, None, 0.0, 0.0, 0, s["reason"], coin["candles"][-1][0]))
                     events.append(f"открыт {s['side']} {base} по рынку {fill:.6g} (класс {s['grade']})")
                 else:
-                    self.conn.execute("INSERT INTO paper_orders VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    self.conn.execute(f"INSERT INTO {self.T_ORD} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (s["id"], base, s["side"], s["grade"], s["kind"], s["entry"], s["stop"], json.dumps(s["tps"]), json.dumps(s["parts"]),
                                        qty, risk_usd, now, now + ORDER_TTL_H * 3_600_000, "PENDING", s["reason"]))
                     events.append(f"лимитка {s['side']} {base} @ {s['entry']:.6g} (класс {s['grade']})")
@@ -256,14 +289,14 @@ class PaperDesk:
                 sgn = 1 if o["side"] == "LONG" else -1
                 pnl = (sgn * (o["stop"] * (1 - sgn * SLIP) - o["entry"]) * o["qty"] - o["stop"] * o["qty"] * FEE) if stopped else 0.0
                 pnl_r = (pnl - o["entry"] * o["qty"] * FEE) / o["risk_usd"] if stopped else 0.0
-                self.conn.execute("INSERT INTO paper_trades VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                self.conn.execute(f"INSERT INTO {self.T_TR} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                   (o["id"], o["symbol"], o["side"], o["grade"], o["kind"], o["entry"], o["stop"], o["stop"], o["tps"], o["parts"],
                                    o["qty"], 0.0 if stopped else o["qty"], o["risk_usd"], filled[0], filled[0] + hold * 3_600_000,
                                    filled[0] if stopped else None, "STOP" if stopped else None, pnl, pnl_r, 0, o["reason"], filled[0]))
-                self.conn.execute("UPDATE paper_orders SET status='FILLED' WHERE id=?", (o["id"],))
+                self.conn.execute(f"UPDATE {self.T_ORD} SET status='FILLED' WHERE id=?", (o["id"],))
                 events.append(f"исполнена лимитка {o['side']} {o['symbol']} @ {o['entry']:.6g}" + (" и выбита стопом в той же свече" if stopped else ""))
             elif now > o["expires"]:
-                self.conn.execute("UPDATE paper_orders SET status='EXPIRED' WHERE id=?", (o["id"],))
+                self.conn.execute(f"UPDATE {self.T_ORD} SET status='EXPIRED' WHERE id=?", (o["id"],))
                 events.append(f"лимитка {o['symbol']} истекла без исполнения")
         self.conn.commit()
         # 3. manage open trades bar by bar (stop first)
@@ -305,7 +338,7 @@ class PaperDesk:
                     break
             entry_fee = t["entry"] * t["qty"] * FEE
             pnl_r = (pnl - entry_fee) / t["risk_usd"] if t["risk_usd"] else 0
-            self.conn.execute("UPDATE paper_trades SET qty_left=?, stop_now=?, tps_hit=?, pnl_usd=?, pnl_r=?, closed=?, exit_kind=?, last_bar=? WHERE id=?",
+            self.conn.execute(f"UPDATE {self.T_TR} SET qty_left=?, stop_now=?, tps_hit=?, pnl_usd=?, pnl_r=?, closed=?, exit_kind=?, last_bar=? WHERE id=?",
                               (qty_left, stop_now, hit, pnl, pnl_r, closed, exit_kind, last_bar, t["id"]))
             if closed:
                 realized += pnl - entry_fee
@@ -313,9 +346,9 @@ class PaperDesk:
         self.conn.commit()
         # 4. equity = start + realized (closed) ; open P&L marked separately
         realized_total = sum((r[0] or 0) - (r[1] or 0) * (r[2] or 0) * FEE for r in
-                             self.conn.execute("SELECT pnl_usd, entry, qty FROM paper_trades WHERE closed IS NOT NULL").fetchall())
+                             self.conn.execute(f"SELECT pnl_usd, entry, qty FROM {self.T_TR} WHERE closed IS NOT NULL").fetchall())
         equity = round(START_EQUITY + realized_total, 2)
-        self.conn.execute("INSERT OR REPLACE INTO paper_equity VALUES(?,?)", (now, equity))
+        self.conn.execute(f"INSERT OR REPLACE INTO {self.T_EQ} VALUES(?,?)", (now, equity))
         self.conn.commit()
         return self.snapshot(by_sym, now, events)
 
@@ -331,30 +364,37 @@ class PaperDesk:
                           "open_pnl_usd": round(sgn * (px - t["entry"]) * t["qty_left"] + t["pnl_usd"], 2), "moved_r": round(sgn * (px - t["entry"]) / r, 2)})
         keys = ("id", "symbol", "side", "grade", "kind", "entry", "stop", "stop_now", "tps", "parts", "qty", "qty_left", "risk_usd", "opened",
                 "expires", "closed", "exit_kind", "pnl_usd", "pnl_r", "tps_hit", "reason", "last_bar")
-        closed = [dict(zip(keys, r)) for r in self.conn.execute("SELECT * FROM paper_trades WHERE closed IS NOT NULL ORDER BY closed DESC LIMIT 100").fetchall()]
+        closed = [dict(zip(keys, r)) for r in self.conn.execute(f"SELECT * FROM {self.T_TR} WHERE closed IS NOT NULL ORDER BY closed DESC LIMIT 100").fetchall()]
         for t in closed:
             t["tps"] = json.loads(t["tps"]); t["parts"] = json.loads(t["parts"]); t["net_usd"] = round(t["pnl_usd"] - t["entry"] * t["qty"] * FEE, 2)
         n = len(closed); wins = [t for t in closed if t["net_usd"] > 0]
-        eqh = [{"time": a, "equity": b} for a, b in self.conn.execute("SELECT time,equity FROM paper_equity ORDER BY time").fetchall()]
+        eqh = [{"time": a, "equity": b} for a, b in self.conn.execute(f"SELECT time,equity FROM {self.T_EQ} ORDER BY time").fetchall()]
         peak, dd = START_EQUITY, 0.0
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
         by_grade = {}
-        for g in ("A", "B", "C"):
+        for g in ("A", "B", "R", "C"):
             ts = [t for t in closed if t["grade"] == g]
             if ts:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),
                                "usd": round(sum(t["net_usd"] for t in ts), 2)}
         eq = self.equity()
-        return {"asof": now, "start_equity": START_EQUITY, "risk_off": self.stress(list(by_sym.values())) >= 0.7, "stress": round(self.stress(list(by_sym.values())), 3), "equity": eq, "pnl_usd": round(eq - START_EQUITY, 2), "pnl_pct": round((eq / START_EQUITY - 1) * 100, 2),
+        return {"asof": now, "profile": self.profile, "name": self.P["name"], "about": self.P["about"], "start_equity": START_EQUITY, "risk_off": self.stress(list(by_sym.values())) >= 0.7, "stress": round(self.stress(list(by_sym.values())), 3), "equity": eq, "pnl_usd": round(eq - START_EQUITY, 2), "pnl_pct": round((eq / START_EQUITY - 1) * 100, 2),
                 "open_pnl_usd": round(sum(o["open_pnl_usd"] for o in opens), 2), "open": opens, "pending": self._pending(), "closed": closed[:50],
                 "stats": {"trades": n, "winrate": round(len(wins) / n, 3) if n else None, "avg_r": round(sum(t["pnl_r"] for t in closed) / n, 3) if n else None,
                           "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0), "max_dd_pct": round(dd * 100, 2),
                           "by_grade": by_grade},
-                "equity_history": eqh[-500:], "events": events, "rules": "риск 1% на сделку, комиссия 0.05%/сторона + проскальзывание 0.02%, стоп первым внутри свечи, без заглядывания вперёд"}
+                "equity_history": eqh[-500:], "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, классы {' '.join(sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02%, стоп первым внутри свечи, без заглядывания вперёд"}
 
 
 def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
+    """Runs the three strategy accounts; the top level of the result is the default (balanced) account,
+    `profiles` holds all three so the panel can switch between them."""
     btc = next((c for c in report["coins"] if c["symbol"].startswith("BTC")), None)
     btc_bull = bool(btc and btc.get("regime", {}).get("long") == "BULL")
-    return PaperDesk(conn).step(report["coins"], btc_bull, now)
+    now = now or int(time.time() * 1000)
+    snaps = {k: PaperDesk(conn, k).step(report["coins"], btc_bull, now) for k in PROFILES}
+    out = dict(snaps[DEFAULT_PROFILE])
+    out["profiles"] = {k: {kk: vv for kk, vv in v.items() if kk != "equity_history"} | {"equity_history": v["equity_history"][-300:]} for k, v in snaps.items()}
+    out["profile_list"] = [{"key": k, "name": p["name"], "about": p["about"], "risk": p["risk"], "classes": sorted(p["classes"]), "max_open": p["max_open"]} for k, p in PROFILES.items()]
+    return out

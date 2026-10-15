@@ -7,7 +7,7 @@ Every minute it reads the autopilot's demo desk (web/paper.json published by the
 match it: a NEW autopilot position (opened ≤ 45 min ago) → market order of the same size with the same stop-loss and target;
 a position the autopilot closed (time exit, target, stop) → reduce-only market close; a moved stop → stop updated.
 Positions that were already open before the mirror started are not chased. Env:
-  CNQ_MIRROR_PROFILE=bal (cons | bal | aggr)   CNQ_MIRROR_SCALE=1.0 (size multiplier vs the $10 000 model)
+  CNQ_MIRROR_PROFILE=bal (cons | bal | aggr)   CNQ_MIRROR_SCALE=auto (sizes × Bybit balance / autopilot balance) or a number
   CNQ_MIRROR_SRC=<url of paper.json>          CNQ_LIVE_TRADING=yes → real account (default: Bybit demo)
 Log: data/mirror.jsonl, state: data/mirror_state.json. Stdlib only."""
 from __future__ import annotations
@@ -22,7 +22,8 @@ from .bybit_trade import BybitTrader
 
 SRC = os.environ.get("CNQ_MIRROR_SRC", "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/paper.json")
 PROFILE = os.environ.get("CNQ_MIRROR_PROFILE", "bal")
-SCALE = float(os.environ.get("CNQ_MIRROR_SCALE", "1.0"))
+SCALE_ENV = os.environ.get("CNQ_MIRROR_SCALE", "auto")   # auto = Bybit balance / autopilot balance (same % result on any deposit)
+SCALE = 1.0
 STATE = "data/mirror_state.json"
 LOG = "data/mirror.jsonl"
 FRESH_MS = 45 * 60_000
@@ -109,8 +110,13 @@ def main() -> int:
     bx = BybitTrader()
     if "--check" in sys.argv:
         eq = bx.equity()
+        sc = float(SCALE_ENV) if SCALE_ENV != "auto" else eq / max(1.0, float(fetch_desk().get("equity") or 10_000))
+        print(f"масштаб сделок ×{sc:.3f} (автопилот считает от своих $10 000, на Bybit — пропорционально балансу)")
         print(f"OK · {bx.mode} · баланс счёта ${eq:,.2f} · открытых позиций {len(bx.positions())} · источник {SRC} · профиль {PROFILE}")
         return 0
+    global SCALE
+    eq = bx.equity()
+    SCALE = float(SCALE_ENV) if SCALE_ENV != "auto" else eq / max(1.0, float(fetch_desk().get("equity") or 10_000))
     st = load_state(); save_state(st)
     log({"ev": "start", "mode": bx.mode, "profile": PROFILE, "scale": SCALE, "equity": bx.equity()})
     while True:

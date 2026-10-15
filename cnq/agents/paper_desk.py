@@ -140,6 +140,7 @@ class PaperDesk:
             tps TEXT, parts TEXT, qty REAL, qty_left REAL, risk_usd REAL, opened INTEGER, expires INTEGER, closed INTEGER, exit_kind TEXT,
             pnl_usd REAL, pnl_r REAL, tps_hit INTEGER, reason TEXT, last_bar INTEGER);
         CREATE TABLE IF NOT EXISTS {self.T_EQ}(time INTEGER PRIMARY KEY, equity REAL);
+        
         CREATE TABLE IF NOT EXISTS paper_meta(k TEXT PRIMARY KEY, v TEXT);""")
         conn.commit()
 
@@ -350,7 +351,18 @@ class PaperDesk:
         realized_total = sum((r[0] or 0) - (r[1] or 0) * (r[2] or 0) * FEE for r in
                              self.conn.execute(f"SELECT pnl_usd, entry, qty FROM {self.T_TR} WHERE closed IS NOT NULL").fetchall())
         equity = round(START_EQUITY + realized_total, 2)
+        # the curve is mark-to-market (open P&L included) — drawdowns are visible, not hidden until the stop
+        price_now = {k: v["candles"][-1][4] for k, v in by_sym.items()}
+        open_pnl = 0.0
+        for t in self._open():
+            px = price_now.get(t["symbol"], t["entry"]); sgn = 1 if t["side"] == "LONG" else -1
+            open_pnl += sgn * (px - t["entry"]) * t["qty_left"] + t["pnl_usd"]
         self.conn.execute(f"INSERT OR REPLACE INTO {self.T_EQ} VALUES(?,?)", (now, equity))
+        try:
+            self.conn.execute(f"ALTER TABLE {self.T_EQ} ADD COLUMN mtm REAL")
+        except Exception:  # noqa: BLE001
+            pass
+        self.conn.execute(f"UPDATE {self.T_EQ} SET mtm=? WHERE time=?", (round(equity + open_pnl, 2), now))
         self.conn.commit()
         return self.snapshot(by_sym, now, events)
 
@@ -370,7 +382,10 @@ class PaperDesk:
         for t in closed:
             t["tps"] = json.loads(t["tps"]); t["parts"] = json.loads(t["parts"]); t["net_usd"] = round(t["pnl_usd"] - t["entry"] * t["qty"] * FEE, 2)
         n = len(closed); wins = [t for t in closed if t["net_usd"] > 0]
-        eqh = [{"time": a, "equity": b} for a, b in self.conn.execute(f"SELECT time,equity FROM {self.T_EQ} ORDER BY time").fetchall()]
+        try:
+            eqh = [{"time": a, "equity": (m if m is not None else b)} for a, b, m in self.conn.execute(f"SELECT time,equity,mtm FROM {self.T_EQ} ORDER BY time").fetchall()]
+        except Exception:  # noqa: BLE001
+            eqh = [{"time": a, "equity": b} for a, b in self.conn.execute(f"SELECT time,equity FROM {self.T_EQ} ORDER BY time").fetchall()]
         peak, dd = START_EQUITY, 0.0
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)

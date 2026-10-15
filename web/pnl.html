@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRYPTO NOVA · доход онлайн</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#060b16;--panel:rgba(12,22,40,.72);--line:rgba(160,190,230,.14);--fg:#e8f0fa;--muted:#7d93ad;--acc:#7cc4ff;--up:#6fcf97;--dn:#ef7d6b;--mono:'JetBrains Mono',ui-monospace,monospace;--display:'Manrope',system-ui,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}
+body{font-family:var(--display);color:var(--fg);background:radial-gradient(1100px 500px at 50% -10%,rgba(124,196,255,.14),transparent 60%),linear-gradient(180deg,#0b1730 0%,#070e1c 45%,#040810 100%);padding:28px 20px 40px;display:grid;place-items:start center}
+.wrap{width:min(1100px,100%)}
+.top{display:flex;align-items:center;gap:14px;margin-bottom:18px}.logo{font-weight:800;letter-spacing:.3em;font-size:16px}.lamp{width:9px;height:9px;border-radius:50%;background:#ff4d5e;box-shadow:0 0 12px #ff4d5e;animation:blink 1.2s infinite}@keyframes blink{50%{opacity:.25}}
+.top .muted{margin-left:auto;font-size:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px 24px 18px;backdrop-filter:blur(10px);box-shadow:0 20px 60px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.05);overflow:hidden}
+.card:after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(180deg,rgba(124,196,255,.06),transparent 30%)}
+.card.up{border-color:rgba(111,207,151,.4);box-shadow:0 20px 60px rgba(0,0,0,.45),0 0 50px rgba(111,207,151,.08)}.card.dn{border-color:rgba(239,125,107,.4);box-shadow:0 20px 60px rgba(0,0,0,.45),0 0 50px rgba(239,125,107,.08)}
+h2{margin:0;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.big{font-family:var(--mono);font-size:clamp(38px,6vw,56px);font-weight:600;margin:10px 0 2px;letter-spacing:.02em;transition:text-shadow .3s}.big.hot{text-shadow:0 0 18px rgba(124,196,255,.9)}
+.pct{font-family:var(--mono);font-size:18px}.pos{color:var(--up)}.neg{color:var(--dn)}
+.row{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 0;font-size:12.5px;color:var(--muted)}.row b{color:var(--fg);font-family:var(--mono);font-weight:500}
+canvas.eq{display:block;width:100%;height:120px;margin-top:14px;border-radius:10px;background:rgba(6,11,22,.45)}
+.pos-list{margin-top:12px;display:grid;gap:6px}.pos-list div{display:grid;grid-template-columns:52px 1fr auto;gap:10px;font-size:12.5px;font-family:var(--mono);padding:6px 10px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.foot{margin-top:18px;font-size:11.5px;color:var(--muted);line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="logo">CRYPTO NOVA</div><span class="lamp"></span><span style="font-size:12px;letter-spacing:.1em">LIVE</span><span class="muted" id="meta">загрузка…</span></div>
+  <div class="grid">
+    <div class="card" id="fc"><h2>Фьючерсы · демо $10 000 · <span id="fname"></span></h2><div class="big" id="fv">—</div><div class="pct" id="fp"></div><div class="row"><span>сегодня <b id="fd">—</b></span><span>в работе <b id="fo">—</b></span><span>сделок <b id="fn">—</b></span><span>точность <b id="fw">—</b></span></div><canvas class="eq" id="fs"></canvas><div class="pos-list" id="fpos"></div></div>
+    <div class="card" id="sc"><h2>Спот · демо $10 000 · <span id="sname"></span></h2><div class="big" id="sv">—</div><div class="pct" id="sp"></div><div class="row"><span>сегодня <b id="sd">—</b></span><span>позиций <b id="so">—</b></span><span>в кэше <b id="sk">—</b></span></div><canvas class="eq" id="ss"></canvas><div class="pos-list" id="spos"></div></div>
+  </div>
+  <div class="foot" id="foot">Два демо-счёта по $10 000 торгуют по правилам системы без участия человека: фьючерсы — сбалансированная стратегия (сделки только от сильных зон, риск 1% на сделку, стоп известен заранее), спот — умеренный портфель (ядро BTC/ETH + фундаментальные идеи, докупки частями на просадках). Цены — Bybit, обновление каждые 10 секунд; история — с запуска счёта. Это демонстрация работы алгоритма, не финансовый совет.</div>
+</div>
+<script>
+const $=s=>document.querySelector(s); const fmt=v=>'$'+Math.round(v).toLocaleString('ru-RU'); const fmtP=p=>p>=1000?Math.round(p).toLocaleString('ru-RU'):p>=1?p.toFixed(2):p.toFixed(4);
+let PAPER=null, PF=null, PX={};
+async function loadJson(){ try{ PAPER=await (await fetch('./paper.json',{cache:'no-store'})).json(); }catch(e){} try{ PF=await (await fetch('./portfolio.json',{cache:'no-store'})).json(); }catch(e){} }
+async function prices(){ const syms=new Set(); const P=PAPER&&PAPER.profiles&&PAPER.profiles.bal; const S=PF&&PF.portfolios&&PF.portfolios.mod; if(P) P.open.forEach(o=>syms.add(o.symbol)); if(S) S.positions.forEach(p=>syms.add(p.symbol)); if(!syms.size) return;
+  try{ const r=await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear')).json(); (r.result&&r.result.list||[]).forEach(t=>{ const b=t.symbol.replace(/USDT$/,''); if(syms.has(b)) PX[b]=+t.lastPrice; }); }catch(e){}
+  try{ const miss=[...syms].filter(b=>!PX[b]); if(miss.length){ const r=await (await fetch('https://api.bybit.com/v5/market/tickers?category=spot')).json(); (r.result&&r.result.list||[]).forEach(t=>{ const b=t.symbol.replace(/USDT$/,''); if(miss.includes(b)) PX[b]=+t.lastPrice; }); } }catch(e){} }
+function spark(c,vals,up){ if(!c||vals.length<2) return; const W=c.clientWidth,H=c.clientHeight; c.width=W*devicePixelRatio; c.height=H*devicePixelRatio; const g=c.getContext('2d'); g.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); g.clearRect(0,0,W,H); const lo=Math.min(...vals,10000),hi=Math.max(...vals,10000); const X=i=>8+i/(vals.length-1)*(W-16), Y=v=>H-10-(hi>lo?(v-lo)/(hi-lo):0.5)*(H-20); g.strokeStyle='rgba(160,190,230,.25)'; g.setLineDash([3,4]); g.beginPath(); g.moveTo(8,Y(10000)); g.lineTo(W-8,Y(10000)); g.stroke(); g.setLineDash([]); const col=up?'111,207,151':'239,125,107'; const gr=g.createLinearGradient(0,0,0,H); gr.addColorStop(0,`rgba(${col},.35)`); gr.addColorStop(1,`rgba(${col},0)`); g.beginPath(); vals.forEach((v,i)=>i?g.lineTo(X(i),Y(v)):g.moveTo(X(i),Y(v))); g.lineTo(X(vals.length-1),H); g.lineTo(X(0),H); g.closePath(); g.fillStyle=gr; g.fill(); g.strokeStyle=`rgba(${col},.95)`; g.lineWidth=1.8; g.shadowColor=`rgba(${col},.8)`; g.shadowBlur=8; g.beginPath(); vals.forEach((v,i)=>i?g.lineTo(X(i),Y(v)):g.moveTo(X(i),Y(v))); g.stroke(); g.shadowBlur=0; g.fillStyle='rgba(160,190,230,.7)'; g.font='10px JetBrains Mono'; g.fillText('старт $10 000', 12, Y(10000)-4); }
+let prev={};
+function setBig(id,v){ const e=$(id); const t=fmt(v); if(e.textContent!==t){ e.textContent=t; if(prev[id]!=null&&Math.abs(prev[id]-v)>=0.5){ e.classList.add('hot'); setTimeout(()=>e.classList.remove('hot'),600); } prev[id]=v; } }
+function dayPnl(hist,nowV,get){ if(!hist||!hist.length) return null; const cut=Date.now()-86400000; let base=null; for(const h of hist){ if(h.time<=cut) base=get(h); } if(base==null) base=get(hist[0]); return nowV-base; }
+function render(){ const P=PAPER&&PAPER.profiles&&PAPER.profiles.bal; const S=PF&&PF.portfolios&&PF.portfolios.mod;
+  if(P){ let f=P.equity; const rows=[]; for(const o of P.open){ const px=PX[o.symbol]||o.price; const sgn=o.side==='LONG'?1:-1; const u=sgn*(px-o.entry)*o.qty_left+o.pnl_usd; f+=u; rows.push(`<div><span class="${o.side==='LONG'?'pos':'neg'}">${o.side==='LONG'?'лонг':'шорт'}</span><span>${o.symbol} от ${fmtP(o.entry)}</span><span class="${u>=0?'pos':'neg'}">${u>=0?'+':'−'}$${Math.abs(u).toFixed(0)}</span></div>`); } const pf=(f/10000-1)*100; setBig('#fv',f); $('#fp').textContent=`${pf>=0?'+':''}${pf.toFixed(2)}% · ${f-10000>=0?'+':'−'}$${Math.abs(f-10000).toFixed(0)} с запуска`; $('#fp').className='pct '+(pf>=0?'pos':'neg'); $('#fc').className='card '+(pf>=0?'up':'dn'); $('#fname').textContent=P.name.toLowerCase(); const d=dayPnl(P.equity_history,f,x=>x.equity); $('#fd').textContent=d==null?'—':`${d>=0?'+':'−'}$${Math.abs(d).toFixed(0)}`; $('#fo').textContent=P.open.length; $('#fn').textContent=P.stats.trades; $('#fw').textContent=P.stats.winrate!=null?Math.round(P.stats.winrate*100)+'%':'—'; $('#fpos').innerHTML=rows.join('')||'<div><span class="pos">—</span><span>открытых позиций нет — ждём цену у зоны</span><span></span></div>'; const hv=P.equity_history.map(x=>x.equity); hv.push(f); spark($('#fs'),hv.slice(-200),pf>=0); }
+  if(S){ let k=1; const rows=[]; for(const p of S.positions){ const px=PX[p.symbol]; const r=px&&p.price?px/p.price-1:0; if(px&&p.price) k+=p.weight*r; const pnl=px&&p.entry?(px/p.entry-1)*100:p.pnl_pct; rows.push(`<div><span>${(p.weight*100).toFixed(0)}%</span><span>${p.symbol} от ${fmtP(p.entry)}</span><span class="${pnl>=0?'pos':'neg'}">${pnl>=0?'+':''}${pnl.toFixed(1)}%</span></div>`); } const sp=10000*S.index/100*k; const ps=(sp/10000-1)*100; setBig('#sv',sp); $('#sp').textContent=`${ps>=0?'+':''}${ps.toFixed(2)}% · ${sp-10000>=0?'+':'−'}$${Math.abs(sp-10000).toFixed(0)} с запуска`; $('#sp').className='pct '+(ps>=0?'pos':'neg'); $('#sc').className='card '+(ps>=0?'up':'dn'); $('#sname').textContent=S.name.toLowerCase(); const d=dayPnl(S.history,sp,x=>10000*(x.v!=null?x.v:x.equity)/100); $('#sd').textContent=d==null?'—':`${d>=0?'+':'−'}$${Math.abs(d).toFixed(0)}`; $('#so').textContent=S.positions.length; $('#sk').textContent=S.cash_pct+'%'; $('#spos').innerHTML=rows.join(''); const hv=S.history.map(x=>10000*(x.v!=null?x.v:x.equity)/100); hv.push(sp); spark($('#ss'),hv.slice(-200),ps>=0); }
+  $('#meta').textContent=(PAPER?'сервер '+new Date(PAPER.asof).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' · ':'')+(Object.keys(PX).length?'цены Bybit live':'цены сервера'); }
+(async()=>{ await loadJson(); await prices(); render(); setInterval(async()=>{ await prices(); render(); },10000); setInterval(async()=>{ await loadJson(); render(); },5*60000); })();
+</script>
+</body>
+</html>

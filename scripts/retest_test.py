@@ -238,3 +238,31 @@ if __name__ == '__main__' and '--gerchik' in sys.argv:
             if b[i,4] > hiN + 0.3*a: tot += 1; fails += int((b[i+1:i+25,4] < hiN - 0.5*a).any())
             elif b[i,4] < loN - 0.3*a: tot += 1; fails += int((b[i+1:i+25,4] > loN + 0.5*a).any())
     print(f"breakouts on volume: {tot}, failed (closed back beyond level within 4 days): {fails/tot*100:.0f}%")
+
+if __name__ == '__main__' and '--stress' in sys.argv:
+    # Split retest trades by market breadth at the breakout bar: stress = ≥70 % of coins down >3 % over 24h (15m grid).
+    import collections
+    D = {}
+    for s in syms:
+        rows = conn.execute("select open_time, close from candles where symbol=? and interval='15m' order by open_time", (s,)).fetchall()
+        D[s] = dict(rows)
+    times = sorted(set.intersection(*[set(D[s]) for s in syms]))
+    br = {}
+    for n, t in enumerate(times):
+        if n < 96: continue
+        t0 = times[n - 96]; xs = [D[s][t] / D[s][t0] - 1 for s in syms]
+        br[t] = sum(1 for x in xs if x < -0.03) / len(xs)
+    def breadth_at(ms):
+        # nearest 15m grid time at or before ms
+        k = ms - ms % 900_000
+        for _ in range(8):
+            if k in br: return br[k]
+            k -= 900_000
+        return 0.0
+    res = run()
+    for side in ('LONG', 'SHORT'):
+        groups = collections.defaultdict(list)
+        for t, r in res[side]:
+            groups['stress' if breadth_at(int(t)) >= 0.7 else 'calm'].append(r)
+        for g, rs in groups.items():
+            a = np.array(rs); print(f"R {side:5} {g:6} n={len(a):4d} avgR={a.mean():+.3f} WR={(a>0).mean()*100:3.0f}% sumR={a.sum():+.0f}")

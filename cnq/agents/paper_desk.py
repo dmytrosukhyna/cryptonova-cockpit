@@ -33,9 +33,9 @@ PROFILES = {
     "cons": {"name": "Осторожная", "classes": {"A", "R"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "none",
              "prefix": "paper_cons_", "about": "Только проверенные входы (гэп FX, ретест с повторным пробоем), риск 0.5%, не больше 2 позиций, в режиме риска не торгует."},
     "bal":  {"name": "Сбалансированная", "classes": {"A", "B", "R", "E"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.20,
-             "prefix": "paper_bal_", "about": "Гэп FX, откуп каскада, ретест, откуп климакса (E: корзина 20% счёта на сутки, без тесного стопа); риск 1%, до 4 позиций, в режиме риска шорты и класс E."},
+             "prefix": "paper_bal_", "about": "Гэп FX, откуп каскада, ретест, откуп климакса (E: корзина 20% счёта на сутки, без тесного стопа); риск 1%, до 4 позиций, в режиме риска — только откуп климакса (E), ретест-шорты в распродаже не торгуем (≈ 0 на истории)."},
     "aggr": {"name": "Агрессивная", "classes": {"A", "B", "R", "E"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.30,
-             "prefix": "paper_", "about": "Гэп FX, откуп каскада, ретест без подтверждения; риск 1.5%, до 6 позиций, в режиме риска шорты. Класс C (лимит у уровня, ≈ 0 на истории) — только наблюдение, не торгуется."},
+             "prefix": "paper_", "about": "Гэп FX, откуп каскада, ретест без подтверждения; риск 1.5%, до 6 позиций, в режиме риска — только E. Класс C (лимит у уровня, ≈ 0 на истории) — только наблюдение, не торгуется."},
 }
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
@@ -277,6 +277,9 @@ class PaperDesk:
                 if s["id"] in known or base in open_syms or s["grade"] not in self.P["classes"]:
                     continue
                 if s["grade"] == "E" and (e_blocked or base in {t["symbol"] for t in self._open()}):
+                    continue
+                if risk_off and s["grade"] == "R" and s["side"] == "SHORT":   # history: retest shorts inside a broad sell-off ≈ 0 (+0.013R, n=839) vs +0.155R in calm markets
+                    events.append(f"пропуск шорта {base}: ретест внутри широкой распродажи на истории ≈ 0 — ждём спокойного рынка")
                     continue
                 if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
                     events.append(f"пропуск {'лонга' if s['side'] == 'LONG' else 'шорта'} {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")

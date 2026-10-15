@@ -59,7 +59,13 @@ def test_alt_longs_blocked_in_bear_and_cascade_market_entry():
     cs[-1] = [cs[-1][0], 9.6, 9.65, 9.55, 9.6, 100.0]
     c2 = {"symbol": "SOL-USDT", "candles": cs, "levels": [], "regime": {"long": "BULL"}}
     res = desk.step([c2], True, cs[-1][0] + 1)
-    assert res["open"] and res["open"][0]["grade"] == "B" and res["open"][0]["side"] == "LONG"
+    # the same candle is also a class-E climax (broad sell-off + 5× volume); E wins on this desk, B on a desk without E
+    assert res["open"] and res["open"][0]["grade"] == "E" and res["open"][0]["side"] == "LONG"
+    assert abs(res["open"][0]["stop"] / res["open"][0]["entry"] - (1 - pd.E_STOP)) < 1e-3   # entry carries slippage
+    desk_b = pd.PaperDesk(sqlite3.connect(":memory:"), classes={"A", "B", "R"})
+    res_b = desk_b.step([c2], True, cs[-1][0] + 1)
+    assert res_b["open"] and res_b["open"][0]["grade"] == "B" and res_b["open"][0]["side"] == "LONG"
+    res = res_b
 
 
 def test_retest_scan_and_signal():

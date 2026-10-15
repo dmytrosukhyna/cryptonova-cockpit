@@ -32,9 +32,9 @@ RISK = 0.01
 PROFILES = {
     "cons": {"name": "Осторожная", "classes": {"A", "R"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "none",
              "prefix": "paper_cons_", "about": "Только проверенные входы (гэп FX, ретест с повторным пробоем), риск 0.5%, не больше 2 позиций, в режиме риска не торгует."},
-    "bal":  {"name": "Сбалансированная", "classes": {"A", "B", "R"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
-             "prefix": "paper_bal_", "about": "Гэп FX, откуп каскада, ретест; риск 1%, до 4 позиций, в режиме риска только шорты."},
-    "aggr": {"name": "Агрессивная", "classes": {"A", "B", "R"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
+    "bal":  {"name": "Сбалансированная", "classes": {"A", "B", "R", "E"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.20,
+             "prefix": "paper_bal_", "about": "Гэп FX, откуп каскада, ретест, откуп климакса (E: корзина 20% счёта на сутки, без тесного стопа); риск 1%, до 4 позиций, в режиме риска шорты и класс E."},
+    "aggr": {"name": "Агрессивная", "classes": {"A", "B", "R", "E"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.30,
              "prefix": "paper_", "about": "Гэп FX, откуп каскада, ретест без подтверждения; риск 1.5%, до 6 позиций, в режиме риска шорты. Класс C (лимит у уровня, ≈ 0 на истории) — только наблюдение, не торгуется."},
 }
 DEFAULT_PROFILE = "bal"
@@ -43,6 +43,10 @@ SLIP = 0.0002
 HOLD_C_H = 48
 HOLD_B_H = 8
 HOLD_R_H = 192
+HOLD_E_H = 24          # class E: liquidation-climax long inside a broad sell-off, time exit 24 h, catastrophe stop −12 % (docs/research/exhaustion_long.md)
+E_DROP = -0.015
+E_VOL = 3.0
+E_STOP = 0.12
 ORDER_TTL_H = 24
 MAX_OPEN = 6
 
@@ -209,6 +213,18 @@ class PaperDesk:
                                 "order": "MARKET", "hold_h": HOLD_R_H,
                                 "reason": f"Пробой {'сопротивления' if side == 'LONG' else 'поддержки'} {rt['level']:.6g} на объёме и ретест: свеча 4ч вернулась к уровню и закрылась "
                                           f"{'выше' if side == 'LONG' else 'ниже'}{' , затем повторный пробой (подтверждение)' if confirm else ''}. Вход по рынку, стоп {stop:.6g}, цель {tgt:g}R, до 8 дней."})
+        # E: liquidation climax inside a broad sell-off — last closed 15m candle ≤ −1.5 % on ≥ 3× its 24h average volume
+        if getattr(self, "_stress", 0.0) >= 0.7 and len(c15) >= 100:
+            last = c15[-2]
+            vavg = sum(k[5] for k in c15[-98:-2]) / 96 if len(c15[-98:-2]) == 96 else 0
+            ret_oc = last[4] / last[1] - 1 if last[1] else 0
+            if vavg and ret_oc <= E_DROP and last[5] >= E_VOL * vavg:
+                entry = c15[-1][1]
+                out.append({"id": f"E-{base}-{last[0]}", "symbol": base, "side": "LONG", "grade": "E", "kind": "CLIMAX_LONG",
+                            "entry": entry, "stop": entry * (1 - E_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
+                            "order": "MARKET", "hold_h": HOLD_E_H,
+                            "reason": f"Откуп климакса: в широкой распродаже свеча {ret_oc*100:.1f}% на объёме {last[5]/vavg:.1f}× — на истории такие свечи выкупают в течение суток (+2% в среднем). "
+                                      f"Выход по времени через 24 ч, катастрофический стоп −{E_STOP*100:.0f}%, размер — доля счёта, не риск по стопу."})
         # cascade long: last closed 15m candle
         rets = [c15[i][4] / c15[i - 1][4] - 1 for i in range(max(1, len(c15) - 96 * 30), len(c15) - 1)]
         sig = math.sqrt(sum(x * x for x in rets) / len(rets)) if rets else 0
@@ -240,9 +256,19 @@ class PaperDesk:
     def step(self, coins: list[dict], btc_bull: bool, now: int | None = None) -> dict:
         now = now or int(time.time() * 1000)
         by_sym = {c["symbol"].replace("-USDT", "").replace("USDT", ""): c for c in coins}
-        risk_off = self.stress(coins) >= 0.7
+        self._stress = self.stress(coins)
+        risk_off = self._stress >= 0.7
         events: list[str] = []
         eq = self.equity()
+        # class E basket: all climax signals of this step share e_share of equity; one basket per 20 h
+        e_sigs = {}
+        if "E" in self.P["classes"]:
+            for base, coin in by_sym.items():
+                for s in self.signals(coin, btc_bull, now):
+                    if s["grade"] == "E":
+                        e_sigs[base] = s
+        e_recent = [t for t in self._open() if t["grade"] == "E" and now - t["opened"] < 20 * 3_600_000]
+        e_blocked = bool(e_recent) and any(t["opened"] != now for t in e_recent)
         # 1. new signals → orders / market fills
         known = {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_ORD}")} | {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_TR}")}
         open_syms = {t["symbol"] for t in self._open()} | {o["symbol"] for o in self._pending()}
@@ -250,14 +276,21 @@ class PaperDesk:
             for s in self.signals(coin, btc_bull, now):
                 if s["id"] in known or base in open_syms or s["grade"] not in self.P["classes"]:
                     continue
-                if risk_off and ((s["side"] == "LONG" and s["grade"] != "B") or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
+                if s["grade"] == "E" and (e_blocked or base in {t["symbol"] for t in self._open()}):
+                    continue
+                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
                     events.append(f"пропуск {'лонга' if s['side'] == 'LONG' else 'шорта'} {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
                     continue
-                if len(self._open()) + len(self._pending()) >= self.P["max_open"]:
+                if s["grade"] != "E" and len(self._open()) + len(self._pending()) >= self.P["max_open"]:
                     break
-                risk_usd = eq * self.P["risk"]
-                r = abs(s["entry"] - s["stop"])
-                qty = risk_usd / (r + s["entry"] * (2 * FEE + SLIP))
+                if s["grade"] == "E":
+                    notional = eq * self.P.get("e_share", 0.2) / max(1, len(e_sigs))
+                    qty = notional / s["entry"]
+                    risk_usd = notional * E_STOP
+                else:
+                    risk_usd = eq * self.P["risk"]
+                    r = abs(s["entry"] - s["stop"])
+                    qty = risk_usd / (r + s["entry"] * (2 * FEE + SLIP))
                 if s["order"] == "MARKET":
                     fill = s["entry"] * (1 + SLIP)
                     self.conn.execute(f"INSERT INTO {self.T_TR} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",

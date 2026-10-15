@@ -27,8 +27,9 @@
 
 ## Запуск
 ```bash
-export ANTHROPIC_API_KEY=...          # без него — мок
-export CNQ_LLM_MODEL=claude-sonnet-5-5
+export CNQ_LLM_PROVIDER=groq          # groq (бесплатно, по умолчанию) | gemini | openrouter | anthropic
+export CNQ_LLM_KEY=...                # без него — мок
+export CNQ_LLM_MODEL=openai/gpt-oss-120b   # необязательно, у провайдера есть модель по умолчанию
 python -m cnq.cli terminal --out web  # квант-слой
 python -m cnq.cli agents --out web --send   # отделы → web/decision.json, пост в Telegram
 ```

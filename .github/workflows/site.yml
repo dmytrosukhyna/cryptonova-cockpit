@@ -41,6 +41,8 @@ jobs:
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}
+          CNQ_LLM_PROVIDER: ${{ vars.CNQ_LLM_PROVIDER }}
           CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
           CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
@@ -58,6 +60,8 @@ jobs:
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}
+          CNQ_LLM_PROVIDER: ${{ vars.CNQ_LLM_PROVIDER }}
           CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
         run: python -m cnq.cli portfolio --out web
       - name: Forecast calibration (A/B записывается и проверяется) → web/calibration.json

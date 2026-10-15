@@ -24,7 +24,8 @@ pm2 serve web 8080 --name cnq-web --spa     # или nginx: root → ~/cryptonov
 */15 * * * * cd ~/cryptonova-quant && . .venv/bin/activate && for s in BTC-USDT ETH-USDT SOL-USDT BNB-USDT XRP-USDT DOGE-USDT ADA-USDT AVAX-USDT LINK-USDT LTC-USDT; do CNQ_SYMBOL=$s python -m cnq.cli backfill --days 2 >/dev/null; done && python -m cnq.cli terminal --out web && python -m cnq.cli alerts
 
 # 4b. Отделы (новости/фундаментал/риск/редактор) — раз в час, пост с утренним брифом
-export ANTHROPIC_API_KEY=...
+export CNQ_LLM_PROVIDER=groq   # groq | gemini | openrouter | anthropic
+export CNQ_LLM_KEY=...
 0 * * * *   cd ~/cryptonova-quant && . .venv/bin/activate && python -m cnq.cli agents --out web
 5 6 * * *   cd ~/cryptonova-quant && . .venv/bin/activate && python -m cnq.cli agents --out web --send
 

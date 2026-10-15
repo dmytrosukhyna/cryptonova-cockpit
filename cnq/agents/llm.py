@@ -1,7 +1,8 @@
-"""LLM client (Anthropic Messages API, stdlib only) + a deterministic mock for tests.
+"""LLM client (stdlib only) + a deterministic mock for tests.
 
-Env: ANTHROPIC_API_KEY, CNQ_LLM_MODEL (default claude-sonnet-5-5).
-Every agent asks for JSON and validates it; a bad or missing answer degrades to the
+Providers (env CNQ_LLM_PROVIDER): groq (default, free tier), gemini (free Flash models), openrouter (free models),
+anthropic (paid). Key: CNQ_LLM_KEY (ANTHROPIC_API_KEY also accepted for anthropic). Model: CNQ_LLM_MODEL overrides
+the provider default. Every agent asks for JSON and validates it; a bad or missing answer degrades to the
 rule-based fallback, never to invented numbers."""
 from __future__ import annotations
 
@@ -10,13 +11,22 @@ import os
 import re
 import urllib.request
 
-API = "https://api.anthropic.com/v1/messages"
+PROVIDERS = {
+    "groq": {"url": "https://api.groq.com/openai/v1/chat/completions", "model": "openai/gpt-oss-120b", "style": "openai"},
+    "gemini": {"url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "model": "gemini-3.5-flash-lite", "style": "openai"},
+    "openrouter": {"url": "https://openrouter.ai/api/v1/chat/completions", "model": "openai/gpt-oss-120b:free", "style": "openai"},
+    "anthropic": {"url": "https://api.anthropic.com/v1/messages", "model": "claude-sonnet-5-5", "style": "anthropic"},
+}
+API = PROVIDERS["anthropic"]["url"]
 
 
 class LLM:
-    def __init__(self, model: str | None = None, api_key: str | None = None, max_tokens: int = 2000):
-        self.model = model or os.environ.get("CNQ_LLM_MODEL", "claude-sonnet-5-5")
-        self.key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    def __init__(self, model: str | None = None, api_key: str | None = None, max_tokens: int = 2000, provider: str | None = None):
+        self.provider = (provider or os.environ.get("CNQ_LLM_PROVIDER") or "groq").lower()
+        if self.provider not in PROVIDERS:
+            self.provider = "groq"
+        self.model = model or os.environ.get("CNQ_LLM_MODEL") or PROVIDERS[self.provider]["model"]
+        self.key = api_key or os.environ.get("CNQ_LLM_KEY") or (os.environ.get("ANTHROPIC_API_KEY") if self.provider == "anthropic" else None)
         self.max_tokens = max_tokens
         self.calls = 0
 
@@ -26,16 +36,24 @@ class LLM:
 
     def complete(self, system: str, user: str, temperature: float = 0.2) -> str:
         if not self.key:
-            raise RuntimeError("ANTHROPIC_API_KEY not set")
-        body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": temperature,
-                "system": system, "messages": [{"role": "user", "content": user}]}
-        req = urllib.request.Request(API, data=json.dumps(body).encode(),
-                                     headers={"x-api-key": self.key, "anthropic-version": "2023-06-01",
-                                              "content-type": "application/json"})
+            raise RuntimeError("LLM key not set (CNQ_LLM_KEY)")
+        P = PROVIDERS[self.provider]
+        if P["style"] == "anthropic":
+            body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": temperature,
+                    "system": system, "messages": [{"role": "user", "content": user}]}
+            headers = {"x-api-key": self.key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+        else:
+            body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": temperature,
+                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+            headers = {"authorization": "Bearer " + self.key, "content-type": "application/json"}
+        req = urllib.request.Request(P["url"], data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(req, timeout=120) as r:
             msg = json.loads(r.read().decode())
         self.calls += 1
-        return "".join(b.get("text", "") for b in msg.get("content", []) if b.get("type") == "text")
+        if P["style"] == "anthropic":
+            return "".join(b.get("text", "") for b in msg.get("content", []) if b.get("type") == "text")
+        ch = (msg.get("choices") or [{}])[0]
+        return ((ch.get("message") or {}).get("content")) or ""
 
     def json(self, system: str, user: str) -> dict | list | None:
         """Ask for strict JSON; tolerate code fences; return None on failure."""

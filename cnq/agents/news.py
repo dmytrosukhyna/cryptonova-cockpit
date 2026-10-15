@@ -117,7 +117,8 @@ class NewsAnalyst:
     def analyze(self, items: list[dict], prices: dict[str, float]) -> list[dict]:
         if not items:
             return []
-        payload = [{k: it[k] for k in ("id", "source", "title", "summary", "published", "assets_hint")} for it in items[:40]]
+        # token diet for free tiers: 25 items, summaries trimmed to 280 chars
+        payload = [{k: ((it[k][:280] if k == "summary" and isinstance(it[k], str) else it[k])) for k in ("id", "source", "title", "summary", "published", "assets_hint")} for it in items[:25]]
         res = self.llm.json(NEWS_SYSTEM, json.dumps(payload, ensure_ascii=False))
         if not isinstance(res, list):
             return []

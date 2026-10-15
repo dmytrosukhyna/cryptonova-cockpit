@@ -51,7 +51,7 @@ def test_llm_output_used_when_faithful():
     tmp = tempfile.mkdtemp(); _web(tmp)
     conn = sqlite3.connect(":memory:"); ch = channel.Channel(conn, tmp)
     class Good:
-        def complete(self, s, u, temperature=0.2): return "<b>Доброе утро, дорогие подписчики!</b> Биткоин $80 984 (-2.9%), эфир $2 366. " + "Рынок нервный. " * 20
+        def complete(self, s, u, temperature=0.2): return "<b>Доброе утро, дорогие подписчики!</b> Биткоин $80 984 (-2.9%), эфир $2 366.\n\n" + "Рынок нервный.\n" * 20
     class Bad:
         def complete(self, s, u, temperature=0.2): return "<b>Доброе утро!</b> Биткоин пробьёт 120 000 уже завтра. " + "Покупайте. " * 30
     assert "Биткоин $80 984" in ch.post("morning", llm=Good())

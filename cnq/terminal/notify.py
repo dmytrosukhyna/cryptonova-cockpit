@@ -24,6 +24,25 @@ def send(text: str, token: str | None = None, chat: str | None = None, parse_mod
         return json.loads(r.read().decode()).get("ok", False)
 
 
+def send_photo(path: str, caption: str = "", token: str | None = None, chat: str | None = None, parse_mode: str = "HTML") -> bool:
+    """sendPhoto with a multipart body (stdlib only). Caption ≤ 1024 chars."""
+    token = token or os.environ.get("CNQ_TG_TOKEN"); chat = chat or os.environ.get("CNQ_TG_CHAT")
+    if not token or not chat or not os.path.exists(path):
+        return False
+    import uuid
+    boundary = "----cnq" + uuid.uuid4().hex
+    fields = {"chat_id": chat, "caption": caption[:1024], "parse_mode": parse_mode}
+    body = b""
+    for k, v in fields.items():
+        body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode()
+    body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"chart.png\"\r\nContent-Type: image/png\r\n\r\n".encode()
+    body += open(path, "rb").read() + f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendPhoto", data=body,
+                                 headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode()).get("ok", False)
+
+
 def _fmt(p: float) -> str:
     return f"{p:,.0f}".replace(",", " ") if p >= 1000 else (f"{p:.2f}" if p >= 1 else f"{p:.4f}")
 

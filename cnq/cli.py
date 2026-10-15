@@ -171,7 +171,8 @@ def main(argv: list[str] | None = None) -> int:
             print(ch.post(args.slot or "morning")); return 0
         send = notify.send if args.send else (lambda t: (print(t), True)[1])
         send_html = (lambda t: notify.send(t, parse_mode="HTML")) if args.send else send
-        res = ch.run(send_html, llm=llm, force_slot=args.slot)
+        photo = (lambda path, cap: notify.send_photo(path, cap)) if args.send else (lambda path, cap: print('photo:', path))
+        res = ch.run(send_html, llm=llm, force_slot=args.slot, photo_fn=photo)
         print(f"channel: slot={res.get('slot')} sent={res.get('sent')} {res.get('why', '')} kyiv={kyiv_now():%H:%M}")
     elif args.cmd == "fx-gaps":
         from .fx.gaps import run as fx_run

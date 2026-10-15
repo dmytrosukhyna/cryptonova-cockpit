@@ -34,6 +34,8 @@ jobs:
           restore-keys: |
             cnq-state-
             cnq-db-
+      - name: Pillow for post charts
+        run: pip install -q pillow
       - name: Candles (BingX, 15m, 400 days)
         continue-on-error: true
         run: python scripts/ci_refresh.py

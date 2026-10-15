@@ -348,7 +348,21 @@ class Channel:
         self.conn.execute("INSERT OR REPLACE INTO channel_posts VALUES(?,?,?,?)", (day, slot, int(time.time() * 1000), text))
         self.conn.commit()
 
-    def run(self, send_fn, llm=None, now: dt.datetime | None = None, force_slot: str | None = None) -> dict:
+    def chart(self, x: dict, slot: str) -> str | None:
+        """PNG for the post (morning/evening): BTC wave, zones, A/B. None if Pillow is missing or data is thin."""
+        try:
+            from . import postchart
+            btc = self.coin(x["terminal"], "BTC")
+            if not btc:
+                return None
+            mb = next((t for t in x["markets"].get("top", []) if t.get("symbol") == "BTC"), None)
+            title = f"BTC/USDT · 1 час · {'утро' if slot == 'morning' else 'вечер' if slot == 'evening' else 'день'} {kyiv_now():%d.%m}"
+            return postchart.render(btc, (x["calibration"].get("open") or {}).get("BTC"), x["markets"].get("fng"),
+                                    os.path.join(self.out, "post_chart.png"), title=title, chg24=mb.get("chg24") if mb else None)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def run(self, send_fn, llm=None, now: dt.datetime | None = None, force_slot: str | None = None, photo_fn=None) -> dict:
         now = now or kyiv_now()
         day = now.strftime("%Y-%m-%d")
         slot = force_slot or slot_for(now)
@@ -363,6 +377,13 @@ class Channel:
         texts.append((slot, self.polish(self.post(slot, now), llm)))
         sent = 0
         for s, t in texts:
+            if photo_fn and s in ("morning", "evening"):
+                png = self.chart(self.ctx(), s)
+                if png:
+                    try:
+                        photo_fn(png, t.split("\n\n")[0])
+                    except Exception:  # noqa: BLE001
+                        pass
             if send_fn(t):
                 self.record(day if s != "intro" else "intro", s, t)
                 sent += 1

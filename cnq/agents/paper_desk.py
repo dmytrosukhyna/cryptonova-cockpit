@@ -357,12 +357,11 @@ class PaperDesk:
         for t in self._open():
             px = price_now.get(t["symbol"], t["entry"]); sgn = 1 if t["side"] == "LONG" else -1
             open_pnl += sgn * (px - t["entry"]) * t["qty_left"] + t["pnl_usd"]
-        self.conn.execute(f"INSERT OR REPLACE INTO {self.T_EQ} VALUES(?,?)", (now, equity))
         try:
             self.conn.execute(f"ALTER TABLE {self.T_EQ} ADD COLUMN mtm REAL")
         except Exception:  # noqa: BLE001
             pass
-        self.conn.execute(f"UPDATE {self.T_EQ} SET mtm=? WHERE time=?", (round(equity + open_pnl, 2), now))
+        self.conn.execute(f"INSERT OR REPLACE INTO {self.T_EQ}(time, equity, mtm) VALUES(?,?,?)", (now, equity, round(equity + open_pnl, 2)))
         self.conn.commit()
         return self.snapshot(by_sym, now, events)
 

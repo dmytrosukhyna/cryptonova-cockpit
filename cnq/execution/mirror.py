@@ -49,6 +49,36 @@ def save_state(st: dict) -> None:
     json.dump(st, open(STATE, "w"), indent=1)
 
 
+GH_TOKEN = os.environ.get("CNQ_GH_TOKEN", "")          # optional: fine-grained token (this repo, Contents: write) → web/bybit.json
+GH_REPO = os.environ.get("CNQ_GH_REPO", "dmytrosukhyna/cryptonova-cockpit")
+
+
+def publish(bx: BybitTrader, st: dict) -> bool:
+    """Push the Bybit demo account state (balance, open positions — never keys) to web/bybit.json so the site can show it."""
+    if not GH_TOKEN:
+        return False
+    import base64
+    eq = bx.equity(); pos = bx.positions()
+    st.setdefault("start_equity", eq)
+    body = {"asof": int(time.time() * 1000), "mode": bx.mode, "equity": round(eq, 2), "start_equity": round(st["start_equity"], 2),
+            "positions": [{"symbol": k.replace("USDT", ""), "side": "LONG" if v.get("side") == "Buy" else "SHORT", "size": float(v.get("size") or 0),
+                           "entry": float(v.get("avgPrice") or 0), "upnl": round(float(v.get("unrealisedPnl") or 0), 2),
+                           "stop": float(v.get("stopLoss") or 0) or None} for k, v in pos.items()]}
+    url = f"https://api.github.com/repos/{GH_REPO}/contents/web/bybit.json"
+    hdr = {"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-mirror"}
+    sha = None
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url + "?ref=main", headers=hdr), timeout=15) as r:
+            sha = json.loads(r.read().decode()).get("sha")
+    except Exception:  # noqa: BLE001
+        pass
+    data = {"message": "bybit demo status", "branch": "main",
+            "content": base64.b64encode(json.dumps(body, ensure_ascii=False).encode()).decode(), **({"sha": sha} if sha else {})}
+    req = urllib.request.Request(url, data=json.dumps(data).encode(), method="PUT", headers={**hdr, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return r.status in (200, 201)
+
+
 def fetch_desk() -> dict:
     req = urllib.request.Request(SRC + f"?t={int(time.time())}", headers={"Cache-Control": "no-cache", "User-Agent": "cnq-mirror"})
     with urllib.request.urlopen(req, timeout=20) as r:
@@ -118,7 +148,9 @@ def main() -> int:
     eq = bx.equity()
     SCALE = float(SCALE_ENV) if SCALE_ENV != "auto" else eq / max(1.0, float(fetch_desk().get("equity") or 10_000))
     st = load_state(); save_state(st)
+    r = {}
     log({"ev": "start", "mode": bx.mode, "profile": PROFILE, "scale": SCALE, "equity": bx.equity()})
+    last_pub = 0.0
     while True:
         try:
             r = step(bx, st, fetch_desk())
@@ -126,6 +158,12 @@ def main() -> int:
                 log({"ev": "step", **r})
         except Exception as e:  # noqa: BLE001
             log({"ev": "error", "error": str(e)[:200]})
+        if GH_TOKEN and (time.time() - last_pub > 300 or any(r.values() if isinstance(r, dict) else [])):
+            try:
+                if publish(bx, st):
+                    last_pub = time.time(); save_state(st)
+            except Exception as e:  # noqa: BLE001
+                log({"ev": "publish_error", "error": str(e)[:200]})
         time.sleep(60)
 
 

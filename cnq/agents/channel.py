@@ -66,6 +66,45 @@ def _load(out: str, name: str):
         return None
 
 
+def latin_heavy(s: str | None) -> bool:
+    """True when a text is mostly English: Latin letters in ordinary words (tickers like BTC, ETF are fine) outweigh Cyrillic."""
+    if not s:
+        return False
+    s = re.sub(r"<a [^>]*>.*?</a>|https?://\S+", "", s)
+    lat = sum(len(w) for w in re.findall(r"\b[A-Za-z][a-z]{2,}\b", s))
+    cyr = len(re.findall(r"[А-Яа-яЁё]", s))
+    return lat > 12 and lat > 0.25 * (lat + cyr)
+
+
+def russify(items: list[dict], llm, keys=("title", "mechanism", "confirms_if", "summary")) -> list[dict]:
+    """Translate English fields of news items into Russian with one LLM call; items that stay English are dropped."""
+    need = [(i, k) for i, it in enumerate(items) for k in keys if latin_heavy(it.get(k))]
+    if need and llm is not None:
+        src = {f"{i}.{k}": items[i][k] for i, k in need}
+        try:
+            res = llm.json("Переведи значения на русский язык: просто, понятно, без потери смысла. Имена людей, названия компаний и тикеры оставь как есть. "
+                           "Верни JSON-объект с теми же ключами.", json.dumps(src, ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            res = None
+        if isinstance(res, dict):
+            for key, val in res.items():
+                try:
+                    i, k = key.split(".", 1); i = int(i)
+                except ValueError:
+                    continue
+                if isinstance(val, str) and val.strip() and not latin_heavy(val) and 0 <= i < len(items):
+                    items[i][k] = val.strip()
+    out = []
+    for it in items:
+        if latin_heavy(it.get("title")) or latin_heavy(it.get("mechanism")):
+            continue
+        for k in keys:
+            if latin_heavy(it.get(k)):
+                it[k] = ""
+        out.append(it)
+    return out
+
+
 def kyiv_now(now_ms: int | None = None) -> dt.datetime:
     t = (now_ms or int(time.time() * 1000)) / 1000
     return dt.datetime.fromtimestamp(t, KYIV)
@@ -329,12 +368,12 @@ class Channel:
     VOICE = ("Ты — редактор Telegram-канала CRYPTO NOVA (AI-система оценки и анализа крипторынка). Пиши по-русски живо, дружелюбно и просто — "
              "так, чтобы понял подросток, но без упрощения смысла: называй причину и следствие (кто вынужден покупать или продавать и почему). "
              "Используй ТОЛЬКО факты и числа из JSON, копируй числа как они даны, ничего не выдумывай и не добавляй событий, которых нет в данных. Незнакомые читателю названия (монеты, протоколы, компании, люди) поясняй в скобках одной фразой. Никогда не пиши служебных слов вроде «шапка», «заголовок», «раздел». "
-             "Если какого-то факта нет — просто не упоминай его. Разметка: только <b>…</b> для заголовков разделов. Без эмодзи, без хэштегов, без ссылок, без подписи в конце.")
+             "Если какого-то факта нет — просто не упоминай его. Весь текст — только на русском: английские заголовки и фразы из данных обязательно переводи (имена, компании и тикеры можно латиницей). Разметка: только <b>…</b> для заголовков разделов. Без эмодзи, без хэштегов, без ссылок, без подписи в конце.")
 
     PROMPTS = {
         "morning": "Напиши утренний пост. Структура строго:\n<b>Доброе утро, дорогие подписчики!</b>\n<b>Утренний обзор рынка · {date}</b>\n\n<b>Рынок:</b> одной-двумя строками цены BTC, ETH, SOL с изменением за сутки, капитализация, индекс страха и жадности.\n\n<b>Аналитика:</b> один-два абзаца: что сейчас двигает рынок (новости из news с их механизмом, если они есть; если нет — режим и потоки), как ведёт себя биткоин относительно альтов, что говорит индекс страха.\n\n<b>Ключевые факторы:</b> 3 коротких пункта, каждый с новой строки через «—».\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения: защитный или рабочий режим, базовый сценарий A с вероятностью и уровнем, где ждём разворота (зоны), что делает система (сделки только от зон; в распродажу не покупаем вдогонку, спот — частями). Длина всего поста до 1900 символов.",
         "news": "Напиши пост об одной новости. Структура строго:\nПервая строка — твой заголовок: короткий и сильный, до 8 слов, по сути новости, в <b>…</b>; никаких слов «шапка», «заголовок» и т.п. Если в новости есть малоизвестная монета, проект, компания или человек — поясни одной фразой в скобках, что это (например, «HEX (токен проекта Ричарда Харта)»), чтобы понял новичок.\n\n<b>Что случилось:</b> 2–3 предложения по summary.\n\n<b>Почему это важно для рынка:</b> 2–4 предложения — механизм: кто вынужден покупать или продавать, на какие монеты влияет, что это меняет в настроении; упомяни текущую цену биткоина из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2 предложения: главный риск или шанс и что делает система (не торгует вдогонку, ждёт реакцию цены у зоны / подтверждение). Длина до 1200 символов. Ссылку НЕ вставляй — её добавят после.",
-        "evening": "Напиши вечерний пост. Структура строго:\n<b>Итоги дня · {date}</b>\n\n<b>Главные события:</b> 2–3 пункта с новой строки «1.», «2.», «3.» — из news (с механизмом одной фразой); если новостей нет — главные движения рынка.\n\n<b>Как вёл себя рынок:</b> 2–3 предложения с числами: BTC, ETH, SOL за сутки, капитализация, страх и жадность, кто лидировал и кто падал.\n\n<b>Сценарий дня:</b> одно предложение — сработал ли утренний сценарий (из scenario_verdict).\n\n<b>Прогноз:</b> три строки: «Краткосрочно:» (по стрессу рынка и импульсу), «Среднесрочно:» (по тренду и зонам), «Долгосрочно:» (по режиму 200-дневной) — без новых чисел, только из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения, честно: что сбылось, что нет, что система делает завтра (сделки только от зон, стоп заранее, в панике не покупаем). Длина до 1900 символов."
+        "evening": "Напиши вечерний пост. Структура строго:\n<b>Итоги дня · {date}</b>\n\n<b>Главные события:</b> 2–3 пункта с новой строки «1.», «2.», «3.» — из news (с механизмом одной фразой); если новостей нет — главные движения рынка.\n\n<b>Как вёл себя рынок:</b> 2–3 предложения с числами: BTC, ETH, SOL за сутки, капитализация, страх и жадность, кто лидировал и кто падал.\n\n<b>Сценарий дня:</b> одно предложение — сработал ли утренний сценарий (из scenario_verdict). Если там сказано, что утреннего сценария не было, — так и напиши и больше нигде в посте не упоминай «сценарий A» и его цели.\n\n<b>Прогноз:</b> три строки: «Краткосрочно:» (по стрессу рынка и импульсу), «Среднесрочно:» (по тренду и зонам), «Долгосрочно:» (по режиму 200-дневной) — без новых чисел, только из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения, честно: что сбылось, что нет, что система делает завтра (сделки только от зон, стоп заранее, в панике не покупаем). Длина до 1900 символов."
     }
 
     # ------------------------------------------------------------------ posts
@@ -344,7 +383,7 @@ class Channel:
 
     def guard(self, out: str, facts: dict) -> bool:
         """Every number in the post must exist in the facts (digits-only comparison; '81 004' == '81004', '2.9' == '2,9')."""
-        if not out or len(out) < 200:
+        if not out or len(out) < 200 or any(latin_heavy(line) for line in out.splitlines()):
             return False
         pool = self._nums(json.dumps(facts, ensure_ascii=False))
         pool |= {str(n) for n in range(0, 32)} | {str(dt.datetime.now().year)}
@@ -410,9 +449,12 @@ class Channel:
         if slot == "intro":
             return self.intro()
         facts = self.facts(x, now)
+        facts["news"] = russify(facts.get("news") or [], llm)
         if slot.startswith("news"):
             used = {r[0].split(":", 1)[1] for r in self.conn.execute("SELECT slot FROM channel_posts WHERE slot LIKE 'news:%'").fetchall()}
             n = self.pick_news(x, used)
+            if n:
+                n = (russify([n], llm) or [None])[0]
             if not n:
                 return None
             f2 = {"date": facts["date"], "item": n, "btc": facts["prices"].get("BTC"), "market_stress": facts.get("market_stress"), "btc_zones": facts.get("btc_zones")}
@@ -470,9 +512,19 @@ class Channel:
             if not btc:
                 return None
             mb = next((t for t in x["markets"].get("top", []) if t.get("symbol") == "BTC"), None)
-            title = f"BTC/USDT · 1 час · {'утро' if slot == 'morning' else 'вечер' if slot == 'evening' else 'день'} {kyiv_now():%d.%m}"
-            return postchart.render(btc, (x["calibration"].get("open") or {}).get("BTC"), x["markets"].get("fng"),
-                                    os.path.join(self.out, "post_chart.png"), title=title, chg24=mb.get("chg24") if mb else None)
+            now = kyiv_now()
+            title = "Биткоин (BTC/USDT) · часовой график за 4 дня"
+            when = f"{'утренний обзор' if slot == 'morning' else 'итоги дня' if slot == 'evening' else 'обзор'} · {now.day} {self.MONTHS[now.month - 1]} {now.year}, {now:%H:%M} по Киеву"
+            op = (x["calibration"].get("open") or {}).get("BTC")
+            concl = []
+            if op and op.get("p_up") is not None:
+                pr = op["p_up"]; a_up = pr >= 0.5; pa = round((pr if a_up else 1 - pr) * 100)
+                ta, tb = (op["up"], op["dn"]) if a_up else (op["dn"], op["up"])
+                concl.append(f"Сценарий A ({pa}%): {'рост к сопротивлению' if a_up else 'снижение к поддержке'} {_fmt(ta)}.")
+                concl.append(f"Сценарий B ({100 - pa}%): {'снижение к поддержке' if a_up else 'рост к сопротивлению'} {_fmt(tb)}.")
+                concl.append("Работаем от зон: вход только после реакции цены, стоп заранее.")
+            return postchart.render(btc, op, x["markets"].get("fng"), os.path.join(self.out, "post_chart.png"), title=title,
+                                    chg24=mb.get("chg24") if mb else None, when=when, conclusion=concl)
         except Exception:  # noqa: BLE001
             return None
 

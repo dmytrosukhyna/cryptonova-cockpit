@@ -21,6 +21,11 @@ def _load(out: str, name: str):
         return None
 
 
+def _latin(s: str) -> bool:
+    lat = sum(len(w) for w in re.findall(r"\b[A-Za-z][a-z]{2,}\b", s or "")); cyr = len(re.findall(r"[А-Яа-яЁё]", s or ""))
+    return lat > 12 and lat > 0.25 * (lat + cyr)
+
+
 def spoken_price(p: float) -> str:
     if p >= 1000:
         k = round(p / 1000)
@@ -62,7 +67,7 @@ def compose(out: str = "web") -> str:
     L.append(f"Готовых входов {sigs} — все на панели." if sigs else "Готовых входов пока нет, система ждёт цену у зоны.")
     dec = _load(out, "decision.json") or {}
     imp = next((i for i in (dec.get("news") or {}).get("impacts", []) if (i.get("magnitude") or 0) >= 4 and i.get("reasoning") and not str(i["reasoning"]).startswith("mock")
-                and time.time() * 1000 - (i.get("created") or 0) < 24 * 3600_000), None)
+                and time.time() * 1000 - (i.get("created") or 0) < 24 * 3600_000 and not _latin(i["reasoning"])), None)
     if imp:
         L.append("Из новостей важно одно: " + re.sub(r"\.$", "", imp["reasoning"]) + ".")
     L.append("Если понадоблюсь — на связи.")

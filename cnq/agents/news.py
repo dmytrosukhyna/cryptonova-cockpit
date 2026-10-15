@@ -40,6 +40,13 @@ CREATE TABLE IF NOT EXISTS news_impact (news_id TEXT, asset TEXT, category TEXT,
 """
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    try:
+        conn.execute("ALTER TABLE news_impact ADD COLUMN title_ru TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+
 def _assets_hint(text: str) -> list[str]:
     t = " " + text.lower() + " "
     return [a for a, words in ASSET_WORDS.items() if any(w in t for w in words)] or ["MARKET"]
@@ -48,7 +55,7 @@ def _assets_hint(text: str) -> list[str]:
 class NewsCollector:
     def __init__(self, conn: sqlite3.Connection, feeds: dict[str, str] | None = None):
         self.conn = conn; self.feeds = feeds or FEEDS
-        conn.executescript(SCHEMA)
+        conn.executescript(SCHEMA); _migrate(conn)
 
     @staticmethod
     def parse_rss(xml_text: str, source: str) -> list[dict]:
@@ -102,12 +109,12 @@ class NewsCollector:
 NEWS_SYSTEM = """Ты — NEWS_ANALYST отдела новостей квант-платформы CRYPTO NOVΛ.
 Твоя задача — не пересказывать новости, а оценивать их ВЛИЯНИЕ на цену конкретных активов как проверяемый прогноз.
 Для каждой новости верни объект:
-{"id": "...", "assets": ["BTC",...] или ["MARKET"], "category": одна из %s,
+{"id": "...", "title_ru": "заголовок новости по-русски, до 12 слов", "assets": ["BTC",...] или ["MARKET"], "category": одна из %s,
  "direction": "bull"|"bear"|"neutral", "horizon": "hours"|"days"|"weeks", "magnitude": 1-5,
  "confidence": 0.0-1.0, "reasoning": "1-2 предложения: механизм влияния (кто вынужден покупать/продавать и почему)",
  "confirm": "что в цене/данных подтвердит оценку в ближайшие сутки"}
 Правила: уже отыгранные новости (цена двигалась до публикации) — magnitude 1, confidence ≤ 0.3. Слухи и мнения — "other", confidence ≤ 0.2.
-Не выдумывай факты, которых нет в тексте. Верни JSON-массив.""" % ", ".join(CATEGORIES)
+Не выдумывай факты, которых нет в тексте. ВСЕ текстовые поля (title_ru, reasoning, confirm) — только на русском языке; имена, названия компаний и тикеры можно оставить латиницей. Верни JSON-массив.""" % ", ".join(CATEGORIES)
 
 
 class NewsAnalyst:
@@ -133,11 +140,11 @@ class NewsAnalyst:
                     px = prices.get(a if a != "MARKET" else "BTC")
                     row = {"news_id": r.get("id"), "asset": a, "category": r["category"], "direction": r.get("direction", "neutral"),
                            "horizon": r.get("horizon", "days"), "magnitude": int(r.get("magnitude", 1)), "confidence": float(r.get("confidence", 0.2)),
-                           "reasoning": r.get("reasoning", ""), "confirm": r.get("confirm", ""), "created": now, "price_at": px}
+                           "reasoning": r.get("reasoning", ""), "confirm": r.get("confirm", ""), "created": now, "price_at": px, "title_ru": r.get("title_ru")}
                     self.conn.execute("INSERT OR REPLACE INTO news_impact (news_id,asset,category,direction,horizon,magnitude,confidence,"
-                                      "reasoning,confirm,created,price_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                                      "reasoning,confirm,created,price_at,title_ru) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                                       tuple(row[k] for k in ("news_id", "asset", "category", "direction", "horizon", "magnitude", "confidence",
-                                                             "reasoning", "confirm", "created", "price_at")))
+                                                             "reasoning", "confirm", "created", "price_at", "title_ru")))
                     out.append(row)
         return out
 
@@ -149,7 +156,7 @@ class ImpactLedger:
     HORIZON_MS = {"hours": 6 * 3_600_000, "days": 2 * 86_400_000, "weeks": 10 * 86_400_000}
 
     def __init__(self, conn: sqlite3.Connection):
-        self.conn = conn; conn.executescript(SCHEMA)
+        self.conn = conn; conn.executescript(SCHEMA); _migrate(conn)
 
     def score_due(self, prices_now: dict[str, float], now_ms: int | None = None) -> int:
         now_ms = now_ms or int(time.time() * 1000)

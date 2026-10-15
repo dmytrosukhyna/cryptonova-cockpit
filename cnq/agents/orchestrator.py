@@ -81,10 +81,12 @@ class Orchestrator:
 
     def _impacts_recent(self, hours: int) -> list[dict]:
         since = int(time.time() * 1000) - hours * 3_600_000
+        from .news import _migrate
+        _migrate(self.conn)
         rows = self.conn.execute("SELECT i.news_id,i.asset,i.category,i.direction,i.horizon,i.magnitude,i.confidence,i.reasoning,i.confirm,"
-                                 "i.created,n.title,n.source,n.link FROM news_impact i JOIN news n ON n.id=i.news_id WHERE i.created>=? "
+                                 "i.created,COALESCE(NULLIF(i.title_ru,''),n.title),n.source,n.link,n.title FROM news_impact i JOIN news n ON n.id=i.news_id WHERE i.created>=? "
                                  "ORDER BY i.magnitude DESC, i.confidence DESC", (since,)).fetchall()
-        keys = ("news_id", "asset", "category", "direction", "horizon", "magnitude", "confidence", "reasoning", "confirm", "created", "title", "source", "link")
+        keys = ("news_id", "asset", "category", "direction", "horizon", "magnitude", "confidence", "reasoning", "confirm", "created", "title", "source", "link", "title_en")
         return [dict(zip(keys, r)) for r in rows]
 
     def _edit(self, decision: dict) -> str:

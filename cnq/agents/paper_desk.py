@@ -29,13 +29,14 @@ RISK = 0.01
 #   confirm  — R longs need a second breakout after the retest (history: +0.085R/trade vs +0.04R, half the trades)
 #   risk     — share of equity risked per trade;  max_open — positions + pending limits
 #   tgt_r    — R-class target in R;  riskoff — what is allowed while ≥70 % of coins fall: 'none' | 'shorts'
-PROFILES = {
-    "cons": {"name": "Осторожная", "classes": {"A", "R"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "none",
-             "prefix": "paper_cons_", "about": "Только проверенные входы (гэп FX, ретест с повторным пробоем), риск 0.5%, не больше 2 позиций, в режиме риска не торгует."},
-    "bal":  {"name": "Сбалансированная", "classes": {"A", "B", "R", "E"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.20,
-             "prefix": "paper_bal_", "about": "Гэп FX, откуп каскада, ретест, откуп климакса (E: корзина 20% счёта на сутки, без тесного стопа); риск 1%, до 4 позиций, в режиме риска — только откуп климакса (E), ретест-шорты в распродаже не торгуем (≈ 0 на истории)."},
-    "aggr": {"name": "Агрессивная", "classes": {"A", "B", "R", "E"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.30,
-             "prefix": "paper_", "about": "Гэп FX, откуп каскада, ретест без подтверждения; риск 1.5%, до 6 позиций, в режиме риска — только E. Класс C (лимит у уровня, ≈ 0 на истории) — только наблюдение, не торгуется."},
+PROFILES = {   # one strategy — "Автопилот" — at three risk levels; retest (R) is no longer traded: in the whole-portfolio backtest
+               # (scripts/autopilot_backtest.py, 10 coins 2020-09→2026-09) it added drawdown (−57 %) and lost money since 12.2024
+    "cons": {"name": "Автопилот · осторожно", "classes": {"A", "B", "E"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts", "e_share": 0.10,
+             "prefix": "paper_cons_", "about": "Откуп каскада ликвидаций и откуп климакса в панике (корзина 10% счёта на сутки), риск 0.5% на сделку, до 2 позиций. История: ≈ +5%/год, просадка до −9%."},
+    "bal":  {"name": "Автопилот · норма", "classes": {"A", "B", "E"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.20,
+             "prefix": "paper_bal_", "about": "Откуп каскада ликвидаций и откуп климакса в панике (корзина 20% счёта на сутки), риск 1% на сделку, до 4 позиций. История: ≈ +10%/год, просадка до −19%, 71% месяцев в плюсе."},
+    "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.30,
+             "prefix": "paper_", "about": "Те же правила, больше газа: риск 1.5% на сделку, корзина климакса 30% счёта. История: ≈ +14%/год, просадка до −28%."},
 }
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005

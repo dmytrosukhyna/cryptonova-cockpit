@@ -26,6 +26,7 @@ canvas.eq{display:block;width:100%;height:120px;margin-top:14px;border-radius:10
 .frame{padding:16px;border-radius:20px;border:1px solid rgba(255,70,85,.6);background:rgba(46,8,16,.25);box-shadow:0 0 0 1px rgba(255,70,85,.15) inset,0 0 30px rgba(255,60,80,.28);animation:glow 2.4s ease-in-out infinite}@keyframes glow{50%{box-shadow:0 0 0 1px rgba(255,80,95,.3) inset,0 0 48px rgba(255,60,80,.45);border-color:rgba(255,105,115,.9)}}
 .tot{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:0 4px 14px}.tot small{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}.tbig{font-family:var(--mono);font-size:clamp(40px,7vw,64px);font-weight:700;line-height:1.05;margin-top:4px}.tbig.pos{color:#6fcf97;text-shadow:0 0 26px rgba(111,207,151,.45)}.tbig.neg{color:#ef7d6b;text-shadow:0 0 26px rgba(239,125,107,.45)}.tside{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-family:var(--mono);font-size:14px}.tside .muted{font-family:inherit;font-size:11.5px}
 .flup{color:#6fcf97!important;text-shadow:0 0 18px rgba(111,207,151,.95)!important}.fldn{color:#ef7d6b!important;text-shadow:0 0 18px rgba(239,125,107,.95)!important}
+.hist{margin-top:16px}.hrow{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:flex-end}.yrs{display:flex;gap:6px;align-items:flex-end;height:90px}.yrs div{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;font-family:var(--mono);font-size:10.5px;color:var(--muted);height:100%}.yrs i{display:block;width:30px;border-radius:4px}
 .foot{margin-top:18px;font-size:11.5px;color:var(--muted);line-height:1.5}
 </style>
 </head>
@@ -38,6 +39,7 @@ canvas.eq{display:block;width:100%;height:120px;margin-top:14px;border-radius:10
     <div class="card" id="sc"><h2>Спот · демо $10 000 · <span id="sname"></span></h2><div class="big" id="sv">—</div><div class="pct" id="sp"></div><div class="row"><span>сегодня <b id="sd">—</b></span><span>позиций <b id="so">—</b></span><span>в кэше <b id="sk">—</b></span></div><canvas class="eq" id="ss"></canvas><div class="pos-list" id="spos"></div></div>
   </div>
   </div>
+  <div class="card hist" id="hist" hidden><h2>Проверка на истории · автопилот «норма» · 10 монет · сентябрь 2020 → сентябрь 2026</h2><div class="hrow"><div><div class="big" id="hv">—</div><div class="pct" id="hp"></div><div class="row" id="hs"></div></div><div class="yrs" id="hy"></div></div><canvas class="eq" id="hc" style="height:150px"></canvas><div class="muted" style="font-size:11px;margin-top:6px">Это не живые сделки, а прогон тех же правил по прошлым ценам с комиссиями и проскальзыванием. Прошлые результаты не гарантируют будущих: были и убыточные годы (2022).</div></div>
   <div class="foot" id="foot">Два демо-счёта по $10 000 торгуют по правилам системы без участия человека: фьючерсы — автопилот, уровень «норма» (сделки только от сильных зон и на панических откупах, риск 1% на сделку, стоп известен заранее), спот — умеренный портфель (ядро BTC/ETH + фундаментальные идеи, докупки частями на просадках). Цены — Bybit, обновление каждые 10 секунд; история — с запуска счёта. Это демонстрация работы алгоритма, не финансовый совет.</div>
 </div>
 <script>
@@ -57,6 +59,12 @@ function render(){ const P=PAPER&&PAPER.profiles&&PAPER.profiles.bal; const S=PF
   { const T=(window._F||10000)-10000+(window._S||10000)-10000; setBig('#tv',T,(T>=0?'+':'−')+fmt(Math.abs(T))); $('#tv').className='tbig '+(T>=0?'pos':'neg'); $('#tp').textContent=`${T>=0?'+':''}${(T/200).toFixed(2)}% на $20 000`; $('#tp').className=T>=0?'pos':'neg'; $('#td').textContent='обновляется каждые 10 секунд по ценам Bybit'; }
   $('#meta').textContent=(PAPER?'сервер '+new Date(PAPER.asof).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' · ':'')+(Object.keys(PX).length?'цены Bybit live':'цены сервера'); }
 (async()=>{ await loadJson(); await prices(); render(); setInterval(async()=>{ await prices(); render(); },10000); setInterval(async()=>{ await loadJson(); render(); },5*60000); })();
+
+async function hist(){ try{ const B=await (await fetch('./backtest.json',{cache:'no-store'})).json(); const r=B.report; $('#hist').hidden=false; $('#hv').textContent='$10 000 → '+fmt(r.final).replace(/,\d\d$/,''); $('#hp').textContent=`${r.cagr>=0?'+':''}${(r.cagr*100).toFixed(1)}% в год в среднем`; $('#hp').className='pct '+(r.cagr>=0?'pos':'neg');
+  $('#hs').innerHTML=`<span>худшая просадка <b>${(r.maxdd*100).toFixed(0)}%</b></span><span>месяцев в плюсе <b>${Math.round(r.win_m*100)}%</b></span><span>сделок <b>${r.n.toLocaleString('ru-RU')}</b></span>`;
+  const ys=Object.entries(B.years), mx=Math.max(...ys.map(([,v])=>Math.abs(v))); $('#hy').innerHTML=ys.map(([y,v])=>`<div><span style="color:${v>=0?'#6fcf97':'#ef7d6b'}">${v>=0?'+':'−'}$${Math.abs(v).toLocaleString('ru-RU')}</span><i style="height:${Math.max(3,Math.abs(v)/mx*60)}px;background:${v>=0?'rgba(111,207,151,.75)':'rgba(239,125,107,.75)'}"></i>${y}</div>`).join('');
+  spark($('#hc'),B.curve.map(x=>x[1]),r.final>=10000); }catch(e){} }
+hist();
 </script>
 </body>
 </html>

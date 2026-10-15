@@ -33,44 +33,71 @@ def spoken_price(p: float) -> str:
     return str(round(p)) if p >= 1 else f"{p:.4f}"
 
 
+def plural(n: int, one: str, few: str, many: str) -> str:
+    n = abs(int(n)); return one if n % 10 == 1 and n % 100 != 11 else few if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else many
+
+
+def deals(n: int, acc: bool = False) -> str:
+    """'одна сделка' / 'две сделки' / '5 сделок' (acc=True → 'одну сделку')."""
+    w = {1: "одну" if acc else "одна", 2: "две", 3: "три", 4: "четыре"}.get(n, str(n))
+    return f"{w} {plural(n, 'сделку' if acc else 'сделка', 'сделки', 'сделок')}"
+
+
+def usd(x: float) -> str:
+    v = round(abs(x)); return f"{v} {plural(v, 'доллар', 'доллара', 'долларов')}"
+
+
+def result(x: float) -> str:
+    return "в нуле" if abs(x) < 5 else (f"в плюсе на {usd(x)}" if x > 0 else f"в минусе на {usd(x)}")
+
+
 def compose(out: str = "web") -> str:
+    """Executive report in plain words: what we closed, where we stand, how many trades are open, market direction."""
     hour = (dt.datetime.utcnow() + dt.timedelta(hours=3)).hour
     hello = "Доброй ночи" if hour < 5 else "Доброе утро" if hour < 12 else "Добрый день" if hour < 18 else "Добрый вечер"
     L = [f"{hello}, {NAME}. Система работает штатно."]
     paper = _load(out, "paper.json") or {}
     prof = (paper.get("profiles") or {}).get("bal") or paper
+    fut_res = None
     if prof:
-        n = len(prof.get("open") or [])
+        opened = prof.get("open") or []
         closed = [t for t in (prof.get("closed") or []) if (t.get("closed") or 0) > time.time() * 1000 - 86400_000]
-        won = sum(t.get("net_usd", 0) for t in closed if t.get("net_usd", 0) > 0)
-        lost = -sum(t.get("net_usd", 0) for t in closed if t.get("net_usd", 0) < 0)
+        day = sum(t.get("net_usd", 0) for t in closed)
         parts = []
         if closed:
-            parts.append(f"за сутки закрыли {len(closed)} {'сделку' if len(closed) == 1 else 'сделки' if len(closed) < 5 else 'сделок'}" +
-                         (f", заработали {round(won)} долларов" if won else "") + (f", отдали {round(lost)} долларов" if lost else ""))
-        parts.append(f"в работе {n}" if n else "открытых позиций нет — ждём цену у стенки")
-        L.append("По фьючерсам " + ", ".join(parts) + ".")
+            parts.append(f"за сутки закрыли {deals(len(closed), acc=True)}, итог {result(day)}")
+        n = len(opened)
+        if n:
+            upnl = sum(o.get("open_pnl_usd") or 0 for o in opened)
+            parts.append(f"в работе {deals(n)}, {'она' if n == 1 else 'они'} сейчас {result(upnl)}")
+        else:
+            parts.append("открытых сделок нет — автопилот ждёт свой сигнал")
+        L.append("По фьючерсам " + "; ".join(parts) + ".")
+        eq = prof.get("equity")
+        if eq:
+            fut_res = eq + sum(o.get("open_pnl_usd") or 0 for o in opened) - 10_000
+    spot_res = None
+    pf = _load(out, "portfolio.json") or {}
+    sp = (pf.get("portfolios") or {}).get("mod") or pf.get("portfolio") or {}
+    if sp.get("index"):
+        spot_res = 10_000 * sp["index"] / 100 - 10_000
+        L.append(f"По споту {'вышли в плюс на ' + usd(spot_res) if spot_res > 5 else 'пока в минусе на ' + usd(spot_res) if spot_res < -5 else 'держимся около нуля'}.")
+    if fut_res is not None and spot_res is not None:
+        tot = fut_res + spot_res
+        L.append(f"Общий результат по двум счетам — {'плюс' if tot >= 0 else 'минус'} {usd(tot)}.")
     markets = _load(out, "markets.json") or {}
     btc = next((t for t in markets.get("top", []) if t.get("symbol") == "BTC"), None)
     stress = (paper.get("stress") or {}).get("level") if isinstance(paper.get("stress"), dict) else None
-    fng = (markets.get("fng") or {}).get("value")
-    mood = "" if fng is None else ("на рынке страх" if fng <= 30 else "на рынке жадность" if fng >= 70 else "настроение нейтральное")
-    L.append(f"Рынок сегодня {'в панике — покупки закрыты, ждём откупа' if (stress or 0) >= 2 else 'нервный' if stress == 1 else 'спокойный'}"
-             + (f", биткоин {spoken_price(btc['price'])}" if btc else "") + (f", {mood}" if mood else "") + ".")
-    cal = _load(out, "calibration.json") or {}
-    op = (cal.get("open") or {}).get("BTC")
-    if op and op.get("p_up") is not None:
-        up = op["p_up"] >= 0.5
-        L.append(f"Базовый сценарий — {'движение к сопротивлению' if up else 'отход к поддержке'}; если подтвердится, работаем от зоны.")
-    term = _load(out, "terminal.json") or {}
-    sigs = sum(1 for c in term.get("coins", []) for s in c.get("setups", []) if s.get("status") in ("CALL", "READY"))
-    L.append(f"Готовых входов {sigs} — все на панели." if sigs else "Готовых входов пока нет, система ждёт цену у зоны.")
+    if btc:
+        ch = btc.get("chg24") or 0
+        trend = "растёт" if ch >= 0.5 else "снижается" if ch <= -0.5 else "стоит на месте"
+        L.append(f"Рынок {'в панике, ' if (stress or 0) >= 2 else ''}{trend}: биткоин {spoken_price(btc['price'])}.")
     dec = _load(out, "decision.json") or {}
     imp = next((i for i in (dec.get("news") or {}).get("impacts", []) if (i.get("magnitude") or 0) >= 4 and i.get("reasoning") and not str(i["reasoning"]).startswith("mock")
                 and time.time() * 1000 - (i.get("created") or 0) < 24 * 3600_000 and not _latin(i["reasoning"])), None)
     if imp:
         L.append("Из новостей важно одно: " + re.sub(r"\.$", "", imp["reasoning"]) + ".")
-    L.append("Если понадоблюсь — на связи.")
+    L.append("Автопилот работает, если понадоблюсь — на связи.")
     return " ".join(L)
 
 

@@ -151,7 +151,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
                  "; худшие: " + ", ".join(f"{r['symbol']} {_pct(r['ret7'])}" for r in market["worst"]) + ".")
     if market["stress_days"]:
         L.append(f"- Дни широкого падения (≥70% монет −3%): {', '.join(market['stress_days'])}. В такие дни система лонги не открывала — "
-                 f"на истории покупка дна со стопом даёт −0.20R, шорт вдогонку −0.04R.")
+                 f"на истории покупка дна со стопом даёт −0.20R, шорт после падения −0.04R.")
     else:
         L.append("- Дней широкого падения не было.")
     L.append("")

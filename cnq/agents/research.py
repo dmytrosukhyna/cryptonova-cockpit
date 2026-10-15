@@ -42,7 +42,7 @@ def _get(url: str, data: dict | None = None, timeout: float = 25):
 
 
 # ----------------------------------------------------------------------------- market snapshot (header strip + overview)
-def markets_top(n: int = 100) -> list[dict]:
+def markets_top(n: int = 150) -> list[dict]:
     rows = _get(f"{CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page={n}&page=1&price_change_percentage=24h,7d,30d,200d,1y&sparkline=false") or []
     out = []
     for r in rows:
@@ -52,7 +52,7 @@ def markets_top(n: int = 100) -> list[dict]:
                     "chg24": r.get("price_change_percentage_24h_in_currency"), "chg7": r.get("price_change_percentage_7d_in_currency"),
                     "chg30": r.get("price_change_percentage_30d_in_currency"), "chg200": r.get("price_change_percentage_200d_in_currency"),
                     "chg1y": r.get("price_change_percentage_1y_in_currency"), "ath": r.get("ath"), "ath_chg": r.get("ath_change_percentage"),
-                    "ath_date": r.get("ath_date"), "circ": r.get("circulating_supply"), "total": r.get("total_supply"), "max": r.get("max_supply"),
+                    "ath_date": r.get("ath_date"), "atl_date": r.get("atl_date"), "circ": r.get("circulating_supply"), "total": r.get("total_supply"), "max": r.get("max_supply"),
                     "image": r.get("image"), "stable": sym in STABLES, "wrapped": sym in WRAPPED})
     return out
 
@@ -240,7 +240,7 @@ class Research:
 
 def run(conn: sqlite3.Connection, now: int | None = None, btc_bull: bool | None = None) -> tuple[dict, dict]:
     now = now or int(time.time() * 1000)
-    markets = markets_top(100)
+    markets = markets_top(150)
     glob = global_stats()
     fng = fear_greed()
     hl = hyperliquid_lists()
@@ -254,7 +254,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, btc_bull: bool | None 
     covered = sum(1 for c in cards if c["detail_age_h"] is not None)
     hl_spot = sorted(hl.get("spot", {}).items(), key=lambda kv: -kv[1]["vol24"])[:20]
     markets_doc = {"asof": now, "available": bool(markets), "global": glob, "fng": fng, "btc_bull": btc_bull,
-                   "top": [{k: m.get(k) for k in ("symbol", "name", "id", "rank", "price", "mcap", "volume", "chg24", "chg7", "chg30", "ath_chg", "image", "stable", "wrapped")} for m in markets],
+                   "top": [{k: m.get(k) for k in ("symbol", "name", "id", "rank", "price", "mcap", "volume", "chg24", "chg7", "chg30", "chg200", "chg1y", "ath_chg", "ath_date", "atl_date", "image", "stable", "wrapped")} for m in markets],
                    "hl_spot_top": [{"symbol": k, **v} for k, v in hl_spot], "hl_perps": hl.get("perps", [])[:200],
                    "sources": ["CoinGecko /coins/markets, /global", "alternative.me Fear & Greed", "Hyperliquid info API"]}
     research_doc = {"asof": now, "available": bool(markets), "fetched_now": fetched, "covered": covered, "total": len(cards),

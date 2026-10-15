@@ -329,7 +329,15 @@ def market_note(btc_bull: bool, btc: dict | None, pk: dict, state: dict) -> str:
 
 def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: int | None = None) -> dict:
     now = now or int(time.time() * 1000)
-    markets = coingecko_markets()
+    markets = []
+    try:   # the research department fetched the same snapshot minutes ago — reuse it instead of hitting CoinGecko twice (rate limits)
+        mk = json.load(open("web/markets.json", encoding="utf-8"))
+        if mk.get("available") and now - mk.get("asof", 0) < 25 * 60_000:
+            markets = [dict(m) for m in mk["top"] if not m.get("stable") and not m.get("wrapped")]
+    except Exception:  # noqa: BLE001
+        markets = []
+    if not markets:
+        markets = coingecko_markets()
     hl = hyperliquid_universe()
     if not markets:
         return {"asof": now, "available": False, "error": "CoinGecko недоступен", "hyperliquid": hl.get("available", False)}

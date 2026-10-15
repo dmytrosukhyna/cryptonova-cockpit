@@ -111,9 +111,20 @@ class PaperDesk:
         return out
 
     # ------------------------------------------------------------------ main step
+    @staticmethod
+    def stress(coins: list[dict]) -> float:
+        """Share of coins down more than 3 % over the last 24 h (96 × 15m). ≥ 0.7 = broad sell-off → no new level longs."""
+        xs = []
+        for c in coins:
+            cs = c.get("candles") or []
+            if len(cs) > 97:
+                xs.append(cs[-1][4] / cs[-97][4] - 1)
+        return len([x for x in xs if x < -0.03]) / len(xs) if xs else 0.0
+
     def step(self, coins: list[dict], btc_bull: bool, now: int | None = None) -> dict:
         now = now or int(time.time() * 1000)
         by_sym = {c["symbol"].replace("-USDT", "").replace("USDT", ""): c for c in coins}
+        risk_off = self.stress(coins) >= 0.7
         events: list[str] = []
         eq = self.equity()
         # 1. new signals → orders / market fills
@@ -122,6 +133,9 @@ class PaperDesk:
         for base, coin in by_sym.items():
             for s in self.signals(coin, btc_bull, now):
                 if s["id"] in known or base in open_syms:
+                    continue
+                if risk_off and s["side"] == "LONG" and s["grade"] == "C":
+                    events.append(f"пропуск лонга {base}: рынок падает широким фронтом (режим риска)")
                     continue
                 if len(self._open()) + len(self._pending()) >= MAX_OPEN:
                     break
@@ -252,7 +266,7 @@ class PaperDesk:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),
                                "usd": round(sum(t["net_usd"] for t in ts), 2)}
         eq = self.equity()
-        return {"asof": now, "start_equity": START_EQUITY, "equity": eq, "pnl_usd": round(eq - START_EQUITY, 2), "pnl_pct": round((eq / START_EQUITY - 1) * 100, 2),
+        return {"asof": now, "start_equity": START_EQUITY, "risk_off": self.stress(list(by_sym.values())) >= 0.7, "stress": round(self.stress(list(by_sym.values())), 3), "equity": eq, "pnl_usd": round(eq - START_EQUITY, 2), "pnl_pct": round((eq / START_EQUITY - 1) * 100, 2),
                 "open_pnl_usd": round(sum(o["open_pnl_usd"] for o in opens), 2), "open": opens, "pending": self._pending(), "closed": closed[:50],
                 "stats": {"trades": n, "winrate": round(len(wins) / n, 3) if n else None, "avg_r": round(sum(t["pnl_r"] for t in closed) / n, 3) if n else None,
                           "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0), "max_dd_pct": round(dd * 100, 2),

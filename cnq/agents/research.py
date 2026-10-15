@@ -185,7 +185,7 @@ def build_card(m: dict, det: dict | None, hl: dict, btc_bull: bool) -> dict:
             "factors": {"economics": round(f_eco), "team": round(f_team), "community": round(f_com), "market": round(f_mkt), "narrative": round(f_nar)},
             "detail_age_h": round((time.time() * 1000 - d["updated"]) / 3600000) if d.get("updated") else None,
             "dilution": round(dil * 100), "fdv_mcap": round(fdv / mcap, 2) if mcap else None,
-            "targets": [{**t, "price": round(price * t["mult"], 6 if price < 1 else 2)} for t in targets], "stop_pct": stop, "hold": hold,
+            "targets": [{**t, "mult": round(t["mult"], 2), "price": round(price * t["mult"], 6 if price < 1 else 2)} for t in targets], "stop_pct": stop, "hold": hold,
             "scenarios": scen, "stable": bool(m.get("stable") or m.get("wrapped"))}
 
 

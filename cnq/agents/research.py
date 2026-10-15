@@ -24,7 +24,8 @@ DETAILS_PER_RUN = 10
 CARD_TTL_MS = 3 * 86400_000
 
 STABLES = {"USDT", "USDC", "DAI", "USDE", "FDUSD", "USDS", "TUSD", "PYUSD", "USD1", "BUSD", "USDD", "FRAX", "EURC", "USDG", "RLUSD"}
-WRAPPED = {"WBTC", "WETH", "STETH", "WSTETH", "WEETH", "CBBTC", "RETH", "WBETH", "LBTC", "BSC-USD", "SOLVBTC", "EZETH", "RSETH", "CBETH", "TBTC"}
+WRAPPED = {"WBTC", "WETH", "STETH", "WSTETH", "WEETH", "CBBTC", "RETH", "WBETH", "LBTC", "BSC-USD", "SOLVBTC", "EZETH", "RSETH", "CBETH", "TBTC",
+           "XAUT", "PAXG", "FIGR_HELOC", "SUSDE", "SUSDS", "BUIDL", "USDTB", "JITOSOL", "MSOL", "BNSOL"}   # + tokenized gold / yield wrappers / RWA notes
 NARRATIVES = [("Meme", "мем"), ("Artificial Intelligence", "ИИ"), ("Real World Assets", "RWA"), ("Hyperliquid Ecosystem", "Hyperliquid"),
               ("Layer 1", "L1"), ("Layer 2", "L2"), ("Decentralized Finance", "DeFi"), ("Gaming", "игры"), ("Exchange-based", "биржевой токен"),
               ("Oracle", "оракул"), ("Privacy", "приватность"), ("Infrastructure", "инфраструктура"), ("Payment", "платежи"), ("Smart Contract Platform", "платформа")]

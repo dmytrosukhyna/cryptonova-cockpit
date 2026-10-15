@@ -29,7 +29,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -148,6 +148,15 @@ def main(argv: list[str] | None = None) -> int:
         write_report(mk, os.path.join(args.out, "markets.json"))
         write_report(rs, os.path.join(args.out, "research.json"))
         print(f"markets.json: top={len(mk['top'])} fng={mk['fng'].get('value')} mcap={mk['global'].get('total_mcap')} | research.json: cards={rs['total']} covered={rs['covered']} fetched_now={rs['fetched_now']}")
+    elif args.cmd == "whales":
+        import os, sqlite3
+        from .agents import whales
+        from .terminal.report import write_report
+        conn = sqlite3.connect("data/agents.sqlite")
+        os.makedirs(args.out, exist_ok=True)
+        d = whales.run(conn)
+        write_report(d, os.path.join(args.out, "whales.json"))
+        print(f"whales.json: available={d.get('available')} whales={len(d.get('whales', []))} coins={len(d.get('coins', []))} changes={len(d.get('changes', []))} bias={(d.get('summary') or {}).get('bias')}")
     elif args.cmd == "fx-gaps":
         from .fx.gaps import run as fx_run
         res = fx_run(send=args.send)

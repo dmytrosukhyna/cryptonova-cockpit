@@ -51,6 +51,9 @@ jobs:
       - name: Coin research (анкета, топ-100, страх/жадность, капитализация) → web/markets.json, web/research.json
         continue-on-error: true
         run: python -m cnq.cli research --out web
+      - name: Whales (Hyperliquid leaderboard positions) → web/whales.json
+        continue-on-error: true
+        run: python -m cnq.cli whales --out web
       - name: Spot portfolio department → web/portfolio.json
         continue-on-error: true
         env:
@@ -74,6 +77,12 @@ jobs:
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
           CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
         run: python -m cnq.cli fx-gaps --send
+      - name: Version stamp (panel shows build time; offers reload when a new build is published)
+        run: python - <<'PY'
+          import json, time, subprocess
+          sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+          json.dump({"time": int(time.time() * 1000), "sha": sha}, open("web/version.json", "w"))
+          PY
       - name: Status file for the panel
         run: python scripts/ci_status.py
       - name: Commit refreshed data (state also survives in the cache)
@@ -81,7 +90,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/weekly.json web/calibration.json web/markets.json web/research.json web/status.json data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/weekly.json web/calibration.json web/markets.json web/research.json web/whales.json web/version.json web/status.json data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done

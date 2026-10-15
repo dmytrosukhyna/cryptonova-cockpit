@@ -15,7 +15,7 @@ def send(text: str, token: str | None = None, chat: str | None = None, parse_mod
     token = token or os.environ.get("CNQ_TG_TOKEN"); chat = chat or os.environ.get("CNQ_TG_CHAT")
     if not token or not chat:
         return False
-    body = {"chat_id": chat, "text": text[:4000], "disable_web_page_preview": True}
+    body = {"chat_id": chat, "text": text[:4000], "disable_web_page_preview": "<a href" not in text}   # a source link gets its preview card
     if parse_mode:
         body["parse_mode"] = parse_mode
     req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",

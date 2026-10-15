@@ -89,10 +89,11 @@ class Orchestrator:
 
     def _edit(self, decision: dict) -> str:
         slim = {"asof": decision["asof"], "portfolio": decision["portfolio"],
-                "coins": [{"symbol": c["symbol"], "price": c["price"], "chg24": round(c["chg24"], 4), "regime": {k: c["regime"][k] for k in ("short", "mid", "long", "r28", "atr_pct")},
-                           "nearest_levels": c["levels"][:2], "setups": [s for s in c["setups"] if s["status"] in ("CALL", "READY", "WAIT_CONFIRMATION")][:2],
-                           "brief": c["brief"]["lines"]} for c in decision["coins"]],
-                "news_impacts": [i for i in decision["news"]["impacts"] if i["magnitude"] >= 2][:12],
+                "coins": [{"symbol": c["symbol"], "price": c["price"], "chg24": round(c["chg24"], 4), "regime": {k: c["regime"][k] for k in ("short", "mid", "long")},
+                           "nearest_levels": [{k: l.get(k) for k in ("lo", "hi", "touches")} for l in c["levels"][:2]],
+                           "setups": [{k: s.get(k) for k in ("family", "direction", "status", "entry", "stop")} for s in c["setups"] if s["status"] in ("CALL", "READY", "WAIT_CONFIRMATION")][:1]}
+                          for c in decision["coins"][:6]],
+                "news_impacts": [{k: i.get(k) for k in ("asset", "category", "direction", "magnitude", "reasoning", "title")} for i in decision["news"]["impacts"] if i["magnitude"] >= 3][:6],
                 "risk": {"global_block": decision["risk"]["global_block"], "blackout": decision["risk"]["blackout_assets"],
                          "denied": [v["symbol"] for v in decision["risk"]["verdicts"] if not v["allow_long"]]}}
         try:

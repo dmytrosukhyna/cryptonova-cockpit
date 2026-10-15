@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 
@@ -52,17 +53,25 @@ class LLM:
         headers["user-agent"] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 cryptonova/1.0"
         headers["accept"] = "application/json"
         req = urllib.request.Request(P["url"], data=json.dumps(body).encode(), headers=headers)
-        try:
-            with urllib.request.urlopen(req, timeout=120) as r:
-                msg = json.loads(r.read().decode())
-        except urllib.error.HTTPError as e:   # surface the provider's message (model name, quota, auth)
-            body_txt = ""
+        msg = None
+        for attempt in range(2):
             try:
-                body_txt = e.read().decode()[:300]
-            except Exception:  # noqa: BLE001
-                pass
-            self.last_error = f"HTTP {e.code}: {body_txt}"
-            raise RuntimeError(self.last_error) from None
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    msg = json.loads(r.read().decode())
+                break
+            except urllib.error.HTTPError as e:   # surface the provider's message (model name, quota, auth)
+                body_txt = ""
+                try:
+                    body_txt = e.read().decode()[:300]
+                except Exception:  # noqa: BLE001
+                    pass
+                self.last_error = f"HTTP {e.code}: {body_txt}"
+                if e.code == 429 and attempt == 0:       # free tier: tokens-per-minute — wait what the provider asks (≤ 40 s) and retry once
+                    m = re.search(r"try again in ([\d.]+)s", body_txt)
+                    time.sleep(min(40.0, float(m.group(1)) + 1 if m else 20.0))
+                    req = urllib.request.Request(P["url"], data=json.dumps(body).encode(), headers=headers)
+                    continue
+                raise RuntimeError(self.last_error) from None
         self.last_error = None
         self.calls += 1
         if P["style"] == "anthropic":

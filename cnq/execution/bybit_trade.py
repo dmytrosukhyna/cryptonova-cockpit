@@ -55,6 +55,32 @@ class BybitTrader:
             raise RuntimeError(f"Bybit {path}: {out.get('retMsg')}")
         return out.get("result", {})
 
+    def _get_signed(self, path: str, params: dict) -> dict:
+        if not self.key or not self.secret:
+            raise RuntimeError("BYBIT_API_KEY / BYBIT_API_SECRET not set")
+        q = "&".join(f"{k}={v}" for k, v in params.items())
+        ts = str(int(time.time() * 1000))
+        req = urllib.request.Request(f"{self.base}{path}?{q}", headers={"X-BAPI-API-KEY": self.key, "X-BAPI-TIMESTAMP": ts,
+                                                                        "X-BAPI-RECV-WINDOW": RECV, "X-BAPI-SIGN": self.sign(ts, q)})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            out = json.loads(r.read().decode())
+        if out.get("retCode") != 0:
+            raise RuntimeError(f"Bybit {path}: {out.get('retCode')} {out.get('retMsg')}")
+        return out.get("result", {})
+
+    def equity(self) -> float:
+        res = self._get_signed("/v5/account/wallet-balance", {"accountType": "UNIFIED"})
+        lst = res.get("list") or [{}]
+        return float(lst[0].get("totalEquity") or 0)
+
+    def positions(self) -> dict[str, dict]:
+        res = self._get_signed("/v5/position/list", {"category": "linear", "settleCoin": "USDT"})
+        return {p["symbol"]: p for p in res.get("list", []) if float(p.get("size") or 0) > 0}
+
+    def set_stop(self, symbol: str, stop: float) -> dict:
+        tick = float(self.instrument(symbol).get("priceFilter", {}).get("tickSize", 0.01))
+        return self._post("/v5/position/trading-stop", {"category": "linear", "symbol": symbol, "stopLoss": str(self._round_step(stop, tick)), "positionIdx": 0})
+
     def instrument(self, symbol: str) -> dict:
         res = self._get("/v5/market/instruments-info", {"category": "linear", "symbol": symbol})
         lst = res.get("list") or []

@@ -34,8 +34,8 @@ PROFILES = {
              "prefix": "paper_cons_", "about": "Только проверенные входы (гэп FX, ретест с повторным пробоем), риск 0.5%, не больше 2 позиций, в режиме риска не торгует."},
     "bal":  {"name": "Сбалансированная", "classes": {"A", "B", "R"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
              "prefix": "paper_bal_", "about": "Гэп FX, откуп каскада, ретест; риск 1%, до 4 позиций, в режиме риска только шорты."},
-    "aggr": {"name": "Агрессивная", "classes": {"A", "B", "R", "C"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
-             "prefix": "paper_", "about": "Всё, включая лимитки от зон (класс C ≈ 0 на истории); риск 1.5%, до 6 позиций, в режиме риска шорты."},
+    "aggr": {"name": "Агрессивная", "classes": {"A", "B", "R"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
+             "prefix": "paper_", "about": "Гэп FX, откуп каскада, ретест без подтверждения; риск 1.5%, до 6 позиций, в режиме риска шорты. Класс C (лимит у уровня, ≈ 0 на истории) — только наблюдение, не торгуется."},
 }
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
@@ -125,10 +125,12 @@ def _atr(c: list[list], n: int = 14) -> float:
 
 
 class PaperDesk:
-    def __init__(self, conn: sqlite3.Connection, profile: str = "aggr"):
+    def __init__(self, conn: sqlite3.Connection, profile: str = "aggr", classes: set | None = None):
         self.conn = conn
         self.profile = profile
-        self.P = PROFILES[profile]
+        self.P = dict(PROFILES[profile])
+        if classes is not None:        # research/tests: trade an explicit class set (e.g. class C) on this desk
+            self.P["classes"] = set(classes)
         px = self.P["prefix"]
         self.T_ORD, self.T_TR, self.T_EQ = px + "orders", px + "trades", px + "equity"
         conn.executescript(f"""

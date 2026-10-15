@@ -17,7 +17,7 @@ def coin(symbol, prices, levels, t0=1_700_000_000_000):
 
 def test_limit_fill_targets_and_stop():
     conn = sqlite3.connect(":memory:")
-    desk = pd.PaperDesk(conn)
+    desk = pd.PaperDesk(conn, classes={"A", "B", "R", "C"})   # class C is observation-only on the real desks; enable it here to test limit fills
     t0 = 1_700_000_000_000
     flat = [100.0] * 300
     c = coin("BTC-USDT", flat, [{"id": "L1", "kind": "support", "lo": 99.6, "hi": 99.9, "center": 99.75, "touches": 3, "status": "ACTIVE"}])
@@ -92,7 +92,7 @@ def test_retest_scan_and_signal():
 
 
 def test_three_profiles_share_signals_but_differ():
-    """Same market: aggressive trades a class-C zone limit, balanced and conservative don't; run() returns all three."""
+    """Same market: class C (zone limit) is observation-only — none of the three desks trades it; run() returns all three."""
     conn = sqlite3.connect(":memory:")
     t0 = 1_700_000_000_000
     flat = [10.0] * 300
@@ -100,7 +100,9 @@ def test_three_profiles_share_signals_but_differ():
     c["regime"] = {"long": "BULL"}
     out = pd.run(conn, {"coins": [c]}, now=t0 + 300 * 900_000)
     assert set(out["profiles"]) == {"cons", "bal", "aggr"} and out["profile"] == "bal"
-    assert out["profiles"]["aggr"]["pending"] and not out["profiles"]["bal"]["pending"] and not out["profiles"]["cons"]["pending"]
+    assert not any(out["profiles"][k]["pending"] for k in ("cons", "bal", "aggr"))
+    lab = pd.PaperDesk(conn, "aggr", classes={"A", "B", "R", "C"}).step([c], True, t0 + 300 * 900_000)
+    assert lab["pending"]   # the same zone would be traded only if class C were enabled
     assert out["profiles"]["cons"]["rules"].startswith("риск 0.5%")
     # tables are separate per profile
     names = {r[0] for r in conn.execute("select name from sqlite_master where type='table'")}

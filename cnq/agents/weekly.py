@@ -193,7 +193,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
         mode = ("Выше средней 200 дней — лонг от поддержки" if n["bull"] else "Ниже средней 200 дней — шорт от сопротивления") + (f"; {n['mid_note']}" if n.get("mid_note") else "")
         L.append(f"- {n['symbol']} {_fmt(n['price'])}: " + "; ".join(parts) + f". {mode}.")
     L.append("")
-    L.append("Правило недели: вход только от стенки с ретестом, стоп за зоной, риск 1% на сделку. Падение вдогонку не торгуем.")
+    L.append("Правило недели: вход только от стенки с ретестом, стоп за зоной, риск 1% на сделку. Не гонимся за движением — ждём цену у стенки.")
     text = "\n".join(L)
     # telegram post (short)
     P = [f"📊 CRYPTO NOVΛ — неделя {week['from']}–{week['to']}"]
@@ -206,7 +206,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
     for n in nxt[:4]:
         if n["support"] and n["resistance"]:
             P.append(f"• {n['symbol']} {_fmt(n['price'])}: {_fmt(n['support']['lo'])} ⇄ {_fmt(n['resistance']['hi'])}")
-    P.append("Вход только от стенки. Падение вдогонку не торгуем.")
+    P.append("Вход только от стенки, не гонимся за движением.")
     return text, "\n".join(P)
 
 

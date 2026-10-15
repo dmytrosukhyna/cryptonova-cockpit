@@ -215,7 +215,7 @@ class PaperDesk:
                 if s["id"] in known or base in open_syms:
                     continue
                 if risk_off and s["side"] == "LONG" and s["grade"] == "C":
-                    events.append(f"пропуск лонга {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт вдогонку −0.04R — не торгуем)")
+                    events.append(f"пропуск лонга {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
                     continue
                 if len(self._open()) + len(self._pending()) >= MAX_OPEN:
                     break

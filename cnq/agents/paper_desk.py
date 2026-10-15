@@ -29,15 +29,20 @@ RISK = 0.01
 #   confirm  — R longs need a second breakout after the retest (history: +0.085R/trade vs +0.04R, half the trades)
 #   risk     — share of equity risked per trade;  max_open — positions + pending limits
 #   tgt_r    — R-class target in R;  riskoff — what is allowed while ≥70 % of coins fall: 'none' | 'shorts'
-PROFILES = {   # one strategy — "Автопилот" — at three risk levels; retest (R) is no longer traded: in the whole-portfolio backtest
-               # (scripts/autopilot_backtest.py, 10 coins 2020-09→2026-09) it added drawdown (−57 %) and lost money since 12.2024
-    "cons": {"name": "Автопилот · осторожно", "classes": {"A", "B", "E"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts", "e_share": 0.10,
-             "prefix": "paper_cons_", "about": "Откуп каскада ликвидаций и откуп климакса в панике (корзина 10% счёта на сутки), риск 0.5% на сделку, до 2 позиций. История: ≈ +5%/год, просадка до −9%."},
-    "bal":  {"name": "Автопилот · норма", "classes": {"A", "B", "E"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.20,
-             "prefix": "paper_bal_", "about": "Откуп каскада ликвидаций и откуп климакса в панике (корзина 20% счёта на сутки), риск 1% на сделку, до 4 позиций. История: ≈ +10%/год, просадка до −19%, 71% месяцев в плюсе."},
-    "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts", "e_share": 0.30,
-             "prefix": "paper_", "about": "Те же правила, больше газа: риск 1.5% на сделку, корзина климакса 30% счёта. История: ≈ +14%/год, просадка до −28%."},
+PROFILES = {   # one strategy — "Автопилот" — at three risk levels. Rules: B cascade buyback, E panic-climax basket, F open-interest flush
+               # (+A FX gap). Retest (R) is not traded: whole-portfolio backtests (scripts/autopilot_backtest.py, scripts/autopilot_v2.py)
+               # showed it adds drawdown (−57 %) without adding profit. Numbers below: 18 coins, 2023-01 → 2026-09, costs included.
+    "cons": {"name": "Автопилот · осторожно", "classes": {"A", "B", "E", "F"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts",
+             "e_share": 0.10, "f_share": 0.10, "f_open": 2, "prefix": "paper_cons_",
+             "about": "Откуп каскада ликвидаций, откуп паники и откуп сброса позиций; риск 0.5% на сделку, малые доли счёта. История 2023–2026: ≈ +14% в год, просадка до −11%."},
+    "bal":  {"name": "Автопилот · норма", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
+             "e_share": 0.20, "f_share": 0.15, "f_open": 3, "prefix": "paper_bal_",
+             "about": "Откуп каскада ликвидаций, откуп паники (корзина 20% счёта) и откуп сброса позиций (15% счёта на сделку, до 3); риск 1%. История 2023–2026: ≈ +27% в год, просадка до −22%, 69% месяцев в плюсе."},
+    "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
+             "e_share": 0.30, "f_share": 0.20, "f_open": 4, "prefix": "paper_",
+             "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 20% счёта на сделку. История 2023–2026: ≈ +39% в год, просадка до −36%."},
 }
+RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций"}
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
@@ -48,6 +53,10 @@ HOLD_E_H = 24          # class E: liquidation-climax long inside a broad sell-of
 E_DROP = -0.015
 E_VOL = 2.0
 E_STOP = 0.12
+HOLD_F_H = 24          # class F: open-interest flush long — OI −12 % and price −5 % over 4 h (docs/research/oi_flush.md)
+F_OI = -0.12
+F_PX = -0.05
+F_STOP = 0.12
 ORDER_TTL_H = 24
 MAX_OPEN = 6
 
@@ -226,6 +235,18 @@ class PaperDesk:
                             "order": "MARKET", "hold_h": HOLD_E_H,
                             "reason": f"Откуп климакса: в широкой распродаже свеча {ret_oc*100:.1f}% на объёме {last[5]/vavg:.1f}× — на истории такие свечи выкупают в течение суток (+2% в среднем). "
                                       f"Выход по времени через 24 ч, катастрофический стоп −{E_STOP*100:.0f}%, размер — доля счёта, не риск по стопу."})
+        # F: open-interest flush — positions forcibly closed (OI −12 % in 4 h) while price fell ≥ 5 % → long, 24 h, catastrophe stop −12 %
+        oi = coin.get("oi_chg4h")
+        if oi is not None and len(c15) >= 18 and c15[-17][4]:
+            px4 = c15[-1][4] / c15[-17][4] - 1
+            if oi <= F_OI and px4 <= F_PX:
+                entry = c15[-1][4]
+                out.append({"id": f"F-{base}-{c15[-1][0] // 3_600_000}", "symbol": base, "side": "LONG", "grade": "F", "kind": "OI_FLUSH",
+                            "entry": entry, "stop": entry * (1 - F_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
+                            "order": "MARKET", "hold_h": HOLD_F_H,
+                            "reason": f"Сброс позиций: открытый интерес за 4 ч {oi*100:.0f}%, цена {px4*100:.1f}% — рынок принудительно вытряс плечи. "
+                                      f"На истории (18 монет, 2023–2026) после такого откуп +1.8% в среднем за сутки, 62% сделок в плюсе. "
+                                      f"Выход через 24 ч, катастрофический стоп −{F_STOP*100:.0f}%, размер — доля счёта."})
         # cascade long: last closed 15m candle
         rets = [c15[i][4] / c15[i - 1][4] - 1 for i in range(max(1, len(c15) - 96 * 30), len(c15) - 1)]
         sig = math.sqrt(sum(x * x for x in rets) / len(rets)) if rets else 0
@@ -282,15 +303,21 @@ class PaperDesk:
                 if risk_off and s["grade"] == "R" and s["side"] == "SHORT":   # history: retest shorts inside a broad sell-off ≈ 0 (+0.013R, n=839) vs +0.155R in calm markets
                     events.append(f"пропуск шорта {base}: ретест внутри широкой распродажи на истории ≈ 0 — ждём спокойного рынка")
                     continue
-                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
+                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
                     events.append(f"пропуск {'лонга' if s['side'] == 'LONG' else 'шорта'} {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
                     continue
-                if s["grade"] != "E" and len(self._open()) + len(self._pending()) >= self.P["max_open"]:
-                    break
+                if s["grade"] == "F" and sum(1 for t in self._open() if t["grade"] == "F") >= self.P.get("f_open", 3):
+                    continue
+                if s["grade"] not in ("E", "F") and sum(1 for t in self._open() if t["grade"] not in ("E", "F")) + len(self._pending()) >= self.P["max_open"]:
+                    continue
                 if s["grade"] == "E":
                     notional = eq * self.P.get("e_share", 0.2) / max(1, len(e_sigs))
                     qty = notional / s["entry"]
                     risk_usd = notional * E_STOP
+                elif s["grade"] == "F":
+                    notional = eq * self.P.get("f_share", 0.15)
+                    qty = notional / s["entry"]
+                    risk_usd = notional * F_STOP
                 else:
                     risk_usd = eq * self.P["risk"]
                     r = abs(s["entry"] - s["stop"])
@@ -300,12 +327,12 @@ class PaperDesk:
                     self.conn.execute(f"INSERT INTO {self.T_TR} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (s["id"], base, s["side"], s["grade"], s["kind"], fill, s["stop"], s["stop"], json.dumps(s["tps"]), json.dumps(s["parts"]),
                                        qty, qty, risk_usd, now, now + s["hold_h"] * 3_600_000, None, None, 0.0, 0.0, 0, s["reason"], coin["candles"][-1][0]))
-                    events.append(f"открыт {s['side']} {base} по рынку {fill:.6g} (класс {s['grade']})")
+                    events.append(f"открыт {s['side']} {base} по рынку {fill:.6g} ({RULE_RU.get(s['grade'], s['grade'])})")
                 else:
                     self.conn.execute(f"INSERT INTO {self.T_ORD} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (s["id"], base, s["side"], s["grade"], s["kind"], s["entry"], s["stop"], json.dumps(s["tps"]), json.dumps(s["parts"]),
                                        qty, risk_usd, now, now + ORDER_TTL_H * 3_600_000, "PENDING", s["reason"]))
-                    events.append(f"лимитка {s['side']} {base} @ {s['entry']:.6g} (класс {s['grade']})")
+                    events.append(f"лимитка {s['side']} {base} @ {s['entry']:.6g} ({RULE_RU.get(s['grade'], s['grade'])})")
                 open_syms.add(base)
         self.conn.commit()
         # 2. pending limits: fill on candles that closed after creation
@@ -323,7 +350,7 @@ class PaperDesk:
                     filled = c
                     break
             if filled:
-                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H}.get(o["grade"], HOLD_C_H)
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
@@ -437,7 +464,7 @@ class PaperDesk:
                 "stats": {"trades": n, "winrate": round(len(wins) / n, 3) if n else None, "avg_r": round(sum(t["pnl_r"] for t in closed) / n, 3) if n else None,
                           "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0), "max_dd_pct": round(dd * 100, 2),
                           "by_grade": by_grade},
-                "equity_history": eqh[-500:], "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, классы {' '.join(sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02%, стоп первым внутри свечи, без заглядывания вперёд"}
+                "equity_history": eqh[-500:], "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, правила: {', '.join(RULE_RU[g] for g in sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02%, стоп первым внутри свечи, без заглядывания вперёд"}
 
 
 def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
@@ -446,6 +473,15 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
     btc = next((c for c in report["coins"] if c["symbol"].startswith("BTC")), None)
     btc_bull = bool(btc and btc.get("regime", {}).get("long") == "BULL")
     now = now or int(time.time() * 1000)
+    try:   # rule F needs open-interest history: record this run, attach the 4-hour change to every coin
+        from cnq.agents import oi_watch
+        bases = [c["symbol"].replace("-USDT", "").replace("USDT", "") for c in report["coins"]]
+        if not report.get("_no_network"):
+            oi_watch.record(conn, bases, now)
+        for c, b in zip(report["coins"], bases):
+            c["oi_chg4h"] = oi_watch.change(conn, b, now)
+    except Exception:  # noqa: BLE001
+        pass
     snaps = {k: PaperDesk(conn, k).step(report["coins"], btc_bull, now) for k in PROFILES}
     out = dict(snaps[DEFAULT_PROFILE])
     out["profiles"] = {k: {kk: vv for kk, vv in v.items() if kk != "equity_history"} | {"equity_history": v["equity_history"][-300:]} for k, v in snaps.items()}

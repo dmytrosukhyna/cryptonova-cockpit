@@ -153,17 +153,35 @@ def score_universe(markets: list[dict], hl: dict, btc_bull: bool) -> list[dict]:
     return rows
 
 
+def preferences() -> dict:
+    """config/preferred.json — the owner's trusted / avoided coins. Preferred get +8 and go first among qualified; avoided are skipped."""
+    try:
+        with open("config/preferred.json", encoding="utf-8") as f:
+            d = json.load(f)
+        return {"preferred": [x.upper() for x in d.get("preferred", [])], "avoid": [x.upper() for x in d.get("avoid", [])]}
+    except Exception:
+        return {"preferred": [], "avoid": []}
+
+
 def picks(rows: list[dict], n: int = 8) -> dict[str, list[dict]]:
     out = {}
+    pref = preferences()
     for h in HORIZONS:
-        pool = [r for r in rows if r["symbol"] not in CORE]
+        pool = [r for r in rows if r["symbol"] not in CORE and r["symbol"] not in pref["avoid"]]
+        for r in pool:
+            if r["symbol"] in pref["preferred"] and not r.get("_pref_applied"):
+                for hh in HORIZONS:
+                    r["score"][hh] = min(100, r["score"][hh] + 8)
+                    r["why"][hh] = (r["why"][hh] + "; в списке доверия") if r["why"].get(hh) else "в списке доверия"
+                r["_pref_applied"] = True
         if h == "mid":
             pool = [r for r in pool if r["mcap"] >= 3e8 and (r.get("age_days") is None or r["age_days"] >= 180)]
         if h == "long":
             pool = [r for r in pool if r["mcap"] >= 1e9]
-        pool.sort(key=lambda r: -r["score"][h])
+        pool.sort(key=lambda r: (-(1 if r["symbol"] in pref["preferred"] and r["score"][h] >= 55 else 0), -r["score"][h]))
         out[h] = [{"symbol": r["symbol"], "name": r["name"], "price": r["price"], "score": r["score"][h], "why": r["why"][h],
-                   "mcap": r["mcap"], "chg7": r.get("chg7"), "chg30": r.get("chg30"), "hl": r["hl_spot"] or r["hl_perp"]} for r in pool[:n]]
+                   "mcap": r["mcap"], "chg7": r.get("chg7"), "chg30": r.get("chg30"), "hl": r["hl_spot"] or r["hl_perp"],
+                   "preferred": r["symbol"] in pref["preferred"]} for r in pool[:n]]
     return out
 
 
@@ -196,6 +214,8 @@ class SpotPortfolio:
         now = now or int(time.time() * 1000)
         price = {r["symbol"]: r["price"] for r in rows}
         score = {r["symbol"]: r["score"] for r in rows}
+        names = {r["symbol"]: r.get("name", r["symbol"]) for r in rows}
+        whys = {r["symbol"]: (r.get("why") or {}).get("mid") for r in rows}
         pos = {p["symbol"]: p for p in self.positions()}
         actions: list[dict] = []
         weekday = datetime.fromtimestamp(now / 1000, tz=timezone.utc).weekday()
@@ -232,6 +252,23 @@ class SpotPortfolio:
             elif px < high * 0.75 and ret > 0.2:
                 actions.append(self._act(now, sym, "SELL", 0, px, f"Откат 25% от максимума позиции при прибыли {ret*100:+.0f}% — забираем, перезайдём по новому сигналу."))
         pos = {p["symbol"]: p for p in self.positions()}
+        # --- owner's trust list: on rebalance a preferred mid idea (score ≥ 60) replaces the weakest non-preferred satellite
+        #     when it beats it by ≥ 10 points — the rules (stop −15 %, caps) stay the same, the owner only sets priorities
+        if rebalance:
+            pref = preferences()["preferred"]
+            held = set(pos)
+            for x in [x for x in pk["mid"] if x["symbol"] in pref and x["score"] >= 60 and x["symbol"] not in held]:
+                mids_held = [p for p in pos.values() if p["bucket"] == "mid" and p["symbol"] not in pref]
+                if not mids_held:
+                    break
+                weakest = min(mids_held, key=lambda p: score.get(p["symbol"], {}).get("mid", 0))
+                w_score = score.get(weakest["symbol"], {}).get("mid", 0)
+                if x["score"] >= w_score + 10 and weakest["symbol"] in price:
+                    actions.append(self._act(now, weakest["symbol"], "SELL", 0, price[weakest["symbol"]],
+                                             f"Замена: {x['symbol']} из списка доверия сильнее ({x['score']} против {w_score}) — освобождаем место."))
+                    pos.pop(weakest["symbol"], None)
+                    actions.append(self._act(now, x["symbol"], "BUY", 0.08, x["price"], f"Из списка доверия, оценка {x['score']}/100: {x['why']}. Стоп −15%, фиксация половины на +40%.", "mid"))
+                    pos[x["symbol"]] = {"symbol": x["symbol"], "bucket": "mid", "weight": 0.08}
         # --- fill satellites (weekly / when empty)
         if rebalance:
             invested = sum(p["weight"] for p in pos.values())
@@ -262,7 +299,7 @@ class SpotPortfolio:
         self.conn.commit()
         hist = [{"time": t, "v": v} for t, v in self.conn.execute("SELECT time,index_value FROM spot_value ORDER BY time DESC LIMIT 60").fetchall()][::-1]
         return {"positions": [dict(p, price=price.get(p["symbol"]), pnl_pct=round((price.get(p["symbol"], p["entry"]) / p["entry"] - 1) * 100, 2) if p["entry"] else None,
-                                   score=score.get(p["symbol"])) for p in pos],
+                                   score=score.get(p["symbol"]), name=names.get(p["symbol"], p["symbol"]), why=whys.get(p["symbol"])) for p in pos],
                 "cash_pct": round(cash * 100), "invested_pct": round(invested * 100), "index": idx, "history": hist,
                 "actions": actions, "rebalance_day": rebalance,
                 "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in

@@ -205,12 +205,13 @@ class Research:
         todo = [m for m in markets if m.get("id") and not m.get("stable") and not m.get("wrapped")]
         todo.sort(key=lambda m: have.get(m["id"], 0))
         n = 0
+        fails = 0
         for m in todo[:limit]:
             if now - have.get(m["id"], 0) < CARD_TTL_MS / 3:
                 continue
             j = _get(f"{CG}/coins/{m['id']}?localization=false&tickers=false&market_data=false&community_data=true&developer_data=true&sparkline=false")
             if not j:
-                fails = locals().get("fails", 0) + 1
+                fails += 1
                 time.sleep(12.0)
                 if fails >= 2:      # rate-limited: stop for this run, the next run continues the rotation
                     break

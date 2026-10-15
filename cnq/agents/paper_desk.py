@@ -4,6 +4,9 @@ Mirrors the panel's signal classes so what you see is what is tracked:
   C  LEVEL_LIMIT        limit at the edge of a tested 4h zone (≤ 0.3 ATR away), stop beyond zone + 0.25 ATR,
                         targets 1R/2R/3R (40/30/30 %), stop → entry after T1, limit expires in 24 h, trade expires in 48 h
   B  LIQ_CASCADE_LONG   market long after a −3.5σ 15m candle with a long lower wick, stop = low − 0.5 ATR, target 1R, 8 h
+  R  RETEST             4h breakout on volume (close beyond 30-bar extreme + 0.3 ATR, vol ≥ 1.3× avg20), then a return to the
+                        level that closes back beyond it (role reversal): market entry, stop = level ∓ 1 ATR(4h), one target 2R,
+                        8 days. History 2020–26: long +0.04R, short +0.07R after costs (random −0.07R). scripts/retest_test.py
 Risk 1 % of equity per trade, fees 0.05 % per side + 0.02 % slippage. Long alts only when BTC is above its 200-day mean.
 Stop-first rule inside a bar (if both stop and target are inside one candle, the stop counts). Deterministic; no look-ahead:
 only candles that closed after the signal are used.
@@ -23,8 +26,68 @@ FEE = 0.0005
 SLIP = 0.0002
 HOLD_C_H = 48
 HOLD_B_H = 8
+HOLD_R_H = 192
 ORDER_TTL_H = 24
 MAX_OPEN = 6
+
+
+def agg4h(c15: list[list]) -> list[list]:
+    """15m → 4h candles [t,o,h,l,c,v], aligned to 4h boundaries (UTC)."""
+    out = []; cur = None
+    for k in c15:
+        t0 = k[0] - (k[0] % 14_400_000)
+        if cur is None or cur[0] != t0:
+            if cur: out.append(cur)
+            cur = [t0, k[1], k[2], k[3], k[4], k[5]]
+        else:
+            cur[2] = max(cur[2], k[2]); cur[3] = min(cur[3], k[3]); cur[4] = k[4]; cur[5] += k[5]
+    if cur: out.append(cur)
+    return out
+
+
+def retest_scan(b4: list[list], n_break: int = 30, wait: int = 24) -> dict | None:
+    """Same rule as the panel's retestScan(): returns the live breakout→retest state on CLOSED 4h bars, or None.
+    b4 must contain only closed bars. Result: side, level, atr, i_break, i_retest (None while waiting)."""
+    n = len(b4)
+    if n < n_break + 22:
+        return None
+    a_all = _atr_series(b4)
+    for i in range(n - 1, max(n_break + 20, n - 1 - wait) - 1, -1):
+        a = a_all[i]
+        if not a:
+            continue
+        hi_n = max(x[2] for x in b4[i - n_break:i]); lo_n = min(x[3] for x in b4[i - n_break:i])
+        v20 = sum(x[5] for x in b4[i - 20:i]) / 20
+        volok = b4[i][5] >= 1.3 * v20
+        if b4[i][4] > hi_n + 0.3 * a and volok:
+            side, lvl = "LONG", hi_n
+        elif b4[i][4] < lo_n - 0.3 * a and volok:
+            side, lvl = "SHORT", lo_n
+        else:
+            continue
+        ret = None; failed = False
+        for j in range(i + 1, n):
+            bj = b4[j]
+            if side == "LONG":
+                if bj[4] < lvl - 0.5 * a: failed = True; break
+                if bj[3] <= lvl + 0.5 * a and bj[4] > lvl: ret = j; break
+            else:
+                if bj[4] > lvl + 0.5 * a: failed = True; break
+                if bj[2] >= lvl - 0.5 * a and bj[4] < lvl: ret = j; break
+        if failed:
+            return None
+        return {"side": side, "level": lvl, "atr": a, "i_break": i, "i_retest": ret, "bars_since_retest": None if ret is None else n - 1 - ret}
+    return None
+
+
+def _atr_series(b: list[list], n: int = 14) -> list[float]:
+    out = [0.0] * len(b)
+    trs = []
+    for i in range(1, len(b)):
+        trs.append(max(b[i][2] - b[i][3], abs(b[i][2] - b[i - 1][4]), abs(b[i][3] - b[i - 1][4])))
+        if len(trs) >= n:
+            out[i] = sum(trs[-n:]) / n
+    return out
 
 
 def _atr(c: list[list], n: int = 14) -> float:
@@ -93,6 +156,23 @@ class PaperDesk:
                         "entry": entry, "stop": stop, "tps": [entry + sgn * k * r for k in (1, 2, 3)], "parts": [0.4, 0.3, 0.3],
                         "order": "LIMIT", "hold_h": HOLD_C_H,
                         "reason": f"Цена у зоны {L['lo']:.6g}–{L['hi']:.6g} ({L['touches']}× касаний). Лимитка на краю, стоп за зоной + 0.25 ATR."})
+        # R: breakout → retest on closed 4h bars (the last 15m candle may be inside an unfinished 4h bar → drop it)
+        b4_all = agg4h(coin.get("candles_long") or c15)
+        cutoff = now - (now % 14_400_000)
+        b4 = [x for x in b4_all if x[0] < cutoff]
+        rt = retest_scan(b4)
+        if rt and rt["i_retest"] is not None and rt["bars_since_retest"] == 0:
+            side = rt["side"]; sgn = 1 if side == "LONG" else -1
+            if not (side == "LONG" and not btc_bull and base != "BTC"):
+                entry = price
+                stop = rt["level"] - sgn * rt["atr"]
+                r = sgn * (entry - stop)
+                if r > 0 and r / entry <= 0.08:
+                    out.append({"id": f"R-{base}-{b4[rt['i_retest']][0]}", "symbol": base, "side": side, "grade": "R", "kind": "RETEST",
+                                "entry": entry, "stop": stop, "tps": [entry + sgn * 2 * r] * 3, "parts": [1.0, 0.0, 0.0],
+                                "order": "MARKET", "hold_h": HOLD_R_H,
+                                "reason": f"Пробой {'сопротивления' if side == 'LONG' else 'поддержки'} {rt['level']:.6g} на объёме и ретест: свеча 4ч вернулась к уровню и закрылась "
+                                          f"{'выше' if side == 'LONG' else 'ниже'}. Вход по рынку, стоп {stop:.6g}, цель 2R, до 8 дней."})
         # cascade long: last closed 15m candle
         rets = [c15[i][4] / c15[i - 1][4] - 1 for i in range(max(1, len(c15) - 96 * 30), len(c15) - 1)]
         sig = math.sqrt(sum(x * x for x in rets) / len(rets)) if rets else 0
@@ -170,7 +250,7 @@ class PaperDesk:
                     filled = c
                     break
             if filled:
-                hold = HOLD_C_H if o["grade"] == "C" else HOLD_B_H
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1

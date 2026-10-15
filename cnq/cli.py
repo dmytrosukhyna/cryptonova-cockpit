@@ -163,6 +163,10 @@ def main(argv: list[str] | None = None) -> int:
             import sqlite3
             from .agents import paper_desk
             conn = sqlite3.connect("data/agents.sqlite")
+            for c in rep["coins"]:   # 4h retest scan needs ~75 closed 4h bars → give the desk 20 days of 15m
+                cs = universe.get(c["symbol"])
+                if cs:
+                    c["candles_long"] = cs[-96 * 20:]
             res = paper_desk.run(conn, rep)
             write_report(res, os.path.join(args.out, "paper.json"))
             print(f"paper.json: equity={res['equity']} open={len(res['open'])} pending={len(res['pending'])} closed={res['stats']['trades']} events={res['events'][:3]}")

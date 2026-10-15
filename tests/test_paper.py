@@ -60,3 +60,32 @@ def test_alt_longs_blocked_in_bear_and_cascade_market_entry():
     c2 = {"symbol": "SOL-USDT", "candles": cs, "levels": [], "regime": {"long": "BULL"}}
     res = desk.step([c2], True, cs[-1][0] + 1)
     assert res["open"] and res["open"][0]["grade"] == "B" and res["open"][0]["side"] == "LONG"
+
+
+def test_retest_scan_and_signal():
+    """Synthetic 4h series: flat 30 bars, breakout bar on volume, then a retest bar that closes back above the level."""
+    from cnq.agents.paper_desk import PaperDesk, agg4h, retest_scan
+    import sqlite3
+    H = 14_400_000
+    b4 = []
+    t0 = 1_700_000_000_000 - (1_700_000_000_000 % H)
+    for i in range(60):
+        b4.append([t0 + i * H, 100.0, 101.0, 99.0, 100.0, 10.0])       # flat, ATR ≈ 2
+    b4.append([t0 + 60 * H, 100.0, 104.0, 99.5, 103.0, 20.0])          # breakout: close 103 > 101 + 0.3·ATR, vol 2×
+    b4.append([t0 + 61 * H, 103.0, 103.5, 102.5, 103.0, 10.0])
+    rt = retest_scan(b4)
+    assert rt and rt["side"] == "LONG" and rt["level"] == 101.0 and rt["i_retest"] is None
+    b4.append([t0 + 62 * H, 103.0, 103.2, 101.5, 102.5, 10.0])          # retest: low within 0.5 ATR of 101, close above
+    rt = retest_scan(b4)
+    assert rt and rt["i_retest"] == 62 and rt["bars_since_retest"] == 0
+    # 15m expansion for the desk: each 4h bar → 16 identical 15m candles
+    c15 = []
+    for b in b4:
+        for k in range(16):
+            c15.append([b[0] + k * 900_000, b[1], b[2], b[3], b[4], b[5] / 16])
+    now = c15[-1][0] + 900_000 + H   # next 4h bar has started, last retest bar is closed
+    desk = PaperDesk(sqlite3.connect(":memory:"))
+    sigs = desk.signals({"symbol": "ETH-USDT", "candles": c15, "levels": []}, True, now)
+    r = [x for x in sigs if x["grade"] == "R"]
+    assert len(r) == 1 and r[0]["side"] == "LONG" and abs(r[0]["stop"] - (101.0 - rt["atr"])) < 1e-9 and r[0]["order"] == "MARKET"
+    assert agg4h(c15)[-1][0] == b4[-1][0]

@@ -136,5 +136,5 @@ def run(conn: sqlite3.Connection, llm=None, token: str | None = None, owner: str
 
     res = mb.poll(token, answer)
     res["profile_set"] = prof
-    res["owner_chat"] = mb.owner_chat(owner or os.environ.get("CNQ_TG_OWNER"))
+    res["owner_chat"] = mb.owner_chat(owner or os.environ.get("CNQ_TG_OWNER") or "dmytrosukhyna")
     return res

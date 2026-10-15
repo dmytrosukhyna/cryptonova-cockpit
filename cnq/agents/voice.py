@@ -11,7 +11,7 @@ import re
 import time
 
 VOICE = os.environ.get("CNQ_TTS_VOICE", "ru-RU-DmitryNeural")
-NAME = os.environ.get("CNQ_OWNER_NAME", "Дмитрий")
+NAME = os.environ.get("CNQ_OWNER_NAME") or "Дмитрий"
 
 
 def _load(out: str, name: str):

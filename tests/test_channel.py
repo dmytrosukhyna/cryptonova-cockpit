@@ -70,3 +70,26 @@ def test_english_news_translated_or_dropped():
     out = channel.russify([dict(items[0])], FakeLLM())
     assert out and out[0]["title"].startswith("Арест") and not channel.latin_heavy(out[0]["summary"])
     assert not channel.Channel.guard(None, "1. Mastercard platform lowers friction for banks and enterprises to hold stablecoins\n" + "а" * 300, {})
+
+
+def test_factcheck_rejects_then_accepts():
+    tmp = tempfile.mkdtemp(); _web(tmp)
+    ch = channel.Channel(sqlite3.connect(":memory:"), tmp)
+    facts = ch.facts(ch.ctx(), dt.datetime(2026, 10, 15, 20, 30, tzinfo=channel.KYIV))
+    good = "<b>Итоги дня</b>\n\n" + "Биткоин закрыл день у $80 984, рынок нервный, работаем от зон, стоп заранее. " * 4
+    good = good.strip()
+    class LLM:
+        def __init__(self): self.n = 0; self.prompts = []
+        def complete(self, system, user, temperature=0.2):
+            self.n += 1; self.prompts.append(user)
+            return good.replace("Итоги дня", "Шапка дня") if self.n == 1 else good     # 1st draft has a service word
+        def json(self, system, user):
+            return {"ok": "завтра ждём 70 000" not in user, "problems": []}
+    llm = LLM()
+    out = ch.write("evening", facts, llm)
+    assert out == good and llm.n == 2 and "Исправь" in llm.prompts[1] and ch.last_review[0]["problems"]
+    class Picky(LLM):
+        def json(self, system, user):
+            return {"ok": False, "problems": ["зона подана как цель на завтра"]}
+    p = Picky()
+    assert ch.write("evening", facts, p) is None and p.n == 3          # never publishes a draft the fact-checker rejected

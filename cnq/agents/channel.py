@@ -371,9 +371,9 @@ class Channel:
              "Если какого-то факта нет — просто не упоминай его. Весь текст — только на русском: английские заголовки и фразы из данных обязательно переводи (имена, компании и тикеры можно латиницей). Разметка: только <b>…</b> для заголовков разделов. Без эмодзи, без хэштегов, без ссылок, без подписи в конце.")
 
     PROMPTS = {
-        "morning": "Напиши утренний пост. Структура строго:\n<b>Доброе утро, дорогие подписчики!</b>\n<b>Утренний обзор рынка · {date}</b>\n\n<b>Рынок:</b> одной-двумя строками цены BTC, ETH, SOL с изменением за сутки, капитализация, индекс страха и жадности.\n\n<b>Аналитика:</b> один-два абзаца: что сейчас двигает рынок (новости из news с их механизмом, если они есть; если нет — режим и потоки), как ведёт себя биткоин относительно альтов, что говорит индекс страха.\n\n<b>Ключевые факторы:</b> 3 коротких пункта, каждый с новой строки через «—».\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения: защитный или рабочий режим, базовый сценарий A с вероятностью и уровнем, где ждём разворота (зоны), что делает система (сделки только от зон; в распродажу не покупаем вдогонку, спот — частями). Длина всего поста до 1900 символов.",
+        "morning": "Напиши утренний пост. Структура строго:\n<b>Доброе утро, дорогие подписчики!</b>\n<b>Утренний обзор рынка · {date}</b>\n\n<b>Рынок:</b> одной-двумя строками цены BTC, ETH, SOL с изменением за сутки, капитализация, индекс страха и жадности.\n\n<b>Аналитика:</b> один-два абзаца: что сейчас двигает рынок (новости из news с их механизмом, если они есть; если нет — режим и потоки), как ведёт себя биткоин относительно альтов, что говорит индекс страха.\n\n<b>Ключевые факторы:</b> 3 коротких пункта, каждый с новой строки через «—».\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения: защитный или рабочий режим, базовый сценарий A с вероятностью и уровнем, где ждём разворота (зоны), что делает система (сделки только от зон; в распродажу не покупаем вдогонку, спот — частями). Пост идёт подписью к картинке, поэтому строго до 950 символов (картинка уже показывает цены, зоны и сценарии — не дублируй всё подряд).",
         "news": "Напиши пост об одной новости. Структура строго:\nПервая строка — твой заголовок: короткий и сильный, до 8 слов, по сути новости, в <b>…</b>; никаких слов «шапка», «заголовок» и т.п. Если в новости есть малоизвестная монета, проект, компания или человек — поясни одной фразой в скобках, что это (например, «HEX (токен проекта Ричарда Харта)»), чтобы понял новичок.\n\n<b>Что случилось:</b> 2–3 предложения по summary.\n\n<b>Почему это важно для рынка:</b> 2–4 предложения — механизм: кто вынужден покупать или продавать, на какие монеты влияет, что это меняет в настроении; упомяни текущую цену биткоина из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2 предложения: главный риск или шанс и что делает система (не торгует вдогонку, ждёт реакцию цены у зоны / подтверждение). Длина до 1200 символов. Ссылку НЕ вставляй — её добавят после.",
-        "evening": "Напиши вечерний пост. Структура строго:\n<b>Итоги дня · {date}</b>\n\n<b>Главные события:</b> 2–3 пункта с новой строки «1.», «2.», «3.» — из news (с механизмом одной фразой); если новостей нет — главные движения рынка.\n\n<b>Как вёл себя рынок:</b> 2–3 предложения с числами: BTC, ETH, SOL за сутки, капитализация, страх и жадность, кто лидировал и кто падал.\n\n<b>Сценарий дня:</b> одно предложение — сработал ли утренний сценарий (из scenario_verdict). Если там сказано, что утреннего сценария не было, — так и напиши и больше нигде в посте не упоминай «сценарий A» и его цели.\n\n<b>Прогноз:</b> три строки: «Краткосрочно:» (по стрессу рынка и импульсу), «Среднесрочно:» (по тренду и зонам), «Долгосрочно:» (по режиму 200-дневной) — без новых чисел, только из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения, честно: что сбылось, что нет, что система делает завтра (сделки только от зон, стоп заранее, в панике не покупаем). Уровни на завтра называй только из btc_scenario (цели A и B); зоны из btc_zones — это дальние ориентиры, упоминай их только как «если пробьём …, следующая зона …», не как ожидание на завтра. Длина до 1900 символов."
+        "evening": "Напиши вечерний пост. Структура строго:\n<b>Итоги дня · {date}</b>\n\n<b>Главные события:</b> 2–3 пункта с новой строки «1.», «2.», «3.» — из news (с механизмом одной фразой); если новостей нет — главные движения рынка.\n\n<b>Как вёл себя рынок:</b> 2–3 предложения с числами: BTC, ETH, SOL за сутки, капитализация, страх и жадность, кто лидировал и кто падал.\n\n<b>Сценарий дня:</b> одно предложение — сработал ли утренний сценарий (из scenario_verdict). Если там сказано, что утреннего сценария не было, — так и напиши и больше нигде в посте не упоминай «сценарий A» и его цели.\n\n<b>Прогноз:</b> три строки: «Краткосрочно:» (по стрессу рынка и импульсу), «Среднесрочно:» (по тренду и зонам), «Долгосрочно:» (по режиму 200-дневной) — без новых чисел, только из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения, честно: что сбылось, что нет, что система делает завтра (сделки только от зон, стоп заранее, в панике не покупаем). Уровни на завтра называй только из btc_scenario (цели A и B); зоны из btc_zones — это дальние ориентиры, упоминай их только как «если пробьём …, следующая зона …», не как ожидание на завтра. Пост идёт подписью к картинке, поэтому строго до 950 символов: каждый раздел — 1–2 коротких предложения, «Главные события» — максимум 2 пункта."
     }
 
     # ------------------------------------------------------------------ posts
@@ -390,18 +390,63 @@ class Channel:
         bad = [n for n in self._nums(out) if n and n not in pool and n.split(",")[0] not in pool]
         return not bad
 
+    REVIEW = ("Ты — выпускающий редактор и фактчекер крипто-канала. Проверь пост перед публикацией строго по данным JSON. Найди ошибки:\n"
+              "1) факт, число или уровень, которого нет в данных или который искажён (например, зона, поданная как цель на завтра, хотя целей в btc_scenario другие);\n"
+              "2) противоречия внутри поста (например, «сценария не было» и дальше «сценарий A не реализовался»);\n"
+              "3) выводы, которые не следуют из данных, обещания и уверенность там, где в данных вероятность;\n"
+              "4) английский текст (кроме имён, компаний, тикеров), служебные слова вроде «шапка», пустые или повторяющиеся разделы;\n"
+              "5) неверное направление: позитив/негатив новости или сценария перепутаны.\n"
+              'Верни JSON: {"ok": true|false, "problems": ["коротко, что не так и как исправить", ...]}. Мелкие стилистические замечания не считаются ошибками.')
+
+    def lint(self, out: str, facts: dict) -> list[str]:
+        """Deterministic pre-publish checks (no LLM)."""
+        probs = []
+        if re.search(r"шапка|заголовок:", out, re.I):
+            probs.append("в тексте служебное слово «шапка/заголовок»")
+        bad = [ln for ln in out.splitlines() if latin_heavy(ln)]
+        if bad:
+            probs.append("строки на английском — переведи на русский: " + " | ".join(b[:80] for b in bad[:3]))
+        v = str(facts.get("scenario_verdict") or "")
+        if v.startswith("утреннего сценария сегодня не было") and re.search(r"сценари\w* A", out):
+            probs.append("утреннего сценария не было — не упоминай «сценарий A» в итогах")
+        heads = re.findall(r"<b>([^<]{3,60})</b>", out)
+        if len(heads) != len(set(heads)):
+            probs.append("повторяющиеся разделы")
+        if facts.get("_max_len") and len(re.sub(r"<[^>]+>", "", out)) > facts["_max_len"]:
+            probs.append(f"слишком длинно: сократи до {facts['_max_len'] - 70} символов")
+        return probs
+
+    def review(self, out: str, facts: dict, llm) -> list[str]:
+        try:
+            res = llm.json(self.REVIEW, json.dumps({"post": out, "data": facts}, ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            return []
+        if isinstance(res, dict) and res.get("ok") is False:
+            return [str(p) for p in (res.get("problems") or [])][:6] or ["рецензент отклонил пост без пояснения"]
+        return []
+
     def write(self, slot: str, facts: dict, llm, headline_hint: str = "") -> str | None:
+        """Draft → number guard → deterministic lint → LLM fact-check; problems go back to the writer (up to 3 drafts).
+        Nothing is published unless a draft passes all checks — otherwise the caller falls back to the data-only template."""
         if llm is None:
             return None
-        prompt = self.PROMPTS["news" if slot.startswith("news") else slot].replace("{date}", facts.get("date", "")).replace("{headline}", headline_hint or "Шапка")
-        for attempt in range(2):
+        prompt = self.PROMPTS["news" if slot.startswith("news") else slot].replace("{date}", facts.get("date", "")).replace("{headline}", headline_hint or "")
+        notes = ""
+        self.last_review = []
+        for attempt in range(3):
             try:
-                out = llm.complete(self.VOICE, prompt + "\n\nДанные (JSON):\n" + json.dumps(facts, ensure_ascii=False), temperature=0.4 if attempt == 0 else 0.2)
+                out = llm.complete(self.VOICE, prompt + notes + "\n\nДанные (JSON):\n" + json.dumps(facts, ensure_ascii=False), temperature=0.4 if attempt == 0 else 0.2)
             except Exception:  # noqa: BLE001
                 return None
             out = re.sub(r"<b>\s*Шапка\s*</b>\s*\n?", "", (out or "").strip())
-            if self.guard(out, facts):
+            probs = [] if self.guard(out, facts) else ["в тексте есть числа, которых нет в данных — используй только числа из JSON"]
+            probs += self.lint(out, facts)
+            if not probs:
+                probs = self.review(out, facts, llm)
+            self.last_review.append({"attempt": attempt + 1, "problems": probs})
+            if not probs:
                 return out
+            notes = "\n\nПредыдущий черновик отклонён проверкой. Исправь:\n- " + "\n- ".join(probs)
         return None
 
     def template(self, slot: str, facts: dict) -> str:
@@ -467,6 +512,7 @@ class Channel:
             facts["movers"] = self.movers_block(x)
             if btc:
                 facts["scenario_verdict"] = self.evening_verdict(btc, x)
+        facts["_max_len"] = 1000                 # morning / evening go out as a photo caption (Telegram limit 1024)
         txt = self.write(slot, facts, llm) or self.template(slot, facts)
         return txt
 
@@ -539,6 +585,11 @@ class Channel:
         except Exception:  # noqa: BLE001
             once = {}
         for k, ver in once.items():
+            if k.startswith("repost:") and not self.already("once", f"{k}:{ver}"):
+                # {"repost:2026-10-15:evening": "1"} — forget that slot once so it is written and checked again
+                _, d_, s_ = k.split(":", 2)
+                self.conn.execute("DELETE FROM channel_posts WHERE day=? AND slot=?", (d_, s_))
+                self.record("once", f"{k}:{ver}", "")
             if k == "intro" and not self.already("once", f"intro:{ver}"):
                 t = self.intro()
                 if send_fn(t):
@@ -548,12 +599,27 @@ class Channel:
         if not force_slot and self.already(day, slot):
             return {"slot": slot, "sent": bool(sent), "n": sent, "why": "already posted"}
         self._last_news_id = None
+        self.last_review = []
         t = self.post(slot, now, llm)
         if not t:
             return {"slot": slot, "sent": bool(sent), "n": sent, "why": "nothing worth posting"}
+        final = self.lint(re.sub(r"Источник: <a [^>]*>.*?</a>", "", t), {})
+        if final:
+            self._log(day, slot, {"blocked": final, "review": self.last_review})
+            return {"slot": slot, "sent": bool(sent), "n": sent, "why": "blocked by pre-publish check", "problems": final, "review": self.last_review}
+        # picture + text as ONE message: Telegram allows a photo caption up to 1024 characters, so morning/evening posts
+        # are written compact (the chart carries prices and scenarios); a longer text falls back to photo + text
         if photo_fn and slot in ("morning", "evening"):
             png = self.chart(self.ctx(), slot)
-            if png:
+            if png and len(re.sub(r"<[^>]+>", "", t)) <= 1024:
+                try:
+                    if photo_fn(png, t):
+                        self.record(day, slot, t); sent += 1; texts.append((slot, t))
+                        self._log(day, slot, {"sent": True, "photo": True, "review": self.last_review})
+                        return {"slot": slot, "sent": True, "n": sent, "text": t, "photo": True, "review": self.last_review}
+                except Exception:  # noqa: BLE001
+                    pass
+            elif png:
                 try:
                     photo_fn(png, t.split("\n\n")[0])
                 except Exception:  # noqa: BLE001
@@ -562,4 +628,11 @@ class Channel:
             self.record(day, slot, t); sent += 1; texts.append((slot, t))
             if self._last_news_id:
                 self.record(day, f"news:{self._last_news_id}", t)
-        return {"slot": slot, "sent": bool(sent), "n": sent, "text": t}
+        self._log(day, slot, {"sent": bool(sent), "review": self.last_review})
+        return {"slot": slot, "sent": bool(sent), "n": sent, "text": t, "review": self.last_review}
+
+    def _log(self, day: str, slot: str, obj: dict) -> None:
+        """Pre-publish check history (committed with agents.sqlite) — shows what the fact-checker rejected and why."""
+        self.conn.execute("CREATE TABLE IF NOT EXISTS channel_review(day TEXT, slot TEXT, time INTEGER, log TEXT)")
+        self.conn.execute("INSERT INTO channel_review VALUES(?,?,?,?)", (day, slot, int(time.time() * 1000), json.dumps(obj, ensure_ascii=False)))
+        self.conn.commit()

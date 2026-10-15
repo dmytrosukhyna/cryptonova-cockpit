@@ -542,7 +542,7 @@ class Channel:
             btc = self.coin(x["terminal"], "BTC")
             facts["movers"] = self.movers_block(x)
             if btc:
-                facts["scenario_verdict"] = self.evening_verdict(btc, x)
+                facts["scenario_verdict"] = self.evening_verdict(btc, x, now.strftime("%Y-%m-%d"))
         facts["_max_len"] = 1000                 # morning / evening go out as a photo caption (Telegram limit 1024)
         txt = self.write(slot, facts, llm) or self.template(slot, facts)
         return txt
@@ -560,9 +560,9 @@ class Channel:
                 "Здесь будут: утренний обзор рынка, разбор главных новостей дня и вечерние итоги с проверкой прогноза. Каждую пятницу — недельный разбор со статистикой: сколько сценариев сбылось, сколько нет.\n\nМы анализируем рынок полностью математически, без человеческого фактора: зоны, стакан, потоки, позиции крупных игроков, новости и их последствия — и даём максимально чёткую картину рынка. Так чётко её не даст никто.\n\n"
                 "Платформа сейчас в закрытом тестировании. Скоро откроем доступ — следите за каналом. Вопросы: @cryptonova_core_ai_bot")
 
-    def evening_verdict(self, btc: dict, x: dict) -> str:
+    def evening_verdict(self, btc: dict, x: dict, day: str | None = None) -> str:
         price = btc.get("price")
-        row = self.conn.execute("SELECT text FROM channel_posts WHERE day=? AND slot='morning'", (kyiv_now().strftime("%Y-%m-%d"),)).fetchone()
+        row = self.conn.execute("SELECT text FROM channel_posts WHERE day=? AND slot='morning'", (day or kyiv_now().strftime("%Y-%m-%d"),)).fetchone()
         if not row:
             return f"утреннего сценария сегодня не было; закрываем день на {_fmt(price)}"
         m = re.search(r"A[^\d]{0,40}(\d+)%[^\d]{0,40}к (сопротивлению|поддержке) ([\d\s]+(?:[.,]\d+)?)", row[0])

@@ -1,0 +1,49 @@
+name: heartbeat
+# Approved by the owner 16.10.2026. GitHub's own cron often skips or delays runs by hours, and the Mac "pulse"
+# only works while the Mac is awake. This job keeps the server on a 30-minute rhythm by itself: it runs ~5.7 h,
+# starts site.yml every 30 min (skipping when a run started recently), then hands over to a fresh heartbeat.
+# The hourly schedule only revives a broken chain. To stop: disable this workflow in the Actions tab.
+# Public repo → Actions minutes are free.
+on:
+  workflow_dispatch:
+    inputs:
+      handover: { description: "started by the previous heartbeat", default: "no" }
+  schedule:
+    - cron: "7 * * * *"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  beat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - name: Exit if another heartbeat is already alive
+        id: alive
+        env: { GH_TOKEN: "${{ github.token }}", REPO: "${{ github.repository }}" }
+        run: |
+          if [ "${{ github.event.inputs.handover }}" = "yes" ]; then echo "others=0" >> "$GITHUB_OUTPUT"; exit 0; fi
+          n=$(gh run list -R "$REPO" -w heartbeat.yml -s in_progress --json databaseId -q "[.[] | select(.databaseId != ${{ github.run_id }})] | length")
+          echo "others=$n" >> "$GITHUB_OUTPUT"
+      - name: Start the server every 30 minutes
+        if: steps.alive.outputs.others == '0'
+        env: { GH_TOKEN: "${{ github.token }}", REPO: "${{ github.repository }}" }
+        run: |
+          end=$(( $(date +%s) + 340*60 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            last=$(gh run list -R "$REPO" -w site.yml -L 1 --json createdAt -q '.[0].createdAt' || echo "")
+            age=999999
+            [ -n "$last" ] && age=$(( $(date +%s) - $(date -d "$last" +%s) ))
+            if [ "$age" -gt 1500 ]; then
+              gh workflow run site.yml -R "$REPO" --ref main && echo "$(date -u +%H:%M) started site.yml (last run ${age}s ago)"
+            else
+              echo "$(date -u +%H:%M) site.yml ran ${age}s ago — skip"
+            fi
+            sleep 1800
+          done
+      - name: Hand over to the next heartbeat
+        if: steps.alive.outputs.others == '0'
+        env: { GH_TOKEN: "${{ github.token }}", REPO: "${{ github.repository }}" }
+        run: gh workflow run heartbeat.yml -R "$REPO" --ref main -f handover=yes

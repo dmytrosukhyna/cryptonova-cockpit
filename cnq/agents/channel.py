@@ -485,7 +485,13 @@ class Channel:
             return "\n\n".join(body)
         if slot.startswith("news"):
             n = facts["item"]
-            return f"<b>{n['title']}</b>\n\n<b>Что случилось:</b> {n.get('summary') or n['title']}\n\n<b>Почему это важно для рынка:</b> {n.get('mechanism') or ''}\n\n<b>Вывод CRYPTO NOVA:</b> не торгуем вдогонку — ждём реакцию цены у ближайшей зоны." + (f" Подтвердит: {n['confirms_if']}." if n.get("confirms_if") else "")
+            parts = [f"<b>{n['title']}</b>"]
+            if n.get("summary"):
+                parts.append(f"<b>Что случилось:</b> {n['summary']}")
+            if n.get("mechanism"):
+                parts.append(f"<b>Почему это важно для рынка:</b> {n['mechanism']}")
+            parts.append("<b>Вывод CRYPTO NOVA:</b> не торгуем вдогонку — ждём реакцию цены у ближайшей зоны." + (f" Подтвердит: {n['confirms_if']}." if n.get("confirms_if") else ""))
+            return "\n\n".join(parts)
         names = {"BTC": "Биткоин", "ETH": "Эфир", "SOL": "Солана"}
         body = [f"<b>Итоги дня · {facts['date']}</b>"]
         ev = [n["title"] for n in facts.get("news", [])[:2]]

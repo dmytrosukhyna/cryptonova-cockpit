@@ -11,6 +11,7 @@ Nothing numeric is produced by the LLM; it only explains and formats what the de
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 
@@ -74,7 +75,7 @@ class Orchestrator:
                              "available": bool(recent), "llm": self.llm.model, "llm_error": getattr(self.llm, "last_error", None),
                              "fresh": len(fresh), "analyzed": len(impacts)},
                     "fundamentals": fundamentals, "risk": risk}
-        post = self._edit(decision)
+        post = self._edit(decision) if os.environ.get("CNQ_EDITOR_LLM") == "yes" else ""   # 16.10: the channel editor writes posts; this per-run LLM summary used ~200k tokens/day and hit Groq's daily limit
         decision["post"] = post or market_brief(report["coins"], report["asof"], report.get("portfolio"))
         decision["post_source"] = "llm" if post else "rules"
         return decision

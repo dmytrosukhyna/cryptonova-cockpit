@@ -77,7 +77,39 @@ def cand_F(oi=-0.12, px=-0.05, delay=1, hold=96, gap=16, stop=0.06):
     return out
 
 
-def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f_share=0.15, f_open=3, lev_cap=3.0, start=10_000.0):
+def cand_S(brk_d=5, trend_d=20, trail_d=1, max_d=14, stop=0.08, btc_filter=False):
+    """Rule S «свинг»: close above the N-day closing high while above the 20-day mean → long next bar;
+    exit when a close falls below the trailing 1-day closing low (after the first hour), stop −8 %, max 14 days.
+    docs/research/swing.md"""
+    from numpy.lib.stride_tricks import sliding_window_view as sw
+    w, tw, mx = brk_d * 96, trail_d * 96, max_d * 96
+    cs = np.nancumsum(C, 1); mt = np.full_like(C, np.nan); n = trend_d * 96; mt[:, n:] = (cs[:, n:] - cs[:, :-n]) / n
+    b = syms.index('BTC') if 'BTC' in syms else 0
+    out = []
+    for k in range(NS):
+        hh = np.full(T, np.nan); ll = np.full(T, np.nan)
+        hh[w:] = np.nanmax(sw(C[k], w)[:-1], 1); ll[tw:] = np.nanmin(sw(C[k], tw)[:-1], 1)
+        with np.errstate(invalid='ignore'):
+            m = (C[k] > hh) & (C[k] > mt[k])
+            if btc_filter: m &= C[b] > mt[b]
+        last = -10 ** 9
+        for i in np.where(m)[0]:
+            if i < START or i - last < 96 or i + mx + 2 >= T or not np.isfinite(O[k, i + 1]): continue
+            e = O[k, i + 1]; st = e * (1 - stop); x = min(T - 1, i + 1 + mx); g = None
+            for j in range(i + 1, x + 1):
+                if not np.isfinite(L[k, j]): continue
+                if L[k, j] <= st: g, x = st / e - 1, j; break
+                if j > i + 4 and np.isfinite(ll[j]) and C[k, j] < ll[j]: g, x = C[k, j] / e - 1, j; break
+            if g is None:
+                while not np.isfinite(C[k, x]): x -= 1
+                g = C[k, x] / e - 1
+            last = x
+            out.append(dict(rule='S', k=k, i=i + 1, x=x, ret=g - COST, sf=stop))
+    return out
+
+
+def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f_share=0.15, f_open=3, lev_cap=3.0, start=10_000.0,
+             s_share=0.0, s_open=0):
     ev = sorted([c for c in cands if c['rule'] in rules], key=lambda c: c['i'])
     byi = collections.defaultdict(list)
     for c in ev: byi[c['i']].append(c)
@@ -101,6 +133,9 @@ def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f
             if c['rule'] == 'F':
                 if sum(1 for o in open_ if o['rule'] == 'F') >= f_open: continue
                 n = eq * f_share
+            elif c['rule'] == 'S':
+                if sum(1 for o in open_ if o['rule'] == 'S') >= s_open: continue
+                n = eq * s_share
             else:
                 if sum(1 for o in open_ if o['rule'] == 'B') >= max_open: continue
                 n = min(eq * risk / c['sf'], eq * 3)

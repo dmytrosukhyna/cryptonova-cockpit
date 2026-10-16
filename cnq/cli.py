@@ -13,6 +13,7 @@
   python -m cnq.cli alerts                    send not-yet-sent events to Telegram
   python -m cnq.cli fx-gaps [--send]          Monday weekend-gap signals for FX (Twelve Data key) → Telegram
   python -m cnq.cli agents [--send]           run departments (news/fundamentals/risk/editor) → web/decision.json (+post to Telegram)
+  python -m cnq.cli funding [--out web]       paper funding-carry account (spot long + perp short) → web/funding.json
 """
 from __future__ import annotations
 
@@ -29,7 +30,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -159,6 +160,16 @@ def main(argv: list[str] | None = None) -> int:
         d = whales.run(conn)
         write_report(d, os.path.join(args.out, "whales.json"))
         print(f"whales.json: available={d.get('available')} whales={len(d.get('whales', []))} coins={len(d.get('coins', []))} changes={len(d.get('changes', []))} bias={(d.get('summary') or {}).get('bias')}")
+    elif args.cmd == "funding":
+        import os, sqlite3
+        from .agents import funding_desk
+        from .terminal.report import write_report
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/agents.sqlite")
+        os.makedirs(args.out, exist_ok=True)
+        d = funding_desk.run(conn)
+        write_report(d, os.path.join(args.out, "funding.json"))
+        print(f"funding.json: venue={d['venue']} ok={d['venues_ok']} equity={d['equity']} positions={[p['symbol'] for p in d['positions']]} events={[e['text'] for e in d['events'][:3]]}")
     elif args.cmd == "channel":
         import os, sqlite3
         from .agents.channel import Channel, kyiv_now

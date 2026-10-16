@@ -105,7 +105,7 @@ def test_three_profiles_share_signals_but_differ():
     c = coin("BTC-USDT", flat, [{"id": "L1", "kind": "support", "lo": 9.96, "hi": 9.99, "center": 9.975, "touches": 3, "status": "ACTIVE"}])
     c["regime"] = {"long": "BULL"}
     out = pd.run(conn, {"coins": [c]}, now=t0 + 300 * 900_000)
-    assert set(out["profiles"]) == {"cons", "bal", "aggr"} and out["profile"] == "bal"
+    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp"} and out["profile"] == "bal"
     assert not any(out["profiles"][k]["pending"] for k in ("cons", "bal", "aggr"))
     lab = pd.PaperDesk(conn, "aggr", classes={"A", "B", "R", "C"}).step([c], True, t0 + 300 * 900_000)
     assert lab["pending"]   # the same zone would be traded only if class C were enabled
@@ -124,3 +124,33 @@ def test_cli_candles_long_conversion_from_store_objects():
     rows = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs]
     b4 = agg4h(rows)
     assert len(b4) == 2 and b4[0][5] == 16.0 and b4[0][2] == 1.1
+
+
+def test_swing_breakout_opens_and_trails_out():
+    """Experimental account: close above the 5-day high while above the 20-day mean → long; a close below yesterday's low exits (TRAIL)."""
+    conn = sqlite3.connect(":memory:")
+    t0 = 1_700_000_000_000
+    n = 96 * 21
+    prices = [100.0] * (n - 3) + [103.0, 104.0, 104.0]          # breakout on the last closed bars
+    c = coin("ETH-USDT", prices, [])
+    c["candles_long"] = c["candles"]
+    now = t0 + n * 900_000
+    desk = pd.PaperDesk(conn, "exp")
+    res = desk.step([c], True, now)
+    assert len(res["open"]) == 1 and res["open"][0]["grade"] == "S"
+    assert abs(res["open"][0]["qty"] * res["open"][0]["entry"] - 1000) < 5      # 10 % of $10 000
+    # price drifts up then closes below the previous day's lowest close → trailing exit
+    more = prices + [105.0] * 100 + [99.0] * 3
+    c2 = coin("ETH-USDT", more, []); c2["candles_long"] = c2["candles"]
+    res2 = desk.step([c2], True, t0 + len(more) * 900_000)
+    assert not res2["open"] and res2["closed"][0]["exit_kind"] == "TRAIL"
+
+
+def test_main_desks_ignore_experimental_rules():
+    conn = sqlite3.connect(":memory:")
+    t0 = 1_700_000_000_000
+    n = 96 * 21
+    prices = [100.0] * (n - 3) + [103.0, 104.0, 104.0]
+    c = coin("ETH-USDT", prices, []); c["candles_long"] = c["candles"]
+    res = pd.PaperDesk(conn, "bal").step([c], True, t0 + n * 900_000)
+    assert not res["open"]

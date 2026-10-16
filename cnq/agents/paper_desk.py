@@ -41,8 +41,14 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
     "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
              "e_share": 0.30, "f_share": 0.30, "f_open": 3, "prefix": "paper_",
              "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +42% в год, просадка до −38%, 2025 в минусе."},
+    # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
+    "exp":  {"name": "Эксперимент · свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
+             "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
+             "about": "Проверка новых правил на живом рынке: свинг-пробой (выше максимума 5 дней в росте, выход ниже вчерашнего минимума) и быстрый откуп резкой свечи. 10% счёта на сделку, до 15 позиций. История: +0.31% и +0.41% на сделку, но в портфеле ≈ 0 — поэтому отдельный счёт."},
 }
-RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций"}
+RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций",
+           "S": "свинг-пробой", "G": "быстрый откуп"}
+SHARE_RULES = {"E", "F", "S", "G"}   # sized as a share of equity, own position caps
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
@@ -56,6 +62,14 @@ E_STOP = 0.12
 HOLD_F_H = 24          # class F: open-interest flush long — OI −12 % and price −5 % over 4 h (docs/research/oi_flush.md)
 F_OI = -0.12
 F_PX = -0.05
+HOLD_S_H = 14 * 24     # class S: swing breakout — close above the 5-day closing high while above the 20-day mean; trailing exit (docs/research/swing.md)
+S_BRK = 96 * 5
+S_TREND = 96 * 20
+S_TRAIL = 96
+S_STOP = 0.08
+HOLD_G_H = 8           # class G: fast buyback — 15m candle ≤ −3σ with a long lower wick, 8 h, stop −3 %
+G_SIG = 3.0
+G_STOP = 0.03
 F_STOP = 0.06          # 16.10: −6 % instead of −12 % — every year positive (2025 −0.29 % → +0.66 % per trade), size raised so risk per trade stays ~1.5 %
 ORDER_TTL_H = 24
 MAX_OPEN = 6
@@ -247,12 +261,32 @@ class PaperDesk:
                             "reason": f"Сброс позиций: открытый интерес за 4 ч {oi*100:.0f}%, цена {px4*100:.1f}% — рынок принудительно вытряс плечи. "
                                       f"На истории (18 монет, 2023–2026) после такого откуп +1.8% в среднем за сутки, 62% сделок в плюсе. "
                                       f"Выход через 24 ч, стоп −{F_STOP*100:.0f}%, размер — доля счёта."})
+        # S: swing breakout on closed 15m bars since the previous run (one per coin per day)
+        cl = coin.get("candles_long") or c15
+        if "S" in self.P["classes"] and len(cl) >= S_TREND + 3:
+            closes = [k[4] for k in cl]
+            for j in range(len(cl) - 4, len(cl) - 1):          # the last three closed bars (runs are ~30 min apart)
+                hh = max(closes[j - S_BRK:j]); mean = sum(closes[j - S_TREND + 1:j + 1]) / S_TREND
+                if closes[j] > hh and closes[j] > mean:
+                    entry = c15[-1][4]
+                    out.append({"id": f"S-{base}-{now // 86_400_000}", "symbol": base, "side": "LONG", "grade": "S", "kind": "SWING_BREAKOUT",
+                                "entry": entry, "stop": entry * (1 - S_STOP), "tps": [entry * 3] * 3, "parts": [1.0, 0.0, 0.0],
+                                "order": "MARKET", "hold_h": HOLD_S_H,
+                                "reason": f"Свинг-пробой: цена закрылась выше максимума 5 дней ({hh:.6g}) и выше средней за 20 дней — монета в росте. "
+                                          f"Держим, пока цена не закроется ниже минимума прошлых суток; стоп −{S_STOP*100:.0f}%, максимум 14 дней."})
+                    break
         # cascade long: last closed 15m candle
         rets = [c15[i][4] / c15[i - 1][4] - 1 for i in range(max(1, len(c15) - 96 * 30), len(c15) - 1)]
         sig = math.sqrt(sum(x * x for x in rets) / len(rets)) if rets else 0
         last = c15[-2]
         ret = last[4] / c15[-3][4] - 1
         rng = last[2] - last[3]
+        if "G" in self.P["classes"] and sig and rng > 0 and ret <= -G_SIG * sig and (min(last[1], last[4]) - last[3]) / rng >= 0.5:
+            entry = c15[-1][1]
+            out.append({"id": f"G-{base}-{last[0]}", "symbol": base, "side": "LONG", "grade": "G", "kind": "FAST_BUYBACK",
+                        "entry": entry, "stop": entry * (1 - G_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
+                        "order": "MARKET", "hold_h": HOLD_G_H,
+                        "reason": f"Быстрый откуп: свеча {ret*100:.1f}% ({ret/sig:.1f}σ) с длинным хвостом снизу — покупатели выкупили. Выход через 8 ч, стоп −{G_STOP*100:.0f}%."})
         if sig and rng > 0 and ret <= -3.5 * sig and (min(last[1], last[4]) - last[3]) / rng >= 0.5:
             entry = c15[-1][1]
             stop = last[3] - 0.5 * a
@@ -303,12 +337,14 @@ class PaperDesk:
                 if risk_off and s["grade"] == "R" and s["side"] == "SHORT":   # history: retest shorts inside a broad sell-off ≈ 0 (+0.013R, n=839) vs +0.155R in calm markets
                     events.append(f"пропуск шорта {base}: ретест внутри широкой распродажи на истории ≈ 0 — ждём спокойного рынка")
                     continue
-                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
+                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F", "G")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
                     events.append(f"пропуск {'лонга' if s['side'] == 'LONG' else 'шорта'} {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
                     continue
                 if s["grade"] == "F" and sum(1 for t in self._open() if t["grade"] == "F") >= self.P.get("f_open", 3):
                     continue
-                if s["grade"] not in ("E", "F") and sum(1 for t in self._open() if t["grade"] not in ("E", "F")) + len(self._pending()) >= self.P["max_open"]:
+                if s["grade"] in ("S", "G") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
+                    continue
+                if s["grade"] not in SHARE_RULES and sum(1 for t in self._open() if t["grade"] not in SHARE_RULES) + len(self._pending()) >= self.P["max_open"]:
                     continue
                 if s["grade"] == "E":
                     notional = eq * self.P.get("e_share", 0.2) / max(1, len(e_sigs))
@@ -318,6 +354,10 @@ class PaperDesk:
                     notional = eq * self.P.get("f_share", 0.15)
                     qty = notional / s["entry"]
                     risk_usd = notional * F_STOP
+                elif s["grade"] in ("S", "G"):
+                    notional = eq * self.P.get(s["grade"].lower() + "_share", 0.1)
+                    qty = notional / s["entry"]
+                    risk_usd = notional * (S_STOP if s["grade"] == "S" else G_STOP)
                 else:
                     risk_usd = eq * self.P["risk"]
                     r = abs(s["entry"] - s["stop"])
@@ -350,7 +390,7 @@ class PaperDesk:
                     filled = c
                     break
             if filled:
-                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H}.get(o["grade"], HOLD_C_H)
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
@@ -377,10 +417,18 @@ class PaperDesk:
             r = abs(t["entry"] - t["stop"])
             qty_left, stop_now, hit, pnl = t["qty_left"], t["stop_now"], t["tps_hit"], t["pnl_usd"]
             closed, exit_kind, last_bar = None, None, t["last_bar"]
-            for c in coin["candles"]:
+            cands = (coin.get("candles_long") or coin["candles"]) if t["grade"] == "S" else coin["candles"]
+            for ci, c in enumerate(cands):
                 if c[0] <= t["last_bar"] or c[0] + 900_000 > now:
                     continue
                 last_bar = c[0]
+                if t["grade"] == "S" and c[0] >= t["opened"] + 3_600_000 and ci >= S_TRAIL:
+                    low_1d = min(k[4] for k in cands[ci - S_TRAIL:ci])
+                    if c[4] < low_1d and c[4] > stop_now:
+                        px = c[4] * (1 - SLIP)
+                        pnl += (px - t["entry"]) * qty_left - px * qty_left * FEE
+                        qty_left = 0; closed = c[0]; exit_kind = "TRAIL"
+                        break
                 hi, lo = c[2], c[3]
                 stop_hit = lo <= stop_now if sgn == 1 else hi >= stop_now
                 if stop_hit:
@@ -453,7 +501,7 @@ class PaperDesk:
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
         by_grade = {}
-        for g in ("A", "B", "R", "C"):
+        for g in ("A", "B", "R", "C", "E", "F", "S", "G"):
             ts = [t for t in closed if t["grade"] == g]
             if ts:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),

@@ -213,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
             for c in rep["coins"]:   # 4h retest scan needs ~75 closed 4h bars → give the desk 20 days of 15m
                 cs = universe.get(c["symbol"])
                 if cs:
-                    c["candles_long"] = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 20:]]
+                    c["candles_long"] = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 22:]]
             res = paper_desk.run(conn, rep)
             write_report(res, os.path.join(args.out, "paper.json"))
             print(f"paper.json: equity={res['equity']} open={len(res['open'])} pending={len(res['pending'])} closed={res['stats']['trades']} events={res['events'][:3]}")

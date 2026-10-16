@@ -1,0 +1,25 @@
+name: research-data
+# Manual only: downloads 15m OKX USDT-swap history for the universe research (scripts/fetch_history.py)
+# and keeps it as a 7-day Actions artifact. Nothing is committed to the repo.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - name: OKX 15m candles (2022-11-20 → now)
+        run: python scripts/fetch_history.py --out okx15m.npz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: okx15m
+          path: okx15m.npz
+          retention-days: 7

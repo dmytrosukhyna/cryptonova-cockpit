@@ -72,8 +72,9 @@ def p_up(coin: dict, btc_bull: bool, stress: int, news: list[dict], now: int) ->
 def targets(coin: dict) -> tuple[float | None, float | None]:
     price = coin["price"]
     lv = [l for l in coin.get("levels", []) if l.get("status") in (None, "ACTIVE")]
-    sup = sorted([l for l in lv if l["center"] < price], key=lambda l: -l["center"])
-    res = sorted([l for l in lv if l["center"] > price], key=lambda l: l["center"])
+    # targets are the next zone BEYOND the one the price sits in (inside a zone: break up → next resistance, break down → next support)
+    sup = sorted([l for l in lv if l["hi"] < price * 0.998], key=lambda l: -l["hi"])
+    res = sorted([l for l in lv if l["lo"] > price * 1.002], key=lambda l: l["lo"])
     a = _atr(coin.get("candles") or []) or price * 0.01
     up = res[0]["lo"] if res else price + 2.5 * a
     dn = sup[0]["hi"] if sup else price - 2.5 * a

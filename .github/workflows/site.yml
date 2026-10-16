@@ -36,7 +36,7 @@ jobs:
             cnq-state-
             cnq-db-
       - name: Pillow for post charts, edge-tts for the spoken brief
-        run: pip install -q pillow edge-tts
+        run: pip install -q pillow edge-tts gtts
       - name: Candles (BingX, 15m, 400 days)
         continue-on-error: true
         run: python scripts/ci_refresh.py

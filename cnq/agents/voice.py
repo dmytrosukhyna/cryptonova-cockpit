@@ -105,16 +105,38 @@ def run(out: str = "web") -> dict:
     text = compose(out)
     os.makedirs(out, exist_ok=True)
     res = {"asof": int(time.time() * 1000), "text": text, "voice": VOICE, "audio": None}
+    # edge-tts sometimes answers «No audio was received» → retry, then the second Microsoft voice, then Google (gTTS).
+    # Without audio the panel falls back to the browser voice, which sounds robotic — so try hard.
+    errs = []
+    path = os.path.join(out, "brief.mp3")
     try:
         import asyncio
         import edge_tts
-
-        async def synth():
-            c = edge_tts.Communicate(text, VOICE, rate="-4%")
-            await c.save(os.path.join(out, "brief.mp3"))
-        asyncio.run(synth())
-        res["audio"] = "brief.mp3"
+        for voice in (VOICE, "ru-RU-SvetlanaNeural"):
+            for attempt in range(3):
+                try:
+                    async def synth(v=voice):
+                        c = edge_tts.Communicate(text, v, rate="-4%")
+                        await c.save(path)
+                    asyncio.run(synth())
+                    if os.path.getsize(path) > 2000:
+                        res["audio"], res["voice"] = "brief.mp3", voice
+                        break
+                except Exception as e:  # noqa: BLE001
+                    errs.append(f"{voice}#{attempt + 1}: {str(e)[:80]}")
+                    time.sleep(2 + 3 * attempt)
+            if res["audio"]:
+                break
     except Exception as e:  # noqa: BLE001
-        res["error"] = str(e)[:200]
+        errs.append(str(e)[:120])
+    if not res["audio"]:
+        try:
+            from gtts import gTTS
+            gTTS(text, lang="ru").save(path)
+            res["audio"], res["voice"] = "brief.mp3", "google-ru"
+        except Exception as e:  # noqa: BLE001
+            errs.append("gtts: " + str(e)[:80])
+    if errs:
+        res["error"] = " | ".join(errs)[:300]
     json.dump(res, open(os.path.join(out, "brief.json"), "w", encoding="utf-8"), ensure_ascii=False)
     return res

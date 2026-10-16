@@ -44,7 +44,8 @@ def test_channel_templates_slots_and_guard():
     # number guard: an invented figure is rejected, faithful text passes
     facts = ch.facts(ch.ctx(), now)
     assert not ch.guard("<b>Рынок:</b> биткоин $80 984, а завтра будет 95 000. " + "x" * 200, facts)
-    assert ch.guard("<b>Рынок:</b> биткоин $80 984 (-2.9%), страх 53. " + "я" * 200, facts)
+    assert ch.guard("<b>Рынок:</b> биткоин $80 984 (-2.9%). " + "я" * 200, facts)
+    assert not ch.guard("<b>Рынок:</b> биткоин $80 984 (-2.9%), страх 53. " + "я" * 200, facts)   # 16.10: fear & greed no longer in facts
 
 
 def test_llm_output_used_when_faithful():

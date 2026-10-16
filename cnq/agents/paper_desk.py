@@ -33,14 +33,14 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
                # (+A FX gap). Retest (R) is not traded: whole-portfolio backtests (scripts/autopilot_backtest.py, scripts/autopilot_v2.py)
                # showed it adds drawdown (−57 %) without adding profit. Numbers below: 18 coins, 2023-01 → 2026-09, costs included.
     "cons": {"name": "Автопилот · осторожно", "classes": {"A", "B", "E", "F"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts",
-             "e_share": 0.10, "f_share": 0.10, "f_open": 2, "prefix": "paper_cons_",
-             "about": "Откуп каскада ликвидаций, откуп паники и откуп сброса позиций; риск 0.5% на сделку, малые доли счёта. История 2023–2026: ≈ +14% в год, просадка до −11%."},
+             "e_share": 0.10, "f_share": 0.15, "f_open": 2, "prefix": "paper_cons_",
+             "about": "Откуп каскада ликвидаций, откуп паники и откуп сброса позиций; риск 0.5% на сделку, малые доли счёта. История 2023–2026: ≈ +13% в год, просадка до −12%, все годы в плюсе."},
     "bal":  {"name": "Автопилот · норма", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
-             "e_share": 0.20, "f_share": 0.15, "f_open": 3, "prefix": "paper_bal_",
-             "about": "Откуп каскада ликвидаций, откуп паники (корзина 20% счёта) и откуп сброса позиций (15% счёта на сделку, до 3); риск 1%. История 2023–2026: ≈ +27% в год, просадка до −22%, 69% месяцев в плюсе."},
+             "e_share": 0.20, "f_share": 0.25, "f_open": 3, "prefix": "paper_bal_",
+             "about": "Откуп каскада ликвидаций, откуп паники (корзина 20% счёта) и откуп сброса позиций (25% счёта на сделку, стоп −6%, до 3); риск 1%. История 2023–2026: ≈ +32% в год, просадка до −27%, все годы в плюсе."},
     "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
-             "e_share": 0.30, "f_share": 0.20, "f_open": 4, "prefix": "paper_",
-             "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 20% счёта на сделку. История 2023–2026: ≈ +39% в год, просадка до −36%."},
+             "e_share": 0.30, "f_share": 0.30, "f_open": 3, "prefix": "paper_",
+             "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +42% в год, просадка до −38%, 2025 в минусе."},
 }
 RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций"}
 DEFAULT_PROFILE = "bal"
@@ -56,7 +56,7 @@ E_STOP = 0.12
 HOLD_F_H = 24          # class F: open-interest flush long — OI −12 % and price −5 % over 4 h (docs/research/oi_flush.md)
 F_OI = -0.12
 F_PX = -0.05
-F_STOP = 0.12
+F_STOP = 0.06          # 16.10: −6 % instead of −12 % — every year positive (2025 −0.29 % → +0.66 % per trade), size raised so risk per trade stays ~1.5 %
 ORDER_TTL_H = 24
 MAX_OPEN = 6
 
@@ -246,7 +246,7 @@ class PaperDesk:
                             "order": "MARKET", "hold_h": HOLD_F_H,
                             "reason": f"Сброс позиций: открытый интерес за 4 ч {oi*100:.0f}%, цена {px4*100:.1f}% — рынок принудительно вытряс плечи. "
                                       f"На истории (18 монет, 2023–2026) после такого откуп +1.8% в среднем за сутки, 62% сделок в плюсе. "
-                                      f"Выход через 24 ч, катастрофический стоп −{F_STOP*100:.0f}%, размер — доля счёта."})
+                                      f"Выход через 24 ч, стоп −{F_STOP*100:.0f}%, размер — доля счёта."})
         # cascade long: last closed 15m candle
         rets = [c15[i][4] / c15[i - 1][4] - 1 for i in range(max(1, len(c15) - 96 * 30), len(c15) - 1)]
         sig = math.sqrt(sum(x * x for x in rets) / len(rets)) if rets else 0

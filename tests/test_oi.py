@@ -25,7 +25,7 @@ def test_flush_opens_long_with_share_sizing():
     f = [t for t in res["open"] if t["grade"] == "F"]
     assert f, res["events"]
     notional = f[0]["qty"] * f[0]["entry"]
-    assert 1400 < notional < 1600                     # 15 % of $10 000
+    assert 2400 < notional < 2600                     # 25 % of $10 000 («норма»)
     coin["oi_chg4h"] = -0.05                          # ordinary deleveraging → no signal
     desk2 = pd.PaperDesk(sqlite3.connect(":memory:"), "bal")
     assert not [t for t in desk2.step([coin], True, t0 + len(prices) * 900_000)["open"] if t["grade"] == "F"]

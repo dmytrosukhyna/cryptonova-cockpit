@@ -62,7 +62,7 @@ def cand_E():
     return out
 
 
-def cand_F(oi=-0.12, px=-0.05, delay=1, hold=96, gap=16):
+def cand_F(oi=-0.12, px=-0.05, delay=1, hold=96, gap=16, stop=0.06):
     out = []
     with np.errstate(invalid='ignore'):
         M = (OI16 <= oi) & (R4h <= px) & (IMP == 0)
@@ -72,8 +72,8 @@ def cand_F(oi=-0.12, px=-0.05, delay=1, hold=96, gap=16):
             if i < START or i - last < gap or i + delay + hold + 2 >= T: continue
             last = i; i0 = i + delay
             if not np.isfinite(O[k, i0]): continue
-            e = O[k, i0]; x, g = walk(k, i0, 1, e * 0.88, None, hold)
-            out.append(dict(rule='F', k=k, i=i0, x=x, ret=g - COST, sf=0.12))
+            e = O[k, i0]; x, g = walk(k, i0, 1, e * (1 - stop), None, hold)
+            out.append(dict(rule='F', k=k, i=i0, x=x, ret=g - COST, sf=stop))
     return out
 
 

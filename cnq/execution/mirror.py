@@ -53,6 +53,27 @@ GH_TOKEN = os.environ.get("CNQ_GH_TOKEN", "")          # optional: fine-grained 
 GH_REPO = os.environ.get("CNQ_GH_REPO", "dmytrosukhyna/cryptonova-cockpit")
 
 
+def pulse() -> bool:
+    """GitHub delays/skips scheduled runs (gaps of up to 4 h were seen); a commit to web/pulse.json triggers the server run.
+    Called every 30 min while the mirror runs — the panel, channel and paper desk then refresh on time."""
+    if not GH_TOKEN:
+        return False
+    import base64
+    url = f"https://api.github.com/repos/{GH_REPO}/contents/web/pulse.json"
+    hdr = {"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-mirror"}
+    sha = None
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url + "?ref=main", headers=hdr), timeout=15) as r:
+            sha = json.loads(r.read().decode()).get("sha")
+    except Exception:  # noqa: BLE001
+        pass
+    data = {"message": "pulse: run the server", "branch": "main",
+            "content": base64.b64encode(json.dumps({"t": int(time.time() * 1000)}).encode()).decode(), **({"sha": sha} if sha else {})}
+    req = urllib.request.Request(url, data=json.dumps(data).encode(), method="PUT", headers={**hdr, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return r.status in (200, 201)
+
+
 def publish(bx: BybitTrader, st: dict) -> bool:
     """Push the Bybit demo account state (balance, open positions — never keys) to web/bybit.json so the site can show it."""
     if not GH_TOKEN:
@@ -151,6 +172,7 @@ def main() -> int:
     r = {}
     log({"ev": "start", "mode": bx.mode, "profile": PROFILE, "scale": SCALE, "equity": bx.equity()})
     last_pub = 0.0
+    last_pulse = time.time() - 25 * 60
     while True:
         try:
             r = step(bx, st, fetch_desk())
@@ -164,6 +186,12 @@ def main() -> int:
                     last_pub = time.time(); save_state(st)
             except Exception as e:  # noqa: BLE001
                 log({"ev": "publish_error", "error": str(e)[:200]})
+        if GH_TOKEN and time.time() - last_pulse > 30 * 60:
+            try:
+                if pulse():
+                    last_pulse = time.time(); log({"ev": "pulse"})
+            except Exception as e:  # noqa: BLE001
+                log({"ev": "pulse_error", "error": str(e)[:200]}); last_pulse = time.time()
         time.sleep(60)
 
 

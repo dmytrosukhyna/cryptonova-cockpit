@@ -16,5 +16,23 @@ for s in SYMS:
         out["books"][s.replace("-", "")] = {"error": str(e)[:80]}
     time.sleep(0.25)
 json.dump(out, open("web/books.json", "w"))
+
+# history for research (16.10): depth within ±1 % of mid and the biggest wall on each side, every server run
+try:
+    import sqlite3
+    con = sqlite3.connect("data/agents.sqlite")
+    con.execute("CREATE TABLE IF NOT EXISTS book_hist(symbol TEXT, time INTEGER, mid REAL, bid1 REAL, ask1 REAL, bwall_p REAL, bwall_usd REAL, awall_p REAL, awall_usd REAL, PRIMARY KEY(symbol, time))")
+    for sym, b in out["books"].items():
+        if "bids" not in b or not b["bids"] or not b["asks"]:
+            continue
+        bids = [(float(p), float(q)) for p, q in b["bids"]]; asks = [(float(p), float(q)) for p, q in b["asks"]]
+        mid = (max(p for p, _ in bids) + min(p for p, _ in asks)) / 2
+        bid1 = sum(p * q for p, q in bids if p >= mid * 0.99); ask1 = sum(p * q for p, q in asks if p <= mid * 1.01)
+        bw = max(bids, key=lambda x: x[0] * x[1]); aw = max(asks, key=lambda x: x[0] * x[1])
+        con.execute("INSERT OR REPLACE INTO book_hist VALUES(?,?,?,?,?,?,?,?,?)", (sym, out["asof"], mid, bid1, ask1, bw[0], bw[0] * bw[1], aw[0], aw[0] * aw[1]))
+    con.commit()
+    print("book_hist rows:", con.execute("SELECT count(*) FROM book_hist").fetchone()[0])
+except Exception as e:  # noqa: BLE001
+    print("book_hist failed", e)
 ok = sum(1 for b in out["books"].values() if "bids" in b)
 print(f"books.json: {ok}/{len(SYMS)} books")

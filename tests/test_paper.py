@@ -154,3 +154,7 @@ def test_main_desks_ignore_experimental_rules():
     c = coin("ETH-USDT", prices, []); c["candles_long"] = c["candles"]
     res = pd.PaperDesk(conn, "bal").step([c], True, t0 + n * 900_000)
     assert not res["open"]
+
+
+def test_panic_breadth_threshold_is_04():
+    assert pd.E_BREADTH == 0.4 and pd.E_BASKET_H == 10

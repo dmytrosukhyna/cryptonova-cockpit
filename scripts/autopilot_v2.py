@@ -49,12 +49,12 @@ def cand_B():
     return out
 
 
-def cand_E():
+def cand_E(br=0.4):   # 16.10: breadth 0.7 → 0.4 (docs/research/panic_breadth.md)
     out = []
     for k in range(NS):
         cs = np.cumsum(np.nan_to_num(V[k])); vav = np.full(T, np.nan); vav[97:] = (cs[96:-1] - cs[:-97]) / 96
         with np.errstate(invalid='ignore'):
-            idx = np.where((C[k] / O[k] - 1 <= -0.015) & (V[k] >= 2 * vav) & (BR >= 0.7) & (np.arange(T) >= START))[0]
+            idx = np.where((C[k] / O[k] - 1 <= -0.015) & (V[k] >= 2 * vav) & (BR >= br) & (np.arange(T) >= START))[0]
         for i in idx:
             if i + 98 >= T or not np.isfinite(O[k, i + 1]): continue
             e = O[k, i + 1]; x, g = walk(k, i + 1, 1, e * 0.88, None, 96)
@@ -109,7 +109,7 @@ def cand_S(brk_d=5, trend_d=20, trail_d=1, max_d=14, stop=0.08, btc_filter=False
 
 
 def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f_share=0.15, f_open=3, lev_cap=3.0, start=10_000.0,
-             s_share=0.0, s_open=0):
+             s_share=0.0, s_open=0, e_gap=40):
     ev = sorted([c for c in cands if c['rule'] in rules], key=lambda c: c['i'])
     byi = collections.defaultdict(list)
     for c in ev: byi[c['i']].append(c)
@@ -122,7 +122,7 @@ def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f
         open_ = still; held = {o['k'] for o in open_}
         gross = sum(o['usd'] for o in open_)
         es = [c for c in byi[i] if c['rule'] == 'E' and c['k'] not in held]
-        if es and i - last_e >= 80:
+        if es and i - last_e >= e_gap:
             n = eq * e_share / len(es)
             for c in es:
                 if gross + n > eq * lev_cap: break

@@ -34,13 +34,13 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
                # showed it adds drawdown (−57 %) without adding profit. Numbers below: 18 coins, 2023-01 → 2026-09, costs included.
     "cons": {"name": "Автопилот · осторожно", "classes": {"A", "B", "E", "F"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts",
              "e_share": 0.10, "f_share": 0.15, "f_open": 2, "prefix": "paper_cons_",
-             "about": "Откуп каскада ликвидаций, откуп паники и откуп сброса позиций; риск 0.5% на сделку, малые доли счёта. История 2023–2026: ≈ +13% в год, просадка до −12%, все годы в плюсе."},
+             "about": "Откуп каскада ликвидаций, откуп паники и откуп сброса позиций; риск 0.5% на сделку, малые доли счёта. История 2023–2026: ≈ +19% в год, просадка до −9%, все годы в плюсе."},
     "bal":  {"name": "Автопилот · норма", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
              "e_share": 0.20, "f_share": 0.25, "f_open": 3, "prefix": "paper_bal_",
-             "about": "Откуп каскада ликвидаций, откуп паники (корзина 20% счёта) и откуп сброса позиций (25% счёта на сделку, стоп −6%, до 3); риск 1%. История 2023–2026: ≈ +32% в год, просадка до −27%, все годы в плюсе."},
+             "about": "Откуп каскада ликвидаций, откуп паники (корзина 20% счёта) и откуп сброса позиций (25% счёта на сделку, стоп −6%, до 3); риск 1%. История 2023–2026: ≈ +50% в год, просадка до −18%, все годы в плюсе."},
     "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
              "e_share": 0.30, "f_share": 0.30, "f_open": 3, "prefix": "paper_",
-             "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +42% в год, просадка до −38%, 2025 в минусе."},
+             "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +75% в год, просадка до −29%, все годы в плюсе."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
     "exp":  {"name": "Эксперимент · свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
@@ -59,6 +59,8 @@ HOLD_E_H = 24          # class E: liquidation-climax long inside a broad sell-of
 E_DROP = -0.015
 E_VOL = 2.0
 E_STOP = 0.12
+E_BREADTH = 0.4       # 16.10: was 0.7 — share of coins down >3 %/24h needed for E; 0.3–0.4 best on history, 0.2 worse (docs/research/panic_breadth.md)
+E_BASKET_H = 10        # 16.10: was 20 — one panic basket per 10 h
 HOLD_F_H = 24          # class F: open-interest flush long — OI −12 % and price −5 % over 4 h (docs/research/oi_flush.md)
 F_OI = -0.12
 F_PX = -0.05
@@ -238,7 +240,7 @@ class PaperDesk:
                                 "reason": f"Пробой {'сопротивления' if side == 'LONG' else 'поддержки'} {rt['level']:.6g} на объёме и ретест: свеча 4ч вернулась к уровню и закрылась "
                                           f"{'выше' if side == 'LONG' else 'ниже'}{' , затем повторный пробой (подтверждение)' if confirm else ''}. Вход по рынку, стоп {stop:.6g}, цель {tgt:g}R, до 8 дней."})
         # E: liquidation climax inside a broad sell-off — last closed 15m candle ≤ −1.5 % on ≥ 3× its 24h average volume
-        if getattr(self, "_stress", 0.0) >= 0.7 and len(c15) >= 100:
+        if getattr(self, "_stress", 0.0) >= E_BREADTH and len(c15) >= 100:
             last = c15[-2]
             vavg = sum(k[5] for k in c15[-98:-2]) / 96 if len(c15[-98:-2]) == 96 else 0
             ret_oc = last[4] / last[1] - 1 if last[1] else 0
@@ -316,14 +318,14 @@ class PaperDesk:
         risk_off = self._stress >= 0.7
         events: list[str] = []
         eq = self.equity()
-        # class E basket: all climax signals of this step share e_share of equity; one basket per 20 h
+        # class E basket: all climax signals of this step share e_share of equity; one basket per E_BASKET_H hours
         e_sigs = {}
         if "E" in self.P["classes"]:
             for base, coin in by_sym.items():
                 for s in self.signals(coin, btc_bull, now):
                     if s["grade"] == "E":
                         e_sigs[base] = s
-        e_recent = [t for t in self._open() if t["grade"] == "E" and now - t["opened"] < 20 * 3_600_000]
+        e_recent = [t for t in self._open() if t["grade"] == "E" and now - t["opened"] < E_BASKET_H * 3_600_000]
         e_blocked = bool(e_recent) and any(t["opened"] != now for t in e_recent)
         # 1. new signals → orders / market fills
         known = {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_ORD}")} | {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_TR}")}

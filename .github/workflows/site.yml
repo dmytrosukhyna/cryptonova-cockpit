@@ -106,6 +106,9 @@ jobs:
         env:
           CNQ_OWNER_NAME: ${{ vars.CNQ_OWNER_NAME }}
         run: python -m cnq.cli voice --out web
+      - name: Trading journal → web/journal.json
+        continue-on-error: true
+        run: python scripts/ci_journal.py
       - name: Version stamp (panel shows build time; offers reload when a new build is published)
         run: python scripts/ci_version.py
       - name: Order-book snapshots (BingX) → web/books.json

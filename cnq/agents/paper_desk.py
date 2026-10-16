@@ -521,6 +521,25 @@ class PaperDesk:
                 "equity_history": eqh[-500:], "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, правила: {', '.join(RULE_RU[g] for g in sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02%, стоп первым внутри свечи, без заглядывания вперёд"}
 
 
+def scan(coins: list[dict]) -> dict:
+    """How close every rule is to firing, per coin — for the panel radar («почему сделок нет»). Same formulas as signals()."""
+    rows = []
+    for c in coins:
+        c15 = c.get("candles") or []
+        if len(c15) < 200:
+            continue
+        base = c["symbol"].replace("-USDT", "").replace("USDT", "")
+        rets = [c15[i][4] / c15[i - 1][4] - 1 for i in range(max(1, len(c15) - 96 * 30), len(c15) - 1)]
+        sig = math.sqrt(sum(x * x for x in rets) / len(rets)) if rets else 0
+        last = c15[-2]; ret = last[4] / c15[-3][4] - 1
+        px4 = c15[-1][4] / c15[-17][4] - 1 if c15[-17][4] else None
+        rows.append({"coin": base, "b_only": bool(c.get("b_only")), "b_sigma": round(ret / sig, 2) if sig else None,
+                     "px4": round(px4, 4) if px4 is not None else None, "oi4": None if c.get("oi_chg4h") is None else round(c["oi_chg4h"], 4),
+                     "ret_last": round(ret, 4)})
+    return {"breadth": round(PaperDesk.stress(coins), 3), "need_breadth": E_BREADTH, "b_need_sigma": -3.5, "f_need_oi": F_OI, "f_need_px": F_PX,
+            "e_need_drop": E_DROP, "rows": rows}
+
+
 def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
     """Runs the three strategy accounts; the top level of the result is the default (balanced) account,
     `profiles` holds all three so the panel can switch between them."""
@@ -537,7 +556,9 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
     except Exception:  # noqa: BLE001
         pass
     snaps = {k: PaperDesk(conn, k).step(report["coins"], btc_bull, now) for k in PROFILES}
+    out_scan = scan(report["coins"])
     out = dict(snaps[DEFAULT_PROFILE])
     out["profiles"] = {k: {kk: vv for kk, vv in v.items() if kk != "equity_history"} | {"equity_history": v["equity_history"][-300:]} for k, v in snaps.items()}
+    out["scan"] = out_scan
     out["profile_list"] = [{"key": k, "name": p["name"], "about": p["about"], "risk": p["risk"], "classes": sorted(p["classes"]), "max_open": p["max_open"]} for k, p in PROFILES.items()]
     return out

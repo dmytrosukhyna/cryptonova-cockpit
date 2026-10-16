@@ -158,3 +158,17 @@ def test_main_desks_ignore_experimental_rules():
 
 def test_panic_breadth_threshold_is_04():
     assert pd.E_BREADTH == 0.4 and pd.E_BASKET_H == 10
+
+
+def test_b_only_coins_trade_only_rule_b_and_skip_breadth():
+    conn = sqlite3.connect(":memory:")
+    t0 = 1_700_000_000_000
+    n = 96 * 31
+    flat = [100.0] * (n - 2)
+    crash = flat + [100.0 * 0.80, 100.0 * 0.80]     # last closed candle −20 % → B candidate shape (wick needed)
+    c = coin("ATOM-USDT", crash, []); c["b_only"] = True
+    c["candles"][-2] = [t0 + (n - 2) * 900_000, 100.0, 100.0, 70.0, 95.0, 100.0]   # long lower wick, close −5 %
+    desk = pd.PaperDesk(conn, "bal")
+    assert desk.stress([c]) == 0.0
+    sigs = desk.signals(c, True, t0 + n * 900_000)
+    assert sigs and all(s["grade"] == "B" for s in sigs)

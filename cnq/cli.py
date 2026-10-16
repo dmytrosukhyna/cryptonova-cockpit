@@ -225,6 +225,11 @@ def main(argv: list[str] | None = None) -> int:
                 cs = universe.get(c["symbol"])
                 if cs:
                     c["candles_long"] = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 22:]]
+            for bx in cfg.b_extra:   # rule-B-only coins (docs/research/universe.md): candles only, excluded from breadth and other rules
+                cs = store.candles(bx, "15m")
+                if len(cs) >= 96 * 31:
+                    rows = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 31:]]
+                    rep["coins"].append({"symbol": bx, "candles": rows, "levels": [], "regime": {}, "b_only": True})
             res = paper_desk.run(conn, rep)
             write_report(res, os.path.join(args.out, "paper.json"))
             print(f"paper.json: equity={res['equity']} open={len(res['open'])} pending={len(res['pending'])} closed={res['stats']['trades']} events={res['events'][:3]}")

@@ -194,6 +194,8 @@ class PaperDesk:
         c15 = coin["candles"]
         if len(c15) < 200:
             return []
+        if coin.get("b_only"):   # extra coins trade rule B only
+            return [s for s in self.signals({k: v for k, v in coin.items() if k != "b_only"} | {"levels": [], "candles_long": None, "oi_chg4h": None}, btc_bull, now) if s["grade"] == "B"]
         price = c15[-1][4]
         a = _atr(c15) or price * 0.003
         base = coin["symbol"].replace("-USDT", "").replace("USDT", "")
@@ -306,6 +308,8 @@ class PaperDesk:
         """Share of coins down more than 3 % over the last 24 h (96 × 15m). ≥ 0.7 = broad sell-off → no new level longs."""
         xs = []
         for c in coins:
+            if c.get("b_only"):
+                continue
             cs = c.get("candles") or []
             if len(cs) > 97:
                 xs.append(cs[-1][4] / cs[-97][4] - 1)
@@ -525,10 +529,10 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
     now = now or int(time.time() * 1000)
     try:   # rule F needs open-interest history: record this run, attach the 4-hour change to every coin
         from cnq.agents import oi_watch
-        bases = [c["symbol"].replace("-USDT", "").replace("USDT", "") for c in report["coins"]]
+        bases = [c["symbol"].replace("-USDT", "").replace("USDT", "") for c in report["coins"] if not c.get("b_only")]
         if not report.get("_no_network"):
             oi_watch.record(conn, bases, now)
-        for c, b in zip(report["coins"], bases):
+        for c, b in zip([c for c in report["coins"] if not c.get("b_only")], bases):
             c["oi_chg4h"] = oi_watch.change(conn, b, now)
     except Exception:  # noqa: BLE001
         pass

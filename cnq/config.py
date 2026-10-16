@@ -34,6 +34,10 @@ class Config:
         # 15.10.2026: +8 coins from the 18-coin research set (rules B/E/F tested on all 18, docs/research/oi_flush.md)
         ("DOT-USDT", "DOTUSDT"), ("NEAR-USDT", "NEARUSDT"), ("BCH-USDT", "BCHUSDT"), ("TRX-USDT", "TRXUSDT"),
         ("SUI-USDT", "SUIUSDT"), ("APT-USDT", "APTUSDT"), ("ARB-USDT", "ARBUSDT"), ("OP-USDT", "OPUSDT"))
+    # 16.10.2026: extra coins for rule B (cascade buyback) ONLY — out-of-sample 2025–26 «норма» +8.9 → +12.5 %/yr (docs/research/universe.md).
+    # They do not feed E breadth, forecasts or the panel. Meme coins (PEPE/SHIB/WIF/BONK/FLOKI) wait: 1000× contract units on the venues.
+    b_extra: tuple[str, ...] = ("ATOM-USDT", "FIL-USDT", "INJ-USDT", "TIA-USDT", "UNI-USDT", "AAVE-USDT", "ETC-USDT",
+                                "HBAR-USDT", "ICP-USDT", "STX-USDT", "IMX-USDT", "WLD-USDT", "JUP-USDT")
     db_path: str = _env("DB", "data/cnq.sqlite")
     # Candle intervals we keep. 1m is the base: delta/CVD are derived from taker-buy volume.
     intervals: tuple[str, ...] = ("1m", "5m", "15m", "1h", "4h", "1d")

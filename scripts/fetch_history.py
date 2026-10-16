@@ -7,22 +7,25 @@ Same keys/shape convention as scripts/ap_data.py (coins × time), only price/vol
 Runs in GitHub Actions (this container's proxy blocks exchange APIs): .github/workflows/research-data.yml
 Usage: python scripts/fetch_history.py [--out okx15m.npz] [--start 2022-11-20] [--coins BTC,ETH,...]
 Start defaults to 2022-11-20, not 2023-01-01: rule B needs 30 days of volatility warm-up before 2023-01-01."""
-import argparse, datetime as dt, json, sys, time, urllib.error, urllib.request
+import argparse, datetime as dt, json, sys, threading, time, urllib.error, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 BASE = "https://www.okx.com"
 CORE18 = "BTC ETH SOL BNB XRP DOGE ADA AVAX LINK LTC DOT NEAR BCH TRX SUI APT ARB OP".split()
 EXTRA = "TON PEPE SHIB WIF ATOM FIL INJ SEI TIA UNI AAVE ETC HBAR ICP RENDER FET STX IMX ORDI WLD JUP ENA ONDO TAO BONK FLOKI".split()
 BAR_MS = 900_000
-MIN_INTERVAL = 0.11          # ≤ ~9 req/s; OKX allows 20 req / 2 s per IP for history-candles
+MIN_INTERVAL = 0.085         # ≤ ~12 req/s shared by all threads; OKX allows 20 req / 2 s per IP for history-candles
+WORKERS = 4                  # requests overlap network latency, the limiter keeps the total rate
 _last = [0.0]
+_lock = threading.Lock()
 
 
 def get(path, tries=8):
     for a in range(tries):
-        wait = _last[0] + MIN_INTERVAL - time.time()
-        if wait > 0: time.sleep(wait)
-        _last[0] = time.time()
+        with _lock:
+            slot = max(time.time(), _last[0] + MIN_INTERVAL); _last[0] = slot
+        if slot > time.time(): time.sleep(slot - time.time())
         try:
             req = urllib.request.Request(BASE + path, headers={"User-Agent": "cnq-research/1.0"})
             with urllib.request.urlopen(req, timeout=20) as r:
@@ -65,18 +68,23 @@ def main():
     start_ms = int(dt.datetime.strptime(a.start, "%Y-%m-%d").replace(tzinfo=dt.timezone.utc).timestamp() * 1000)
     end_ms = (int(time.time() * 1000) // BAR_MS) * BAR_MS          # bars opening before the current one = closed
     ins = instruments()
-    data, syms, lst = {}, [], []
-    for c in a.coins.split(","):
+    T0 = time.time()
+
+    def one(c):
         inst = f"{c}-USDT-SWAP"
-        if inst not in ins: print(f"{c}: no OKX USDT swap — skipped", flush=True); continue
-        t0 = time.time()
+        if inst not in ins: print(f"{c}: no OKX USDT swap — skipped", flush=True); return c, None
         try:
             rows = fetch(inst, start_ms, end_ms)
         except Exception as e:  # one bad coin must not kill the whole run
-            print(f"{c}: FAILED {e}", flush=True); continue
-        if not rows: print(f"{c}: no candles — skipped", flush=True); continue
-        data[c] = rows; syms.append(c); lst.append(int(ins[inst].get("listTime") or 0))
-        print(f"{c}: {len(rows)} bars from {dt.datetime.utcfromtimestamp(min(rows) / 1000):%Y-%m-%d} ({time.time() - t0:.0f}s)", flush=True)
+            print(f"{c}: FAILED {e}", flush=True); return c, None
+        if not rows: print(f"{c}: no candles — skipped", flush=True); return c, None
+        print(f"{c}: {len(rows)} bars from {dt.datetime.utcfromtimestamp(min(rows) / 1000):%Y-%m-%d} (t={time.time() - T0:.0f}s)", flush=True)
+        return c, rows
+
+    with ThreadPoolExecutor(WORKERS) as ex:
+        res = list(ex.map(one, a.coins.split(",")))
+    data = {c: r for c, r in res if r}; syms = [c for c, r in res if r]
+    lst = [int(ins[f"{c}-USDT-SWAP"].get("listTime") or 0) for c in syms]
     times = np.arange(start_ms, end_ms, BAR_MS, dtype=np.int64)
     cols = ["open", "high", "low", "close", "volume_quote"]
     A = {k: np.full((len(syms), len(times)), np.nan, dtype=np.float32) for k in cols}

@@ -1,7 +1,7 @@
 """Download 15m USDT-perpetual candles from OKX public history and save them aligned on one 15m grid.
 
 Output (.npz, compressed): syms (e.g. 'BTC'), times (int64 ms, bar open), open/high/low/close/volume_quote
-(float32, NaN where the coin has no bar), list_ms (OKX listing time per coin, int64).
+(float32, NaN where the coin has no bar), list_ms (OKX listing time per coin, int64), notes (skipped/failed coins).
 Same keys/shape convention as scripts/ap_data.py (coins × time), only price/volume columns.
 
 Runs in GitHub Actions (this container's proxy blocks exchange APIs): .github/workflows/research-data.yml
@@ -63,21 +63,27 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="okx15m.npz")
     ap.add_argument("--start", default="2022-11-20")
-    ap.add_argument("--coins", default=",".join(CORE18 + EXTRA))
+    ap.add_argument("--coins", default="")
+
     a = ap.parse_args()
+    a.coins = a.coins or ",".join(CORE18 + EXTRA)
     start_ms = int(dt.datetime.strptime(a.start, "%Y-%m-%d").replace(tzinfo=dt.timezone.utc).timestamp() * 1000)
     end_ms = (int(time.time() * 1000) // BAR_MS) * BAR_MS          # bars opening before the current one = closed
     ins = instruments()
     T0 = time.time()
+    notes = []
+
+    def warn(c, msg):   # also as a workflow annotation: run logs are not readable from the research container
+        notes.append(f"{c}: {msg}"); print(f"::warning title=fetch {c}::{c}: {msg}", flush=True); return c, None
 
     def one(c):
         inst = f"{c}-USDT-SWAP"
-        if inst not in ins: print(f"{c}: no OKX USDT swap — skipped", flush=True); return c, None
+        if inst not in ins: return warn(c, "no OKX USDT swap — skipped")
         try:
             rows = fetch(inst, start_ms, end_ms)
         except Exception as e:  # one bad coin must not kill the whole run
-            print(f"{c}: FAILED {e}", flush=True); return c, None
-        if not rows: print(f"{c}: no candles — skipped", flush=True); return c, None
+            return warn(c, f"FAILED {e}")
+        if not rows: return warn(c, "no candles — skipped")
         print(f"{c}: {len(rows)} bars from {dt.datetime.utcfromtimestamp(min(rows) / 1000):%Y-%m-%d} (t={time.time() - T0:.0f}s)", flush=True)
         return c, rows
 
@@ -92,9 +98,10 @@ def main():
         ts = np.fromiter(data[s].keys(), dtype=np.int64); v = np.array(list(data[s].values()), dtype=np.float64)
         ii = (ts - start_ms) // BAR_MS; ok = (ii >= 0) & (ii < len(times)) & ((ts - start_ms) % BAR_MS == 0)
         for j, col in enumerate(cols): A[col][k, ii[ok]] = v[ok, j]
-    np.savez_compressed(a.out, syms=np.array(syms), times=times, list_ms=np.array(lst, dtype=np.int64), **A)
+    np.savez_compressed(a.out, syms=np.array(syms), times=times, list_ms=np.array(lst, dtype=np.int64),
+                        notes=np.array(notes, dtype=str), **A)
     print(f"saved {a.out}: {len(syms)} coins × {len(times)} bars", flush=True)
-    if len(syms) < len(CORE18): sys.exit("too few coins fetched")
+    if not syms: sys.exit("no coins fetched")
 
 
 if __name__ == "__main__":

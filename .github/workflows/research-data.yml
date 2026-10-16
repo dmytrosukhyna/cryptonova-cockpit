@@ -3,6 +3,11 @@ name: research-data
 # and keeps it as a 7-day Actions artifact. Nothing is committed to the repo.
 on:
   workflow_dispatch:
+    inputs:
+      coins:
+        description: "comma-separated coins (empty = 18 core + 26 candidates)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -17,7 +22,8 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install numpy
       - name: OKX 15m candles (2022-11-20 → now)
-        run: python scripts/fetch_history.py --out okx15m.npz
+        env: { COINS: "${{ inputs.coins }}" }
+        run: python scripts/fetch_history.py --out okx15m.npz --coins "$COINS"
       - uses: actions/upload-artifact@v4
         with:
           name: okx15m

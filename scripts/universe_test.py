@@ -60,9 +60,11 @@ def stats(cs):
     return (len(a), a.mean() if len(a) else np.nan, (a > 0).mean() * 100 if len(a) else np.nan)
 
 
-def run(cands, coins, i0):
-    """Simulate «норма» B+E on the given coins with entries from bar i0; stats over [i0, end]."""
-    ks = set(coins); cs = [c for c in cands if c['k'] in ks and c['i'] >= i0]
+def run(cands, coins, i0, e_coins=None):
+    """Simulate «норма» B+E on the given coins with entries from bar i0; stats over [i0, end].
+    e_coins: if given, rule E trades only these coins (B still trades `coins`)."""
+    ks = set(coins); ke = set(e_coins) if e_coins is not None else ks
+    cs = [c for c in cands if (c['k'] in (ke if c['rule'] == 'E' else ks)) and c['i'] >= i0]
     eq, tr, cu = ap.simulate(cs, **NORMA)
     cu = [(i0, 10_000.0)] + sorted(cu[1:]); v = np.array([x for _, x in cu]); pk = np.maximum.accumulate(v)
     days = (times[-1] - times[i0]) / 86400_000
@@ -76,7 +78,9 @@ out = []
 P = lambda s='': (print(s, flush=True), out.append(s))
 P(f"# OKX universe test — {len(syms)} coins, {ap.DAY[ap.START]} → {ap.DAY[-1]}\n")
 P(f"Coins in file: {' '.join(syms)}")
-P(f"Missing from the 18: {' '.join(c for c in CORE18 if c not in syms) or '—'}\n")
+P(f"Missing from the 18: {' '.join(c for c in CORE18 if c not in syms) or '—'}")
+_z = np.load(NPZ, allow_pickle=True)
+P(f"Fetch notes: {'; '.join(map(str, _z['notes'])) if 'notes' in _z.files else '—'}\n")
 
 # ---- per coin -----------------------------------------------------------------------------------------------------
 yrs = sorted(set(YEAR[ap.START:]))
@@ -114,15 +118,16 @@ P()
 # ---- portfolios -----------------------------------------------------------------------------------------------------
 P(f"Filter (2023–2024 only, B+E avg > 0, n ≥ 10, listed by 2024-06-30) passed: {', '.join(syms[k] for k in passed)}")
 P(f"Failed: {', '.join(syms[k] for k in new if k not in passed)}\n")
-sets = (("(a) 18 coins", core), ("(b) 18 + passed filter", core + passed), ("(c) all coins", list(range(NS))))
+sets = (("(a) 18 coins", core, None), ("(b) 18 + passed filter", core + passed, None), ("(c) all coins", list(range(NS)), None),
+        ("(d) B on 18 + passed, E on 18", core + passed, core), ("(e) B on all, E on 18", list(range(NS)), core))
 for title, i0 in (("Full period 2023-01 → now", ap.START), ("Out-of-sample 2025-01 → now (filter chosen on 2023–2024)", OOS)):
     P(f"### {title}, «норма» B+E, start $10k\n")
     P("| set | coins | E breadth | final | CAGR | max DD | trades | per day | B / E | P&L by year |")
     P("|---|---|---|---|---|---|---|---|---|---|")
-    for nm, ks in sets:
+    for nm, ks, ke in sets:
         for bn, E in (("18", E18), ("all", EALL)):
-            if nm.startswith("(a)") and bn == "all": continue
-            r = run(B + E, ks, i0)
+            if (nm.startswith("(a)") or ke is not None) and bn == "all": continue
+            r = run(B + E, ks, i0, ke)
             P(f"| {nm} | {len(ks)} | {bn} | ${r['final']:,.0f} | {r['cagr'] * 100:+.1f}% | {r['dd'] * 100:.1f}% | {r['n']} | {r['tpd']:.2f} | "
               f"{r['nb']} / {r['ne']} | {r['years']} |")
     P()

@@ -1055,6 +1055,7 @@ def portfolio_x(data, key, W, sigs, strength, X, max_pos=6, size=0.10):
 
 EXIT_NOW = {"stop": -0.25, "body_at": 0.50, "body_frac": 0.5, "trail": None, "basis": "high", "pre_bars": 18, "max_bars": 18}
 EXIT_REF = {"stop": -0.25, "body_at": 1.00, "body_frac": 0.5, "trail": 0.35, "basis": "close", "pre_bars": None, "max_bars": 60 * 6}
+EXIT_LIVE = {"stop": -0.25, "body_at": 0.50, "body_frac": 2 / 3, "trail": 0.35, "basis": "close", "pre_bars": 18, "max_bars": 60 * 6}
 
 
 def xname(X, W=6):
@@ -1124,6 +1125,7 @@ def exits_study(data, log=print) -> tuple[str, dict]:
             a = float(np.mean([t["ret"] for t in tr])) if tr else None
             res.append((a if a is not None else -9, X, len(tr)))
         pos_cells = sum(1 for a, _, _ in res if a > 0)
+        pos3 = sum(1 for a, X, _ in res if a > 0 and X["pre_bars"] == 18); posn = sum(1 for a, X, _ in res if a > 0 and X["pre_bars"] is None)
         best = max(res, key=lambda r: r[0])
         med = float(np.median([a for a, _, _ in res]))
         rows = {}
@@ -1142,7 +1144,8 @@ def exits_study(data, log=print) -> tuple[str, dict]:
                       f"{pct(o['best'], 0)} (пик ×{o['best_peak']:.1f}) | ${o['final']:,.0f} | {pct(o['dd'], 0)} | {pct(o['top5'], 0, False) if o['top5'] is not None else '—'} | "
                       f"{pct(o['half1'])} / {pct(o['half2'])} |")
         S["entries"][en] = {"cells_pos": pos_cells, "cells": len(res), "median_avg": med, "rows": rows}
-        md.append(f"| {en} | сетка: {pos_cells} из {len(res)} вариантов в плюсе, медиана {pct(med)} на сделку | | | | | | | | | |")
+        md.append(f"| {en} | сетка: {pos_cells} из {len(res)} вариантов в плюсе (ждём тело 3 дня: {pos3} из 36; ждём до конца: {posn} из 36), медиана {pct(med)} на сделку | | | | | | | | | |")
+        S["entries"][en]["pos_wait3"], S["entries"][en]["pos_wait_all"] = pos3, posn
         log(f"exits {en}: {round(time.time() - t0)}s")
     # detailed look at the dip-buy (reference entry): trail × basis, body variants, max term, random baseline, without top months
     sigs, strg = entries["C откуп −25%"]
@@ -1185,6 +1188,59 @@ def exits_study(data, log=print) -> tuple[str, dict]:
         S["dip_ref"][lab] = o
         md.append(f"| {lab} | {o['n']} | {pct(o['avg'])} | {pct(ra)} | {'—' if p is None else f'{p:.2f}'} | ${o['final']:,.0f} | {pct(o['dd'], 0)} | "
                   f"{pct(o['months_pos'], 0, False)} из {o['months_active']} | {pct(o['wo_top3'])} | {o['med_days']:.1f} |")
+    md.append("\n### Сколько ждать тело: эталон владельца с лимитом ожидания (если тело не взяли — выходим целиком)\n")
+    md.append("| ждём тело | сделок | средняя | итог $10k | просадка | тело взято | стопом закрыто |")
+    md.append("|---|---|---|---|---|---|---|")
+    S["wait"] = {}
+    for dd_ in (1, 2, 3, 5, 7, 14, None):
+        X = dict(EXIT_REF, pre_bars=None if dd_ is None else dd_ * W)
+        tr = trades_x(data, "h4", W, sigs, X); pf = portfolio_x(data, "h4", W, sigs, strg, X)
+        a = float(np.mean([t["ret"] for t in tr])); bt = float(np.mean([t["body"] for t in tr])); stp = float(np.mean([t["kind"] == "стоп" for t in tr]))
+        S["wait"][str(dd_)] = [len(tr), a, pf["final"], pf["dd"], bt, stp]
+        md.append(f"| {'до конца (60 д)' if dd_ is None else f'{dd_} д'} | {len(tr)} | {pct(a)} | ${pf['final']:,.0f} | {pct(pf['dd'], 0)} | {pct(bt, 0, False)} | {pct(stp, 0, False)} |")
+    md.append("\n### Откуп −25%: сетка выходов при ожидании тела 3 дня (средняя / итог $10k)\n")
+    md.append("| тело | трейлинг | по закрытиям, стоп −25% | по закрытиям, стоп −35% | по максимумам, стоп −25% | по максимумам, стоп −35% |")
+    md.append("|---|---|---|---|---|---|")
+    sub = []
+    for ba, bf in ((1.0, 0.5), (0.5, 2 / 3), (0.5, 0.5)):
+        for trl in (0.25, 0.35, 0.50):
+            cells = []
+            for basis in ("close", "high"):
+                for st in (-0.25, -0.35):
+                    X = {"stop": st, "body_at": ba, "body_frac": bf, "trail": trl, "basis": basis, "pre_bars": 18, "max_bars": 360}
+                    tr = trades_x(data, "h4", W, sigs, X); pf = portfolio_x(data, "h4", W, sigs, strg, X)
+                    a = float(np.mean([t["ret"] for t in tr])); sub.append(a)
+                    cells.append(f"{pct(a)} / ${pf['final']:,.0f}")
+            md.append(f"| {bf * 100:.0f}% на +{ba * 100:.0f}% | {trl * 100:.0f}% | " + " | ".join(cells) + " |")
+    S["sub3d"] = {"n": len(sub), "pos": sum(1 for a in sub if a > 0), "min": min(sub), "max": max(sub), "median": float(np.median(sub))}
+    md.append(f"\nВ плюсе {S['sub3d']['pos']} из {len(sub)}, средняя от {pct(min(sub))} до {pct(max(sub))} (медиана {pct(float(np.median(sub)))}).\n")
+    pos_by = {}
+    for en in S["entries"]:
+        pass
+    md.append("\n### Кандидаты в боевой выход (откуп −25%)\n")
+    md.append("| выход | сделок | средняя | случайно | p | итог $10k | просадка | месяцев в плюсе | без 3 лучших месяцев | доля топ-5 | 1-я / 2-я половина | тело взято |")
+    md.append("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    S["live_candidates"] = {}
+    for lab, X in (("текущий", EXIT_NOW), ("67% на +50%, трейлинг 35% по закрытиям, ждём 3 д", EXIT_LIVE),
+                   ("50% на +100%, трейлинг 35% по закрытиям, ждём 3 д", dict(EXIT_REF, pre_bars=18)),
+                   ("67% на +50%, трейлинг 25% по максимумам, ждём 3 д", dict(EXIT_LIVE, trail=0.25, basis="high"))):
+        tr = trades_x(data, "h4", W, sigs, X)
+        ra, p = random_x(data, "h4", W, tr, X)
+        pf = portfolio_x(data, "h4", W, sigs, strg, X)
+        bym = defaultdict(list)
+        for t in tr:
+            bym[month(t["t"])].append(t["ret"])
+        top3 = sorted(bym, key=lambda m: -sum(bym[m]))[:3]
+        rest = [t["ret"] for t in tr if month(t["t"]) not in top3]
+        (a1, _), (a2, _) = halves(tr, t_mid)
+        o = {"n": len(tr), "avg": float(np.mean([t["ret"] for t in tr])), "rand": ra, "p": p, "final": pf["final"], "dd": pf["dd"],
+             "months_pos": pf["months_pos"], "months_active": pf["months_active"], "wo_top3": float(np.mean(rest)) if rest else None,
+             "top5": pf["top5_share"], "half1": a1, "half2": a2, "body": float(np.mean([t["body"] for t in tr])),
+             "best": float(max(t["ret"] for t in tr)), "best_peak": float(max(t["peak"] for t in tr))}
+        S["live_candidates"][lab] = o
+        md.append(f"| {lab} | {o['n']} | {pct(o['avg'])} | {pct(ra)} | {'—' if p is None else f'{p:.2f}'} | ${o['final']:,.0f} | {pct(o['dd'], 0)} | "
+                  f"{pct(o['months_pos'], 0, False)} из {o['months_active']} | {pct(o['wo_top3'])} | {pct(o['top5'], 0, False) if o['top5'] is not None else '—'} | "
+                  f"{pct(a1)} / {pct(a2)} | {pct(o['body'], 0, False)} |")
     md.append("\nЧем закрывались сделки (эталон владельца): " + ", ".join(f"{k} — {v}" for k, v in sorted(S["dip_ref"].get("эталон владельца (макс. 60 д)", {}).get("kinds", {}).items())))
     return "\n".join(md), S
 
@@ -1215,6 +1271,22 @@ def tokenomics_check() -> tuple[str, dict]:
     ra = get("https://api.llama.fi/raises", timeout=40)
     raises = (ra or {}).get("raises") if isinstance(ra, dict) else None
     S["raises_total"] = len(raises or [])
+    if raises is None:
+        md.append(f"- DefiLlama raises недоступен ({(ra or {}).get('__error__') if isinstance(ra, dict) else ra}) — раунды из него не проверить")
+    # CoinGecko «… Portfolio» categories = known investors/market makers (free); only tier-1 names, 1 call each, slow on purpose
+    cats = get("https://api.coingecko.com/api/v3/coins/categories/list")
+    port = [c for c in cats if "portfolio" in (c.get("name") or "").lower() and any(k in c["name"].lower() for k in TIER1)] if isinstance(cats, list) else []
+    backed = defaultdict(list)
+    for c in port[:20]:
+        time.sleep(7)
+        j = get(f"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category={c['category_id']}&per_page=250&page=1")
+        if isinstance(j, list):
+            for x in j:
+                backed[x.get("id")].append(c["name"].replace(" Portfolio", ""))
+    S["portfolio_categories"] = [c["name"] for c in port[:20]]
+    for x in rows:
+        if backed.get(x["id"]):
+            x["raised"] = True; x["tier1"] = True; x["investors"] = backed[x["id"]]
     by_name = defaultdict(list)
     for r in raises or []:
         by_name[_norm(r.get("name"))].append(r)
@@ -1222,6 +1294,7 @@ def tokenomics_check() -> tuple[str, dict]:
         rr = by_name.get(_norm(x["name"])) or []
         inv = [i for r in rr for i in (r.get("leadInvestors") or []) + (r.get("otherInvestors") or [])]
         x["raised"] = bool(rr); x["tier1"] = any(any(k in i.lower() for k in TIER1) for i in inv); x["investors"] = inv[:8]
+        x["id"] = x.get("id")
     def spearman(a, b):
         a, b = np.asarray(a, float), np.asarray(b, float)
         ra_, rb_ = a.argsort().argsort(), b.argsort().argsort()
@@ -1237,7 +1310,8 @@ def tokenomics_check() -> tuple[str, dict]:
             S[f"ratio_{key}"] = {"n": len(pts), "rho": rho, "hi_med": float(np.median(hi)) if hi else None, "hi_n": len(hi),
                                  "lo_med": float(np.median(lo)) if lo else None, "lo_n": len(lo)}
     rz = [x for x in rows if x["raised"]]
-    md.append(f"- мемов из топ-250 CoinGecko, у которых DefiLlama знает раунды финансирования (совпадение по названию): {len(rz)}"
+    md.append(f"- категории-портфели CoinGecko из списка tier-1: {', '.join(S['portfolio_categories']) or 'нет'}")
+    md.append(f"- мемов из топ-250 CoinGecko с известными инвесторами (портфель tier-1 в CoinGecko или раунд в DefiLlama): {len(rz)}"
               + (": " + ", ".join(f"{x['sym']} ({'tier-1' if x['tier1'] else 'есть'}; 1 год {x['r1y']:+.0f}%)" if x['r1y'] is not None else f"{x['sym']}" for x in rz[:15]) if rz else ""))
     if rz:
         a = [x["r1y"] for x in rz if x["r1y"] is not None]; b = [x["r1y"] for x in rows if not x["raised"] and x["r1y"] is not None and x["mc"] >= 2e7]
@@ -1324,12 +1398,19 @@ def probe() -> str:
     det = get("https://api.coingecko.com/api/v3/coins/dogwifcoin?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false")
     if isinstance(det, dict):
         show("CoinGecko coin details (dogwifcoin): keys + fields", {"keys": sorted(det)[:60], "categories": det.get("categories"), "platforms": det.get("platforms"),
+                                                                   "listing_timestamp": det.get("listing_timestamp"), "preview_listing": det.get("preview_listing"),
                                                                    "genesis_date": det.get("genesis_date"), "links": {k: det.get("links", {}).get(k) for k in ("homepage", "twitter_screen_name")}}, 2500)
         mint = (det.get("platforms") or {}).get("solana")
         if mint:
             la = post("https://api.mainnet-beta.solana.com", {"jsonrpc": "2.0", "id": 1, "method": "getTokenLargestAccounts", "params": [mint]})
             vals = ((la or {}).get("result") or {}).get("value") if isinstance(la, dict) else None
-            show("RPC getTokenLargestAccounts (WIF)", {"err": (la or {}).get("error") if isinstance(la, dict) else la, "n": len(vals or []), "first": (vals or [])[:2]}, 1500)
+            show("RPC getTokenLargestAccounts (WIF) raw", la, 1500)
+            rc = get(f"https://api.rugcheck.xyz/v1/tokens/{mint}/report")
+            if isinstance(rc, dict):
+                show("RugCheck full report (WIF): keys, topHolders[0:3], knownAccounts sample, markets[0] keys, lpLockedPct",
+                     {"keys": sorted(rc)[:60], "top": (rc.get("topHolders") or [])[:3], "known": dict(list((rc.get("knownAccounts") or {}).items())[:6]),
+                      "m0": sorted((rc.get("markets") or [{}])[0])[:40] if rc.get("markets") else None, "lp": rc.get("lpLockedPct"),
+                      "totalHolders": rc.get("totalHolders"), "err": rc.get("__error__")}, 3500)
             if vals:
                 accs = [v["address"] for v in vals[:20]]
                 ma = post("https://api.mainnet-beta.solana.com", {"jsonrpc": "2.0", "id": 1, "method": "getMultipleAccounts", "params": [accs, {"encoding": "jsonParsed"}]})
@@ -1345,6 +1426,8 @@ def probe() -> str:
     rl = (ra or {}).get("raises") if isinstance(ra, dict) else None
     show("DefiLlama raises", {"err": ra.get("__error__") if isinstance(ra, dict) else None, "n": len(rl or []), "sample": (rl or [])[-2:],
                               "memeish": [r for r in rl or [] if any(k in (r.get("category") or "").lower() for k in ("meme",))][:5]}, 3000)
+    cats = get("https://api.coingecko.com/api/v3/coins/categories/list")
+    show("CoinGecko portfolio categories", [c for c in cats if "portfolio" in (c.get("name") or "").lower()][:80] if isinstance(cats, list) else cats, 3500)
     sp = get("https://www.okx.com/api/v5/public/instruments?instType=SPOT")
     show("OKX spot instruments", {"n": len((sp or {}).get("data") or []) if isinstance(sp, dict) else None,
                                   "meme_bases": sorted({x.get("baseCcy") for x in ((sp or {}).get("data") or []) if x.get("quoteCcy") == "USDT" and x.get("baseCcy") in ("WIF", "BONK", "PEPE", "POPCAT", "FARTCOIN", "PENGU", "TRUMP", "DOGE", "SHIB", "FLOKI", "MEW", "PNUT", "MOODENG", "SPX", "PUMP", "USELESS")})})

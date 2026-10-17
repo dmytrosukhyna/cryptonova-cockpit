@@ -172,3 +172,23 @@ def test_b_only_coins_trade_only_rule_b_and_skip_breadth():
     assert desk.stress([c]) == 0.0
     sigs = desk.signals(c, True, t0 + n * 900_000)
     assert sigs and all(s["grade"] == "B" for s in sigs)
+
+
+def test_rule_d_basis_discount_opens_share_sized_long():
+    from cnq.agents import basis_watch as bw
+    conn = sqlite3.connect(":memory:")
+    t0 = 1_700_000_000_000
+    n = 300
+    c = coin("SOL-USDT", [100.0] * n, [])
+    now = t0 + n * 900_000
+    fake = (("bingx", lambda bases: {"SOL": -0.0030}),)
+    bw.record(conn, ["SOL"], now - 40 * 60_000, fetchers=fake)
+    assert bw.avg_1h(conn, "SOL", now - 40 * 60_000) is None            # one sample is not enough
+    bw.record(conn, ["SOL"], now, fetchers=fake)
+    c["basis_1h"] = bw.avg_1h(conn, "SOL", now)
+    assert abs(c["basis_1h"] + 0.003) < 1e-12
+    res = pd.PaperDesk(conn, "bal").step([c], True, now)
+    d = [t for t in res["open"] if t["grade"] == "D"]
+    assert d and abs(d[0]["qty"] * d[0]["entry"] - 1500) < 5             # 15 % of $10 000
+    c2 = coin("ETH-USDT", [100.0] * n, []); c2["basis_1h"] = -0.0010     # −0.10 % is not deep enough
+    assert not [s for s in pd.PaperDesk(conn, "cons").signals(c2, True, now) if s["grade"] == "D"]

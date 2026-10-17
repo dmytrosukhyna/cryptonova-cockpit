@@ -32,14 +32,14 @@ RISK = 0.01
 PROFILES = {   # one strategy — "Автопилот" — at three risk levels. Rules: B cascade buyback, E panic-climax basket, F open-interest flush
                # (+A FX gap). Retest (R) is not traded: whole-portfolio backtests (scripts/autopilot_backtest.py, scripts/autopilot_v2.py)
                # showed it adds drawdown (−57 %) without adding profit. Numbers below: 18 coins, 2023-01 → 2026-09, costs included.
-    "cons": {"name": "Автопилот · осторожно", "classes": {"A", "B", "E", "F"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts",
-             "e_share": 0.10, "f_share": 0.15, "f_open": 2, "prefix": "paper_cons_",
-             "about": "Откуп каскада ликвидаций, откуп паники и откуп сброса позиций; риск 0.5% на сделку, малые доли счёта. История 2023–2026: ≈ +19% в год, просадка до −9%, все годы в плюсе."},
-    "bal":  {"name": "Автопилот · норма", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
-             "e_share": 0.20, "f_share": 0.25, "f_open": 3, "prefix": "paper_bal_",
-             "about": "Откуп каскада ликвидаций, откуп паники (корзина 20% счёта) и откуп сброса позиций (25% счёта на сделку, стоп −6%, до 3); риск 1%. История 2023–2026: ≈ +50% в год, просадка до −18%, все годы в плюсе."},
-    "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
-             "e_share": 0.30, "f_share": 0.30, "f_open": 3, "prefix": "paper_",
+    "cons": {"name": "Автопилот · осторожно", "classes": {"A", "B", "E", "F", "D"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts",
+             "e_share": 0.10, "f_share": 0.15, "f_open": 2, "d_share": 0.10, "d_open": 2, "prefix": "paper_cons_",
+             "about": "Откуп каскада ликвидаций, откуп паники, откуп сброса позиций и (с 17.10, испытание) откуп дисконта фьючерса; риск 0.5% на сделку, малые доли счёта. История 2023–2026: ≈ +19% в год, просадка до −9%, все годы в плюсе."},
+    "bal":  {"name": "Автопилот · норма", "classes": {"A", "B", "E", "F", "D"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
+             "e_share": 0.20, "f_share": 0.25, "f_open": 3, "d_share": 0.15, "d_open": 3, "prefix": "paper_bal_",
+             "about": "Откуп каскада ликвидаций, откуп паники (корзина 20% счёта), откуп сброса позиций (25% счёта, стоп −6%, до 3) и с 17.10 откуп дисконта фьючерса (15% счёта, до 3); риск 1%. История 2023–2026: ≈ +50% в год, просадка до −18%, все годы в плюсе."},
+    "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F", "D"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
+             "e_share": 0.30, "f_share": 0.30, "f_open": 3, "d_share": 0.20, "d_open": 3, "prefix": "paper_",
              "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +75% в год, просадка до −29%, все годы в плюсе."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
     "exp":  {"name": "Эксперимент · свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
@@ -47,8 +47,8 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
              "about": "Проверка новых правил на живом рынке: свинг-пробой (выше максимума 5 дней в росте, выход ниже вчерашнего минимума) и быстрый откуп резкой свечи. 10% счёта на сделку, до 15 позиций. История: +0.31% и +0.41% на сделку, но в портфеле ≈ 0 — поэтому отдельный счёт."},
 }
 RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций",
-           "S": "свинг-пробой", "G": "быстрый откуп"}
-SHARE_RULES = {"E", "F", "S", "G"}   # sized as a share of equity, own position caps
+           "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса"}
+SHARE_RULES = {"E", "F", "S", "G", "D"}   # sized as a share of equity, own position caps
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
@@ -72,6 +72,9 @@ S_STOP = 0.08
 HOLD_G_H = 8           # class G: fast buyback — 15m candle ≤ −3σ with a long lower wick, 8 h, stop −3 %
 G_SIG = 3.0
 G_STOP = 0.03
+HOLD_D_H = 24          # class D (17.10): perp ≥ 0.20 % below its spot index on a 1-hour average → long 24 h, stop −12 % (docs/research/new_signals.md)
+D_BASIS = -0.0020
+D_STOP = 0.12
 F_STOP = 0.06          # 16.10: −6 % instead of −12 % — every year positive (2025 −0.29 % → +0.66 % per trade), size raised so risk per trade stays ~1.5 %
 ORDER_TTL_H = 24
 MAX_OPEN = 6
@@ -279,6 +282,16 @@ class PaperDesk:
                                 "reason": f"Свинг-пробой: цена закрылась выше максимума 5 дней ({hh:.6g}) и выше средней за 20 дней — монета в росте. "
                                           f"Держим, пока цена не закроется ниже минимума прошлых суток; стоп −{S_STOP*100:.0f}%, максимум 14 дней."})
                     break
+        # D: perpetual at a deep discount to its spot index (1-hour average, recorded by basis_watch)
+        bz = coin.get("basis_1h")
+        if bz is not None and bz <= D_BASIS:
+            entry = c15[-1][4]
+            out.append({"id": f"D-{base}-{now // 3_600_000}", "symbol": base, "side": "LONG", "grade": "D", "kind": "BASIS_DISCOUNT",
+                        "entry": entry, "stop": entry * (1 - D_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
+                        "order": "MARKET", "hold_h": HOLD_D_H,
+                        "reason": f"Дисконт фьючерса: фьючерс торгуется на {bz*100:.2f}% ниже спота (среднее за час) — продавцы фьючерсов перегнули. "
+                                  f"На истории (18 монет, 2023–2026) после такого откуп +1.8% в среднем за сутки, все годы в плюсе. "
+                                  f"Выход через 24 ч, стоп −{D_STOP*100:.0f}%, размер — доля счёта."})
         # cascade long: last closed 15m candle
         rets = [c15[i][4] / c15[i - 1][4] - 1 for i in range(max(1, len(c15) - 96 * 30), len(c15) - 1)]
         sig = math.sqrt(sum(x * x for x in rets) / len(rets)) if rets else 0
@@ -343,12 +356,12 @@ class PaperDesk:
                 if risk_off and s["grade"] == "R" and s["side"] == "SHORT":   # history: retest shorts inside a broad sell-off ≈ 0 (+0.013R, n=839) vs +0.155R in calm markets
                     events.append(f"пропуск шорта {base}: ретест внутри широкой распродажи на истории ≈ 0 — ждём спокойного рынка")
                     continue
-                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F", "G")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
+                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F", "G", "D")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
                     events.append(f"пропуск {'лонга' if s['side'] == 'LONG' else 'шорта'} {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
                     continue
                 if s["grade"] == "F" and sum(1 for t in self._open() if t["grade"] == "F") >= self.P.get("f_open", 3):
                     continue
-                if s["grade"] in ("S", "G") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
+                if s["grade"] in ("S", "G", "D") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
                     continue
                 if s["grade"] not in SHARE_RULES and sum(1 for t in self._open() if t["grade"] not in SHARE_RULES) + len(self._pending()) >= self.P["max_open"]:
                     continue
@@ -360,10 +373,10 @@ class PaperDesk:
                     notional = eq * self.P.get("f_share", 0.15)
                     qty = notional / s["entry"]
                     risk_usd = notional * F_STOP
-                elif s["grade"] in ("S", "G"):
+                elif s["grade"] in ("S", "G", "D"):
                     notional = eq * self.P.get(s["grade"].lower() + "_share", 0.1)
                     qty = notional / s["entry"]
-                    risk_usd = notional * (S_STOP if s["grade"] == "S" else G_STOP)
+                    risk_usd = notional * {"S": S_STOP, "G": G_STOP, "D": D_STOP}[s["grade"]]
                 else:
                     risk_usd = eq * self.P["risk"]
                     r = abs(s["entry"] - s["stop"])
@@ -396,7 +409,7 @@ class PaperDesk:
                     filled = c
                     break
             if filled:
-                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H}.get(o["grade"], HOLD_C_H)
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
@@ -507,7 +520,7 @@ class PaperDesk:
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
         by_grade = {}
-        for g in ("A", "B", "R", "C", "E", "F", "S", "G"):
+        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D"):
             ts = [t for t in closed if t["grade"] == g]
             if ts:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),
@@ -535,8 +548,8 @@ def scan(coins: list[dict]) -> dict:
         px4 = c15[-1][4] / c15[-17][4] - 1 if c15[-17][4] else None
         rows.append({"coin": base, "b_only": bool(c.get("b_only")), "b_sigma": round(ret / sig, 2) if sig else None,
                      "px4": round(px4, 4) if px4 is not None else None, "oi4": None if c.get("oi_chg4h") is None else round(c["oi_chg4h"], 4),
-                     "ret_last": round(ret, 4)})
-    return {"breadth": round(PaperDesk.stress(coins), 3), "need_breadth": E_BREADTH, "b_need_sigma": -3.5, "f_need_oi": F_OI, "f_need_px": F_PX,
+                     "ret_last": round(ret, 4), "basis": None if c.get("basis_1h") is None else round(c["basis_1h"], 5)})
+    return {"breadth": round(PaperDesk.stress(coins), 3), "need_breadth": E_BREADTH, "d_need_basis": D_BASIS, "b_need_sigma": -3.5, "f_need_oi": F_OI, "f_need_px": F_PX,
             "e_need_drop": E_DROP, "rows": rows}
 
 
@@ -553,6 +566,15 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
             oi_watch.record(conn, bases, now)
         for c, b in zip([c for c in report["coins"] if not c.get("b_only")], bases):
             c["oi_chg4h"] = oi_watch.change(conn, b, now)
+    except Exception:  # noqa: BLE001
+        pass
+    try:   # rule D needs the perp-vs-index basis: record this run, attach the 1-hour average
+        from cnq.agents import basis_watch
+        bases = [c["symbol"].replace("-USDT", "").replace("USDT", "") for c in report["coins"] if not c.get("b_only")]
+        if not report.get("_no_network"):
+            basis_watch.record(conn, bases, now)
+        for c, b in zip([c for c in report["coins"] if not c.get("b_only")], bases):
+            c["basis_1h"] = basis_watch.avg_1h(conn, b, now)
     except Exception:  # noqa: BLE001
         pass
     snaps = {k: PaperDesk(conn, k).step(report["coins"], btc_bull, now) for k in PROFILES}

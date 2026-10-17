@@ -262,6 +262,10 @@ def main(argv: list[str] | None = None) -> int:
                 if len(cs) >= 96 * 31:
                     rows = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 31:]]
                     rep["coins"].append({"symbol": bx, "candles": rows, "levels": [], "regime": {}, "b_only": True})
+            try:   # macro dashboard of the previous run (Nikkei close for lab rule J)
+                rep["macro"] = json.load(open(os.path.join(args.out, "macro.json"), encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                rep["macro"] = None
             res = paper_desk.run(conn, rep)
             try:   # macro calendar (FOMC / CPI / NFP) → web/calendar.json
                 from .agents import macro_calendar

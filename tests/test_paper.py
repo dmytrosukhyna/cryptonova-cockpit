@@ -235,3 +235,19 @@ def test_lab_news_rule_trades_strong_fresh_news_once():
     desk = pd.PaperDesk(conn, "lab")
     w = [s for s in desk.signals(c, True, now) + desk.signals(e, True, now) if s["grade"] == "W"]
     assert len(w) == 1 and w[0]["symbol"] == "BTC" and w[0]["side"] == "SHORT" and w[0]["hold_h"] == 6
+
+
+def test_lab_nikkei_reversal_after_tokyo_close():
+    import datetime as _dt
+    conn = sqlite3.connect(":memory:")
+    now = int(_dt.datetime(2026, 10, 19, 7, 0, tzinfo=_dt.timezone.utc).timestamp() * 1000)
+    n = 300
+    t0 = now - n * 900_000
+    c = coin("BTC-USDT", [80000.0] * n, [], t0)
+    desk = pd.PaperDesk(conn, "lab"); desk._nikkei = {"chg": -2.1, "date": "2026-10-19"}
+    j = [s for s in desk.signals(c, True, now) if s["grade"] == "J"]
+    assert len(j) == 1 and j[0]["side"] == "LONG" and j[0]["hold_h"] == 24
+    desk._nikkei = {"chg": -2.1, "date": "2026-10-18"}                      # stale close → nothing
+    assert not [s for s in desk.signals(c, True, now) if s["grade"] == "J"]
+    desk._nikkei = {"chg": 0.9, "date": "2026-10-19"}                       # small move → nothing
+    assert not [s for s in desk.signals(c, True, now) if s["grade"] == "J"]

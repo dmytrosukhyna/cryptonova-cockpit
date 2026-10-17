@@ -16,6 +16,7 @@ State: data/agents.sqlite (paper_orders, paper_trades, paper_equity). Output: we
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import math
 import sqlite3
@@ -43,8 +44,8 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
              "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +75% в год, просадка до −29%, все годы в плюсе."},
     # 17.10: «Лаборатория» — aggressive range/level rules the owner asked to try live although history is ≈0 or negative
     # (docs/research/range.md). Limit entries only, filled only when price trades through. Separate $10 000, not mirrored.
-    "lab":  {"name": "Лаборатория · агрессивно", "classes": {"L", "W", "X", "Y"}, "confirm": False, "risk": 0.005, "max_open": 12, "tgt_r": 1.5, "riskoff": "shorts",
-             "caps": {"L": 7, "W": 4}, "max_notional": 0.10, "x_share": 0.05, "x_open": 4, "y_share": 0.15, "y_open": 3, "prefix": "paper_lab_",
+    "lab":  {"name": "Лаборатория · агрессивно", "classes": {"L", "W", "X", "Y", "J"}, "confirm": False, "risk": 0.005, "max_open": 12, "tgt_r": 1.5, "riskoff": "shorts",
+             "caps": {"L": 7, "W": 4}, "max_notional": 0.10, "x_share": 0.05, "x_open": 4, "y_share": 0.15, "y_open": 3, "j_share": 0.15, "j_open": 1, "prefix": "paper_lab_",
              "about": "Эксперименты вживую (на истории не доказаны): L — покупка у низа 14-дневного диапазона лимиткой (история +0.30% на сделку, 2025–26 в минусе), W — сделка по сильной новости, X — откуп паники на 36 ликвидных альткоинах (+4% в год вслепую), Y — откуп дисконта фьючерса на альткоинах (+12% в год вслепую, просадка −37%). 17.10 убраны N/Q — на истории они обнуляли счёт. Не больше 10% счёта на сделку."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
     "exp":  {"name": "Эксперимент · свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
@@ -54,10 +55,10 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
 RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций",
            "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса",
            "L": "покупка у низа диапазона", "N": "отскок от часовой поддержки", "Q": "шорт от часового сопротивления",
-           "W": "сделка по сильной новости", "X": "откуп паники на альткоине", "Y": "откуп дисконта на альткоине"}
+           "W": "сделка по сильной новости", "X": "откуп паники на альткоине", "Y": "откуп дисконта на альткоине", "J": "разворот после Никкей"}
 THROUGH = {"L", "N", "Q"}        # lab limits fill only when price trades through the level by ≥ 0.01 %
 HOLD_L_H, HOLD_N_H = 72, 24
-SHARE_RULES = {"E", "F", "S", "G", "D", "X", "Y"}   # sized as a share of equity, own position caps
+SHARE_RULES = {"E", "F", "S", "G", "D", "X", "Y", "J"}   # sized as a share of equity, own position caps
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
@@ -384,6 +385,18 @@ class PaperDesk:
                         "entry": entry, "stop": entry * (1 - D_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0], "order": "MARKET", "hold_h": HOLD_D_H,
                         "reason": f"Лаборатория: фьючерс альткоина на {bz_alt*100:.2f}% ниже спота (среднее за час). Выход через 24 ч, стоп −12%. "
                                   f"История на альтах: +12% в год вслепую, но просадка −37% и 2026 в минусе — эксперимент."})
+        # J (lab): Nikkei reversal — after the Tokyo close, trade BTC against a Nikkei day move of ±1.5 %, hold 24 h (docs/research/macro_factors.md:
+        # +0.76 % per trade 2023–26, every year positive, beats shifted calendars; but 2021–22 ≈ 0 → experiment)
+        nk = getattr(self, "_nikkei", None)
+        if base == "BTC" and "J" in self.P["classes"] and nk and abs(nk["chg"]) >= 1.5:
+            t = dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc)
+            if nk["date"] == t.strftime("%Y-%m-%d") and (6, 45) <= (t.hour, t.minute) < (12, 0):
+                side = "LONG" if nk["chg"] < 0 else "SHORT"; sg = 1 if side == "LONG" else -1; entry = c15[-1][4]
+                out.append({"id": f"J-BTC-{nk['date']}", "symbol": base, "side": side, "grade": "J", "kind": "NIKKEI_REVERSAL",
+                            "entry": entry, "stop": entry * (1 - sg * 0.20), "tps": [entry * (1 + sg * 0.5)] * 3, "parts": [1.0, 0.0, 0.0],
+                            "order": "MARKET", "hold_h": 24,
+                            "reason": f"Лаборатория: Никкей закрылся {nk['chg']:+.1f}% — на истории 2023–2026 биткоин в следующие сутки чаще шёл в обратную сторону "
+                                      f"(+0.76% на сделку, все годы в плюсе, но в 2021–22 эффекта не было). {'Покупка' if side == 'LONG' else 'Продажа'} на 24 ч, 15% счёта. Эксперимент."})
         # D: perpetual at a deep discount to its spot index (1-hour average, recorded by basis_watch)
         bz = coin.get("basis_1h")
         if bz is not None and bz <= D_BASIS and not coin.get("_alt"):
@@ -458,12 +471,12 @@ class PaperDesk:
                 if risk_off and s["grade"] == "R" and s["side"] == "SHORT":   # history: retest shorts inside a broad sell-off ≈ 0 (+0.013R, n=839) vs +0.155R in calm markets
                     events.append(f"пропуск шорта {base}: ретест внутри широкой распродажи на истории ≈ 0 — ждём спокойного рынка")
                     continue
-                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F", "G", "D")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
+                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F", "G", "D", "J")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
                     events.append(f"пропуск {'лонга' if s['side'] == 'LONG' else 'шорта'} {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
                     continue
                 if s["grade"] == "F" and sum(1 for t in self._open() if t["grade"] == "F") >= self.P.get("f_open", 3):
                     continue
-                if s["grade"] in ("S", "G", "D", "X", "Y") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
+                if s["grade"] in ("S", "G", "D", "X", "Y", "J") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
                     continue
                 if s["grade"] not in SHARE_RULES and sum(1 for t in self._open() if t["grade"] not in SHARE_RULES) + len(self._pending()) >= self.P["max_open"]:
                     continue
@@ -478,12 +491,12 @@ class PaperDesk:
                     notional = eq * self.P.get("f_share", 0.15)
                     qty = notional / s["entry"]
                     risk_usd = notional * F_STOP
-                elif s["grade"] in ("S", "G", "D", "X", "Y"):
+                elif s["grade"] in ("S", "G", "D", "X", "Y", "J"):
                     if s["grade"] == "X" and any(t["grade"] == "X" and now - t["opened"] < E_BASKET_H * 3_600_000 and t["opened"] != now for t in self._open()):
                         continue   # one alt panic basket per 10 h
                     notional = eq * self.P.get(s["grade"].lower() + "_share", 0.1)
                     qty = notional / s["entry"]
-                    risk_usd = notional * {"S": S_STOP, "G": G_STOP, "D": D_STOP, "X": E_STOP, "Y": D_STOP}[s["grade"]]
+                    risk_usd = notional * {"S": S_STOP, "G": G_STOP, "D": D_STOP, "X": E_STOP, "Y": D_STOP, "J": 0.20}[s["grade"]]
                 else:
                     risk_usd = eq * self.P["risk"]
                     r = abs(s["entry"] - s["stop"])
@@ -520,7 +533,7 @@ class PaperDesk:
                     filled = c
                     break
             if filled:
-                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H, "W": 48, "X": HOLD_E_H, "Y": HOLD_D_H}.get(o["grade"], HOLD_C_H)
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H, "W": 48, "X": HOLD_E_H, "Y": HOLD_D_H, "J": 24}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
@@ -631,7 +644,7 @@ class PaperDesk:
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
         by_grade = {}
-        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q", "W", "X", "Y"):
+        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q", "W", "X", "Y", "J"):
             ts = [t for t in closed if t["grade"] == g]
             if ts:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),
@@ -688,7 +701,17 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
             c["basis_1h"] = basis_watch.avg_1h(conn, b, now)
     except Exception:  # noqa: BLE001
         pass
-    snaps = {k: PaperDesk(conn, k).step(report["coins"], btc_bull, now) for k in PROFILES}
+    nikkei = None
+    try:
+        it = next(i for i in (report.get("macro") or {}).get("items", []) if i.get("key") == "NIKKEI")
+        if it.get("chg_1d") is not None and it.get("asof"):
+            nikkei = {"chg": float(it["chg_1d"]), "date": str(it["asof"])[:10]}
+    except Exception:  # noqa: BLE001
+        pass
+    snaps = {}
+    for k in PROFILES:
+        d = PaperDesk(conn, k); d._nikkei = nikkei
+        snaps[k] = d.step(report["coins"], btc_bull, now)
     out_scan = scan(report["coins"])
     out = dict(snaps[DEFAULT_PROFILE])
     out["profiles"] = {k: {kk: vv for kk, vv in v.items() if kk != "equity_history"} | {"equity_history": v["equity_history"][-300:]} for k, v in snaps.items()}

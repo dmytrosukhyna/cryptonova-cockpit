@@ -170,6 +170,26 @@ def universe(a):
         if d["instId"].endswith("-USDT-SWAP"): okx[d["instId"].split("-")[0]] = int(d.get("listTime") or 0)
     vs = vision_symbols()
     lim = a.min_month
+    if a.mode == "all2023":                     # survivorship check: every Binance perp listed by `lim`, delisted ones included
+        rk = {}
+        for r in sorted(rows, key=lambda r: r["rank"]): rk.setdefault(r["sym"], r["rank"])
+        cand = sorted(x for x in vs if x.endswith("USDT") and "_" not in x)
+        def chk(bs): return bs, http(f"{VISION}/monthly/klines/{bs}/15m/{bs}-15m-{lim}.zip", head=True)[0] == 200
+        with ThreadPoolExecutor(16) as ex:
+            listed = [bs for bs, ok in ex.map(chk, cand) if ok]
+        coins = []
+        for bs in listed:
+            base = bs[:-4]; m = re.match(r"^(1000000|1000|1M)([A-Z0-9]+)$", base); sym = m.group(2) if m else base
+            if sym in EXCL or base in ("BTCDOM", "DEFI", "FOOTBALL", "BLUEBIRD", "USDC", "BTCST") or sym in CORE18: continue
+            coins.append(dict(sym=sym, name="", id="", rank=rk.get(sym, 9999), mcap=0, price=0, okx=sym in okx, okx_list="", bsym=bs, bfirst=lim,
+                              use=True, why=""))
+        json.dump(dict(source=src + " (ranks only)", mode="all2023", made=dt.datetime.utcnow().isoformat(timespec="minutes"), min_month=lim,
+                       coins=coins), open(a.out, "w"), indent=1)
+        txt = (f"all Binance USDT-M perps with a {lim} archive (delisted included), minus core/stables/indices: {len(coins)}; "
+               f"in today's top-{a.top} ranking: {sum(c['rank'] < 9999 for c in coins)} || "
+               + " ".join(f"{c['sym']}#{c['rank'] if c['rank'] < 9999 else '-'}" for c in coins))
+        for k in range(0, len(txt), 3500): note(f"universe {k // 3500 + 1}", txt[k:k + 3500])
+        return
     def mapone(r):
         sym = r["sym"]; okx_list = okx.get(sym)
         cand = [f"{sym}USDT", f"1000{sym}USDT", f"1000000{sym}USDT", f"1M{sym}USDT"]
@@ -223,12 +243,13 @@ def kl_series(sym, kind, start_ms, end_ms):
             if t > 10 ** 14: t //= 1000                                               # µs timestamps in 2025+ spot files (safety)
             if start_ms <= t < end_ms: out[t] = (float(x[1]), float(x[2]), float(x[3]), float(x[4]), float(x[7]) if kind == "klines" else 0.0)
     missing = []
+    prev_month = (dt.date(today.year, today.month, 1) - dt.timedelta(days=1)).strftime("%Y-%m")
     for mo in months_between(dt.datetime.utcfromtimestamp(start_ms / 1000).strftime("%Y-%m"), cur_month):
         if mo < cur_month:
             s, b = http(f"{VISION}/monthly/{kind}/{sym}/15m/{sym}-15m-{mo}.zip", binary=True)
             if s == 200: add(read_zip_csv(b)); continue
-            missing.append(mo)                                                       # month not archived yet → daily files
-            if mo < "2024-01" and s == 404 and not out: continue                     # before listing
+            missing.append(mo)
+            if mo < prev_month: continue        # not listed yet / delisted; only the last month may lack its monthly archive
         d0 = dt.date(int(mo[:4]), int(mo[5:7]), 1)
         d = d0
         while d.strftime("%Y-%m") == mo and d < today:
@@ -320,6 +341,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(); sp = ap.add_subparsers(dest="cmd", required=True)
     sp.add_parser("probe")
     u = sp.add_parser("universe"); u.add_argument("--top", type=int, default=100); u.add_argument("--min-month", default="2024-01")
+    u.add_argument("--mode", default="cap", choices=["cap", "all2023"])
     u.add_argument("--out", default="universe.json")
     f = sp.add_parser("fetch"); f.add_argument("--universe", default="universe.json"); f.add_argument("--shard", type=int, default=0)
     f.add_argument("--nshards", type=int, default=1); f.add_argument("--out", default="shard.npz")

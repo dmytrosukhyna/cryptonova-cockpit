@@ -2,7 +2,7 @@ name: research-alt100
 # Manual only (no schedule, no self-dispatch). Top-100 altcoin research, docs/research/alt100.md:
 #   probe    — what the public sources give from CI (ranking APIs, Binance public archive, OKX index / OI history depth)
 #   data     — universe (CoinGecko top-100 → OKX swap + Binance perp history ≤ 2024-01) + 15m klines / index klines /
-#              5-min OI from data.binance.vision in 4 shards → artifact alt100 (7 days). Nothing is committed.
+#              5-min OI from data.binance.vision in 8 shards → artifact alt100 (7 days). Nothing is committed.
 #   all      — data, then analyze
 #   analyze  — scripts/alt100_test.py on the alt100 artifact of run `data_run_id`; results are published as the job
 #              summary + annotations (artifact downloads are not reachable from the research container).
@@ -25,6 +25,10 @@ on:
         description: "universe size: top-N non-stable coins by market cap (100 = the test; 200 = extra check on ranks 101–200)"
         required: false
         default: "100"
+      universe:
+        description: "cap = top-N by market cap with history ≤ 2024-01; all2023 = every Binance perp listed by 2023-01, delisted included (survivorship check)"
+        required: false
+        default: "cap"
 
 permissions:
   contents: read
@@ -51,7 +55,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install numpy
-      - run: python scripts/fetch_alt100.py universe --top ${{ inputs.top || '100' }} --min-month 2024-01 --out universe.json
+      - run: python scripts/fetch_alt100.py universe --top ${{ inputs.top || '100' }} --mode ${{ inputs.universe || 'cap' }} --min-month ${{ inputs.universe == 'all2023' && '2023-01' || '2024-01' }} --out universe.json
       - uses: actions/upload-artifact@v4
         with: { name: universe, path: universe.json, retention-days: 7 }
 
@@ -61,7 +65,7 @@ jobs:
     timeout-minutes: 240
     strategy:
       fail-fast: false
-      matrix: { shard: [0, 1, 2, 3] }
+      matrix: { shard: [0, 1, 2, 3, 4, 5, 6, 7] }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -69,7 +73,7 @@ jobs:
       - run: pip install numpy
       - uses: actions/download-artifact@v4
         with: { name: universe }
-      - run: python scripts/fetch_alt100.py fetch --universe universe.json --shard ${{ matrix.shard }} --nshards 4 --out shard_${{ matrix.shard }}.npz
+      - run: python scripts/fetch_alt100.py fetch --universe universe.json --shard ${{ matrix.shard }} --nshards 8 --out shard_${{ matrix.shard }}.npz
       - uses: actions/upload-artifact@v4
         with: { name: "shard_${{ matrix.shard }}", path: "shard_${{ matrix.shard }}.npz", retention-days: 2 }
 

@@ -14,6 +14,7 @@
   python -m cnq.cli fx-gaps [--send]          Monday weekend-gap signals for FX (Twelve Data key) → Telegram
   python -m cnq.cli agents [--send]           run departments (news/fundamentals/risk/editor) → web/decision.json (+post to Telegram)
   python -m cnq.cli funding [--out web]       paper funding-carry account (spot long + perp short) → web/funding.json
+  python -m cnq.cli arb [--out web]           cross-exchange spot spreads net of fees, sampled each run → web/arb.json
 """
 from __future__ import annotations
 
@@ -30,7 +31,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -170,6 +171,16 @@ def main(argv: list[str] | None = None) -> int:
         d = funding_desk.run(conn)
         write_report(d, os.path.join(args.out, "funding.json"))
         print(f"funding.json: venue={d['venue']} ok={d['venues_ok']} equity={d['equity']} positions={[p['symbol'] for p in d['positions']]} events={[e['text'] for e in d['events'][:3]]}")
+    elif args.cmd == "arb":
+        import os, sqlite3
+        from .agents import arb_watch
+        from .terminal.report import write_report
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/agents.sqlite")
+        os.makedirs(args.out, exist_ok=True)
+        d = arb_watch.run(conn)
+        write_report(d, os.path.join(args.out, "arb.json"))
+        print(f"arb.json: venues={d['venues_ok']} day={d['day']} best_now={d['now'][:1]}")
     elif args.cmd == "channel":
         import os, sqlite3
         from .agents.channel import Channel, kyiv_now

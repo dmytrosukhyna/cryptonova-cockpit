@@ -56,6 +56,9 @@ jobs:
       - name: Funding carry → web/funding.json
         continue-on-error: true
         run: python -m cnq.cli funding --out web || true
+      - name: Arbitrage watch → web/arb.json
+        continue-on-error: true
+        run: python -m cnq.cli arb --out web || true
       - name: Coin research (анкета, топ-100, страх/жадность, капитализация) → web/markets.json, web/research.json
         continue-on-error: true
         run: python -m cnq.cli research --out web
@@ -124,7 +127,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/funding.json web/weekly.json web/calibration.json web/markets.json web/research.json web/whales.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/funding.json web/arb.json web/weekly.json web/calibration.json web/markets.json web/research.json web/whales.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase -X theirs origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done

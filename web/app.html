@@ -298,7 +298,7 @@ body:not(.tab-overview) #ovAcc{display:none}.ovgrid{display:grid;grid-template-c
 .card.zoomed{position:fixed!important;inset:4vh 4vw;z-index:80;overflow:auto;max-height:none!important;display:flex!important;flex-direction:column;box-shadow:0 0 0 100vmax rgba(3,6,12,.78),0 0 0 1px rgba(124,196,255,.35)}.card.zoomed canvas{flex:1;width:100%!important;height:auto!important;min-height:60vh}
 body.zooming main,body.zooming .col{z-index:auto!important;filter:none!important;backdrop-filter:none!important;transform:none!important}
 .kpi .k{text-align:center;justify-items:center;align-content:center}.kpi .k>*{margin-left:auto;margin-right:auto}
-.efig{display:block;width:100%;height:380px;margin:4px 0 6px}@media (max-width:640px){.efig{height:260px}}.evst{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.evs{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}.evs.ok{color:var(--up);border-color:rgba(111,207,151,.5)}.evs.off::after{content:' · нет связи'}.evs.off{color:var(--dn)}.enote{font-size:12px;margin:4px 0 8px;line-height:1.5}
+.efig{display:block;width:100%;height:380px;margin:4px 0 6px}@media (max-width:640px){.efig{height:260px}}.esrv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:6px 0}.esrv>div{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);font-size:12px}.esrv small{display:block;color:var(--muted);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}@media (max-width:760px){.esrv{grid-template-columns:1fr}}.evst{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.evs{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}.evs.ok{color:var(--up);border-color:rgba(111,207,151,.5)}.evs.off::after{content:' · нет связи'}.evs.off{color:var(--dn)}.enote{font-size:12px;margin:4px 0 8px;line-height:1.5}
 @media (max-width:640px){.erow{grid-template-columns:52px minmax(0,1fr) 64px;font-size:12px}.erow:not(.tri)>span:nth-child(3){display:none}.erow.tri{grid-template-columns:minmax(0,1fr) 70px}}
 </style>
 </head>
@@ -1500,7 +1500,7 @@ function earnTriangles(){ const b=EARN.books.binance; if(!b) return []; const ou
       if(r1>r2) out.push({path:`USDT → ${base} → ${c} → USDT`,r:r1}); else out.push({path:`USDT → ${c} → ${base} → USDT`,r:r2}); } }
   return out.sort((a,b)=>b.r-a.r).slice(0,8); }
 const pctS=(x,d=2)=>(x>=0?'+':'−')+Math.abs(x*100).toFixed(d)+'%';
-async function earnLoadFunding(){ if(Date.now()-EARN.fundAt<5*60000&&EARN.fund) return; try{ EARN.fund=await (await fetch('./funding.json',{cache:'no-store'})).json(); EARN.fundAt=Date.now(); }catch(e){ EARN.fund=null; } }
+async function earnLoadFunding(){ if(Date.now()-EARN.fundAt<5*60000&&EARN.fund) return; try{ EARN.fund=await (await fetch('./funding.json',{cache:'no-store'})).json(); EARN.fundAt=Date.now(); }catch(e){ EARN.fund=null; } try{ EARN.srv=await (await fetch('./arb.json',{cache:'no-store'})).json(); }catch(e){ EARN.srv=null; } }
 /* ---- «Заработок»: big animated figures (canvas 2D, pseudo-3D) + virtual arbitrage account (this browser only) */
 const EFIG={raf:0,t0:performance.now(),sp:[],tri:[],pulses:[]};
 function efitCanvas(c){ const r=c.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1); const w=Math.max(10,Math.round(r.width*d)), h=Math.max(10,Math.round(r.height*d)); if(c.width!==w||c.height!==h){ c.width=w; c.height=h; } const x=c.getContext('2d'); x.setTransform(d,0,0,d,0,0); return [x,r.width,r.height]; }
@@ -1569,7 +1569,7 @@ function varbTick(sp,tri){ const v=varbLoad(), now=Date.now();
   varbSave(v); return v; }
 function earnSkeleton(el){ el.innerHTML=`
   <div class="card"><h2>${ico('scale')} Арбитраж между биржами <span class="r muted" id="eArbMeta"></span></h2><canvas id="efSphere" class="efig"></canvas>
-    <div class="muted enote">Ищем монету, которая на одной бирже дешевле, чем на другой. «Чистыми» — уже после комиссий обеих бирж. Чтобы забрать разницу, деньги должны заранее лежать на обеих биржах: перевод монеты занимает минуты, разница обычно исчезает за секунды.</div><div id="eArb"></div></div>
+    <div id="eSrv"></div><div class="muted enote">Ищем монету, которая на одной бирже дешевле, чем на другой. «Чистыми» — уже после комиссий обеих бирж. Чтобы забрать разницу, деньги должны заранее лежать на обеих биржах: перевод монеты занимает минуты, разница обычно исчезает за секунды.</div><div id="eArb"></div></div>
   <div class="card"><h2>${ico('trend')} Треугольник на Binance <span class="r muted">3 обмена подряд, комиссия 0.1% × 3</span></h2><canvas id="efTri" class="efig"></canvas>
     <div class="muted enote">Меняем USDT на одну монету, её на другую и обратно в USDT. Если цены трёх пар не сошлись — остаётся прибыль. Обычно такие окна живут доли секунды.</div><div id="eTri"></div></div>
   <div class="card"><h2>${ico('robot')} Виртуальный счёт арбитража <span class="r muted">$10 000 · считается, пока открыта эта вкладка</span></h2><div id="eVarb"></div></div>
@@ -1583,6 +1583,8 @@ function earnRender(){ const el=$('#earn'); if(!el) return; if(!$('#efSphere')) 
   $('#eArbMeta').textContent=`обновление каждые 10 с · проверок ${EARN.scans} · с плюсом после комиссий ${EARN.hits}`;
   $('#eArb').innerHTML=`<div class="evst">${st}</div><div class="erow head"><b>Монета</b><span>где купить → где продать</span><span>разница</span><span>чистыми</span></div>${sp.slice(0,12).map(row).join('')||'<div class="muted">загрузка цен…</div>'}
     ${EARN.best?`<div class="muted enote">Лучшее за сессию: ${EARN.best.c} ${EARN.best.A.v.n} → ${EARN.best.B.v.n} ${pctS(EARN.best.net)} чистыми (${fmtT(EARN.best.t)}).</div>`:''}`;
+  { const A=EARN.srv; const st=x=>x&&x.samples?`${x.samples} проверок · окно с плюсом было в ${Math.round((x.share||0)*100)}% · окон ${x.windows} · виртуально <b class="${x.virtual_pnl_usd>0?'pos':''}">+$${x.virtual_pnl_usd.toFixed(2)}</b>`:'данные копятся';
+    $('#eSrv').innerHTML=A?`<div class="esrv"><div><small>Сервер 24/7 · за сутки</small><span>${st(A.day)}</span></div><div><small>за неделю</small><span>${st(A.week)}</span></div><div><small>биржи, доступные серверу</small><span>${(A.venues_ok||[]).join(', ')||'—'}</span></div></div>`:''; }
   $('#eTri').innerHTML=tri.map(t=>`<div class="erow tri ${t.r>0?'pos':''}"><span>${t.path}</span><span class="num ${t.r>0?'pos':'neg'}">${pctS(t.r,3)}</span></div>`).join('')||`<div class="muted">${EARN.status.binance==='off'?'Binance не отвечает из этого браузера.':'загрузка…'}</div>`;
   const V=varbTick(sp,tri), pnl=V.eq-10000;
   $('#eVarb').innerHTML=`<div class="fk" style="grid-template-columns:repeat(3,1fr)"><div><small>Баланс</small><b>$${V.eq.toLocaleString('ru-RU',{maximumFractionDigits:2})}</b></div><div><small>Результат</small><b class="${pnl>=0?'pos':'neg'}">${pnl>=0?'+':'−'}$${Math.abs(pnl).toFixed(2)}</b></div><div><small>Исполнено окон</small><b>${V.n}</b></div></div>

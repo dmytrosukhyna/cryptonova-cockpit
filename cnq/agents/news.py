@@ -97,6 +97,14 @@ class NewsCollector:
                     if not it["title"]:
                         it["title"] = "Трамп: " + it["summary"][:120]
             new += self.store(items)
+        try:   # X posts of market-moving accounts — only when the owner adds an X API token (secret CNQ_X_BEARER)
+            from cnq.agents import x_watch
+            xs = x_watch.fetch(self.conn)
+            for it in xs:
+                it["assets_hint"] = _assets_hint(it["summary"])
+            new += self.store(xs)
+        except Exception:  # noqa: BLE001
+            pass
         return new
 
     def store(self, items: list[dict]) -> list[dict]:

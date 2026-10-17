@@ -49,6 +49,7 @@ jobs:
           CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
           CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
+          CNQ_X_BEARER: ${{ secrets.CNQ_X_BEARER }}
         run: python -m cnq.cli agents --out web
       - name: Paper desk ($10k demo futures account) → web/paper.json
         continue-on-error: true

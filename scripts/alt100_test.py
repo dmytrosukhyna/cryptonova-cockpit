@@ -744,7 +744,19 @@ if "labx" in SECT:
     acc(f"E basket only on {PGN} (breadth on core)", on(MK["E"], PG), ("E",))
     acc(f"B −2.5σ on core + {PGN}, risk 0.5 % ×8", on(MK["B25"], core + PG), ("B",), risk=0.005, max_open=8)
     acc(f"F 8 h on core + {PGN}, 15 % ×3", [dict(c, rule="F") for c in on(MK["F8h"], core + PG)], ("F",), f_share=0.15)
+    acc(f"E basket 10 % only on {PGN}", on(MK["E"], PG), ("E",), e_share=0.10)
+    acc(f"lab mix: E basket 20 % on {PGN} + D −25 bp 15 % ×3 on {PGN} IS-pass", on(MK["E"], PG) + [dict(c, rule="D") for c in on(MK["D25"], pd25)],
+        ("E", "D"))
+    acc(f"lab mix + core: E 0.3 on core, E on {PGN} in the same basket, D −25 bp on alts (d)",
+        [c for c in base if c["rule"] != "E"] + on(MK["E30"], core) + on(MK["E"], PG) + relabel(on(MK["D25"], pd25), "d"), R4 + ("d",), extra=EX)
     P()
+
+if "volrank" in SECT:                       # forward-looking coin list: what a trader sees today (no backtest claim)
+    last = times[-1] - 365 * 86400_000; m = times >= last
+    v365 = np.nansum(V[:, m], 1) / max(1, m.sum() / 96)
+    rk = sorted([k for k in alts + alts2], key=lambda k: -v365[k])
+    P("## Alts ranked by Binance futures volume over the last 365 days (daily average, $ million)\n")
+    P(" ".join(f"{syms[k]} {v365[k] / 1e6:.0f}" for k in rk) + "\n")
 
 P(f"_run time {time.time() - t0:.0f} s_")
 if MD: open(MD, "w").write("\n".join(OUT) + "\n")

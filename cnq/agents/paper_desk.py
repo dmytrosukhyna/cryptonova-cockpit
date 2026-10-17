@@ -12,7 +12,8 @@ Risk 1 % of equity per trade, fees 0.05 % per side + 0.02 % slippage. Long alts 
 Stop-first rule inside a bar (if both stop and target are inside one candle, the stop counts). Deterministic; no look-ahead:
 only candles that closed after the signal are used.
 
-State: data/agents.sqlite (paper_orders, paper_trades, paper_equity). Output: web/paper.json for the panel.
+State: data/agents.sqlite (paper_orders, paper_trades, paper_equity; one-time resets: migrations + paper_archive, see reset_desks).
+Output: web/paper.json for the panel (per desk `since` and, after a reset, `reset` = {time, archived_pnl_usd, note_ru}).
 """
 from __future__ import annotations
 
@@ -42,9 +43,9 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
     "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F", "D"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
              "e_share": 0.30, "f_share": 0.30, "f_open": 3, "d_share": 0.20, "d_open": 3, "prefix": "paper_",
              "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +75% в год, просадка до −29%, все годы в плюсе."},
-    # 17.10: «Лаборатория» — aggressive range/level rules the owner asked to try live although history is ≈0 or negative
+    # 17.10: «Тест новых идей» (key `lab`, formerly «Лаборатория») — aggressive range/level rules the owner asked to try live although history is ≈0 or negative
     # (docs/research/range.md). Limit entries only, filled only when price trades through. Separate $10 000, not mirrored.
-    "lab":  {"name": "Лаборатория · агрессивно", "classes": {"L", "W", "X", "Y", "J"}, "confirm": False, "risk": 0.005, "max_open": 12, "tgt_r": 1.5, "riskoff": "shorts",
+    "lab":  {"name": "Тест новых идей", "classes": {"L", "W", "X", "Y", "J"}, "confirm": False, "risk": 0.005, "max_open": 12, "tgt_r": 1.5, "riskoff": "shorts",
              "caps": {"L": 7, "W": 4}, "max_notional": 0.10, "x_share": 0.05, "x_open": 4, "y_share": 0.15, "y_open": 3, "j_share": 0.15, "j_open": 1, "prefix": "paper_lab_",
              "about": "Эксперименты вживую (на истории не доказаны): L — покупка у низа 14-дневного диапазона лимиткой (история +0.30% на сделку, 2025–26 в минусе), W — сделка по сильной новости, X — откуп паники на 36 ликвидных альткоинах (+4% в год вслепую), Y — откуп дисконта фьючерса на альткоинах (+12% в год вслепую, просадка −37%). 17.10 убраны N/Q — на истории они обнуляли счёт. Не больше 10% счёта на сделку."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
@@ -227,6 +228,25 @@ class PaperDesk:
         keys = ("id", "symbol", "side", "grade", "kind", "entry", "stop", "tps", "parts", "qty", "risk_usd", "created", "expires", "status", "reason")
         return [dict(zip(keys, r)) for r in self.conn.execute(f"SELECT * FROM {self.T_ORD} WHERE status='PENDING'").fetchall()]
 
+    def _archives(self) -> list[dict]:
+        """This desk's archived states (one-time resets, see reset_desks), oldest first."""
+        try:
+            rows = self.conn.execute("SELECT json FROM paper_archive WHERE profile=? ORDER BY time", (self.profile,)).fetchall()
+        except sqlite3.OperationalError:
+            return []
+        return [json.loads(r[0]) for r in rows]
+
+    def reset_info(self) -> dict | None:
+        a = self._archives()
+        return a[-1].get("reset") if a else None
+
+    def _archived_ids(self) -> set:
+        """Signal ids already traded before a reset — never re-opened (the ids are deterministic per bar/hour/day)."""
+        out = set()
+        for a in self._archives():
+            out |= {t["id"] for t in a.get("trades", [])} | {o["id"] for o in a.get("orders", [])}
+        return out
+
     # ------------------------------------------------------------------ signals (same rules as the panel)
     def signals(self, coin: dict, btc_bull: bool, now: int) -> list[dict]:
         c15 = coin["candles"]
@@ -329,7 +349,7 @@ class PaperDesk:
                     out.append({"id": f"L-{base}-{slot}", "symbol": base, "side": "LONG", "grade": "L", "kind": "RANGE_LOW_LIMIT",
                                 "entry": ent, "stop": lo - 0.25 * wdt, "tps": [lo + 0.80 * wdt] * 3, "parts": [1.0, 0.0, 0.0], "order": "LIMIT",
                                 "hold_h": HOLD_L_H, "ttl_h": 1,
-                                "reason": f"Лаборатория: диапазон 14 дней {lo:.6g}–{hi:.6g}. Лимитка на 30% от низа ({ent:.6g}), цель — 80% диапазона, стоп под низом. Эксперимент."})
+                                "reason": f"Тест новых идей: диапазон 14 дней {lo:.6g}–{hi:.6g}. Лимитка на 30% от низа ({ent:.6g}), цель — 80% диапазона, стоп под низом. Эксперимент."})
             if ("N" in self.P["classes"] or "Q" in self.P["classes"]) and len(h1) >= 60:
                 trs = [max(h1[i][2] - h1[i][3], abs(h1[i][2] - h1[i - 1][4]), abs(h1[i][3] - h1[i - 1][4])) for i in range(len(h1) - 14, len(h1))]
                 atr1 = sum(trs) / len(trs)
@@ -340,13 +360,13 @@ class PaperDesk:
                     tg = min(up) if up else lv + 1.5 * (lv - st)
                     out.append({"id": f"N-{base}-{slot}", "symbol": base, "side": "LONG", "grade": "N", "kind": "H1_SUPPORT_LIMIT",
                                 "entry": lv, "stop": st, "tps": [tg] * 3, "parts": [1.0, 0.0, 0.0], "order": "LIMIT", "hold_h": HOLD_N_H, "ttl_h": 1,
-                                "reason": f"Лаборатория: часовая поддержка {lv:.6g} (локальный минимум). Лимитка на уровне, стоп {st:.6g}, цель {tg:.6g}. Эксперимент: на истории ≈ −0.1% на сделку."})
+                                "reason": f"Тест новых идей: часовая поддержка {lv:.6g} (локальный минимум). Лимитка на уровне, стоп {st:.6g}, цель {tg:.6g}. Эксперимент: на истории ≈ −0.1% на сделку."})
                 if "Q" in self.P["classes"] and highs and atr1 > 0:
                     lv = min(highs); st = lv + 0.6 * atr1; dn = [x for x in fractals(h1, "low") if x < price]
                     tg = max(dn) if dn else lv - 1.5 * (st - lv)
                     out.append({"id": f"Q-{base}-{slot}", "symbol": base, "side": "SHORT", "grade": "Q", "kind": "H1_RESIST_LIMIT",
                                 "entry": lv, "stop": st, "tps": [tg] * 3, "parts": [1.0, 0.0, 0.0], "order": "LIMIT", "hold_h": HOLD_N_H, "ttl_h": 1,
-                                "reason": f"Лаборатория: часовое сопротивление {lv:.6g} (локальный максимум). Лимитка на продажу, стоп {st:.6g}, цель {tg:.6g}. Эксперимент: шорты на истории слабые."})
+                                "reason": f"Тест новых идей: часовое сопротивление {lv:.6g} (локальный максимум). Лимитка на продажу, стоп {st:.6g}, цель {tg:.6g}. Эксперимент: шорты на истории слабые."})
         # W (lab): strong fresh news about this coin (or the whole market → BTC), rated by the news analyst 4–5/5, confidence ≥ 0.6
         if "W" in self.P["classes"]:
             try:
@@ -363,7 +383,7 @@ class PaperDesk:
                 out.append({"id": f"W-{base}-{nid}", "symbol": base, "side": side, "grade": "W", "kind": "NEWS",
                             "entry": entry, "stop": entry * (1 - sg * 0.03), "tps": [entry * (1 + sg * 0.06)] * 3, "parts": [1.0, 0.0, 0.0],
                             "order": "MARKET", "hold_h": hold,
-                            "reason": f"Лаборатория: сильная новость ({mag}/5, уверенность {conf:.0%}){': ' + title if title else ''}. "
+                            "reason": f"Тест новых идей: сильная новость ({mag}/5, уверенность {conf:.0%}){': ' + title if title else ''}. "
                                       f"{'Покупка' if side == 'LONG' else 'Продажа'} по рынку, стоп −3%, цель +6%, выход через {hold} ч. Эксперимент без истории."})
                 break
         # X / Y (lab, alt coins only — docs/research/alt100.md, aggressive and unproven): panic candle in a broad sell-off of the core
@@ -376,14 +396,14 @@ class PaperDesk:
                 entry = c15[-1][1]
                 out.append({"id": f"X-{base}-{last[0]}", "symbol": base, "side": "LONG", "grade": "X", "kind": "ALT_PANIC",
                             "entry": entry, "stop": entry * (1 - E_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0], "order": "MARKET", "hold_h": HOLD_E_H,
-                            "reason": f"Лаборатория: откуп паники на альткоине — свеча {ret_oc*100:.1f}% на объёме {last[5]/vavg:.1f}×, пока падает {getattr(self, '_stress', 0)*100:.0f}% крупных монет. "
+                            "reason": f"Тест новых идей: откуп паники на альткоине — свеча {ret_oc*100:.1f}% на объёме {last[5]/vavg:.1f}×, пока падает {getattr(self, '_stress', 0)*100:.0f}% крупных монет. "
                                       f"Выход через 24 ч, стоп −12%. История на альтах без подглядывания: +4% в год, 2026 в минусе — эксперимент."})
         bz_alt = coin.get("basis_1h")
         if coin.get("_alt") and "Y" in self.P["classes"] and bz_alt is not None and bz_alt <= -0.0025:
             entry = c15[-1][4]
             out.append({"id": f"Y-{base}-{now // 86_400_000}", "symbol": base, "side": "LONG", "grade": "Y", "kind": "ALT_BASIS",
                         "entry": entry, "stop": entry * (1 - D_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0], "order": "MARKET", "hold_h": HOLD_D_H,
-                        "reason": f"Лаборатория: фьючерс альткоина на {bz_alt*100:.2f}% ниже спота (среднее за час). Выход через 24 ч, стоп −12%. "
+                        "reason": f"Тест новых идей: фьючерс альткоина на {bz_alt*100:.2f}% ниже спота (среднее за час). Выход через 24 ч, стоп −12%. "
                                   f"История на альтах: +12% в год вслепую, но просадка −37% и 2026 в минусе — эксперимент."})
         # J (lab): Nikkei reversal — after the Tokyo close, trade BTC against a Nikkei day move of ±1.5 %, hold 24 h (docs/research/macro_factors.md:
         # +0.76 % per trade 2023–26, every year positive, beats shifted calendars; but 2021–22 ≈ 0 → experiment)
@@ -395,7 +415,7 @@ class PaperDesk:
                 out.append({"id": f"J-BTC-{nk['date']}", "symbol": base, "side": side, "grade": "J", "kind": "NIKKEI_REVERSAL",
                             "entry": entry, "stop": entry * (1 - sg * 0.20), "tps": [entry * (1 + sg * 0.5)] * 3, "parts": [1.0, 0.0, 0.0],
                             "order": "MARKET", "hold_h": 24,
-                            "reason": f"Лаборатория: Никкей закрылся {nk['chg']:+.1f}% — на истории 2023–2026 биткоин в следующие сутки чаще шёл в обратную сторону "
+                            "reason": f"Тест новых идей: Никкей закрылся {nk['chg']:+.1f}% — на истории 2023–2026 биткоин в следующие сутки чаще шёл в обратную сторону "
                                       f"(+0.76% на сделку, все годы в плюсе, но в 2021–22 эффекта не было). {'Покупка' if side == 'LONG' else 'Продажа'} на 24 ч, 15% счёта. Эксперимент."})
         # D: perpetual at a deep discount to its spot index (1-hour average, recorded by basis_watch)
         bz = coin.get("basis_1h")
@@ -460,7 +480,7 @@ class PaperDesk:
         e_recent = [t for t in self._open() if t["grade"] == "E" and now - t["opened"] < E_BASKET_H * 3_600_000]
         e_blocked = bool(e_recent) and any(t["opened"] != now for t in e_recent)
         # 1. new signals → orders / market fills
-        known = {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_ORD}")} | {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_TR}")}
+        known = {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_ORD}")} | {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_TR}")} | self._archived_ids()
         open_syms = {t["symbol"] for t in self._open()} | {o["symbol"] for o in self._pending()}
         for base, coin in by_sym.items():
             for s in self.signals(coin, btc_bull, now):
@@ -650,7 +670,9 @@ class PaperDesk:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),
                                "usd": round(sum(t["net_usd"] for t in ts), 2)}
         eq = self.equity()
-        return {"asof": now, "profile": self.profile, "name": self.P["name"], "about": self.P["about"], "start_equity": START_EQUITY, "risk_off": self.stress(list(by_sym.values())) >= 0.7, "stress": round(self.stress(list(by_sym.values())), 3), "equity": eq, "pnl_usd": round(eq - START_EQUITY, 2), "pnl_pct": round((eq / START_EQUITY - 1) * 100, 2),
+        reset = self.reset_info()
+        return {"asof": now, "profile": self.profile, "name": self.P["name"], "about": self.P["about"], "start_equity": START_EQUITY,
+                "since": reset["time"] if reset else (eqh[0]["time"] if eqh else now), "reset": reset, "risk_off":self.stress(list(by_sym.values())) >= 0.7, "stress": round(self.stress(list(by_sym.values())), 3), "equity": eq, "pnl_usd": round(eq - START_EQUITY, 2), "pnl_pct": round((eq / START_EQUITY - 1) * 100, 2),
                 "open_pnl_usd": round(sum(o["open_pnl_usd"] for o in opens), 2), "open": opens, "pending": self._pending(), "closed": closed[:50],
                 "stats": {"trades": n, "winrate": round(len(wins) / n, 3) if n else None, "avg_r": round(sum(t["pnl_r"] for t in closed) / n, 3) if n else None,
                           "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0), "max_dd_pct": round(dd * 100, 2),
@@ -677,12 +699,156 @@ def scan(coins: list[dict]) -> dict:
             "e_need_drop": E_DROP, "rows": rows}
 
 
+# ── one-time reset (owner, 17.10.2026): «Фьючерсы, автопилот, норма — результат обнули: эти три шорта портят всю картину».
+# The three main autopilot desks restart from $10 000 together; their whole past state is archived in `paper_archive`
+# (one row per desk, id "<migration>:<profile>"), the migration id goes to `migrations`, so it runs exactly once per database.
+# Lab / experiment desks are not touched.
+RESET_ID = "reset-2026-10-17"
+RESET_PROFILES = ("cons", "bal", "aggr")
+RESET_DAY_RU = "17.10"
+RESET_UNTIL = 1_793_491_200_000          # 2026-11-01 UTC: a database that meets this migration later is not wiped (marked «skipped»)
+RULE_OFF_RU = {"R": "выключено 16.10"}
+
+
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    n = abs(n)
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    return few if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else many
+
+
+def _usd_ru(x: float) -> str:
+    v = round(x)
+    return ("−" if v < 0 else "+" if v > 0 else "") + f"${abs(v):,}".replace(",", " ")
+
+
+def reset_note(trades: list[dict], pnl: float, classes: set) -> str:
+    """«Счёт обнулён 17.10 по решению владельца: прошлые 3 сделки (3 шорта по правилу «ретест уровня», выключено 16.10) — в архиве, итог −$299»."""
+    if not trades:
+        return f"Счёт обнулён {RESET_DAY_RU} по решению владельца вместе с остальными автопилотами: сделок не было, итог $0 — старт с $10 000"
+    groups = {}
+    for t in trades:
+        groups.setdefault(t["grade"], []).append(t)
+    parts = []
+    for g, ts in sorted(groups.items(), key=lambda kv: (kv[0] not in RULE_OFF_RU, -len(kv[1]), kv[0])):
+        n, longs = len(ts), sum(1 for t in ts if t["side"] == "LONG")
+        rule = f"по правилу «{RULE_RU.get(g, g)}»"
+        if longs == n:
+            s = f"{n} {_plural(n, 'лонг', 'лонга', 'лонгов')} {rule}"
+        elif longs == 0:
+            s = f"{n} {_plural(n, 'шорт', 'шорта', 'шортов')} {rule}"
+        else:
+            s = f"{longs} {_plural(longs, 'лонг', 'лонга', 'лонгов')} и {n - longs} {_plural(n - longs, 'шорт', 'шорта', 'шортов')} {rule}"
+        if g in RULE_OFF_RU:
+            s += f", {RULE_OFF_RU[g]}"
+        elif g not in classes:
+            s += ", сейчас не торгуется"
+        parts.append(s)
+    n = len(trades)
+    return (f"Счёт обнулён {RESET_DAY_RU} по решению владельца: {_plural(n, 'прошлая', 'прошлые', 'прошлые')} {n} "
+            f"{_plural(n, 'сделка', 'сделки', 'сделок')} ({'; '.join(parts)}) — в архиве, итог {_usd_ru(pnl)}")
+
+
+def reset_desks(conn: sqlite3.Connection, now: int, prices: dict | None = None, mig_id: str = RESET_ID,
+                profiles=RESET_PROFILES, until: int = RESET_UNTIL) -> dict:
+    """Idempotent one-time reset → {profile: reset_info} for the desks reset by THIS call ({} when already applied).
+    Open positions (none on 17.10) are closed at the last price (`prices` {BASE: px}, else at entry) into the archive,
+    pending limits are cancelled; then trades/orders/equity are emptied and the curve restarts at $10 000 at `now`.
+    A desk with no history at all (fresh database) is not «reset» — the migration is only marked as applied."""
+    conn.execute("CREATE TABLE IF NOT EXISTS migrations(id TEXT PRIMARY KEY, time INTEGER, note TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS paper_archive(id TEXT PRIMARY KEY, profile TEXT, time INTEGER, json TEXT)")
+    conn.commit()
+    if conn.execute("SELECT 1 FROM migrations WHERE id=?", (mig_id,)).fetchone():
+        return {}
+    if now > until:
+        conn.execute("INSERT INTO migrations VALUES(?,?,?)", (mig_id, now, "skipped: too late"))
+        conn.commit()
+        return {}
+    desks = {k: PaperDesk(conn, k) for k in profiles}
+    for d in desks.values():
+        try:
+            conn.execute(f"ALTER TABLE {d.T_EQ} ADD COLUMN mtm REAL")
+        except sqlite3.OperationalError:
+            pass
+    prices = prices or {}
+    tkeys = ("id", "symbol", "side", "grade", "kind", "entry", "stop", "stop_now", "tps", "parts", "qty", "qty_left", "risk_usd", "opened",
+             "expires", "closed", "exit_kind", "pnl_usd", "pnl_r", "tps_hit", "reason", "last_bar")
+    okeys = ("id", "symbol", "side", "grade", "kind", "entry", "stop", "tps", "parts", "qty", "risk_usd", "created", "expires", "status", "reason")
+    done: dict = {}
+    try:
+        for k, d in desks.items():
+            n_hist = sum(conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in (d.T_TR, d.T_ORD, d.T_EQ))
+            if not n_hist:
+                continue
+            equity_before = d.equity()
+            closed_at_reset = []
+            for t in d._open():                      # none on 17.10; if any — closed at the last price, not silently dropped
+                sgn = 1 if t["side"] == "LONG" else -1
+                last = prices.get(t["symbol"]) or t["entry"]
+                px = last * (1 - sgn * SLIP)
+                pnl = t["pnl_usd"] + sgn * (px - t["entry"]) * t["qty_left"] - px * t["qty_left"] * FEE
+                pnl_r = (pnl - t["entry"] * t["qty"] * FEE) / t["risk_usd"] if t["risk_usd"] else 0.0
+                conn.execute(f"UPDATE {d.T_TR} SET qty_left=0, pnl_usd=?, pnl_r=?, closed=?, exit_kind='RESET' WHERE id=?", (pnl, pnl_r, now, t["id"]))
+                closed_at_reset.append({"id": t["id"], "symbol": t["symbol"], "side": t["side"], "price": last, "priced": t["symbol"] in prices})
+            cancelled = [o["id"] for o in d._pending()]
+            conn.execute(f"UPDATE {d.T_ORD} SET status='CANCELLED' WHERE status='PENDING'")
+            trades = [dict(zip(tkeys, r)) for r in conn.execute(f"SELECT * FROM {d.T_TR} ORDER BY opened").fetchall()]
+            net = {t["id"]: (t["pnl_usd"] or 0) - (t["entry"] or 0) * (t["qty"] or 0) * FEE for t in trades}
+            for t in trades:
+                t["net_usd"] = round(net[t["id"]], 2)
+            orders = [dict(zip(okeys, r)) for r in conn.execute(f"SELECT * FROM {d.T_ORD} ORDER BY created").fetchall()]
+            eqh = [{"time": a, "equity": b, "mtm": m} for a, b, m in conn.execute(f"SELECT time, equity, mtm FROM {d.T_EQ} ORDER BY time").fetchall()]
+            closed = [t for t in trades if t["closed"] is not None]
+            pnl = round(float(sum(net[t["id"]] for t in closed)), 2)       # = equity − $10 000, same formula as step()
+            by_grade = {}
+            for t in closed:
+                g = by_grade.setdefault(t["grade"], {"n": 0, "usd": 0.0, "sum_r": 0.0})
+                g["n"] += 1; g["usd"] = round(g["usd"] + t["net_usd"], 2); g["sum_r"] = round(g["sum_r"] + (t["pnl_r"] or 0), 3)
+            peak, dd = START_EQUITY, 0.0
+            for e in eqh:
+                v = e["mtm"] if e["mtm"] is not None else e["equity"]
+                peak = max(peak, v); dd = max(dd, (peak - v) / peak)
+            note = reset_note(closed, pnl, d.P["classes"])
+            info = {"time": now, "archived_pnl_usd": pnl, "note_ru": note, "archived_trades": len(closed), "migration": mig_id,
+                    "since_before": eqh[0]["time"] if eqh else None}
+            arch = {"profile": k, "name": d.P["name"], "migration": mig_id, "time": now, "start_equity": START_EQUITY,
+                    "equity_before": equity_before, "equity_at_reset": round(START_EQUITY + pnl, 2), "reset": info,
+                    "stats": {"trades": len(closed), "wins": sum(1 for t in closed if t["net_usd"] > 0), "usd": pnl,
+                              "max_dd_pct": round(dd * 100, 2), "by_grade": by_grade},
+                    "closed_at_reset": closed_at_reset, "cancelled_orders": cancelled,
+                    "trades": trades, "orders": orders, "equity_history": eqh}
+            conn.execute("INSERT INTO paper_archive VALUES(?,?,?,?)", (f"{mig_id}:{k}", k, now, json.dumps(arch, ensure_ascii=False)))
+            for t in (d.T_TR, d.T_ORD, d.T_EQ):
+                conn.execute(f"DELETE FROM {t}")
+            conn.execute(f"INSERT INTO {d.T_EQ}(time, equity, mtm) VALUES(?,?,?)", (now, START_EQUITY, START_EQUITY))
+            done[k] = info
+        conn.execute("INSERT INTO migrations VALUES(?,?,?)", (mig_id, now, "desks reset: " + (", ".join(f"{k} {v['archived_pnl_usd']:+.2f}" for k, v in done.items()) or "none (no history)")))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return done
+
+
 def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
     """Runs the three strategy accounts; the top level of the result is the default (balanced) account,
     `profiles` holds all three so the panel can switch between them."""
     btc = next((c for c in report["coins"] if c["symbol"].startswith("BTC")), None)
     btc_bull = bool(btc and btc.get("regime", {}).get("long") == "BULL")
     now = now or int(time.time() * 1000)
+    just_reset = {}
+    try:   # one-time reset of the three autopilot desks (owner's decision 17.10) — no-op once applied
+        last_px = {c["symbol"].replace("-USDT", "").replace("USDT", ""): c["candles"][-1][4] for c in report["coins"] if c.get("candles")}
+        just_reset = reset_desks(conn, now, last_px)
+    except Exception as e:  # noqa: BLE001
+        print("paper reset failed (will retry next run):", e)
+    try:   # 17.10: «Лаборатория» is called «Тест новых идей» for people — stored reasons of the lab desk follow (idempotent)
+        lab = PaperDesk(conn, "lab")
+        for t in (lab.T_TR, lab.T_ORD):
+            conn.execute(f"UPDATE {t} SET reason = 'Тест новых идей:' || substr(reason, 13) WHERE reason LIKE 'Лаборатория:%'")
+        conn.commit()
+    except Exception as e:  # noqa: BLE001
+        print("lab rename:", e)
     try:   # rule F needs open-interest history: record this run, attach the 4-hour change to every coin
         from cnq.agents import oi_watch
         bases = [c["symbol"].replace("-USDT", "").replace("USDT", "") for c in report["coins"] if not c.get("b_only")]
@@ -712,6 +878,8 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
     for k in PROFILES:
         d = PaperDesk(conn, k); d._nikkei = nikkei
         snaps[k] = d.step(report["coins"], btc_bull, now)
+        if k in just_reset:
+            snaps[k]["events"].insert(0, just_reset[k]["note_ru"])
     out_scan = scan(report["coins"])
     out = dict(snaps[DEFAULT_PROFILE])
     out["profiles"] = {k: {kk: vv for kk, vv in v.items() if kk != "equity_history"} | {"equity_history": v["equity_history"][-300:]} for k, v in snaps.items()}

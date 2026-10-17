@@ -251,3 +251,117 @@ def test_lab_nikkei_reversal_after_tokyo_close():
     assert not [s for s in desk.signals(c, True, now) if s["grade"] == "J"]
     desk._nikkei = {"chg": 0.9, "date": "2026-10-19"}                       # small move → nothing
     assert not [s for s in desk.signals(c, True, now) if s["grade"] == "J"]
+
+
+# ── one-time reset of the three autopilot desks (owner, 17.10.2026) ──────────────────────────────────────────────────────
+def _put_trade(conn, tbl, tid, sym, side, grade, entry, qty, pnl, opened, closed, exit_kind="STOP"):
+    stop = entry * (1.05 if side == "SHORT" else 0.95)
+    conn.execute(f"INSERT INTO {tbl} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                 (tid, sym, side, grade, "TEST", entry, stop, stop, "[1e9,1e9,1e9]", "[1.0,0.0,0.0]", qty, 0.0 if closed else qty, 100.0,
+                  opened, opened + 48 * 3_600_000, closed, exit_kind if closed else None, pnl, pnl / 100.0, 0, "test", opened))
+
+
+def _reset_world():
+    """cons: curve only; bal: 3 stopped retest shorts; aggr: retest short + 2 level trades + an OPEN rule-D long + a pending limit;
+    lab: one trade (must stay). SOL has a −0.30 % futures discount at `now` → rule D fires for the same id again after the reset."""
+    from cnq.agents import basis_watch as bw
+    conn = sqlite3.connect(":memory:")
+    t0, n = 1_700_000_000_000, 300
+    now = t0 + n * 900_000
+    c = coin("SOL-USDT", [100.0] * n, [], t0)
+    fake = (("bingx", lambda bases: {"SOL": -0.0030}),)
+    bw.record(conn, ["SOL"], now - 40 * 60_000, fetchers=fake); bw.record(conn, ["SOL"], now, fetchers=fake)
+    D = {k: pd.PaperDesk(conn, k) for k in ("cons", "bal", "aggr", "lab")}
+    for k in ("cons", "bal", "aggr", "lab"):
+        conn.execute(f"INSERT INTO {D[k].T_EQ}(time, equity) VALUES(?,?)", (t0, 10_000.0))
+    for i, (sym, pnl) in enumerate((("ETH", -98.2), ("ADA", -98.5), ("AVAX", -98.7))):
+        _put_trade(conn, D["bal"].T_TR, f"R-{sym}-1", sym, "SHORT", "R", 100.0, 10.0, pnl, t0 + i, t0 + 3_600_000 + i)
+    _put_trade(conn, D["aggr"].T_TR, "R-ADA-1", "ADA", "SHORT", "R", 100.0, 10.0, -144.8, t0, t0 + 3_600_000)
+    _put_trade(conn, D["aggr"].T_TR, "C-ETH-1", "ETH", "LONG", "C", 100.0, 10.0, -96.3, t0 + 1, t0 + 7_200_000)
+    _put_trade(conn, D["aggr"].T_TR, "C-DOGE-1", "DOGE", "SHORT", "C", 100.0, 10.0, 92.6, t0 + 2, t0 + 7_200_000, "BREAKEVEN")
+    did = f"D-SOL-{now // 3_600_000}"
+    _put_trade(conn, D["aggr"].T_TR, did, "SOL", "LONG", "D", 110.0, 10.0, 0.0, now - 600_000, None)
+    conn.execute(f"INSERT INTO {D['aggr'].T_ORD} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                 ("C-ETH-2", "ETH", "LONG", "C", "LEVEL_LIMIT", 99.0, 98.0, "[100,101,102]", "[0.4,0.3,0.3]", 1.0, 1.0, now - 600_000, now + 3_600_000, "PENDING", "t"))
+    _put_trade(conn, D["lab"].T_TR, "N-SUI-1", "SUI", "LONG", "N", 1.0, 100.0, -46.1, t0, t0 + 3_600_000)
+    conn.commit()
+    return conn, c, now, did
+
+
+def test_reset_desks_runs_once_archives_and_restarts_clean():
+    import json
+    conn, c, now, did = _reset_world()
+    net = lambda pnls: round(sum(p - 100.0 * 10.0 * pd.FEE for p in pnls), 2)
+    out = pd.run(conn, {"coins": [c], "_no_network": True}, now=now)
+    P = out["profiles"]
+    for k in ("cons", "bal", "aggr"):
+        assert P[k]["equity"] == 10_000.0 and P[k]["closed"] == [] and P[k]["stats"]["trades"] == 0, k
+        assert P[k]["equity_history"][0]["time"] == now and P[k]["since"] == now and P[k]["reset"]["time"] == now, k
+        assert P[k]["events"][0] == P[k]["reset"]["note_ru"], k
+    rb = P["bal"]["reset"]
+    assert rb["archived_pnl_usd"] == net([-98.2, -98.5, -98.7]) and rb["archived_trades"] == 3
+    assert "прошлые 3 сделки (3 шорта по правилу «ретест уровня», выключено 16.10) — в архиве, итог −$" in rb["note_ru"]
+    assert rb["note_ru"].endswith(pd._usd_ru(rb["archived_pnl_usd"])) and rb["note_ru"].startswith("Счёт обнулён 17.10 по решению владельца")
+    assert P["cons"]["reset"]["archived_pnl_usd"] == 0.0 and "сделок не было, итог $0" in P["cons"]["reset"]["note_ru"]
+    assert out["reset"] == rb and out["since"] == now                                   # top level = the default «норма» desk
+    # aggr: the open D long was closed at the last price (100 < entry 110) into the archive, the pending limit cancelled
+    ra = P["aggr"]["reset"]
+    assert ra["archived_trades"] == 4 and "1 шорт по правилу «ретест уровня», выключено 16.10" in ra["note_ru"]
+    assert "1 лонг и 1 шорт по правилу «наблюдение у уровня», сейчас не торгуется" in ra["note_ru"] and "1 лонг по правилу «откуп дисконта фьючерса»" in ra["note_ru"]
+    arch = json.loads(conn.execute("SELECT json FROM paper_archive WHERE id=?", (f"{pd.RESET_ID}:aggr",)).fetchone()[0])
+    d_tr = next(t for t in arch["trades"] if t["id"] == did)
+    assert d_tr["exit_kind"] == "RESET" and d_tr["closed"] == now and d_tr["net_usd"] < -100
+    assert arch["closed_at_reset"][0]["id"] == did and arch["closed_at_reset"][0]["price"] == 100.0 and arch["cancelled_orders"] == ["C-ETH-2"]
+    assert ra["archived_pnl_usd"] == round(sum(t["net_usd"] for t in arch["trades"]), 2) == round(-144.8 - 96.3 + 92.6 + d_tr["net_usd"] - 3 * 100 * 10 * pd.FEE, 2)
+    assert len(arch["equity_history"]) >= 1 and arch["stats"]["trades"] == 4
+    # the same D signal fires again at `now`: fresh desks take it, aggr does not re-open an archived id
+    assert [t["id"] for t in P["aggr"]["open"]] == [] and P["aggr"]["pending"] == []
+    assert [t["id"] for t in P["bal"]["open"]] == [did] and [t["id"] for t in P["cons"]["open"]] == [did]
+    # lab is not touched
+    assert P["lab"]["reset"] is None and P["lab"]["stats"]["trades"] == 1
+    assert conn.execute("SELECT COUNT(*) FROM paper_archive").fetchone()[0] == 3
+    assert conn.execute("SELECT id FROM migrations").fetchall() == [(pd.RESET_ID,)]
+    # second run: nothing archived again, the note stays in `reset` but is not repeated as an event
+    out2 = pd.run(conn, {"coins": [c], "_no_network": True}, now=now + 1_800_000)
+    assert conn.execute("SELECT COUNT(*) FROM paper_archive").fetchone()[0] == 3 and pd.reset_desks(conn, now + 3_600_000) == {}
+    for k in ("cons", "bal", "aggr"):
+        q = out2["profiles"][k]
+        assert q["reset"]["time"] == now and q["equity_history"][0]["time"] == now and not any("обнулён" in e for e in q["events"]), k
+    assert out2["profiles"]["bal"]["reset"]["archived_pnl_usd"] == rb["archived_pnl_usd"]
+
+
+def test_reset_desks_fresh_db_and_late_run_do_not_wipe():
+    conn = sqlite3.connect(":memory:")
+    now = 1_792_270_000_000
+    assert pd.reset_desks(conn, now) == {}                                      # nothing to reset → only marked as applied
+    d = pd.PaperDesk(conn, "bal")
+    _put_trade(conn, d.T_TR, "B-SOL-1", "SOL", "LONG", "B", 100.0, 1.0, 50.0, now, now + 1)
+    conn.commit()
+    assert pd.reset_desks(conn, now + 60_000) == {} and conn.execute(f"SELECT COUNT(*) FROM {d.T_TR}").fetchone()[0] == 1
+    conn2 = sqlite3.connect(":memory:")
+    d2 = pd.PaperDesk(conn2, "bal")
+    _put_trade(conn2, d2.T_TR, "B-SOL-1", "SOL", "LONG", "B", 100.0, 1.0, 50.0, now, now + 1)
+    conn2.commit()
+    assert pd.reset_desks(conn2, pd.RESET_UNTIL + 1) == {}                      # a database that meets the migration too late is kept
+    assert conn2.execute(f"SELECT COUNT(*) FROM {d2.T_TR}").fetchone()[0] == 1
+    assert conn2.execute("SELECT note FROM migrations").fetchone()[0].startswith("skipped")
+    assert pd._plural(1, "a", "b", "c") == "a" and pd._plural(3, "a", "b", "c") == "b" and pd._plural(6, "a", "b", "c") == "c" and pd._plural(12, "a", "b", "c") == "c"
+    assert pd._usd_ru(-298.84) == "−$299" and pd._usd_ru(0.0) == "$0" and pd._usd_ru(1234.4) == "+$1 234"
+
+
+def test_lab_is_called_test_of_new_ideas_for_people():
+    assert pd.PROFILES["lab"]["name"] == "Тест новых идей" and pd.PROFILES["lab"]["prefix"] == "paper_lab_"
+    t0, n = 1_700_000_000_000, 400
+    c = coin("SOL-USDT", [100.0] * n, [], t0)
+    c["_alt"] = True; c["basis_1h"] = -0.004
+    y = [s for s in pd.PaperDesk(sqlite3.connect(":memory:"), "lab").signals(c, True, t0 + n * 900_000) if s["grade"] == "Y"]
+    assert y and y[0]["reason"].startswith("Тест новых идей: ")
+    # reasons already stored with the old name are renamed once by run()
+    conn = sqlite3.connect(":memory:")
+    lab = pd.PaperDesk(conn, "lab")
+    _put_trade(conn, lab.T_TR, "N-SUI-1", "SUI", "LONG", "N", 1.0, 100.0, 0.0, t0, None)
+    conn.execute(f"UPDATE {lab.T_TR} SET reason='Лаборатория: часовая поддержка 1.0'")
+    conn.commit()
+    out = pd.run(conn, {"coins": [c], "_no_network": True}, now=t0 + n * 900_000)
+    assert conn.execute(f"SELECT reason FROM {lab.T_TR} WHERE id='N-SUI-1'").fetchone()[0] == "Тест новых идей: часовая поддержка 1.0"
+    assert out["profiles"]["lab"]["name"] == "Тест новых идей" and "lab" in {p["key"] for p in out["profile_list"]}

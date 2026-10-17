@@ -18,7 +18,8 @@ Actions: buy / add / trim (+40 % → sell half) / sell (−15 % from entry or sc
 rebalance once a week (Monday) or when a rule fires. Everything is explained in Russian for the panel.
 
 Five demo accounts of $10 000 go to the panel under `portfolios` (order in `portfolio_order`):
-  cons / high — spot_profiles.RiskPortfolio;  mod — SpotPortfolio above;
+  cons / high — spot_profiles.RiskPortfolio;  mod — SpotPortfolio above (17.10: holds no memes; closed P&L counted in the index);
+  cons / mod / high were reset and rebuilt from $10 000 once on 17.10 (reset_spot, archive in spot_archive);
   meme — the meme desk's paper account (memes.py, Hyperliquid meme perps, 1× notional) mapped into the same schema by
          `meme_profile` — read-only, the meme rules are not touched here;
   bal  — «Сбалансированный · максимум потенциала» (BalancedPortfolio below): an EXPERIMENT built for a rising market, with a
@@ -42,6 +43,13 @@ WRAPPED = {"WBTC", "WETH", "STETH", "WSTETH", "WEETH", "CBBTC", "RETH", "WBETH",
 HORIZONS = ("short", "mid", "long")
 CORE = {"BTC": 0.35, "ETH": 0.15}
 CORE_BEAR = {"BTC": 0.25, "ETH": 0.10}
+
+
+def overheated(chg7: float | None, chg30: float | None) -> bool:
+    """«Рывок вверх» — +40 % or more in 7 days or +120 % or more in 30 days: the mod portfolio does not chase it (17.10; same
+    thresholds as the spot ideas table, spot_ideas.OVERHEAT_7D / OVERHEAT_30D)."""
+    from .spot_ideas import OVERHEAT_7D, OVERHEAT_30D
+    return (chg7 is not None and chg7 >= OVERHEAT_7D) or (chg30 is not None and chg30 >= OVERHEAT_30D)
 
 
 def _get(url: str, data: dict | None = None, timeout: float = 25):
@@ -208,25 +216,48 @@ class SpotPortfolio:
                         entry_time INTEGER, high REAL, status TEXT, reason TEXT)""")
         conn.execute("CREATE TABLE IF NOT EXISTS spot_actions(time INTEGER, symbol TEXT, action TEXT, weight REAL, price REAL, reason TEXT)")
         conn.execute("CREATE TABLE IF NOT EXISTS spot_value(time INTEGER PRIMARY KEY, index_value REAL)")
+        conn.execute("CREATE TABLE IF NOT EXISTS spot_mod_meta(k TEXT PRIMARY KEY, v REAL)")
         conn.commit()
 
     def positions(self) -> list[dict]:
         keys = ("symbol", "bucket", "weight", "entry", "entry_time", "high", "status", "reason")
         return [dict(zip(keys, r)) for r in self.conn.execute("SELECT symbol,bucket,weight,entry,entry_time,high,status,reason FROM spot_portfolio WHERE status='OPEN'")]
 
+    def realized(self) -> float:
+        """Closed P&L in units of the $10 000 start (17.10: sells and trims used to drop out of the index)."""
+        r = self.conn.execute("SELECT v FROM spot_mod_meta WHERE k='realized'").fetchone()
+        return r[0] if r else 0.0
+
     def _act(self, now: int, sym: str, action: str, weight: float, price: float, reason: str, bucket: str | None = None):
         self.conn.execute("INSERT INTO spot_actions VALUES(?,?,?,?,?,?)", (now, sym, action, weight, price, reason))
+        row = self.conn.execute("SELECT weight, entry, status FROM spot_portfolio WHERE symbol=?", (sym,)).fetchone()
+        is_open = bool(row and row[2] == "OPEN")
+        w0, e0 = (row[0], row[1]) if is_open else (0.0, price)
+        gain = 0.0
         if action in ("BUY", "ADD"):
-            self.conn.execute("INSERT INTO spot_portfolio VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(symbol) DO UPDATE SET weight=excluded.weight, reason=excluded.reason, status='OPEN'",
-                              (sym, bucket, weight, price, now, price, "OPEN", reason))
+            if is_open and weight > w0 and e0 and price:      # ADD: harmonic entry keeps the coin amount exact
+                self.conn.execute("UPDATE spot_portfolio SET weight=?, entry=?, reason=? WHERE symbol=?",
+                                  (weight, weight / (w0 / e0 + (weight - w0) / price), reason, sym))
+            elif is_open:
+                self.conn.execute("UPDATE spot_portfolio SET weight=?, reason=? WHERE symbol=?", (weight, reason, sym))
+            else:     # new position or a re-buy of a closed one: fresh entry, time and high (17.10: a re-buy kept the old entry)
+                self.conn.execute("INSERT OR REPLACE INTO spot_portfolio VALUES(?,?,?,?,?,?,?,?)", (sym, bucket, weight, price, now, price, "OPEN", reason))
         elif action == "TRIM":
+            gain = max(0.0, w0 - weight) * (price / e0 - 1) if is_open and e0 else 0.0
             self.conn.execute("UPDATE spot_portfolio SET weight=?, reason=? WHERE symbol=?", (weight, reason, sym))
         elif action == "SELL":
+            gain = w0 * (price / e0 - 1) if is_open and e0 else 0.0
             self.conn.execute("UPDATE spot_portfolio SET status='CLOSED', weight=0, reason=? WHERE symbol=?", (reason, sym))
+        if gain:
+            self.conn.execute("INSERT OR REPLACE INTO spot_mod_meta VALUES('realized', ?)", (self.realized() + gain,))
         return {"time": now, "symbol": sym, "action": action, "weight": round(weight, 3), "price": price, "reason": reason}
 
-    def step(self, rows: list[dict], pk: dict, btc_bull: bool, now: int | None = None) -> dict:
+    def step(self, rows: list[dict], pk: dict, btc_bull: bool, now: int | None = None, memes: set[str] | None = None) -> dict:
+        """`memes` (17.10): meme tickers — never bought here and sold if held (memes live in «Высокий риск» / «Мем-портфель»)."""
         now = now or int(time.time() * 1000)
+        memes = {m.upper() for m in memes or ()}
+        # 17.10: no memes, and no coin after a spike (+40 % in 7 days / +120 % in 30 days) is bought here
+        pk = {h: [x for x in v if x["symbol"] not in memes and not overheated(x.get("chg7"), x.get("chg30"))] for h, v in pk.items()}
         price = {r["symbol"]: r["price"] for r in rows}
         score = {r["symbol"]: r["score"] for r in rows}
         names = {r["symbol"]: r.get("name", r["symbol"]) for r in rows}
@@ -237,6 +268,12 @@ class SpotPortfolio:
         last_act = self.conn.execute("SELECT MAX(time) FROM spot_actions").fetchone()[0] or 0
         rebalance = weekday == 0 and now - last_act > 20 * 3_600_000 or not pos
         core = CORE if btc_bull else CORE_BEAR
+        for sym, p in list(pos.items()):           # memes are not for the moderate portfolio
+            if sym in memes and p["bucket"] != "core" and price.get(sym):
+                ret = price[sym] / p["entry"] - 1 if p["entry"] else 0.0
+                actions.append(self._act(now, sym, "SELL", 0, price[sym], f"Мемы в умеренном портфеле не держим: {sym} — мем (для мемов есть «Высокий риск» "
+                                                                          f"по статусу безопасности и «Мем-портфель»). Выходим ({ret*100:+.0f}%)."))
+                pos.pop(sym)
         # --- core
         for sym, w in core.items():
             if sym not in price:
@@ -309,7 +346,7 @@ class SpotPortfolio:
         invested = sum(p["weight"] for p in pos)
         cash = max(0.1, 1 - invested)
         pnl = sum(p["weight"] * (price.get(p["symbol"], p["entry"]) / p["entry"] - 1) for p in pos if p["entry"])
-        idx = round(100 * (1 + pnl), 2)   # open-position P&L vs entries, weight-adjusted (100 = start)
+        idx = round(100 * (1 + self.realized() + pnl), 2)   # closed + open P&L vs entries, weight-adjusted (100 = start)
         self.conn.execute("INSERT OR REPLACE INTO spot_value VALUES(?,?)", (now, idx))
         self.conn.commit()
         hist = [{"time": t, "v": v} for t, v in self.conn.execute("SELECT time,index_value FROM spot_value ORDER BY time DESC LIMIT 60").fetchall()][::-1]
@@ -349,7 +386,7 @@ ROLE_RU = {"core": "ядро", "mid": "крупный альт", "anchor": "HYPE
 BAL_ABOUT = ("Эксперимент, без обещаний доходности. Собран под рост рынка; если рынок развернётся вниз — правило защиты: когда BTC "
              "3 дня подряд в медвежьем режиме, продаём высокий риск, альты режем вдвое, ядро до 2/3, кэш ≈55%; полные доли — когда "
              "BTC снова 3 дня в бычьем. Состав: ядро BTC/ETH/SOL 45%, пять крупных альтов в своём тренде по 6%, высокий риск 20% (HYPE 6%, "
-             "два лидера секторов по 4%, два мема по 3% — только после просадки 30%), кэш 5%. Ребаланс раз в месяц или когда доля "
+             "два лидера секторов по 4%, два мема по 3% — только после просадки 30% и проверки мемов), кэш 5%. Ребаланс раз в месяц или когда доля "
              "корзины уходит от плана на треть. Высокий риск: на ×2 забираем тело, остаток — до отката 35% от пика, стоп −35%; "
              "альты — стоп −30%.")
 BAL_RULES = [
@@ -360,7 +397,8 @@ BAL_RULES = [
     "Высокий риск 20%: HYPE 6% (выбор владельца; если HYPE ниже, чем 200 дней назад, его место берёт следующий лидер), "
     "два лидера секторов по 4% (капитализация от $300M, оборот от $20M, есть на Hyperliquid, рост за 30 и 200 дней, лучший по "
     "оценке в своём секторе, по одному на сектор), два самых ликвидных мема по 3% (капитализация от $1 млрд, оборот от $50M) — "
-    "покупаем только когда мем на 30%+ ниже максимума за 30 дней; до этого их доля ждёт в кэше.",
+    "покупаем только когда мем на 30%+ ниже максимума за 30 дней и проверка мемов даёт «можно на небольшую сумму»; до этого их доля "
+    "ждёт в кэше. Если проверка мемов показала «не брать» — продаём: при красном флаге сразу, иначе на недельной проверке.",
     "Ребаланс: 1–3 числа месяца или когда доля корзины ушла от плана больше чем на треть (ядро вне 30–60%, альты вне 20–40%, "
     "высокий риск выше 26.7%), но по перекосу — не чаще раза в неделю. Ядро и альты возвращаем к плановым долям, выбывших из правил "
     "меняем; если подходящих альтов меньше пяти, их доля ждёт в кэше. Высокий риск не доливаем.",
@@ -564,9 +602,18 @@ class BalancedPortfolio:
         return {s for (s,) in self.conn.execute(f"SELECT DISTINCT symbol FROM {self.rp.T_ACT} WHERE action='SELL' AND time>=? "
                                                 f"AND (reason LIKE 'Стоп%' OR reason LIKE 'Трейлинг%')", (now - days * DAY_MS,))}
 
-    def step(self, rows: list[dict], cards: list[dict], btc_bull: bool, memes: set[str] | None = None, now: int | None = None) -> dict:
+    def step(self, rows: list[dict], cards: list[dict], btc_bull: bool, memes: set[str] | None = None, now: int | None = None,
+             meme_status: dict | None = None) -> dict:
+        """`meme_status` (17.10): {SYM: spot meme row} from memes.json → spot_memes — the same check «Высокий риск» uses. A meme slot is
+        bought only with status «small»; without status data no meme is bought. A held meme whose status is «avoid» is sold: with a red
+        flag on the next run, otherwise at the weekly (Monday) meme check."""
         now = now or int(time.time() * 1000)
         memes = memes if memes is not None else meme_symbols(cards)
+        mstat = {k.upper(): v for k, v in (meme_status or {}).items()}
+        d = datetime.fromtimestamp(now / 1000, tz=timezone.utc)
+        meme_week = d.weekday() == 0 and now - (self._m("meme_review") or 0) > 6 * DAY_MS
+        if meme_week:
+            self._set("meme_review", now)
         if rows and not any(r.get("hl_perp") or r.get("hl_spot") for r in rows):
             # Hyperliquid API did not answer this run: skip the «есть на Hyperliquid» filter instead of selling every alt
             rows = [{**r, "hl_perp": True} for r in rows]
@@ -619,8 +666,15 @@ class BalancedPortfolio:
                     self._trade(now, s, 0, px, f"Трейлинг: {s} на {(1 - px / high)*100:.0f}% ниже пика {high:.4g} — остаток продаём ({ret*100:+.0f}% от входа).", actions=actions)
             elif role == "mid" and ret <= BAL["mid_stop"]:
                 self._trade(now, s, 0, px, f"Стоп {_mpct(BAL['mid_stop'])}: {s} {ret*100:+.0f}% от входа. Место ждёт ребаланса.", actions=actions)
+            if role == "meme" and (mstat.get(s) or {}).get("status") == "avoid" and {p["symbol"] for p in self.rp.positions()} >= {s}:
+                why = str(mstat[s].get("why_ru") or "статус «не брать»")
+                v = round(ret * 100)
+                res = "итог " + ("0%" if v == 0 else f"{v:+d}%".replace("-", "−")) + " от входа"
+                if why.startswith("красный флаг"):
+                    self._trade(now, s, 0, px, f"{s} продан: проверка мемов — красный флаг ({why.split(':', 1)[1].strip() if ':' in why else why}), {res}.", actions=actions)
+                elif meme_week:
+                    self._trade(now, s, 0, px, f"{s} продан на недельной проверке мемов: статус «не брать» — {why}, {res}.", actions=actions)
         # --- 2. rebalance: first run, monthly, mode switch, drift
-        d = datetime.fromtimestamp(now / 1000, tz=timezone.utc)
         last_reb = self._m("last_rebalance") or 0
         first = self._m("started") is None
         monthly = d.day <= 3 and now - last_reb > BAL["rebalance_days"] * DAY_MS
@@ -706,17 +760,20 @@ class BalancedPortfolio:
             self._set("last_rebalance", now)
             if first:
                 self._set("started", now)
-        # --- 3. meme slots: every run, bull mode only, buy only after a ≥ 30 % dip from the 30-day high
+        # --- 3. meme slots: every run, bull mode only, buy only after a ≥ 30 % dip from the 30-day high AND with the spot meme status «small»
         meme_c = bal_meme_candidates(rows, memes, self.conn, now)
+        for c in meme_c:
+            c["status"] = (mstat.get(c["symbol"]) or {}).get("status"); c["status_ru"] = (mstat.get(c["symbol"]) or {}).get("status_ru")
         if mode_s == "bull" and self._m("started") is not None:
             held = {p["symbol"]: p for p in self.rp.positions()}
             n_meme = sum(1 for p in held.values() if self._role(p) == "meme")
             V = self.value(price)
-            for c in sorted([c for c in meme_c if c["dip"] and c["symbol"] not in held and c["symbol"] not in cool], key=lambda c: c["from_high30_pct"]):
+            for c in sorted([c for c in meme_c if c["dip"] and c["status"] == "small" and c["symbol"] not in held and c["symbol"] not in cool],
+                            key=lambda c: c["from_high30_pct"]):
                 if n_meme >= BAL["meme_n"]:
                     break
                 self._trade(now, c["symbol"], BAL["meme_w"] * V, price[c["symbol"]], f"Мем на просадке: {c['symbol']} {c['from_high30_pct']:.0f}% от максимума "
-                            f"за 30 дней — {BAL['meme_w']*100:.0f}%. Стоп −35%, на ×2 забираем тело, остаток до отката 35% от пика.", bucket="high:meme", actions=actions)
+                            f"за 30 дней, проверка мемов — «можно на небольшую сумму» — {BAL['meme_w']*100:.0f}%. Стоп −35%, на ×2 забираем тело, остаток до отката 35% от пика.", bucket="high:meme", actions=actions)
                 n_meme += 1
         self.conn.commit()
         return self.snapshot(price, live, byrow, mode_s, actions, now, {"mid": mid_c[:8], "leaders": lead_c[:5] or bal_leader_candidates(rows, cards, memes, exclude={c["symbol"] for c in mid_c[:BAL["mid_n"]]})[:5], "memes": meme_c[:4]})
@@ -886,6 +943,122 @@ def load_meme_account(conn: sqlite3.Connection, now: int, path: str = "web/memes
         return None
 
 
+# ----------------------------------------------------------------------------- one-time reset + rebuild (owner, 17.10.2026)
+# «Да и обнови просто споты тоже. Пересобери, пересмотри разные портфели с учётом наших мемкоинов»: cons / mod / high restart from
+# $10 000 under the rules of 17.10 (cons — market-weight rebalance; mod — no memes; high — memes only by the spot meme status, capped).
+# The old state of each goes to `spot_archive` (id "<migration>:<profile>"), the migration id to `migrations` → runs exactly once.
+# «bal» is not reset: it started on 17.10 16:29 UTC, already under its written rules.
+SPOT_RESET_ID = "spot-reset-2026-10-17"
+SPOT_RESET_PROFILES = ("cons", "mod", "high")
+SPOT_RESET_UNTIL = 1_793_491_200_000          # 2026-11-01 UTC — later the migration is only marked «skipped»
+SPOT_RESET_NEW_RU = {
+    "cons": "ребаланс теперь по рыночным долям (раньше сравнивались доли по цене покупки)",
+    "mod": "те же правила отбора, но без мемов и без монет после рывка (+40% за 7 дней или +120% за 30)",
+    "high": "мемы — только со статусом «можно на небольшую сумму» (проверки пройдены, цена на 30%+ ниже максимума за 30 дней), "
+            "5% на мем, все мемы вместе не больше 25%; тело забираем на ×2",
+}
+
+
+def _spot_tables(conn: sqlite3.Connection, key: str) -> dict:
+    if key == "mod":
+        SpotPortfolio(conn)
+        return {"pos": "spot_portfolio", "act": "spot_actions", "val": "spot_value", "meta": "spot_mod_meta"}
+    from .spot_profiles import RiskPortfolio
+    rp = RiskPortfolio(conn, key)
+    return {"pos": rp.T_POS, "act": rp.T_ACT, "val": rp.T_VAL, "meta": rp.T_META}
+
+
+def _rows(conn: sqlite3.Connection, sql: str) -> list[dict]:
+    cur = conn.execute(sql)
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+
+def reset_spot(conn: sqlite3.Connection, now: int, price: dict, memes=(), mig_id: str = SPOT_RESET_ID,
+               profiles=SPOT_RESET_PROFILES, until: int = SPOT_RESET_UNTIL) -> dict:
+    """Idempotent one-time reset → {profile: reset_info} for the portfolios reset by THIS call ({} once applied).
+    Open positions are valued at `price` (the run's snapshot; if a held coin has no price — the last recorded index) and archived
+    with their result; then positions, actions, value history and meta (cash, realized) are emptied, so the next step rebuilds the
+    portfolio from $10 000 under the current rules. A profile with no history (fresh database) is skipped."""
+    from .paper_desk import RESET_DAY_RU, _usd_ru
+    conn.execute("CREATE TABLE IF NOT EXISTS migrations(id TEXT PRIMARY KEY, time INTEGER, note TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS spot_archive(id TEXT PRIMARY KEY, profile TEXT, time INTEGER, json TEXT)")
+    conn.commit()
+    if conn.execute("SELECT 1 FROM migrations WHERE id=?", (mig_id,)).fetchone():
+        return {}
+    if now > until:
+        conn.execute("INSERT INTO migrations VALUES(?,?,?)", (mig_id, now, "skipped: too late"))
+        conn.commit()
+        return {}
+    tables = {k: _spot_tables(conn, k) for k in profiles}
+    memes = {m.upper() for m in memes}
+    done: dict = {}
+    try:
+        for k, T in tables.items():
+            if not sum(conn.execute(f"SELECT COUNT(*) FROM {T[x]}").fetchone()[0] for x in ("pos", "act", "val")):
+                continue
+            pos = _rows(conn, f"SELECT * FROM {T['pos']}")
+            acts = _rows(conn, f"SELECT * FROM {T['act']} ORDER BY time")
+            vals = conn.execute(f"SELECT time, index_value FROM {T['val']} ORDER BY time").fetchall()
+            meta = {a: b for a, b in conn.execute(f"SELECT k, v FROM {T['meta']}").fetchall()}
+            held = [p for p in pos if p["status"] == "OPEN"]
+            for p in held:
+                px = price.get(p["symbol"])
+                p["price_at_reset"] = px
+                p["pnl_pct"] = round((px / p["entry"] - 1) * 100, 2) if px and p["entry"] else None
+                p["value_usd"] = round(10_000 * p["weight"] * px / p["entry"], 2) if px and p["entry"] else None
+            if k == "mod":
+                value = 1 + (meta.get("realized") or 0.0) + sum(p["weight"] * (price[p["symbol"]] / p["entry"] - 1) for p in held if price.get(p["symbol"]) and p["entry"])
+            else:
+                value = (meta["cash"] if "cash" in meta else 1.0) + sum(p["weight"] * price[p["symbol"]] / p["entry"] for p in held if price.get(p["symbol"]) and p["entry"])
+            basis = "цены запуска"
+            if any(not price.get(p["symbol"]) for p in held) and vals:
+                value, basis = vals[-1][1] / 100, "последняя оценка портфеля"
+            pnl = round(10_000 * (value - 1), 2)
+            started = acts[0]["time"] if acts else (vals[0][0] if vals else now)
+            syms = [p["symbol"] for p in held]
+            new = SPOT_RESET_NEW_RU.get(k, "текущие правила")
+            if k == "mod" and [s for s in syms if s in memes]:
+                new += f" (в прошлом составе мем — {', '.join(s for s in syms if s in memes)})"
+            d0 = datetime.fromtimestamp(started / 1000, tz=timezone.utc).strftime("%d.%m")
+            note = (f"Портфель пересобран {RESET_DAY_RU} по решению владельца: прошлый счёт с {d0}"
+                    + (f" ({', '.join(syms)})" if syms else "") + f" — в архиве, итог {_usd_ru(pnl)}. Новый старт $10 000: {new}.")
+            info = {"time": now, "archived_pnl_usd": pnl, "note_ru": note, "migration": mig_id, "since_before": started}
+            arch = {"profile": k, "migration": mig_id, "time": now, "start_usd": 10_000, "value_at_reset": round(value, 6), "value_basis": basis,
+                    "reset": info, "positions": pos, "actions": acts, "history": [{"time": t, "v": v} for t, v in vals], "meta": meta}
+            conn.execute("INSERT INTO spot_archive VALUES(?,?,?,?)", (f"{mig_id}:{k}", k, now, json.dumps(arch, ensure_ascii=False)))
+            for x in ("pos", "act", "val", "meta"):
+                conn.execute(f"DELETE FROM {T[x]}")
+            done[k] = info
+        conn.execute("INSERT INTO migrations VALUES(?,?,?)", (mig_id, now, "spot reset: " + (", ".join(f"{k} {v['archived_pnl_usd']:+.2f}" for k, v in done.items()) or "none (no history)")))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return done
+
+
+def spot_reset_info(conn: sqlite3.Connection, key: str) -> dict | None:
+    try:
+        row = conn.execute("SELECT json FROM spot_archive WHERE profile=? ORDER BY time DESC LIMIT 1", (key,)).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    return json.loads(row[0]).get("reset") if row else None
+
+
+def load_spot_memes(now: int, path: str = "web/memes.json") -> dict:
+    """{SYM: spot meme row (status / status_ru / why_ru / score / price / from_high30_pct)} written by the meme desk minutes ago in
+    the same server run; {} if missing or older than 3 h — then «Высокий риск» buys no memes."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            m = json.load(f)
+        if now - (m.get("asof") or 0) < 3 * 3_600_000:
+            return {(r.get("symbol") or "").upper(): r for r in m.get("spot_memes") or [] if r.get("symbol")}
+    except Exception:  # noqa: BLE001
+        pass
+    return {}
+
+
 # ----------------------------------------------------------------------------- daily note (rules) + run
 def market_note(btc_bull: bool, btc: dict | None, pk: dict, state: dict) -> str:
     lines = []
@@ -926,7 +1099,32 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
         btc_bull = bool(btc and (btc.get("chg200") or 0) > 0)
     rows = score_universe(markets, hl, btc_bull)
     pk = picks(rows)
-    state = SpotPortfolio(conn).step(rows, pk, btc_bull, now)
+    cards = []
+    try:
+        with open("web/research.json", encoding="utf-8") as f:
+            cards = json.load(f).get("cards") or []
+    except Exception:  # noqa: BLE001
+        cards = []
+    # memes: the meme desk's HL list + research cards tagged «мем» + CoinGecko's meme category (cached by meme_spot) + spot meme rows
+    from . import meme_spot
+    meme_spot.ensure(conn)
+    cg_t, cg_rows = meme_spot._cache_any(conn, "cg_markets")
+    cg_rows = cg_rows or []
+    spot_memes = load_spot_memes(now)
+    memes = meme_symbols(cards, [(x.get("symbol") or "").upper() for x in cg_rows]) | set(spot_memes)
+    price = {r["symbol"]: r["price"] for r in markets if r.get("price")}
+    # prices for coins outside the CoinGecko top-200: memes (CoinGecko meme list ≤ 6 h old, spot meme rows), then Hyperliquid spot
+    meme_px = {(x.get("symbol") or "").upper(): x.get("current_price") for x in (cg_rows if cg_t and now - cg_t < 6 * 3_600_000 else []) if x.get("current_price")}
+    meme_px.update({s: r["price"] for s, r in spot_memes.items() if r.get("price")})
+    hl_px = {k: v["price"] for k, v in (hl.get("spot") or {}).items() if v.get("price")}
+    px_all = {**hl_px, **meme_px, **price}
+    try:      # one-time reset + rebuild of cons / mod / high (owner, 17.10) — no-op once applied
+        reset_spot(conn, now, px_all, memes)
+    except Exception as e:  # noqa: BLE001
+        print("spot reset failed (will retry next run):", e)
+    state = SpotPortfolio(conn).step(rows, picks([r for r in rows if r["symbol"] not in memes and not overheated(r.get("chg7"), r.get("chg30"))]),
+                                 btc_bull, now, memes=memes)
+    state["reset"] = spot_reset_info(conn, "mod")
     note = market_note(btc_bull, btc, pk, state)
     llm_note = ""
     # 17.10: this call ran every 30 min and alone used up Groq's free 200k tokens/day (channel fact-check then failed with 429).
@@ -947,19 +1145,13 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
     hl_spot_list = sorted(hl.get("spot", {}).items(), key=lambda kv: -kv[1]["vol24"])[:15]
     # the other two risk profiles (conservative / high risk) run on the same prices; research cards come from web/research.json
     from .spot_profiles import RiskPortfolio, PROFILES as RP
-    cards = []
-    try:
-        with open("web/research.json", encoding="utf-8") as f:
-            cards = json.load(f).get("cards") or []
-    except Exception:  # noqa: BLE001
-        cards = []
-    price = {r["symbol"]: r["price"] for r in markets if r.get("price")}
     hl_movers = [{"symbol": k, **v} for k, v in hl_spot_list]
-    profiles = {"mod": {"key": "mod", "name": "Умеренный", "about": "Ядро BTC/ETH + до 5 среднесрочных идей по 8 % и до 3 коротких по 5 %; стоп −15 %, фиксация половины на +40 %, кэш ≥ 10 %.",
-                        **{k: state[k] for k in ("positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions")}}}
+    profiles = {"mod": {"key": "mod", "name": "Умеренный", "about": "Ядро BTC/ETH + до 5 среднесрочных идей по 8 % и до 3 коротких по 5 %; стоп −15 %, фиксация половины на +40 %, кэш ≥ 10 %. Без мемов и без монет после рывка (+40 % за 7 дней или +120 % за 30).",
+                        **{k: state[k] for k in ("positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions", "reset")}}}
     for key in RP:
         try:
-            profiles[key] = RiskPortfolio(conn, key).step(dict(price), cards, hl_movers, now)
+            profiles[key] = RiskPortfolio(conn, key).step(dict(px_all), cards, hl_movers, now, memes=memes, meme_status=spot_memes if key == "high" else None)
+            profiles[key]["reset"] = spot_reset_info(conn, key)
         except Exception as e:  # noqa: BLE001
             profiles[key] = {"key": key, "name": RP[key]["name"], "about": RP[key]["about"], "error": str(e), "positions": [], "index": 100, "cash_pct": 100, "invested_pct": 0, "history": [], "actions": [], "recent_actions": []}
     empty = {"positions": [], "index": 100.0, "cash_pct": 100, "invested_pct": 0, "history": [], "actions": [], "recent_actions": []}
@@ -967,11 +1159,8 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
         profiles["meme"] = meme_profile(load_meme_account(conn, now), now)
     except Exception as e:  # noqa: BLE001
         profiles["meme"] = {"key": "meme", "name": "Мем-портфель", "about": MEME_ABOUT, "error": str(e), **empty}
-    try:      # 5th: «Сбалансированный · максимум потенциала»
-        from . import meme_spot
-        meme_spot.ensure(conn)
-        cg_memes = [(x.get("symbol") or "").upper() for x in (meme_spot._cache_any(conn, "cg_markets")[1] or [])]
-        profiles["bal"] = BalancedPortfolio(conn).step(rows, cards, btc_bull, meme_symbols(cards, cg_memes), now)
+    try:      # 5th: «Сбалансированный · максимум потенциала» (not reset on 17.10 — it started that day under its own rules)
+        profiles["bal"] = BalancedPortfolio(conn).step(rows, cards, btc_bull, memes, now, meme_status=spot_memes)
     except Exception as e:  # noqa: BLE001
         profiles["bal"] = {"key": "bal", "name": BAL["name"], "about": BAL_ABOUT, "error": str(e), **empty}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),

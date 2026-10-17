@@ -161,7 +161,8 @@ def test_bal_take_profit_trailing_stops_and_meme_dip():
     _px(rows, "LAI", 2.1)                                     # ×2 → body back
     _px(rows, "A0", 0.65)                                     # −35 % → mid stop
     _px(rows, "PEPE", chg30=-40.0)                              # 40 % below the price 30 days ago → dip → meme slot
-    st = port.step(rows, cards, True, memes, T0 + DAY)
+    ms = {"PEPE": _meme_row("PEPE", "small")}                   # 17.10: and the meme check says «можно на небольшую сумму»
+    st = port.step(rows, cards, True, memes, T0 + DAY, meme_status=ms)
     acts = {(a["symbol"], a["action"]) for a in st["actions"]}
     assert ("LAI", "TRIM") in acts and ("A0", "SELL") in acts and ("PEPE", "BUY") in acts
     by = {p["symbol"]: p for p in st["positions"]}
@@ -169,7 +170,7 @@ def test_bal_take_profit_trailing_stops_and_meme_dip():
     assert by["PEPE"]["role"] == "meme" and abs(by["PEPE"]["weight"] - 0.03) < 0.003
     _px(rows, "LAI", 0.6)                                     # 40 % below its peak → trailing exit of the rest
     _px(rows, "PEPE", 0.6)                                    # −40 % from entry → stop; still «in a dip» but not re-bought (30-day cooldown)
-    st = port.step(rows, cards, True, memes, T0 + 2 * DAY)
+    st = port.step(rows, cards, True, memes, T0 + 2 * DAY, meme_status=ms)
     acts = {(a["symbol"], a["action"]) for a in st["actions"]}
     assert ("LAI", "SELL") in acts and ("PEPE", "SELL") in acts and ("PEPE", "BUY") not in acts
     assert any(a["reason"].startswith("Трейлинг") for a in st["actions"]) and "PEPE" in port.stopped_recently(T0 + 2 * DAY)
@@ -286,3 +287,205 @@ def test_run_returns_five_portfolios(tmp_path):
             assert f in P, (k, f)
     assert {p["symbol"] for p in res["portfolios"]["bal"]["positions"]} >= {"BTC", "ETH", "SOL"}
     assert res["portfolios"]["meme"]["index"] == 104.0
+
+
+# ── 17.10: cons rebalances on MARKET weights, high takes memes only by the spot meme status, mod holds no memes, one-time reset ──
+def _meme_row(sym, status, score=60, price=1.0, dd=-40.0, why=None):
+    return {"symbol": sym, "status": status, "status_ru": {"small": "можно на небольшую сумму", "wait": "ждём", "avoid": "не брать"}[status],
+            "why_ru": why or ("просадка −40% от максимума за 30 дней, проверки пройдены" if status == "small" else "ждём просадку"),
+            "score": score, "price": price, "from_high30_pct": dd}
+
+
+def test_cons_monthly_rebalance_uses_market_weights():
+    from cnq.agents.spot_profiles import RiskPortfolio
+    conn = sqlite3.connect(":memory:")
+    d10 = int(datetime(2026, 9, 10, tzinfo=timezone.utc).timestamp() * 1000)
+    c = RiskPortfolio(conn, "cons")
+    c.step({"BTC": 100.0, "ETH": 10.0, "SOL": 1.0}, [], [], d10)
+    px = {"BTC": 200.0, "ETH": 10.0, "SOL": 1.0}                                 # BTC doubles: cost weight still 50 %, market weight 67 %
+    st = c.step(dict(px), [], [], d10 + DAY)
+    assert not st["actions"] and st["index"] == 150.0                             # not the 1st–3rd → no rebalance
+    oct1 = int(datetime(2026, 10, 1, 6, tzinfo=timezone.utc).timestamp() * 1000)
+    st = c.step(dict(px), [], [], oct1)
+    acts = {(a["symbol"], a["action"]) for a in st["actions"]}
+    assert ("BTC", "TRIM") in acts and ("ETH", "ADD") in acts and ("SOL", "ADD") in acts and "рыночным долям" in st["actions"][0]["reason"]
+    assert st["index"] == 150.0                                                   # rebalancing moves value, it does not create it
+    V = c.value(px)
+    mw = {p["symbol"]: c._mv(p, px) / V for p in c.positions()}
+    assert abs(mw["BTC"] - 0.50) < 1e-6 and abs(mw["ETH"] - 0.25) < 1e-6 and abs(mw["SOL"] - 0.15) < 1e-6 and abs(c.cash() / V - 0.10) < 1e-6
+    # inside the ±5 p.p. band → nothing next month
+    px2 = {"BTC": 210.0, "ETH": 10.0, "SOL": 1.0}
+    nov1 = int(datetime(2026, 11, 1, 6, tzinfo=timezone.utc).timestamp() * 1000)
+    assert not c.step(dict(px2), [], [], nov1)["actions"]
+
+
+def test_high_takes_memes_only_by_status_with_caps():
+    from cnq.agents.spot_profiles import RiskPortfolio
+    conn = sqlite3.connect(":memory:")
+    h = RiskPortfolio(conn, "high")
+    memes = {"M1", "M2", "M3", "M4", "M5", "M6", "M7", "MW", "MA", "PUMP", "MEMECARD"}
+    ms = {f"M{i}": _meme_row(f"M{i}", "small", score=70 - i) for i in range(1, 8)}
+    ms["MW"] = _meme_row("MW", "wait", score=99)
+    ms["MA"] = _meme_row("MA", "avoid", score=99, why="мало оборота")
+    cards = [{"symbol": "ALT", "risk": "high", "rating": 70, "chg7": 20, "on_hl": True},
+             {"symbol": "MEMECARD", "risk": "high", "rating": 90, "chg7": 50, "tags": ["мем"]},
+             {"symbol": "USDX", "risk": "high", "rating": 90, "chg7": 1, "stable": True}]
+    hl = [{"symbol": "UPUMP", "chg24": 9, "vol24": 9e6, "price": 0.004}, {"symbol": "USOL", "chg24": 2, "vol24": 9e6, "price": 100.0},
+          {"symbol": "NEKO", "chg24": 12, "vol24": 9e6, "price": 5.0}]
+    price = {"ALT": 2.0, "MEMECARD": 1.0, "USDX": 1.0, "SOL": 100.0}
+    st = h.step(dict(price), cards, hl, T0, memes=memes, meme_status=ms)
+    by = {p["symbol"]: p for p in st["positions"]}
+    assert set(by) == {"ALT", "NEKO", "M1", "M2", "M3", "M4", "M5"}             # 5 memes × 5 % = the 25 % cap; best quality first
+    assert all(by[s]["bucket"] == "meme" and by[s]["meme_status"] == "small" and by[s]["weight"] <= 0.06 for s in ("M1", "M2", "M3", "M4", "M5"))
+    V = h.value({**price, **{s: 1.0 for s in ms}})
+    assert sum(h._mv(p, {**price, **{s: 1.0 for s in ms}}) for p in h.positions() if p["symbol"] in memes) <= 0.25 * V + 1e-9
+    assert st["cash_pct"] >= 50 and "MW" not in by and "MA" not in by and "MEMECARD" not in by and "UPUMP" not in by and "USOL" not in by and "USDX" not in by
+    # next run: caps full → nothing new; M1 gets a red flag → sold at once; M2 −35 % → stop, and not re-bought while still «small»
+    ms["M1"] = _meme_row("M1", "avoid", why="красный флаг: топ-10 кошельков держат 70%")
+    px = {**price, "M2": 0.65}
+    st = h.step(dict(px), cards, [], T0 + DAY, memes=memes, meme_status=ms)
+    acts = {(a["symbol"], a["action"]) for a in st["actions"]}
+    assert ("M1", "SELL") in acts and ("M2", "SELL") in acts and ("M2", "BUY") not in acts
+    assert ("M6", "BUY") in acts and ("M7", "BUY") not in acts               # freed room refilled, but the cap is 25 % of the value NOW:
+    held = {p["symbol"] for p in h.positions()}                                 # the M2 loss shrank the portfolio, 3 × 5 % + M6 already ≈ 20.3 %
+    assert {"M3", "M4", "M5", "M6"} <= held and not {"M1", "M2", "M7"} & held
+    pxm = {**price, **{s: 1.0 for s in ms}}
+    assert sum(h._mv(p, pxm) for p in h.positions() if p["symbol"] in memes) <= 0.25 * h.value(pxm) + 1e-9
+    # body at ×2 (the rule stays): sell half, the rest rides
+    st = h.step({**price, "M3": 2.05}, cards, [], T0 + 2 * DAY, memes=memes, meme_status=ms)
+    assert any(a["symbol"] == "M3" and a["action"] == "TRIM" for a in st["actions"])
+    assert next(p for p in h.positions() if p["symbol"] == "M3")["fixes"] == 1
+    # no status data (memes.json stale) → no meme is bought at all
+    h2 = RiskPortfolio(sqlite3.connect(":memory:"), "high")
+    assert not [p for p in h2.step(dict(price), cards, [], T0, memes=memes, meme_status={})["positions"] if p["symbol"] in memes]
+
+
+def test_mod_holds_no_memes_and_counts_closed_pnl():
+    conn = sqlite3.connect(":memory:")
+    port = pf.SpotPortfolio(conn)
+    port._act(T0, "X", "BUY", 0.08, 10.0, "t", "mid")
+    port._act(T0, "PEPE", "BUY", 0.08, 1.0, "t", "mid")
+    port._act(T0 + 1, "X", "SELL", 0, 8.0, "stop")                               # −20 % on 8 % → −1.6 % of the start
+    assert abs(port.realized() + 0.016) < 1e-12
+    port._act(T0 + 2, "X", "BUY", 0.08, 5.0, "re-buy", "mid")
+    assert next(p for p in port.positions() if p["symbol"] == "X")["entry"] == 5.0   # a re-buy starts from its own price
+    rows = [{"symbol": "X", "price": 5.0, "score": {"short": 0, "mid": 50, "long": 0}}, {"symbol": "PEPE", "price": 1.0, "score": {"short": 0, "mid": 99, "long": 0}}]
+    st = port.step(rows, {"short": [], "mid": [{"symbol": "PEPE", "score": 99, "price": 1.0, "why": ""}], "long": []}, True, T0 + DAY, memes={"PEPE"})
+    assert ("PEPE", "SELL") in {(a["symbol"], a["action"]) for a in st["actions"]} and "PEPE" not in {p["symbol"] for p in st["positions"]}
+    assert st["index"] == round(100 * (1 - 0.016), 2)                             # the closed loss stays in the index
+
+
+def test_spot_reset_archives_and_rebuilds_once(tmp_path):
+    import json
+    import os
+    from cnq.agents.spot_profiles import RiskPortfolio
+    conn = sqlite3.connect(":memory:")
+    t_old = T0 - 2 * DAY
+    RiskPortfolio(conn, "cons").step({"BTC": 64000.0, "ETH": 2400.0, "SOL": 100.0}, [], [], t_old)
+    hp = RiskPortfolio(conn, "high"); hp._act(t_old, "T03", "BUY", 0.05, 4.0, "old", "high"); hp._set_cash(0.95)
+    mp = pf.SpotPortfolio(conn); mp._act(t_old, "BTC", "BUY", 0.35, 80000.0, "old", "core"); mp._act(t_old, "PEPE", "BUY", 0.08, 1e-5, "old", "mid")
+    conn.commit()
+    mk = fake_markets()
+    mk.append({"symbol": "SOL", "name": "Solana", "id": "solana", "price": 100, "mcap": 5e10, "rank": 6, "volume": 3e9, "chg24": 1, "chg7": 1,
+               "chg30": 5, "chg200": 10, "chg1y": 20, "ath_chg": -60, "ath_date": "2025-01-01T00:00:00Z", "atl_date": "2020-05-01T00:00:00Z"})
+    mk.append({"symbol": "PEPE", "name": "Pepe", "id": "pepe", "price": 1.1e-5, "mcap": 4e9, "rank": 30, "volume": 4e8, "chg24": 1, "chg7": 30,
+               "chg30": 60, "chg200": 90, "chg1y": 50, "ath_chg": -40, "ath_date": "2025-01-01T00:00:00Z", "atl_date": "2023-05-01T00:00:00Z"})
+    now = T0 + 60_000
+    memes_json = _memes_json(now)
+    memes_json["spot_memes"] = [_meme_row("DIPA", "small", 70, 0.5), _meme_row("DIPB", "small", 65, 2.0), _meme_row("WAITC", "wait", 90, 1.0)]
+    cwd, old = os.getcwd(), (pf.coingecko_markets, pf.hyperliquid_universe)
+    try:
+        os.chdir(tmp_path); os.makedirs("web")
+        json.dump(memes_json, open("web/memes.json", "w", encoding="utf-8"))
+        pf.coingecko_markets = lambda pages=2: [dict(r) for r in mk]
+        pf.hyperliquid_universe = lambda: {"perps": {r["symbol"]: {"vol24": 1e8} for r in mk}, "spot": {}, "available": True}
+        res = pf.run(conn, btc_bull=True, llm=None, now=now)
+        res2 = pf.run(conn, btc_bull=True, llm=None, now=now + 1_800_000)
+    finally:
+        os.chdir(cwd)
+        pf.coingecko_markets, pf.hyperliquid_universe = old
+    P = res["portfolios"]
+    for k in ("cons", "mod", "high"):
+        r = P[k]["reset"]
+        assert r and r["time"] == now and "Портфель пересобран 17.10 по решению владельца" in r["note_ru"] and "Новый старт $10 000" in r["note_ru"], k
+        assert P[k]["history"][0]["time"] == now and all(a["time"] == now for a in P[k]["recent_actions"]), k
+        assert "error" not in P[k], (k, P[k].get("error"))
+    assert P["cons"]["reset"]["archived_pnl_usd"] == 1250.0 and "итог +$1 250" in P["cons"]["reset"]["note_ru"]   # BTC 64k → 80k on 50 %
+    assert P["mod"]["reset"]["archived_pnl_usd"] == round(10_000 * 0.08 * (1.1e-5 / 1e-5 - 1), 2)   # BTC flat, PEPE +10 %
+    assert "в прошлом составе мем — PEPE" in P["mod"]["reset"]["note_ru"]
+    assert P["high"]["reset"]["archived_pnl_usd"] == round(10_000 * (0.95 + 0.05 * 4.0 / 4.0 - 1), 2)
+    assert "PEPE" not in {p["symbol"] for p in P["mod"]["positions"]} and {"BTC", "ETH"} <= {p["symbol"] for p in P["mod"]["positions"]}
+    assert {p["symbol"] for p in P["high"]["positions"] if p["bucket"] == "meme"} == {"DIPA", "DIPB"}
+    assert {p["symbol"] for p in P["cons"]["positions"]} == {"BTC", "ETH", "SOL"} and P["cons"]["index"] == 100.0
+    assert P["bal"].get("reset") is None
+    assert res["portfolio"]["reset"] == P["mod"]["reset"]
+    rows = conn.execute("SELECT id FROM spot_archive ORDER BY id").fetchall()
+    assert [r[0] for r in rows] == [f"{pf.SPOT_RESET_ID}:{k}" for k in ("cons", "high", "mod")]
+    arch = json.loads(conn.execute("SELECT json FROM spot_archive WHERE profile='high'").fetchone()[0])
+    assert arch["positions"][0]["symbol"] == "T03" and arch["actions"][0]["reason"] == "old" and arch["meta"]["cash"] == 0.95
+    # second run: no new archive, no rebuild, reset info unchanged
+    P2 = res2["portfolios"]
+    assert conn.execute("SELECT COUNT(*) FROM spot_archive").fetchone()[0] == 3 and pf.reset_spot(conn, now + 3_600_000, {}) == {}
+    assert all(P2[k]["reset"] == P[k]["reset"] and not [a for a in P2[k]["actions"] if a["action"] == "BUY"] for k in ("cons", "mod", "high"))
+
+
+def test_bal_memes_need_status_small_and_red_flag_sells_next_run():
+    rows, cards = bal_world()
+    conn = sqlite3.connect(":memory:")
+    port = pf.BalancedPortfolio(conn)
+    memes = pf.meme_symbols(cards)
+    port.step(rows, cards, True, memes, T0)                                     # Wednesday
+    _px(rows, "PEPE", chg30=-40.0); _px(rows, "DOGE", chg30=-45.0)             # both ≥ 30 % below the 30-day high
+    for ms in (None, {}, {"PEPE": _meme_row("PEPE", "wait"), "DOGE": _meme_row("DOGE", "avoid", why="низкий балл качества: 41 из 100")}):
+        st = port.step(rows, cards, True, memes, T0 + 3_600_000, meme_status=ms)
+        assert not [a for a in st["actions"] if a["symbol"] in ("PEPE", "DOGE")], ms   # a dip alone is not enough any more
+    ms = {"PEPE": _meme_row("PEPE", "small"), "DOGE": _meme_row("DOGE", "small")}
+    st = port.step(rows, cards, True, memes, T0 + DAY, meme_status=ms)
+    acts = {(a["symbol"], a["action"]) for a in st["actions"]}
+    assert ("PEPE", "BUY") in acts and ("DOGE", "BUY") in acts and "проверка мемов" in st["actions"][-1]["reason"]
+    assert {c["symbol"]: c["status"] for c in st["candidates"]["memes"]}["PEPE"] == "small"
+    # PEPE gets a red flag → sold on the next run (Friday) with an honest reason; DOGE «не брать» without a red flag waits for Monday
+    ms = {"PEPE": _meme_row("PEPE", "avoid", why="красный флаг: топ-10 кошельков держат 60%"),
+          "DOGE": _meme_row("DOGE", "avoid", why="мало оборота: $3M в сутки — цену легко сдвинуть")}
+    st = port.step(rows, cards, True, memes, T0 + 2 * DAY, meme_status=ms)
+    sells = {a["symbol"]: a["reason"] for a in st["actions"] if a["action"] == "SELL"}
+    assert set(sells) == {"PEPE"} and sells["PEPE"] == "PEPE продан: проверка мемов — красный флаг (топ-10 кошельков держат 60%), итог 0% от входа."
+    st = port.step(rows, cards, True, memes, T0 + 5 * DAY + 3_600_000, meme_status=ms)           # Monday 19.10: weekly meme check
+    sells = {a["symbol"]: a["reason"] for a in st["actions"] if a["action"] == "SELL"}
+    assert set(sells) == {"DOGE"} and sells["DOGE"].startswith("DOGE продан на недельной проверке мемов: статус «не брать» — мало оборота")
+    assert not [p for p in st["positions"] if p["role"] == "meme"]
+    st = port.step(rows, cards, True, memes, T0 + 5 * DAY + 7_200_000, meme_status=ms)           # same Monday: nothing twice
+    assert not st["actions"]
+
+
+def test_mod_does_not_buy_overheated_coins():
+    assert pf.overheated(40.0, None) and pf.overheated(None, 120.0) and pf.overheated(278.7, 10.0)
+    assert not pf.overheated(39.9, 119.9) and not pf.overheated(None, None)
+    conn = sqlite3.connect(":memory:")
+    rows = [{"symbol": "BTC", "price": 80000.0, "score": {"short": 50, "mid": 50, "long": 50}},
+            {"symbol": "ETH", "price": 2400.0, "score": {"short": 50, "mid": 50, "long": 50}}]
+    mid = [{"symbol": "Q", "score": 95, "price": 0.12, "why": "", "chg7": 278.7, "chg30": 300.0},
+           {"symbol": "QNT", "score": 90, "price": 80.0, "why": "", "chg7": 12.0, "chg30": 130.0},
+           {"symbol": "NEAR", "score": 85, "price": 4.8, "why": "", "chg7": 5.0, "chg30": 70.0},
+           {"symbol": "INJ", "score": 80, "price": 8.4, "why": "", "chg7": 15.9, "chg30": 50.0}]
+    st = pf.SpotPortfolio(conn).step(rows, {"short": [], "mid": mid, "long": []}, True, T0)
+    held = {p["symbol"] for p in st["positions"]}
+    assert held == {"BTC", "ETH", "NEAR", "INJ"}                                 # the next candidates take the place of Q / QNT
+    # through run(): a coin with the best trend after a +500 % month is still shown in the picks but not bought by «Умеренный»
+    import os
+    cwd, old = os.getcwd(), (pf.coingecko_markets, pf.hyperliquid_universe)
+    mk = fake_markets()
+    for r in mk:
+        if r["symbol"] == "T05":
+            r.update(chg30=500.0, chg200=900.0, chg7=60.0)
+    tmp = __import__("tempfile").mkdtemp()
+    try:
+        os.chdir(tmp); os.makedirs("web")
+        pf.coingecko_markets = lambda pages=2: [dict(r) for r in mk]
+        pf.hyperliquid_universe = lambda: {"perps": {r["symbol"]: {"vol24": 1e8} for r in mk}, "spot": {}, "available": True}
+        res = pf.run(sqlite3.connect(":memory:"), btc_bull=True, llm=None, now=T0 + 60_000)
+    finally:
+        os.chdir(cwd)
+        pf.coingecko_markets, pf.hyperliquid_universe = old
+    assert "T05" in {x["symbol"] for x in res["picks"]["mid"]} and "T05" not in {p["symbol"] for p in res["portfolios"]["mod"]["positions"]}
+    assert len([p for p in res["portfolios"]["mod"]["positions"] if p["bucket"] == "mid"]) >= 3

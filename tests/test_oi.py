@@ -7,11 +7,12 @@ from cnq.agents import oi_watch, paper_desk as pd
 def test_oi_change_same_source():
     conn = sqlite3.connect(":memory:")
     t0 = 1_700_000_000_000
-    vals = {0: 1000.0, 2: 950.0, 4: 870.0, 6: 860.0, 8: 850.0}          # half-hours → OI (BingX)
+    vals = {0: 1000.0, 2: 950.0, 4: 870.0, 6: 860.0, 8: 850.0}          # half-hours → OI (OKX)
     for h, v in vals.items():
-        oi_watch.record(conn, ["SOL"], t0 + h * 1_800_000, fetch_bingx=lambda b, v=v: v, fetch_hl=lambda: {"SOL": 5.0})
+        oi_watch.record(conn, ["SOL"], t0 + h * 1_800_000, fetch_bingx=lambda b, h=h: 300.0 * (1 + 0.1 * h), fetch_hl=lambda: {"SOL": 5.0},
+                        fetch_okx=lambda v=v: {"SOL": v})
     ch = oi_watch.change(conn, "SOL", t0 + 8 * 1_800_000)
-    assert abs(ch - (850 / 1000 - 1)) < 1e-9          # compared with BingX 4 h ago, never mixed with the Hyperliquid value
+    assert abs(ch - (850 / 1000 - 1)) < 1e-9          # OKX first; never mixed with the Hyperliquid or the noisy BingX value
     assert oi_watch.change(conn, "BTC", t0 + 8 * 1_800_000) is None
 
 

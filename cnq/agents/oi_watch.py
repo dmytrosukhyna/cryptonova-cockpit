@@ -27,6 +27,17 @@ def _bingx(base: str, timeout: int = 10) -> float | None:
         return None
 
 
+def _okx(timeout: int = 12) -> dict[str, float]:
+    """All OKX USDT swaps in one call: open interest in USD. 17.10: primary source — BingX OI swings ±25–50 % within hours
+    (venue-specific noise) while the rule's thresholds were fitted on Binance, a venue of comparable size to OKX."""
+    try:
+        with urllib.request.urlopen(urllib.request.Request("https://www.okx.com/api/v5/public/open-interest?instType=SWAP", headers=UA), timeout=timeout) as r:
+            d = json.loads(r.read().decode())
+        return {x["instId"][:-10]: float(x["oiUsd"]) for x in d.get("data") or [] if x.get("instId", "").endswith("-USDT-SWAP") and float(x.get("oiUsd") or 0) > 0}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _hyperliquid(timeout: int = 15) -> dict[str, float]:
     try:
         req = urllib.request.Request("https://api.hyperliquid.xyz/info", data=json.dumps({"type": "metaAndAssetCtxs"}).encode(), headers=UA)
@@ -37,10 +48,14 @@ def _hyperliquid(timeout: int = 15) -> dict[str, float]:
         return {}
 
 
-def record(conn: sqlite3.Connection, bases: list[str], now: int | None = None, fetch_bingx=_bingx, fetch_hl=_hyperliquid) -> dict:
+def record(conn: sqlite3.Connection, bases: list[str], now: int | None = None, fetch_bingx=_bingx, fetch_hl=_hyperliquid, fetch_okx=_okx) -> dict:
     now = now or int(time.time() * 1000)
     _ensure(conn)
-    hl = None; n = {"bingx": 0, "hl": 0}
+    hl = None; n = {"bingx": 0, "hl": 0, "okx": 0}
+    okx = fetch_okx() or {}
+    for b in bases:
+        if b in okx:
+            conn.execute("INSERT OR REPLACE INTO oi_hist VALUES(?,?,?,?)", (b, now, okx[b], "okx")); n["okx"] += 1
     for b in bases:
         v = fetch_bingx(b)
         if v:
@@ -55,9 +70,9 @@ def record(conn: sqlite3.Connection, bases: list[str], now: int | None = None, f
 
 
 def change(conn: sqlite3.Connection, base: str, now: int, window_h: float = 4.0, tol_min: int = 50) -> float | None:
-    """OI change over the last `window_h` hours (fraction), BingX first, else Hyperliquid; None if no matching history."""
+    """OI change over the last `window_h` hours (fraction) from one source: OKX, else Hyperliquid, else BingX; None without history."""
     _ensure(conn)
-    for src in ("bingx", "hl"):
+    for src in ("okx", "hl", "bingx"):   # 17.10: OKX first (closest to the Binance data the thresholds came from), BingX last
         cur = conn.execute("SELECT time, oi_usd FROM oi_hist WHERE symbol=? AND src=? ORDER BY time DESC LIMIT 1", (base, src)).fetchone()
         if not cur or now - cur[0] > 45 * 60_000:
             continue

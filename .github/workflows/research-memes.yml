@@ -5,6 +5,11 @@ name: research-memes
 # research container). Nothing is committed.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "full = probe + research (~25 min); probe = sources only (~1 min)"
+        required: false
+        default: "full"
 
 permissions:
   contents: read
@@ -22,6 +27,7 @@ jobs:
         continue-on-error: true
         run: python scripts/meme_research.py --probe probe.md
       - name: Research (download + tests)
+        if: inputs.mode != 'probe'
         continue-on-error: true
         run: python scripts/meme_research.py --md results.md --json summary.json
       - name: Publish results 1

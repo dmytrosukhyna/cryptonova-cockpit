@@ -285,10 +285,10 @@ def fund_day(data, coin) -> float:
 
 # ── signals (bars per day W: 4h → 6, 1h → 24) ──────────────────────────────────────────────────────────────────────────
 
-def base_ok(b, W):
+def base_ok(b, W, liq=None):
     """Liquidity filter + enough warm-up (20 days for the trend mean)."""
     med = roll_prev(b["v"], 7 * W, np.median)
-    ok = (med * W >= LIQ_DAY)
+    ok = (med * W >= (LIQ_DAY if liq is None else liq))
     ok[: 20 * W] = False
     return ok, med
 
@@ -301,8 +301,8 @@ def sig_breakout(b, W, K):
     return np.nan_to_num(s, nan=0).astype(bool), np.nan_to_num(ratio)
 
 
-def sig_dip(b, W, D, oi=None, oi_drop=-0.10):
-    ok, _ = base_ok(b, W)
+def sig_dip(b, W, D, oi=None, oi_drop=-0.10, liq=None):
+    ok, _ = base_ok(b, W, liq)
     hh = roll_incl(b["h"], W, np.max)
     dd = b["c"] / hh - 1
     s = ok & (dd <= -D) & (np.r_[0, dd[:-1]] > -D)
@@ -595,6 +595,53 @@ def split_by(trades, f):
 
 # ── the study ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+def c_deep_dive(data, memes, sigsC, md) -> dict:
+    """Where does the dip-buy result come from: years, best months, market-wide flush vs a single coin's dump, liquidity."""
+    W, out = 6, {}
+    md.append("\n**Откуда берётся результат C (эталон: −25% от максимума за 24 ч, 3 дня, стоп −25%, половина на +50%):**\n")
+    tr = run_rule(data, "h4", W, {c: s for c, (s, _) in sigsC[0.25].items()}, 3, STOP, TP)
+    if not tr:
+        md.append("- сделок нет"); return out
+    def line(xs):
+        return f"{len(xs)} сделок, средняя {pct(float(np.mean(xs)) if xs else None)}, в плюс {pct(float(np.mean([x > 0 for x in xs])) if xs else None, 0, False)}"
+    by_y, by_m = defaultdict(list), defaultdict(list)
+    for t in tr:
+        by_y[month(t["t"])[:4]].append(t["ret"]); by_m[month(t["t"])].append(t["ret"])
+    md.append("- по годам: " + "; ".join(f"{y}: {line(v)}" for y, v in sorted(by_y.items())))
+    out["by_year"] = {y: [len(v), float(np.mean(v))] for y, v in by_y.items()}
+    top3 = sorted(by_m, key=lambda m: -sum(by_m[m]))[:3]
+    rest = [t["ret"] for t in tr if month(t["t"]) not in top3]
+    md.append(f"- три лучших месяца ({', '.join(f'{m}: {len(by_m[m])} сд., сумма {pct(sum(by_m[m]), 0)}' for m in top3)}); без них: {line(rest)}")
+    out["without_top3"] = [len(rest), float(np.mean(rest)) if rest else None]; out["top3"] = top3
+    flush = {}
+    for c in memes:
+        b = data["h4"][c]; ok, _ = base_ok(b, W); dd = b["c"] / roll_incl(b["h"], W, np.max) - 1
+        for t, o_, d_ in zip(b["t"], ok, dd):
+            if o_:
+                a = flush.setdefault(int(t), [0, 0]); a[0] += 1; a[1] += int(d_ <= -0.15)
+    def br(t):
+        b = data["h4"][t["coin"]]; a = flush.get(int(b["t"][t["e"] - 1]))
+        return None if not a or a[0] < 4 else a[1] / a[0]
+    mass = [t["ret"] for t in tr if (br(t) or 0) >= 0.3]
+    single = [t["ret"] for t in tr if br(t) is not None and br(t) < 0.3]
+    md.append(f"- массовый обвал (в тот же 4-часовой бар ≥ 30% ликвидных мемов на 15%+ ниже максимума за сутки): {line(mass)}")
+    md.append(f"- обвал одной монеты (остальные мемы спокойны): {line(single)}")
+    out["mass"] = [len(mass), float(np.mean(mass)) if mass else None]; out["single"] = [len(single), float(np.mean(single)) if single else None]
+    b1 = run_rule(data, "h4", W, {c: s for c, (s, _) in sigsC[0.25].items()}, 1, STOP, TP)
+    md.append(f"- держать 1 день вместо 3: {line([t['ret'] for t in b1])}")
+    for liq in (250_000, 3_000_000):
+        sg = {c: sig_dip(data["h4"][c], W, 0.25, liq=liq)[0] for c in memes}
+        tl_ = run_rule(data, "h4", W, sg, 3, STOP, TP)
+        ra, p = random_baseline(data, "h4", tl_, W, 3, STOP, TP) if tl_ else (None, None)
+        yy = defaultdict(list)
+        for t in tl_:
+            yy[month(t["t"])[:4]].append(t["ret"])
+        md.append(f"- фильтр ликвидности ${liq / 1e6:g}M/сутки вместо $1M: {line([t['ret'] for t in tl_])}, случайно {pct(ra)} (p {'—' if p is None else f'{p:.2f}'}); "
+                  + "; ".join(f"{y}: {len(v)} сд., {pct(float(np.mean(v)))}" for y, v in sorted(yy.items())))
+        out[f"liq_{liq}"] = [len(tl_), float(np.mean([t["ret"] for t in tl_])) if tl_ else None, ra, p]
+    return out
+
+
 def study(data, log=print) -> tuple[str, dict]:
     memes = [m for m in data["meta"]["memes"] if m in data["h4"]]
     md, S = [], {"memes": memes, "delisted": data["meta"]["delisted"]}
@@ -716,6 +763,7 @@ def study(data, log=print) -> tuple[str, dict]:
         o, _ = describe(name, "h4", W, sigs, {c: r for c, (_, r) in sg.items()}, hold, STOP, TP)
         resC[name] = o; md.append(row(o))
     S["rules"]["C"] = resC
+    S["rules"]["C_why"] = c_deep_dive(data, memes, sigsC, md)
     # OI variant (1h bars where OKX OI exists; compared on the same coins / period)
     oi_coins = [c for c in memes if c in data["oi"] and c in data["h1"]]
     if oi_coins:
@@ -865,6 +913,25 @@ def probe() -> str:
     present = [m for m in MEME_COINS if m in names]
     show("HL metaAndAssetCtxs", {"n": len(uni), "memes_present": present, "delisted_memes": [u["name"] for u in uni if u.get("isDelisted") and u["name"] in MEME_COINS],
                                  "sample_universe": uni[:1], "sample_ctx": (ctx[1] or [None])[:1]}, 2500)
+    vols = [(u["name"], float(c.get("dayNtlVlm") or 0), bool(u.get("isDelisted"))) for u, c in zip(uni, ctx[1] or [])]
+    show("HL newest 50 perps (listing order; name, $M 24h volume)", [(n, round(v / 1e6, 2)) for n, v, d in vols[-60:] if not d][-50:], 2500)
+    show("HL top 50 perps by 24h volume ($M)", [(n, round(v / 1e6, 1)) for n, v, _ in sorted(vols, key=lambda x: -x[1])[:50]], 2500)
+    dexs = hl({"type": "perpDexs"}) or []
+    names_d = [d.get("name") for d in dexs if isinstance(d, dict) and d.get("name")]
+    hip3 = {}
+    for dn in names_d[:12]:
+        m = hl({"type": "metaAndAssetCtxs", "dex": dn}) or [{}, []]
+        hip3[dn] = sorted([(u["name"], round(float(c.get("dayNtlVlm") or 0) / 1e6, 2)) for u, c in zip((m[0] or {}).get("universe", []), m[1] or [])], key=lambda x: -x[1])[:12]
+    show("HIP-3 builder perp dexes (top markets by $M volume)", hip3, 3000)
+    sp = hl({"type": "spotMetaAndAssetCtxs"}) or [{}, []]
+    toks = {t["index"]: t["name"] for t in (sp[0] or {}).get("tokens", [])}
+    spv = []
+    for pr, c in zip((sp[0] or {}).get("universe", []), sp[1] or []):
+        try:
+            spv.append((toks.get(pr["tokens"][0], pr["name"]), round(float(c.get("dayNtlVlm") or 0) / 1e6, 2)))
+        except (KeyError, IndexError, TypeError, ValueError):
+            pass
+    show("HL spot top 25 by $M volume", sorted(spv, key=lambda x: -x[1])[:25], 1500)
     cg = get("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=meme-token&per_page=250&page=1")
     if isinstance(cg, list):
         syms = {x.get("symbol", "").upper(): x.get("market_cap_rank") for x in cg}

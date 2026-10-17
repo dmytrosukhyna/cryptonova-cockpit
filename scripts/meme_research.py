@@ -906,6 +906,350 @@ def study(data, log=print) -> tuple[str, dict]:
     return "\n".join(md), S
 
 
+# ── exits: body first, then a trailing stop (owner's request 17.10.2026) ─────────────────────────────────────────────────
+
+def run_exit(b, e, X):
+    """Long entered at the open of bar e. X: stop (before the body is taken), body_at (+x), body_frac, trail (None = hold the
+    rest to max_bars), basis ("close" | "high"), pre_bars (time limit before the body; None = only max_bars), max_bars.
+    Returns (events [(j, frac, fill)], kind, frac_bars, body_taken, peak_multiple)."""
+    o_, h_, l_, c_ = b["o"], b["h"], b["l"], b["c"]
+    px = o_[e]; n = len(c_)
+    last = n - 1 if X["max_bars"] is None else min(n - 1, e + X["max_bars"] - 1)
+    rem, ev, body, peak, fb = 1.0, [], False, px, 0.0
+    hb = X["basis"] == "high"
+    for j in range(e, last + 1):
+        fb += rem
+        o, h, lo, c = o_[j], h_[j], l_[j], c_[j]
+        if not body:
+            sp = px * (1 + X["stop"])
+            if lo <= sp:
+                ev.append((j, rem, min(o, sp))); return ev, "стоп", fb, False, max(peak, h) / px
+            if h >= px * (1 + X["body_at"]):
+                f = min(rem, X["body_frac"]); fill = max(o, px * (1 + X["body_at"]))
+                ev.append((j, f, fill)); rem -= f; body = True
+                peak = max(peak, h if hb else c)
+                if rem <= 1e-9:
+                    return ev, "тело", fb, True, peak / px
+                continue
+            if X["pre_bars"] is not None and j - e + 1 >= X["pre_bars"]:
+                ev.append((j, rem, c)); return ev, "время, тело не взяли", fb, False, max(peak, h) / px
+            peak = max(peak, h if hb else c)
+        elif X["trail"] is None:
+            peak = max(peak, h)
+        elif hb:
+            tl = peak * (1 - X["trail"])
+            if lo <= tl:
+                ev.append((j, rem, min(o, tl))); return ev, "трейлинг", fb, True, peak / px
+            peak = max(peak, h)
+        else:
+            peak = max(peak, c)
+            if c <= peak * (1 - X["trail"]):
+                ev.append((j, rem, c)); return ev, "трейлинг", fb, True, peak / px
+    ev.append((last, rem, c_[last]))
+    return ev, ("конец данных" if last == n - 1 and (X["max_bars"] is None or e + X["max_bars"] - 1 > n - 1) else "макс. срок"), fb, body, peak / px
+
+
+def trades_x(data, key, W, sigs, X):
+    out = []
+    for coin, sig in sigs.items():
+        b = data[key][coin]; n = len(b["c"]); fd = fund_day(data, coin)
+        idx = np.flatnonzero(sig); k = 0
+        while k < len(idx):
+            e = idx[k] + 1
+            if e >= n:
+                break
+            if b["o"][e] <= 0:
+                k += 1; continue
+            ev, kind, fb, body, pk = run_exit(b, e, X)
+            g = sum(f * (fill / b["o"][e] - 1) for _, f, fill in ev)
+            j = ev[-1][0]
+            out.append({"coin": coin, "e": int(e), "j": int(j), "t": int(b["t"][e]), "ret": g - COST - fd * fb / W, "kind": kind,
+                        "days": (j - e + 1) / W, "body": body, "peak": pk})
+            while k < len(idx) and idx[k] <= j:
+                k += 1
+    return sorted(out, key=lambda t: t["t"])
+
+
+def random_x(data, key, W, trades, X, reps=30, seed=3):
+    if not trades:
+        return None, None
+    rng = random.Random(seed); avgs = []
+    for _ in range(reps):
+        rs = []
+        for tr in trades:
+            b = data[key][tr["coin"]]; n = len(b["c"])
+            lo, hi = max(20 * W + 1, tr["e"] - 15 * W), min(n - 2, tr["e"] + 15 * W)
+            if hi <= lo:
+                continue
+            e = rng.randint(lo, hi)
+            ev, _, fb, _, _ = run_exit(b, e, X)
+            rs.append(sum(f * (fill / b["o"][e] - 1) for _, f, fill in ev) - COST - fund_day(data, tr["coin"]) * fb / W)
+        if rs:
+            avgs.append(float(np.mean(rs)))
+    s_ = float(np.mean([t["ret"] for t in trades]))
+    return float(np.mean(avgs)), float(np.mean([a >= s_ for a in avgs]))
+
+
+def portfolio_x(data, key, W, sigs, strength, X, max_pos=6, size=0.10):
+    """$10k, 10% per position, ≤ 6 positions, exits pre-computed by run_exit (deterministic given prices), MTM every bar."""
+    coins = list(sigs)
+    tl = np.unique(np.concatenate([data[key][c]["t"] for c in coins]))
+    g2c = {}
+    for c in coins:
+        t = data[key][c]["t"]; m = np.full(len(tl), -1, dtype=np.int64); m[np.searchsorted(tl, t)] = np.arange(len(t)); g2c[c] = m
+    half = COST / 2
+    cash, pos, pending, pstr, eq, done, last_px, first = START, {}, [], {}, np.zeros(len(tl)), [], {}, None
+    for gi in range(len(tl)):
+        if pending:
+            equity = cash + sum(p["qty"] * last_px[c] for c, p in pos.items())
+            for c in sorted(pending, key=lambda c: -pstr.get(c, 0)):
+                if len(pos) >= max_pos:
+                    break
+                i = g2c[c][gi]; b = data[key][c]
+                if c in pos or i < 0 or b["o"][i] <= 0:
+                    continue
+                notional = size * equity; q0 = notional / b["o"][i]
+                ev, kind, _, body, pk = run_exit(b, i, X)
+                cash -= notional * (1 + half)
+                pos[c] = {"qty": q0, "q0": q0, "ev": {j: (f, fill) for j, f, fill in ev}, "in": notional * (1 + half), "out": 0.0,
+                          "t": int(b["t"][i]), "end": ev[-1][0], "kind": kind, "body": body, "pk": pk}
+                last_px[c] = b["o"][i]
+            pending = []
+        for c in list(pos):
+            i = g2c[c][gi]
+            if i < 0:
+                continue
+            b, p = data[key][c], pos[c]
+            fee = p["qty"] * b["o"][i] * fund_day(data, c) / W; cash -= fee; p["in"] += fee
+            if i in p["ev"]:
+                f, fill = p["ev"][i]; q = min(p["qty"], p["q0"] * f); v = q * fill * (1 - half)
+                cash += v; p["out"] += v; p["qty"] -= q
+            if i >= p["end"] or p["qty"] <= 1e-12:
+                if p["qty"] > 1e-12:
+                    v = p["qty"] * b["c"][i] * (1 - half); cash += v; p["out"] += v; p["qty"] = 0
+                done.append({"coin": c, "t": p["t"], "ret": p["out"] / p["in"] - 1, "pnl": p["out"] - p["in"], "kind": p["kind"]})
+                del pos[c]
+            else:
+                last_px[c] = b["c"][i]
+        pstr = {}
+        for c in coins:
+            i = g2c[c][gi]
+            if i >= 0 and sigs[c][i] and c not in pos:
+                pending.append(c); pstr[c] = float(strength[c][i]); first = first or int(tl[gi])
+        eq[gi] = cash + sum(p["qty"] * last_px[c] for c, p in pos.items())
+    k0 = int(np.searchsorted(tl, first)) if first else 0
+    eqs, tls = eq[k0:], tl[k0:]
+    me = {}
+    for t, v in zip(tls, eqs):
+        me[month(int(t))] = v
+    prev, mret = (eqs[0] if len(eqs) else START), {}
+    for m in sorted(me):
+        mret[m] = me[m] / prev - 1; prev = me[m]
+    act = [v for v in mret.values() if abs(v) > 1e-9]
+    pn = sorted((d["pnl"] for d in done), reverse=True)
+    tot = sum(pn)
+    return {"final": float(eqs[-1]) if len(eqs) else START, "dd": max_dd(eqs), "trades": len(done),
+            "months_pos": float(np.mean([v > 0 for v in act])) if act else None, "months_active": len(act),
+            "top5_share": (sum(pn[:5]) / tot) if tot > 0 else None, "best_usd": pn[0] if pn else None, "pnl": tot}
+
+
+EXIT_NOW = {"stop": -0.25, "body_at": 0.50, "body_frac": 0.5, "trail": None, "basis": "high", "pre_bars": 18, "max_bars": 18}
+EXIT_REF = {"stop": -0.25, "body_at": 1.00, "body_frac": 0.5, "trail": 0.35, "basis": "close", "pre_bars": None, "max_bars": 60 * 6}
+
+
+def xname(X, W=6):
+    if X["trail"] is None:
+        return f"стоп {X['stop'] * 100:.0f}%, {X['body_frac'] * 100:.0f}% на +{X['body_at'] * 100:.0f}%, остальное через {X['max_bars'] // W} д"
+    pre = "тело ждём до конца" if X["pre_bars"] is None else f"тело ждём {X['pre_bars'] // W} д"
+    mx = "без срока" if X["max_bars"] is None else f"макс. {X['max_bars'] // W} д"
+    return (f"стоп {X['stop'] * 100:.0f}%, {X['body_frac'] * 100:.0f}% на +{X['body_at'] * 100:.0f}%, трейлинг {X['trail'] * 100:.0f}% "
+            f"({'по закрытиям 4ч' if X['basis'] == 'close' else 'по максимумам'}), {pre}, {mx}")
+
+
+def sig_rs_entry(data, coins, W=6, L=5, N=3):
+    """Momentum entry for exit tests: once a day (4h bar closing at 00:00 UTC) a coin newly enters the top-N by L-day return."""
+    per_t = defaultdict(list)
+    for c in coins:
+        b = data["h4"][c]; ok, _ = base_ok(b, W)
+        r = np.full(len(b["c"]), np.nan); r[L * W:] = b["c"][L * W:] / b["c"][:-L * W] - 1
+        for i, t in enumerate(b["t"]):
+            if (int(t) + DAY // 6) % DAY == 0 and ok[i] and np.isfinite(r[i]):
+                per_t[int(t)].append((r[i], c))
+    top = {t: {c for _, c in sorted(v, reverse=True)[:N]} for t, v in per_t.items() if len(v) >= N + 1}
+    sigs, strg = {}, {}
+    for c in coins:
+        b = data["h4"][c]; s = np.zeros(len(b["c"]), dtype=bool); st = np.zeros(len(b["c"]))
+        for i, t in enumerate(b["t"]):
+            t = int(t)
+            if t in top and c in top[t] and c not in top.get(t - DAY, set()) and (t - DAY) in top:
+                s[i] = True; st[i] = 1.0
+        sigs[c], strg[c] = s, st
+    return sigs, strg
+
+
+def exits_study(data, log=print) -> tuple[str, dict]:
+    memes = [m for m in data["meta"]["memes"] if m in data["h4"]]
+    W, md, S = 6, [], {}
+    h4_all = np.concatenate([data["h4"][c]["t"] for c in memes])
+    t_mid = int((h4_all.min() + h4_all.max()) / 2)
+    md.append(f"## Выходы «сначала тело, потом трейлинг» (свечи 4ч, {day(int(h4_all.min()))} → {day(int(h4_all.max()))})\n")
+    md.append("Эталон выхода выбран до прогона (как описал владелец): стоп −25% до взятия тела; на +100% продаём половину "
+              "(возвращаем вложенное); остаток — трейлинг 35% ниже максимума по закрытиям 4ч; без лимита времени до тела; максимум 60 дней. "
+              "Для сравнения — текущий выход (стоп −25%, половина на +50%, остальное через 3 дня). Сетка: стоп −25/−35%; тело +100%/50%, "
+              "+50%/67% (вернуть вложенное), +50%/50%; трейлинг 25/35/50% по закрытиям или по максимумам; до тела ждём 3 дня или до конца; "
+              "максимум 60 дней.\n")
+    entries = {}
+    for D in (0.25, 0.20, 0.30):
+        sg = {c: sig_dip(data["h4"][c], W, D) for c in memes}
+        entries[f"C откуп −{int(D * 100)}%"] = ({c: s for c, (s, _) in sg.items()}, {c: r for c, (_, r) in sg.items()})
+    for K in (3, 5):
+        sg = {c: sig_breakout(data["h4"][c], W, K) for c in memes}
+        entries[f"A пробой K={K}"] = ({c: s for c, (s, _) in sg.items()}, {c: r for c, (_, r) in sg.items()})
+    entries["B вход в топ-3 по 5 дням"] = sig_rs_entry(data, memes)
+    grid = []
+    for st in (-0.25, -0.35):
+        for ba, bf in ((1.0, 0.5), (0.5, 2 / 3), (0.5, 0.5)):
+            for tr in (0.25, 0.35, 0.50):
+                for basis in ("close", "high"):
+                    for pre in (18, None):
+                        grid.append({"stop": st, "body_at": ba, "body_frac": bf, "trail": tr, "basis": basis, "pre_bars": pre, "max_bars": 360})
+    md.append("| вход | выход | сделок | средняя | в плюс | тело взято | лучшая сделка | итог $10k | макс. просадка | доля топ-5 сделок в прибыли | 1-я / 2-я половина |")
+    md.append("|---|---|---|---|---|---|---|---|---|---|---|")
+    S["entries"] = {}
+    for en, (sigs, strg) in entries.items():
+        t0 = time.time()
+        res = []
+        for X in grid:
+            tr = trades_x(data, "h4", W, sigs, X)
+            a = float(np.mean([t["ret"] for t in tr])) if tr else None
+            res.append((a if a is not None else -9, X, len(tr)))
+        pos_cells = sum(1 for a, _, _ in res if a > 0)
+        best = max(res, key=lambda r: r[0])
+        med = float(np.median([a for a, _, _ in res]))
+        rows = {}
+        for lab, X in (("текущий", EXIT_NOW), ("эталон владельца", EXIT_REF), ("лучший в сетке", best[1])):
+            tr = trades_x(data, "h4", W, sigs, X)
+            if not tr:
+                continue
+            pf = portfolio_x(data, "h4", W, sigs, strg, X)
+            r = np.array([t["ret"] for t in tr])
+            (a1, _), (a2, _) = halves(tr, t_mid)
+            rows[lab] = {"exit": xname(X), "n": len(tr), "avg": float(r.mean()), "win": float((r > 0).mean()), "body": float(np.mean([t["body"] for t in tr])),
+                         "best": float(r.max()), "final": pf["final"], "dd": pf["dd"], "top5": pf["top5_share"], "half1": a1, "half2": a2,
+                         "months_pos": pf["months_pos"], "months_active": pf["months_active"], "best_peak": float(max(t["peak"] for t in tr))}
+            o = rows[lab]
+            md.append(f"| {en} | {lab}: {o['exit']} | {o['n']} | {pct(o['avg'])} | {pct(o['win'], 0, False)} | {pct(o['body'], 0, False)} | "
+                      f"{pct(o['best'], 0)} (пик ×{o['best_peak']:.1f}) | ${o['final']:,.0f} | {pct(o['dd'], 0)} | {pct(o['top5'], 0, False) if o['top5'] is not None else '—'} | "
+                      f"{pct(o['half1'])} / {pct(o['half2'])} |")
+        S["entries"][en] = {"cells_pos": pos_cells, "cells": len(res), "median_avg": med, "rows": rows}
+        md.append(f"| {en} | сетка: {pos_cells} из {len(res)} вариантов в плюсе, медиана {pct(med)} на сделку | | | | | | | | | |")
+        log(f"exits {en}: {round(time.time() - t0)}s")
+    # detailed look at the dip-buy (reference entry): trail × basis, body variants, max term, random baseline, without top months
+    sigs, strg = entries["C откуп −25%"]
+    md.append("\n### Откуп −25%: чувствительность выхода (стоп −25%, тело ждём до конца, максимум 60 дней)\n")
+    md.append("| тело | трейлинг | по закрытиям: средняя / итог $10k / просадка | по максимумам: средняя / итог $10k / просадка |")
+    md.append("|---|---|---|---|")
+    sens = []
+    for ba, bf in ((1.0, 0.5), (0.5, 2 / 3), (0.5, 0.5)):
+        for trl in (0.25, 0.35, 0.50):
+            cells = []
+            for basis in ("close", "high"):
+                X = {"stop": -0.25, "body_at": ba, "body_frac": bf, "trail": trl, "basis": basis, "pre_bars": None, "max_bars": 360}
+                tr = trades_x(data, "h4", W, sigs, X); pf = portfolio_x(data, "h4", W, sigs, strg, X)
+                a = float(np.mean([t["ret"] for t in tr])) if tr else None
+                sens.append((ba, bf, trl, basis, a, pf["final"], pf["dd"]))
+                cells.append(f"{pct(a)} / ${pf['final']:,.0f} / {pct(pf['dd'], 0)}")
+            md.append(f"| {bf * 100:.0f}% на +{ba * 100:.0f}% | {trl * 100:.0f}% | " + " | ".join(cells) + " |")
+    S["dip_sensitivity"] = sens
+    md.append("\n### Откуп −25%, эталон владельца: срок, стоп, проверка случайным входом\n")
+    md.append("| вариант | сделок | средняя | случайно | p | итог $10k | просадка | месяцев в плюсе | без 3 лучших месяцев | медиана дней в сделке |")
+    md.append("|---|---|---|---|---|---|---|---|---|---|")
+    S["dip_ref"] = {}
+    for lab, X in (("текущий выход", EXIT_NOW), ("эталон владельца (макс. 60 д)", EXIT_REF), ("эталон, макс. 30 д", dict(EXIT_REF, max_bars=180)),
+                   ("эталон, без срока", dict(EXIT_REF, max_bars=None)), ("эталон, стоп −35%", dict(EXIT_REF, stop=-0.35)),
+                   ("эталон, тело ждём 3 дня", dict(EXIT_REF, pre_bars=18)), ("эталон, 67% на +50%", dict(EXIT_REF, body_at=0.5, body_frac=2 / 3)),
+                   ("эталон, трейлинг по максимумам", dict(EXIT_REF, basis="high"))):
+        tr = trades_x(data, "h4", W, sigs, X)
+        if not tr:
+            continue
+        ra, p = random_x(data, "h4", W, tr, X)
+        pf = portfolio_x(data, "h4", W, sigs, strg, X)
+        bym = defaultdict(list)
+        for t in tr:
+            bym[month(t["t"])].append(t["ret"])
+        top3 = sorted(bym, key=lambda m: -sum(bym[m]))[:3]
+        rest = [t["ret"] for t in tr if month(t["t"]) not in top3]
+        o = {"n": len(tr), "avg": float(np.mean([t["ret"] for t in tr])), "rand": ra, "p": p, "final": pf["final"], "dd": pf["dd"],
+             "months_pos": pf["months_pos"], "months_active": pf["months_active"], "wo_top3": float(np.mean(rest)) if rest else None,
+             "med_days": float(np.median([t["days"] for t in tr])), "top5": pf["top5_share"], "kinds": {k: sum(1 for t in tr if t["kind"] == k) for k in set(t["kind"] for t in tr)}}
+        S["dip_ref"][lab] = o
+        md.append(f"| {lab} | {o['n']} | {pct(o['avg'])} | {pct(ra)} | {'—' if p is None else f'{p:.2f}'} | ${o['final']:,.0f} | {pct(o['dd'], 0)} | "
+                  f"{pct(o['months_pos'], 0, False)} из {o['months_active']} | {pct(o['wo_top3'])} | {o['med_days']:.1f} |")
+    md.append("\nЧем закрывались сделки (эталон владельца): " + ", ".join(f"{k} — {v}" for k, v in sorted(S["dip_ref"].get("эталон владельца (макс. 60 д)", {}).get("kinds", {}).items())))
+    return "\n".join(md), S
+
+
+# ── tokenomics / backers: can today's data say anything about past returns? ─────────────────────────────────────────────
+
+TIER1 = ["a16z", "andreessen", "paradigm", "polychain", "pantera", "dragonfly", "multicoin", "jump", "wintermute", "gsr", "dwf",
+         "binance labs", "yzi", "coinbase ventures", "animoca", "delphi", "sequoia", "galaxy", "framework", "electric capital",
+         "hashed", "spartan", "sky9", "okx ventures", "bybit", "kucoin ventures", "gate", "blockchain capital", "placeholder", "variant"]
+
+
+def _norm(x: str) -> str:
+    return "".join(ch for ch in (x or "").lower() if ch.isalnum())
+
+
+def tokenomics_check() -> tuple[str, dict]:
+    md, S = ["## Токеномика и инвесторы: предсказывали ли они доходность мемов?\n"], {}
+    cg = get("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=meme-token&order=market_cap_desc&per_page=250&page=1"
+             "&price_change_percentage=30d,200d,1y")
+    if not isinstance(cg, list):
+        md.append(f"CoinGecko не ответил: {cg}"); return "\n".join(md), S
+    rows = []
+    for x in cg:
+        mc, fdv = x.get("market_cap") or 0, x.get("fully_diluted_valuation") or 0
+        r1 = x.get("price_change_percentage_1y_in_currency"); r200 = x.get("price_change_percentage_200d_in_currency")
+        rows.append({"id": x.get("id"), "name": x.get("name"), "sym": (x.get("symbol") or "").upper(), "mc": mc, "fdv": fdv,
+                     "ratio": (mc / fdv) if mc and fdv else None, "r1y": r1, "r200": r200, "r30": x.get("price_change_percentage_30d_in_currency")})
+    ra = get("https://api.llama.fi/raises", timeout=40)
+    raises = (ra or {}).get("raises") if isinstance(ra, dict) else None
+    S["raises_total"] = len(raises or [])
+    by_name = defaultdict(list)
+    for r in raises or []:
+        by_name[_norm(r.get("name"))].append(r)
+    for x in rows:
+        rr = by_name.get(_norm(x["name"])) or []
+        inv = [i for r in rr for i in (r.get("leadInvestors") or []) + (r.get("otherInvestors") or [])]
+        x["raised"] = bool(rr); x["tier1"] = any(any(k in i.lower() for k in TIER1) for i in inv); x["investors"] = inv[:8]
+    def spearman(a, b):
+        a, b = np.asarray(a, float), np.asarray(b, float)
+        ra_, rb_ = a.argsort().argsort(), b.argsort().argsort()
+        return float(np.corrcoef(ra_, rb_)[0, 1]) if len(a) > 3 else None
+    for lab, key in (("1 год", "r1y"), ("200 дней", "r200")):
+        pts = [(x["ratio"], x[key]) for x in rows if x["ratio"] is not None and x[key] is not None and x["mc"] >= 2e7]
+        if len(pts) > 10:
+            rho = spearman([p[0] for p in pts], [p[1] for p in pts])
+            hi = [p[1] for p in pts if p[0] >= 0.95]; lo = [p[1] for p in pts if p[0] < 0.8]
+            md.append(f"- доля монет в обращении (капитализация / FDV) vs доходность за {lab}: {len(pts)} мемов с капитализацией ≥ $20M, "
+                      f"ранговая корреляция {rho:+.2f}; ≥ 95% в обращении — медиана {np.median(hi):+.0f}% ({len(hi)}), < 80% — медиана "
+                      f"{np.median(lo) if lo else float('nan'):+.0f}% ({len(lo)})")
+            S[f"ratio_{key}"] = {"n": len(pts), "rho": rho, "hi_med": float(np.median(hi)) if hi else None, "hi_n": len(hi),
+                                 "lo_med": float(np.median(lo)) if lo else None, "lo_n": len(lo)}
+    rz = [x for x in rows if x["raised"]]
+    md.append(f"- мемов из топ-250 CoinGecko, у которых DefiLlama знает раунды финансирования (совпадение по названию): {len(rz)}"
+              + (": " + ", ".join(f"{x['sym']} ({'tier-1' if x['tier1'] else 'есть'}; 1 год {x['r1y']:+.0f}%)" if x['r1y'] is not None else f"{x['sym']}" for x in rz[:15]) if rz else ""))
+    if rz:
+        a = [x["r1y"] for x in rz if x["r1y"] is not None]; b = [x["r1y"] for x in rows if not x["raised"] and x["r1y"] is not None and x["mc"] >= 2e7]
+        md.append(f"- доходность за год: с раундами — медиана {np.median(a) if a else float('nan'):+.0f}% ({len(a)}), без — {np.median(b) if b else float('nan'):+.0f}% ({len(b)})")
+        S["raised"] = {"n": len(rz), "med_1y": float(np.median(a)) if a else None, "others_med_1y": float(np.median(b)) if b else None,
+                       "list": [[x["sym"], x["tier1"], x["r1y"]] for x in rz]}
+    md.append("\n**Почему это не доказательство:** список — только выжившие мемы, которые сегодня в топ-250; доля в обращении и раунды — "
+              "сегодняшние, а доходность — прошлая (заглядывание вперёд); истории концентрации держателей в бесплатных источниках нет. "
+              "Поэтому в балл эти признаки входят как фильтр риска, а не как доказанный источник доходности.")
+    return "\n".join(md), S
+
+
 # ── probe of the live-scanner sources ──────────────────────────────────────────────────────────────────────────────────
 
 def probe() -> str:
@@ -976,6 +1320,34 @@ def probe() -> str:
     show("DexScreener token-boosts/top (first 2)", bo[:2] if isinstance(bo, list) else bo, 1500)
     sr = get("https://api.dexscreener.com/latest/dex/search?q=solana%20meme")
     show("DexScreener search", {"n": len((sr or {}).get("pairs") or []) if isinstance(sr, dict) else None, "err": sr.get("__error__") if isinstance(sr, dict) else None})
+    # sources for the spot-meme score (tokenomics, holders, backers)
+    det = get("https://api.coingecko.com/api/v3/coins/dogwifcoin?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false")
+    if isinstance(det, dict):
+        show("CoinGecko coin details (dogwifcoin): keys + fields", {"keys": sorted(det)[:60], "categories": det.get("categories"), "platforms": det.get("platforms"),
+                                                                   "genesis_date": det.get("genesis_date"), "links": {k: det.get("links", {}).get(k) for k in ("homepage", "twitter_screen_name")}}, 2500)
+        mint = (det.get("platforms") or {}).get("solana")
+        if mint:
+            la = post("https://api.mainnet-beta.solana.com", {"jsonrpc": "2.0", "id": 1, "method": "getTokenLargestAccounts", "params": [mint]})
+            vals = ((la or {}).get("result") or {}).get("value") if isinstance(la, dict) else None
+            show("RPC getTokenLargestAccounts (WIF)", {"err": (la or {}).get("error") if isinstance(la, dict) else la, "n": len(vals or []), "first": (vals or [])[:2]}, 1500)
+            if vals:
+                accs = [v["address"] for v in vals[:20]]
+                ma = post("https://api.mainnet-beta.solana.com", {"jsonrpc": "2.0", "id": 1, "method": "getMultipleAccounts", "params": [accs, {"encoding": "jsonParsed"}]})
+                owners = [(((x or {}).get("data") or {}).get("parsed") or {}).get("info", {}).get("owner") for x in ((ma or {}).get("result") or {}).get("value") or []]
+                mo = post("https://api.mainnet-beta.solana.com", {"jsonrpc": "2.0", "id": 1, "method": "getMultipleAccounts", "params": [[o for o in owners if o][:20], {"encoding": "base64", "dataSlice": {"offset": 0, "length": 0}}]})
+                progs = [(x or {}).get("owner") if x else None for x in ((mo or {}).get("result") or {}).get("value") or []]
+                show("RPC owners of the 20 largest WIF accounts → owner program", list(zip(owners, progs))[:20], 3000)
+            sup = post("https://api.mainnet-beta.solana.com", {"jsonrpc": "2.0", "id": 1, "method": "getTokenSupply", "params": [mint]})
+            show("RPC getTokenSupply (WIF)", sup, 600)
+    else:
+        show("CoinGecko coin details", det)
+    ra = get("https://api.llama.fi/raises", timeout=40)
+    rl = (ra or {}).get("raises") if isinstance(ra, dict) else None
+    show("DefiLlama raises", {"err": ra.get("__error__") if isinstance(ra, dict) else None, "n": len(rl or []), "sample": (rl or [])[-2:],
+                              "memeish": [r for r in rl or [] if any(k in (r.get("category") or "").lower() for k in ("meme",))][:5]}, 3000)
+    sp = get("https://www.okx.com/api/v5/public/instruments?instType=SPOT")
+    show("OKX spot instruments", {"n": len((sp or {}).get("data") or []) if isinstance(sp, dict) else None,
+                                  "meme_bases": sorted({x.get("baseCcy") for x in ((sp or {}).get("data") or []) if x.get("quoteCcy") == "USDT" and x.get("baseCcy") in ("WIF", "BONK", "PEPE", "POPCAT", "FARTCOIN", "PENGU", "TRUMP", "DOGE", "SHIB", "FLOKI", "MEW", "PNUT", "MOODENG", "SPX", "PUMP", "USELESS")})})
     inst = get("https://www.okx.com/api/v5/public/instruments?instType=SWAP")
     ok = isinstance(inst, dict) and inst.get("data")
     oi = get("https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-history?instId=WIF-USDT-SWAP&period=1H&limit=3")
@@ -983,32 +1355,67 @@ def probe() -> str:
     return "\n\n".join(out)
 
 
+def load_or_download(cache: str | None, synthetic_: bool) -> dict:
+    import pickle
+    if synthetic_:
+        return synthetic()
+    if cache and os.path.exists(cache) and time.time() - os.path.getmtime(cache) < 20 * 3600:
+        with open(cache, "rb") as f:
+            d = pickle.load(f)
+        print(f"data from cache {cache} ({(time.time() - os.path.getmtime(cache)) / 3600:.1f} h old)")
+        return d
+    d = download()
+    if cache:
+        with open(cache, "wb") as f:
+            pickle.dump(d, f)
+    return d
+
+
+def _clean(o):
+    if isinstance(o, dict):
+        return {k: _clean(v) for k, v in o.items() if k not in ("by_month", "port_mret", "mret")}
+    if isinstance(o, (list, tuple)):
+        return [_clean(v) for v in o]
+    if isinstance(o, (np.floating, float)):
+        return None if not math.isfinite(float(o)) else round(float(o), 5)
+    if isinstance(o, (np.integer,)):
+        return int(o)
+    if isinstance(o, np.bool_):
+        return bool(o)
+    return o
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--md"); ap.add_argument("--json"); ap.add_argument("--probe"); ap.add_argument("--synthetic", action="store_true")
+    ap.add_argument("--exits", help="write the exits study (markdown) here"); ap.add_argument("--exits-json")
+    ap.add_argument("--tokenomics", help="write the tokenomics/backers check (markdown) here")
+    ap.add_argument("--cache", help="pickle with downloaded data (reused if < 20 h old)")
     a = ap.parse_args()
     if a.probe:
         open(a.probe, "w").write(probe()); print("probe written"); return 0
+    if a.tokenomics:
+        md, S = tokenomics_check()
+        open(a.tokenomics, "w").write(md + "\n\n```\n" + json.dumps(_clean(S), ensure_ascii=False)[:6000] + "\n```\n"); print(md[:2000]); return 0
     t0 = time.time()
-    data = synthetic() if a.synthetic else download()
+    data = load_or_download(a.cache, a.synthetic)
     t1 = time.time()
+    if a.exits:
+        md, S = exits_study(data)
+        hdr = f"# Мем-перпы Hyperliquid — выходы, {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC{' (СИНТЕТИКА — тест)' if a.synthetic else ''}\n\n"
+        open(a.exits, "w").write(hdr + md + "\n")
+        if a.exits_json:
+            open(a.exits_json, "w").write(json.dumps(_clean(S), ensure_ascii=False))
+        print(hdr + md[:3000]); print("seconds", round(t1 - t0), round(time.time() - t1))
+        if not a.md:
+            return 0
     md, S = study(data)
     S["seconds"] = {"download": round(t1 - t0), "study": round(time.time() - t1)}
     hdr = f"# Мем-перпы Hyperliquid — результаты {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC{' (СИНТЕТИКА — тест)' if a.synthetic else ''}\n\n"
     if a.md:
         open(a.md, "w").write(hdr + md + "\n")
     if a.json:
-        def clean(o):
-            if isinstance(o, dict):
-                return {k: clean(v) for k, v in o.items() if k not in ("by_month", "port_mret", "mret")}
-            if isinstance(o, (list, tuple)):
-                return [clean(v) for v in o]
-            if isinstance(o, (np.floating, float)):
-                return None if not math.isfinite(float(o)) else round(float(o), 5)
-            if isinstance(o, (np.integer,)):
-                return int(o)
-            return o
-        open(a.json, "w").write(json.dumps(clean(S), ensure_ascii=False))
+        open(a.json, "w").write(json.dumps(_clean(S), ensure_ascii=False))
     print(hdr + md[:3000])
     print("seconds", S["seconds"])
     return 0

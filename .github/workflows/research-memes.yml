@@ -2,12 +2,12 @@ name: research-memes
 # Manual only (no schedule, no self-dispatch). Hyperliquid meme-perp research (scripts/meme_research.py, docs/research/memes.md)
 # plus a probe of the live meme-scanner sources (GeckoTerminal, DexScreener, Solana RPC, RugCheck, OKX OI).
 # Results are published as job annotations (readable through the GitHub API; artifacts/logs are not reachable from the
-# research container). Nothing is committed.
+# research container). Nothing is committed. Downloaded candles are kept in the Actions cache (reused if < 20 h old).
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "full = probe + research (~25 min); probe = sources only (~1 min)"
+        description: "full = probe + research + exits + tokenomics (~30 min); exits = exits + tokenomics (cached data); probe = sources only"
         required: false
         default: "full"
 
@@ -23,58 +23,86 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install numpy
+      - name: Candle cache
+        if: inputs.mode != 'probe'
+        uses: actions/cache@v4
+        with:
+          path: memes_data.pkl
+          key: memes-data-${{ github.run_id }}
+          restore-keys: memes-data-
       - name: Probe live sources
+        if: inputs.mode != 'exits'
         continue-on-error: true
         run: python scripts/meme_research.py --probe probe.md
       - name: Research (download + tests)
+        if: inputs.mode == 'full'
+        continue-on-error: true
+        run: python scripts/meme_research.py --cache memes_data.pkl --md results.md --json summary.json
+      - name: Exits (body first, then trailing)
         if: inputs.mode != 'probe'
         continue-on-error: true
-        run: python scripts/meme_research.py --md results.md --json summary.json
-      - name: Publish results 1
-        if: always()
+        run: python scripts/meme_research.py --cache memes_data.pkl --exits exits.md --exits-json exits.json
+      - name: Tokenomics and backers check
+        if: inputs.mode != 'probe'
+        continue-on-error: true
+        run: python scripts/meme_research.py --tokenomics tokenomics.md
+      - name: Publish results
+        if: always() && inputs.mode == 'full'
         run: |
-          python - results.md results 0 <<'PY'
+          python - results.md results 0 10 <<'PY'
           import os, sys
-          f, title, off = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
           s = open(f).read() if os.path.exists(f) else "(no file)"
           n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
-          for j, p in enumerate(parts[off:off + 10], start=off):
-              p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
-              print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
-          PY
-      - name: Publish results 2
-        if: always()
-        run: |
-          python - results.md results 10 <<'PY'
-          import os, sys
-          f, title, off = sys.argv[1], sys.argv[2], int(sys.argv[3])
-          s = open(f).read() if os.path.exists(f) else "(no file)"
-          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
-          for j, p in enumerate(parts[off:off + 10], start=off):
+          for j, p in enumerate(parts[off:off + mx], start=off):
               p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
               print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
           PY
       - name: Publish summary
-        if: always()
+        if: always() && inputs.mode == 'full'
         run: |
-          python - summary.json summary 0 <<'PY'
+          python - summary.json summary 0 6 <<'PY'
           import os, sys
-          f, title, off = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
           s = open(f).read() if os.path.exists(f) else "(no file)"
           n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
-          for j, p in enumerate(parts[off:off + 10], start=off):
+          for j, p in enumerate(parts[off:off + mx], start=off):
+              p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+              print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
+          PY
+      - name: Publish exits
+        if: always() && inputs.mode != 'probe'
+        run: |
+          python - exits.md exits 0 10 <<'PY'
+          import os, sys
+          f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+          s = open(f).read() if os.path.exists(f) else "(no file)"
+          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          for j, p in enumerate(parts[off:off + mx], start=off):
+              p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+              print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
+          PY
+      - name: Publish tokenomics
+        if: always() && inputs.mode != 'probe'
+        run: |
+          python - tokenomics.md tokenomics 0 5 <<'PY'
+          import os, sys
+          f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+          s = open(f).read() if os.path.exists(f) else "(no file)"
+          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          for j, p in enumerate(parts[off:off + mx], start=off):
               p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
               print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
           PY
       - name: Publish probe
-        if: always()
+        if: always() && inputs.mode != 'exits'
         run: |
-          python - probe.md probe 0 <<'PY'
+          python - probe.md probe 0 8 <<'PY'
           import os, sys
-          f, title, off = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
           s = open(f).read() if os.path.exists(f) else "(no file)"
           n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
-          for j, p in enumerate(parts[off:off + 10], start=off):
+          for j, p in enumerate(parts[off:off + mx], start=off):
               p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
               print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
           PY

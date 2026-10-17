@@ -161,6 +161,13 @@ def study():
                 P(f"{a:7} {w0:+4d}…{w1:+3d}h {np.nanmean(x[:, 0]):+7.2f} {np.nanmean(x[:, 1]):+7.2f} {np.nanmean(ex):+7.2f} "
                   f"{tstat(ex):+5.1f} {(x[:, 0] < 0).mean() * 100:5.0f} {np.nanmean(x[:, 5]):8.0f} {np.nanmean(np.abs(x[:, 0])):7.2f} "
                   f"{np.nanmean(x[:, 4]):7.2f} {np.exp(np.nanmean(lv)):5.2f} {tstat(lv):+8.1f}   {py}")
+        yy = np.array([r['year'] for r in rows])
+        for a in ('BTC', 'basket'):
+            s = []
+            for (w0, w1) in ((-24, 0), (0, 1), (1, 4)):
+                x = np.array([r[(a, w0, w1)] for r in rows], float); lv = np.log(x[:, 2] / x[:, 3])
+                s.append(f"{w0:+d}…{w1:+d}h " + '/'.join(f"{np.exp(np.nanmean(lv[yy == y])):.2f}" for y in YEARS))
+            P(f"   vol× by year 2023/24/25/26, {a:6}: " + ' | '.join(s))
     # extra sample: 2021–2022 events (BTC/ETH/basket of the coins listed then)
     P('\n--- out-of-sample check: 2021–2022 events (same method) — excess return % (t) and vol× for the key windows ---')
     for typ in TYPES:
@@ -325,8 +332,9 @@ def rules():
     # empirical null: the same 180 variants on fake calendars (every event moved to a random non-event week)
     rng = np.random.default_rng(11); cnt = []; keep = collections.defaultdict(list); bmin = []; bt = []
     worst = lambda s: min(v for v in s['per'].values() if np.isfinite(v))
-    for _ in range(40):
-        g2 = rule_grid(tmap=placebo_map(rng)); cnt.append(sum(1 for g in g2 if g[-1]['allpos']))
+    pmaps = [placebo_map(rng) for _ in range(40)]
+    for pm in pmaps:
+        g2 = rule_grid(tmap=pm); cnt.append(sum(1 for g in g2 if g[-1]['allpos']))
         for g in g2: keep[g[:6]].append(g[-1]['avg'])
         bmin.append(max(worst(g[-1]) for g in g2 if g[-1]['n'] >= 15)); bt.append(max(g[-1]['t'] for g in g2 if g[-1]['n'] >= 15))
     cnt, bmin, bt = np.array(cnt), np.array(bmin), np.array(bt)
@@ -361,6 +369,19 @@ def rules():
             for hh in (b / 2, b * 2):
                 P(f"   hold {hh:g} h           {fmt(post_fade(typ, asset, a, hh, side))}")
             P(f"   2021–22 events      {fmt(post_fade(typ, asset, a, b, side, sample='extra_2021_2022'))}")
+    # pooled pre-announcement drift: all three event types together (one rule, not selected per type)
+    P('\n--- pre-announcement drift, FOMC + CPI + NFP pooled: long from −E h to the release (or 15 min before it) ---')
+    for asset in ASSETS:
+        for eh in (-12, -8, -6, -4, -2):
+            for xh in (-0.25, 0):
+                s = pre_drift('ALL', asset, eh, xh, 1)
+                pl = np.array([pre_drift('ALL', asset, eh, xh, 1, tmap=pm)['avg'] for pm in pmaps])
+                o = pre_drift('ALL', asset, eh, xh, 1, sample='extra_2021_2022')
+                P(f"ALL  {asset:6} long {eh:+3d}h→{xh:+g}h  {fmt(s)} | placebo median {np.median(pl):+.2f}% (real beats {(s['avg'] > pl).mean() * 100:.0f}%) "
+                  f"| 2021–22 n={o['n']} {o['avg']:+.2f}% t {o['t']:+.1f}")
+    for typ in ('FOMC', 'CPI', 'NFP'):
+        s = pre_drift(typ, 'BTC', -6, -0.25, 1); o = pre_drift(typ, 'BTC', -6, -0.25, 1, sample='extra_2021_2022')
+        P(f"{typ:4} BTC    long  -6h→-0.25h  {fmt(s)} | 2021–22 n={o['n']} {o['avg']:+.2f}% t {o['t']:+.1f}")
     # the owner's exact hypothesis: "price gets dumped before / after" = short into the event, short after the event
     P('\n--- owner\'s hypothesis as trades: short BTC / basket before and after (net) ---')
     for typ in ('FOMC', 'CPI', 'NFP', 'ALL'):
@@ -467,6 +488,28 @@ def null_pf(nrep=20):
       f"(beats {(max(rp, default=0) > gain).mean() * 100:.0f}% of fake calendars)")
 
 
+def day_avg(v):
+    """[(ret, day)] → (days, mean of per-day mean returns %, t over days): E enters in batches, a day is the real unit."""
+    d = collections.defaultdict(list)
+    for r, dd in v: d[dd].append(r)
+    x = np.array([np.mean(a) for a in d.values()]) * 100
+    return len(x), (x.mean() if len(x) else np.nan), tstat(x)
+
+
+def e_after_by_day(cs, label):
+    """E entries in the first 12 h after any FOMC/CPI/NFP vs all other E entries — trade-weighted and day-weighted."""
+    eb = np.array(sorted({bar(e['t']) for e in EV if e['type'] in ('FOMC', 'CPI', 'NFP') and bar(e['t']) is not None}), int)
+    g = collections.defaultdict(list)
+    for c in cs:
+        if c['rule'] != 'E': continue
+        i = c['i']; j = np.searchsorted(eb, i, side='right'); since = (i - eb[j - 1]) / HB if j > 0 else 1e9
+        g['after' if since < 12 else 'other'].append((c['ret'], AP.DAY[i]))
+    for k in ('after', 'other'):
+        n, m, t = day_avg(g[k]); r = np.array([x for x, _ in g[k]]) * 100
+        P(f"{label} E {'0…12 ч после события' if k == 'after' else 'остальные':22} trades {len(r):5d} avg {r.mean():+6.2f}% | "
+          f"days {n:4d} day-avg {m:+6.2f}% (t {t:+.1f})")
+
+
 def oos_ap():
     """2021–2022 check for the post-event idea on the rules that can be built before 2023 (E and B; F and D need real
     OI / basis metrics, imputed before 2023): average trade by entry time relative to FOMC/CPI/NFP."""
@@ -487,6 +530,7 @@ def oos_ap():
         for (rl, g), v in sorted(grp.items()):
             r = np.array([x for x, _ in v]) * 100
             P(f"{tl:4} {rl} {g:14} n={len(r):5d} days={len(set(d for _, d in v)):4d} avg {r.mean():+6.2f}% win {(r > 0).mean() * 100:3.0f}%")
+    e_after_by_day(cs, '2021–22')
 
 
 def autopilot():
@@ -517,6 +561,7 @@ def autopilot():
         days = len(set(AP.DAY[ii]))
         py = ' '.join(f"{r[y == q].mean():+6.2f}" if (y == q).any() else '     -' for q in YEARS)
         P(f"{rl:4} {g:16} {len(r):5d} {days:5d} {r.mean():+6.2f}% {(r > 0).mean() * 100:3.0f}% | {py}")
+    e_after_by_day(B, '2023–26')
     res = {}
     P('\n--- filters (FOMC + CPI + NFP unless stated) ---')
     variants = pf_variants()

@@ -131,7 +131,11 @@ def cand_S(brk_d=5, trend_d=20, trail_d=1, max_d=14, stop=0.08, btc_filter=False
 
 
 def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f_share=0.15, f_open=3, lev_cap=3.0, start=10_000.0,
-             s_share=0.0, s_open=0, e_gap=40, d_share=0.0, d_open=0, r_share=0.0, r_open=0):
+             s_share=0.0, s_open=0, e_gap=40, d_share=0.0, d_open=0, r_share=0.0, r_open=0, extra=None):
+    """extra (off by default): new rule letters with their own caps, e.g. alt-coin candidates (docs/research/alt100.md):
+    {'b': dict(risk=0.01, open=4), 'f': dict(share=0.25, open=3)} — 'risk' sizes like B (risk / stop distance, ≤ 3× equity),
+    'share' sizes like F/D (share of equity); 'open' = max open positions of that letter. Letters must also be in `rules`."""
+    extra = extra or {}
     ev = sorted([c for c in cands if c['rule'] in rules], key=lambda c: c['i'])
     byi = collections.defaultdict(list)
     for c in ev: byi[c['i']].append(c)
@@ -167,6 +171,10 @@ def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f
             elif c['rule'] == 'D':                      # rule D: share of equity per trade, at most d_open at once
                 if sum(1 for o in open_ if o['rule'] == 'D') >= d_open: continue
                 n = eq * d_share
+            elif c['rule'] in extra:                    # extra letters: own cap, risk- or share-sized
+                x = extra[c['rule']]
+                if sum(1 for o in open_ if o['rule'] == c['rule']) >= x.get('open', 0): continue
+                n = eq * x['share'] if 'share' in x else min(eq * x['risk'] / c['sf'], eq * 3)
             else:
                 if sum(1 for o in open_ if o['rule'] == 'B') >= max_open: continue
                 n = min(eq * risk / c['sf'], eq * 3)

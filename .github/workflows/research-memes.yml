@@ -1,0 +1,74 @@
+name: research-memes
+# Manual only (no schedule, no self-dispatch). Hyperliquid meme-perp research (scripts/meme_research.py, docs/research/memes.md)
+# plus a probe of the live meme-scanner sources (GeckoTerminal, DexScreener, Solana RPC, RugCheck, OKX OI).
+# Results are published as job annotations (readable through the GitHub API; artifacts/logs are not reachable from the
+# research container). Nothing is committed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  memes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - name: Probe live sources
+        continue-on-error: true
+        run: python scripts/meme_research.py --probe probe.md
+      - name: Research (download + tests)
+        continue-on-error: true
+        run: python scripts/meme_research.py --md results.md --json summary.json
+      - name: Publish results 1
+        if: always()
+        run: |
+          python - results.md results 0 <<'PY'
+          import os, sys
+          f, title, off = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          s = open(f).read() if os.path.exists(f) else "(no file)"
+          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          for j, p in enumerate(parts[off:off + 10], start=off):
+              p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+              print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
+          PY
+      - name: Publish results 2
+        if: always()
+        run: |
+          python - results.md results 10 <<'PY'
+          import os, sys
+          f, title, off = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          s = open(f).read() if os.path.exists(f) else "(no file)"
+          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          for j, p in enumerate(parts[off:off + 10], start=off):
+              p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+              print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
+          PY
+      - name: Publish summary
+        if: always()
+        run: |
+          python - summary.json summary 0 <<'PY'
+          import os, sys
+          f, title, off = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          s = open(f).read() if os.path.exists(f) else "(no file)"
+          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          for j, p in enumerate(parts[off:off + 10], start=off):
+              p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+              print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
+          PY
+      - name: Publish probe
+        if: always()
+        run: |
+          python - probe.md probe 0 <<'PY'
+          import os, sys
+          f, title, off = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          s = open(f).read() if os.path.exists(f) else "(no file)"
+          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          for j, p in enumerate(parts[off:off + 10], start=off):
+              p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+              print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
+          PY

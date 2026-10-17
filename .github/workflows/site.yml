@@ -2,7 +2,7 @@ name: refresh-and-deploy
 on:
   push:
     branches: [main]
-    paths-ignore: ["web/bybit.json"]      # the Bybit mirror on the owner's Mac updates this file every few minutes
+    paths-ignore: ["web/bybit.json", "web/ivan.enc.json"]      # the Bybit mirror on the owner's Mac updates these files every few minutes
   schedule:
     - cron: "*/30 * * * *"      # данные + отдел новостей каждые 30 минут (UTC)
     - cron: "13,43 * * * *"     # второе расписание со сдвигом: GitHub часто задерживает/пропускает запуски, два шанса в полчаса
@@ -70,6 +70,10 @@ jobs:
       - name: Arbitrage watch → web/arb.json
         continue-on-error: true
         run: python -m cnq.cli arb --out web || true
+      - name: Triangle watch (3 trades inside one exchange) → web/tri.json
+        continue-on-error: true
+        timeout-minutes: 3
+        run: python -m cnq.cli tri --out web || true
       - name: Coin research (анкета, топ-100, страх/жадность, капитализация) → web/markets.json, web/research.json
         continue-on-error: true
         run: python -m cnq.cli research --out web
@@ -138,7 +142,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/funding.json web/macro.json web/memes.json web/arb.json web/calendar.json web/weekly.json web/calibration.json web/markets.json web/research.json web/whales.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/funding.json web/macro.json web/memes.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/markets.json web/research.json web/whales.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase -X theirs origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done

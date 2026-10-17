@@ -15,6 +15,7 @@
   python -m cnq.cli agents [--send]           run departments (news/fundamentals/risk/editor) → web/decision.json (+post to Telegram)
   python -m cnq.cli funding [--out web]       paper funding-carry account (spot long + perp short) → web/funding.json
   python -m cnq.cli arb [--out web]           cross-exchange spot spreads net of fees, sampled each run → web/arb.json
+  python -m cnq.cli tri [--out web]           triangles inside one exchange (all USDT/USDC/FDUSD/BTC/ETH/BNB pairs) → web/tri.json
   python -m cnq.cli memes [--out web]         HL meme perps + Solana memecoin watchlist + paper «Мем-портфель» → web/memes.json
   python -m cnq.cli macro [--out web]         DXY, US 10Y/2Y, USDJPY, oil, gold, index futures, VIX, Nikkei: value + 1d/5d change → web/macro.json
 """
@@ -33,7 +34,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "memes", "macro"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -183,6 +184,16 @@ def main(argv: list[str] | None = None) -> int:
         d = arb_watch.run(conn)
         write_report(d, os.path.join(args.out, "arb.json"))
         print(f"arb.json: venues={d['venues_ok']} day={d['day']} best_now={d['now'][:1]}")
+    elif args.cmd == "tri":
+        import os, sqlite3
+        from .agents import tri_watch
+        from .terminal.report import write_report
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/agents.sqlite")
+        os.makedirs(args.out, exist_ok=True)
+        d = tri_watch.run(conn)
+        write_report(d, os.path.join(args.out, "tri.json"))
+        print(f"tri.json: venues={d['venues_ok']} scanned={d['scanned_total']} day={d['day']} best_now={d['now'][:1]}")
     elif args.cmd == "memes":
         import os, sqlite3
         from .agents import memes

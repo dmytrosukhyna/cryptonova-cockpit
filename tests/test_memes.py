@@ -434,3 +434,108 @@ def test_holders_from_rugcheck_report():
     got = ms.holders_any("M", lambda url: rep, lambda u, b: (_ for _ in ()).throw(OSError()))
     assert got["source"] == "RugCheck"
     assert ms.holders_any("M", lambda url: {}, lambda u, b: (_ for _ in ()).throw(OSError())) is None
+
+
+# ── spot meme status: «ждём» / «можно на небольшую сумму» / «не брать» ────────────────────────────────────────────────
+
+def _cand(**kw):
+    r = {"symbol": "M", "price": 1.0, "vol24": 5e7, "score": 70, "flags": [], "listed": {"okx_spot": True, "hl_perp": False, "solana_liq": None},
+         "from_high30_pct": -10.0}
+    r.update(kw)
+    return r
+
+
+def test_spot_status_on_synthetic_candidates():
+    cases = [
+        (_cand(flags=[{"level": "red", "text": "в обращении только 20% токенов — давление разлоков"}]), "avoid", "красный флаг"),
+        (_cand(flags=[{"level": "red", "text": "RugCheck: Mint Authority still enabled"}]), "avoid", "красный флаг: RugCheck — могут допечатать"),
+        (_cand(flags=[{"level": "yellow", "text": "топ-10 кошельков держат 45%"}], from_high30_pct=-35.0), "small", "просадка −35%"),
+        (_cand(vol24=2e6, from_high30_pct=-50.0), "avoid", "мало оборота: $2M"),
+        (_cand(listed={"okx_spot": False, "hl_perp": False, "solana_liq": 5e5}), "avoid", "нет на OKX и Hyperliquid"),
+        (_cand(listed={"okx_spot": False, "hl_perp": False, "solana_liq": 2e6}, from_high30_pct=-31.0), "small", "просадка −31%"),
+        (_cand(score=45, from_high30_pct=-60.0), "avoid", "низкий балл качества: 45"),
+        (_cand(from_high30_pct=-29.4), "wait", "−29% от максимума за 30 дней"),
+        (_cand(from_high30_pct=None), "wait", "ждём просадку от −30%"),
+        (_cand(price=None), "avoid", "нет цены"),
+    ]
+    for r, st, why in cases:
+        ms.status_of(r)
+        assert r["status"] == st, (r, st)
+        assert r["status_ru"] == {"small": "можно на небольшую сумму", "wait": "ждём", "avoid": "не брать"}[st]
+        assert r["why_ru"].startswith(why) or why in r["why_ru"], (r["why_ru"], why)
+        assert len(r["why_ru"].split()) <= 12, r["why_ru"]
+    long = _cand(flags=[{"level": "red", "text": " ".join(["слово"] * 30)}])
+    ms.status_of(long)
+    assert len(long["why_ru"].split()) <= 12 and long["why_ru"].endswith("…")
+    rows = [dict(_cand(symbol="AAA", from_high30_pct=-40.0), score=60), dict(_cand(symbol="BBB", from_high30_pct=-45.0), score=80),
+            _cand(symbol="CCC"), _cand(symbol="DDD", vol24=1e6)]
+    for r in rows:
+        ms.status_of(r)
+    s = ms.summary_of(rows)
+    assert s == "Сейчас можно присмотреться (на небольшую сумму): BBB, AAA; остальные — ждём (1) или не брать (1)." and "\n" not in s
+    assert ms.summary_of(rows[2:]) == "Сейчас брать нечего: ждём просадку — 1, не брать — 1."
+
+
+def test_high30_is_a_lower_bound_from_all_sources():
+    d0 = NOW // DAY
+    hi, basis = ms.high30(1.0, [-10.0, -20.0, 50.0], None, None, NOW)
+    assert abs(hi - 1.25) < 1e-9 and basis == ["24 ч", "7 дн", "30 дн"]          # 7 days ago the price was 1 / 0.8
+    hi, _ = ms.high30(1.0, [None, None, None], {d0 - 5: 2.0, d0 - 40: 9.0}, None, NOW)
+    assert hi == 2.0                                                               # own sample inside 30 days counts, the old one not
+    hi, basis = ms.high30(1.0, [0, 0, 0], {}, {"px": 1.05, "d": {str(d0 - 3): 3.0}}, NOW)
+    assert hi == 3.0 and basis[-1].startswith("свечи Hyperliquid")
+    hi, _ = ms.high30(1.0, [0, 0, 0], {}, {"px": 2.0, "d": {str(d0 - 3): 3.0}}, NOW)
+    assert hi == 1.0                                                               # HL price ≠ CoinGecko price → other asset, ignored
+    assert ms.high30(None, [1, 2, 3], None, None, NOW) == (None, [])
+
+
+def test_hl_daily_highs_per_token_for_k_contracts():
+    c = flat_1h(NOW, px=9.0, days=3)
+    out = mm.hl_daily_highs({"kPEPE": ctx_of(9.0), "DOGE": ctx_of(0.2)}, {"kPEPE": c, "DOGE": flat_1h(NOW, px=0.2, days=3)})
+    assert set(out) == {"PEPE", "DOGE"} and abs(out["PEPE"]["px"] - 0.009) < 1e-12
+    assert abs(max(out["PEPE"]["d"].values()) - 9.0 * 1.01 / 1000) < 1e-12 and abs(max(out["DOGE"]["d"].values()) - 0.202) < 1e-12
+
+
+def test_spot_run_adds_status_summary_and_uses_own_price_samples():
+    state = {"m2_px": 1.0}
+
+    def markets():
+        return [_cg_row(1, symbol="dip", market_cap=5e9, fully_diluted_valuation=5e9, total_volume=2e8, price_change_percentage_30d_in_currency=-40.0),
+                _cg_row(2, symbol="calm", market_cap=5e9, fully_diluted_valuation=5e9, total_volume=2e8, current_price=state["m2_px"],
+                        price_change_percentage_24h=0.0, price_change_percentage_7d_in_currency=0.0, price_change_percentage_30d_in_currency=5.0),
+                _cg_row(3, symbol="thin", market_cap=6e7, fully_diluted_valuation=6e7, total_volume=2e6)]
+
+    def get(url):
+        if "coins/markets" in url:
+            return markets()
+        if "okx" in url:
+            return {"data": [{"baseCcy": b, "quoteCcy": "USDT"} for b in ("DIP", "CALM", "THIN")]}
+        raise OSError(url)
+    conn = sqlite3.connect(":memory:"); ms.ensure(conn)
+    res = ms.run(conn, NOW, get, lambda u, b: None, set(), deadline=10 ** 12)
+    st = {r["symbol"]: r for r in res["rows"]}
+    assert st["DIP"]["status"] == "small" and st["DIP"]["from_high30_pct"] == -40.0
+    assert st["CALM"]["status"] == "wait" and st["THIN"]["status"] == "avoid"
+    assert res["status_counts"] == {"small": 1, "wait": 1, "avoid": 1} and "DIP" in res["summary_ru"] and res["status_rules_ru"]
+    for k in ("score", "reasons", "flags", "listed", "coverage", "why_ru", "status_ru", "high30_px", "high30_basis"):
+        assert k in st["CALM"], k
+    state["m2_px"] = 0.6                                       # a day later CALM fell 40 %, CoinGecko % fields still say +5 % for 30 days
+    res = ms.run(conn, NOW + DAY, get, lambda u, b: None, set(), deadline=10 ** 12)
+    calm = next(r for r in res["rows"] if r["symbol"] == "CALM")
+    assert calm["status"] == "small" and calm["from_high30_pct"] == -40.0 and any(b.startswith("наши замеры") for b in calm["high30_basis"])
+
+
+def test_meme_run_exposes_spot_summary_and_stores_hl_highs():
+    conn = sqlite3.connect(":memory:")
+
+    def spot(conn_, now, hl, deadline):
+        return {"rows": [{"symbol": "X", "status": "wait"}], "sources": {}, "note": "n", "summary_ru": "S", "status_rules_ru": "R",
+                "status_counts": {"small": 0, "wait": 1, "avoid": 0}}
+    r = mm.run(conn, NOW, hl_ctx_fn=lambda: {"kPEPE": ctx_of(9.0)}, hl_candles_fn=lambda c, s, e: flat_1h(NOW, px=9.0),
+               sol_fn=no_sol, btc_fn=dict, spot_fn=spot, holders_fn=no_holders)
+    assert r["spot_summary_ru"] == "S" and r["spot_status_rules_ru"] == "R" and r["spot_status_counts"]["wait"] == 1
+    hl = ms._cache_any(conn, "hlhi:PEPE")[1]
+    assert hl and abs(hl["px"] - 0.009) < 1e-12 and len(hl["d"]) >= 20
+    r = mm.run(sqlite3.connect(":memory:"), NOW, hl_ctx_fn=lambda: {}, hl_candles_fn=lambda *a: [], sol_fn=no_sol, btc_fn=dict,
+               spot_fn=no_spot, holders_fn=no_holders)
+    assert r["spot_summary_ru"] == "Список спот-мемов пуст — статусов нет." and r["spot_status_counts"] == {"small": 0, "wait": 0, "avoid": 0}

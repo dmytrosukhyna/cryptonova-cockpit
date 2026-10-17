@@ -9,6 +9,8 @@ a position the autopilot closed (time exit, target, stop) → reduce-only market
 Positions that were already open before the mirror started are not chased. Env:
   CNQ_MIRROR_PROFILE=bal (cons | bal | aggr)   CNQ_MIRROR_SCALE=auto (sizes × Bybit balance / autopilot balance) or a number
   CNQ_MIRROR_SRC=<url of paper.json>          CNQ_LIVE_TRADING=yes → real account (default: Bybit demo)
+Optional «Иван тест» monitor (cnq/execution/ivan_watch.py): with IVAN_BYBIT_KEY / IVAN_BYBIT_SECRET / IVAN_PASS and CNQ_GH_TOKEN
+set, every 15 min a read-only snapshot of that account is encrypted and published to web/ivan.enc.json.
 Log: data/mirror.jsonl, state: data/mirror_state.json. Stdlib only."""
 from __future__ import annotations
 
@@ -18,6 +20,7 @@ import sys
 import time
 import urllib.request
 
+from . import ivan_watch
 from .bybit_trade import BybitTrader
 
 SRC = os.environ.get("CNQ_MIRROR_SRC", "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/paper.json")
@@ -100,6 +103,15 @@ def publish(bx: BybitTrader, st: dict) -> bool:
         return r.status in (200, 201)
 
 
+def ivan_tick() -> bool:
+    """«Иван тест»: one read-only snapshot → encrypted web/ivan.enc.json. A failure prints one line and never stops the mirror."""
+    try:
+        return ivan_watch.run() is not None
+    except Exception as e:  # noqa: BLE001
+        print(ivan_watch.describe_error(e), flush=True)
+        return False
+
+
 def fetch_desk() -> dict:
     req = urllib.request.Request(SRC + f"?t={int(time.time())}", headers={"Cache-Control": "no-cache", "User-Agent": "cnq-mirror"})
     with urllib.request.urlopen(req, timeout=20) as r:
@@ -160,10 +172,15 @@ def step(bx: BybitTrader, st: dict, desk: dict, now: int | None = None) -> dict:
 def main() -> int:
     bx = BybitTrader()
     if "--check" in sys.argv:
-        eq = bx.equity()
-        sc = float(SCALE_ENV) if SCALE_ENV != "auto" else eq / max(1.0, float(fetch_desk().get("equity") or 10_000))
-        print(f"масштаб сделок ×{sc:.3f} (автопилот считает от своих $10 000, на Bybit — пропорционально балансу)")
-        print(f"OK · {bx.mode} · баланс счёта ${eq:,.2f} · открытых позиций {len(bx.positions())} · источник {SRC} · профиль {PROFILE}")
+        try:
+            eq = bx.equity()
+            sc = float(SCALE_ENV) if SCALE_ENV != "auto" else eq / max(1.0, float(fetch_desk().get("equity") or 10_000))
+            print(f"масштаб сделок ×{sc:.3f} (автопилот считает от своих $10 000, на Bybit — пропорционально балансу)")
+            print(f"OK · {bx.mode} · баланс счёта ${eq:,.2f} · открытых позиций {len(bx.positions())} · источник {SRC} · профиль {PROFILE}")
+        finally:
+            msg = ivan_watch.check()          # None (prints nothing) when the IVAN_* lines are not in ~/.cryptonova.env
+            if msg:
+                print(msg + ("" if GH_TOKEN else " · нет CNQ_GH_TOKEN — публиковать не буду"), flush=True)
         return 0
     global SCALE
     eq = bx.equity()
@@ -173,6 +190,7 @@ def main() -> int:
     log({"ev": "start", "mode": bx.mode, "profile": PROFILE, "scale": SCALE, "equity": bx.equity()})
     last_pub = 0.0
     last_pulse = time.time() - 25 * 60
+    ivan_on, last_ivan, ivan_said = bool(GH_TOKEN and ivan_watch.creds()), 0.0, False
     while True:
         try:
             r = step(bx, st, fetch_desk())
@@ -192,6 +210,10 @@ def main() -> int:
                     last_pulse = time.time(); log({"ev": "pulse"})
             except Exception as e:  # noqa: BLE001
                 log({"ev": "pulse_error", "error": str(e)[:200]}); last_pulse = time.time()
+        if ivan_on and time.time() - last_ivan >= ivan_watch.EVERY_S:   # once at start, then every IVAN_EVERY min (default 15)
+            last_ivan = time.time()
+            if ivan_tick() and not ivan_said:
+                ivan_said = True; print(f"Иван тест: монитор работает, web/ivan.enc.json обновляется каждые {ivan_watch.EVERY_S / 60:g} мин", flush=True)
         time.sleep(60)
 
 

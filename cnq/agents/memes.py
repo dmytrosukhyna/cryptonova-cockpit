@@ -785,6 +785,9 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     for k in ("geckoterminal", "dexscreener", "solana_rpc", "rugcheck"):
         sources.setdefault(k, False)
     spot = {"rows": [], "sources": {}, "note": "Пропущено: не хватило времени в этом запуске."}
+    if candles:     # daily highs of the HL candles we already have → better 30-day high for the spot status (meme_spot.high30)
+        from . import meme_spot
+        _safe(meme_spot.put_hl_highs, conn, hl_daily_highs(ctx, candles), now)
     if time.time() - t_start < deadline_s - 15:
         spot = _safe(spot_fn, conn, now, set(ctx), t_start + deadline_s - 5) or {"rows": [], "sources": {}, "note": "Спот-сканер упал — список пуст."}
     for k in ("coingecko", "defillama", "okx"):
@@ -799,6 +802,9 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     out["market"] = market
     out["spot_memes"] = spot["rows"]
     out["spot_note"] = spot["note"]
+    out["spot_summary_ru"] = spot.get("summary_ru") or ("Список спот-мемов пуст — статусов нет." if not spot["rows"] else "")
+    out["spot_status_rules_ru"] = spot.get("status_rules_ru") or _spot_status_rules()
+    out["spot_status_counts"] = spot.get("status_counts") or {"small": 0, "wait": 0, "avoid": 0}
     if sol_note:
         out["solana_note"] = sol_note + " " + out["solana_note"]
     out["seconds"] = round(time.time() - t_start, 1)
@@ -808,6 +814,27 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
 def _spot_formula() -> str:
     from . import meme_spot
     return meme_spot.SCORE_SPOT
+
+
+def _spot_status_rules() -> str:
+    from . import meme_spot
+    return meme_spot.STATUS_RULES_RU
+
+
+def hl_daily_highs(ctx: dict, candles: dict) -> dict:
+    """{SYM: {"px": price per token, "d": {utc day: high}}} from HL 1h candles; ×1000 contracts (kPEPE …) divided back to one token."""
+    out = {}
+    for coin, c1 in candles.items():
+        k = coin.startswith("k") and coin[1:].isupper()
+        mult = 1000.0 if k else 1.0
+        d: dict[int, float] = {}
+        for t, o, h, lo, c, v in c1:
+            if h:
+                d[t // DAY] = max(d.get(t // DAY, 0.0), h / mult)
+        px = (ctx.get(coin) or {}).get("px")
+        if d and px:
+            out[coin[1:] if k else coin] = {"px": px / mult, "d": d}
+    return out
 
 
 def account_equity(conn, ctx) -> float:

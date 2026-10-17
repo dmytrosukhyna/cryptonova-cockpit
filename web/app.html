@@ -1090,7 +1090,37 @@ let MEMES=null, MCAL=null, MACRO=null, MEMES_T=0;
 // ---------------------------------------------------------------- «Иван тест» (17.10): private monitor of the Bybit account connected to Ivan's platform.
 // The Mac mirror reads it with a read-only key and publishes it ENCRYPTED (web/ivan.enc.json); only a browser with the owner's password can read it.
 let IVAN=null, IVAN_T=0, IVAN_ERR='';
-/*IVAN_DECRYPT*/
+// «Иван тест»: decrypt web/ivan.enc.json in the browser. WebCrypto (crypto.subtle) + atob only, no libraries.
+// ivanDecrypt is self-contained and can be pasted into the panel as is. Format (cnq/execution/ivan_watch.py):
+//   km = PBKDF2-SHA256(utf8(pass), salt, 200000 iterations, 512 bits); encKey = km[0:32], macKey = km[32:64]
+//   tag = HMAC-SHA256(macKey, salt || nonce || ct)  is checked first (wrong pass → Error('Неверный пароль'))
+//   keystream block i = HMAC-SHA256(encKey, nonce || uint32_be(i)); plaintext = ct XOR keystream (UTF-8 JSON)
+async function ivanDecrypt(blob, pass) {
+  if (typeof blob === 'string') blob = JSON.parse(blob);
+  if (!blob || blob.v !== 1) throw new Error('Неизвестный формат файла');
+  const S = crypto.subtle;
+  const u8 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const salt = u8(blob.salt), nonce = u8(blob.nonce), ct = u8(blob.ct), tag = u8(blob.tag);
+  const base = await S.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const km = new Uint8Array(await S.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 200000 }, base, 512));
+  const hk = raw => S.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const encKey = await hk(km.slice(0, 32)), macKey = await hk(km.slice(32, 64));
+  const msg = new Uint8Array(salt.length + nonce.length + ct.length);
+  msg.set(salt, 0); msg.set(nonce, salt.length); msg.set(ct, salt.length + nonce.length);
+  const t = new Uint8Array(await S.sign('HMAC', macKey, msg));
+  let diff = t.length ^ tag.length;
+  for (let i = 0; i < t.length; i++) diff |= t[i] ^ (tag[i] | 0);
+  if (diff) throw new Error('Неверный пароль');
+  const blocks = await Promise.all(Array.from({ length: Math.ceil(ct.length / 32) }, (_, i) => {
+    const m = new Uint8Array(nonce.length + 4);
+    m.set(nonce, 0);
+    new DataView(m.buffer).setUint32(nonce.length, i, false);
+    return S.sign('HMAC', encKey, m).then(b => new Uint8Array(b));
+  }));
+  const pt = new Uint8Array(ct.length);
+  for (let i = 0; i < ct.length; i++) pt[i] = ct[i] ^ blocks[i >> 5][i & 31];
+  return JSON.parse(new TextDecoder().decode(pt));
+}
 async function loadIvan(force){ const pass=load('cnq_ivan_pass',''); const card=$('#ivanCard'); if(!card) return; if(!pass||load('cnq_guest','')==='1'&&!force){ card.hidden=true; return; } if(!force&&Date.now()-IVAN_T<2*60000&&IVAN) return renderIvan(); IVAN_T=Date.now();
   let blob=null; try{ const r=await fetch('./ivan.enc.json?'+Math.floor(Date.now()/60000),{cache:'no-store'}); if(r.ok) blob=await r.json(); }catch(e){}
   if(!blob){ IVAN=null; IVAN_ERR='Данных пока нет: зеркало на Маке ещё не выложило «Иван тест». Проверь, что в файле ключей есть строки IVAN_… и зеркало перезапущено.'; return renderIvan(); }
@@ -1113,7 +1143,7 @@ function renderIvan(){ const el=$('#ivanCard'); if(!el) return; const pass=load(
    <h3>Открытые позиции</h3>${pos.length?pos.map(p=>`<div class="mrow"><b>${(p.symbol||'').replace('USDT','')}</b><i>${p.side==='Buy'||p.side==='LONG'?'лонг':'шорт'} · ${p.size} · вход ${fmtP(+p.entry)} → ${fmtP(+p.mark)}${p.leverage?' · плечо '+p.leverage+'×':''}${p.liq?' · ликвидация '+fmtP(+p.liq):''}</i><span class="num ${cl(+p.upnl)}">${sg(+p.upnl)}</span></div>`).join(''):'<div class="muted" style="font-size:12.5px">Открытых позиций нет.</div>'}
    <h3>Последние закрытые</h3>${cls.length?cls.map(t=>`<div class="mrow"><b>${(t.symbol||'').replace('USDT','')}</b><i>${t.side==='Buy'||t.side==='LONG'?'лонг':'шорт'} · ${fmtP(+t.entry)} → ${fmtP(+t.exit)} · ${t.close_time?new Date(t.close_time).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}</i><span class="num ${cl(+t.pnl)}">${sg(+t.pnl)}</span></div>`).join(''):'<div class="muted" style="font-size:12.5px">Закрытых сделок пока нет.</div>'}
    ${st.n?`<div class="muted" style="font-size:11.5px;margin-top:6px">Средняя прибыльная ${st.avg_win!=null?sg(st.avg_win):'—'} · средняя убыточная ${st.avg_loss!=null?sg(st.avg_loss):'—'} · худшая ${st.max_loss!=null?sg(st.max_loss):'—'}</div>`:''}
-   <div class="muted" style="font-size:11.5px;margin-top:6px">${I.note||''}</div>`; }
+   ${(I.spot||[]).length?`<div class="muted" style="font-size:11.5px;margin-top:6px">Спот: ${I.spot.length} последних сделок (покупки и продажи без плеча).</div>`:''}<div class="muted" style="font-size:11.5px;margin-top:6px">${I.note||''}</div>`; }
 async function loadMemesCal(){ if(Date.now()-MEMES_T<5*60000&&MEMES) return; MEMES_T=Date.now();
   try{ MEMES=await (await fetch('./memes.json',{cache:'no-store'})).json(); }catch(e){ MEMES=null; }
   try{ MCAL=await (await fetch('./calendar.json',{cache:'no-store'})).json(); }catch(e){ MCAL=null; } try{ MACRO=await (await fetch('./macro.json',{cache:'no-store'})).json(); }catch(e){ MACRO=null; } }

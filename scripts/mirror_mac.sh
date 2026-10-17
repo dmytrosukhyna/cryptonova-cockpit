@@ -4,6 +4,13 @@
 #     export BYBIT_API_KEY=...
 #     export BYBIT_API_SECRET=...
 #     export CNQ_GH_TOKEN=...
+# - optional, private monitor «Иван тест» (cnq/execution/ivan_watch.py). Add these lines only if you want it;
+#   without them the mirror runs exactly as before:
+#     export IVAN_BYBIT_KEY=...      # API key of the «Иван тест» Bybit account, created as READ-ONLY
+#     export IVAN_BYBIT_SECRET=...   # its secret
+#     export IVAN_PASS=...           # long passphrase (4+ random words); the panel asks for it. The encrypted file
+#                                    # web/ivan.enc.json is public, only this passphrase protects it. Never send it to anyone.
+#   history of that account is kept in ~/.cryptonova_ivan.json (outside the repo)
 # - caffeinate keeps the Mac awake while the mirror runs (keep it plugged in; closing the lid on battery still sleeps)
 # - if the mirror stops (network, error), it restarts by itself after 30 s. Stop: Ctrl+C twice.
 cd "$(dirname "$0")/.." || exit 1

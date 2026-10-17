@@ -16,6 +16,16 @@ Model portfolio (state in data/agents.sqlite, table spot_portfolio)
   cash   the rest (never below 10 %)
 Actions: buy / add / trim (+40 % → sell half) / sell (−15 % from entry or score lost) / hold / wait,
 rebalance once a week (Monday) or when a rule fires. Everything is explained in Russian for the panel.
+
+Five demo accounts of $10 000 go to the panel under `portfolios` (order in `portfolio_order`):
+  cons / high — spot_profiles.RiskPortfolio;  mod — SpotPortfolio above;
+  meme — the meme desk's paper account (memes.py, Hyperliquid meme perps, 1× notional) mapped into the same schema by
+         `meme_profile` — read-only, the meme rules are not touched here;
+  bal  — «Сбалансированный · максимум потенциала» (BalancedPortfolio below): an EXPERIMENT built for a rising market, with a
+         written protection rule for a falling one. Sleeves (bull targets): core BTC 22 / ETH 14 / SOL 9 = 45 %; five large
+         established alts in their own uptrend × 6 % = 30 %; high risk 20 % = HYPE 6 % + two sector leaders × 4 % + two liquid
+         memes × 3 % (memes only after a ≥ 30 % dip from the 30-day high — the only entry our meme research supported);
+         cash 5 %. Selection, rebalancing, take-profit, stops and the bear switch are explicit rules (BAL, bal_* functions).
 """
 from __future__ import annotations
 
@@ -311,6 +321,549 @@ class SpotPortfolio:
                                    self.conn.execute("SELECT time,symbol,action,weight,price,reason FROM spot_actions ORDER BY time DESC LIMIT 20").fetchall()]}
 
 
+# ----------------------------------------------------------------------------- 5th profile: «Сбалансированный · максимум потенциала»
+DAY_MS = 86_400_000
+BAL = {
+    "key": "bal", "name": "Сбалансированный · максимум потенциала", "prefix": "spot_bal_", "status": "эксперимент",
+    "core": {"BTC": 0.22, "ETH": 0.14, "SOL": 0.09},                      # core sleeve 45 %
+    "mid_n": 5, "mid_w": 0.06,                                              # mid sleeve 30 %
+    "anchor": "HYPE", "anchor_w": 0.06, "lead_n": 2, "lead_w": 0.04,       # high sleeve 20 % = 6 + 2 × 4 + 2 × 3
+    "meme_n": 2, "meme_w": 0.03,
+    "bear_mult": {"core": 2 / 3, "mid": 0.5, "high": 0.0},                  # protection: cash ≈ 55 %
+    "drift": 1 / 3,                     # rebalance when a sleeve is off its target by more than a third of the target
+    "rebalance_days": 20,               # monthly: first run on the 1st–3rd of a month, ≥ 20 days after the last rebalance
+    "regime_confirm_h": 72,             # the BTC regime must hold 3 days before the mode switches: on 2021–26 daily data the
+                                        # raw flag flipped 62 times; 1/3/7/14-day windows gave ×1.85–1.99 and −48 % DD alike,
+                                        # 3 days halves the protection trades vs 1 day (scripts/balanced_backtest.py)
+    "mid_stop": -0.30, "high_stop": -0.35, "body_x": 2.0, "trail": 0.35,
+    "mid_min_vol": 5e7, "lead_min_mcap": 3e8, "lead_min_vol": 2e7, "meme_min_mcap": 1e9, "meme_min_vol": 5e7,
+    "dead_ath": -90.0,                  # more than −90 % from the all-time high = «мёртвая» монета, not bought
+    "fee": 0.001,                       # 0.1 % per traded notional (spot taker), charged to cash
+}
+CEX_TOKENS = {"BNB", "LEO", "OKB", "BGB", "GT", "KCS", "CRO", "HTX", "WBT", "MX"}
+SECTORS = ("ИИ", "RWA", "DeFi", "L2", "оракул", "инфраструктура", "игры", "приватность", "платежи", "L1", "платформа")
+SLEEVE_RU = {"core": "ядро", "mid": "крупные альты", "high": "высокий риск"}
+ROLE_RU = {"core": "ядро", "mid": "крупный альт", "anchor": "HYPE — якорь высокого риска", "lead": "лидер сектора", "meme": "мем"}
+BAL_ABOUT = ("Эксперимент, без обещаний доходности. Собран под рост рынка; если рынок развернётся вниз — правило защиты: когда BTC "
+             "3 дня подряд в медвежьем режиме, продаём высокий риск, альты режем вдвое, ядро до 2/3, кэш ≈55%; полные доли — когда "
+             "BTC снова 3 дня в бычьем. Состав: ядро BTC/ETH/SOL 45%, пять крупных альтов в своём тренде по 6%, высокий риск 20% (HYPE 6%, "
+             "два лидера секторов по 4%, два мема по 3% — только после просадки 30%), кэш 5%. Ребаланс раз в месяц или когда доля "
+             "корзины уходит от плана на треть. Высокий риск: на ×2 забираем тело, остаток — до отката 35% от пика, стоп −35%; "
+             "альты — стоп −30%.")
+BAL_RULES = [
+    "Ядро 45%: BTC 22%, ETH 14%, SOL 9%. Без стопа, раз в месяц возвращаем доли.",
+    "Крупные альты 30% (5 × 6%): класс «умеренный» в анкете (топ-60, капитализация от $1 млрд, на рынке больше года, не мем), "
+    "не токен централизованной биржи, оборот от $50M в сутки, есть на Hyperliquid, монета выше, чем 200 дней назад, "
+    "и не ниже −90% от максимума. Из подходящих — пять с лучшей среднесрочной оценкой (тренд 30/200 дней, оборот; список доверия +8).",
+    "Высокий риск 20%: HYPE 6% (выбор владельца; если HYPE ниже, чем 200 дней назад, его место берёт следующий лидер), "
+    "два лидера секторов по 4% (капитализация от $300M, оборот от $20M, есть на Hyperliquid, рост за 30 и 200 дней, лучший по "
+    "оценке в своём секторе, по одному на сектор), два самых ликвидных мема по 3% (капитализация от $1 млрд, оборот от $50M) — "
+    "покупаем только когда мем на 30%+ ниже максимума за 30 дней; до этого их доля ждёт в кэше.",
+    "Ребаланс: 1–3 числа месяца или когда доля корзины ушла от плана больше чем на треть (ядро вне 30–60%, альты вне 20–40%, "
+    "высокий риск выше 26.7%). Ядро и альты возвращаем к плановым долям, выбывших из правил меняем; высокий риск не доливаем.",
+    "Фиксация в высоком риске: на ×2 от входа продаём половину — тело вернулось; остаток держим без потолка и продаём при откате "
+    "35% от пика. Стоп −35% от входа, пока тело не взято. Альты: стоп −30% от входа, место ждёт ребаланса.",
+    "Защита: если BTC 3 дня подряд в медвежьем режиме (тот же флаг, что у остальных портфелей), продаём весь высокий риск, "
+    "альты режем вдвое, ядро до 2/3 (BTC ≈15%, ETH ≈9%, SOL 6%), кэш ≈55%. Полные доли возвращаем, когда BTC 3 дня снова в бычьем. "
+    "3 дня — чтобы не дёргаться: на истории 2021–2026 флаг BTC переключался 62 раза, часто на 1–2 дня.",
+    "Комиссия 0.1% с каждой сделки вычитается из счёта. Это учебный счёт, а не совет; рынок может пойти против плана.",
+]
+BAL_BACKTEST: dict | None = None        # filled from scripts/balanced_backtest.py (see below)
+
+
+def _mpct(x: float) -> str:
+    return f"{x * 100:.0f}%".replace("-", "−")
+
+
+def bal_targets(mode: str) -> dict:
+    m = BAL["bear_mult"] if mode == "bear" else {"core": 1.0, "mid": 1.0, "high": 1.0}
+    core = sum(BAL["core"].values()) * m["core"]
+    mid = BAL["mid_n"] * BAL["mid_w"] * m["mid"]
+    high = (BAL["anchor_w"] + BAL["lead_n"] * BAL["lead_w"] + BAL["meme_n"] * BAL["meme_w"]) * m["high"]
+    return {"core": core, "mid": mid, "high": high, "cash": 1 - core - mid - high}
+
+
+def meme_symbols(cards: list[dict] | None = None, extra=()) -> set[str]:
+    """Meme tickers: the meme desk's HL list (×1000 «k» prefix stripped) + research cards tagged «мем» + `extra`."""
+    from .memes import MEME_COINS
+    s = {c[1:] if c.startswith("k") and c[1:].isupper() else c for c in MEME_COINS}
+    s |= {c["symbol"] for c in cards or [] if "мем" in (c.get("tags") or [])}
+    return {x.upper() for x in s | set(extra)}
+
+
+def _is_cex(sym: str, card: dict | None) -> bool:
+    tags = (card or {}).get("tags") or []
+    return sym in CEX_TOKENS or sym in WRAPPED or ("биржевой токен" in tags and "DeFi" not in tags)
+
+
+def _sector(card: dict | None) -> str:
+    tags = (card or {}).get("tags") or []
+    return next((t for t in SECTORS if t in tags), "прочее")
+
+
+def _trend_fail(r: dict, min_vol: float, need30: bool = False) -> str | None:
+    """None if the coin passes the common filters, else a short Russian reason."""
+    if (r.get("volume") or 0) < min_vol:
+        return f"оборот ${(r.get('volume') or 0) / 1e6:.0f}M < ${min_vol / 1e6:.0f}M"
+    if not (r.get("hl_perp") or r.get("hl_spot")):
+        return "нет на Hyperliquid"
+    if (r.get("chg200") or 0) <= 0:
+        return f"ниже, чем 200 дней назад ({r.get('chg200') or 0:+.0f}%)"
+    if need30 and (r.get("chg30") or 0) <= 0:
+        return f"за 30 дней {r.get('chg30') or 0:+.0f}%"
+    if (r.get("ath_chg") if r.get("ath_chg") is not None else -50) <= BAL["dead_ath"]:
+        return f"{r.get('ath_chg'):.0f}% от максимума"
+    return None
+
+
+def _sc(r: dict, h: str = "mid") -> float:
+    return ((r.get("score") or {}).get(h) or 0) if isinstance(r.get("score"), dict) else 0
+
+
+def bal_mid_candidates(rows: list[dict], cards: list[dict], memes: set[str], exclude=()) -> list[dict]:
+    cm = {c["symbol"]: c for c in cards or []}
+    out = []
+    for r in rows:
+        s, c = r["symbol"], cm.get(r["symbol"])
+        if s in BAL["core"] or s == BAL["anchor"] or s in exclude or s in memes or s in STABLE or _is_cex(s, c):
+            continue
+        if cards:
+            if not c or c.get("risk") != "mod":
+                continue
+        elif not ((r.get("rank") or 999) <= 60 and (r.get("mcap") or 0) >= 1e9):
+            continue
+        if _trend_fail(r, BAL["mid_min_vol"]) is None:
+            out.append({"symbol": s, "score": _sc(r), "chg30": r.get("chg30"), "chg200": r.get("chg200"), "sector": _sector(c),
+                        "why": (r.get("why") or {}).get("mid")})
+    return sorted(out, key=lambda x: -x["score"])
+
+
+def bal_leader_candidates(rows: list[dict], cards: list[dict], memes: set[str], exclude=()) -> list[dict]:
+    cm = {c["symbol"]: c for c in cards or []}
+    out, seen = [], set()
+    for r in sorted(rows, key=lambda r: -_sc(r)):
+        s, c = r["symbol"], cm.get(r["symbol"])
+        if s in BAL["core"] or s == BAL["anchor"] or s in exclude or s in memes or s in STABLE or _is_cex(s, c):
+            continue
+        if (r.get("mcap") or 0) < BAL["lead_min_mcap"] or _trend_fail(r, BAL["lead_min_vol"], need30=True) is not None:
+            continue
+        sec = _sector(c)
+        if sec != "прочее" and sec in seen:
+            continue
+        seen.add(sec)
+        out.append({"symbol": s, "score": _sc(r), "sector": sec, "chg30": r.get("chg30"), "chg200": r.get("chg200"),
+                    "why": (r.get("why") or {}).get("mid")})
+    return out
+
+
+def bal_meme_candidates(rows: list[dict], memes: set[str], conn: sqlite3.Connection | None, now: int) -> list[dict]:
+    """The most liquid big memes with their distance from the 30-day high (same estimate as the spot meme status)."""
+    from . import meme_spot as ms
+    if conn is not None:
+        ms.ensure(conn)
+    out = []
+    for r in sorted(rows, key=lambda r: -(r.get("volume") or 0)):
+        if r["symbol"] not in memes or (r.get("mcap") or 0) < BAL["meme_min_mcap"] or (r.get("volume") or 0) < BAL["meme_min_vol"]:
+            continue
+        own = hl = None
+        if conn is not None:
+            own = {int(a): b for a, b in ((ms._cache_any(conn, f"hi:{r['symbol']}")[1] or {}).get("d") or {}).items()}
+            hl = ms._cache_any(conn, f"hlhi:{r['symbol']}")[1]
+        hi, basis = ms.high30(r.get("price"), [r.get("chg24"), r.get("chg7"), r.get("chg30")], own, hl, now)
+        dd = round((r["price"] / hi - 1) * 100, 1) if hi and r.get("price") else None
+        out.append({"symbol": r["symbol"], "from_high30_pct": dd, "dip": dd is not None and dd <= ms.DIP_30D * 100,
+                    "volume": r.get("volume"), "mcap": r.get("mcap"), "basis": basis})
+    return out
+
+
+class BalancedPortfolio:
+    """Ledger of spot_profiles.RiskPortfolio (tables spot_bal_*, cash in units of the $10 000 start) + sleeve rules above."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        from .spot_profiles import RiskPortfolio
+        self.rp = RiskPortfolio(conn, "bal", BAL)
+        self.conn = conn
+
+    # -- meta (REAL values)
+    def _m(self, k: str):
+        r = self.conn.execute(f"SELECT v FROM {self.rp.T_META} WHERE k=?", (k,)).fetchone()
+        return r[0] if r else None
+
+    def _set(self, k: str, v):
+        if v is None:
+            self.conn.execute(f"DELETE FROM {self.rp.T_META} WHERE k=?", (k,))
+        else:
+            self.conn.execute(f"INSERT OR REPLACE INTO {self.rp.T_META} VALUES(?,?)", (k, float(v)))
+
+    @staticmethod
+    def _role(p: dict) -> str:
+        b = p.get("bucket") or ""
+        return b.split(":", 1)[1] if b.startswith("high:") else b
+
+    def _mv(self, p: dict, px: float | None) -> float:
+        return p["weight"] * (px or p["entry"]) / p["entry"] if p["entry"] else 0.0
+
+    def _trade(self, now, sym, target_mv, px, reason, bucket=None, actions=None, tol=0.005):
+        """Bring the position's market value to `target_mv` (units of the start capital); fee 0.1 % of the traded notional."""
+        row = {p["symbol"]: p for p in self.rp.positions()}.get(sym)
+        mv = self._mv(row, px) if row else 0.0
+        diff = target_mv - mv
+        if row and abs(diff) < tol and target_mv > 0:
+            return
+        if not row and target_mv <= 0:
+            return
+        if target_mv <= 0:
+            a = self.rp._act(now, sym, "SELL", 0, px, reason)
+        elif not row:
+            diff = min(diff, max(0.0, self.rp.cash() / (1 + BAL["fee"])))
+            if diff < tol:
+                return
+            a = self.rp._act(now, sym, "BUY", diff, px, reason, bucket)
+        elif diff < 0:
+            a = self.rp._act(now, sym, "TRIM", row["weight"] * target_mv / mv, px, reason)
+        else:
+            diff = min(diff, max(0.0, self.rp.cash() / (1 + BAL["fee"])))
+            if diff < tol:
+                return
+            a = self.rp._act(now, sym, "ADD", row["weight"] + diff, px, reason)
+        self.rp._set_cash(self.rp.cash() - abs(diff) * BAL["fee"])
+        if actions is not None:
+            actions.append(a)
+
+    def value(self, price: dict) -> float:
+        return self.rp.cash() + sum(self._mv(p, price.get(p["symbol"])) for p in self.rp.positions())
+
+    def sleeves_now(self, price: dict) -> dict:
+        V = self.value(price) or 1.0
+        out = {"core": 0.0, "mid": 0.0, "high": 0.0}
+        for p in self.rp.positions():
+            sleeve = (p["bucket"] or "high").split(":")[0]
+            out[sleeve] = out.get(sleeve, 0.0) + self._mv(p, price.get(p["symbol"])) / V
+        out["cash"] = self.rp.cash() / V
+        return out
+
+    def stopped_recently(self, now: int, days: int = 30) -> set[str]:
+        """Coins sold by a stop or a trailing exit in the last `days` — not bought again until then (no re-entry right after a stop)."""
+        return {s for (s,) in self.conn.execute(f"SELECT DISTINCT symbol FROM {self.rp.T_ACT} WHERE action='SELL' AND time>=? "
+                                                f"AND (reason LIKE 'Стоп%' OR reason LIKE 'Трейлинг%')", (now - days * DAY_MS,))}
+
+    def step(self, rows: list[dict], cards: list[dict], btc_bull: bool, memes: set[str] | None = None, now: int | None = None) -> dict:
+        now = now or int(time.time() * 1000)
+        memes = memes if memes is not None else meme_symbols(cards)
+        byrow = {r["symbol"]: r for r in rows}
+        live = {r["symbol"]: r["price"] for r in rows if r.get("price")}
+        price = dict(live)
+        for p in self.rp.positions():                   # a held coin that left the snapshot keeps its last seen price
+            s = p["symbol"]
+            if s in live:
+                self._set(f"px:{s}", live[s])
+            elif self._m(f"px:{s}"):
+                price[s] = self._m(f"px:{s}")
+        actions: list[dict] = []
+        # --- regime with a 24 h confirmation
+        seen = 1.0 if btc_bull else 0.0
+        mode = self._m("mode")
+        mode_changed = False
+        if mode is None:
+            mode = seen; self._set("mode", mode)
+        if seen != mode:
+            since = self._m("flip_since")
+            if since is None:
+                self._set("flip_since", now); since = now
+            if now - since >= BAL["regime_confirm_h"] * 3_600_000:
+                mode = seen; self._set("mode", mode); self._set("flip_since", None); mode_changed = True
+        else:
+            self._set("flip_since", None)
+        mode_s = "bull" if mode == 1.0 else "bear"
+        T = bal_targets(mode_s)
+        mult = BAL["bear_mult"] if mode_s == "bear" else {"core": 1.0, "mid": 1.0, "high": 1.0}
+        # --- 1. exits by rule (every run)
+        for p in self.rp.positions():
+            s, role = p["symbol"], self._role(p)
+            px = price.get(s)
+            if not px or not p["entry"]:
+                continue
+            high = max(p["high"] or px, px)
+            self.conn.execute(f"UPDATE {self.rp.T_POS} SET high=? WHERE symbol=?", (high, s))
+            ret = px / p["entry"] - 1
+            fixes = p["fixes"] or 0
+            if role in ("anchor", "lead", "meme"):
+                if not fixes and ret <= BAL["high_stop"]:
+                    self._trade(now, s, 0, px, f"Стоп {_mpct(BAL['high_stop'])}: {s} {ret*100:+.0f}% от входа — в высоком риске убыток режем.", actions=actions)
+                elif not fixes and px >= p["entry"] * BAL["body_x"]:
+                    a = self.rp._act(now, s, "TRIM", round(p["weight"] / 2, 6), px, f"×{BAL['body_x']:.0f} от входа ({ret*100:+.0f}%): продаём половину — "
+                                     f"тело вернулось. Остаток держим без потолка, выход при откате {BAL['trail']*100:.0f}% от пика.", fixes=1, last_fix=px)
+                    self.rp._set_cash(self.rp.cash() - p["weight"] / 2 * px / p["entry"] * BAL["fee"])
+                    actions.append(a)
+                elif fixes and px <= high * (1 - BAL["trail"]):
+                    self._trade(now, s, 0, px, f"Трейлинг: {s} на {(1 - px / high)*100:.0f}% ниже пика {high:.4g} — остаток продаём ({ret*100:+.0f}% от входа).", actions=actions)
+            elif role == "mid" and ret <= BAL["mid_stop"]:
+                self._trade(now, s, 0, px, f"Стоп {_mpct(BAL['mid_stop'])}: {s} {ret*100:+.0f}% от входа. Место ждёт ребаланса.", actions=actions)
+        # --- 2. rebalance: first run, monthly, mode switch, drift
+        d = datetime.fromtimestamp(now / 1000, tz=timezone.utc)
+        last_reb = self._m("last_rebalance") or 0
+        first = self._m("started") is None
+        monthly = d.day <= 3 and now - last_reb > BAL["rebalance_days"] * DAY_MS
+        W = self.sleeves_now(price)
+        dr = BAL["drift"]
+        drift = [k for k in ("core", "mid") if T[k] > 0 and abs(W[k] - T[k]) > T[k] * dr] + (["high"] if W["high"] > T["high"] * (1 + dr) + 1e-9 else [])
+        cool = self.stopped_recently(now)
+        why_reb = "старт" if first else ("смена режима BTC" if mode_changed else ("месячный ребаланс" if monthly else (f"перекос: {', '.join(SLEEVE_RU[k] for k in drift)}" if drift else None)))
+        mid_c = bal_mid_candidates(rows, cards, memes, exclude=cool)
+        lead_c = []
+        if why_reb:
+            V = self.value(price)
+            held = {p["symbol"]: p for p in self.rp.positions()}
+            ok_mid = {c["symbol"] for c in mid_c}
+            # review: coins that no longer pass the rules
+            for s, p in list(held.items()):
+                role, r = self._role(p), byrow.get(s)
+                if s not in price:
+                    continue
+                fail = None
+                if role == "mid" and s not in ok_mid:
+                    fail = "больше не проходит правила крупных альтов" + (f" ({_trend_fail(r, BAL['mid_min_vol'])})" if r and _trend_fail(r, BAL["mid_min_vol"]) else "")
+                elif role in ("anchor", "lead") and not p["fixes"] and r and (r.get("chg200") or 0) <= 0 and (r.get("chg30") or 0) <= 0:
+                    fail = f"тренд сломан (30 дней {r.get('chg30') or 0:+.0f}%, 200 дней {r.get('chg200') or 0:+.0f}%)"
+                elif role in ("anchor", "lead", "meme") and mode_s == "bear":
+                    fail = "защита: BTC в медвежьем режиме — высокий риск продаём"
+                if fail:
+                    self._trade(now, s, 0, price[s], f"Пересмотр ({why_reb}): {s} — {fail}.", actions=actions)
+                    held.pop(s)
+            # targets: core + mid back to plan, missing slots filled from the candidates
+            want: list[tuple[str, float, str, str]] = []          # (symbol, target share, bucket, reason)
+            for s, w in BAL["core"].items():
+                if s in price:
+                    want.append((s, w * mult["core"], "core", f"Ядро: {s} {w*mult['core']*100:.0f}% — держим без стопа, доля возвращается раз в месяц."))
+            mids = [s for s, p in held.items() if self._role(p) == "mid"]
+            for c in mid_c:
+                if len(mids) >= BAL["mid_n"]:
+                    break
+                if c["symbol"] not in mids:
+                    mids.append(c["symbol"])
+            for s in mids:
+                c = next((x for x in mid_c if x["symbol"] == s), None)
+                want.append((s, BAL["mid_w"] * mult["mid"], "mid", f"Крупный альт в своём тренде, оценка {c['score'] if c else '—'}/100"
+                             + (f": {c['why']}" if c and c.get("why") else "") + f". {BAL['mid_w']*mult['mid']*100:.0f}%, стоп −30%, ребаланс раз в месяц."))
+            if mode_s == "bull":
+                highs = {s: p for s, p in held.items() if self._role(p) in ("anchor", "lead")}
+                anchor_r = byrow.get(BAL["anchor"])
+                anchor_ok = anchor_r is not None and BAL["anchor"] not in cool and _trend_fail(anchor_r, BAL["lead_min_vol"]) is None
+                if anchor_ok and BAL["anchor"] not in held:
+                    want.append((BAL["anchor"], BAL["anchor_w"], "high:anchor", f"{BAL['anchor']} — якорь высокого риска (выбор владельца, крупнейший токен "
+                                 f"Hyperliquid): {BAL['anchor_w']*100:.0f}%. Стоп −35%, на ×2 забираем тело."))
+                n_lead = BAL["lead_n"] + (0 if anchor_ok or BAL["anchor"] in held else 1)
+                lead_c = bal_leader_candidates(rows, cards, memes, exclude=set(mids) | set(held) | cool)
+                have = [s for s, p in highs.items() if self._role(p) == "lead"]
+                for c in lead_c:
+                    if len(have) >= n_lead:
+                        break
+                    w = BAL["lead_w"] if len(have) < BAL["lead_n"] else BAL["anchor_w"]
+                    want.append((c["symbol"], w, "high:lead", f"Лидер сектора «{c['sector']}» по тренду, оценка {c['score']}/100, за 30 дней "
+                                 f"{c['chg30'] or 0:+.0f}%, за 200 дней {c['chg200'] or 0:+.0f}%: {w*100:.0f}%. Стоп −35%, на ×2 забираем тело."))
+                    have.append(c["symbol"])
+                if W["high"] > T["high"] * (1 + dr):         # high sleeve grew past its band → trim it pro rata back to the target
+                    k = T["high"] / W["high"]
+                    for s, p in held.items():
+                        if self._role(p) in ("anchor", "lead", "meme"):
+                            self._trade(now, s, self._mv(p, price.get(s)) * k, price[s], f"Ребаланс: высокий риск {W['high']*100:.0f}% при плане "
+                                        f"{T['high']*100:.0f}% — срезаем пропорционально.", actions=actions)
+            # execute: sells/trims first, then buys/adds
+            V = self.value(price)
+            plan = [(s, t * V, b, why) for s, t, b, why in want]
+            cur = {p["symbol"]: self._mv(p, price.get(p["symbol"])) for p in self.rp.positions()}
+            for s, tv, b, why in sorted(plan, key=lambda x: (x[1] - cur.get(x[0], 0.0))):
+                if tv < cur.get(s, 0.0):
+                    self._trade(now, s, tv, price[s], f"Ребаланс ({why_reb}): {s} → {tv / V * 100:.0f}%.", actions=actions)
+            for s, p in {p["symbol"]: p for p in self.rp.positions()}.items():     # core/mid holdings outside the plan (e.g. bear: fewer slots)
+                if self._role(p) in ("core", "mid") and s not in {x[0] for x in plan} and s in price:
+                    self._trade(now, s, 0, price[s], f"Ребаланс ({why_reb}): {s} вне плана — продаём.", actions=actions)
+            for s, tv, b, why in sorted(plan, key=lambda x: -(x[1] - cur.get(x[0], 0.0))):
+                if tv > cur.get(s, 0.0):
+                    self._trade(now, s, tv, price[s], why if s not in cur else f"Ребаланс ({why_reb}): {s} → {tv / V * 100:.0f}%.", bucket=b, actions=actions)
+            self._set("last_rebalance", now)
+            if first:
+                self._set("started", now)
+        # --- 3. meme slots: every run, bull mode only, buy only after a ≥ 30 % dip from the 30-day high
+        meme_c = bal_meme_candidates(rows, memes, self.conn, now)
+        if mode_s == "bull" and self._m("started") is not None:
+            held = {p["symbol"]: p for p in self.rp.positions()}
+            n_meme = sum(1 for p in held.values() if self._role(p) == "meme")
+            V = self.value(price)
+            for c in sorted([c for c in meme_c if c["dip"] and c["symbol"] not in held and c["symbol"] not in cool], key=lambda c: c["from_high30_pct"]):
+                if n_meme >= BAL["meme_n"]:
+                    break
+                self._trade(now, c["symbol"], BAL["meme_w"] * V, price[c["symbol"]], f"Мем на просадке: {c['symbol']} {c['from_high30_pct']:.0f}% от максимума "
+                            f"за 30 дней — {BAL['meme_w']*100:.0f}%. Стоп −35%, на ×2 забираем тело, остаток до отката 35% от пика.", bucket="high:meme", actions=actions)
+                n_meme += 1
+        self.conn.commit()
+        return self.snapshot(price, live, byrow, mode_s, actions, now, {"mid": mid_c[:8], "leaders": lead_c[:5] or bal_leader_candidates(rows, cards, memes, exclude={c["symbol"] for c in mid_c[:BAL["mid_n"]]})[:5], "memes": meme_c[:4]})
+
+    def snapshot(self, price, live, byrow, mode_s, actions, now, cands) -> dict:
+        rp = self.rp
+        pos = rp.positions()
+        V = self.value(price) or 1.0
+        T = bal_targets(mode_s)
+        idx = round(100 * V, 2)
+        rp.conn.execute(f"INSERT OR REPLACE INTO {rp.T_VAL} VALUES(?,?)", (now, idx))
+        rp.conn.commit()
+        hist = [{"time": t, "v": v} for t, v in rp.conn.execute(f"SELECT time,index_value FROM {rp.T_VAL} ORDER BY time DESC LIMIT 60").fetchall()][::-1]
+        mult = BAL["bear_mult"] if mode_s == "bear" else {"core": 1.0, "mid": 1.0, "high": 1.0}
+        out_pos = []
+        for p in pos:
+            s, role = p["symbol"], self._role(p)
+            px = price.get(s)
+            mv = self._mv(p, px)
+            sleeve = (p["bucket"] or "").split(":")[0]
+            tw = (BAL["core"].get(s, 0) * mult["core"] if role == "core" else BAL["mid_w"] * mult["mid"] if role == "mid"
+                  else (BAL["anchor_w"] if role == "anchor" else BAL["meme_w"] if role == "meme" else BAL["lead_w"]) * mult["high"])
+            ret = px / p["entry"] - 1 if px and p["entry"] else None
+            r = byrow.get(s) or {}
+            out_pos.append({**p, "bucket": sleeve, "role": role, "sleeve": SLEEVE_RU.get(sleeve, sleeve), "role_ru": ROLE_RU.get(role, role),
+                            "name": r.get("name", s), "weight": round(mv / V, 4), "cost_weight": round(p["weight"], 6), "target_weight": round(tw, 4),
+                            "price": px, "price_live": s in live, "pnl_pct": round(ret * 100, 2) if ret is not None else None,
+                            "pnl_usd": round(10_000 * (mv - p["weight"]), 2), "value_usd": round(10_000 * mv, 2),
+                            "score": r.get("score"), "why": (r.get("why") or {}).get("mid"),
+                            "reco": bal_reco(role, p, px, mv / V, tw)})
+        W = self.sleeves_now(price)
+        pending = self._m("flip_since")
+        return {"key": BAL["key"], "name": BAL["name"], "about": BAL_ABOUT, "status": BAL["status"], "experiment": True,
+                "positions": out_pos, "cash_pct": round(rp.cash() / V * 100), "invested_pct": round((V - rp.cash()) / V * 100),
+                "index": idx, "equity_usd": round(10_000 * V, 2), "start_usd": 10_000, "history": hist, "actions": actions,
+                "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in
+                                   rp.conn.execute(f"SELECT time,symbol,action,weight,price,reason FROM {rp.T_ACT} ORDER BY time DESC LIMIT 20").fetchall()],
+                "mode": mode_s, "mode_ru": "рост рынка — полные доли" if mode_s == "bull" else "защита — BTC в медвежьем режиме",
+                "mode_pending": {"to": "bear" if mode_s == "bull" else "bull", "since": int(pending),
+                                 "confirm_at": int(pending + BAL["regime_confirm_h"] * 3_600_000)} if pending else None,
+                "sleeves": {k: {"label": SLEEVE_RU.get(k, "кэш"), "target_pct": round(T[k] * 100, 1), "now_pct": round(W.get(k, 0) * 100, 1)} for k in ("core", "mid", "high", "cash")},
+                "started": int(self._m("started")) if self._m("started") else None, "last_rebalance": int(self._m("last_rebalance")) if self._m("last_rebalance") else None,
+                "rules_ru": BAL_RULES, "candidates": cands, "backtest": BAL_BACKTEST}
+
+
+def bal_reco(role: str, p: dict, px: float | None, w_now: float, w_target: float) -> dict:
+    """Server-side recommendation in the panel's format {k: hold|add|trim|sell, t, why} (the panel's spotReco has no rules for this profile)."""
+    if not px or not p.get("entry"):
+        return {"k": "hold", "t": "Нет цены", "why": "Монеты нет в свежем снимке CoinGecko — показываем последнюю известную цену."}
+    ret = px / p["entry"] - 1
+    high = max(p.get("high") or px, px)
+    off = w_target > 0 and abs(w_now - w_target) > w_target * BAL["drift"]
+    if role == "core":
+        if off:
+            return {"k": "trim" if w_now > w_target else "add", "t": "Ребаланс", "why": f"Доля {w_now*100:.0f}% при плане {w_target*100:.0f}% — на ребалансе вернём."}
+        return {"k": "hold", "t": "Держать", "why": f"Ядро без стопа: держим, раз в месяц возвращаем долю {w_target*100:.0f}%."}
+    if role == "mid":
+        if ret <= BAL["mid_stop"] + 0.05:
+            return {"k": "sell", "t": "У стопа −30%", "why": f"Сейчас {ret*100:+.0f}% от входа; на −30% продаём, место ждёт ребаланса."}
+        if off:
+            return {"k": "trim" if w_now > w_target else "add", "t": "Ребаланс", "why": f"Доля {w_now*100:.0f}% при плане {w_target*100:.0f}% — вернём на ребалансе."}
+        return {"k": "hold", "t": "Держать", "why": "Крупный альт в тренде: стоп −30% от входа, раз в месяц возвращаем 6%."}
+    if not p.get("fixes"):
+        if ret <= BAL["high_stop"] + 0.07:
+            return {"k": "sell", "t": "У стопа −35%", "why": f"Сейчас {ret*100:+.0f}% от входа; на −35% продаём целиком."}
+        if px >= p["entry"] * (BAL["body_x"] - 0.15):
+            return {"k": "trim", "t": "Скоро ×2", "why": f"Сейчас {ret*100:+.0f}%: на ×2 продаём половину — возвращаем тело."}
+        return {"k": "hold", "t": "Держать", "why": "Высокий риск: стоп −35%, на ×2 забираем тело."}
+    dd = 1 - px / high
+    if dd >= BAL["trail"] - 0.07:
+        return {"k": "sell", "t": "У трейлинга", "why": f"{dd*100:.0f}% ниже пика; на откате 35% остаток продаём."}
+    return {"k": "hold", "t": "Едет бесплатно", "why": "Тело забрано; остаток без потолка, выход при откате 35% от пика."}
+
+
+# ----------------------------------------------------------------------------- 4th profile: the meme desk's paper account in this schema
+MEME_ABOUT = ("Бумажный счёт $10 000 мем-деска: фьючерсы мемов на Hyperliquid без плеча (по риску как спот). Эксперимент «откуп "
+              "обвала»: покупаем после падения на 25% от максимума за сутки, 10% счёта на сделку, до 6 сделок. На +50% продаём 67% — "
+              "тело вернулось; остаток — до отката 35% от пика по 4-часовым свечам, без потолка, не дольше 60 дней. Тело не взято за "
+              "3 дня — выходим. Стоп −25%. Комиссии и фандинг учтены.")
+
+
+def _meme_sym(coin: str) -> tuple[str, float]:
+    return (coin[1:], 1000.0) if coin.startswith("k") and coin[1:].isupper() else (coin, 1.0)
+
+
+def meme_profile(m: dict | None, now: int | None = None) -> dict:
+    """The «Мем-портфель» (memes.json → account) in the spot-profile schema. Prices of ×1000 contracts (kPEPE …) are per one token."""
+    import re
+    now = now or int(time.time() * 1000)
+    base = {"key": "meme", "name": "Мем-портфель", "about": MEME_ABOUT, "status": "эксперимент", "experiment": True, "kind": "paper_perps",
+            "venue": "Hyperliquid, фьючерсы без плеча", "start_usd": 10_000, "source": "web/memes.json → account"}
+    a = (m or {}).get("account")
+    if not a:
+        return {**base, "error": "мем-деск ещё не отработал", "positions": [], "index": 100.0, "cash_pct": 100, "invested_pct": 0,
+                "history": [], "actions": [], "recent_actions": []}
+    start = a.get("start_equity") or 10_000.0
+    eq = a.get("equity") or start
+    lim = a.get("limits") or {}
+    pos = []
+    for p in a.get("positions") or []:
+        sym, k = _meme_sym(p["coin"])
+        px, entry = (p.get("px") or p["entry_px"]) / k, p["entry_px"] / k
+        body = bool(p.get("body_taken") or p.get("tp_done"))
+        ret = px / entry - 1 if entry else 0.0
+        if not body:
+            if ret <= (lim.get("stop_pct", -25) / 100) + 0.05:
+                reco = {"k": "sell", "t": "У стопа −25%", "why": f"Сейчас {ret*100:+.0f}% от входа; стоп сработает автоматически."}
+            elif ret >= (lim.get("take_profit_pct", 50) / 100) - 0.1:
+                reco = {"k": "trim", "t": "Скоро тело", "why": "На +50% счёт сам продаст 67% — вложенное вернётся."}
+            else:
+                left = ((p.get("entry_time") or now) + (lim.get("pre_body_limit_h") or 72) * 3_600_000 - now) / 3_600_000
+                reco = {"k": "hold", "t": "Держать", "why": f"Ждём +50% для тела; если не будет ещё {max(0, left):.0f} ч — выход целиком."}
+        else:
+            reco = {"k": "hold", "t": "Едет бесплатно", "why": "Тело забрано; остаток продаём при откате 35% от пика (4-часовые свечи)."}
+        pos.append({"symbol": sym, "coin": p["coin"], "contract_mult": k, "name": sym, "bucket": "meme", "role": "meme", "sleeve": "мемы",
+                    "weight": round((p.get("value") or 0) / eq, 4) if eq else 0, "entry": entry, "entry_time": p.get("entry_time"),
+                    "high": (p.get("peak_px") or p["entry_px"]) / k, "status": "OPEN", "reason": p.get("why"), "price": px,
+                    "price_live": p.get("price_live"), "pnl_pct": p.get("pnl_pct"), "pnl_usd": p.get("pnl_usd"), "value_usd": p.get("value"),
+                    "fixes": 1 if body else 0, "stop_px": (p["stop_px"] / k) if p.get("stop_px") else None,
+                    "body_px": (p["body_px"] / k) if p.get("body_px") else None, "trail_px": (p["trail_px"] / k) if p.get("trail_px") else None,
+                    "exit_by": p.get("exit_by"), "remaining_pct": p.get("remaining_pct"), "reco": reco})
+    acts = []
+    for p in a.get("positions") or []:
+        sym, k = _meme_sym(p["coin"])
+        acts.append({"time": p.get("entry_time"), "symbol": sym, "action": "BUY", "weight": lim.get("size_pct", 10) / 100, "price": p["entry_px"] / k, "reason": p.get("why")})
+    for c in a.get("closed") or []:
+        sym, k = _meme_sym(c["coin"])
+        acts.append({"time": c.get("entry_time"), "symbol": sym, "action": "BUY", "weight": lim.get("size_pct", 10) / 100, "price": c["entry_px"] / k,
+                     "reason": "вход по правилу «откуп обвала мема»"})
+        acts.append({"time": c.get("exit_time"), "symbol": sym, "action": "SELL", "weight": 0, "price": c["exit_px"] / k,
+                     "reason": f"{c.get('why')}; итог сделки {c.get('pnl_pct', 0):+.1f}% (${c.get('pnl_usd', 0):+,.0f})"})
+    for e in a.get("events") or []:
+        mt = re.match(r"Вернули вложенное по (\S+): продали (\d+)% по \$([\d.,eE+-]+)", e.get("text") or "")
+        if mt:
+            sym, k = _meme_sym(mt.group(1))
+            try:
+                px = float(mt.group(3).replace(",", "")) / k
+            except ValueError:
+                px = None
+            acts.append({"time": e["time"], "symbol": sym, "action": "TRIM", "weight": None, "price": px, "reason": e["text"]})
+    acts = sorted([x for x in acts if x.get("time")], key=lambda x: -x["time"])[:20]
+    asof = (m or {}).get("asof") or now
+    hist = [{"time": t, "v": round(100 * v / start, 2)} for t, v in (a.get("history") or [])][-60:]
+    cash = a.get("cash", eq)
+    return {**base, "asof": asof, "stale": now - asof > 3 * 3_600_000, "positions": pos,
+            "cash_pct": round(cash / eq * 100) if eq else 100, "invested_pct": round((eq - cash) / eq * 100) if eq else 0,
+            "index": round(100 * eq / start, 2), "equity_usd": round(eq, 2), "history": hist,
+            "actions": [x for x in acts if x["time"] >= asof], "recent_actions": acts,
+            "stats": a.get("stats"), "rules_ru": [a.get("rules")] if a.get("rules") else [], "limits": lim}
+
+
+def load_meme_account(conn: sqlite3.Connection, now: int, path: str = "web/memes.json") -> dict | None:
+    """memes.json written minutes ago by the same server run; if it is missing or older than 3 h — the account from the DB tables
+    (positions priced at entry, flagged stale)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            m = json.load(f)
+        if m.get("account") and now - (m.get("asof") or 0) < 3 * 3_600_000:
+            return m
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from . import memes
+        memes._ensure(conn)
+        return memes.snapshot(conn, now, {}, {}, [], [], [], {})
+    except Exception:  # noqa: BLE001
+        return None
+
+
 # ----------------------------------------------------------------------------- daily note (rules) + run
 def market_note(btc_bull: bool, btc: dict | None, pk: dict, state: dict) -> str:
     lines = []
@@ -387,8 +940,21 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
             profiles[key] = RiskPortfolio(conn, key).step(dict(price), cards, hl_movers, now)
         except Exception as e:  # noqa: BLE001
             profiles[key] = {"key": key, "name": RP[key]["name"], "about": RP[key]["about"], "error": str(e), "positions": [], "index": 100, "cash_pct": 100, "invested_pct": 0, "history": [], "actions": [], "recent_actions": []}
+    empty = {"positions": [], "index": 100.0, "cash_pct": 100, "invested_pct": 0, "history": [], "actions": [], "recent_actions": []}
+    try:      # 4th: the meme desk's paper account (written to web/memes.json earlier in the same server run)
+        profiles["meme"] = meme_profile(load_meme_account(conn, now), now)
+    except Exception as e:  # noqa: BLE001
+        profiles["meme"] = {"key": "meme", "name": "Мем-портфель", "about": MEME_ABOUT, "error": str(e), **empty}
+    try:      # 5th: «Сбалансированный · максимум потенциала»
+        from . import meme_spot
+        meme_spot.ensure(conn)
+        cg_memes = [(x.get("symbol") or "").upper() for x in (meme_spot._cache_any(conn, "cg_markets")[1] or [])]
+        profiles["bal"] = BalancedPortfolio(conn).step(rows, cards, btc_bull, meme_symbols(cards, cg_memes), now)
+    except Exception as e:  # noqa: BLE001
+        profiles["bal"] = {"key": "bal", "name": BAL["name"], "about": BAL_ABOUT, "error": str(e), **empty}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),
-            "picks": pk, "portfolio": state, "portfolios": profiles, "note": llm_note or note, "note_source": "llm" if llm_note else "rules",
+            "picks": pk, "portfolio": state, "portfolios": profiles, "portfolio_order": ["cons", "mod", "high", "meme", "bal"],
+            "note": llm_note or note, "note_source": "llm" if llm_note else "rules",
             "hl_spot_top": [{"symbol": k, "vol24": v["vol24"], "price": v["price"], "chg24": v["chg24"],
                              "score": next((r["score"] for r in rows if r["symbol"] == k), None)} for k, v in hl_spot_list],
             "sources": ["CoinGecko /coins/markets", "Hyperliquid info API"]}

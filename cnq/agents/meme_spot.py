@@ -14,7 +14,20 @@ Free sources only (all reachable from GitHub Actions; each cached in agents.sqli
     stay in the top-10, so for big memes the share can be OVERSTATED;
   • RugCheck summary (Solana, ≤ 3 per run, kept 24 h) — share of liquidity locked/burned and risk list;
   • DexScreener `tokens/v1/solana` — deepest pool, oldest pool date (age), link; OKX spot instruments — CEX listing.
-Score: see SCORE_SPOT. Missing data is shown as «нет данных» and the component is left out of the score (coverage shown)."""
+Score: see SCORE_SPOT. Missing data is shown as «нет данных» and the component is left out of the score (coverage shown).
+
+Status for the panel (owner 17.10.2026: «понятный статус вместо простыни текста»): every row gets `status` ∈ {"avoid", "small",
+"wait"}, `status_ru` and a ≤ 12-word `why_ru`; the run returns a one-line `summary_ru`. Rules, checked in this order:
+  avoid «не брать»  — a red flag (fewer than 30% of tokens circulating, insiders ≥ 25%, top-10 wallets > 60%, RugCheck «danger»),
+                      OR 24 h volume < $5M (STATUS_MIN_VOL), OR not on OKX spot / Hyperliquid perp / a Solana pool ≥ $1M,
+                      OR quality score < 50 (STATUS_MIN_SCORE);
+  small «можно на небольшую сумму» — passed all of the above AND the price is ≥ 30% below its 30-day high (DIP_30D): in our meme
+                      research (docs/research/memes.md) only buying after a flush made money; momentum/breakout entries lost;
+  wait  «ждём»      — passed the checks, no dip yet.
+The 30-day high is a LOWER-BOUND estimate (so the dip is never overstated): the max of the current price, the prices 24 h / 7 d /
+30 d ago implied by CoinGecko's % changes, our own daily price samples from earlier runs (`hi:SYM` in meme_spot_cache) and, for memes
+listed on Hyperliquid, the daily highs of the 22 days of 1h candles the meme desk already loads (`hlhi:SYM`, used only when the HL
+price is within 10% of the CoinGecko price — same asset). It is a filter of risk and timing, not a forecast."""
 from __future__ import annotations
 
 import json
@@ -58,6 +71,19 @@ SCORE_SPOT = ("балл 0–100 = 90 × (сумма доступных част�
               "(a16z, Paradigm, Polychain, Pantera, Dragonfly, Multicoin, Jump, Wintermute, GSR, DWF, Binance Labs/YZi, Coinbase Ventures, "
               "Animoca, Delphi и др.) в портфеле CoinGecko или в раунде DefiLlama +10, другой известный инвестор +5, нет данных +0. "
               "Рост цены в балл не входит.")
+
+# ── status («ждём» / «можно на небольшую сумму» / «не брать») ────────────────────────────────────────────────────────────
+DIP_30D = -0.30                      # «просадка» = price ≥ 30% below the 30-day high
+STATUS_MIN_SCORE = 50
+STATUS_MIN_VOL = 5_000_000
+STATUS_MIN_POOL = 1_000_000
+STATUS_RU = {"small": "можно на небольшую сумму", "wait": "ждём", "avoid": "не брать"}
+STATUS_RULES_RU = ("«Не брать» — красный флаг (в обращении меньше 30% токенов, инсайдеры или топ-10 кошельков держат слишком много, "
+                   "RugCheck «опасно»), оборот меньше $5M в сутки, монеты нет ни на споте OKX, ни на Hyperliquid, ни в пуле Solana от $1M, "
+                   "или балл качества ниже 50. «Можно на небольшую сумму» — проверки пройдены и цена на 30% и больше ниже максимума "
+                   "за 30 дней: в нашем исследовании мемов плюс давала только покупка после обвала. «Ждём» — проверки пройдены, "
+                   "просадки нет. Максимум за 30 дней — оценка снизу (цены 24 ч / 7 / 30 дней назад, наши замеры, свечи Hyperliquid). "
+                   "Это не прогноз роста; только суммы, которые не жалко потерять.")
 
 
 def _f(x, default=None):
@@ -345,6 +371,100 @@ def reasons_and_flags(r: dict) -> None:
     r["reasons"], r["flags"] = rs, fl
 
 
+# ── 30-day high + status ───────────────────────────────────────────────────────────────────────────────────────────────
+
+def _day(ts: int) -> int:
+    return int(ts // DAY)
+
+
+def update_highs(conn, sym: str, price: float | None, now: int) -> dict:
+    """Remember the highest price we saw for `sym` per UTC day (last 31 days); returns {day: high}."""
+    k = f"hi:{sym}"
+    d = {int(a): b for a, b in ((_cache_any(conn, k)[1] or {}).get("d") or {}).items()}
+    if price:
+        d[_day(now)] = max(d.get(_day(now), 0.0), float(price))
+    d = {a: b for a, b in d.items() if a >= _day(now) - 31}
+    _cache_put(conn, k, {"d": {str(a): b for a, b in d.items()}}, now)
+    return d
+
+
+def put_hl_highs(conn, highs: dict[str, dict], now: int) -> None:
+    """{SYM: {"px": hl_price, "d": {day: high}}} from the meme desk's Hyperliquid 1h candles (prices already per 1 token)."""
+    for sym, v in highs.items():
+        _cache_put(conn, f"hlhi:{sym}", {"px": v.get("px"), "d": {str(a): b for a, b in (v.get("d") or {}).items()}}, now)
+
+
+def high30(price: float | None, chgs: list, own: dict | None, hl: dict | None, now: int) -> tuple[float | None, list[str]]:
+    """Lower-bound estimate of the 30-day high and the list of what it is built from."""
+    if not price:
+        return None, []
+    pts, basis = [float(price)], []
+    for c, lab in zip(chgs, ("24 ч", "7 дн", "30 дн")):
+        if c is not None and -99 < c:
+            pts.append(price / (1 + c / 100)); basis.append(lab)
+    lo = _day(now) - 30
+    own_pts = [b for a, b in (own or {}).items() if int(a) >= lo]
+    if own_pts:
+        pts += own_pts; basis.append(f"наши замеры {len(own_pts)} дн.")
+    if hl and hl.get("px") and abs(hl["px"] / price - 1) <= 0.10:
+        hp = [b for a, b in (hl.get("d") or {}).items() if int(a) >= lo]
+        if hp:
+            pts += hp; basis.append(f"свечи Hyperliquid {len(hp)} дн.")
+    return max(pts), basis
+
+
+def _words(s: str, n: int = 12) -> str:
+    w = s.split()
+    return s if len(w) <= n else " ".join(w[:n]).rstrip(",;:—-") + "…"
+
+
+def _money(x: float) -> str:
+    return f"${x / 1e9:.1f}B" if x >= 1e9 else (f"${x / 1e6:.0f}M" if x >= 1e6 else f"${x / 1e3:.0f}k")
+
+
+def status_of(r: dict) -> None:
+    """status / status_ru / why_ru by the rules in the module docstring (needs score, flags and from_high30_pct)."""
+    reds = [f for f in r.get("flags") or [] if f.get("level") == "red"]
+    ls = r.get("listed") or {}
+    vol, dd = r.get("vol24") or 0, r.get("from_high30_pct")
+    where = ls.get("okx_spot") or ls.get("hl_perp") or (ls.get("solana_liq") or 0) >= STATUS_MIN_POOL
+    if not r.get("price"):
+        st, why = "avoid", "нет цены — не оцениваем"
+    elif reds:
+        t = reds[0]["text"]
+        if t.startswith("RugCheck: "):
+            from .memes import RUG_RU
+            t = "RugCheck — " + RUG_RU.get(t[10:].strip().lower(), t[10:])
+        st, why = "avoid", "красный флаг: " + t
+    elif vol < STATUS_MIN_VOL:
+        st, why = "avoid", f"мало оборота: {_money(vol)} в сутки — цену легко сдвинуть"
+    elif not where:
+        st, why = "avoid", "нет на OKX и Hyperliquid, пул Solana меньше $1M"
+    elif (r.get("score") or 0) < STATUS_MIN_SCORE:
+        st, why = "avoid", f"низкий балл качества: {r.get('score') or 0} из 100"
+    elif dd is not None and dd <= DIP_30D * 100:
+        st, why = "small", f"просадка {_pct(dd)} от максимума за 30 дней, проверки пройдены"
+    elif dd is not None:
+        st, why = "wait", f"{_pct(dd)} от максимума за 30 дней — ждём просадку от {_pct(DIP_30D * 100)}"
+    else:
+        st, why = "wait", f"проверки пройдены, ждём просадку от {_pct(DIP_30D * 100)}"
+    r["status"], r["status_ru"], r["why_ru"] = st, STATUS_RU[st], _words(why)
+
+
+def _pct(x: float) -> str:
+    v = round(x)
+    return f"{v}%".replace("-", "−") if v else "0%"
+
+
+def summary_of(rows: list[dict]) -> str:
+    small = [r["symbol"] for r in sorted(rows, key=lambda r: -(r.get("score") or 0)) if r.get("status") == "small"]
+    n_wait = sum(1 for r in rows if r.get("status") == "wait")
+    n_avoid = sum(1 for r in rows if r.get("status") == "avoid")
+    if small:
+        return f"Сейчас можно присмотреться (на небольшую сумму): {', '.join(small[:6])}; остальные — ждём ({n_wait}) или не брать ({n_avoid})."
+    return f"Сейчас брать нечего: ждём просадку — {n_wait}, не брать — {n_avoid}."
+
+
 # ── run ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def run(conn, now: int, get, post, hl_memes: set[str], deadline: float, max_details: int = 2, max_holders: int = 3) -> dict:
@@ -471,10 +591,19 @@ def run(conn, now: int, get, post, hl_memes: set[str], deadline: float, max_deta
             r["lp_locked_pct"] = _f(rg.get("lp")); r["rug_risks"] = rg.get("risks")
     for r in rows:
         score(r); reasons_and_flags(r)
+        own = update_highs(conn, r["symbol"], r.get("price"), now)
+        hl_hi = _cache_any(conn, f"hlhi:{r['symbol']}")[1]
+        hi, basis = high30(r.get("price"), [r.get("chg24h"), r.get("chg7d"), r.get("chg30d")], own, hl_hi, now)
+        r["high30_px"] = hi
+        r["from_high30_pct"] = round((r["price"] / hi - 1) * 100, 1) if hi and r.get("price") else None
+        r["high30_basis"] = basis
+        status_of(r)
     rows.sort(key=lambda r: -r["score"])
     filled = sum(1 for r in rows if r["details_known"])
     note = (f"Кандидаты в спот-портфель мемов: мемы из топ-100 CoinGecko с капитализацией от $50M и объёмом от $1M. Балл — качество и риск "
             f"(размер, токеномика, держатели, возраст, ликвидность, где купить, инвесторы), а НЕ прогноз роста: история не доказала, что эти "
             f"признаки предсказывают доходность мемов (docs/research/memes.md). Подробные данные собраны по {filled} из {len(rows)} монет — "
             f"остальные дозаполняются по 2 за запуск. Только наблюдение, без сделок.")
-    return {"rows": rows[:25], "sources": src, "note": note}
+    top = rows[:25]
+    return {"rows": top, "sources": src, "note": note, "summary_ru": summary_of(top), "status_rules_ru": STATUS_RULES_RU,
+            "status_counts": {k: sum(1 for r in top if r.get("status") == k) for k in ("small", "wait", "avoid")}}

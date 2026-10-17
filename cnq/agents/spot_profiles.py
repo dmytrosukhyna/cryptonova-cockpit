@@ -24,10 +24,10 @@ DAY = 86400_000
 
 
 class RiskPortfolio:
-    def __init__(self, conn: sqlite3.Connection, profile: str):
+    def __init__(self, conn: sqlite3.Connection, profile: str, P: dict | None = None):
         self.conn = conn
         self.key = profile
-        self.P = PROFILES[profile]
+        self.P = P or PROFILES[profile]
         px = self.P["prefix"]
         self.T_POS, self.T_ACT, self.T_VAL = px + "portfolio", px + "actions", px + "value"
         conn.execute(f"""CREATE TABLE IF NOT EXISTS {self.T_POS}(symbol TEXT PRIMARY KEY, bucket TEXT, weight REAL, entry REAL, entry_time INTEGER,
@@ -57,9 +57,11 @@ class RiskPortfolio:
         entry = row[1] if row and row[2] == "OPEN" else price
         cash = self.cash()
         if action in ("BUY", "ADD"):
-            if row and row[2] == "OPEN" and weight > w_before:   # ADD: new entry = weighted average, cash pays the difference
+            if row and row[2] == "OPEN" and weight > w_before:   # ADD: cash pays `add`; new entry keeps the coin amount exact
                 add = weight - w_before
-                new_entry = (w_before * entry + add * price) / weight
+                # 17.10 fix: coins held = w/entry + add/price, so the entry is the HARMONIC weighted mean (the arithmetic mean
+                # used before understated the position's value after an ADD at a lower price)
+                new_entry = weight / (w_before / entry + add / price) if entry and price else price
                 self._set_cash(cash - add)
                 self.conn.execute(f"UPDATE {self.T_POS} SET weight=?, entry=?, reason=?, status='OPEN' WHERE symbol=?", (weight, new_entry, reason, sym))
             else:

@@ -1276,13 +1276,18 @@ def tokenomics_check() -> tuple[str, dict]:
     # CoinGecko «… Portfolio» categories = known investors/market makers (free); only tier-1 names, 1 call each, slow on purpose
     cats = get("https://api.coingecko.com/api/v3/coins/categories/list")
     port = [c for c in cats if "portfolio" in (c.get("name") or "").lower() and any(k in c["name"].lower() for k in TIER1)] if isinstance(cats, list) else []
-    backed = defaultdict(list)
+    backed, ok_c, bad_c = defaultdict(list), 0, []
     for c in port[:20]:
-        time.sleep(7)
+        time.sleep(12)
         j = get(f"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category={c['category_id']}&per_page=250&page=1")
         if isinstance(j, list):
+            ok_c += 1
             for x in j:
                 backed[x.get("id")].append(c["name"].replace(" Portfolio", ""))
+        else:
+            bad_c.append(c["name"])
+    S["portfolio_calls"] = {"ok": ok_c, "failed": bad_c}
+    md.append(f"- запросы портфелей CoinGecko: успешно {ok_c}, не ответили {len(bad_c)}" + (f" ({', '.join(bad_c)})" if bad_c else ""))
     S["portfolio_categories"] = [c["name"] for c in port[:20]]
     for x in rows:
         if backed.get(x["id"]):

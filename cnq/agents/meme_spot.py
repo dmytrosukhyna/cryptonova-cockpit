@@ -4,11 +4,14 @@
 Free sources only (all reachable from GitHub Actions; each cached in agents.sqlite so one run makes few calls):
   • CoinGecko `coins/markets?category=meme-token` (top 100 by market cap; every 2 h) — price, market cap, FDV, supply, volume;
   • CoinGecko `coins/{id}` (≤ 2 coins per run, kept 7 days) — categories, links, chain addresses, genesis date;
-  • DefiLlama `raises` (once a day) — funding rounds with lead/other investors, matched by project NAME (memes rarely raise:
-    «нет данных» is the normal answer, never a guess);
-  • Solana RPC (≤ 3 mints per run, kept 24 h) — the 20 largest token accounts, their owners and the owners' programs → pool
-    vaults (Raydium, Orca, Meteora, PumpSwap, pump.fun), burn and lock accounts are excluded from the top-10 share. Exchange hot
-    wallets cannot be told apart, so for big memes the top-10 share is OVERSTATED;
+  • backers: CoinGecko «… Portfolio» categories of the coin (free: a16z, Binance Labs, DWF Labs, Coinbase Ventures … portfolios)
+    and DefiLlama `raises` matched by project NAME — but DefiLlama answered HTTP 402 (paid) on 17.10.2026, so it is tried once a
+    day and usually empty. Memes rarely have backers: «нет данных» is the normal answer, never a guess;
+  • holders (Solana, ≤ 3 mints per run, kept 24 h): RugCheck full report — top holders with RugCheck's labels of known accounts
+    (pools, lockers, exchanges), insider flag, total holders; pools/burn/locks/labelled exchanges are excluded from the top-10 share.
+    Fallback — public Solana RPC (20 largest accounts → owners → owner programs = pool vaults of Raydium, Orca, Meteora, PumpSwap,
+    pump.fun); the public RPC answered HTTP 429 for WIF on 17.10.2026, so the fallback often fails. Unlabelled exchange wallets
+    stay in the top-10, so for big memes the share can be OVERSTATED;
   • RugCheck summary (Solana, ≤ 3 per run, kept 24 h) — share of liquidity locked/burned and risk list;
   • DexScreener `tokens/v1/solana` — deepest pool, oldest pool date (age), link; OKX spot instruments — CEX listing.
 Score: see SCORE_SPOT. Missing data is shown as «нет данных» and the component is left out of the score (coverage shown)."""
@@ -51,9 +54,10 @@ SCORE_SPOT = ("балл 0–100 = 90 × (сумма доступных част�
               "капитализация ÷ FDV; 50% и меньше → 0, 100% → 25), распределение (0–20: топ-10 кошельков без пулов, сожжённых и "
               "заблокированных; 50% и больше → 0, 10% и меньше → 20; только Solana), возраст (0–10: год и больше → 10), ликвидность "
               "заблокирована/сожжена по RugCheck (0–10, только Solana), доступность (0–10: спот OKX +5, перп Hyperliquid +3, пул на Solana "
-              "от $1M +2). Если данных нет — часть не считается («покрытие» показывает долю). Бонус: раунд с инвестором из списка tier-1 "
+              "от $1M +2). Если данных нет — часть не считается («покрытие» показывает долю). Бонус: фонд или маркетмейкер из списка tier-1 "
               "(a16z, Paradigm, Polychain, Pantera, Dragonfly, Multicoin, Jump, Wintermute, GSR, DWF, Binance Labs/YZi, Coinbase Ventures, "
-              "Animoca, Delphi и др.) +10, другой раунд +5, нет данных +0. Рост цены в балл не входит.")
+              "Animoca, Delphi и др.) в портфеле CoinGecko или в раунде DefiLlama +10, другой известный инвестор +5, нет данных +0. "
+              "Рост цены в балл не входит.")
 
 
 def _f(x, default=None):
@@ -106,6 +110,61 @@ def tier1_of(investors: list[str]) -> list[str]:
 
 # ── Solana holders ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
+RUG_REPORT = "https://api.rugcheck.xyz/v1/tokens/{}/report"
+NOT_INVESTOR = {"venture capital portfolios", "ondo intelligent portfolios"}
+
+
+def holders_rugcheck(j: dict) -> dict | None:
+    """Top-10 share from a RugCheck full report (pct of supply), excluding accounts RugCheck labels as pools/lockers/burn/exchanges."""
+    top = j.get("topHolders") or []
+    if not top:
+        return None
+    known = j.get("knownAccounts") or {}
+    kept, excluded, insiders = [], [], 0.0
+    for h in top[:20]:
+        pct = _f(h.get("pct"), 0.0)
+        lab = known.get(h.get("owner")) or known.get(h.get("address")) or {}
+        typ, nm = (lab.get("type") or "").upper(), lab.get("name") or ""
+        low = nm.lower()
+        why = None
+        if h.get("owner") in BURN or "BURN" in typ or "incinerator" in low:
+            why = "сожжено"
+        elif typ == "AMM" or "pool" in low or "amm" in low or h.get("owner") in POOL_AUTH:
+            why = f"пул {nm or 'AMM'}"
+        elif "LOCK" in typ or "lock" in low:
+            why = f"заблокировано ({nm})"
+        elif typ in ("CEX", "EXCHANGE") or any(k in low for k in ("binance", "okx", "bybit", "coinbase", "kraken", "gate", "bitget", "kucoin", "mexc", "htx")):
+            why = f"биржа {nm}"
+        if why:
+            excluded.append({"account": h.get("owner") or h.get("address"), "pct": round(pct, 2), "why": why})
+        else:
+            kept.append(pct)
+            if h.get("insider"):
+                insiders += pct
+    if not kept:
+        return None
+    k10 = sorted(kept, reverse=True)
+    return {"top10_pct": round(sum(k10[:10]), 1), "top1_pct": round(k10[0], 1), "insiders_pct": round(insiders, 1) if insiders else 0.0,
+            "excluded": excluded[:8], "checked": len(top[:20]), "holders_total": j.get("totalHolders"), "source": "RugCheck",
+            "method": "20 крупнейших держателей по RugCheck; пулы, сожжённые, заблокированные и отмеченные биржи исключены"}
+
+
+def holders_any(mint: str, get, post) -> dict | None:
+    """RugCheck full report first (labels + insiders), public RPC as a fallback."""
+    try:
+        j = get(RUG_REPORT.format(mint))
+        if isinstance(j, dict):
+            h = holders_rugcheck(j)
+            if h:
+                return h
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        return holders(mint, post)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def holders(mint: str, post) -> dict | None:
     """Top-10 share of supply held by wallets that are NOT pool vaults / burn / lock accounts (20 largest accounts checked)."""
     def rpc(method, params):
@@ -149,7 +208,7 @@ def holders(mint: str, post) -> dict | None:
     base = sup - burned
     top10 = sum(sorted(kept, reverse=True)[:10])
     return {"top10_pct": round(top10 / base * 100, 1) if base > 0 else None, "top1_pct": round(max(kept) / base * 100, 1) if kept and base > 0 else None,
-            "excluded": excluded[:8], "checked": len(big[:20]),
+            "excluded": excluded[:8], "checked": len(big[:20]), "source": "Solana RPC",
             "method": "20 крупнейших счетов; пулы, сожжённые и заблокированные исключены; биржевые кошельки не отличаем"}
 
 
@@ -170,8 +229,20 @@ def cg_details(get, cid: str) -> dict:
     if not isinstance(j, dict) or "id" not in j:
         raise RuntimeError("coingecko details")
     links = j.get("links") or {}
-    return {"categories": [c for c in (j.get("categories") or []) if c][:8], "platforms": {k: v for k, v in (j.get("platforms") or {}).items() if k and v},
-            "genesis_date": j.get("genesis_date"), "homepage": next((u for u in links.get("homepage") or [] if u), None),
+    cats = [c for c in (j.get("categories") or []) if c]
+    lt = j.get("listing_timestamp")
+    lts = None
+    try:
+        if isinstance(lt, (int, float)) and lt > 0:
+            lts = int(lt * 1000 if lt < 1e11 else lt)
+        elif isinstance(lt, str) and lt:
+            lts = int(datetime.fromisoformat(lt.replace("Z", "+00:00")).timestamp() * 1000)
+    except ValueError:
+        lts = None
+    return {"categories": [c for c in cats if "portfolio" not in c.lower()][:8],
+            "portfolios": [c.replace(" Portfolio", "").replace(" portfolio", "") for c in cats if "portfolio" in c.lower() and c.lower() not in NOT_INVESTOR],
+            "platforms": {k: v for k, v in (j.get("platforms") or {}).items() if k and v},
+            "genesis_date": j.get("genesis_date"), "listing_ts": lts, "homepage": next((u for u in links.get("homepage") or [] if u), None),
             "twitter": links.get("twitter_screen_name") or None}
 
 
@@ -221,7 +292,7 @@ def score(r: dict) -> None:
     ls = r.get("listed") or {}
     parts["доступность"] = (5 if ls.get("okx_spot") else 0) + (3 if ls.get("hl_perp") else 0) + (2 if (ls.get("solana_liq") or 0) >= 1e6 else 0); avail += 10
     b = r.get("backers") or {}
-    bonus = 10 if b.get("tier1") else (5 if b.get("raises") else 0)
+    bonus = 10 if b.get("tier1") else (5 if b.get("investors") else 0)
     base = 90 * sum(parts.values()) / avail if avail else 0
     r["score_parts"] = {k: round(v, 1) for k, v in parts.items()} | {"бонус инвесторы": bonus}
     r["coverage"] = round(avail / 100, 2)
@@ -243,7 +314,10 @@ def reasons_and_flags(r: dict) -> None:
         fl.append({"level": "red" if cr < 0.3 else "yellow", "text": f"в обращении только {cr * 100:.0f}% токенов — давление разлоков"})
     h = r.get("holders")
     if h and h.get("top10_pct") is not None:
-        rs.append(f"топ-10 кошельков (без пулов и сожжённых): {h['top10_pct']:.0f}%")
+        rs.append(f"топ-10 кошельков (без пулов, сожжённых и бирж): {h['top10_pct']:.0f}%" + (f", держателей {h['holders_total']:,}".replace(",", " ") if h.get("holders_total") else "")
+                  + f" ({h.get('source')})")
+        if (h.get("insiders_pct") or 0) >= 10:
+            fl.append({"level": "red" if h["insiders_pct"] >= 25 else "yellow", "text": f"инсайдеры (по RugCheck) держат {h['insiders_pct']:.0f}%"})
         if h["top10_pct"] > 60:
             fl.append({"level": "red", "text": f"топ-10 кошельков держат {h['top10_pct']:.0f}%"})
         elif h["top10_pct"] > 40:
@@ -259,10 +333,10 @@ def reasons_and_flags(r: dict) -> None:
                              (f"Solana пул {money(ls.get('solana_liq') or 0)}", (ls.get("solana_liq") or 0) >= 1e5)) if ok]
     rs.append("где купить: " + (", ".join(where) if where else "нет данных"))
     b = r.get("backers") or {}
-    if b.get("raises"):
-        rs.append("инвесторы: " + ", ".join((b.get("tier1") or []) + [i for i in b.get("investors", []) if i not in (b.get("tier1") or [])][:4]))
+    if b.get("investors"):
+        rs.append("инвесторы/маркетмейкеры: " + ", ".join(b["investors"][:5]) + f" (источник: {b.get('source')})")
     else:
-        rs.append("инвесторы: нет данных" + (" (DefiLlama не знает раундов)" if b.get("checked") else " (ещё не проверено)"))
+        rs.append("инвесторы: нет данных" + (" (в CoinGecko нет портфелей фондов, раунды DefiLlama платные)" if b.get("checked") else " (ещё не проверено)"))
     if r.get("from_ath_pct") is not None:
         rs.append(f"от исторического максимума {r['from_ath_pct']:.0f}%")
     for x in r.get("rug_risks") or []:
@@ -333,7 +407,7 @@ def run(conn, now: int, get, post, hl_memes: set[str], deadline: float, max_deta
         mc, fdv = x.get("market_cap") or 0, x.get("fully_diluted_valuation")
         sym = (x.get("symbol") or "").upper()
         raises = rz.get(x["id"]) if isinstance(rz, dict) else None
-        inv = [i for r in raises or [] for i in (r.get("lead") or []) + (r.get("other") or [])]
+        inv = list(dict.fromkeys((d.get("portfolios") or []) + [i for r in raises or [] for i in (r.get("lead") or []) + (r.get("other") or [])]))
         rows.append({"id": x["id"], "symbol": sym, "name": x.get("name"), "price": x.get("current_price"), "mcap": mc, "fdv": fdv,
                      "circ_ratio": round(mc / fdv, 3) if mc and fdv else None, "vol24": x.get("total_volume") or 0,
                      "chg24h": x.get("price_change_percentage_24h"), "chg7d": x.get("price_change_percentage_7d_in_currency"),
@@ -341,10 +415,13 @@ def run(conn, now: int, get, post, hl_memes: set[str], deadline: float, max_deta
                      "categories": d.get("categories"), "homepage": d.get("homepage"), "twitter": d.get("twitter"),
                      "chains": sorted((d.get("platforms") or {}).keys()) or None, "solana_mint": mint, "details_known": bool(d),
                      "listed": {"okx_spot": sym in okx, "hl_perp": sym in hl, "solana_liq": None},
-                     "backers": {"checked": raises is not None, "raises": raises or [], "investors": inv[:10], "tier1": tier1_of(inv)},
+                     "backers": {"checked": bool(d) or raises is not None, "raises": raises or [], "investors": inv[:10], "tier1": tier1_of(inv),
+                                 "source": ", ".join(x for x, ok in (("CoinGecko портфели", bool(d.get("portfolios"))), ("DefiLlama", bool(raises))) if ok) or None},
                      "age_days": None, "age_source": None, "holders": None, "lp_locked_pct": None,
                      "link": f"https://www.coingecko.com/en/coins/{x['id']}"})
         g = d.get("genesis_date")
+        if d.get("listing_ts") and not g:
+            rows[-1]["age_days"] = round((now - d["listing_ts"]) / DAY); rows[-1]["age_source"] = "листинг на CoinGecko"
         if g:
             try:
                 rows[-1]["age_days"] = round((now - datetime.fromisoformat(g).replace(tzinfo=timezone.utc).timestamp() * 1000) / DAY)
@@ -379,9 +456,9 @@ def run(conn, now: int, get, post, hl_memes: set[str], deadline: float, max_deta
         if (h is None or rg is None) and n_new < max_holders and time.time() < deadline:
             n_new += 1
             if h is None:
-                h = safe(holders, r["solana_mint"], post)
+                h = safe(holders_any, r["solana_mint"], get, post)
                 if h is not None:
-                    _cache_put(conn, hk, h, now); src["solana_rpc"] = True
+                    _cache_put(conn, hk, h, now); src["holders"] = True
             if rg is None:
                 j = safe(get, RUG.format(r["solana_mint"]))
                 if isinstance(j, dict) and ("risks" in j or "score" in j):

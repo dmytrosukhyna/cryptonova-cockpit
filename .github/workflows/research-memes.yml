@@ -53,7 +53,12 @@ jobs:
           import os, sys
           f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
           s = open(f).read() if os.path.exists(f) else "(no file)"
-          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          parts, cur = [], ""                     # annotation messages are cut at 4096 bytes: chunk by bytes, not characters
+          for ch in s:
+              if len((cur + ch).encode()) > 3600:
+                  parts.append(cur); cur = ""
+              cur += ch
+          parts.append(cur)
           for j, p in enumerate(parts[off:off + mx], start=off):
               p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
               print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
@@ -65,7 +70,12 @@ jobs:
           import os, sys
           f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
           s = open(f).read() if os.path.exists(f) else "(no file)"
-          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          parts, cur = [], ""                     # annotation messages are cut at 4096 bytes: chunk by bytes, not characters
+          for ch in s:
+              if len((cur + ch).encode()) > 3600:
+                  parts.append(cur); cur = ""
+              cur += ch
+          parts.append(cur)
           for j, p in enumerate(parts[off:off + mx], start=off):
               p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
               print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
@@ -77,7 +87,12 @@ jobs:
           import os, sys
           f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
           s = open(f).read() if os.path.exists(f) else "(no file)"
-          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          parts, cur = [], ""                     # annotation messages are cut at 4096 bytes: chunk by bytes, not characters
+          for ch in s:
+              if len((cur + ch).encode()) > 3600:
+                  parts.append(cur); cur = ""
+              cur += ch
+          parts.append(cur)
           for j, p in enumerate(parts[off:off + mx], start=off):
               p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
               print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
@@ -89,7 +104,12 @@ jobs:
           import os, sys
           f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
           s = open(f).read() if os.path.exists(f) else "(no file)"
-          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          parts, cur = [], ""                     # annotation messages are cut at 4096 bytes: chunk by bytes, not characters
+          for ch in s:
+              if len((cur + ch).encode()) > 3600:
+                  parts.append(cur); cur = ""
+              cur += ch
+          parts.append(cur)
           for j, p in enumerate(parts[off:off + mx], start=off):
               p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
               print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
@@ -101,7 +121,12 @@ jobs:
           import os, sys
           f, title, off, mx = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
           s = open(f).read() if os.path.exists(f) else "(no file)"
-          n = 3000; parts = [s[i:i + n] for i in range(0, len(s), n)]
+          parts, cur = [], ""                     # annotation messages are cut at 4096 bytes: chunk by bytes, not characters
+          for ch in s:
+              if len((cur + ch).encode()) > 3600:
+                  parts.append(cur); cur = ""
+              cur += ch
+          parts.append(cur)
           for j, p in enumerate(parts[off:off + mx], start=off):
               p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
               print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")

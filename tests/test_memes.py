@@ -204,7 +204,39 @@ def _bars(h0, spec):
     return out
 
 
+class exit_as:
+    """Temporarily set the live exit parameters."""
+    def __init__(self, **kw):
+        self.kw = kw
+
+    def __enter__(self):
+        self.old = dict(mm.EXIT); mm.EXIT.update(self.kw)
+
+    def __exit__(self, *a):
+        mm.EXIT.clear(); mm.EXIT.update(self.old)
+
+
+def test_live_exit_is_body_first_with_trailing():
+    X = mm.EXIT
+    assert X["trail"] and X["body_at"] > 0 and abs(X["body_frac"] * (1 + X["body_at"]) - 1) < 1e-9     # the body sale returns the stake
+    assert X["pre_h"] == 72 and X["max_h"] == 60 * 24 and "тело" in mm.EXIT_TEXT
+
+
+def test_body_not_taken_in_3_days_exits_all():
+    conn = sqlite3.connect(":memory:")
+    base = with_dip(NOW, px=1.4, close=1.0)
+    _run(conn, NOW, 1.0, {"WIF": base})
+    r = _run(conn, NOW + 72 * H + 60_000, 1.2, {"WIF": base})
+    cl = r["account"]["closed"][0]
+    assert cl["why"] == "тело не взяли за 72 ч" and cl["exit_px"] == 1.2 and cl["pnl_usd"] > 0
+
+
 def test_body_first_then_trailing_on_4h_closes():
+    with exit_as(stop=-0.25, body_at=1.0, body_frac=0.5, trail=0.35, basis="close", pre_h=None, max_h=1440):
+        _body_first_then_trailing()
+
+
+def _body_first_then_trailing():
     conn = sqlite3.connect(":memory:")
     base = with_dip(NOW, px=1.4, close=1.0)
     _run(conn, NOW, 1.0, {"WIF": base}, funding_h=0.0001)
@@ -228,7 +260,7 @@ def test_body_first_then_trailing_on_4h_closes():
 
 def test_trailing_on_highs_and_time_limit():
     old = dict(mm.EXIT)
-    mm.EXIT.update({"basis": "high", "max_h": 10})
+    mm.EXIT.update({"stop": -0.25, "body_at": 1.0, "body_frac": 0.5, "trail": 0.35, "basis": "high", "pre_h": None, "max_h": 10})
     try:
         conn = sqlite3.connect(":memory:")
         base = with_dip(NOW, px=1.4, close=1.0)
@@ -336,7 +368,7 @@ def _cg_row(i, **kw):
 def test_spot_run_score_reasons_and_cache():
     calls = {"n": 0}
     markets = [_cg_row(1), _cg_row(2, fully_diluted_valuation=2e9, symbol="wif"), _cg_row(3, market_cap=1e7), _cg_row(4, symbol="usdt")]
-    det = {"c1": {"id": "c1", "categories": ["Meme"], "platforms": {"ethereum": "0xabc"}, "genesis_date": "2023-04-14", "links": {"homepage": ["https://x"]}},
+    det = {"c1": {"id": "c1", "categories": ["Meme", "DWF Labs Portfolio"], "platforms": {"ethereum": "0xabc"}, "genesis_date": "2023-04-14", "links": {"homepage": ["https://x"]}},
            "c2": {"id": "c2", "categories": ["Meme", "Solana Meme"], "platforms": {"solana": "MINT2"}, "genesis_date": None, "links": {}}}
     raises = {"raises": [{"name": "Meme 1", "date": 1, "round": "Seed", "amount": 2, "leadInvestors": ["Polychain Capital"], "otherInvestors": ["Some Fund"]}]}
 
@@ -352,6 +384,8 @@ def test_spot_run_score_reasons_and_cache():
             return {"data": [{"baseCcy": "M1", "quoteCcy": "USDT"}]}
         if "dexscreener" in url:
             return [{"baseToken": {"address": "MINT2"}, "liquidity": {"usd": 3e6}, "url": "https://dexscreener.com/solana/p2", "pairCreatedAt": NOW - 400 * DAY}]
+        if "rugcheck" in url and url.endswith("/report"):
+            raise OSError("report unavailable → RPC fallback")
         if "rugcheck" in url:
             return {"score": 1, "lpLockedPct": 100, "risks": []}
         raise OSError(url)
@@ -362,13 +396,14 @@ def test_spot_run_score_reasons_and_cache():
     rows = {r["symbol"]: r for r in res["rows"]}
     assert set(rows) == {"M1", "WIF"}                                                  # small cap and stablecoin dropped
     m1, wif = rows["M1"], rows["WIF"]
-    assert m1["backers"]["tier1"] == ["Polychain"] and m1["score_parts"]["бонус инвесторы"] == 10
+    assert m1["backers"]["tier1"] == ["DWF", "Polychain"] and m1["score_parts"]["бонус инвесторы"] == 10
+    assert m1["backers"]["source"] == "CoinGecko портфели, DefiLlama" and "DWF Labs" in m1["backers"]["investors"]
     assert m1["listed"] == {"okx_spot": True, "hl_perp": True, "solana_liq": None} and m1["holders"] is None
     assert any("держатели: нет данных (не Solana" in x for x in m1["reasons"]) and m1["age_source"] == "CoinGecko genesis"
     assert wif["circ_ratio"] == 0.25 and any(f["level"] == "red" and "в обращении только 25%" in f["text"] for f in wif["flags"])
     assert abs(wif["holders"]["top10_pct"] - 10.0) < 0.01                             # 10 wallets × 10 of supply 1000
     assert wif["age_days"] == 400 and wif["lp_locked_pct"] == 100 and wif["backers"]["checked"] and wif["backers"]["raises"] == []
-    assert any(x == "инвесторы: нет данных (DefiLlama не знает раундов)" for x in wif["reasons"])
+    assert any(x.startswith("инвесторы: нет данных (в CoinGecko нет портфелей") for x in wif["reasons"]) and wif["score_parts"]["бонус инвесторы"] == 0
     assert 0 < wif["coverage"] <= 1 and m1["coverage"] < 1 and 0 <= wif["score"] <= 100
     assert res["sources"]["coingecko"] and res["sources"]["defillama"] and res["sources"]["okx"]
     n1 = calls["n"]
@@ -383,3 +418,19 @@ def test_solana_holder_flags():
     texts = [(f["level"], f["text"]) for f in mm.sol_flags(r)]
     assert ("red", "топ-10 кошельков (без пулов) держат 72%") in texts
     assert any(lv == "yellow" and "в обращении 25%" in t for lv, t in texts)
+
+
+def test_holders_from_rugcheck_report():
+    rep = {"totalHolders": 813444,
+           "topHolders": [{"address": "t1", "owner": "POOLOWNER", "pct": 20.0}, {"address": "t2", "owner": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", "pct": 9.7},
+                          {"address": "t3", "owner": "w3", "pct": 5.0, "insider": True}, {"address": "t4", "owner": "w4", "pct": 3.0},
+                          {"address": "t5", "owner": "1nc1nerator11111111111111111111111111111111", "pct": 4.0}]
+                         + [{"address": f"x{i}", "owner": f"o{i}", "pct": 1.0} for i in range(12)],
+           "knownAccounts": {"POOLOWNER": {"name": "Raydium AMM", "type": "AMM"},
+                             "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM": {"name": "Binance 2", "type": "CEX"}}}
+    h = ms.holders_rugcheck(rep)
+    assert h["top10_pct"] == 5.0 + 3.0 + 8 * 1.0 and h["top1_pct"] == 5.0 and h["insiders_pct"] == 5.0 and h["holders_total"] == 813444
+    assert {e["why"] for e in h["excluded"]} == {"пул Raydium AMM", "биржа Binance 2", "сожжено"} and h["source"] == "RugCheck"
+    got = ms.holders_any("M", lambda url: rep, lambda u, b: (_ for _ in ()).throw(OSError()))
+    assert got["source"] == "RugCheck"
+    assert ms.holders_any("M", lambda url: {}, lambda u, b: (_ for _ in ()).throw(OSError())) is None

@@ -52,7 +52,7 @@ COST = 0.0015                                # round trip; half charged on entry
 # stop — before the body is taken; body_at/body_frac — sell this share at +body_at; trail — the rest is sold when the price falls this
 # far below its running peak (basis "close" = 4h closes, filled at the price of the next run; "high" = 1h highs, filled at the level);
 # pre_h — hours to wait for the body (None = until max_h); max_h — hard time limit for whatever is left.
-EXIT = {"stop": -0.25, "body_at": 1.00, "body_frac": 0.5, "trail": 0.35, "basis": "close", "pre_h": None, "max_h": 60 * 24}
+EXIT = {"stop": -0.25, "body_at": 0.50, "body_frac": 2 / 3, "trail": 0.35, "basis": "close", "pre_h": 72, "max_h": 60 * 24}
 STOP, TP, TP_FRAC, HOLD_H = EXIT["stop"], EXIT["body_at"], EXIT["body_frac"], EXIT["max_h"]      # kept for older readers
 MIN_VOL24 = 1_000_000                        # HL meme must trade ≥ $1M a day to be traded/ranked
 BREAK_K = 3.0                                # breakout bar volume ≥ 3 × median 4h volume of the previous 7 days (shown, not traded)
@@ -62,10 +62,11 @@ RULE_STATUS = "эксперимент"
 RULE = "dip"                                 # research rule C (docs/research/memes.md); "breakout" kept for comparison only
 RULES_TEXT = ("Эксперимент «откуп обвала мема». Покупаем мем-фьючерс Hyperliquid, когда 4-часовая свеча закрылась на 25% и больше "
               "ниже максимума последних суток (монета торгуется на $1M+ в сутки и есть на Hyperliquid не меньше 20 дней). "
-              "На позицию — 10% счёта, не больше 6 позиций сразу. Стоп −25% от цены входа. Половину продаём на +50%, остальное — "
-              "через 3 дня (72 ч). Комиссия с проскальзыванием 0.15% за сделку и фандинг учитываются. "
-              "История 2024–2026: в среднем +3.4% на сделку, 54% сделок в плюсе, но почти весь плюс дали три месяца массовых обвалов "
-              "(08.2024, 12.2024, 10.2025); без них −1% на сделку. Сигналов мало: в 2026 году — 8 за 9.5 месяца. "
+              "На позицию — 10% счёта, не больше 6 позиций сразу. Стоп −25% от цены входа, пока не взято тело. На +50% продаём 67% — "
+              "возвращаем вложенное; остаток держим без потолка и продаём, когда 4-часовая свеча закроется на 35% ниже пика (максимум 60 дней). "
+              "Если за 3 дня тело не взято — выходим целиком. Комиссия с проскальзыванием 0.15% за сделку и фандинг учитываются. "
+              "История 2024–2026 с этим выходом: +3.7% на сделку (157 сделок), итог $14 375, просадка −34%; почти весь плюс дали три месяца "
+              "массовых обвалов (08.2024, 12.2024, 10.2025), без них −0.8% на сделку. Сигналов мало: в 2026 году — 8 за 9.5 месяца. "
               "Покупку на пробоях и «самых сильных» мемов история не подтвердила (минус во всех вариантах) — так не торгуем.")
 
 # ── Solana filters ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -88,8 +89,23 @@ WARNINGS = [
     "не дают честно посчитать вход и выход. Проверки безопасности (авторитеты, RugCheck) снижают риск, но не убирают его.",
 ]
 
-EXIT_TEXT = "pending"
-EXIT_RESEARCH = {}
+EXIT_TEXT = ("Выход «сначала тело, потом трейлинг» (требование владельца). Пока тело не взято — стоп −25%. На +50% продаём 67% позиции: "
+             "это возвращает вложенную сумму. Остаток держим без потолка прибыли и продаём, когда 4-часовая свеча закроется на 35% ниже "
+             "пика (не дольше 60 дней). Если за 3 дня тело не взято — выходим целиком. Почему 3 дня: отскок мема после обвала короткий; "
+             "если ждать тело без срока, 86% сделок закрывает стоп и выходит −14% на сделку. История (04.2024–10.2026, 157 сделок): "
+             "+3.7% на сделку против +3.4% у прежнего выхода, итог $14 375 против $14 808, просадка та же (−34%) — по сути ничья. "
+             "Тело берётся только в 10% сделок; самый высокий пик после входа за 2.5 года — ×3.8, «100×» на мем-перпах HL не было.")
+EXIT_RESEARCH = {
+    "period": "2024-04 → 2026-10, 4h, 40 HL meme perps, costs 0.15% + funding",
+    "chosen": {"trades": 157, "avg_pct": 3.74, "random_avg_pct": -3.24, "p": 0.0, "final_usd": 14375, "max_dd_pct": -34, "months_pos": "67% из 21",
+               "without_top3_months_avg_pct": -0.83, "top5_share_pct": 60, "body_taken_pct": 10},
+    "previous_exit": {"trades": 162, "avg_pct": 3.40, "final_usd": 14808, "max_dd_pct": -34, "top5_share_pct": 71, "without_top3_months_avg_pct": -1.03},
+    "owner_no_time_limit": {"trades": 129, "avg_pct": -14.39, "final_usd": 3233, "max_dd_pct": -76, "closed_by_stop_pct": 86},
+    "wait_for_body": {"1d": 4.17, "2d": 2.69, "3d": 3.03, "5d": -0.26, "7d": -2.65, "14d": -7.22, "60d": -14.39},
+    "grid_3d_wait": {"variants": 36, "positive": 36, "avg_range_pct": [2.25, 3.74]},
+    "momentum_entries_any_exit": {"breakout_k3": "0/72", "breakout_k5": "0/72", "top3_by_5d": "0/72"},
+    "max_peak_after_entry": 3.8,
+}
 
 RESEARCH_SUMMARY = {
     "status": "готово 17.10.2026", "doc": "docs/research/memes.md", "verdict": "надёжного правила нет; лучшее — эксперимент «откуп обвала»",
@@ -105,6 +121,12 @@ RESEARCH_SUMMARY = {
         "dip_25_3d": {"cells_positive": "21/27", "trades": 162, "avg_pct": 3.40, "random_avg_pct": -1.87, "win_rate": 0.54,
                       "max_dd_pct": -34, "final_usd": 14678, "without_top3_months_avg_pct": -1.03, "verdict": "эксперимент"},
     },
+    "exits": ("Выход «сначала тело, потом трейлинг» проверен на всех входах (72 варианта на вход). На откупе он работает только с лимитом "
+              "ожидания тела 3 дня (36 из 36 вариантов в плюсе, +2.3…+3.7% на сделку); без лимита — 0 из 36, −14% на сделку. На пробоях "
+              "и «самых сильных» мемах — минус при любом выходе (0 из 72). Подробно — account.exit."),
+    "tokenomics_backers": ("Доля монет в обращении почти не связана с доходностью мемов (ранговая корреляция +0.07 за год, +0.11 за 200 дней, "
+                           "64–72 мема; выжившие и сегодняшние данные — не доказательство). Истории держателей и раундов в бесплатных "
+                           "источниках нет; DefiLlama raises стал платным. Поэтому токеномика и инвесторы — фильтр риска, а не прогноз."),
     "observed_after_the_fact": ("Откуп работал при массовом обвале мемов (+4.7% на сделку, 101 сделка) и когда BTC ниже 50-дневной "
                                 "средней (+8.9%, 75 сделок); при BTC выше средней −1.4% (87). Это найдено после прогона — в правило не "
                                 "вшито, записываем обстановку каждой сделки и проверяем вживую."),
@@ -457,6 +479,8 @@ def sol_flags(r: dict) -> list[dict]:
     if mc and fv and mc / fv < 0.7:
         add("yellow", f"в обращении {mc / fv * 100:.0f}% токенов — остальное может выйти на рынок")
     h = r.get("holders")
+    if h and (h.get("insiders_pct") or 0) >= 10:
+        add("red" if h["insiders_pct"] >= 25 else "yellow", f"инсайдеры (по RugCheck) держат {h['insiders_pct']:.0f}%")
     if h and h.get("top10_pct") is not None:
         if h["top10_pct"] > 60:
             add("red", f"топ-10 кошельков (без пулов) держат {h['top10_pct']:.0f}%")
@@ -663,7 +687,7 @@ def _spot_default(conn, now, hl_memes, deadline):
 
 def _holders_default(mint):
     from . import meme_spot
-    return meme_spot.holders(mint, lambda url, body: _req(url, body))
+    return meme_spot.holders_any(mint, lambda url: _req(url), lambda url, body: _req(url, body))
 
 
 def sol_holders(conn, rows: list[dict], now: int, holders_fn, deadline: float, new_max: int = 2) -> None:

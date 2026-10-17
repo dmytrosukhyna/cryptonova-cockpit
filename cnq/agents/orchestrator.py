@@ -47,8 +47,18 @@ class Orchestrator:
     def run(self, report: dict, news_items: list[dict] | None = None, open_positions: list[dict] | None = None,
             now_ms: int | None = None) -> dict:
         now_ms = now_ms or int(time.time() * 1000)
-        prices = {c["symbol"].replace("USDT", ""): c["price"] for c in report["coins"]}
+        # 17.10 fix: BingX symbols are "BTC-USDT" — the old key was "BTC-", so price_at stayed empty and news were never scored
+        prices = {c["symbol"].replace("-USDT", "").replace("USDT", ""): c["price"] for c in report["coins"]}
         prices["MARKET"] = prices.get("BTC")
+        try:   # backfill price_at for news that missed it, from the 15m candles we still have in the report
+            for nid, asset, created in self.conn.execute("SELECT news_id, asset, created FROM news_impact WHERE price_at IS NULL").fetchall():
+                coin = next((c for c in report["coins"] if c["symbol"].replace("-USDT", "").replace("USDT", "") == (asset if asset != "MARKET" else "BTC")), None)
+                bars = [k for k in (coin or {}).get("candles") or [] if k[0] <= created]
+                if bars and created - bars[-1][0] <= 3_600_000:
+                    self.conn.execute("UPDATE news_impact SET price_at=? WHERE news_id=? AND asset=?", (bars[-1][4], nid, asset))
+            self.conn.commit()
+        except Exception:  # noqa: BLE001
+            pass
         # --- news desk
         if news_items is not None:
             self.collector.store(news_items)

@@ -305,7 +305,7 @@ class RiskPortfolio:
 
 # ----------------------------------------------------------------------------- 6th profile: «По рекомендациям» (follows web/ideas.json)
 IDEAS = {
-    "key": "ideas", "name": "По рекомендациям", "prefix": "spot_ideas_", "status": "эксперимент",
+    "key": "ideas", "name": "AI-портфель · по рекомендациям", "prefix": "spot_ideas_", "status": "эксперимент",
     "buy_w": 0.10, "buy_n": 8,            # table status «можно брать» / «можно добрать»: 10 % each, at most 8 coins
     "small_w": 0.025, "small_n": 4,       # table status «можно на небольшую сумму»: 2.5 % each, at most 4 coins
     "min_cash": 0.10, "fee": 0.001,       # cash ≥ 10 % after a buy; 0.1 % of every traded notional (the 10 % / 2.5 % include it)

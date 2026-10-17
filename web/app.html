@@ -953,9 +953,9 @@ async function renderSpotChart(){ const el=$('#spotChart'); if(!el) return; cons
 function whAdvice(){ const S=WHS.summary, fm=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+Math.round(v/1e3)+'k'; const out=[];
   out.push(`<div class="whv ${S.bias==='LONG'?'pos':S.bias==='SHORT'?'neg':''}"><b>${S.bias==='LONG'?'Крупные трейдеры ставят на рост':S.bias==='SHORT'?'Крупные трейдеры ставят на падение':'У крупных трейдеров нет общего мнения'}</b><span>${fm(S.total_long_usd)} в покупках против ${fm(S.total_short_usd)} в продажах · топ-${S.n_whales} счетов Hyperliquid</span></div>`);
   const strong=(WHS.coins||[]).filter(c=>(c.long_n+c.short_n)>=2&&Math.abs(c.consensus)>=0.6).slice(0,4);
-  strong.forEach(c=>{ const L=c.lean==='LONG'; out.push(`<div class="whr"><span class="${L?'pos':'neg'}">${L?'▲':'▼'} ${c.coin}</span><span>${L?`${c.long_n} из ${c.long_n+c.short_n} китов покупают — присмотреться к покупке, но только от поддержки`:`${c.short_n} из ${c.long_n+c.short_n} китов продают — не спешить покупать`}</span></div>`); });
-  (WHS.changes||[]).filter(c=>c.notional>=1e6&&(c.kind==='OPEN'||c.kind==='FLIP'||c.kind==='ADD')).slice(0,3).forEach(c=>{ const L=c.side==='LONG'; out.push(`<div class="whr"><span class="${L?'pos':'neg'}">⚡ ${c.coin}</span><span>кит ${({OPEN:'открыл',FLIP:'перевернул в',ADD:'нарастил'})[c.kind]} ${L?'покупку':'продажу'} на ${fm(c.notional)} — ${L?'возможно, знает что-то хорошее: следим за ростом':'возможно, ждёт падения: осторожно с покупками'}</span></div>`); });
-  out.push('<div class="muted enote">Киты ошибаются тоже: это подсказка, куда смотреть, а не сигнал на вход.</div>');
+  strong.forEach(c=>{ const L=c.lean==='LONG'; out.push(`<div class="whr"><span class="${L?'pos':'neg'}">${L?'▲':'▼'} ${c.coin}</span><span>${L?`${c.long_n} из ${c.long_n+c.short_n} китов в покупке`:`${c.short_n} из ${c.long_n+c.short_n} китов в продаже`}</span></div>`); });
+  (WHS.changes||[]).filter(c=>c.notional>=1e6&&(c.kind==='OPEN'||c.kind==='FLIP'||c.kind==='ADD')).slice(0,3).forEach(c=>{ const L=c.side==='LONG'; out.push(`<div class="whr"><span class="${L?'pos':'neg'}">⚡ ${c.coin}</span><span>кит ${({OPEN:'открыл',FLIP:'перевернул в',ADD:'нарастил'})[c.kind]} ${L?'покупку':'продажу'} на ${fm(c.notional)} </span></div>`); });
+  out.push('<div class="muted enote">Справочно: что держат крупнейшие счета Hyperliquid. Похожий показатель крупных трейдеров Binance на истории 2023–2026 цену не предсказывал — это не сигнал на вход.</div>');
   return out.join(''); }
 /* ---- futures tab: autopilot radar (how close each rule is to firing), urgent news, top traders of Binance/Bybit */
 function renderApRadar(){ const el=$('#apRadar'); if(!el) return; const S=PAPER&&PAPER.scan; if(!S){ el.innerHTML='<h2>Радар автопилота</h2><div class="muted">Появится после следующего запуска сервера.</div>'; return; }
@@ -978,15 +978,10 @@ async function loadTopTraders(){ if(Date.now()-TOPT.t<10*60000) return; TOPT.t=D
     try{ const r=await (await fetch(`https://api.bybit.com/v5/market/account-ratio?category=linear&symbol=${c}USDT&period=1h&limit=24`)).json(); const l=r.result&&r.result.list; if(l&&l.length){ o.byb=+l[0].buyRatio; o.byb0=+l[l.length-1].buyRatio; } }catch(e){}
     TOPT.d[c]=o; })); }
 async function renderTopTraders(){ const el=$('#topCard'); if(!el) return; await loadTopTraders(); const rows=Object.entries(TOPT.d).filter(([c,o])=>o.bin!=null||o.byb!=null);
-  const adv=(c,o)=>{ const L=o.bin!=null?o.bin:o.byb, d=o.bin!=null&&o.bin0!=null?o.bin-o.bin0:null; const crowd=o.byb;
-    if(L>=0.6&&crowd!=null&&crowd<0.5) return ['pos',`крупные покупают, толпа продаёт — часто к росту: присмотреться к покупке ${c}`];
-    if(L<=0.45&&crowd!=null&&crowd>0.55) return ['neg',`крупные продают, толпа покупает — осторожно, возможен слив ${c}`];
-    if(d!=null&&d>=0.05) return ['pos',`крупные за сутки нарастили покупки на ${(d*100).toFixed(0)} п.п. — следим за ростом`];
-    if(d!=null&&d<=-0.05) return ['neg',`крупные за сутки сократили покупки на ${(-d*100).toFixed(0)} п.п. — не спешить`];
-    return ['',L>=0.55?'крупные чуть больше в покупках — без сигнала':L<=0.45?'крупные чуть больше в продажах — без сигнала':'мнения разделились — без сигнала']; };
-  el.innerHTML=`<h2>${ico('eye')} Крупнейшие трейдеры рынка <span class="r muted">Binance топ-трейдеры · Bybit все счета</span></h2>
+  const adv=(c,o)=>['','справочно — это не сигнал'];
+  el.innerHTML=`<h2>${ico('eye')} Крупнейшие трейдеры рынка <span class="r muted">справочно · на истории цену не предсказывает</span></h2>
     ${rows.length?rows.map(([c,o])=>{ const [cl,t]=adv(c,o); return `<div class="tt ${cl}"><b>${c}</b><span class="ttb"><i style="width:${((o.bin??o.byb)*100).toFixed(0)}%"></i></span><small>${o.bin!=null?`топ Binance ${(o.bin*100).toFixed(0)}% в лонге`:''}${o.byb!=null?` · толпа Bybit ${(o.byb*100).toFixed(0)}%`:''}</small><em>${t}</em></div>`; }).join(''):'<div class="muted enote">Биржи не отвечают из этого окна — данные появятся на сайте cryptonova.vip.</div>'}
-    <details class="whdet"><summary>Как это читать</summary><div class="muted enote">«Топ Binance» — какая доля позиций самых крупных трейдеров биржи в покупке. «Толпа Bybit» — доля всех счетов в покупке. Когда крупные и толпа расходятся, чаще прав крупный капитал. Это подсказка, а не сигнал на вход.</div></details>`; }
+    <details class="whdet"><summary>Как это читать</summary><div class="muted enote">«Топ Binance» — доля позиций самых крупных трейдеров биржи в покупке. «Толпа Bybit» — доля всех счетов в покупке. Мы проверили это на истории 2023–2026 по 18 монетам: ни уровень, ни расхождение крупных и толпы не предсказывали цену на ближайшие сутки — результат как у случайного входа. Показываем только как настроение участников, не как сигнал.</div></details>`; }
 
 /* ---- overview: our accounts at a glance (spot positions with advice + open futures trades) */
 function renderOvAccounts(){ const el=$('#ovAcc'); if(!el) return; const P=PF&&PF.portfolios&&PF.portfolios[SPROF]; const fp=(PAPER&&PAPER.profiles&&PAPER.profiles[PROF])||PAPER;

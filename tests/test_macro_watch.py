@@ -58,6 +58,12 @@ def test_changes_pct_and_bp_and_signals():
     assert k["chg_1d"] == -2.0 and "чаще рос" in k["signal_ru"] and "2021–2022" in k["signal_ru"]
 
 
+def test_cboe_weekend_repeat_gives_no_change():
+    d = mw.run(fetch=fake(cboe={"_VIX": (20.0, 20.0)}, yahoo_down=True), now=NOW)
+    v = item(d, "VIX")
+    assert v["value"] == 20.0 and v["chg_1d"] is None and v["signal_ru"] == ""
+
+
 def test_old_tnx_convention_scaled():
     t = item(mw.run(fetch=fake(yahoo={"^TNX": [42.0, 42.5]}), now=NOW), "US10Y")
     assert t["value"] == 4.25 and t["chg_1d"] == 5.0
@@ -76,13 +82,15 @@ def test_fallbacks_when_yahoo_down():
     assert n["name_ru"] == "Nasdaq-100 (индекс)" and n["chg_1d"] == -2.0
     j = item(d, "USDJPY")
     assert j["source"].startswith("ЕЦБ") and j["chg_1d"] == round((149.5 / 151 - 1) * 100, 2)
+    assert item(d, "US2Y")["source"].startswith("US Treasury") and item(d, "US2Y")["chg_1d"] == 5.0
     g = item(d, "GOLD")                                               # no free fallback → empty item, error listed
     assert g["value"] is None and g["source"] is None and any(e.startswith("GOLD") for e in d["errors"])
 
 
 def test_write_json_shape():
     with tempfile.TemporaryDirectory() as tmp:
-        d = mw.write(tmp, fetch=fake(yahoo={s: [1.0, 1.0] for _, _, _, s, _, _ in mw.ITEMS}), now=NOW)
+        d = mw.write(tmp, fetch=fake(yahoo={s: [1.0, 1.0] for _, _, _, s, _, _ in mw.ITEMS if s},
+                                     treasury=[("10/14/2025", 3.5, 4.0), ("10/15/2025", 3.5, 4.0)]), now=NOW)
         x = json.load(open(os.path.join(tmp, "macro.json"), encoding="utf-8"))
     assert set(x) >= {"asof", "items", "notes"} and len(x["items"]) == len(mw.ITEMS) == 11
     assert {"key", "name_ru", "value", "chg_1d", "chg_5d", "unit", "source", "signal_ru"} <= set(x["items"][0])

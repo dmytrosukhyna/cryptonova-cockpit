@@ -5,7 +5,8 @@ Nikkei 225. Each item: latest value, change vs the previous daily close and vs t
 points, everything else in %).
 
 Sources, as checked from GitHub Actions on 17.10.2026 (scripts/macro_factors_fetch.py --probe):
-  • Yahoo Finance chart API — every item. From Actions it answers only to a browser-like TLS client: if the optional package
+  • Yahoo Finance chart API — every item except the 2-year yield (Yahoo's 2YY=F is sparse; US Treasury is used for it). From
+    Actions Yahoo answers only to a browser-like TLS client: if the optional package
     curl_cffi is installed it is used (site.yml installs it for this step); plain urllib gets HTTP 429 there.
   • fallbacks that answer to plain urllib: US Treasury daily par yields (10Y, 2Y; end of day), CBOE delayed quotes (VIX,
     S&P 500 and Nasdaq-100 cash indices, 15 min delay), ECB reference rate via api.frankfurter.app (USD/JPY, once a day).
@@ -29,11 +30,11 @@ import urllib.request
 
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
 
-# key, name_ru, unit shown, Yahoo symbol, fallback (kind:id) or None, change kind ('bp' | 'pct')
+# key, name_ru, unit shown, Yahoo symbol (None = official source only), fallback (kind:id) or None, change kind ('bp' | 'pct')
 ITEMS = [
     ("DXY", "Индекс доллара (DXY)", "пт", "DX-Y.NYB", None, "pct"),
     ("US10Y", "Доходность 10-летних облигаций США", "%", "^TNX", "treasury:10 Yr", "bp"),
-    ("US2Y", "Доходность 2-летних облигаций США", "%", "2YY=F", "treasury:2 Yr", "bp"),
+    ("US2Y", "Доходность 2-летних облигаций США", "%", None, "treasury:2 Yr", "bp"),   # Yahoo 2YY=F is sparse → Treasury
     ("USDJPY", "Доллар / иена", "¥", "JPY=X", "ecb:JPY", "pct"),
     ("WTI", "Нефть WTI", "$", "CL=F", None, "pct"),
     ("BRENT", "Нефть Brent", "$", "BZ=F", None, "pct"),
@@ -125,6 +126,8 @@ def cboe_quote(sym: str, fetch=None) -> list[tuple[int, float]]:
     if prev in (None, 0):
         prev = cur - float(d.get("price_change") or 0)
     t = int(time.time())
+    if float(prev) == cur:                     # weekends / holidays: CBOE repeats the last close → no honest 1-day change
+        return [(t, cur)]
     return [(t - 86_400, float(prev)), (t, cur)]
 
 
@@ -187,10 +190,11 @@ def run(fetch=None, now: float | None = None) -> dict:
     items, errors = [], []
     for key, name, unit, ysym, fb, kind in ITEMS:
         ser, src, err = None, None, None
-        try:
-            ser = yahoo_daily(ysym, fetch); src = "Yahoo Finance"
-        except Exception as e:  # noqa: BLE001
-            err = str(e)[:120]
+        if ysym:
+            try:
+                ser = yahoo_daily(ysym, fetch); src = "Yahoo Finance"
+            except Exception as e:  # noqa: BLE001
+                err = str(e)[:120]
         if ser is None and fb:
             try:
                 ser, src = _fallback(fb, fetch, now)

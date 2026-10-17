@@ -6,11 +6,17 @@ container cannot reach market-data sites, so the data travel back as job annotat
   python scripts/macro_factors_fetch.py --probe probe.md                  live-source check for cnq/agents/macro_watch.py
   python scripts/macro_factors_fetch.py --decode ann_dir out.json         (research container) annotations → series JSON
 
-Sources (all free, no key):
-  FRED   https://fred.stlouisfed.org/graph/fredgraph.csv?id=<ID>&cosd=2021-01-01      daily / weekly / monthly
-  Yahoo  https://query1.finance.yahoo.com/v8/finance/chart/<SYM>?interval=1d|1h      daily since 2021, hourly 730 days
-Series format after decode: {name: {"src", "freq", "t": [unix seconds], "v": [float]}}; Yahoo bars are stamped at the bar
-OPEN (hourly close = last price in that hour); FRED values are stamped at 00:00 UTC of the observation date."""
+Reachability from Actions (probe of 17.10.2026): plain urllib → Yahoo answers 429, FRED times out, Stooq shows a JavaScript
+wall; US Treasury and CBOE answer. So:
+  Yahoo     via yfinance (curl_cffi browser TLS): daily since 2021, hourly for the last 730 days
+  Treasury  https://home.treasury.gov/.../daily-treasury-rates.csv/<year>/all?type=daily_treasury_yield_curve   (2Y, 10Y, 3M)
+            and real yields (type=daily_treasury_real_yield_curve, 10Y TIPS)
+  CBOE      https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv
+  NY Fed    reverse repo (RRP) https://markets.newyorkfed.org/api/rp/reverserepo/propositions/search.json
+  Fiscal    Treasury General Account (TGA) https://api.fiscaldata.treasury.gov/.../dts/operating_cash_balance
+  FRED      fredgraph.csv (WALCL, M2SL, BAMLH0A0HYM2 …) — best effort, usually times out from Actions
+Series format after decode: {key: {"src", "freq", "t": [unix seconds], "v": [float]}}; Yahoo bars are stamped at the bar
+OPEN (hourly close = last price in that hour); daily official series are stamped at 00:00 UTC of the observation date."""
 from __future__ import annotations
 
 import base64
@@ -19,20 +25,21 @@ import datetime as dt
 import io
 import json
 import lzma
+import math
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       "Accept": "text/csv,application/json,*/*"}
 START = "2021-01-01"
-FRED = ["DGS10", "DGS2", "DGS3MO", "T10Y2Y", "T10YIE", "DFII10", "DTWEXBGS", "DEXJPUS", "DEXUSEU", "DCOILWTICO", "DCOILBRENTEU",
-        "VIXCLS", "SP500", "NASDAQCOM", "BAMLH0A0HYM2", "WALCL", "WTREGEN", "RRPONTSYD", "M2SL", "NFCI", "DFF"]
 Y_DAILY = ["ES=F", "NQ=F", "RTY=F", "DX-Y.NYB", "JPY=X", "EURUSD=X", "CNY=X", "CL=F", "BZ=F", "GC=F", "HG=F", "^TNX", "^FVX",
-           "^IRX", "^VIX", "^MOVE", "^N225", "BTC-USD", "ETH-USD", "2YY=F", "ZN=F", "COIN", "MSTR"]
+           "^IRX", "^VIX", "^MOVE", "^N225", "^GSPC", "^IXIC", "BTC-USD", "ETH-USD", "2YY=F", "ZN=F", "HYG", "TLT", "UUP"]
 Y_HOURLY = ["ES=F", "NQ=F", "RTY=F", "DX-Y.NYB", "JPY=X", "EURUSD=X", "CL=F", "BZ=F", "GC=F", "HG=F", "^TNX", "^VIX", "2YY=F",
             "ZN=F", "^N225", "BTC-USD"]
+FRED = ["WALCL", "M2SL", "BAMLH0A0HYM2", "DGS10", "DEXJPUS"]
 CHUNK = 4000
 
 
@@ -47,45 +54,94 @@ def get(url: str, timeout: float = 20.0, tries: int = 2) -> bytes:
     raise RuntimeError(f"{url}: {last}")
 
 
-def fred(sid: str) -> tuple[list[int], list[float]]:
-    raw = get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={START}").decode()
+def ts_day(s: str, fmt: str) -> int:
+    return int(dt.datetime.strptime(s, fmt).replace(tzinfo=dt.timezone.utc).timestamp())
+
+
+def fred(sid: str) -> dict:
+    raw = get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={START}", timeout=60, tries=1).decode()
     rd = csv.reader(io.StringIO(raw)); next(rd)
     t, v = [], []
     for row in rd:
-        if len(row) < 2 or row[1] in ("", ".", "NA"):
-            continue
-        try:
-            x = float(row[1])
-        except ValueError:
-            continue
-        d = dt.datetime.strptime(row[0], "%Y-%m-%d").replace(tzinfo=dt.timezone.utc)
-        t.append(int(d.timestamp())); v.append(x)
-    return t, v
+        if len(row) >= 2 and row[1] not in ("", ".", "NA"):
+            t.append(ts_day(row[0], "%Y-%m-%d")); v.append(float(row[1]))
+    return {f"fred:{sid}:1d": (t, v, {})}
 
 
-def yahoo(sym: str, interval: str) -> tuple[list[int], list[float], dict]:
-    q = urllib.request.quote(sym, safe="")
-    if interval == "1h":
-        rng = "range=730d"
-    else:
-        p1 = int(dt.datetime.strptime(START, "%Y-%m-%d").replace(tzinfo=dt.timezone.utc).timestamp())
-        rng = f"period1={p1}&period2={int(time.time())}"
-    last = None
-    for host in ("query1", "query2"):
+def treasury() -> dict:
+    """daily par yields (nominal 3M/2Y/10Y) and real 10Y; one CSV per year."""
+    cols = {"3 Mo": "UST3M", "2 Yr": "UST2Y", "10 Yr": "UST10Y"}
+    out = {k: {} for k in list(cols.values()) + ["REAL10Y"]}
+    for y in range(int(START[:4]), dt.date.today().year + 1):
+        for typ in ("daily_treasury_yield_curve", "daily_treasury_real_yield_curve"):
+            url = (f"https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/{y}/all"
+                   f"?type={typ}&field_tdr_date_value={y}&page&_format=csv")
+            rd = csv.DictReader(io.StringIO(get(url).decode()))
+            for row in rd:
+                d = ts_day(row["Date"], "%m/%d/%Y")
+                if typ.endswith("real_yield_curve"):
+                    x = row.get("10 YR") or row.get("10 Yr")
+                    if x: out["REAL10Y"][d] = float(x)
+                else:
+                    for c, k in cols.items():
+                        if row.get(c): out[k][d] = float(row[c])
+    return {f"treasury:{k}:1d": (sorted(m), [m[t] for t in sorted(m)], {}) for k, m in out.items() if m}
+
+
+def cboe_vix() -> dict:
+    rd = csv.DictReader(io.StringIO(get("https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv").decode()))
+    t, v = [], []
+    for row in rd:
+        d = ts_day(row["DATE"], "%m/%d/%Y")
+        if d >= ts_day(START, "%Y-%m-%d"):
+            t.append(d); v.append(float(row["CLOSE"]))
+    return {"cboe:VIX:1d": (t, v, {})}
+
+
+def nyfed_rrp() -> dict:
+    url = f"https://markets.newyorkfed.org/api/rp/reverserepo/propositions/search.json?startDate={START}&endDate={dt.date.today().isoformat()}"
+    ops = json.loads(get(url, timeout=60))["repo"]["operations"]
+    m = {}
+    for o in ops:
+        d = ts_day(o["operationDate"], "%Y-%m-%d"); m[d] = m.get(d, 0.0) + float(o.get("totalAmtAccepted") or 0) / 1e9   # $ bln
+    return {"nyfed:RRP:1d": (sorted(m), [m[t] for t in sorted(m)], {})}
+
+
+def fiscal_tga() -> dict:
+    base = "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dts/operating_cash_balance"
+    m, page, kinds = {}, 1, set()
+    while True:
+        url = f"{base}?filter=record_date:gte:{START}&fields=record_date,account_type,open_today_bal,close_today_bal&page[size]=5000&page[number]={page}"
+        d = json.loads(get(url, timeout=60))
+        for r in d["data"]:
+            a = (r.get("account_type") or "").lower(); kinds.add(a[:60])
+            if "closing balance" in a:
+                x = r.get("close_today_bal") if r.get("close_today_bal") not in (None, "null") else r.get("open_today_bal")
+                if x not in (None, "null"):
+                    m[ts_day(r["record_date"], "%Y-%m-%d")] = float(x) / 1000.0        # $ mln → $ bln
+        if page >= int(d.get("meta", {}).get("total-pages", 1)): break
+        page += 1
+    if not m:
+        raise RuntimeError(f"no closing balance rows; account types seen: {sorted(kinds)[:8]}")
+    return {"fiscal:TGA:1d": (sorted(m), [m[t] for t in sorted(m)], {})}
+
+
+def yahoo_yf(syms: list[str], interval: str) -> dict:
+    import yfinance as yf
+    out = {}
+    for s in syms:
         try:
-            d = json.loads(get(f"https://{host}.finance.yahoo.com/v8/finance/chart/{q}?interval={interval}&{rng}&includePrePost=false"))
-            res = d["chart"]["result"][0]
-            ts = res.get("timestamp") or []
-            cl = res["indicators"]["quote"][0].get("close") or []
-            t, v = [], []
-            for a, b in zip(ts, cl):
-                if b is not None:
-                    t.append(int(a)); v.append(float(b))
-            meta = res.get("meta", {})
-            return t, v, {"tz": meta.get("exchangeTimezoneName"), "gmtoffset": meta.get("gmtoffset"), "cur": meta.get("currency")}
+            tk = yf.Ticker(s)
+            h = tk.history(period="730d", interval="1h", auto_adjust=False, prepost=False) if interval == "1h" else \
+                tk.history(start=START, interval="1d", auto_adjust=False)
+            h = h[h["Close"].notna()]
+            t = [int(x.timestamp()) for x in h.index]; v = [float(x) for x in h["Close"]]
+            tz = str(getattr(h.index, "tz", "") or "")
+            out[f"yahoo:{s}:{interval}"] = (t, v, {"tz": tz}) if t else RuntimeError("empty")
         except Exception as e:  # noqa: BLE001
-            last = e
-    raise RuntimeError(f"yahoo {sym} {interval}: {last}")
+            out[f"yahoo:{s}:{interval}"] = RuntimeError(str(e)[:200])
+        time.sleep(0.3)
+    return out
 
 
 def pack_series(t: list[int], v: list[float]) -> dict:
@@ -93,12 +149,9 @@ def pack_series(t: list[int], v: list[float]) -> dict:
     if not v:
         return {"t": [], "v": [], "s": 1}
     mx = max(abs(x) for x in v) or 1.0
-    import math
-    s = 10 ** (5 - int(math.floor(math.log10(mx))))           # ~6 significant digits for the largest value
+    s = 10 ** (5 - int(math.floor(math.log10(mx))))
     iv = [int(round(x * s)) for x in v]
-    dtt = [t[0]] + [b - a for a, b in zip(t, t[1:])]
-    dv = [iv[0]] + [b - a for a, b in zip(iv, iv[1:])]
-    return {"t": dtt, "v": dv, "s": s}
+    return {"t": [t[0]] + [b - a for a, b in zip(t, t[1:])], "v": [iv[0]] + [b - a for a, b in zip(iv, iv[1:])], "s": s}
 
 
 def unpack_series(p: dict) -> tuple[list[int], list[float]]:
@@ -109,38 +162,39 @@ def unpack_series(p: dict) -> tuple[list[int], list[float]]:
 
 
 def do_fetch(out: str, md: str) -> None:
-    data, lines, fails = {}, ["| series | source | freq | n | first | last | last value | time |", "|---|---|---|---|---|---|---|---|"], []
-    jobs = [("fred", s, "1d") for s in FRED] + [("yahoo", s, "1d") for s in Y_DAILY] + [("yahoo", s, "1h") for s in Y_HOURLY]
     from concurrent.futures import ThreadPoolExecutor
+    tasks = [("treasury", treasury), ("cboe", cboe_vix), ("nyfed", nyfed_rrp), ("fiscal", fiscal_tga),
+             ("yahoo 1d", lambda: yahoo_yf(Y_DAILY, "1d")), ("yahoo 1h", lambda: yahoo_yf(Y_HOURLY, "1h"))] + \
+            [(f"fred {s}", (lambda s=s: fred(s))) for s in FRED]
 
-    def one(job):
-        src, sid, iv = job; t0 = time.time()
+    def one(task):
+        name, fn = task; t0 = time.time()
         try:
-            if src == "fred":
-                t, v = fred(sid); meta = {}
-            else:
-                t, v, meta = yahoo(sid, iv)
-            return job, (t, v, meta), None, time.time() - t0
+            return name, fn(), None, time.time() - t0
         except Exception as e:  # noqa: BLE001
-            return job, None, str(e)[:200], time.time() - t0
-    with ThreadPoolExecutor(8) as ex:
-        res = list(ex.map(one, jobs))
+            return name, {}, str(e)[:240], time.time() - t0
+    with ThreadPoolExecutor(6) as ex:
+        res = list(ex.map(one, tasks))
+    data, fails = {}, []
+    lines = ["| series | n | first | last | last value |", "|---|---|---|---|---|"]
     f = lambda x: dt.datetime.fromtimestamp(x, dt.timezone.utc).strftime("%Y-%m-%d %H:%M")
-    for (src, sid, iv), got, err, sec in res:
-        key = f"{src}:{sid}:{iv}"
-        if got is None:
-            fails.append(f"{key}: {err} ({sec:.0f}s)"); continue
-        t, v, meta = got
-        p = pack_series(t, v); p.update(src=src, freq=iv, meta=meta)
-        data[key] = p
-        lines.append(f"| {sid} | {src} | {iv} | {len(t)} | {f(t[0]) if t else '-'} | {f(t[-1]) if t else '-'} | {v[-1] if v else '-'} | {sec:.0f}s |")
+    for name, got, err, sec in res:
+        if err: fails.append(f"{name}: {err} ({sec:.0f}s)")
+        for key, val in got.items():
+            if isinstance(val, Exception):
+                fails.append(f"{key}: {val}"); continue
+            t, v, meta = val
+            p = pack_series(t, v); p.update(src=key.split(":")[0], freq=key.split(":")[-1], meta=meta)
+            data[key] = p
+            lines.append(f"| {key} | {len(t)} | {f(t[0]) if t else '-'} | {f(t[-1]) if t else '-'} | {v[-1] if v else '-'} |")
     raw = json.dumps(data, separators=(",", ":")).encode()
     blob = base64.b64encode(lzma.compress(raw, preset=9 | lzma.PRESET_EXTREME)).decode()
     open(out, "w").write(blob)
     n = (len(blob) + CHUNK - 1) // CHUNK
     head = (f"built {dt.datetime.now(dt.timezone.utc):%Y-%m-%d %H:%M} UTC; series {len(data)}; json {len(raw)} B; "
-            f"packed {len(blob)} chars = {n} chunks of {CHUNK}; failures {len(fails)}")
-    open(md, "w").write(head + "\n\n" + "\n".join(lines) + "\n\nFAILURES\n" + "\n".join(fails) + "\n")
+            f"packed {len(blob)} chars = {n} chunks of {CHUNK}; failures {len(fails)}; times: "
+            + ", ".join(f"{name} {sec:.0f}s" for name, _, _, sec in res))
+    open(md, "w").write(head + "\n\nFAILURES\n" + "\n".join(fails) + "\n\n" + "\n".join(lines) + "\n")
     print(head)
 
 
@@ -156,23 +210,56 @@ def do_emit(src: str, start: int, count: int) -> None:
 def do_probe(md: str) -> None:
     """Which live sources answer from Actions (for cnq/agents/macro_watch.py)."""
     out = []
-    tests = [("FRED DGS10", f"https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10&cosd={(dt.date.today() - dt.timedelta(days=20)).isoformat()}"),
-             ("Yahoo q1 DX-Y.NYB 1d", "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=10d"),
-             ("Yahoo q2 JPY=X 1d", "https://query2.finance.yahoo.com/v8/finance/chart/JPY%3DX?interval=1d&range=10d"),
-             ("Yahoo q1 multi-quote v7", "https://query1.finance.yahoo.com/v7/finance/quote?symbols=ES%3DF,NQ%3DF"),
-             ("Yahoo q1 spark", "https://query1.finance.yahoo.com/v8/finance/spark?symbols=ES%3DF,NQ%3DF,%5ETNX&range=5d&interval=1d"),
-             ("Stooq ^spx daily", "https://stooq.com/q/d/l/?s=%5Espx&i=d"),
-             ("Stooq quote usdjpy", "https://stooq.com/q/l/?s=usdjpy&f=sd2t2ohlcv&h&e=csv"),
-             ("Stooq 60m usdjpy", "https://stooq.com/q/d/l/?s=usdjpy&i=60"),
-             ("CBOE VIX csv", "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"),
-             ("Treasury yields xml", "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2026/all?type=daily_treasury_yield_curve&field_tdr_date_value=2026&page&_format=csv")]
+    today = dt.date.today()
+    tests = [("CBOE delayed _VIX", "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json"),
+             ("CBOE delayed _SPX", "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_SPX.json"),
+             ("CBOE delayed _NDX", "https://cdn.cboe.com/api/global/delayed_quotes/quotes/_NDX.json"),
+             ("CBOE delayed UUP", "https://cdn.cboe.com/api/global/delayed_quotes/quotes/UUP.json"),
+             ("CBOE delayed FXY", "https://cdn.cboe.com/api/global/delayed_quotes/quotes/FXY.json"),
+             ("CBOE delayed GLD", "https://cdn.cboe.com/api/global/delayed_quotes/quotes/GLD.json"),
+             ("CBOE delayed USO", "https://cdn.cboe.com/api/global/delayed_quotes/quotes/USO.json"),
+             ("Treasury month CSV", f"https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/{today:%Y%m}?type=daily_treasury_yield_curve&field_tdr_date_value_month={today:%Y%m}&page&_format=csv"),
+             ("ECB eurofxref daily", "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"),
+             ("Frankfurter latest USD", "https://api.frankfurter.app/latest?from=USD&to=JPY,EUR"),
+             ("NY Fed RRP last", "https://markets.newyorkfed.org/api/rp/reverserepo/propositions/search.json?startDate=" + (today - dt.timedelta(days=7)).isoformat()),
+             ("Google Finance USDJPY", "https://www.google.com/finance/quote/USD-JPY"),
+             ("Hyperliquid meta (crypto venue, sanity)", "https://api.hyperliquid.xyz/info")]
     for name, url in tests:
         t0 = time.time()
         try:
-            b = get(url, timeout=20, tries=1)
-            out.append(f"OK   {name}: {len(b)} B in {time.time() - t0:.1f}s; head: {b[:160]!r}")
+            if "hyperliquid" in url:
+                req = urllib.request.Request(url, data=b'{"type":"meta"}', headers={**UA, "Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=15) as r: b = r.read()
+            else:
+                b = get(url, timeout=15, tries=1)
+            out.append(f"OK   {name}: {len(b)} B in {time.time() - t0:.1f}s; head: {b[:140]!r}")
         except Exception as e:  # noqa: BLE001
-            out.append(f"FAIL {name}: {str(e)[:220]}")
+            out.append(f"FAIL {name}: {str(e)[:160]}")
+    key = os.environ.get("TWELVE_DATA_KEY", "")
+    if key:
+        for sym in ("USD/JPY", "XAU/USD", "WTI/USD", "DXY", "SPY"):
+            try:
+                d = json.loads(get(f"https://api.twelvedata.com/quote?symbol={urllib.parse.quote(sym)}&apikey={key}", timeout=15, tries=1))
+                out.append(f"TD   {sym}: " + (f"close {d.get('close')} prev {d.get('previous_close')} at {d.get('datetime')}" if "close" in d else str(d)[:150]))
+            except Exception as e:  # noqa: BLE001
+                out.append(f"TD   {sym}: FAIL {str(e)[:120]}")
+            time.sleep(8)                                    # free plan: 8 requests per minute
+    else:
+        out.append("TD   no TWELVE_DATA_KEY in the environment")
+    try:
+        import yfinance as yf
+        for s in ("DX-Y.NYB", "JPY=X", "ES=F", "^TNX"):
+            t0 = time.time()
+            h = yf.Ticker(s).history(period="5d", interval="1d")
+            out.append(f"YF   {s}: {len(h)} rows in {time.time() - t0:.1f}s; last {float(h['Close'].iloc[-1]) if len(h) else None}")
+    except Exception as e:  # noqa: BLE001
+        out.append(f"YF   FAIL {str(e)[:200]}")
+    try:
+        from curl_cffi import requests as cr
+        r = cr.get("https://query1.finance.yahoo.com/v8/finance/chart/JPY%3DX?interval=1d&range=10d", impersonate="chrome", timeout=15)
+        out.append(f"CURL_CFFI yahoo chart: HTTP {r.status_code}, {len(r.content)} B")
+    except Exception as e:  # noqa: BLE001
+        out.append(f"CURL_CFFI FAIL {str(e)[:200]}")
     open(md, "w").write("\n".join(out) + "\n")
     print("\n".join(out))
 

@@ -112,7 +112,14 @@ late = [k for k in alts_all if k not in elig and syms[k] not in REUSED and syms[
 alts = [k for k in elig if RANK.get(syms[k], 0) <= 125]       # the hypothesis: altcoins of the top 100 (≈ market-cap rank ≤ 125 incl. stables)
 alts2 = [k for k in elig if 125 < RANK.get(syms[k], 0) < 9999]  # extra independent check: ranks 101–200
 alts3 = [k for k in elig if RANK.get(syms[k], 0) >= 9999]     # survivorship check: listed by 2023-01 but not in today's top-250 (fallen / delisted)
-GROUPS = [("alts top-100", alts)] + ([("alts 101–200", alts2)] if alts2 else []) + ([("alts outside today's top-250", alts3)] if alts3 else [])
+# point-in-time universe (no hindsight): only in the survivorship data set (every perp listed by 2023-01, delisted ones kept) —
+# alts ranked by their 2024 average daily volume, i.e. what a trader could see on 2025-01-01
+_y24 = YEAR == 2024
+VOL24 = np.nansum(V[:, _y24], 1) / max(1, _y24.sum() / 96)
+pit = sorted([k for k in elig if VOL24[k] > 0], key=lambda k: -VOL24[k]) if alts3 else []
+altsV, altsV2 = pit[:40], pit[40:80]
+GROUPS = ([("alts top-100", alts)] + ([("alts 101–200", alts2)] if alts2 else []) + ([("alts outside today's top-250", alts3)] if alts3 else [])
+          + ([("alts top-40 by 2024 volume (point-in-time)", altsV), ("alts 41–80 by 2024 volume", altsV2)] if altsV else []))
 WARM = 30 * 96
 DAYS = (times[-1] - times[START]) / 86400_000
 DAYS_IS = (times[OOS] - times[START]) / 86400_000 if OOS < T else DAYS
@@ -428,6 +435,11 @@ if "data" in SECT:
     if alts2: P(f"Alts ranks 101–200 ({len(alts2)}): " + " ".join(f"{syms[k]}#{RANK.get(syms[k], 0)}" for k in alts2) + "  ")
     if alts3: P(f"Alts outside today's top-250 ({len(alts3)}): " + " ".join(syms[k] for k in alts3) + "  ")
     if FLAT: P(f"Excluded (stale / flat archive series): {' '.join(sorted(FLAT))}  ")
+    if altsV:
+        P(f"Point-in-time top-40 alts by 2024 volume: {' '.join(f'{syms[k]}#{RANK.get(syms[k], 0) if RANK.get(syms[k], 0) < 9999 else chr(8212)}' for k in altsV)}  ")
+        P(f"41–80: {' '.join(f'{syms[k]}#{RANK.get(syms[k], 0) if RANK.get(syms[k], 0) < 9999 else chr(8212)}' for k in altsV2)}  ")
+        dl = [syms[k] for k in pit[:80] if not np.isfinite(C[k, T - 200:]).any()]
+        P(f"Of these 80, no longer trading at the end of the data (delisted / renamed): {' '.join(dl) or '—'}  ")
     if late: P(f"Alts dropped (history starts after 2024-01 once cleaned): {' '.join(syms[k] for k in late)}  ")
     for s, msg in CLEAN.items(): P(f"Cleaned {s}: {msg}  ")
     for s, msg in REUSED.items():
@@ -622,30 +634,31 @@ if "portfolio" in SECT:
         fd = base + relabel(on(MK["F"], pas["F"]), "f") + relabel(on(MK["D"], pas["D"]), "d")
         P(pf_row(f"+ f + d on ALL alt groups IS-pass (f {len(pas['F'])}, d {len(pas['D'])})", fd, R4 + ("f", "d"), extra=EX))
 
-    P("\n**Robustness of «+ d» and «+ f» on top-100 alts (IS-pass coins)** — sizing, late entry, higher alt costs, best days removed:\n")
-    P(PFH); P(PFS)
-    pd_ = is_pass(MK["D"], alts, 3); pf_ = is_pass(MK["F"], alts, 5)
-    dA, fA = on(MK["D"], pd_), on(MK["F"], pf_)
-    for lab_, extra in (("d 10 % ×3", dict(d=dict(share=0.10, open=3))), ("d 15 % ×2", dict(d=dict(share=0.15, open=2))),
-                        ("d 15 % ×5", dict(d=dict(share=0.15, open=5))), ("d 20 % ×3", dict(d=dict(share=0.20, open=3)))):
-        P(pf_row(f"+ {lab_}", base + relabel(dA, "d"), R4 + ("d",), extra=extra))
-    P(pf_row("+ d, entry 15 min later", base + relabel(on(MK["Dlate"], pd_), "d"), R4 + ("d",), extra=EX))
-    P(pf_row("+ d, threshold −25 bp", base + relabel(on(MK["D25"], pd_), "d"), R4 + ("d",), extra=EX))
-    P(pf_row("+ d, exit after 8 h", base + relabel(on(MK["D8h"], pd_), "d"), R4 + ("d",), extra=EX))
-    P(pf_row("+ d, chronic-discount coins skipped", base + relabel(on(MK["Dch"], pd_), "d"), R4 + ("d",), extra=EX))
-    for extra_cost in (0.0016, 0.0036):
-        P(pf_row(f"+ d, alt costs {0.14 + extra_cost * 100:.2f} % round trip", base + [dict(c, rule="d", ret=c["ret"] - extra_cost) for c in dA],
-                 R4 + ("d",), extra=EX))
-    for nd in (5, 10, 20):
-        bd = best_days(dA, nd)
-        P(pf_row(f"+ d without its {nd} best days", base + relabel([c for c in dA if DAY[c["i"]] not in bd], "d"), R4 + ("d",), extra=EX))
-    P(pf_row("+ d without 10–11.10.2025", base + relabel([c for c in dA if DAY[c["i"]] not in ("2025-10-10", "2025-10-11")], "d"), R4 + ("d",), extra=EX))
-    P(pf_row("+ f, entry 15 min later (8 h hold)", base + relabel(on(MK["F8hlate"], pf_), "f"), R4 + ("f",), extra=EX))
-    P(pf_row("+ f 8 h hold", base + relabel(on(MK["F8h"], pf_), "f"), R4 + ("f",), extra=EX))
-    P(pf_row("+ f 15 % ×3", base + relabel(fA, "f"), R4 + ("f",), extra=dict(f=dict(share=0.15, open=3))))
-    P(pf_row("+ f, alt costs 0.30 %", base + [dict(c, rule="f", ret=c["ret"] - 0.0016) for c in fA], R4 + ("f",), extra=EX))
-    bd = best_days(fA, 10)
-    P(pf_row("+ f without its 10 best days", base + relabel([c for c in fA if DAY[c["i"]] not in bd], "f"), R4 + ("f",), extra=EX))
+    for RG, RGN in ([(altsV, "point-in-time top-40")] if altsV else [(alts, "top-100")]):
+        P(f"\n**Robustness of «+ d» and «+ f» on {RGN} alts (IS-pass coins)** — sizing, late entry, higher alt costs, best days removed:\n")
+        P(PFH); P(PFS)
+        pd_ = is_pass(MK["D"], RG, 3); pf_ = is_pass(MK["F"], RG, 5)
+        dA, fA = on(MK["D"], pd_), on(MK["F"], pf_)
+        for lab_, extra in (("d 10 % ×3", dict(d=dict(share=0.10, open=3))), ("d 15 % ×2", dict(d=dict(share=0.15, open=2))),
+                            ("d 15 % ×5", dict(d=dict(share=0.15, open=5))), ("d 20 % ×3", dict(d=dict(share=0.20, open=3)))):
+            P(pf_row(f"+ {lab_}", base + relabel(dA, "d"), R4 + ("d",), extra=extra))
+        P(pf_row("+ d, entry 15 min later", base + relabel(on(MK["Dlate"], pd_), "d"), R4 + ("d",), extra=EX))
+        P(pf_row("+ d, threshold −25 bp", base + relabel(on(MK["D25"], pd_), "d"), R4 + ("d",), extra=EX))
+        P(pf_row("+ d, exit after 8 h", base + relabel(on(MK["D8h"], pd_), "d"), R4 + ("d",), extra=EX))
+        P(pf_row("+ d, chronic-discount coins skipped", base + relabel(on(MK["Dch"], pd_), "d"), R4 + ("d",), extra=EX))
+        for extra_cost in (0.0016, 0.0036):
+            P(pf_row(f"+ d, alt costs {0.14 + extra_cost * 100:.2f} % round trip", base + [dict(c, rule="d", ret=c["ret"] - extra_cost) for c in dA],
+                     R4 + ("d",), extra=EX))
+        for nd in (5, 10, 20):
+            bd = best_days(dA, nd)
+            P(pf_row(f"+ d without its {nd} best days", base + relabel([c for c in dA if DAY[c["i"]] not in bd], "d"), R4 + ("d",), extra=EX))
+        P(pf_row("+ d without 10–11.10.2025", base + relabel([c for c in dA if DAY[c["i"]] not in ("2025-10-10", "2025-10-11")], "d"), R4 + ("d",), extra=EX))
+        P(pf_row("+ f, entry 15 min later (8 h hold)", base + relabel(on(MK["F8hlate"], pf_), "f"), R4 + ("f",), extra=EX))
+        P(pf_row("+ f 8 h hold", base + relabel(on(MK["F8h"], pf_), "f"), R4 + ("f",), extra=EX))
+        P(pf_row("+ f 15 % ×3", base + relabel(fA, "f"), R4 + ("f",), extra=dict(f=dict(share=0.15, open=3))))
+        P(pf_row("+ f, alt costs 0.30 %", base + [dict(c, rule="f", ret=c["ret"] - 0.0016) for c in fA], R4 + ("f",), extra=EX))
+        bd = best_days(fA, 10)
+        P(pf_row("+ f without its 10 best days", base + relabel([c for c in fA if DAY[c["i"]] not in bd], "f"), R4 + ("f",), extra=EX))
 
     P("\n**Aggressive market variants** (replace the rule on core + top-100 alts; everything else «норма»+D on core):\n")
     P(PFH); P(PFS)

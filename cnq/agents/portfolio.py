@@ -80,7 +80,12 @@ def hyperliquid_universe() -> dict:
     if s and len(s) == 2:
         tokens = {t["index"]: t["name"] for t in s[0].get("tokens", [])}
         pairs = s[0].get("universe", [])
-        for pr, c in zip(pairs, s[1]):
+        # 17.10 fix: the context list is longer than the pair list (1117 vs 332) — match by the pair name in ctx["coin"], never by position
+        ctx = {c.get("coin"): c for c in s[1] if isinstance(c, dict)}
+        for pr in pairs:
+            c = ctx.get(pr.get("name"))
+            if c is None:
+                continue
             try:
                 base = tokens.get(pr["tokens"][0], pr["name"]).upper()
                 spot[base] = {"vol24": float(c.get("dayNtlVlm", 0)), "price": float(c.get("markPx", 0)),

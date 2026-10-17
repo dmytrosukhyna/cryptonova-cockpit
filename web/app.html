@@ -373,6 +373,12 @@ body.tab-spot #spotChart{order:-3}body.tab-spot #below{order:-2}
 @media (max-width:640px){#apRadar .rbar>b{grid-column:1/-1;grid-row:2;text-align:left}#apRadar .rbar .gb{grid-row:3}}
 aside.col .card h2{flex-wrap:wrap}aside.col .card h2 .r{white-space:normal;min-width:0}
 #jrCard table{display:block;overflow-x:auto;max-width:100%}
+#ivanCard .fkpi{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:6px 0 10px}#ivanCard .fkpi>div{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;gap:2px}#ivanCard .fkpi small{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}#ivanCard .fkpi b{font-size:16px}#ivanCard .fkpi em{font-style:normal;font-size:10.5px}#ivanCard h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
+@media (max-width:760px){#ivanCard .fkpi{grid-template-columns:1fr 1fr}}
+body:not(.tab-futures) #ivanCard{display:none}
+.eseg{display:flex;gap:6px;flex-wrap:wrap}.eseg button{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid var(--line2);background:var(--panel2);color:var(--fg);font-size:13px;cursor:pointer}.eseg button[aria-pressed=true]{border-color:rgba(124,196,255,.6);background:rgba(124,196,255,.14)}.eseg .ico{width:15px;height:15px}
+.epane{display:grid;gap:14px}.epane[hidden]{display:none}
+.eact{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:12.5px}.eact select,.eact input{background:rgba(6,11,22,.6);color:var(--fg);border:1px solid var(--line2);border-radius:8px;padding:5px 8px}
 </style>
 </head>
 <body>
@@ -451,6 +457,7 @@ aside.col .card h2{flex-wrap:wrap}aside.col .card h2 .r{white-space:normal;min-w
   </aside>
   <section class="col">
     <div class="card" id="fdeskBox" hidden></div>
+    <div class="card" id="ivanCard" hidden></div>
     <div class="card" id="apRadar"></div>
     <div class="card" id="stratsCard"></div>
     <div class="card" id="ovAcc"></div>
@@ -488,7 +495,8 @@ aside.col .card h2{flex-wrap:wrap}aside.col .card h2 .r{white-space:normal;min-w
 <div class="sheet" id="settings">
   <h3 id="keysHead">Настройки <button class="ib sm" id="setSave">Сохранить</button><button class="ib sm" id="setClose">✕</button></h3><div class="muted" style="font-size:12px;margin:-4px 0 10px">Enter в любом поле — сохранить.</div>
   <div class="lay" style="font-size:12.5px">
-    <label>Как к вам обращаться <input id="sName" placeholder="Дмитрий" style="width:100%"></label>
+    <label>Как к вам обращаться <input id="sName" placeholder="ваше имя" style="width:100%"></label>
+    <label id="sIvanL">«Иван тест» · пароль <input id="sIvan" type="password" autocomplete="off" placeholder="только для владельца" style="width:100%"></label>
     <label>Голос ассистента <select id="sVoice" style="width:100%;font:inherit;padding:6px;border-radius:8px;background:var(--panel2);color:var(--fg);border:1px solid var(--line2)"><option value="on">включён — доклад при входе и ответы</option><option value="off">выключен</option></select></label>
     <label>Тема <select id="sTheme" style="width:100%;font:inherit;padding:6px;border-radius:8px;background:var(--panel2);color:var(--fg);border:1px solid var(--line2)"><option value="blue">синяя, как приложение CryptoNova</option><option value="green">зелёная, милитари</option></select></label>
     <label>Депозит $ <input id="sDepo" type="number" value="10000" style="width:100%"></label>
@@ -620,7 +628,7 @@ function deskNotify(){ try{
   for(const s of prev.s) if(!cur.s[s]) msgs.push(`🔴 Продали ${s} из спот-портфеля`);
   for(const m of msgs.slice(0,5)){ toast(m); try{ if('Notification' in window&&Notification.permission==='granted') new Notification('CRYPTO NOVΛ',{body:m}); }catch(e){} }
 }catch(e){} }
-async function loadJson(){ try{ PF=await (await fetch('./portfolio.json',{cache:'no-store'})).json(); }catch(e){ PF=null; } try{ WEEKLY=await (await fetch('./weekly.json',{cache:'no-store'})).json(); }catch(e){ WEEKLY=null; } try{ PAPER=await (await fetch('./paper.json',{cache:'no-store'})).json(); }catch(e){ PAPER=null; } try{ STATUS=await (await fetch('./status.json',{cache:'no-store'})).json(); }catch(e){ STATUS=null; } try{ CAL=await (await fetch('./calibration.json',{cache:'no-store'})).json(); }catch(e){ CAL=null; } try{ MK=await (await fetch('./markets.json',{cache:'no-store'})).json(); }catch(e){ MK=null; } try{ RS=await (await fetch('./research.json',{cache:'no-store'})).json(); }catch(e){ RS=null; } try{ WHS=await (await fetch('./whales.json',{cache:'no-store'})).json(); }catch(e){ WHS=null; } try{ renderKpi(); renderTape(); renderWhalesServer(); checkVersion(); }catch(e){} renderAccounts(); feedServer(); renderFeed(); renderProc(); try{ renderLive(); renderAssistant(); }catch(e){} deskNotify(); try{ renderSpotChart(); }catch(e){} try{ renderApRadar(); renderUrgent(); renderTopTraders(); }catch(e){} try{ renderOvAccounts(); }catch(e){} loadMemesCal().then(()=>loadStratData()).then(()=>{ try{ renderMemes(); renderCal(); renderStrats(); renderMacro(); }catch(e){} }); }
+async function loadJson(){ try{ PF=await (await fetch('./portfolio.json',{cache:'no-store'})).json(); }catch(e){ PF=null; } try{ WEEKLY=await (await fetch('./weekly.json',{cache:'no-store'})).json(); }catch(e){ WEEKLY=null; } try{ PAPER=await (await fetch('./paper.json',{cache:'no-store'})).json(); }catch(e){ PAPER=null; } try{ STATUS=await (await fetch('./status.json',{cache:'no-store'})).json(); }catch(e){ STATUS=null; } try{ CAL=await (await fetch('./calibration.json',{cache:'no-store'})).json(); }catch(e){ CAL=null; } try{ MK=await (await fetch('./markets.json',{cache:'no-store'})).json(); }catch(e){ MK=null; } try{ RS=await (await fetch('./research.json',{cache:'no-store'})).json(); }catch(e){ RS=null; } try{ WHS=await (await fetch('./whales.json',{cache:'no-store'})).json(); }catch(e){ WHS=null; } try{ renderKpi(); renderTape(); renderWhalesServer(); checkVersion(); }catch(e){} renderAccounts(); feedServer(); renderFeed(); renderProc(); try{ renderLive(); renderAssistant(); }catch(e){} deskNotify(); try{ renderSpotChart(); }catch(e){} try{ renderApRadar(); renderUrgent(); renderTopTraders(); }catch(e){} try{ renderOvAccounts(); }catch(e){} loadMemesCal().then(()=>loadStratData()).then(()=>{ try{ renderMemes(); renderCal(); renderStrats(); renderMacro(); }catch(e){} }); loadIvan(); }
 // ---------------------------------------------------------------- data
 const live={ok:false}; const K={}; const META={}; const LIQ_RECENT={}; const SETUPS={}; let BTC_BULL=true;
 async function rest(path){ const r=await fetch(FAPI+path,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
@@ -1079,6 +1087,33 @@ function renderOvAccounts(){ const el=$('#ovAcc'); if(!el) return; const P=PF&&P
 const RULE_NAMES={B:'откуп каскада',E:'откуп паники',F:'сброс позиций',D:'дисконт фьючерса',S:'свинг',G:'быстрый откуп',R:'ретест',L:'низ диапазона',N:'часовая поддержка',Q:'часовое сопротивление',W:'новость',X:'паника на альте',Y:'дисконт на альте',J:'Никкей'};
 /* ---- «Мем-сектор» (spot tab) from web/memes.json and the macro calendar from web/calendar.json */
 let MEMES=null, MCAL=null, MACRO=null, MEMES_T=0;
+// ---------------------------------------------------------------- «Иван тест» (17.10): private monitor of the Bybit account connected to Ivan's platform.
+// The Mac mirror reads it with a read-only key and publishes it ENCRYPTED (web/ivan.enc.json); only a browser with the owner's password can read it.
+let IVAN=null, IVAN_T=0, IVAN_ERR='';
+/*IVAN_DECRYPT*/
+async function loadIvan(force){ const pass=load('cnq_ivan_pass',''); const card=$('#ivanCard'); if(!card) return; if(!pass||load('cnq_guest','')==='1'&&!force){ card.hidden=true; return; } if(!force&&Date.now()-IVAN_T<2*60000&&IVAN) return renderIvan(); IVAN_T=Date.now();
+  let blob=null; try{ const r=await fetch('./ivan.enc.json?'+Math.floor(Date.now()/60000),{cache:'no-store'}); if(r.ok) blob=await r.json(); }catch(e){}
+  if(!blob){ IVAN=null; IVAN_ERR='Данных пока нет: зеркало на Маке ещё не выложило «Иван тест». Проверь, что в файле ключей есть строки IVAN_… и зеркало перезапущено.'; return renderIvan(); }
+  try{ IVAN=await ivanDecrypt(blob,pass); IVAN.__asof=blob.asof; IVAN_ERR=''; }catch(e){ IVAN=null; IVAN_ERR=(e&&e.message==='Неверный пароль')?'Пароль не подходит — введи в настройках тот же, что IVAN_PASS на Маке.':'Не удалось прочитать данные: '+(e.message||e); }
+  renderIvan(); }
+function renderIvan(){ const el=$('#ivanCard'); if(!el) return; const pass=load('cnq_ivan_pass',''); if(!pass){ el.hidden=true; return; } el.hidden=false;
+  const usd=v=>(v<0?'−':'')+'$'+Math.abs(v).toLocaleString('ru-RU',{maximumFractionDigits:2,minimumFractionDigits:Math.abs(v)<100?2:0}); const sg=v=>(v>0?'+':'')+usd(v); const cl=v=>v>0?'pos':v<0?'neg':'';
+  const head=`<h2>${ico('shield')} Иван тест <span class="r muted">${IVAN?`Bybit ${IVAN.host==='demo'?'демо':'основной'} · обновлено ${new Date(IVAN.asof||IVAN.__asof).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · видно только тебе`:'видно только тебе'}</span></h2>`;
+  if(!IVAN){ el.innerHTML=head+`<div class="muted" style="font-size:12.5px">${IVAN_ERR||'Загружаю…'}</div>`; return; }
+  const I=IVAN, st=I.stats||{}, pos=I.positions||[], cls=(I.closed||[]).slice().sort((a,b)=>(b.close_time||0)-(a.close_time||0)).slice(0,12);
+  const start=(I.equity_hist&&I.equity_hist.length)?I.equity_hist[0][1]:null; const res=start!=null?I.equity-start:null;
+  const warn=(st.winrate!=null&&st.winrate>=0.9&&(I.upnl||0)<0&&Math.abs(I.upnl)>Math.max(20,(st.pnl_sum||0)*0.3))?`<div class="mwarn">⚠ Винрейт ${Math.round(st.winrate*100)}%, но в открытых позициях сейчас ${usd(I.upnl)}. Если убыточные позиции не закрывают, винрейт выглядит идеально, а риск копится здесь.</div>`:'';
+  el.innerHTML=head+`<div class="fkpi">
+     <div><small>Баланс</small><b class="num">${usd(I.equity)}</b></div>
+     <div><small>Результат${start!=null?' с начала наблюдения':''}</small><b class="num ${cl(res??st.pnl_sum??0)}">${res!=null?sg(res):st.pnl_sum!=null?sg(st.pnl_sum):'—'}</b></div>
+     <div><small>Винрейт</small><b class="num">${st.winrate!=null?Math.round(st.winrate*100)+'%':'—'}</b><em class="muted">${st.n||0} закрытых</em></div>
+     <div><small>В открытых</small><b class="num ${cl(I.upnl||0)}">${sg(I.upnl||0)}</b><em class="muted">${pos.length} поз.</em></div>
+     <div><small>Макс. просадка</small><b class="num ${I.max_dd>0.0001?'neg':''}">${I.max_dd!=null?'−'+(I.max_dd*100).toFixed(1)+'%':'—'}</b></div></div>
+   ${warn}
+   <h3>Открытые позиции</h3>${pos.length?pos.map(p=>`<div class="mrow"><b>${(p.symbol||'').replace('USDT','')}</b><i>${p.side==='Buy'||p.side==='LONG'?'лонг':'шорт'} · ${p.size} · вход ${fmtP(+p.entry)} → ${fmtP(+p.mark)}${p.leverage?' · плечо '+p.leverage+'×':''}${p.liq?' · ликвидация '+fmtP(+p.liq):''}</i><span class="num ${cl(+p.upnl)}">${sg(+p.upnl)}</span></div>`).join(''):'<div class="muted" style="font-size:12.5px">Открытых позиций нет.</div>'}
+   <h3>Последние закрытые</h3>${cls.length?cls.map(t=>`<div class="mrow"><b>${(t.symbol||'').replace('USDT','')}</b><i>${t.side==='Buy'||t.side==='LONG'?'лонг':'шорт'} · ${fmtP(+t.entry)} → ${fmtP(+t.exit)} · ${t.close_time?new Date(t.close_time).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):''}</i><span class="num ${cl(+t.pnl)}">${sg(+t.pnl)}</span></div>`).join(''):'<div class="muted" style="font-size:12.5px">Закрытых сделок пока нет.</div>'}
+   ${st.n?`<div class="muted" style="font-size:11.5px;margin-top:6px">Средняя прибыльная ${st.avg_win!=null?sg(st.avg_win):'—'} · средняя убыточная ${st.avg_loss!=null?sg(st.avg_loss):'—'} · худшая ${st.max_loss!=null?sg(st.max_loss):'—'}</div>`:''}
+   <div class="muted" style="font-size:11.5px;margin-top:6px">${I.note||''}</div>`; }
 async function loadMemesCal(){ if(Date.now()-MEMES_T<5*60000&&MEMES) return; MEMES_T=Date.now();
   try{ MEMES=await (await fetch('./memes.json',{cache:'no-store'})).json(); }catch(e){ MEMES=null; }
   try{ MCAL=await (await fetch('./calendar.json',{cache:'no-store'})).json(); }catch(e){ MCAL=null; } try{ MACRO=await (await fetch('./macro.json',{cache:'no-store'})).json(); }catch(e){ MACRO=null; } }
@@ -1138,6 +1173,7 @@ function renderWhalesServer0(){ const el=$('#whalesSrv'); if(!el) return; if(!WH
 // guests (17.10): a browser that has never entered before is a guest — no owner name, a welcome window and the tour instead of the owner's report.
 // ?guest in the address shows the guest view on any device without changing its memory.
 const GUEST_FORCE=/[?&]guest\b/.test(location.search); const hasKey=k=>{ try{ return localStorage.getItem(k)!=null; }catch(e){ return false; } };
+if(/[?&]owner\b/.test(location.search)){ store('cnq_owner','1'); store('cnq_guest'); }   // owner on a new device: open once with ?owner
 let IS_GUEST=GUEST_FORCE||load('cnq_guest','')==='1';
 if(!IS_GUEST&&load('cnq_owner','')!=='1'){ if(hasKey('cnq_name')||hasKey('cnq_pin')||hasKey('cnq_cred')||hasKey('cnq_visits')) store('cnq_owner','1'); else { IS_GUEST=true; store('cnq_guest','1'); } }
 const USER_NAME=GUEST_FORCE?'':load('cnq_name',IS_GUEST?'':'Дмитрий'); let VOICE_ON=load('cnq_voice','on')!=='off'; let speaking=false;
@@ -1296,8 +1332,8 @@ const LAYERS=[['levels','▬','Зоны','синие — поддержка, б�
 function renderLayers(){ $('#layList').innerHTML=LAYERS.map(([k,i,t,d])=>`<button data-l="${k}" aria-pressed="${!!view.ind[k]}"><span class="i">${i}</span><span><b>${t}</b><small>${d}</small></span><span class="sw"></span></button>`).join(''); $$('#layList button').forEach(b=>b.addEventListener('click',()=>{ view.ind[b.dataset.l]=!view.ind[b.dataset.l]; b.setAttribute('aria-pressed',String(view.ind[b.dataset.l])); store('cnq_layers',view.ind); draw(); })); }
 Object.assign(view.ind,load('cnq_layers',{})); renderLayers();
 $('#layersBtn').addEventListener('click',()=>$('#layers').classList.toggle('open')); $('#setBtn').addEventListener('click',()=>{ $('#layers').classList.remove('open'); $('#settings').classList.toggle('open'); }); $('#setClose').addEventListener('click',()=>$('#settings').classList.remove('open')); $('#settings').addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.matches('input')){ e.preventDefault(); $('#setSave').click(); } }); $('#layersClose').addEventListener('click',()=>$('#layers').classList.remove('open'));
-$('#sSrc').value=SRC; $('#sName').value=USER_NAME==='Дмитрий'?'':USER_NAME; $('#sVoice').value=VOICE_ON?'on':'off'; $('#sTheme').value=load('cnq_theme','blue'); $('#sDepo').value=SET.depo; $('#sRisk').value=SET.riskPct; $('#sLev').value=SET.maxLev; $('#sAnth').value=SET.anth; $('#sLlmP').value=SET.llm; $('#sTd').value=SET.td; $('#sExec').value=SET.execUrl; SET.venue=load('cnq_venue','bybit'); $('#sVenue').value=SET.venue; $('#sExecKey').value=SET.execKey;
-$('#setSave').addEventListener('click',()=>{ SET.depo=+$('#sDepo').value||10000; SET.riskPct=+$('#sRisk').value||1; SET.maxLev=+$('#sLev').value||20; SET.anth=$('#sAnth').value.trim(); SET.llm=$('#sLlmP').value; store('cnq_llm',SET.llm); SET.td=$('#sTd').value.trim(); SET.execUrl=$('#sExec').value.trim(); SET.venue=$('#sVenue').value; store('cnq_venue',SET.venue); SET.execKey=$('#sExecKey').value.trim(); store('cnq_depo',String(SET.depo)); store('cnq_risk',String(SET.riskPct)); store('cnq_lev',String(SET.maxLev)); store('cnq_anth',SET.anth); store('cnq_td_key',SET.td); store('cnq_execUrl',SET.execUrl); store('cnq_execKey',SET.execKey); const hadTd=!!TD_KEY; TD_KEY=SET.td; for(const s of UNIVERSE) if(K[s]&&K[s]['4h']) SETUPS[s]=findSetups(s); renderBelow(); draw(); chatMode(); const srcNew=$('#sSrc').value; if(srcNew!==SRC){ store('cnq_src',srcNew); toast('Источник данных изменён — перезагружаю.'); setTimeout(()=>location.reload(),600); } const nmv=$('#sName').value.trim(); store('cnq_name',nmv||(IS_GUEST?'':'Дмитрий')); VOICE_ON=$('#sVoice').value==='on'; store('cnq_voice',VOICE_ON?'on':'off'); applyTheme($('#sTheme').value); toast('Настройки сохранены.'); if(TD_KEY&&!hadTd) loadFonda(); });
+{ const il=$('#sIvanL'); if(il) il.hidden=IS_GUEST; } $('#sSrc').value=SRC; $('#sName').value=USER_NAME==='Дмитрий'?'':USER_NAME; $('#sVoice').value=VOICE_ON?'on':'off'; $('#sTheme').value=load('cnq_theme','blue'); $('#sDepo').value=SET.depo; $('#sRisk').value=SET.riskPct; $('#sLev').value=SET.maxLev; $('#sAnth').value=SET.anth; $('#sLlmP').value=SET.llm; $('#sTd').value=SET.td; $('#sExec').value=SET.execUrl; SET.venue=load('cnq_venue','bybit'); $('#sVenue').value=SET.venue; $('#sExecKey').value=SET.execKey;
+$('#setSave').addEventListener('click',()=>{ SET.depo=+$('#sDepo').value||10000; SET.riskPct=+$('#sRisk').value||1; SET.maxLev=+$('#sLev').value||20; SET.anth=$('#sAnth').value.trim(); SET.llm=$('#sLlmP').value; store('cnq_llm',SET.llm); SET.td=$('#sTd').value.trim(); SET.execUrl=$('#sExec').value.trim(); SET.venue=$('#sVenue').value; store('cnq_venue',SET.venue); SET.execKey=$('#sExecKey').value.trim(); store('cnq_depo',String(SET.depo)); store('cnq_risk',String(SET.riskPct)); store('cnq_lev',String(SET.maxLev)); store('cnq_anth',SET.anth); store('cnq_td_key',SET.td); store('cnq_execUrl',SET.execUrl); store('cnq_execKey',SET.execKey); const hadTd=!!TD_KEY; TD_KEY=SET.td; for(const s of UNIVERSE) if(K[s]&&K[s]['4h']) SETUPS[s]=findSetups(s); renderBelow(); draw(); chatMode(); const srcNew=$('#sSrc').value; if(srcNew!==SRC){ store('cnq_src',srcNew); toast('Источник данных изменён — перезагружаю.'); setTimeout(()=>location.reload(),600); } { const iv=$('#sIvan'); if(iv){ const v=iv.value; if(v){ store('cnq_ivan_pass',v); iv.value=''; IVAN_T=0; loadIvan(true); } } } const nmv=$('#sName').value.trim(); store('cnq_name',nmv||(IS_GUEST?'':'Дмитрий')); VOICE_ON=$('#sVoice').value==='on'; store('cnq_voice',VOICE_ON?'on':'off'); applyTheme($('#sTheme').value); toast('Настройки сохранены.'); if(TD_KEY&&!hadTd) loadFonda(); });
 // ================================================================ market stress (risk-off) detector
 let STRESS={level:0,why:[],prev:null};
 function marketStress(){ const cs=UNIVERSE.filter(isCrypto).map(s=>{ const b=K[s]&&K[s]['15m'],d=K[s]&&K[s]['1d']; if(!b||!d||b.length<100||d.length<25) return null; const last=b[b.length-1].c; const c24=last/b[Math.max(0,b.length-97)].c-1; const c4=last/b[Math.max(0,b.length-17)].c-1; const ll20=Math.min(...d.slice(-21,-1).map(x=>x.l)); return {s,c24,c4,below20:last<ll20}; }).filter(Boolean); if(cs.length<5) return STRESS;
@@ -1639,7 +1675,7 @@ function earnTriangles(){ const b=EARN.books.binance; if(!b) return []; const ou
       if(r1>r2) out.push({path:`USDT → ${base} → ${c} → USDT`,r:r1}); else out.push({path:`USDT → ${c} → ${base} → USDT`,r:r2}); } }
   return out.sort((a,b)=>b.r-a.r).slice(0,8); }
 const pctS=(x,d=2)=>(x>=0?'+':'−')+Math.abs(x*100).toFixed(d)+'%';
-async function earnLoadFunding(){ if(Date.now()-EARN.fundAt<5*60000&&EARN.fund) return; try{ EARN.fund=await (await fetch('./funding.json',{cache:'no-store'})).json(); EARN.fundAt=Date.now(); }catch(e){ EARN.fund=null; } try{ EARN.srv=await (await fetch('./arb.json',{cache:'no-store'})).json(); }catch(e){ EARN.srv=null; } }
+async function earnLoadFunding(){ if(Date.now()-EARN.fundAt<5*60000&&EARN.fund) return; try{ EARN.fund=await (await fetch('./funding.json',{cache:'no-store'})).json(); EARN.fundAt=Date.now(); }catch(e){ EARN.fund=null; } try{ EARN.srv=await (await fetch('./arb.json',{cache:'no-store'})).json(); }catch(e){ EARN.srv=null; } try{ const r=await fetch('./tri.json',{cache:'no-store'}); EARN.trisrv=r.ok?await r.json():null; }catch(e){ EARN.trisrv=null; } }
 /* ---- «Заработок»: big animated figures (canvas 2D, pseudo-3D) + virtual arbitrage account (this browser only) */
 const EFIG={raf:0,t0:performance.now(),sp:[],tri:[],pulses:[]};
 function efitCanvas(c){ const r=c.getBoundingClientRect(), d=Math.min(2,window.devicePixelRatio||1); const w=Math.max(10,Math.round(r.width*d)), h=Math.max(10,Math.round(r.height*d)); if(c.width!==w||c.height!==h){ c.width=w; c.height=h; } const x=c.getContext('2d'); x.setTransform(d,0,0,d,0,0); return [x,r.width,r.height]; }
@@ -1701,19 +1737,45 @@ const VARB_KEY='cnq_varb_v2';
 function varbLoad(){ try{ return JSON.parse(localStorage.getItem(VARB_KEY))||{eq:10000,n:0,log:[],seen:{}}; }catch(e){ return {eq:10000,n:0,log:[],seen:{}}; } }
 function varbSave(v){ try{ localStorage.setItem(VARB_KEY,JSON.stringify(v)); }catch(e){} }
 function varbTick(sp,tri){ const v=varbLoad(), now=Date.now();
-  const take=(key,txt,r)=>{ if(r<=0.0005||r>0.05) return; if(v.seen[key]&&now-v.seen[key]<86400e3){ v.seen[key]=v.seen[key]; return; } v.seen[key]=now; const pnl=1000*r; v.eq+=pnl; v.n++; v.log.unshift({t:now,txt,pnl}); v.log=v.log.slice(0,30); };
+  const take=(key,txt,r)=>{ if(r<=0.0005||r>0.05) return; if(v.seen[key]&&now-v.seen[key]<86400e3){ return; } v.seen[key]=now; const pnl=(v.ticket||1000)*r; v.eq+=pnl; v.n++; v.log.unshift({t:now,txt,pnl}); v.log=v.log.slice(0,30); };
   sp.forEach(s=>take(`x:${s.c}:${s.A.v.k}:${s.B.v.k}`,`${s.c}: купили на ${s.A.v.n}, продали на ${s.B.v.n}`,s.net));
   tri.forEach(s=>take(`t:${s.path}`,`Треугольник ${s.path}`,s.r));
   for(const k in v.seen) if(now-v.seen[k]>2*86400e3) delete v.seen[k];
   varbSave(v); return v; }
 function earnSkeleton(el){ el.innerHTML=`
+  <div class="eseg" id="eSeg"><button data-e="arb">${ico('scale')} Арбитраж</button><button data-e="tri">${ico('trend')} Треугольники</button><button data-e="fund">${ico('time')} Фандинг</button></div>
+  <div class="epane" data-e="arb">
   <div class="card"><h2>${ico('scale')} Арбитраж между биржами <span class="r muted" id="eArbMeta"></span></h2><canvas id="efSphere" class="efig"></canvas>
     <div id="eSrv"></div><div class="muted enote">Ищем монету, которая на одной бирже дешевле, чем на другой. «Чистыми» — уже после комиссий обеих бирж. Чтобы забрать разницу, деньги должны заранее лежать на обеих биржах: перевод монеты занимает минуты, разница обычно исчезает за секунды.</div><div id="eArb"></div></div>
+  <div class="card"><h2>${ico('robot')} Виртуальный счёт арбитража <span class="r muted">считается в этом браузере, пока открыта вкладка</span></h2><div id="eVarb"></div>
+    <div class="eact"><span class="muted">Сумма на окно</span><select id="eTicket"><option value="500">$500</option><option value="1000">$1 000</option><option value="2500">$2 500</option><option value="5000">$5 000</option></select><button class="ib sm" id="eTop">+ пополнить $1 000</button><button class="ib sm" id="eReset">начать заново</button></div></div>
+  <div class="card"><h2>${ico('basket')} Где держать деньги для арбитража <span class="r muted">по окнам сервера</span></h2><div id="ePlace"></div></div>
+  </div>
+  <div class="epane" data-e="tri">
   <div class="card"><h2>${ico('trend')} Треугольник на Binance <span class="r muted">3 обмена подряд, комиссия 0.1% × 3</span></h2><canvas id="efTri" class="efig"></canvas>
     <div class="muted enote">Меняем USDT на одну монету, её на другую и обратно в USDT. Если цены трёх пар не сошлись — остаётся прибыль. Обычно такие окна живут доли секунды.</div><div id="eTri"></div></div>
-  <div class="card"><h2>${ico('robot')} Виртуальный счёт арбитража <span class="r muted">$10 000 · считается, пока открыта эта вкладка</span></h2><div id="eVarb"></div></div>
+  <div class="card" id="eTriSrvCard"><h2>${ico('radar')} Треугольники · сервер 24/7 <span class="r muted" id="eTriSrvMeta"></span></h2><div id="eTriSrv"><div class="muted">Сервер начнёт проверять все треугольники после ближайшего запуска.</div></div></div>
+  </div>
+  <div class="epane" data-e="fund">
   <div class="card"><h2>${ico('time')} Фандинг · без направления <span class="r muted">демо-счёт $10 000</span></h2><canvas id="efFund" class="efig"></canvas>
-    <div class="muted enote">Покупаем монету на споте и одновременно продаём такую же на фьючерсах. Цена монеты на результат почти не влияет. Каждые 8 часов покупатели фьючерсов платят продавцам — эту плату и собираем.</div><div id="eFund"></div></div>`; }
+    <div class="muted enote">Покупаем монету на споте и одновременно продаём такую же на фьючерсах. Цена монеты на результат почти не влияет. Каждые 8 часов покупатели фьючерсов платят продавцам — эту плату и собираем.</div><div id="eFund"></div></div>
+  <div class="card"><h2>${ico('scale')} Калькулятор фандинга <span class="r muted">сколько принесёт и когда окупятся комиссии</span></h2>
+    <div class="eact"><span class="muted">Сумма</span><input id="eFundAmt" type="number" min="100" step="100" value="1000" style="width:110px"><span class="muted">держать дней</span><input id="eFundDays" type="number" min="1" max="365" value="30" style="width:70px"></div><div id="eFundCalc"></div></div>
+  </div>`;
+  const pick=k=>{ $$('#eSeg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.e===k))); $$('#earn .epane').forEach(p=>p.hidden=p.dataset.e!==k); store('cnq_earn_tab',k); setTimeout(()=>dispatchEvent(new Event('resize')),30); };
+  $$('#eSeg button').forEach(b=>b.addEventListener('click',()=>pick(b.dataset.e))); pick(load('cnq_earn_tab','arb'));
+  { const v=varbLoad(); $('#eTicket').value=String(v.ticket||1000); }
+  $('#eTicket').addEventListener('change',e=>{ const v=varbLoad(); v.ticket=+e.target.value; varbSave(v); toast('Сумма на окно: $'+(+e.target.value).toLocaleString('ru-RU')); });
+  $('#eTop').addEventListener('click',()=>{ const v=varbLoad(); v.eq+=1000; v.dep=(v.dep||0)+1000; varbSave(v); toast('Виртуальный счёт пополнен на $1 000'); earnRender(); });
+  $('#eReset').addEventListener('click',()=>{ varbSave({eq:10000,n:0,log:[],seen:{},ticket:varbLoad().ticket||1000,dep:0}); toast('Виртуальный счёт начат заново: $10 000'); earnRender(); });
+  ['eFundAmt','eFundDays'].forEach(id=>$('#'+id).addEventListener('input',()=>earnFundCalc())); }
+function earnFundCalc(){ const el=$('#eFundCalc'); if(!el) return; const F=EARN.fund; const amt=Math.max(0,+$('#eFundAmt').value||0), days=Math.max(1,+$('#eFundDays').value||1);
+  const rates=((F&&F.positions)||[]).map(p=>p.rate_now).filter(x=>x!=null); const tb=((F&&F.table)||[]).map(r=>r.rate_now!=null?r.rate_now:r.rate).filter(x=>x!=null&&x>0).sort((a,b)=>b-a).slice(0,5);
+  const r8=rates.length?rates.reduce((a,b)=>a+b,0)/rates.length:(tb.length?tb.reduce((a,b)=>a+b,0)/tb.length:null);
+  if(r8==null){ el.innerHTML='<div class="muted">Нет текущих ставок — появятся после запуска сервера.</div>'; return; }
+  const fees=amt*0.003; /* вход и выход: спот 0.1% + фьючерс 0.05% на каждую сторону = 0.3% */ const inc=amt*r8*3*days; const be=r8>0?fees/(amt*r8*3):Infinity;
+  el.innerHTML=`<div class="fk" style="grid-template-columns:repeat(3,1fr)"><div><small>Фандинг за ${days} дн.</small><b class="pos">+$${inc.toFixed(2)}</b></div><div><small>Комиссии вход+выход</small><b class="neg">−$${fees.toFixed(2)}</b></div><div><small>Итого</small><b class="${inc-fees>=0?'pos':'neg'}">${inc-fees>=0?'+':'−'}$${Math.abs(inc-fees).toFixed(2)}</b></div></div>
+    <div class="muted enote">По текущей ставке ${(r8*100).toFixed(4)}% за 8 часов (≈ ${(r8*3*365*100).toFixed(1)}% годовых). Комиссии окупаются примерно за ${isFinite(be)?Math.ceil(be)+' дн.':'—'}. Ставка меняется каждые 8 часов и может стать отрицательной — тогда позицию закрываем. Сумма не меняет процент дохода: вдвое больше денег — вдвое больше и фандинг, и комиссии.</div>`; }
 function earnRender(){ const el=$('#earn'); if(!el) return; if(!$('#efSphere')) earnSkeleton(el);
   const st=EARN_VENUES.map(v=>`<span class="evs ${EARN.status[v.k]||'wait'}">${v.n}</span>`).join('');
   const sp=earnSpreads(); EFIG.sp=sp; if(sp.length){ EARN.scans++; if(sp[0].net>0){ EARN.hits++; } if(!EARN.best||sp[0].net>EARN.best.net) EARN.best={...sp[0],t:Date.now()}; }
@@ -1725,16 +1787,20 @@ function earnRender(){ const el=$('#earn'); if(!el) return; if(!$('#efSphere')) 
   { const A=EARN.srv; const st=x=>x&&x.samples?`${x.samples} проверок · новых окон ${x.windows} · виртуально <b class="${x.virtual_pnl_usd>0?'pos':''}">+$${x.virtual_pnl_usd.toFixed(2)}</b>${x.stuck_routes?` · застывших маршрутов ${x.stuck_routes}`:''}`:'данные копятся';
     $('#eSrv').innerHTML=A?`<div class="esrv"><div><small>Сервер 24/7 · за сутки</small><span>${st(A.day)}</span></div><div><small>за неделю</small><span>${st(A.week)}</span></div><div><small>биржи, доступные серверу</small><span>${(A.venues_ok||[]).join(', ')||'—'}</span></div></div>${(A.stuck||[]).length?`<div class="muted enote">⚠ Застывшие окна (держатся часами — почти всегда закрыт ввод/вывод монеты или пустой стакан, забрать нельзя): ${A.stuck.slice(0,5).map(x=>`${x.coin} ${x.buy}→${x.sell} ${pctS(x.net)}`).join(' · ')}</div>`:''}`:''; }
   $('#eTri').innerHTML=tri.map(t=>`<div class="erow tri ${t.r>0?'pos':''}"><span>${t.path}</span><span class="num ${t.r>0?'pos':'neg'}">${pctS(t.r,3)}</span></div>`).join('')||`<div class="muted">${EARN.status.binance==='off'?'Binance не отвечает из этого браузера.':'загрузка…'}</div>`;
-  const V=varbTick(sp,tri), pnl=V.eq-10000;
-  $('#eVarb').innerHTML=`<div class="fk" style="grid-template-columns:repeat(3,1fr)"><div><small>Баланс</small><b>$${V.eq.toLocaleString('ru-RU',{maximumFractionDigits:2})}</b></div><div><small>Результат</small><b class="${pnl>=0?'pos':'neg'}">${pnl>=0?'+':'−'}$${Math.abs(pnl).toFixed(2)}</b></div><div><small>Исполнено окон</small><b>${V.n}</b></div></div>
+  const V=varbTick(sp,tri), pnl=V.eq-10000-(V.dep||0);
+  $('#eVarb').innerHTML=`<div class="fk" style="grid-template-columns:repeat(3,1fr)"><div><small>Баланс</small><b>$${V.eq.toLocaleString('ru-RU',{maximumFractionDigits:2})}</b></div><div><small>Результат</small><b class="${pnl>=0?'pos':'neg'}">${pnl>=0?'+':'−'}$${Math.abs(pnl).toFixed(2)}</b></div><div><small>Исполнено окон</small><b>${V.n}</b></div></div>${V.dep?`<div class="muted" style="font-size:11.5px">Пополнено на $${V.dep.toLocaleString('ru-RU')} — в результат не входит.</div>`:''}
     <h3>Последние сделки</h3>${V.log.slice(0,6).map(l=>`<div class="erow tri pos"><span>${fmtT(l.t)} · ${l.txt}</span><span class="num pos">+$${l.pnl.toFixed(2)}</span></div>`).join('')||'<div class="muted">Пока ни одного окна больше 0.05% после комиссий — ждём.</div>'}
-    <div class="muted enote">Правило: если окно даёт больше 0.05% чистыми, счёт «исполняет» его на $1 000. Один и тот же маршрут — не чаще раза в сутки: окно, которое висит часами, почти всегда застывшее (закрыт перевод монеты). Это оптимистичная оценка: считаем, что деньги уже лежат на обеих биржах и сделка прошла по лучшей цене без задержки. Реальный результат будет ниже.</div>`;
+    <div class="muted enote">Правило: если окно даёт больше 0.05% чистыми, счёт «исполняет» его на выбранную сумму (сейчас $${(V.ticket||1000).toLocaleString('ru-RU')}). Один и тот же маршрут — не чаще раза в сутки: окно, которое висит часами, почти всегда застывшее (закрыт перевод монеты). Это оптимистичная оценка: считаем, что деньги уже лежат на обеих биржах и сделка прошла по лучшей цене без задержки. Реальный результат будет ниже.</div>`;
   const F=EARN.fund; let fund='<div class="muted">Счёт запускается на сервере — данные появятся после ближайшего запуска (до 30 минут).</div>';
   if(F&&F.equity!=null){ const pos=(F.positions||[]).map(p=>`<div class="erow"><b>${p.symbol}</b><span>спот куплен + фьючерс продан на $${Math.round(p.notional).toLocaleString('ru-RU')}</span><span class="num">${(p.rate_now*100).toFixed(4)}% / 8 ч</span><span class="num pos">+$${(p.earned_usd||0).toFixed(2)}</span></div>`).join('')||'<div class="muted">Сейчас нет монет с фандингом выше порога 0.01% за 8 ч — ждём.</div>';
     const tb=(F.table||[]).filter(r=>r.spread).slice(0,8).map(r=>`<div class="erow"><b>${r.symbol}</b><span>шорт на <b>${r.spread.short_on}</b>, лонг на <b>${r.spread.long_on}</b></span><span class="num">${(r.spread.per8h*100).toFixed(4)}% / 8 ч</span><span class="num">${r.spread.apr_pct.toFixed(1)}% год.</span></div>`).join('');
     fund=`<div class="fk" style="grid-template-columns:repeat(3,1fr)"><div><small>Баланс</small><b>$${F.equity.toLocaleString('ru-RU',{maximumFractionDigits:2})}</b></div><div><small>Результат</small><b class="${F.pnl_usd>=0?'pos':'neg'}">${F.pnl_usd>=0?'+':'−'}$${Math.abs(F.pnl_usd).toFixed(2)}</b></div><div><small>Следующая выплата</small><b>${F.next_settlement?fmtT(F.next_settlement).split(',').pop():'—'}</b></div></div>
       <h3>Что держим</h3>${pos}<h3>Разница фандинга между биржами</h3>${tb||'<div class="muted">нет данных</div>'}<div class="muted enote">${F.about||''} ${F.note||''}</div>`; }
-  $('#eFund').innerHTML=fund; }
+  $('#eFund').innerHTML=fund; earnFundCalc();
+  { const A=EARN.srv, el=$('#ePlace'); if(el){ const w=(A&&A.recent_windows)||[]; if(!w.length) el.innerHTML='<div class="muted">Окон пока мало — план появится, когда сервер накопит статистику.</div>'; else { const cnt=(k)=>{ const m={}; w.forEach(x=>m[x[k]]=(m[x[k]]||0)+1); return Object.entries(m).sort((a,b)=>b[1]-a[1]); }; const buy=cnt('buy'), sell=cnt('sell'); const coins={}; w.forEach(x=>coins[x.coin]=(coins[x.coin]||0)+1);
+    el.innerHTML=`<div class="fk" style="grid-template-columns:repeat(2,1fr)"><div><small>Где держать доллары (USDT) — тут покупали</small><b style="font-size:14px">${buy.slice(0,3).map(([v,n])=>`${v} <span class="muted">${n}</span>`).join(' · ')}</b></div><div><small>Где держать монеты — тут продавали</small><b style="font-size:14px">${sell.slice(0,3).map(([v,n])=>`${v} <span class="muted">${n}</span>`).join(' · ')}</b></div></div>
+      <div class="muted enote">По последним ${w.length} свежим окнам сервера. Монеты, которые чаще давали окно: ${Object.entries(coins).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([c,n])=>c+' '+n).join(', ')}. Для реального арбитража нужно заранее держать доллары на бирже покупки и такие же монеты на бирже продажи, а раз в несколько дней выравнивать остатки (перевод стоит денег). Сначала стоит проверить, что ввод и вывод этих монет на обеих биржах открыты.</div>`; } } }
+  { const T=EARN.trisrv, el=$('#eTriSrv'); if(el&&T){ $('#eTriSrvMeta').textContent=T.asof?('обновлено '+fmtT(T.asof)):''; el.innerHTML=(T.explain_ru?`<div class="muted enote">${T.explain_ru}</div>`:'')+((T.now||T.top||[]).slice(0,10).map(t=>`<div class="erow tri ${(t.net||0)>0?'pos':''}"><span>${t.venue?'<b>'+t.venue+'</b> · ':''}${t.path||t.route||''}</span><span class="num ${(t.net||0)>0?'pos':'neg'}">${pctS(t.net||0,3)}</span></div>`).join('')||'<div class="muted">Окон с плюсом после комиссий пока нет.</div>'); } } }
 async function earnTick(){ await Promise.all([...EARN_VENUES.map(earnFetch),earnLoadFunding()]); earnRender(); }
 function earnStart(){ if(EARN.timer) return; earnRender(); earnTick(); EARN.timer=setInterval(earnTick,10000); efStart(); }
 function earnStop(){ if(EARN.timer){ clearInterval(EARN.timer); EARN.timer=null; } efStop(); }

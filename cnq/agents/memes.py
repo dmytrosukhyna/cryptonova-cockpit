@@ -168,37 +168,6 @@ def hl_candles(coin: str, start: int, end: int, interval: str = "1h") -> list[li
     return sorted(out)
 
 
-SPOT_SKIP = {"USDC", "USDT0", "USDE", "USDHL", "FEUSD", "USDH", "USDXL", "USH", "USR", "HYPE", "UBTC", "UETH", "USOL", "UZEC", "UFART",
-             "UPUMP", "UBONK", "USPX", "UXPL", "UENA", "UMON", "UUUSPX", "XAUT0", "AVAX0", "TAO1", "QQQ", "GLD", "SPCX", "STABLE", "KHYPE", "LHYPE"}
-
-
-def hl_spot() -> list[dict]:
-    """Most traded HL spot tokens (HIP-1) — watch only; not all of them are memes."""
-    meta, ctxs = _req(HL, {"type": "spotMetaAndAssetCtxs"}, timeout=15)
-    toks = {t["index"]: t["name"] for t in meta.get("tokens", [])}
-    uni = meta.get("universe", [])
-    by_name = {pr.get("name"): pr for pr in uni}
-    # HL returns more contexts than pairs and in another order (1117 vs 332 on 17.10.2026): align by the pair name each
-    # context carries; contexts without a known pair are skipped. Positional zip only if no context has a name at all.
-    if any(isinstance(c, dict) and c.get("coin") for c in ctxs):
-        pairs = [(by_name[c["coin"]], c) for c in ctxs if isinstance(c, dict) and c.get("coin") in by_name]
-    else:
-        pairs = list(zip(uni, ctxs))
-    best: dict[str, dict] = {}
-    for pr, c in pairs:
-        try:
-            base, quote = toks.get(pr["tokens"][0]), toks.get(pr["tokens"][1])
-        except (KeyError, IndexError, TypeError):
-            continue
-        if not base or base.upper() in SPOT_SKIP or base.upper().startswith("USD") or quote not in ("USDC", "USDT0", "USDH", "USDE"):
-            continue
-        px, prev, vol = _f(c.get("markPx")) or _f(c.get("midPx")), _f(c.get("prevDayPx")), _f(c.get("dayNtlVlm"), 0.0)
-        if not px or vol < 100_000 or (base in best and best[base]["vol24"] >= vol):
-            continue
-        best[base] = {"token": base, "px": px, "chg24h": round((px / prev - 1) * 100, 2) if prev else None, "vol24": round(vol)}
-    return sorted(best.values(), key=lambda r: -r["vol24"])[:10]
-
-
 def btc_context(get_candles=None, now: int | None = None) -> dict:
     """BTC vs its 50-day mean (daily closes). In the research the dip rule worked mostly while BTC was BELOW it."""
     now = now or int(time.time() * 1000)
@@ -635,7 +604,7 @@ def manage(conn, ctx: dict, candles: dict, now: int, ev: list) -> float:
 
 
 def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_candles_fn=hl_candles, sol_fn=sol_fetch,
-        spot_fn=hl_spot, btc_fn=btc_context, deadline_s: float = 50.0) -> dict:
+        btc_fn=btc_context, deadline_s: float = 50.0) -> dict:
     t_start = time.time()
     now = now or int(time.time() * 1000)
     _ensure(conn)
@@ -647,13 +616,13 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     held = {r[0] for r in conn.execute("SELECT coin FROM meme_pos")}
     want = sorted({c for c, x in ctx.items() if x["vol24"] >= 100_000} | (held & set(ctx)), key=lambda c: (c not in held, -ctx[c]["vol24"]))[:30]
     candles: dict[str, list] = {}
-    market, spot = {}, []
+    market = {}
     if ctx:
         start = now - 22 * DAY
         with ThreadPoolExecutor(max_workers=6) as ex:
-            fut_m, fut_s = ex.submit(_safe, btc_fn), ex.submit(_safe, spot_fn)
+            fut_m = ex.submit(_safe, btc_fn)
             res = list(ex.map(lambda c: (c, _safe(hl_candles_fn, c, start, now)), want))
-            market, spot = fut_m.result() or {}, fut_s.result() or []
+            market = fut_m.result() or {}
         candles = {c: v for c, v in res if v}
     rows = [metrics(c, ctx[c], candles.get(c, []), now) for c in ctx]
     score_hl(rows)
@@ -714,9 +683,6 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     conn.commit()
     out = snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources)
     out["market"] = market
-    out["hl_spot"] = spot
-    out["hl_spot_note"] = ("Самые торгуемые спот-токены Hyperliquid (HIP-1), без стейблкоинов и обёрток. Не все из них — мемы; "
-                           "проверок безопасности нет; только наблюдение, без сделок.")
     if sol_note:
         out["solana_note"] = sol_note + " " + out["solana_note"]
     out["seconds"] = round(time.time() - t_start, 1)

@@ -4,7 +4,8 @@ buy/sell volume ratio, perp-vs-index basis. Every signal: entry at the next 15m 
 −12 %, no overlapping trades on one coin. Baseline = random entry on the same coin, same year, same side, same hold (the exact
 mean of all real bars of that coin-year, no sampling noise). "Typical level" thresholds use only the PRIOR 30 days (updated daily).
 Pass rule: after costs positive in each of 2023/24/25/26, better than baseline in each year, day-clustered t ≥ 2, neighbours too.
-Sections: bef liq cvd top panel taker basis deep portfolio  (default: all but deep/portfolio; portfolio runs the deep candidates)
+Sections: bef liq cvd top panel taker basis deep portfolio pfD  (default: all but deep/portfolio/pfD; portfolio runs the deep
+candidates through the free 'S' slot of simulate, pfD checks the accepted rule D = AP.cand_D with d_share/d_open)
 Usage: python scripts/new_signals_test.py [section ...]      e.g.  python scripts/new_signals_test.py top panel
 docs/research/new_signals.md"""
 import sys, os, collections, warnings, numpy as np
@@ -451,6 +452,48 @@ def portfolio(rows):
                   f"{'' if r['maxdd'] >= r0['maxdd'] - 0.005 else ', просадка хуже'}", flush=True)
 
 
+def sec_pfD():
+    """Rule D (AP.cand_D, deep negative basis) inside the «норма» portfolio: neighbours, delay, dependence on the best days."""
+    base = bef(); eq, tr, cu = AP.simulate(base, **NORMA); r0, _ = AP.report(eq, tr, cu)
+    D = AP.cand_D(); eq, tr, cu = AP.simulate(base + D, **NORMA); rd, _ = AP.report(eq, tr, cu)
+    print(f"\n=== Правило D в портфеле «норма». База B+E+F: ${r0['final']:,}, просадка {r0['maxdd'] * 100:.1f}%, месяцев в плюсе {r0['win_m'] * 100:.0f}%, "
+          f"годы {r0['years']}\n  проверка: те же кандидаты + D, но d_share=0 (по умолчанию) → ${rd['final']:,} (должно совпасть)")
+
+    def line(lab, cands, sh, op):
+        eq, tr, cu = AP.simulate(base + cands, rules=('B', 'E', 'F', 'D'), d_share=sh, d_open=op, **NORMA); r, _ = AP.report(eq, tr, cu)
+        better = all(r['years'].get(y, 0) >= r0['years'].get(y, 0) for y in r0['years'])
+        nD = sum(1 for t in tr if t['rule'] == 'D')
+        print(f"  {lab:34} {sh * 100:3.0f}%×{op}: ${r['final']:>8,} ({(r['final'] / r0['final'] - 1) * 100:+4.0f}%) просадка {r['maxdd'] * 100:5.1f}% "
+              f"мес+ {r['win_m'] * 100:3.0f}%  D: {nD} сделок ({nD / NDAYS:.2f}/день) ${r['rules'].get('D', 0):>7,}  годы "
+              + ' '.join(f"{y}:{v:+,}" for y, v in r['years'].items())
+              + f"  {'✔ каждый год лучше' if better else '✘ есть год хуже'}{'' if r['maxdd'] >= r0['maxdd'] - 0.005 else ', ✘ просадка хуже'}", flush=True)
+        return r
+    for th in (-15, -20, -25, -30):
+        for h in (32, 96):
+            c = AP.cand_D(th=th, hold=h)
+            for sh, op in ((0.1, 2), (0.1, 3), (0.15, 3), (0.2, 3)):
+                line(f"базис ≤{th} б.п., {h // 4} ч", c, sh, op)
+    c = AP.cand_D(delay=2)
+    for sh, op in ((0.1, 3), (0.15, 3)): line("≤−20, 24 ч, вход на 15 мин позже", c, sh, op)
+    c = AP.cand_D(n=1)
+    for sh, op in ((0.1, 3), (0.15, 3)): line("≤−20 по одной свече, 24 ч", c, sh, op)
+    dd = collections.defaultdict(float)
+    for x in D: dd[int(DAYN[x['i']])] += x['ret']
+    for top in (5, 10, 20):
+        bad = set(sorted(dd, key=lambda d: -dd[d])[:top]); c = [x for x in D if int(DAYN[x['i']]) not in bad]
+        line(f"≤−20, 24 ч, без {top} лучших дней D", c, 0.15, 3)
+    print("  10 лучших дней D (дата: сделки, монета результат, breadth в момент сигнала):")
+    for d in sorted(dd, key=lambda d: -dd[d])[:10]:
+        xs = [x for x in D if int(DAYN[x['i']]) == d]
+        print(f"    {AP.DAY[xs[0]['i']]}: " + ', '.join(f"{syms[x['k']]} {x['ret'] * 100:+.1f}%" for x in xs) + f"  breadth {BR[xs[0]['i'] - 1]:.2f}")
+    crash = {int(DAYN[i]) for i in range(T) if AP.DAY[i] in ('2025-10-10', '2025-10-11')}
+    line("≤−20, 24 ч, без 10–11.10.2025", [x for x in D if int(DAYN[x['i']]) not in crash], 0.15, 3)
+    per, days = bef_index()
+    near = [x for x in D if x['k'] in per and np.any(np.abs(per[x['k']] - x['i']) <= 96)]
+    print(f"  D: {len(D)} сделок-кандидатов, из них рядом с B/E/F (та же монета ±24 ч) {len(near)} ({len(near) / len(D) * 100:.0f}%), "
+          f"в дни с B/E/F {np.mean([int(DAYN[x['i']]) in days for x in D]) * 100:.0f}%")
+
+
 def summary():
     print("\n=== Итог: варианты, прошедшие проверку (плюс в каждом году, лучше случайного входа в каждом году, t≥2, n≥60)")
     ok = [r for r in RES if r['ok']]
@@ -469,10 +512,10 @@ if __name__ == '__main__':
     secs = [a for a in sys.argv[1:] if not a.startswith('-')] or ['bef', 'liq', 'cvd', 'top', 'panel', 'taker', 'basis']
     print(f"18 монет, {NDAYS} дней (2023-01-01 → {AP.DAY[-1]}), издержки {COST * 100:.2f}% за сделку, стоп −12%, вход на следующей свече")
     baseline_table()
-    fn = dict(bef=sec_bef, liq=sec_liq, cvd=sec_cvd, top=sec_top, panel=sec_panel, taker=sec_taker, basis=sec_basis, deep=sec_deep)
+    fn = dict(bef=sec_bef, liq=sec_liq, cvd=sec_cvd, top=sec_top, panel=sec_panel, taker=sec_taker, basis=sec_basis, deep=sec_deep, pfD=sec_pfD)
     for s in secs:
         if s in fn: fn[s]()
     ok = summary()
     if 'portfolio' in secs:
         if not CANDS: sec_deep()
-        portfolio([CANDS[c] for c in ('basis-20_96', 'basis-20_32', 'basis-30_96', 'topacc2.0_96', 'topacc1.5_96', 'liq5_32')])
+        portfolio([CANDS[c] for c in ('basis-20_96', 'basis-20_32', 'basis-30_96', 'topacc2.0_96', 'topacc2.5_96', 'topacc1.5_96', 'liq5_32')])

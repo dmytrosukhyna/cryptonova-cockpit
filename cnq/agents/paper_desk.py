@@ -43,10 +43,10 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
              "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +75% в год, просадка до −29%, все годы в плюсе."},
     # 17.10: «Лаборатория» — aggressive range/level rules the owner asked to try live although history is ≈0 or negative
     # (docs/research/range.md). Limit entries only, filled only when price trades through. Separate $10 000, not mirrored.
-    "lab":  {"name": "Лаборатория · агрессивно", "classes": {"L", "N", "Q"}, "confirm": False, "risk": 0.005, "max_open": 20, "tgt_r": 1.5, "riskoff": "shorts",
-             "caps": {"L": 7, "N": 8, "Q": 6}, "prefix": "paper_lab_",
+    "lab":  {"name": "Лаборатория · агрессивно", "classes": {"L", "N", "Q", "W"}, "confirm": False, "risk": 0.005, "max_open": 20, "tgt_r": 1.5, "riskoff": "shorts",
+             "caps": {"L": 7, "N": 8, "Q": 6, "W": 4}, "prefix": "paper_lab_",
              "about": "Проверка вживую агрессивных правил внутри диапазона: L — покупка у низа диапазона за 14 дней (история +0.30% на сделку, но 2025–26 в минусе), "
-                      "N — отскок от часовой поддержки и Q — шорт от часового сопротивления (история ≈ −0.1% на сделку). Риск 0.5% на сделку, до 20 ордеров и позиций (L до 7, N до 8, Q до 6), 31 монета. Это эксперимент."},
+                      "N — отскок от часовой поддержки и Q — шорт от часового сопротивления (история ≈ −0.1% на сделку), W — сделка по сильной новости (оценка нейросети 4–5 из 5, без истории). Риск 0.5% на сделку, до 20 ордеров и позиций (L до 7, N до 8, Q до 6), 31 монета. Это эксперимент."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
     "exp":  {"name": "Эксперимент · свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
@@ -54,7 +54,8 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
 }
 RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций",
            "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса",
-           "L": "покупка у низа диапазона", "N": "отскок от часовой поддержки", "Q": "шорт от часового сопротивления"}
+           "L": "покупка у низа диапазона", "N": "отскок от часовой поддержки", "Q": "шорт от часового сопротивления",
+           "W": "сделка по сильной новости"}
 THROUGH = {"L", "N", "Q"}        # lab limits fill only when price trades through the level by ≥ 0.01 %
 HOLD_L_H, HOLD_N_H = 72, 24
 SHARE_RULES = {"E", "F", "S", "G", "D"}   # sized as a share of equity, own position caps
@@ -346,6 +347,25 @@ class PaperDesk:
                     out.append({"id": f"Q-{base}-{slot}", "symbol": base, "side": "SHORT", "grade": "Q", "kind": "H1_RESIST_LIMIT",
                                 "entry": lv, "stop": st, "tps": [tg] * 3, "parts": [1.0, 0.0, 0.0], "order": "LIMIT", "hold_h": HOLD_N_H, "ttl_h": 1,
                                 "reason": f"Лаборатория: часовое сопротивление {lv:.6g} (локальный максимум). Лимитка на продажу, стоп {st:.6g}, цель {tg:.6g}. Эксперимент: шорты на истории слабые."})
+        # W (lab): strong fresh news about this coin (or the whole market → BTC), rated by the news analyst 4–5/5, confidence ≥ 0.6
+        if "W" in self.P["classes"]:
+            try:
+                rows = self.conn.execute("SELECT news_id, asset, direction, horizon, magnitude, confidence, COALESCE(NULLIF(title_ru,''), '') FROM news_impact "
+                                         "WHERE created >= ? AND magnitude >= 4 AND confidence >= 0.6 AND direction IN ('bull','bear')",
+                                         (now - 45 * 60_000,)).fetchall()
+            except Exception:  # noqa: BLE001
+                rows = []
+            for nid, asset, d, hz, mag, conf, title in rows:
+                if (asset if asset != "MARKET" else "BTC") != base:
+                    continue
+                side = "LONG" if d == "bull" else "SHORT"; sg = 1 if side == "LONG" else -1; entry = c15[-1][4]
+                hold = 6 if hz == "hours" else 48
+                out.append({"id": f"W-{base}-{nid}", "symbol": base, "side": side, "grade": "W", "kind": "NEWS",
+                            "entry": entry, "stop": entry * (1 - sg * 0.03), "tps": [entry * (1 + sg * 0.06)] * 3, "parts": [1.0, 0.0, 0.0],
+                            "order": "MARKET", "hold_h": hold,
+                            "reason": f"Лаборатория: сильная новость ({mag}/5, уверенность {conf:.0%}){': ' + title if title else ''}. "
+                                      f"{'Покупка' if side == 'LONG' else 'Продажа'} по рынку, стоп −3%, цель +6%, выход через {hold} ч. Эксперимент без истории."})
+                break
         # D: perpetual at a deep discount to its spot index (1-hour average, recorded by basis_watch)
         bz = coin.get("basis_1h")
         if bz is not None and bz <= D_BASIS:
@@ -477,7 +497,7 @@ class PaperDesk:
                     filled = c
                     break
             if filled:
-                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H}.get(o["grade"], HOLD_C_H)
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H, "W": 48}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
@@ -588,7 +608,7 @@ class PaperDesk:
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
         by_grade = {}
-        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q"):
+        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q", "W"):
             ts = [t for t in closed if t["grade"] == g]
             if ts:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),

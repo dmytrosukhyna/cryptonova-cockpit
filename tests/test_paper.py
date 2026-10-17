@@ -215,3 +215,20 @@ def test_lab_range_low_limit_fills_only_through_level():
     c2 = dict(c, candles=rows, candles_long=rows)
     res2 = desk.step([c2], True, now + 900_000)
     assert not [t for t in res2["open"] if t["id"] == o["id"]] or o["side"] == "SHORT"
+
+
+def test_lab_news_rule_trades_strong_fresh_news_once():
+    conn = sqlite3.connect(":memory:")
+    from cnq.agents.news import SCHEMA
+    conn.executescript(SCHEMA)
+    t0 = 1_700_000_000_000
+    n = 300
+    now = t0 + n * 900_000
+    conn.execute("INSERT INTO news_impact (news_id,asset,category,direction,horizon,magnitude,confidence,reasoning,confirm,created,price_at) "
+                 "VALUES ('n1','MARKET','macro','bear','hours',5,0.8,'','',?,100)", (now - 10 * 60_000,))
+    conn.execute("INSERT INTO news_impact (news_id,asset,category,direction,horizon,magnitude,confidence,reasoning,confirm,created,price_at) "
+                 "VALUES ('n2','ETH','etf','bull','days',3,0.9,'','',?,100)", (now - 10 * 60_000,))      # too weak
+    c = coin("BTC-USDT", [100.0] * n, []); e = coin("ETH-USDT", [100.0] * n, [])
+    desk = pd.PaperDesk(conn, "lab")
+    w = [s for s in desk.signals(c, True, now) + desk.signals(e, True, now) if s["grade"] == "W"]
+    assert len(w) == 1 and w[0]["symbol"] == "BTC" and w[0]["side"] == "SHORT" and w[0]["hold_h"] == 6

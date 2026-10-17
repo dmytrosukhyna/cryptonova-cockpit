@@ -36,14 +36,14 @@ Y_HOURLY = ["ES=F", "NQ=F", "RTY=F", "DX-Y.NYB", "JPY=X", "EURUSD=X", "CL=F", "B
 CHUNK = 4000
 
 
-def get(url: str, timeout: float = 30.0, tries: int = 3) -> bytes:
+def get(url: str, timeout: float = 20.0, tries: int = 2) -> bytes:
     last = None
     for k in range(tries):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
                 return r.read()
         except Exception as e:  # noqa: BLE001
-            last = e; time.sleep(2 + 3 * k)
+            last = e; time.sleep(1 + 2 * k)
     raise RuntimeError(f"{url}: {last}")
 
 
@@ -109,22 +109,31 @@ def unpack_series(p: dict) -> tuple[list[int], list[float]]:
 
 
 def do_fetch(out: str, md: str) -> None:
-    data, lines, fails = {}, ["| series | source | freq | n | first | last | last value |", "|---|---|---|---|---|---|---|"], []
+    data, lines, fails = {}, ["| series | source | freq | n | first | last | last value | time |", "|---|---|---|---|---|---|---|---|"], []
     jobs = [("fred", s, "1d") for s in FRED] + [("yahoo", s, "1d") for s in Y_DAILY] + [("yahoo", s, "1h") for s in Y_HOURLY]
-    for src, sid, iv in jobs:
-        key = f"{src}:{sid}:{iv}"
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(job):
+        src, sid, iv = job; t0 = time.time()
         try:
             if src == "fred":
                 t, v = fred(sid); meta = {}
             else:
                 t, v, meta = yahoo(sid, iv)
-            p = pack_series(t, v); p.update(src=src, freq=iv, meta=meta)
-            data[key] = p
-            f = lambda x: dt.datetime.fromtimestamp(x, dt.timezone.utc).strftime("%Y-%m-%d %H:%M")
-            lines.append(f"| {sid} | {src} | {iv} | {len(t)} | {f(t[0]) if t else '-'} | {f(t[-1]) if t else '-'} | {v[-1] if v else '-'} |")
+            return job, (t, v, meta), None, time.time() - t0
         except Exception as e:  # noqa: BLE001
-            fails.append(f"{key}: {str(e)[:200]}")
-        time.sleep(0.4)
+            return job, None, str(e)[:200], time.time() - t0
+    with ThreadPoolExecutor(8) as ex:
+        res = list(ex.map(one, jobs))
+    f = lambda x: dt.datetime.fromtimestamp(x, dt.timezone.utc).strftime("%Y-%m-%d %H:%M")
+    for (src, sid, iv), got, err, sec in res:
+        key = f"{src}:{sid}:{iv}"
+        if got is None:
+            fails.append(f"{key}: {err} ({sec:.0f}s)"); continue
+        t, v, meta = got
+        p = pack_series(t, v); p.update(src=src, freq=iv, meta=meta)
+        data[key] = p
+        lines.append(f"| {sid} | {src} | {iv} | {len(t)} | {f(t[0]) if t else '-'} | {f(t[-1]) if t else '-'} | {v[-1] if v else '-'} | {sec:.0f}s |")
     raw = json.dumps(data, separators=(",", ":")).encode()
     blob = base64.b64encode(lzma.compress(raw, preset=9 | lzma.PRESET_EXTREME)).decode()
     open(out, "w").write(blob)

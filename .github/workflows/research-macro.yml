@@ -20,8 +20,15 @@ jobs:
         with: { python-version: "3.12" }
       - name: Probe live sources
         continue-on-error: true
-        run: python scripts/macro_factors_fetch.py --probe probe.md
+        timeout-minutes: 5
+        run: |
+          python scripts/macro_factors_fetch.py --probe probe.md
+          python - <<'PY'
+          s = open("probe.md").read()[:3900].replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+          print(f"::notice title=probe::{s}")
+          PY
       - name: Download history
+        timeout-minutes: 15
         run: python scripts/macro_factors_fetch.py --fetch pack.b64 --md status.md
       - uses: actions/upload-artifact@v4
         with: { name: macro-pack, path: pack.b64, retention-days: 3 }
@@ -30,7 +37,7 @@ jobs:
         run: |
           python - <<'PY'
           import os
-          for f, title in (("status.md", "status"), ("probe.md", "probe")):
+          for f, title in (("status.md", "status"),):
               s = open(f).read() if os.path.exists(f) else "(no file)"
               n = 3500; parts = [s[i:i + n] for i in range(0, len(s), n)][:8]
               for j, p in enumerate(parts):

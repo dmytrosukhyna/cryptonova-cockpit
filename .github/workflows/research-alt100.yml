@@ -21,6 +21,10 @@ on:
         description: "extra arguments for scripts/alt100_test.py (sections), e.g. 'rules portfolio'"
         required: false
         default: ""
+      top:
+        description: "universe size: top-N non-stable coins by market cap (100 = the test; 200 = extra check on ranks 101–200)"
+        required: false
+        default: "100"
 
 permissions:
   contents: read
@@ -47,7 +51,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install numpy
-      - run: python scripts/fetch_alt100.py universe --top 100 --min-month 2024-01 --out universe.json
+      - run: python scripts/fetch_alt100.py universe --top ${{ inputs.top || '100' }} --min-month 2024-01 --out universe.json
       - uses: actions/upload-artifact@v4
         with: { name: universe, path: universe.json, retention-days: 7 }
 
@@ -108,9 +112,16 @@ jobs:
       - name: Alt-100 test
         env: { ARGS: "${{ inputs.args }}" }
         run: python scripts/alt100_test.py alt100.npz --md results.md $ARGS
-      - name: Publish results
+      # annotations: ≤ 4096 chars each, ≤ 10 per level per step → three steps × (10 notices + 10 warnings)
+      - name: Publish results 1
         if: always()
         run: |
           test -f results.md || exit 0
           cat results.md >> "$GITHUB_STEP_SUMMARY"
-          python scripts/alt100_test.py --annotate results.md
+          python scripts/alt100_test.py --annotate results.md 0
+      - name: Publish results 2
+        if: always()
+        run: test -f results.md && python scripts/alt100_test.py --annotate results.md 1 || true
+      - name: Publish results 3
+        if: always()
+        run: test -f results.md && python scripts/alt100_test.py --annotate results.md 2 || true

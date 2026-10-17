@@ -25,7 +25,14 @@ FEEDS = {
     "theblock": "https://www.theblock.co/rss.xml",
     "decrypt": "https://decrypt.co/feed",
     "bitcoinmagazine": "https://bitcoinmagazine.com/.rss/full/",
+    # 17.10: Trump's Truth Social posts via the independent archive trumpstruth.org (free RSS; not an official API, may lag minutes)
+    "trump_truth": "https://www.trumpstruth.org/feed",
 }
+# Personal feeds are mostly not about markets — keep only posts that can move prices (saves the free LLM budget)
+PERSONAL = {"trump_truth"}
+MARKET_WORDS = ("crypto", "bitcoin", "btc", "coin", "token", "stablecoin", "blockchain", "tariff", "fed", "federal reserve", "powell", "interest rate",
+                "rates", "inflation", "dollar", "economy", "stock", "market", "dow", "nasdaq", "trade", "china", "deal", "sanction", "oil", "war",
+                "tax", "treasury", "bank", "sec ", "etf", "reserve", "debt", "recession", "jobs")
 ASSET_WORDS = {"BTC": ["bitcoin", "btc"], "ETH": ["ethereum", "ether ", "eth "], "SOL": ["solana", "sol "], "BNB": ["bnb", "binance coin"],
                "XRP": ["xrp", "ripple"], "DOGE": ["doge"], "ADA": ["cardano", "ada "], "AVAX": ["avalanche", "avax"],
                "LINK": ["chainlink", "link "], "LTC": ["litecoin"], "MARKET": ["crypto market", "fomc", "fed ", "cpi", "sec ", "etf", "tariff", "treasury"]}
@@ -84,6 +91,11 @@ class NewsCollector:
                     items = self.parse_rss(r.read().decode("utf-8", "ignore"), name)
             except Exception:  # noqa: BLE001
                 continue
+            if name in PERSONAL:
+                items = [it for it in items if any(w in (it["title"] + " " + it["summary"]).lower() for w in MARKET_WORDS)]
+                for it in items:
+                    if not it["title"]:
+                        it["title"] = "Трамп: " + it["summary"][:120]
             new += self.store(items)
         return new
 

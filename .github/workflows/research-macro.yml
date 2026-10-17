@@ -1,0 +1,55 @@
+name: research-macro
+# Manual only (no schedule). Macro factor history for docs/research/macro_factors.md: FRED (yields, dollar, yen, oil, VIX,
+# S&P 500, Nasdaq, liquidity) and Yahoo (index futures, DXY, USDJPY, Brent, gold, 10Y, VIX — daily since 2021, hourly
+# 730 days) + a probe of live sources for cnq/agents/macro_watch.py. The research container cannot reach these sites and
+# cannot download artifacts or logs, so the packed data come back as job annotations (scripts/macro_factors_fetch.py
+# --decode). Nothing is committed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Probe live sources
+        continue-on-error: true
+        run: python scripts/macro_factors_fetch.py --probe probe.md
+      - name: Download history
+        run: python scripts/macro_factors_fetch.py --fetch pack.b64 --md status.md
+      - uses: actions/upload-artifact@v4
+        with: { name: macro-pack, path: pack.b64, retention-days: 3 }
+      - name: Publish status + probe
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          for f, title in (("status.md", "status"), ("probe.md", "probe")):
+              s = open(f).read() if os.path.exists(f) else "(no file)"
+              n = 3500; parts = [s[i:i + n] for i in range(0, len(s), n)][:8]
+              for j, p in enumerate(parts):
+                  p = p.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+                  print(f"::notice title={title} {j + 1}/{len(parts)}::{p}")
+          PY
+
+  publish:
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: macro-pack }
+      # ≤ 10 annotations per level per step, ≤ 50 per job → 48 chunks per shard in three steps
+      - run: python scripts/macro_factors_fetch.py --emit pack.b64 $(( ${{ matrix.shard }} * 48 )) 20
+      - run: python scripts/macro_factors_fetch.py --emit pack.b64 $(( ${{ matrix.shard }} * 48 + 20 )) 20
+      - run: python scripts/macro_factors_fetch.py --emit pack.b64 $(( ${{ matrix.shard }} * 48 + 40 )) 8

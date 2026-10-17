@@ -5,14 +5,15 @@ No new data and no forecasts: the module only re-reads what the other department
   • research.json  `cards`      — the coin «анкета»: risk class cons/mod/high, rating 0–100, 7/30/200-day change, distance from
                                    the all-time high, FDV/market cap, tags (мем …), CoinGecko id;
   • portfolio.json `btc_bull`   — BTC regime (the same flag every portfolio uses); `picks` short/mid/long — the consultant's
-                                   0–100 scores; `portfolios.*.positions` — what our five demo portfolios hold (+ server `reco`);
+                                   0–100 scores; `portfolios.*.positions` — what our demo portfolios hold (+ server `reco`;
+                                   the follower «По рекомендациям» only adds coins to the universe, see below);
   • memes.json     `spot_memes` — the meme desk's checked spot memes: status small/wait/avoid, why_ru, quality score,
                                    `from_high30_pct` (distance from the 30-day high, a lower-bound estimate);
   • markets.json   `top`        — 24 h volume (liquidity);  decision.json `coins` — support zones and the 20-day high for the
                                    18 futures coins of the terminal (used for «цена у поддержки» and the 30-day-high estimate).
 Missing files are skipped; a coin missing a value simply does not pass the check that needs it (never a guess).
 
-Universe: every research card + every consultant pick + every position of the five portfolios + every spot meme, deduplicated
+Universe: every research card + every consultant pick + every position of the demo portfolios + every spot meme, deduplicated
 by symbol. Left out: stablecoins / wrapped / tokenized funds (research `stable` flag, a known stablecoin ticker or «USD» in the
 ticker, or a peg-like price: |7 d| < 1.5 %, |30 d| < 3 % and within 12 % of the all-time high).
 
@@ -48,6 +49,11 @@ momentum / breakout entry lost money). The 30-day high is a LOWER-BOUND estimate
 meme desk's value; otherwise the max of today's price, the prices 24 h / 7 d / 30 d ago implied by CoinGecko's % changes and the
 20-day high of the terminal's candles (decision.json, only when its price is within 10 % of CoinGecko's).
 
+Followers (17.10): the 6th spot portfolio «По рекомендациям» (`ideas`, spot_profiles.IdeasPortfolio) BUYS from this table, so its
+positions only keep a coin in the universe — they never count as «held», never trigger «у стопа» / «добрать» and give no consultant
+score (no feedback loop: its own reco «sell» must not turn a coin into «не брать»). `statuses` = {symbol: status, status_ru,
+why_ru, kind, price} for EVERY evaluated coin, so the follower can sell by status even when a coin is not among the 30 rows.
+
 Rows: sorted buy, add, small, wait, avoid, then by score; 30 rows. Up to 6 of the 30 places are kept for «не брать» (those we hold
 or the consultant picks first, then by score) so the table also shows what NOT to buy. Each row has a ≤ 14-word `why_ru` and a
 2–5-sentence `info_ru` for the «i» popup: the checks with their real numbers, the research behind the rule, our portfolios
@@ -80,6 +86,7 @@ MIN_VOL_BUY = 2e7        # turnover for «можно брать» of a large alt
 STOP_NEAR = {"mod": -12.0, "high": -25.0}   # P&L at which the panel already shows «у стопа» for portfolios without server reco
 MAX_ROWS, AVOID_SLOTS = 30, 6
 STALE_MS = 6 * 3_600_000
+FOLLOWERS = ("ideas",)   # portfolios that buy FROM this table («По рекомендациям») — their holdings never feed back into a status
 MAX_WHY_WORDS = 14
 
 RULES_RU = [
@@ -216,7 +223,10 @@ def _gather(inp: dict, now: int) -> tuple[dict, dict]:
         for pos in p.get("positions") or []:
             sym = (pos.get("symbol") or "").upper()
             if sym and sym not in STABLES:
-                slot(sym)["positions"].append((key, pos))
+                if key in FOLLOWERS:      # only keeps the coin evaluated; never a holding / stop / reco / consultant input
+                    slot(sym)
+                else:
+                    slot(sym)["positions"].append((key, pos))
     for m in memes.get("spot_memes") or []:
         sym = (m.get("symbol") or "").upper()
         if sym:
@@ -577,7 +587,10 @@ def build(inp: dict, now: int | None = None) -> dict:
             "counts": counts, "counts_all": counts_all, "evaluated": len(allrows), "shown": len(rows),
             "portfolio_names": ctx["names"], "sources": ctx["sources"],
             "disclaimer_ru": "Правила отбора по данным панели, а не прогноз цены и не инвестиционный совет.",
-            "rows": rows}
+            "rows": rows,
+            # every evaluated coin, not only the 30 shown rows — «По рекомендациям» sells by status even when a coin left the table
+            "statuses": {r["symbol"]: {"status": r["status"], "status_ru": r["status_ru"], "why_ru": r["why_ru"], "kind": r["kind"],
+                                       "price": r["price"]} for r in sorted(allrows, key=lambda r: r["symbol"])}}
 
 
 def run(web_dir: str = "web", now: int | None = None) -> dict:

@@ -1,4 +1,4 @@
-"""Two more model spot portfolios ($10 000 each) next to the moderate one in portfolio.py:
+"""Model spot portfolios ($10 000 each) next to the moderate one in portfolio.py:
 
   cons  Консервативный — BTC 50 % / ETH 25 % / SOL 15 % / cash 10 %. No stops. Monthly (1st–3rd) check of the MARKET weights
                          (value now ÷ portfolio value — 17.10 fix: it compared cost weights before, so a coin that doubled never
@@ -16,9 +16,24 @@
 
 Deterministic, rule-based; prices come from the CoinGecko top snapshot (+ CoinGecko meme list, + Hyperliquid spot); a held coin that
 left the snapshot keeps its last seen price (`px:SYM` in the meta table). Tables are prefixed per profile.
+
+  ideas По рекомендациям (IdeasPortfolio below, 17.10, owner: «если мы рекомендуем, что взять на спот, то почему мы сами не
+                         берём?») — an EXPERIMENT that buys what the spot ideas table (web/ideas.json, spot_ideas.py) says, to test the
+                         table with money. It reads the PREVIOUS server run's ideas.json (the ideas step runs after the portfolio step);
+                         missing or older than 3 h → no buys, holdings are kept, priced and only the price rules work.
+                         Entry: «buy»/«add» 10 % each (≤ 8 coins), «small» 2.5 % each (≤ 4), table order, one buy per coin (no top-ups),
+                         cash ≥ 10 % after the buy, fee 0.1 % per trade (the 10 % / 2.5 % include it). Price: a live price of the run
+                         (CoinGecko top → meme list → Hyperliquid spot) within 25 % of the table's price (same coin, not a namesake);
+                         the source is remembered per coin (meta `src:SYM`), no reliable price → the coin is skipped («SKIP» in actions).
+                         Exits: table status «avoid» → sold on the next run with the table's reason; stop −20 % for buy/add coins except
+                         core (BTC/ETH/SOL — the table's «ядро» — no stop); «small»: stop −35 %, at ×2 sell half (body back), the rest
+                         trails 35 % from the peak; weekly review (Monday, once): table status «wait» and P&L ≤ −10 % → sold; a coin
+                         sold in the last 14 days is not bought again. Statuses come from ideas.json `statuses` (every evaluated coin,
+                         not only the 30 shown rows); spot_ideas.py does not count this portfolio's holdings (no feedback loop).
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from datetime import datetime, timezone
@@ -286,3 +301,339 @@ class RiskPortfolio:
                 "cash_pct": round(self.cash() / value * 100) if value else 0, "invested_pct": round((value - self.cash()) / value * 100) if value else 0, "index": idx, "history": hist, "actions": actions,
                 "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in
                                    self.conn.execute(f"SELECT time,symbol,action,weight,price,reason FROM {self.T_ACT} ORDER BY time DESC LIMIT 20").fetchall()]}
+
+
+# ----------------------------------------------------------------------------- 6th profile: «По рекомендациям» (follows web/ideas.json)
+IDEAS = {
+    "key": "ideas", "name": "По рекомендациям", "prefix": "spot_ideas_", "status": "эксперимент",
+    "buy_w": 0.10, "buy_n": 8,            # table status «можно брать» / «можно добрать»: 10 % each, at most 8 coins
+    "small_w": 0.025, "small_n": 4,       # table status «можно на небольшую сумму»: 2.5 % each, at most 4 coins
+    "min_cash": 0.10, "fee": 0.001,       # cash ≥ 10 % after a buy; 0.1 % of every traded notional (the 10 % / 2.5 % include it)
+    "stop_buy": -0.20,                    # buy/add coins except core (the table's «ядро» BTC/ETH/SOL — no stop)
+    "stop_small": -0.35, "body_x": 2.0, "trail": 0.35,   # «small»: stop, ×2 → sell half (body back), the rest trails 35 % from the peak
+    "review_pnl": -0.10,                  # weekly (Monday) review: table «wait» and P&L ≤ −10 % → sold
+    "cooldown_d": 14,                     # a sold coin is not bought again for 14 days
+    "stale_h": 3,                         # ideas.json older than this → no buys
+    "px_tol": 0.25,                       # a live price within 25 % of the table's (or the last seen) price = the same coin, not a namesake
+}
+IDEAS_ABOUT = ("Эксперимент: портфель сам покупает то, что советует таблица «Что брать на спот», — проверяем таблицу деньгами учебного "
+               "счёта. Старт $10 000. «Можно брать» и «можно добрать» — по 10%, не больше 8 монет; «можно на небольшую сумму» — по 2.5%, "
+               "не больше 4; кэш не меньше 10%, комиссия 0.1% с каждой сделки. Продаём, если таблица поставила «не брать»; стоп −20% от "
+               "входа (ядро BTC, ETH, SOL — без стопа); для небольшой суммы стоп −35%, на ×2 продаём половину, остаток — до отката 35% от "
+               "пика; по понедельникам продаём монеты со статусом «ждём» и минусом 10% и больше. Проданную монету 14 дней не берём. "
+               "Результат не обещаем — может быть и минус.")
+IDEAS_RULES = [
+    "Что покупаем: строки таблицы «Что брать на спот» с прошлого прогона сервера (таблица считается сразу после портфелей). "
+    "«Можно брать» и «можно добрать» — по 10% счёта, не больше 8 монет; «можно на небольшую сумму» — по 2.5%, не больше 4. "
+    "Порядок — как в таблице. Одна покупка на монету: не доливаем и не усредняем.",
+    "Кэш не меньше 10%: покупку, после которой кэша стало бы меньше, пропускаем. Комиссия 0.1% с каждой покупки и продажи "
+    "вычитается из счёта (10% и 2.5% — вместе с комиссией).",
+    "Цена: живая цена сервера (CoinGecko, список мемов, спот Hyperliquid), и она отличается от цены в таблице не больше чем на 25% — "
+    "иначе это может быть другой токен с тем же тикером. Нет надёжной цены — монету не покупаем и пишем об этом в действиях.",
+    "Продажа по таблице: монета получила «не брать» — продаём на следующем прогоне, причина берётся из таблицы.",
+    "Стоп −20% от входа для «можно брать / добрать». Ядро (BTC, ETH, SOL) держим без стопа.",
+    "Небольшая сумма (мемы и высокий риск): стоп −35%; на ×2 продаём половину — вложенное вернулось, остаток держим до отката "
+    "35% от пика.",
+    "Раз в неделю, в понедельник: если у монеты в таблице «ждём» и позиция в минусе на 10% и больше — продаём.",
+    "Проданную монету не покупаем снова 14 дней.",
+    "Если таблица не обновлялась больше 3 часов (или её нет) — новых покупок нет, позиции держим и оцениваем; работают только "
+    "ценовые правила (стопы, ×2, трейлинг).",
+    "Это проверка таблицы на учебном счёте, а не совет и не прогноз: результат может оказаться минусом.",
+]
+IDEAS_SRC = ("cg", "meme", "hl")          # price sources of portfolio.run in priority order
+IDEAS_SRC_RU = {"cg": "CoinGecko", "meme": "список мемов", "hl": "спот Hyperliquid", "ideas": "цена из таблицы",
+                "last": "последняя известная цена"}
+_SRC_CODE = {"cg": 1.0, "meme": 2.0, "hl": 3.0}      # meta `src:SYM` (REAL column)
+IDEAS_ROLE_RU = {"buy": "из таблицы: можно брать", "add": "из таблицы: можно добрать", "small": "на небольшую сумму"}
+KIND_RU = {"core": "ядро", "mid": "крупный альт", "high": "высокий риск", "meme": "мем"}
+
+
+def _pc(x: float) -> str:
+    v = round(x * 100)
+    return "0%" if v == 0 else f"{v:+d}%".replace("-", "−")
+
+
+def _fp(x) -> str:
+    return f"{x:.4g}" if x else "—"
+
+
+def _posnum(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+
+
+def load_ideas(path: str = "web/ideas.json") -> dict | None:
+    """web/ideas.json as the PREVIOUS server run published it (the ideas step runs after the portfolio step); None if missing."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def ideas_freshness(d: dict | None, now: int) -> tuple[bool, str | None]:
+    """(fresh, note_ru): fresh = the table exists, has rows and is at most IDEAS['stale_h'] hours old."""
+    if not d or not d.get("asof"):
+        return False, "Таблицы «Что брать на спот» нет — новых покупок нет, позиции держим и оцениваем по ценовым правилам."
+    age_h = (now - int(d["asof"])) / 3_600_000
+    if age_h > IDEAS["stale_h"]:
+        return False, (f"Таблица «Что брать на спот» не обновлялась {age_h:.1f} ч — новых покупок нет, позиции держим и оцениваем; "
+                       "работают только ценовые правила (стопы, ×2, трейлинг).")
+    if not d.get("available", True) or not d.get("rows"):
+        return False, "Таблица «Что брать на спот» пустая — новых покупок нет, позиции держим и оцениваем по ценовым правилам."
+    return True, None
+
+
+def ideas_statuses(d: dict | None) -> dict:
+    """{SYM: {status, status_ru, why_ru, kind, price}} for every coin the table evaluated (`statuses`, 17.10) — the shown rows win."""
+    out = {str(s).upper(): v for s, v in ((d or {}).get("statuses") or {}).items() if isinstance(v, dict)}
+    for r in (d or {}).get("rows") or []:
+        if r.get("symbol"):
+            out[r["symbol"].upper()] = r
+    return out
+
+
+def ideas_reco(kind: str, est: str, p: dict, px: float | None, row: dict | None, fresh: bool) -> dict:
+    """Server recommendation {k: hold|add|trim|sell, t, why} for one position of «По рекомендациям»."""
+    P = IDEAS
+    if not px or not p.get("entry"):
+        return {"k": "hold", "t": "Нет цены", "why": "Свежей цены нет — показываем последнюю известную."}
+    ret = px / p["entry"] - 1
+    st = (row or {}).get("status")
+    tab = (f"в таблице «{row['status_ru']}»" if row and row.get("status_ru") else "монеты сейчас нет в таблице") if fresh \
+        else "таблица устарела — работают только ценовые правила"
+    if fresh and st == "avoid":
+        return {"k": "sell", "t": "Продать — «не брать»", "why": f"Таблица: {row.get('why_ru') or 'не брать'}."}
+    if est == "small":
+        if not p.get("fixes"):
+            if ret <= P["stop_small"] + 0.07:
+                return {"k": "sell", "t": "У стопа −35%", "why": f"Сейчас {_pc(ret)} от входа; на −35% продаём целиком."}
+            if px >= p["entry"] * (P["body_x"] - 0.15):
+                return {"k": "trim", "t": "Скоро ×2", "why": f"Сейчас {_pc(ret)}: на ×2 продаём половину — вложенное вернётся."}
+        else:
+            dd = 1 - px / max(p.get("high") or px, px)
+            if dd >= P["trail"] - 0.07:
+                return {"k": "sell", "t": "У трейлинга", "why": f"{dd*100:.0f}% ниже пика; на откате 35% остаток продаём."}
+            return {"k": "hold", "t": "Едет бесплатно", "why": f"Тело забрано; остаток держим до отката 35% от пика; {tab}."}
+    elif kind != "core" and ret <= P["stop_buy"] + 0.05:
+        return {"k": "sell", "t": "У стопа −20%", "why": f"Сейчас {_pc(ret)} от входа; на −20% продаём."}
+    if fresh and st == "wait" and ret <= P["review_pnl"]:
+        return {"k": "sell", "t": "Продать в понедельник",
+                "why": f"В таблице «ждём» ({row.get('why_ru') or '—'}), позиция {_pc(ret)} — на недельном пересмотре продаём."}
+    rule = ("Небольшая сумма: стоп −35%, на ×2 забираем тело" if est == "small"
+            else "Ядро без стопа: продаём, только если таблица скажет «не брать» или на пересмотре («ждём» и −10%)" if kind == "core"
+            else "Стоп −20% от входа, продаём и при «не брать»")
+    if fresh and st == "add":
+        rule += "; таблица пишет «можно добрать», но портфель не доливает — одна покупка на монету"
+    return {"k": "hold", "t": "Держать", "why": f"{rule}; {tab}."}
+
+
+class IdeasPortfolio:
+    """«По рекомендациям»: buys what web/ideas.json says (rules in IDEAS / IDEAS_RULES and the module docstring). Ledger =
+    RiskPortfolio (tables spot_ideas_*, cash and weights in units of the $10 000 start); bucket column = "<kind>:<entry status>"."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        self.rp = RiskPortfolio(conn, IDEAS["key"], {**IDEAS, "about": IDEAS_ABOUT})
+        self.conn = conn
+
+    @staticmethod
+    def _split(bucket: str | None) -> tuple[str, str]:
+        kind, _, est = (bucket or "high:buy").partition(":")
+        return kind or "high", est or "buy"
+
+    @staticmethod
+    def _mv(p: dict, px: float | None) -> float:
+        return p["weight"] * (px or p["entry"]) / p["entry"] if p.get("entry") else 0.0
+
+    def value(self, price: dict) -> float:
+        return self.rp.cash() + sum(self._mv(p, price.get(p["symbol"])) for p in self.rp.positions())
+
+    def _price_held(self, s: str, p: dict, src: dict, smap: dict) -> tuple[float, str, bool]:
+        """(price, source, live): the coin's own source first; another live source or the table's price only within px_tol of the
+        last seen price (a namesake token in another list is not taken for ours); otherwise the last seen price (not live)."""
+        rp, tol = self.rp, IDEAS["px_tol"]
+        last = rp._meta(f"px:{s}") or p["entry"]
+        code = rp._meta(f"src:{s}")
+        own = next((k for k, c in _SRC_CODE.items() if c == code), None)
+        for k in ([own] if own else []) + [k for k in IDEAS_SRC if k != own]:
+            v = src[k].get(s)
+            if v and (k == own or abs(v / last - 1) <= tol):
+                if k != own:
+                    rp._set_meta(f"src:{s}", _SRC_CODE[k])
+                return v, k, True
+        v = (smap.get(s) or {}).get("price")
+        if _posnum(v) and abs(v / last - 1) <= tol:
+            return float(v), "ideas", False
+        return last, "last", False
+
+    @staticmethod
+    def _entry_price(s: str, row: dict, src: dict) -> tuple[float | None, str | None, str | None]:
+        """(price, source, why_not): a live price of this run that agrees with the table's price within px_tol."""
+        ref = row.get("price") if _posnum(row.get("price")) else None
+        seen = []
+        for k in IDEAS_SRC:
+            v = src[k].get(s)
+            if not v:
+                continue
+            if ref and abs(v / ref - 1) <= IDEAS["px_tol"]:
+                return v, k, None
+            seen.append((k, v))
+        if not ref:
+            return None, None, "в таблице нет цены — не с чем сверить живую цену"
+        if seen:
+            k, v = seen[0]
+            return None, None, (f"цена {IDEAS_SRC_RU[k]} {_fp(v)} расходится с ценой таблицы {_fp(ref)} больше чем на "
+                                f"{IDEAS['px_tol']*100:.0f}% — возможно, другой токен с тем же тикером")
+        return None, None, "нет живой цены ни в CoinGecko, ни в списке мемов, ни на споте Hyperliquid — позицию потом нечем оценивать"
+
+    def _sell(self, now: int, s: str, p: dict, px: float, reason: str, actions: list):
+        mv = self._mv(p, px)
+        actions.append(self.rp._act(now, s, "SELL", 0, px, reason))
+        self.rp._set_cash(self.rp.cash() - mv * IDEAS["fee"])
+
+    def _trim_half(self, now: int, s: str, p: dict, px: float, reason: str, actions: list):
+        half = p["weight"] / 2
+        actions.append(self.rp._act(now, s, "TRIM", half, px, reason, fixes=(p["fixes"] or 0) + 1, last_fix=px))
+        self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
+
+    def step(self, sources: dict, ideas: dict | None, now: int | None = None) -> dict:
+        """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
+        "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas())."""
+        now = now or int(time.time() * 1000)
+        P, rp = IDEAS, self.rp
+        src = {k: {str(s).upper(): float(v) for s, v in ((sources or {}).get(k) or {}).items() if _posnum(v)} for k in IDEAS_SRC}
+        fresh, note = ideas_freshness(ideas, now)
+        smap = ideas_statuses(ideas) if fresh else {}
+        rows = ((ideas or {}).get("rows") or []) if fresh else []
+        if rp._meta("started") is None:
+            rp._set_meta("started", now)
+        actions: list[dict] = []
+        # --- 1. price the holdings (own source → another agreeing source → the table's price → last seen)
+        price, live, psrc = {}, set(), {}
+        for p in rp.positions():
+            s = p["symbol"]
+            px, k, is_live = self._price_held(s, p, src, smap)
+            price[s], psrc[s] = px, k
+            if is_live:
+                live.add(s)
+                rp._set_meta(f"px:{s}", px)
+        # --- 2. exits: table «avoid» (fresh table only), price rules (always), weekly review (Monday, fresh table only)
+        d = datetime.fromtimestamp(now / 1000, tz=timezone.utc)
+        weekly = fresh and d.weekday() == 0 and now - (rp._meta("last_weekly") or 0) > 6 * DAY
+        if weekly:
+            rp._set_meta("last_weekly", now)
+        for p in rp.positions():
+            s = p["symbol"]
+            px = price.get(s)
+            if not px or not p["entry"]:
+                continue
+            kind, est = self._split(p["bucket"])
+            high = max(p["high"] or px, px)
+            self.conn.execute(f"UPDATE {rp.T_POS} SET high=? WHERE symbol=?", (high, s))
+            ret = px / p["entry"] - 1
+            fixes = p["fixes"] or 0
+            r = smap.get(s) or {}
+            st = r.get("status")
+            res = f"{_pc(ret)} от входа" + ("" if s in live else f", цена — {IDEAS_SRC_RU[psrc[s]]}")
+            if st == "avoid":
+                self._sell(now, s, p, px, f"Таблица поставила «не брать»: {r.get('why_ru') or 'проверки не пройдены'}. Продаём, итог {res}.", actions)
+            elif est == "small" and not fixes and ret <= P["stop_small"]:
+                self._sell(now, s, p, px, f"Стоп {_pc(P['stop_small'])}: {s} {res} — небольшую сумму режем целиком.", actions)
+            elif est == "small" and not fixes and px >= p["entry"] * P["body_x"]:
+                self._trim_half(now, s, p, px, f"×{P['body_x']:.0f} от входа ({res}): продаём половину — вложенное вернулось. "
+                                f"Остаток держим до отката {P['trail']*100:.0f}% от пика.", actions)
+            elif est == "small" and fixes and px <= high * (1 - P["trail"]):
+                self._sell(now, s, p, px, f"Трейлинг: {s} на {(1 - px / high) * 100:.0f}% ниже пика {_fp(high)} — остаток продаём ({res}).", actions)
+            elif est != "small" and kind != "core" and ret <= P["stop_buy"]:
+                self._sell(now, s, p, px, f"Стоп {_pc(P['stop_buy'])}: {s} {res}. Убыток режем; {P['cooldown_d']} дней монету не берём.", actions)
+            elif weekly and st == "wait" and ret <= P["review_pnl"]:
+                self._sell(now, s, p, px, f"Недельный пересмотр: в таблице «ждём» ({r.get('why_ru') or '—'}), позиция {res} — "
+                           "освобождаем место.", actions)
+        # --- 3. buys: table order, buy/add 10 % (≤ 8), small 2.5 % (≤ 4), cash ≥ 10 %, 14-day cooldown, a reliable live price
+        not_bought: list[dict] = []
+        if fresh:
+            held = {p["symbol"]: p for p in rp.positions()}
+            n_buy = sum(1 for p in held.values() if self._split(p["bucket"])[1] != "small")
+            n_small = len(held) - n_buy
+            V = self.value(price)
+            cool = rp.sold_recently(now, P["cooldown_d"])
+            for r in rows:
+                st, s = r.get("status"), (r.get("symbol") or "").upper()
+                if st not in ("buy", "add", "small") or not s or s in held:
+                    continue
+                small = st == "small"
+                w = P["small_w"] if small else P["buy_w"]
+                st_ru = r.get("status_ru") or st
+                px = k = why_not = None
+                if s in cool:
+                    t = self.conn.execute(f"SELECT MAX(time) FROM {rp.T_ACT} WHERE symbol=? AND action='SELL'", (s,)).fetchone()[0] or now
+                    dd = lambda x: datetime.fromtimestamp(x / 1000, tz=timezone.utc).strftime("%d.%m")   # noqa: E731
+                    why_not = f"продана {dd(t)} — снова не раньше {dd(t + P['cooldown_d'] * DAY)}"
+                elif (n_small >= P["small_n"]) if small else (n_buy >= P["buy_n"]):
+                    n = P["small_n"] if small else P["buy_n"]
+                    why_not = f"все {n} {'места' if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else 'мест'} для «{st_ru}» заняты"
+                elif rp.cash() - w * V < P["min_cash"] * V - 1e-9:
+                    why_not = f"кэш не опускаем ниже {P['min_cash']*100:.0f}%"
+                else:
+                    px, k, why_not = self._entry_price(s, r, src)
+                    if px is None:
+                        actions.append({"time": now, "symbol": s, "action": "SKIP", "weight": 0, "price": r.get("price"),
+                                        "reason": f"Не покупаем {s} («{st_ru}»): {why_not}."})
+                if px is None:
+                    not_bought.append({"symbol": s, "status": st, "why_ru": why_not})
+                    continue
+                kind = r.get("kind") or "high"
+                cost = w * V / (1 + P["fee"])
+                rule = (f"стоп {_pc(P['stop_small'])}, на ×{P['body_x']:.0f} продаём половину, остаток — до отката "
+                        f"{P['trail']*100:.0f}% от пика" if small else "ядро — без стопа" if kind == "core" else f"стоп {_pc(P['stop_buy'])} от входа")
+                actions.append(rp._act(now, s, "BUY", cost, px, f"Из таблицы «{st_ru}»: {r.get('why_ru') or '—'}. {w*100:g}% счёта, {rule}; "
+                                       "продаём и при статусе «не брать».", f"{kind}:{st}"))
+                rp._set_cash(rp.cash() - cost * P["fee"])
+                rp._set_meta(f"src:{s}", _SRC_CODE[k])
+                rp._set_meta(f"px:{s}", px)
+                price[s], psrc[s] = px, k
+                live.add(s)
+                held[s] = {"symbol": s}
+                n_small, n_buy = (n_small + 1, n_buy) if small else (n_small, n_buy + 1)
+        self.conn.commit()
+        return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
+
+    def snapshot(self, price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas) -> dict:
+        rp, P = self.rp, IDEAS
+        V = self.value(price) or 1.0
+        idx = round(100 * V, 2)
+        self.conn.execute(f"INSERT OR REPLACE INTO {rp.T_VAL} VALUES(?,?)", (now, idx))
+        self.conn.commit()
+        hist = [{"time": t, "v": v} for t, v in self.conn.execute(f"SELECT time,index_value FROM {rp.T_VAL} ORDER BY time DESC LIMIT 60").fetchall()][::-1]
+        names = {(r.get("symbol") or "").upper(): r.get("name") for r in (ideas or {}).get("rows") or []}
+        out, sl = [], {"buy": 0.0, "small": 0.0}
+        for p in rp.positions():
+            s = p["symbol"]
+            kind, est = self._split(p["bucket"])
+            px = price.get(s)
+            mv = self._mv(p, px)
+            sl["small" if est == "small" else "buy"] += mv / V
+            r = smap.get(s)
+            ret = px / p["entry"] - 1 if px and p["entry"] else None
+            out.append({**p, "bucket": kind, "kind_ru": KIND_RU.get(kind, kind), "role": est, "role_ru": IDEAS_ROLE_RU.get(est, est),
+                        "name": names.get(s) or s, "weight": round(mv / V, 4), "cost_weight": round(p["weight"], 6),
+                        "target_weight": P["small_w"] if est == "small" else P["buy_w"],
+                        "price": px, "price_live": s in live, "price_src": psrc.get(s),
+                        "pnl_pct": round(ret * 100, 2) if ret is not None else None,
+                        "pnl_usd": round(10_000 * (mv - p["weight"]), 2), "value_usd": round(10_000 * mv, 2),
+                        "table_status": (r or {}).get("status"), "table_status_ru": (r or {}).get("status_ru"),
+                        "table_why_ru": (r or {}).get("why_ru"), "reco": ideas_reco(kind, est, p, px, r, fresh)})
+        cash = rp.cash() / V
+        started, last_weekly = rp._meta("started"), rp._meta("last_weekly")
+        return {"key": P["key"], "name": P["name"], "about": IDEAS_ABOUT, "status": P["status"], "experiment": True,
+                "positions": out, "cash_pct": round(cash * 100), "invested_pct": round((1 - cash) * 100), "index": idx,
+                "equity_usd": round(10_000 * V, 2), "start_usd": 10_000, "history": hist, "actions": actions,
+                "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in
+                                   self.conn.execute(f"SELECT time,symbol,action,weight,price,reason FROM {rp.T_ACT} ORDER BY time DESC LIMIT 20").fetchall()],
+                "sleeves": {"buy": {"label": "можно брать / добрать", "target_pct": round(P["buy_n"] * P["buy_w"] * 100, 1), "now_pct": round(sl["buy"] * 100, 1)},
+                            "small": {"label": "на небольшую сумму", "target_pct": round(P["small_n"] * P["small_w"] * 100, 1), "now_pct": round(sl["small"] * 100, 1)},
+                            "cash": {"label": "кэш", "target_pct": round(P["min_cash"] * 100, 1), "now_pct": round(cash * 100, 1)}},
+                "rules_ru": IDEAS_RULES,
+                "ideas": {"asof": (ideas or {}).get("asof"), "fresh": fresh, "note_ru": note,
+                          "summary_ru": (ideas or {}).get("summary_ru") if fresh else None},
+                "not_bought": not_bought,
+                "started": int(started) if started else None, "last_weekly": int(last_weekly) if last_weekly else None}

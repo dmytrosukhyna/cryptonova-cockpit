@@ -181,3 +181,21 @@ def test_top30_keeps_room_for_avoid():
     av = [r["symbol"] for r in d["rows"] if r["status"] == "avoid"]
     assert len(av) == si.AVOID_SLOTS and "D1" in av                                   # picked coin goes first among «не брать»
     assert d["counts_all"]["avoid"] == 10 and d["evaluated"] == 50
+
+
+def test_follower_portfolio_does_not_feed_back_and_statuses_cover_every_coin():
+    """«По рекомендациям» (portfolio key `ideas`) buys FROM the table: its holdings — even at a stop with reco «sell» — must not turn a
+    coin into «не брать» / «добрать» or count as «held»; a coin only it holds stays evaluated; `statuses` covers every evaluated coin."""
+    cards = base_cards()                                     # ONLYF has no card: only the follower holds it
+    fol = [pos("ALTA", pnl=-30.0, reco={"k": "sell", "t": "У стопа −20%", "why": "x"}), pos("ALTB", reco={"k": "add", "t": "x", "why": "x"}),
+           pos("ONLYF")]
+    base = si.build(inputs(cards=cards, picks=base_picks()), NOW)
+    d = si.build(inputs(cards=cards, picks=base_picks(), portfolios={"ideas": fol}), NOW)
+    R0, R = rows_by_sym(base), rows_by_sym(d)
+    for s in ("ALTA", "ALTB", "BTC"):
+        assert R[s]["status"] == R0[s]["status"] and R[s]["in_portfolios"] == [] and R[s]["why_ru"] == R0[s]["why_ru"]
+    assert R["ALTA"]["status"] == "buy"
+    assert d["evaluated"] == len(d["statuses"]) and set(d["statuses"]) >= {r["symbol"] for r in d["rows"]} | {"ONLYF"}
+    st = d["statuses"]["ALTA"]
+    assert st["status"] == "buy" and st["status_ru"] == "можно брать" and st["kind"] == "mid" and st["price"] == 10.0 and st["why_ru"]
+    assert d["statuses"]["ONLYF"]["status"] == "wait" and "ONLYF" not in base["statuses"]

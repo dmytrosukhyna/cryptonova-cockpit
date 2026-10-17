@@ -17,7 +17,8 @@ Model portfolio (state in data/agents.sqlite, table spot_portfolio)
 Actions: buy / add / trim (+40 % → sell half) / sell (−15 % from entry or score lost) / hold / wait,
 rebalance once a week (Monday) or when a rule fires. Everything is explained in Russian for the panel.
 
-Five demo accounts of $10 000 go to the panel under `portfolios` (order in `portfolio_order`):
+Six demo accounts of $10 000 go to the panel under `portfolios` (order in `portfolio_order`; 6th `ideas` «По рекомендациям» —
+spot_profiles.IdeasPortfolio, buys what web/ideas.json says, see the spot_profiles docstring):
   cons / high — spot_profiles.RiskPortfolio;  mod — SpotPortfolio above (17.10: holds no memes; closed P&L counted in the index);
   cons / mod / high were reset and rebuilt from $10 000 once on 17.10 (reset_spot, archive in spot_archive);
   meme — the meme desk's paper account (memes.py, Hyperliquid meme perps, 1× notional) mapped into the same schema by
@@ -1163,8 +1164,14 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
         profiles["bal"] = BalancedPortfolio(conn).step(rows, cards, btc_bull, memes, now, meme_status=spot_memes)
     except Exception as e:  # noqa: BLE001
         profiles["bal"] = {"key": "bal", "name": BAL["name"], "about": BAL_ABOUT, "error": str(e), **empty}
+    from .spot_profiles import IDEAS, IDEAS_ABOUT, IdeasPortfolio, load_ideas
+    try:      # 6th: «По рекомендациям» — buys what the spot ideas table says (web/ideas.json of the PREVIOUS run: the ideas step runs
+              # after this one); prices: the same live sources as the other profiles, the source a coin was bought with is kept
+        profiles["ideas"] = IdeasPortfolio(conn).step({"cg": price, "meme": meme_px, "hl": hl_px}, load_ideas(), now)
+    except Exception as e:  # noqa: BLE001
+        profiles["ideas"] = {"key": "ideas", "name": IDEAS["name"], "about": IDEAS_ABOUT, "experiment": True, "error": str(e), **empty}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),
-            "picks": pk, "portfolio": state, "portfolios": profiles, "portfolio_order": ["cons", "mod", "high", "meme", "bal"],
+            "picks": pk, "portfolio": state, "portfolios": profiles, "portfolio_order": ["cons", "mod", "high", "meme", "bal", "ideas"],
             "note": llm_note or note, "note_source": "llm" if llm_note else "rules",
             "hl_spot_top": [{"symbol": k, "vol24": v["vol24"], "price": v["price"], "chg24": v["chg24"],
                              "score": next((r["score"] for r in rows if r["symbol"] == k), None)} for k, v in hl_spot_list],

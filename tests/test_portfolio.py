@@ -261,7 +261,7 @@ def test_meme_profile_has_the_spot_schema():
     assert pf.meme_profile(m, now)["index"] == 100.0
 
 
-def test_run_returns_five_portfolios(tmp_path):
+def test_run_returns_six_portfolios(tmp_path):
     import json
     import os
     cwd = os.getcwd()
@@ -274,19 +274,24 @@ def test_run_returns_five_portfolios(tmp_path):
         os.makedirs("web")
         with open("web/memes.json", "w", encoding="utf-8") as f:
             json.dump(_memes_json(T0), f)
+        with open("web/ideas.json", "w", encoding="utf-8") as f:      # the previous run's table → «По рекомендациям» follows it
+            json.dump(_ideas([_irow("BTC", "buy", 80000, "core"), _irow("ETH", "buy", 2400, "core"), _irow("GHOST", "buy", 3.0)], T0 - 1_800_000), f)
         pf.coingecko_markets = lambda pages=2: [dict(r) for r in mk]
         pf.hyperliquid_universe = lambda: {"perps": {r["symbol"]: {"vol24": 1e8} for r in mk}, "spot": {}, "available": True}
         res = pf.run(sqlite3.connect(":memory:"), btc_bull=True, llm=None, now=T0 + 60_000)
     finally:
         os.chdir(cwd)
         pf.coingecko_markets, pf.hyperliquid_universe = old
-    assert res["portfolio_order"] == ["cons", "mod", "high", "meme", "bal"] and set(res["portfolios"]) == set(res["portfolio_order"])
+    assert res["portfolio_order"] == ["cons", "mod", "high", "meme", "bal", "ideas"] and set(res["portfolios"]) == set(res["portfolio_order"])
     for k, P in res["portfolios"].items():
         assert "error" not in P, (k, P.get("error"))
         for f in ("key", "name", "about", "positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions"):
             assert f in P, (k, f)
     assert {p["symbol"] for p in res["portfolios"]["bal"]["positions"]} >= {"BTC", "ETH", "SOL"}
     assert res["portfolios"]["meme"]["index"] == 104.0
+    ip = res["portfolios"]["ideas"]
+    assert {p["symbol"] for p in ip["positions"]} == {"BTC", "ETH"} and ip["experiment"] and ip["name"] == "По рекомендациям"
+    assert [a["symbol"] for a in ip["actions"] if a["action"] == "SKIP"] == ["GHOST"]          # no price source → skipped, said so
 
 
 # ── 17.10: cons rebalances on MARKET weights, high takes memes only by the spot meme status, mod holds no memes, one-time reset ──
@@ -489,3 +494,172 @@ def test_mod_does_not_buy_overheated_coins():
         pf.coingecko_markets, pf.hyperliquid_universe = old
     assert "T05" in {x["symbol"] for x in res["picks"]["mid"]} and "T05" not in {p["symbol"] for p in res["portfolios"]["mod"]["positions"]}
     assert len([p for p in res["portfolios"]["mod"]["positions"] if p["bucket"] == "mid"]) >= 3
+
+
+# ── 6th profile «По рекомендациям»: buys what web/ideas.json says ──────────────────────────────────────────────────────────
+import copy  # noqa: E402
+
+from cnq.agents import spot_profiles as sp  # noqa: E402
+
+_IRU = {"buy": "можно брать", "add": "можно добрать", "small": "можно на небольшую сумму", "wait": "ждём", "avoid": "не брать"}
+
+
+def _irow(sym, status, price, kind="mid", why=None):
+    return {"symbol": sym, "name": sym.title(), "kind": kind, "status": status, "status_ru": _IRU[status],
+            "why_ru": why or f"{sym}: {_IRU[status]}", "price": price}
+
+
+def _ideas(rows, asof, statuses=None):
+    d = {"asof": asof, "available": True, "summary_ru": "тест", "rows": rows}
+    if statuses is not None:
+        d["statuses"] = statuses
+    return d
+
+
+def ideas_world():
+    rows = [_irow("BTC", "buy", 80000, "core"), _irow("ETH", "buy", 2400, "core"), _irow("NAMESAKE", "buy", 1.0), _irow("NOPX", "buy", 3.0)]
+    rows += [_irow(f"A{i}", "buy", 10.0 + i) for i in range(1, 7)]                 # A1…A6
+    rows += [_irow("ADD1", "add", 5.0)]
+    rows += [_irow(f"M{i}", "small", 0.01 * i, "meme") for i in range(1, 6)]         # M1…M5
+    rows += [_irow("W1", "wait", 7.0), _irow("X1", "avoid", 9.0)]
+    cg = {r["symbol"]: r["price"] for r in rows if r["kind"] != "meme" and r["symbol"] not in ("NAMESAKE", "NOPX")}
+    cg["NAMESAKE"] = 50.0                                                          # another token with the same ticker
+    meme = {r["symbol"]: r["price"] for r in rows if r["kind"] == "meme"}
+    return rows, {"cg": cg, "meme": meme, "hl": {}}
+
+
+def _set(rows, sym, **kw):
+    for r in rows:
+        if r["symbol"] == sym:
+            r.update(kw)
+
+
+def test_ideas_first_run_weights_cash_and_unpriceable_skips():
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    st = port.step(src, _ideas(rows, T0 - 1_800_000), T0)
+    by = {p["symbol"]: p for p in st["positions"]}
+    big = {s for s, p in by.items() if p["role"] in ("buy", "add")}
+    assert big == {"BTC", "ETH", "A1", "A2", "A3", "A4", "A5", "A6"}                 # at most 8; ADD1 has no place left
+    assert {s for s, p in by.items() if p["role"] == "small"} == {"M1", "M2", "M3", "M4"}     # at most 4
+    assert all(abs(by[s]["weight"] - 0.10) < 0.001 for s in big) and all(abs(by[f"M{i}"]["weight"] - 0.025) < 0.001 for i in range(1, 5))
+    assert st["cash_pct"] >= 10 and port.rp.cash() >= 0.10 * st["index"] / 100 - 1e-9 and 99.85 < st["index"] < 100   # fees 0.1 %
+    skips = {a["symbol"]: a["reason"] for a in st["actions"] if a["action"] == "SKIP"}
+    assert set(skips) == {"NAMESAKE", "NOPX"} and "другой токен" in skips["NAMESAKE"] and "нет живой цены" in skips["NOPX"]
+    nb = {x["symbol"]: x["why_ru"] for x in st["not_bought"]}
+    assert "8 мест" in nb["ADD1"] and "4 места" in nb["M5"] and "W1" not in nb and "X1" not in nb
+    for k in ("key", "name", "about", "positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions"):
+        assert k in st, k
+    assert st["key"] == "ideas" and st["name"] == "По рекомендациям" and st["experiment"] and "не обещаем" in st["about"]
+    assert by["A1"]["bucket"] == "mid" and by["BTC"]["bucket"] == "core" and by["M1"]["bucket"] == "meme"
+    assert by["A1"]["role_ru"] == "из таблицы: можно брать" and by["M1"]["role_ru"] == "на небольшую сумму"
+    assert by["M1"]["price_src"] == "meme" and by["A1"]["price_src"] == "cg" and by["A1"]["price_live"]
+    for p in st["positions"]:
+        assert p["reco"]["k"] in ("hold", "add", "trim", "sell") and p["reco"]["t"] and p["reco"]["why"]
+        assert p["status"] == "OPEN" and "pnl_usd" in p and abs(p["value_usd"] - 10_000 * p["weight"] * st["index"] / 100) < 1
+    assert abs(st["sleeves"]["buy"]["now_pct"] - 80) < 0.5 and abs(st["sleeves"]["small"]["now_pct"] - 10) < 0.5
+    st2 = port.step(src, _ideas(rows, T0), T0 + 1_800_000)          # nothing changed → no trades (places full → no SKIP either)
+    assert not st2["actions"] and all(a["action"] != "SKIP" for a in st2["recent_actions"]) and len(st2["recent_actions"]) == 12
+    src3 = copy.deepcopy(src)
+    src3["cg"]["A1"] *= 1.1
+    st3 = port.step(src3, _ideas(rows, T0), T0 + 3_600_000)                          # the index moves with the live price
+    assert st3["index"] > st2["index"] and {p["symbol"]: p for p in st3["positions"]}["A1"]["pnl_pct"] == 10.0
+
+
+def test_ideas_avoid_stops_body_trailing_and_cooldown():
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows, T0), T0)
+    rows1, src1 = copy.deepcopy(rows), copy.deepcopy(src)
+    _set(rows1, "A1", status="avoid", status_ru="не брать", why_ru="Оборот $3M в сутки — цену легко сдвинуть")
+    src1["cg"]["A2"] *= 0.79                                                          # −21 % → stop −20 %
+    src1["cg"]["A3"] *= 0.85                                                          # −15 % → no stop yet
+    src1["cg"]["BTC"] *= 0.60                                                         # core: no stop
+    src1["meme"]["M1"] *= 0.64                                                        # −36 % → stop −35 %
+    src1["meme"]["M3"] *= 0.70                                                        # −30 % → kept (small stop is −35 %)
+    src1["meme"]["M2"] *= 2.0                                                         # ×2 → sell half
+    st = port.step(src1, _ideas(rows1, T0 + DAY), T0 + DAY)
+    acts = {(a["symbol"], a["action"]): a for a in st["actions"]}
+    assert ("A1", "SELL") in acts and "Оборот $3M в сутки" in acts[("A1", "SELL")]["reason"]
+    assert ("A2", "SELL") in acts and acts[("A2", "SELL")]["reason"].startswith("Стоп −20%")
+    assert ("M1", "SELL") in acts and acts[("M1", "SELL")]["reason"].startswith("Стоп −35%") and ("M2", "TRIM") in acts
+    assert not {("A3", "SELL"), ("BTC", "SELL"), ("M3", "SELL")} & set(acts)
+    by = {p["symbol"]: p for p in st["positions"]}
+    assert by["M2"]["fixes"] == 1 and by["M2"]["reco"]["t"] == "Едет бесплатно" and abs(by["M2"]["cost_weight"] - 0.025 / 1.001 / 2) < 1e-6
+    assert by["BTC"]["pnl_pct"] == -40.0 and by["BTC"]["reco"]["k"] == "hold"
+    assert by["A3"]["reco"]["k"] == "sell" and by["A3"]["reco"]["t"] == "У стопа −20%"
+    # freed places go to the next rows of the table; sold coins are not bought back (14 days)
+    assert ("ADD1", "BUY") in acts and ("M5", "BUY") in acts and ("A2", "BUY") not in acts and ("M1", "BUY") not in acts
+    assert "снова не раньше" in {x["symbol"]: x["why_ru"] for x in st["not_bought"]}["A2"]
+    # the rest of a ×2 position trails 35 % from its peak
+    src2 = copy.deepcopy(src1)
+    src2["meme"]["M2"] = src["meme"]["M2"] * 2.5
+    st = port.step(src2, _ideas(rows1, T0 + DAY + 3_600_000), T0 + DAY + 3_600_000)
+    assert not [a for a in st["actions"] if a["symbol"] == "M2"]
+    src2["meme"]["M2"] = src["meme"]["M2"] * 2.5 * 0.6
+    st = port.step(src2, _ideas(rows1, T0 + DAY + 7_200_000), T0 + DAY + 7_200_000)
+    m2 = [a for a in st["actions"] if a["symbol"] == "M2"]
+    assert len(m2) == 1 and m2[0]["action"] == "SELL" and m2[0]["reason"].startswith("Трейлинг")
+    # cooldown: A2 (sold on T0+1d, still «можно брать») is not bought on day 13, bought again after 14 days
+    _set(rows1, "A2", price=src1["cg"]["A2"])
+    st = port.step(src1, _ideas(rows1, T0 + 14 * DAY), T0 + 14 * DAY)
+    assert ("A2", "BUY") not in {(a["symbol"], a["action"]) for a in st["actions"]}
+    st = port.step(src1, _ideas(rows1, T0 + 15 * DAY + 3_600_000), T0 + 15 * DAY + 3_600_000)
+    assert ("A2", "BUY") in {(a["symbol"], a["action"]) for a in st["actions"]}
+
+
+def test_ideas_weekly_review_on_monday_once():
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows, T0), T0)                                              # Wednesday 14.10
+    rows1, src1 = copy.deepcopy(rows), copy.deepcopy(src)
+    for s in ("A3", "A4"):
+        _set(rows1, s, status="wait", status_ru="ждём", why_ru="Консультант 55/100 ниже порога 60 — ждём")
+    src1["cg"]["A3"] *= 0.88                                                          # «ждём» and −12 % → sold on Monday
+    src1["cg"]["A4"] *= 0.95                                                          # «ждём» and −5 % → kept
+    src1["cg"]["A5"] *= 0.88                                                          # −12 % but still «можно брать» → kept
+    sun = T0 + 4 * DAY
+    st = port.step(src1, _ideas(rows1, sun), sun)
+    assert not [a for a in st["actions"] if a["action"] == "SELL"]
+    assert {p["symbol"]: p for p in st["positions"]}["A3"]["reco"]["t"] == "Продать в понедельник"
+    mon = T0 + 5 * DAY + 3_600_000                                                    # Monday 19.10
+    st = port.step(src1, _ideas(rows1, mon), mon)
+    sells = {a["symbol"]: a["reason"] for a in st["actions"] if a["action"] == "SELL"}
+    assert set(sells) == {"A3"} and sells["A3"].startswith("Недельный пересмотр") and "−12%" in sells["A3"]
+    src1["cg"]["A4"] = src["cg"]["A4"] * 0.85                                         # later the same Monday: −15 %, review already done
+    st = port.step(src1, _ideas(rows1, mon + 3_600_000), mon + 3_600_000)
+    assert not [a for a in st["actions"] if a["action"] == "SELL"] and st["last_weekly"] == mon
+    nxt = T0 + 12 * DAY + 3_600_000                                                   # next Monday → A4 goes
+    st = port.step(src1, _ideas(rows1, nxt), nxt)
+    assert {a["symbol"] for a in st["actions"] if a["action"] == "SELL"} == {"A4"}
+
+
+def test_ideas_stale_or_missing_table_no_buys_but_holdings_priced():
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    st = port.step(src, _ideas(rows, T0 - 4 * 3_600_000), T0)                          # 4 h old
+    assert not st["positions"] and not st["actions"] and st["index"] == 100.0 and st["cash_pct"] == 100
+    assert not st["ideas"]["fresh"] and "не обновлялась" in st["ideas"]["note_ru"]
+    st = port.step(src, None, T0 + 60_000)                                             # no file at all
+    assert not st["positions"] and "нет" in st["ideas"]["note_ru"]
+    port.step(src, _ideas(rows, T0), T0 + 120_000)
+    n = len(port.rp.positions())
+    rows1, src1 = copy.deepcopy(rows), copy.deepcopy(src)
+    _set(rows1, "A1", status="avoid", status_ru="не брать", why_ru="красный флаг")
+    for s in src1["cg"]:
+        src1["cg"][s] *= 1.05
+    src1["meme"]["M1"] *= 0.6                                                          # price rules still work on a stale table
+    t = T0 + 5 * 3_600_000
+    st = port.step(src1, _ideas(rows1, T0 + 1_000), t)                                 # the table is ~5 h old
+    assert [(a["symbol"], a["action"]) for a in st["actions"]] == [("M1", "SELL")]     # «не брать» ignored, nothing bought
+    assert len(st["positions"]) == n - 1 and st["index"] > 100 and all(p["price_live"] for p in st["positions"])
+    assert all("таблица устарела" in p["reco"]["why"] for p in st["positions"] if p["reco"]["k"] == "hold")
+    # statuses beyond the 30 shown rows: A6 left the rows but `statuses` says «не брать» → sold
+    rows2 = [r for r in rows1 if r["symbol"] != "A6"]
+    st = port.step(src1, _ideas(rows2, t, statuses={"A6": {"status": "avoid", "status_ru": "не брать", "why_ru": "мёртвая монета",
+                                                           "kind": "mid", "price": 16.0}}), t + 60_000)
+    assert {(a["symbol"], a["action"]) for a in st["actions"]} >= {("A6", "SELL"), ("A1", "SELL")}

@@ -879,17 +879,20 @@ def study(data, log=print) -> tuple[str, dict]:
     md.append("\n## Критерии «устойчиво» (заданы до прогона)\n")
     md.append("Средняя после издержек > 0 и выше случайной на ≥ 0.5 п.п. при p ≤ 0.05; обе половины периода в плюсе; ≥ 60% месяцев в плюсе (счёт; месяцы без позиций не считаются); "
               "≥ 30 сделок; повтор на 1ч в плюсе. Для ротации: обгоняет «все поровну» и ≥ 95% случайных прогонов, обе половины в плюсе, ≥ 6 из 9 ячеек в плюсе.\n")
-    verdict = {}
+    verdict, notes = {}, []
     h1r = S["rules"].get("h1", {})
     for grp, rep1 in (("A", "A K=3, 3д (1ч)"), ("C", "C −25%, 3д (1ч)")):
         for name, o in S["rules"].get(grp, {}).items():
             if not o.get("n"):
                 verdict[name] = False; continue
             p = o.get("port") or {}
-            ok = (o["avg"] > 0 and o.get("rand_avg") is not None and o["avg"] - o["rand_avg"] >= 0.005 and (o.get("p") or 1) <= 0.05
+            ok = (o["avg"] > 0 and o.get("rand_avg") is not None and o["avg"] - o["rand_avg"] >= 0.005 and (o["p"] if o.get("p") is not None else 1) <= 0.05
                   and (o.get("half1") or -1) > 0 and (o.get("half2") or -1) > 0 and (p.get("months_pos") or 0) >= 0.6 and o["n"] >= 30
                   and (h1r.get(rep1, {}).get("avg") or -1) > 0)
             verdict[name] = bool(ok)
+            cw = S["rules"].get("C_why") or {}
+            if ok and grp == "C" and cw.get("without_top3") and (cw["without_top3"][1] or 0) <= 0:
+                notes.append(f"- {name}: формально прошло, но без трёх лучших месяцев средняя эталона {pct(cw['without_top3'][1])} — хрупко")
     if S["rules"].get("B"):
         b = S["rules"]["B"]; ref = b.get("топ-3 по 5д", {}); base_f = b["все мемы поровну"]["final"]
         verdict["B топ-3 по 5д"] = bool(ref and ref["final"] > base_f and S["rules"]["B_random3"]["p_ref"] <= 0.05
@@ -899,6 +902,7 @@ def study(data, log=print) -> tuple[str, dict]:
     S["verdict"] = verdict
     for k, v in verdict.items():
         md.append(f"- {k}: **{'устойчиво' if v else 'не прошло'}**")
+    md += notes
     return "\n".join(md), S
 
 

@@ -81,6 +81,10 @@ def best_spreads(books: dict[str, dict]) -> list[dict]:
 def _ensure(conn):
     conn.executescript("""CREATE TABLE IF NOT EXISTS arb_samples(time INTEGER PRIMARY KEY, venues TEXT, best_net REAL, n_pos INTEGER);
     CREATE TABLE IF NOT EXISTS arb_windows(time INTEGER, coin TEXT, buy TEXT, sell TEXT, net REAL, PRIMARY KEY(time, coin));""")
+    try:
+        conn.execute("ALTER TABLE arb_windows ADD COLUMN fresh INTEGER DEFAULT 1")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def run(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_books, samples: int = SAMPLES, pause: float = 4.0) -> dict:
@@ -96,8 +100,11 @@ def run(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_books, sam
             last_rows = rows
             pos = [r for r in rows if r["net"] >= MIN_NET]
             conn.execute("INSERT OR REPLACE INTO arb_samples VALUES(?,?,?,?)", (t, ",".join(sorted(books)), rows[0]["net"], len(pos)))
-            for r in pos:
-                conn.execute("INSERT OR REPLACE INTO arb_windows VALUES(?,?,?,?,?)", (t, r["coin"], r["buy"], r["sell"], r["net"]))
+            for r in pos:   # the same coin/route seen in the last 24 h = a stuck spread (closed transfers, stale book) → counted once
+                seen = conn.execute("SELECT 1 FROM arb_windows WHERE coin=? AND buy=? AND sell=? AND time BETWEEN ? AND ? LIMIT 1",
+                                    (r["coin"], r["buy"], r["sell"], t - 86400_000, t - 1)).fetchone()
+                conn.execute("INSERT OR REPLACE INTO arb_windows(time, coin, buy, sell, net, fresh) VALUES(?,?,?,?,?,?)",
+                             (t, r["coin"], r["buy"], r["sell"], r["net"], 0 if seen else 1))
         if i < samples - 1 and pause:
             time.sleep(pause)
     t_now = now or int(time.time() * 1000)
@@ -107,14 +114,19 @@ def run(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_books, sam
 
     def stats(since):
         n, npos = conn.execute("SELECT COUNT(*), SUM(n_pos > 0) FROM arb_samples WHERE time >= ?", (since,)).fetchone()
-        w = conn.execute("SELECT COUNT(*), COALESCE(SUM(net),0), COALESCE(MAX(net),0) FROM arb_windows WHERE time >= ?", (since,)).fetchone()
+        w = conn.execute("SELECT COUNT(*), COALESCE(SUM(net),0), COALESCE(MAX(net),0) FROM arb_windows WHERE fresh=1 AND time >= ?", (since,)).fetchone()
+        stuck = conn.execute("SELECT COUNT(DISTINCT coin||buy||sell) FROM arb_windows WHERE fresh=0 AND time >= ?", (since,)).fetchone()[0]
         return {"samples": n or 0, "samples_with_window": npos or 0, "share": round((npos or 0) / n, 3) if n else None,
-                "windows": w[0], "virtual_pnl_usd": round(w[1] * TICKET, 2), "best_net": round(w[2], 5)}
+                "windows": w[0], "virtual_pnl_usd": round(w[1] * TICKET, 2), "best_net": round(w[2], 5), "stuck_routes": stuck}
     top = [{"time": a, "coin": b, "buy": c, "sell": d, "net": e} for a, b, c, d, e in
-           conn.execute("SELECT time, coin, buy, sell, net FROM arb_windows ORDER BY time DESC LIMIT 15").fetchall()]
+           conn.execute("SELECT time, coin, buy, sell, net FROM arb_windows WHERE fresh=1 ORDER BY time DESC LIMIT 15").fetchall()]
+    stuck = [{"coin": b, "buy": c, "sell": d, "net": e, "since": a} for b, c, d, e, a in conn.execute(
+        "SELECT coin, buy, sell, MAX(net), MIN(time) FROM arb_windows WHERE time >= ? GROUP BY coin, buy, sell HAVING COUNT(*) >= 3 ORDER BY MAX(net) DESC LIMIT 10",
+        (t_now - 86400_000,)).fetchall()]
     first = conn.execute("SELECT MIN(time) FROM arb_samples").fetchone()[0]
     return {"asof": t_now, "venues_ok": sorted(venues_ok), "venues_all": list(VENUES), "now": last_rows[:12],
-            "day": stats(t_now - 86400_000), "week": stats(t_now - 7 * 86400_000), "since": first, "recent_windows": top,
+            "day": stats(t_now - 86400_000), "week": stats(t_now - 7 * 86400_000), "since": first, "recent_windows": top, "stuck": stuck,
             "rules": f"окно = ≥{MIN_NET * 100:.2f}% после комиссий обеих бирж; виртуально ${TICKET:,.0f} на окно; разница >5% не считается (другой токен/закрыт вывод)",
             "note": "Сервер смотрит цены 3 раза за запуск (раз в 30 минут) — это выборка, а не непрерывное наблюдение. "
+                    "Окно, которое держится часами, почти всегда «застывшее»: на бирже закрыт ввод/вывод монеты или стакан пустой — такое считаем один раз в сутки. "
                     "Оценка оптимистичная: деньги заранее на обеих биржах, исполнение по лучшей цене без задержки, перевод не нужен."}

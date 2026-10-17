@@ -1553,14 +1553,14 @@ function efLoop(t){ drawSphere(t); drawTri(t); drawFund(t); EFIG.raf=requestAnim
 function efStart(){ if(!EFIG.raf) EFIG.raf=requestAnimationFrame(efLoop); }
 function efStop(){ if(EFIG.raf){ cancelAnimationFrame(EFIG.raf); EFIG.raf=0; } }
 // virtual account: «executes» every window that is positive after fees, $1 000 per window, once per pair per minute
-const VARB_KEY='cnq_varb_v1';
+const VARB_KEY='cnq_varb_v2';
 function varbLoad(){ try{ return JSON.parse(localStorage.getItem(VARB_KEY))||{eq:10000,n:0,log:[],seen:{}}; }catch(e){ return {eq:10000,n:0,log:[],seen:{}}; } }
 function varbSave(v){ try{ localStorage.setItem(VARB_KEY,JSON.stringify(v)); }catch(e){} }
 function varbTick(sp,tri){ const v=varbLoad(), now=Date.now();
-  const take=(key,txt,r)=>{ if(r<=0.0005||r>0.05) return; if(v.seen[key]&&now-v.seen[key]<60000) return; v.seen[key]=now; const pnl=1000*r; v.eq+=pnl; v.n++; v.log.unshift({t:now,txt,pnl}); v.log=v.log.slice(0,30); };
+  const take=(key,txt,r)=>{ if(r<=0.0005||r>0.05) return; if(v.seen[key]&&now-v.seen[key]<86400e3){ v.seen[key]=v.seen[key]; return; } v.seen[key]=now; const pnl=1000*r; v.eq+=pnl; v.n++; v.log.unshift({t:now,txt,pnl}); v.log=v.log.slice(0,30); };
   sp.forEach(s=>take(`x:${s.c}:${s.A.v.k}:${s.B.v.k}`,`${s.c}: купили на ${s.A.v.n}, продали на ${s.B.v.n}`,s.net));
   tri.forEach(s=>take(`t:${s.path}`,`Треугольник ${s.path}`,s.r));
-  for(const k in v.seen) if(now-v.seen[k]>3600e3) delete v.seen[k];
+  for(const k in v.seen) if(now-v.seen[k]>2*86400e3) delete v.seen[k];
   varbSave(v); return v; }
 function earnSkeleton(el){ el.innerHTML=`
   <div class="card"><h2>${ico('scale')} Арбитраж между биржами <span class="r muted" id="eArbMeta"></span></h2><canvas id="efSphere" class="efig"></canvas>
@@ -1578,13 +1578,13 @@ function earnRender(){ const el=$('#earn'); if(!el) return; if(!$('#efSphere')) 
   $('#eArbMeta').textContent=`обновление каждые 10 с · проверок ${EARN.scans} · с плюсом после комиссий ${EARN.hits}`;
   $('#eArb').innerHTML=`<div class="evst">${st}</div><div class="erow head"><b>Монета</b><span>где купить → где продать</span><span>разница</span><span>чистыми</span></div>${sp.slice(0,12).map(row).join('')||'<div class="muted">загрузка цен…</div>'}
     ${EARN.best?`<div class="muted enote">Лучшее за сессию: ${EARN.best.c} ${EARN.best.A.v.n} → ${EARN.best.B.v.n} ${pctS(EARN.best.net)} чистыми (${fmtT(EARN.best.t)}).</div>`:''}`;
-  { const A=EARN.srv; const st=x=>x&&x.samples?`${x.samples} проверок · окно с плюсом было в ${Math.round((x.share||0)*100)}% · окон ${x.windows} · виртуально <b class="${x.virtual_pnl_usd>0?'pos':''}">+$${x.virtual_pnl_usd.toFixed(2)}</b>`:'данные копятся';
-    $('#eSrv').innerHTML=A?`<div class="esrv"><div><small>Сервер 24/7 · за сутки</small><span>${st(A.day)}</span></div><div><small>за неделю</small><span>${st(A.week)}</span></div><div><small>биржи, доступные серверу</small><span>${(A.venues_ok||[]).join(', ')||'—'}</span></div></div>`:''; }
+  { const A=EARN.srv; const st=x=>x&&x.samples?`${x.samples} проверок · новых окон ${x.windows} · виртуально <b class="${x.virtual_pnl_usd>0?'pos':''}">+$${x.virtual_pnl_usd.toFixed(2)}</b>${x.stuck_routes?` · застывших маршрутов ${x.stuck_routes}`:''}`:'данные копятся';
+    $('#eSrv').innerHTML=A?`<div class="esrv"><div><small>Сервер 24/7 · за сутки</small><span>${st(A.day)}</span></div><div><small>за неделю</small><span>${st(A.week)}</span></div><div><small>биржи, доступные серверу</small><span>${(A.venues_ok||[]).join(', ')||'—'}</span></div></div>${(A.stuck||[]).length?`<div class="muted enote">⚠ Застывшие окна (держатся часами — почти всегда закрыт ввод/вывод монеты или пустой стакан, забрать нельзя): ${A.stuck.slice(0,5).map(x=>`${x.coin} ${x.buy}→${x.sell} ${pctS(x.net)}`).join(' · ')}</div>`:''}`:''; }
   $('#eTri').innerHTML=tri.map(t=>`<div class="erow tri ${t.r>0?'pos':''}"><span>${t.path}</span><span class="num ${t.r>0?'pos':'neg'}">${pctS(t.r,3)}</span></div>`).join('')||`<div class="muted">${EARN.status.binance==='off'?'Binance не отвечает из этого браузера.':'загрузка…'}</div>`;
   const V=varbTick(sp,tri), pnl=V.eq-10000;
   $('#eVarb').innerHTML=`<div class="fk" style="grid-template-columns:repeat(3,1fr)"><div><small>Баланс</small><b>$${V.eq.toLocaleString('ru-RU',{maximumFractionDigits:2})}</b></div><div><small>Результат</small><b class="${pnl>=0?'pos':'neg'}">${pnl>=0?'+':'−'}$${Math.abs(pnl).toFixed(2)}</b></div><div><small>Исполнено окон</small><b>${V.n}</b></div></div>
     <h3>Последние сделки</h3>${V.log.slice(0,6).map(l=>`<div class="erow tri pos"><span>${fmtT(l.t)} · ${l.txt}</span><span class="num pos">+$${l.pnl.toFixed(2)}</span></div>`).join('')||'<div class="muted">Пока ни одного окна больше 0.05% после комиссий — ждём.</div>'}
-    <div class="muted enote">Правило: если окно даёт больше 0.05% чистыми, счёт «исполняет» его на $1 000 (одна пара — не чаще раза в минуту). Это оптимистичная оценка: считаем, что деньги уже лежат на обеих биржах и сделка прошла по лучшей цене без задержки. Реальный результат будет ниже.</div>`;
+    <div class="muted enote">Правило: если окно даёт больше 0.05% чистыми, счёт «исполняет» его на $1 000. Один и тот же маршрут — не чаще раза в сутки: окно, которое висит часами, почти всегда застывшее (закрыт перевод монеты). Это оптимистичная оценка: считаем, что деньги уже лежат на обеих биржах и сделка прошла по лучшей цене без задержки. Реальный результат будет ниже.</div>`;
   const F=EARN.fund; let fund='<div class="muted">Счёт запускается на сервере — данные появятся после ближайшего запуска (до 30 минут).</div>';
   if(F&&F.equity!=null){ const pos=(F.positions||[]).map(p=>`<div class="erow"><b>${p.symbol}</b><span>спот куплен + фьючерс продан на $${Math.round(p.notional).toLocaleString('ru-RU')}</span><span class="num">${(p.rate_now*100).toFixed(4)}% / 8 ч</span><span class="num pos">+$${(p.earned_usd||0).toFixed(2)}</span></div>`).join('')||'<div class="muted">Сейчас нет монет с фандингом выше порога 0.01% за 8 ч — ждём.</div>';
     const tb=(F.table||[]).filter(r=>r.spread).slice(0,8).map(r=>`<div class="erow"><b>${r.symbol}</b><span>шорт на <b>${r.spread.short_on}</b>, лонг на <b>${r.spread.long_on}</b></span><span class="num">${(r.spread.per8h*100).toFixed(4)}% / 8 ч</span><span class="num">${r.spread.apr_pct.toFixed(1)}% год.</span></div>`).join('');

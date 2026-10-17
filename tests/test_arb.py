@@ -17,6 +17,15 @@ def test_run_counts_windows_and_virtual_pnl():
     conn = sqlite3.connect(":memory:")
     books = {"Binance": {"BTC": (100.0, 100.0)}, "MEXC": {"BTC": (100.5, 100.5)}}   # +0.5 % gross, −0.15 % fees → +0.35 %
     d = aw.run(conn, now=1_700_000_000_000, fetch=lambda: books, samples=2, pause=0)
-    assert d["day"]["samples"] == 2 and d["day"]["samples_with_window"] == 2 and d["day"]["windows"] == 2
-    assert abs(d["day"]["virtual_pnl_usd"] - 2 * 1000 * (0.005 - 0.0015)) < 0.05
+    assert d["day"]["samples"] == 2 and d["day"]["samples_with_window"] == 2 and d["day"]["windows"] == 1   # same route twice = once
+    assert abs(d["day"]["virtual_pnl_usd"] - 1000 * (0.005 - 0.0015)) < 0.05
     assert set(d["venues_ok"]) == {"Binance", "MEXC"}
+
+
+def test_repeating_route_counted_once_per_day():
+    conn = sqlite3.connect(":memory:")
+    books = {"Binance": {"BTC": (100.0, 100.0)}, "MEXC": {"BTC": (100.5, 100.5)}}
+    aw.run(conn, now=1_700_000_000_000, fetch=lambda: books, samples=1, pause=0)
+    d = aw.run(conn, now=1_700_000_000_000 + 1_800_000, fetch=lambda: books, samples=2, pause=0)
+    assert d["day"]["windows"] == 1 and d["day"]["stuck_routes"] == 1
+    assert d["stuck"] and d["stuck"][0]["coin"] == "BTC"

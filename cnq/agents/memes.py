@@ -48,8 +48,12 @@ NAME = "Мем-портфель"
 START_EQUITY = 10_000.0
 SIZE, MAX_POS = 0.10, 6
 COST = 0.0015                                # round trip; half charged on entry, half on every exit part
-STOP, TP, TP_FRAC = -0.25, 0.50, 0.5
-HOLD_H = 72                                  # time exit
+# Exit (owner 17.10.2026: «сначала забрать тело, остаток — с трейлингом, потолок прибыли не ставим»), research: docs/research/memes.md.
+# stop — before the body is taken; body_at/body_frac — sell this share at +body_at; trail — the rest is sold when the price falls this
+# far below its running peak (basis "close" = 4h closes, filled at the price of the next run; "high" = 1h highs, filled at the level);
+# pre_h — hours to wait for the body (None = until max_h); max_h — hard time limit for whatever is left.
+EXIT = {"stop": -0.25, "body_at": 1.00, "body_frac": 0.5, "trail": 0.35, "basis": "close", "pre_h": None, "max_h": 60 * 24}
+STOP, TP, TP_FRAC, HOLD_H = EXIT["stop"], EXIT["body_at"], EXIT["body_frac"], EXIT["max_h"]      # kept for older readers
 MIN_VOL24 = 1_000_000                        # HL meme must trade ≥ $1M a day to be traded/ranked
 BREAK_K = 3.0                                # breakout bar volume ≥ 3 × median 4h volume of the previous 7 days (shown, not traded)
 DIP = -0.25                                  # dip rule: 4h close ≥ 25% below the 24 h high
@@ -83,6 +87,9 @@ WARNINGS = [
     "Solana-токены — только список наблюдения с сигналами. Мы их не покупаем даже на бумаге: цены с DEX-агрегаторов раз в 30 минут "
     "не дают честно посчитать вход и выход. Проверки безопасности (авторитеты, RugCheck) снижают риск, но не убирают его.",
 ]
+
+EXIT_TEXT = "pending"
+EXIT_RESEARCH = {}
 
 RESEARCH_SUMMARY = {
     "status": "готово 17.10.2026", "doc": "docs/research/memes.md", "verdict": "надёжного правила нет; лучшее — эксперимент «откуп обвала»",
@@ -358,6 +365,7 @@ def sol_fetch(get=None, post=None, top_rug: int = 10) -> dict:
             r["ds_price"] = _f(pr.get("priceUsd"))
             r["ds_liquidity"] = _f((pr.get("liquidity") or {}).get("usd"))
             r["boosted"] = bool((pr.get("boosts") or {}).get("active"))
+            r["ds_mcap"], r["ds_fdv"] = _f(pr.get("marketCap")), _f(pr.get("fdv"))
             info = pr.get("info") or {}
             r["socials"] = bool(info.get("websites") or info.get("socials"))
             if pr.get("pairCreatedAt") and r.get("age_h") is None:
@@ -390,7 +398,7 @@ def sol_fetch(get=None, post=None, top_rug: int = 10) -> dict:
         for r, j in zip(pre, res):
             if isinstance(j, dict) and ("risks" in j or "score" in j):
                 ok_rug = True
-                r["rug"] = {"score": j.get("score_normalised", j.get("score")),
+                r["rug"] = {"score": j.get("score_normalised", j.get("score")), "lp_locked_pct": _f(j.get("lpLockedPct")),
                             "risks": [{"name": x.get("name"), "level": x.get("level")} for x in j.get("risks") or [] if isinstance(x, dict)][:8]}
     src["rugcheck"] = ok_rug
     return {"rows": rows, "sources": src}
@@ -445,6 +453,15 @@ def sol_flags(r: dict) -> list[dict]:
             pass
         if bps:
             add("red" if bps >= 500 else "yellow", f"комиссия при переводе {bps / 100:.1f}%")
+    mc, fv = r.get("ds_mcap") or r.get("mcap"), r.get("ds_fdv") or r.get("fdv")
+    if mc and fv and mc / fv < 0.7:
+        add("yellow", f"в обращении {mc / fv * 100:.0f}% токенов — остальное может выйти на рынок")
+    h = r.get("holders")
+    if h and h.get("top10_pct") is not None:
+        if h["top10_pct"] > 60:
+            add("red", f"топ-10 кошельков (без пулов) держат {h['top10_pct']:.0f}%")
+        elif h["top10_pct"] > 40:
+            add("yellow", f"топ-10 кошельков (без пулов) держат {h['top10_pct']:.0f}%")
     if r.get("ds_price") and r.get("price"):
         d = abs(r["ds_price"] / r["price"] - 1)
         if d > 0.05:
@@ -487,7 +504,8 @@ def score_sol(r: dict) -> None:
 def _ensure(conn: sqlite3.Connection) -> None:
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS meme_pos(coin TEXT PRIMARY KEY, entry_px REAL, qty REAL, qty0 REAL, cost_in REAL, cash_out REAL,
-                                            entry_time INTEGER, tp_done INTEGER, funding REAL, last_bar INTEGER, why TEXT, tags TEXT);
+                                            entry_time INTEGER, tp_done INTEGER, funding REAL, last_bar INTEGER, why TEXT, tags TEXT,
+                                            peak REAL, last4h INTEGER);
         CREATE TABLE IF NOT EXISTS meme_closed(coin TEXT, entry_time INTEGER, exit_time INTEGER, entry_px REAL, exit_px REAL,
                                                pnl_usd REAL, pnl_pct REAL, why TEXT, tags TEXT);
         CREATE TABLE IF NOT EXISTS meme_events(time INTEGER, text TEXT);
@@ -495,6 +513,18 @@ def _ensure(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS meme_meta(k TEXT PRIMARY KEY, v TEXT);
         CREATE TABLE IF NOT EXISTS meme_sol_watch(mint TEXT PRIMARY KEY, symbol TEXT, first_seen INTEGER, first_px REAL,
                                                   first_score INTEGER, last_seen INTEGER, last_px REAL, max_px REAL, min_px REAL, link TEXT);""")
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(meme_pos)")}
+    for c, typ in (("tags", "TEXT"), ("peak", "REAL"), ("last4h", "INTEGER")):          # tables created by older versions
+        if c not in cols:
+            conn.execute(f"ALTER TABLE meme_pos ADD COLUMN {c} {typ}")
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(meme_closed)")}
+    if "tags" not in cols:
+        conn.execute("ALTER TABLE meme_closed ADD COLUMN tags TEXT")
+    from . import meme_spot
+    meme_spot.ensure(conn)
+
+
+POS_COLS = "coin, entry_px, qty, qty0, cost_in, cash_out, entry_time, tp_done, funding, last_bar, why, tags, peak, last4h"
 
 
 def _meta(conn, k, default=None):
@@ -557,56 +587,104 @@ def entry_context(rows: list[dict], market: dict) -> list[str]:
 
 
 def manage(conn, ctx: dict, candles: dict, now: int, ev: list) -> float:
-    """Funding, stops, take-profits and time exits for open positions. Returns cash."""
+    """Funding, stop (before the body), body sale, trailing stop on the rest, time limits. Returns cash."""
     cash = float(_meta(conn, "cash", START_EQUITY))
     last_run = int(_meta(conn, "last_run", now))
-    half = COST / 2
-    for coin, epx, qty, qty0, cost_in, cash_out, et, tp_done, fund, last_bar, why, tags in conn.execute("SELECT * FROM meme_pos").fetchall():
+    half, X = COST / 2, EXIT
+    for coin, epx, qty, qty0, cost_in, cash_out, et, body, fund, last_bar, why, tags, peak, last4h in conn.execute(f"SELECT {POS_COLS} FROM meme_pos").fetchall():
         c = ctx.get(coin)
         px = c["px"] if c else None
-        if px is None:                          # coin vanished from HL (delisted / API gap): keep, say so once per day
+        if px is None:                          # coin vanished from HL (delisted / API gap): keep it as it is
             continue
+        peak, last4h = peak or epx, last4h or 0
         # funding: live hourly rate × hours since the previous run × position value (longs pay when positive)
         hrs = max(0.0, (now - max(last_run, et)) / H)
         fee = qty * px * c["funding_h"] * hrs
         cash -= fee; fund += fee; cost_in += fee
-        # walk the closed 1h bars since the last check, then the current price
-        path = [(b[0], b[1], b[2], b[3], b[4]) for b in candles.get(coin, []) if b[0] > last_bar and b[0] >= et and b[0] + H <= now]
+        c1 = candles.get(coin, [])
+        path = [(b[0], b[1], b[2], b[3], b[4]) for b in c1 if b[0] > last_bar and b[0] >= et and b[0] + H <= now]
         path.append((now, px, px, px, px))
-        closed = None
+        closed, body_t = None, (0 if body else None)
         for t, o, h, lo, cl in path:
-            stop_px = epx * (1 + STOP)
-            if lo <= stop_px:
-                fill = min(o, stop_px)
-                v = qty * fill * (1 - half); cash += v; cash_out += v
-                closed = (fill, "стоп −25%", t); break
-            if not tp_done and h >= epx * (1 + TP):
-                fill = max(o, epx * (1 + TP)); q = qty0 * TP_FRAC
-                v = q * fill * (1 - half); cash += v; cash_out += v; qty -= q; tp_done = 1
-                ev.append((now, f"Зафиксировали половину {coin} по {_px(fill)} (+{(fill / epx - 1) * 100:.0f}%): {_usd(v - cost_in * TP_FRAC)}"))
+            if not body:
+                sp = epx * (1 + X["stop"])
+                if lo <= sp:
+                    fill = min(o, sp); v = qty * fill * (1 - half); cash += v; cash_out += v
+                    closed = (fill, f"стоп {X['stop'] * 100:.0f}%", t); break
+                if h >= epx * (1 + X["body_at"]):
+                    fill = max(o, epx * (1 + X["body_at"])); q = min(qty, qty0 * X["body_frac"])
+                    v = q * fill * (1 - half); cash += v; cash_out += v; qty -= q; body, body_t = 1, t
+                    ev.append((now, f"Вернули вложенное по {coin}: продали {X['body_frac'] * 100:.0f}% по {_px(fill)} (+{(fill / epx - 1) * 100:.0f}%), "
+                                    f"получили ${v:,.0f}. Остаток держим, пока цена не упадёт на {X['trail'] * 100:.0f}% от пика"))
+                if X["basis"] == "high":
+                    peak = max(peak, h)
+            elif X["basis"] == "high":
+                tl = peak * (1 - X["trail"])
+                if lo <= tl:
+                    fill = min(o, tl); v = qty * fill * (1 - half); cash += v; cash_out += v
+                    closed = (fill, f"трейлинг {X['trail'] * 100:.0f}% от пика {_px(peak)}", t); break
+                peak = max(peak, h)
             if t < now:
                 last_bar = t
-        if closed is None and now - et >= HOLD_H * H:
+        if closed is None and X["basis"] == "close":
+            for b in to_4h(c1, now):
+                if b[0] + 4 * H <= et or b[0] <= last4h:
+                    continue
+                peak = max(peak, b[4]); last4h = b[0]
+                if body and body_t is not None and b[0] > body_t - body_t % (4 * H) and b[4] <= peak * (1 - X["trail"]):   # from the 4h bar after the body
+                    v = qty * px * (1 - half); cash += v; cash_out += v
+                    closed = (px, f"трейлинг {X['trail'] * 100:.0f}% от пика {_px(peak)} (закрытие 4ч)", now); break
+        if closed is None and X["pre_h"] is not None and not body and now - et >= X["pre_h"] * H:
             v = qty * px * (1 - half); cash += v; cash_out += v
-            closed = (px, f"время вышло ({HOLD_H} ч)", now)
+            closed = (px, f"тело не взяли за {X['pre_h']} ч", now)
+        if closed is None and X["max_h"] is not None and now - et >= X["max_h"] * H:
+            v = qty * px * (1 - half); cash += v; cash_out += v
+            closed = (px, f"время вышло ({X['max_h'] // 24} дн.)", now)
         if closed:
             fill, reason, t = closed
             pnl = cash_out - cost_in
             pct = pnl / cost_in * 100 if cost_in else 0
             conn.execute("INSERT INTO meme_closed VALUES(?,?,?,?,?,?,?,?,?)", (coin, et, now, epx, fill, round(pnl, 2), round(pct, 2), reason, tags))
             conn.execute("DELETE FROM meme_pos WHERE coin=?", (coin,))
-            # do not re-enter on the same 4h bar
-            _set(conn, f"last_bar:{coin}", now - now % (4 * H))
-            verb = "Стоп" if reason.startswith("стоп") else "Вышли"
-            ev.append((now, f"{verb}: продали {coin} по {_px(fill)} — {reason}. Итог сделки {_usd(pnl)} ({pct:+.1f}%)"))
+            _set(conn, f"last_bar:{coin}", now - now % (4 * H))      # do not re-enter on the same 4h bar
+            verb = "Стоп" if reason.startswith("стоп") else ("Трейлинг" if reason.startswith("трейлинг") else "Вышли")
+            ev.append((now, f"{verb}: продали {'остаток ' if body else ''}{coin} по {_px(fill)} — {reason}. Итог сделки {_usd(pnl)} ({pct:+.1f}%)"))
         else:
-            conn.execute("UPDATE meme_pos SET qty=?, cost_in=?, cash_out=?, tp_done=?, funding=?, last_bar=? WHERE coin=?",
-                         (qty, cost_in, cash_out, tp_done, fund, last_bar, coin))
+            conn.execute("UPDATE meme_pos SET qty=?, cost_in=?, cash_out=?, tp_done=?, funding=?, last_bar=?, peak=?, last4h=? WHERE coin=?",
+                         (qty, cost_in, cash_out, body, fund, last_bar, peak, last4h, coin))
     return cash
 
 
+def _spot_default(conn, now, hl_memes, deadline):
+    from . import meme_spot
+    return meme_spot.run(conn, now, lambda url: _req(url, timeout=25 if "llama" in url else TIMEOUT), lambda url, body: _req(url, body),
+                         hl_memes, deadline)
+
+
+def _holders_default(mint):
+    from . import meme_spot
+    return meme_spot.holders(mint, lambda url, body: _req(url, body))
+
+
+def sol_holders(conn, rows: list[dict], now: int, holders_fn, deadline: float, new_max: int = 2) -> None:
+    """Holder concentration for the strongest pre-filter Solana candidates (cached 12 h per mint, ≤ 2 new per run)."""
+    from . import meme_spot
+    pre = sorted([r for r in rows if (r.get("liquidity") or 0) >= SOL_MIN_LIQ and (r.get("vol24") or 0) >= SOL_MIN_VOL
+                  and (r.get("age_h") or 0) >= SOL_MIN_AGE_H], key=lambda r: -(r.get("vol24") or 0))[:8]
+    n = 0
+    for r in pre:
+        k = f"holders:{r['mint']}"
+        h = meme_spot._cache_get(conn, k, 12 * H, now)
+        if h is None and n < new_max and time.time() < deadline:
+            n += 1
+            h = _safe(holders_fn, r["mint"])
+            if h is not None:
+                meme_spot._cache_put(conn, k, h, now)
+        r["holders"] = h if h is not None else meme_spot._cache_any(conn, k)[1]
+
+
 def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_candles_fn=hl_candles, sol_fn=sol_fetch,
-        btc_fn=btc_context, deadline_s: float = 50.0) -> dict:
+        btc_fn=btc_context, spot_fn=_spot_default, holders_fn=_holders_default, deadline_s: float = 50.0) -> dict:
     t_start = time.time()
     now = now or int(time.time() * 1000)
     _ensure(conn)
@@ -647,12 +725,15 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
             if cost_in > cash:
                 break
             cash -= cost_in
-            conn.execute("INSERT INTO meme_pos VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (coin, px, notional / px, notional / px, cost_in, 0.0, now, 0, 0.0, now - now % H, reason, ",".join(tags)))
+            conn.execute(f"INSERT INTO meme_pos({POS_COLS}) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                         (coin, px, notional / px, notional / px, cost_in, 0.0, now, 0, 0.0, now - now % H, reason, ",".join(tags), px, 0))
             bar = next((r.get("signal_bar") for r in rows if r["coin"] == coin), now)
             _set(conn, f"last_bar:{coin}", bar)
             held.add(coin)
             ev.append((now, f"Купили {coin} по {_px(px)} на ${notional:,.0f} ({SIZE * 100:.0f}% счёта): {reason}. Обстановка: {', '.join(tags)}. "
-                            f"Стоп {_px(px * (1 + STOP))}, половину продаём на {_px(px * (1 + TP))}, остальное — через {HOLD_H} ч"))
+                            f"Стоп {_px(px * (1 + EXIT['stop']))}. На {_px(px * (1 + EXIT['body_at']))} (+{EXIT['body_at'] * 100:.0f}%) продаём "
+                            f"{EXIT['body_frac'] * 100:.0f}% — возвращаем вложенное; остаток держим, пока цена не упадёт на {EXIT['trail'] * 100:.0f}% от пика, "
+                            f"максимум {EXIT['max_h'] // 24} дней"))
         _set(conn, "cash", cash)
         _set(conn, "last_run", now)
     else:
@@ -666,6 +747,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     if time.time() - t_start < deadline_s - 25:
         s = _safe(sol_fn) or {"rows": [], "sources": {}}
         sources.update({k: v for k, v in s["sources"].items()})
+        sol_holders(conn, s["rows"], now, holders_fn, deadline=t_start + deadline_s - 20)
         for r in s["rows"]:
             r["flags"] = sol_flags(r)
             score_sol(r)
@@ -677,6 +759,11 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
         sol_note = "Пропущено: не хватило времени в этом запуске."
     for k in ("geckoterminal", "dexscreener", "solana_rpc", "rugcheck"):
         sources.setdefault(k, False)
+    spot = {"rows": [], "sources": {}, "note": "Пропущено: не хватило времени в этом запуске."}
+    if time.time() - t_start < deadline_s - 15:
+        spot = _safe(spot_fn, conn, now, set(ctx), t_start + deadline_s - 5) or {"rows": [], "sources": {}, "note": "Спот-сканер упал — список пуст."}
+    for k in ("coingecko", "defillama", "okx"):
+        sources[k] = bool(spot["sources"].get(k))
 
     eq = account_equity(conn, ctx)
     conn.execute("INSERT OR REPLACE INTO meme_equity VALUES(?,?)", (now, round(eq, 4)))
@@ -685,10 +772,17 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     conn.commit()
     out = snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources)
     out["market"] = market
+    out["spot_memes"] = spot["rows"]
+    out["spot_note"] = spot["note"]
     if sol_note:
         out["solana_note"] = sol_note + " " + out["solana_note"]
     out["seconds"] = round(time.time() - t_start, 1)
     return out
+
+
+def _spot_formula() -> str:
+    from . import meme_spot
+    return meme_spot.SCORE_SPOT
 
 
 def account_equity(conn, ctx) -> float:
@@ -719,14 +813,17 @@ def track_sol(conn, rows: list[dict], now: int) -> None:
 def snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources) -> dict:
     cash = float(_meta(conn, "cash", START_EQUITY))
     positions = []
-    for coin, epx, qty, qty0, cost_in, cash_out, et, tp_done, fund, last_bar, why, tags in conn.execute("SELECT * FROM meme_pos ORDER BY entry_time"):
+    for coin, epx, qty, qty0, cost_in, cash_out, et, tp_done, fund, last_bar, why, tags, peak, last4h in conn.execute(f"SELECT {POS_COLS} FROM meme_pos ORDER BY entry_time"):
         px = ctx.get(coin, {}).get("px") or epx
         val = qty * px
         pnl = cash_out + val * (1 - COST / 2) - cost_in
         positions.append({"coin": coin, "entry_px": epx, "px": px, "qty": round(qty, 6), "value": round(val, 2), "invested": round(cost_in, 2),
                           "pnl_usd": round(pnl, 2), "pnl_pct": round(pnl / cost_in * 100, 2) if cost_in else None, "entry_time": et,
-                          "hours_held": round((now - et) / H, 1), "stop_px": epx * (1 + STOP), "tp_px": epx * (1 + TP), "tp_done": bool(tp_done),
-                          "exit_by": et + HOLD_H * H, "funding_paid": round(fund, 2), "why": why, "context": [t for t in (tags or "").split(",") if t],
+                          "hours_held": round((now - et) / H, 1), "stop_px": None if tp_done else epx * (1 + EXIT["stop"]),
+                          "tp_px": epx * (1 + EXIT["body_at"]), "tp_done": bool(tp_done), "body_px": epx * (1 + EXIT["body_at"]), "body_taken": bool(tp_done),
+                          "remaining_pct": round(qty / qty0 * 100, 1) if qty0 else None, "peak_px": peak or epx,
+                          "trail_px": (peak or epx) * (1 - EXIT["trail"]) if tp_done else None,
+                          "exit_by": et + EXIT["max_h"] * H if EXIT["max_h"] else None, "funding_paid": round(fund, 2), "why": why, "context": [t for t in (tags or "").split(",") if t],
                           "price_live": coin in ctx})
     equity = cash + sum(p["value"] for p in positions)
     closed = [{"coin": c, "entry_time": a, "exit_time": b, "entry_px": e, "exit_px": x, "pnl_usd": p, "pnl_pct": q, "why": w,
@@ -757,8 +854,10 @@ def snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources) -> dict
                     "stats": {"trades": len(allc), "wins": sum(1 for (p,) in allc if p > 0), "sum_pnl": round(sum(p for (p,) in allc), 2),
                               "by_context": by_ctx},
                     "events": events, "history": hist, "rules": RULES_TEXT, "rule": RULE, "rule_status": RULE_STATUS,
-                    "limits": {"size_pct": SIZE * 100, "max_positions": MAX_POS, "stop_pct": STOP * 100, "take_profit_pct": TP * 100,
-                               "take_profit_part": TP_FRAC, "time_exit_h": HOLD_H, "cost_round_trip_pct": COST * 100}},
+                    "limits": {"size_pct": SIZE * 100, "max_positions": MAX_POS, "stop_pct": EXIT["stop"] * 100, "take_profit_pct": EXIT["body_at"] * 100,
+                               "take_profit_part": EXIT["body_frac"], "time_exit_h": EXIT["max_h"], "cost_round_trip_pct": COST * 100,
+                               "trail_pct": EXIT["trail"] * 100, "trail_basis": EXIT["basis"], "pre_body_limit_h": EXIT["pre_h"]},
+                    "exit": {"text": EXIT_TEXT, "params": EXIT, "research": EXIT_RESEARCH}},
         "hl_memes": rows,
         "solana": sol_rows[:30],
         "solana_note": "Только наблюдение: бумажных сделок по Solana нет. «С сигнала» — изменение цены с момента, когда токен впервые прошёл фильтры с баллом ≥ 50.",
@@ -766,5 +865,5 @@ def snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources) -> dict
         "warnings": warnings,
         "research_summary": RESEARCH_SUMMARY,
         "sources": sources,
-        "score_formula": {"hl": SCORE_HL, "solana": SCORE_SOL},
+        "score_formula": {"hl": SCORE_HL, "solana": SCORE_SOL, "spot": _spot_formula()},
     }

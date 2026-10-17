@@ -45,6 +45,14 @@ def no_sol():
     return {"rows": [], "sources": {}}
 
 
+def no_spot(conn, now, hl, deadline):
+    return {"rows": [], "sources": {}, "note": "test"}
+
+
+def no_holders(mint):
+    return None
+
+
 def test_to_4h_and_metrics():
     c = with_breakout(NOW)
     b4 = mm.to_4h(c, NOW)
@@ -148,7 +156,7 @@ def _run(conn, now, px, candles, rule="dip", funding_h=0.0):
     mm.RULE = rule
     try:
         return mm.run(conn, now, hl_ctx_fn=lambda: {"WIF": ctx_of(px, funding_h=funding_h), "POPCAT": ctx_of(1.0)},
-                      hl_candles_fn=lambda c, s, e: candles.get(c, flat_1h(now)), sol_fn=no_sol, btc_fn=dict)
+                      hl_candles_fn=lambda c, s, e: candles.get(c, flat_1h(now)), sol_fn=no_sol, btc_fn=dict, spot_fn=no_spot, holders_fn=no_holders)
     finally:
         mm.RULE = old
 
@@ -188,22 +196,65 @@ def test_stale_signal_not_entered():
     assert r["account"]["positions"] == []
 
 
-def test_take_profit_half_then_time_exit_and_funding():
-    conn = sqlite3.connect(":memory:")
-    _run(conn, NOW, 1.0, {"WIF": with_dip(NOW, px=1.4, close=1.0)}, funding_h=0.0001)
-    t1 = NOW + 3 * H
-    c = flat_1h(NOW, 1.0) + [[NOW - NOW % H + H, 1.0, 1.60, 0.98, 1.40, 1000.0]]
-    r = _run(conn, t1, 1.40, {"WIF": c}, funding_h=0.0001)
-    p = r["account"]["positions"][0]
-    assert p["tp_done"] and abs(p["qty"] - 500) < 1e-6 and p["funding_paid"] > 0
-    assert any("Зафиксировали половину WIF по $1.5000" in e["text"] for e in r["account"]["events"])
-    r = _run(conn, NOW + (mm.HOLD_H + 1) * H, 1.20, {"WIF": flat_1h(NOW, 1.0)}, funding_h=0.0001)
-    acc = r["account"]
-    assert acc["positions"] == [] and "время вышло" in acc["closed"][0]["why"]
-    # 500 sold at 1.5, 500 at 1.2, minus costs and funding
-    gross = 500 * 1.5 * (1 - mm.COST / 2) + 500 * 1.2 * (1 - mm.COST / 2)
-    assert acc["closed"][0]["pnl_usd"] < gross - 1000 and acc["closed"][0]["pnl_usd"] > gross - 1000 - 10
+def _bars(h0, spec):
+    """1h candles from h0: list of (high, low, close) per hour (open = previous close)."""
+    out, prev = [], spec[0][2]
+    for k, (hi, lo, cl) in enumerate(spec):
+        out.append([h0 + k * H, prev, hi, lo, cl, 1e5]); prev = cl
+    return out
 
+
+def test_body_first_then_trailing_on_4h_closes():
+    conn = sqlite3.connect(":memory:")
+    base = with_dip(NOW, px=1.4, close=1.0)
+    _run(conn, NOW, 1.0, {"WIF": base}, funding_h=0.0001)
+    h0 = NOW - NOW % H
+    after = _bars(h0, [(1.0, 0.99, 1.0), (2.1, 0.98, 2.05), (3.02, 2.9, 3.0), (3.05, 2.95, 3.0),
+                       (2.0, 1.88, 1.9), (1.95, 1.88, 1.9), (1.95, 1.88, 1.9), (1.95, 1.88, 1.9)])
+    c = [x for x in base if x[0] < h0] + after
+    r = _run(conn, h0 + 2 * H + 5 * 60_000, 2.05, {"WIF": [x for x in c if x[0] <= h0 + 2 * H]}, funding_h=0.0001)
+    p = r["account"]["positions"][0]
+    assert p["body_taken"] and p["tp_done"] and abs(p["qty"] - 500) < 1e-6 and p["remaining_pct"] == 50.0 and p["stop_px"] is None
+    assert any(e["text"].startswith("Вернули вложенное по WIF: продали 50% по $2.0000") for e in r["account"]["events"])
+    assert p["funding_paid"] > 0
+    t3 = h0 + 8 * H + 10 * 60_000
+    r = _run(conn, t3, 1.92, {"WIF": c}, funding_h=0.0001)
+    acc = r["account"]
+    assert acc["positions"] == [] and acc["closed"][0]["why"].startswith("трейлинг 35% от пика $3.0000")
+    assert acc["closed"][0]["exit_px"] == 1.92 and any(e["text"].startswith("Трейлинг: продали остаток WIF по $1.9200") for e in acc["events"])
+    gross = 500 * 2.0 * (1 - mm.COST / 2) + 500 * 1.92 * (1 - mm.COST / 2) - 1000 * (1 + mm.COST / 2)
+    assert gross - 5 < acc["closed"][0]["pnl_usd"] < gross            # minus funding
+
+
+def test_trailing_on_highs_and_time_limit():
+    old = dict(mm.EXIT)
+    mm.EXIT.update({"basis": "high", "max_h": 10})
+    try:
+        conn = sqlite3.connect(":memory:")
+        base = with_dip(NOW, px=1.4, close=1.0)
+        _run(conn, NOW, 1.0, {"WIF": base})
+        h0 = NOW - NOW % H
+        after = _bars(h0, [(1.0, 0.99, 1.0), (2.1, 0.98, 2.05), (4.0, 2.9, 3.9), (3.0, 2.5, 2.7)])
+        c = [x for x in base if x[0] < h0] + after
+        r = _run(conn, h0 + 4 * H + 5 * 60_000, 2.7, {"WIF": c})
+        cl = r["account"]["closed"][0]
+        assert cl["why"].startswith("трейлинг 35% от пика $4.0000") and abs(cl["exit_px"] - 4.0 * 0.65) < 1e-9
+        conn2 = sqlite3.connect(":memory:")
+        _run(conn2, NOW, 1.0, {"WIF": base})
+        r = _run(conn2, NOW + 11 * H, 1.1, {"WIF": base})
+        assert r["account"]["closed"][0]["why"] == "время вышло (0 дн.)"
+    finally:
+        mm.EXIT.clear(); mm.EXIT.update(old)
+
+
+def test_old_table_is_migrated():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("""CREATE TABLE meme_pos(coin TEXT PRIMARY KEY, entry_px REAL, qty REAL, qty0 REAL, cost_in REAL, cash_out REAL,
+                    entry_time INTEGER, tp_done INTEGER, funding REAL, last_bar INTEGER, why TEXT, tags TEXT)""")
+    conn.execute("INSERT INTO meme_pos VALUES('WIF', 1.0, 1000, 1000, 1000.75, 0, ?, 0, 0, ?, 'x', '')", (NOW - H, NOW - 2 * H))
+    r = _run(conn, NOW, 1.1, {"WIF": flat_1h(NOW, 1.1)})
+    p = r["account"]["positions"][0]
+    assert p["coin"] == "WIF" and p["peak_px"] >= 1.0 and p["trail_px"] is None
 
 def test_btc_context():
     daily = [[NOW - (60 - i) * DAY, 1, 1, 1, 100.0 + i, 1] for i in range(61)]
@@ -215,7 +266,7 @@ def test_pending_rule_no_trades_and_no_hl():
     conn = sqlite3.connect(":memory:")
     r = _run(conn, NOW, 0.72, {"WIF": with_dip(NOW)}, rule="pending")
     assert r["account"]["positions"] == [] and r["account"]["equity"] == 10_000
-    r = mm.run(conn, NOW + H, hl_ctx_fn=lambda: {}, hl_candles_fn=lambda *a: [], sol_fn=no_sol, btc_fn=dict)
+    r = mm.run(conn, NOW + H, hl_ctx_fn=lambda: {}, hl_candles_fn=lambda *a: [], sol_fn=no_sol, btc_fn=dict, spot_fn=no_spot, holders_fn=no_holders)
     assert r["hl_memes"] == [] and r["account"]["equity"] == 10_000 and r["warnings"][0].startswith("Hyperliquid не ответил")
     assert r["sources"]["hyperliquid"] is False
 
@@ -227,7 +278,7 @@ def test_json_shape_and_max_positions():
     mm.RULE = "dip"
     try:
         r = mm.run(conn, NOW, hl_ctx_fn=lambda: {c: ctx_of(0.74 - 0.01 * int(c[1:])) for c in coins},
-                   hl_candles_fn=lambda c, s, e: with_dip(NOW, close=0.74 - 0.01 * int(c[1:])), sol_fn=no_sol, btc_fn=dict)
+                   hl_candles_fn=lambda c, s, e: with_dip(NOW, close=0.74 - 0.01 * int(c[1:])), sol_fn=no_sol, btc_fn=dict, spot_fn=no_spot, holders_fn=no_holders)
     finally:
         mm.RULE = old[0]
     acc = r["account"]
@@ -239,3 +290,96 @@ def test_json_shape_and_max_positions():
         assert k in acc, k
     assert any("100%" in w for w in r["warnings"])
     json.dumps(r, ensure_ascii=False)
+
+
+# ── spot memes (cnq/agents/meme_spot.py) ──────────────────────────────────────────────────────────────────────────────
+
+from cnq.agents import meme_spot as ms
+
+
+def fake_rpc(largest, owners, owner_programs, supply="1000"):
+    def post(url, body):
+        m, prm = body["method"], body["params"]
+        if m == "getTokenLargestAccounts":
+            return {"result": {"value": [{"address": a, "uiAmountString": str(v)} for a, v in largest]}}
+        if m == "getTokenSupply":
+            return {"result": {"value": {"uiAmountString": supply}}}
+        if m == "getMultipleAccounts" and prm[1]["encoding"] == "jsonParsed":
+            return {"result": {"value": [{"data": {"parsed": {"info": {"owner": owners[a]}}}} for a in prm[0]]}}
+        if m == "getMultipleAccounts":
+            return {"result": {"value": [({"owner": owner_programs[o]} if owner_programs.get(o) else None) for o in prm[0]]}}
+        raise OSError(m)
+    return post
+
+
+def test_holders_excludes_pools_burn_and_locks():
+    largest = [("a1", 300), ("a2", 100), ("a3", 50), ("a4", 40), ("a5", 30)] + [(f"x{i}", 10) for i in range(10)]
+    owners = {"a1": "POOLSTATE", "a2": "1nc1nerator11111111111111111111111111111111", "a3": "LOCKER", "a4": "w4", "a5": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"}
+    owners.update({f"x{i}": f"w{i}x" for i in range(10)})
+    progs = {"POOLSTATE": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA", "LOCKER": "strmRqUCoQUgGUan5YhzUZa6KqdzwX5L6FpUxfmKg5m",
+             "w4": "11111111111111111111111111111111"}
+    h = ms.holders("MINT", fake_rpc(largest, owners, progs))
+    # kept: w4 40 + ten wallets × 10 → top-10 = 40 + 9 × 10 = 130 of (1000 − 100 burned)
+    assert abs(h["top10_pct"] - 130 / 900 * 100) < 0.1 and abs(h["top1_pct"] - 40 / 900 * 100) < 0.1
+    whys = {e["why"] for e in h["excluded"]}
+    assert whys == {"пул PumpSwap", "сожжено", "заблокировано (Streamflow)", "пул Raydium"}
+
+
+def _cg_row(i, **kw):
+    r = {"id": f"c{i}", "symbol": f"m{i}", "name": f"Meme {i}", "current_price": 1.0, "market_cap": 5e8, "fully_diluted_valuation": 5e8,
+         "total_volume": 5e7, "circulating_supply": 1, "total_supply": 1, "max_supply": None, "price_change_percentage_24h": 1.0,
+         "price_change_percentage_7d_in_currency": 2.0, "price_change_percentage_30d_in_currency": 3.0, "ath_change_percentage": -80.0}
+    r.update(kw)
+    return r
+
+
+def test_spot_run_score_reasons_and_cache():
+    calls = {"n": 0}
+    markets = [_cg_row(1), _cg_row(2, fully_diluted_valuation=2e9, symbol="wif"), _cg_row(3, market_cap=1e7), _cg_row(4, symbol="usdt")]
+    det = {"c1": {"id": "c1", "categories": ["Meme"], "platforms": {"ethereum": "0xabc"}, "genesis_date": "2023-04-14", "links": {"homepage": ["https://x"]}},
+           "c2": {"id": "c2", "categories": ["Meme", "Solana Meme"], "platforms": {"solana": "MINT2"}, "genesis_date": None, "links": {}}}
+    raises = {"raises": [{"name": "Meme 1", "date": 1, "round": "Seed", "amount": 2, "leadInvestors": ["Polychain Capital"], "otherInvestors": ["Some Fund"]}]}
+
+    def get(url):
+        calls["n"] += 1
+        if "coins/markets" in url:
+            return markets
+        if "/coins/" in url:
+            return det[url.split("/coins/")[1].split("?")[0]]
+        if "llama" in url:
+            return raises
+        if "okx" in url:
+            return {"data": [{"baseCcy": "M1", "quoteCcy": "USDT"}]}
+        if "dexscreener" in url:
+            return [{"baseToken": {"address": "MINT2"}, "liquidity": {"usd": 3e6}, "url": "https://dexscreener.com/solana/p2", "pairCreatedAt": NOW - 400 * DAY}]
+        if "rugcheck" in url:
+            return {"score": 1, "lpLockedPct": 100, "risks": []}
+        raise OSError(url)
+    largest = [(f"a{i}", 10) for i in range(15)]
+    post = fake_rpc(largest, {f"a{i}": f"w{i}" for i in range(15)}, {})
+    conn = sqlite3.connect(":memory:"); ms.ensure(conn)
+    res = ms.run(conn, NOW, get, post, {"kM1"}, deadline=10 ** 12)
+    rows = {r["symbol"]: r for r in res["rows"]}
+    assert set(rows) == {"M1", "WIF"}                                                  # small cap and stablecoin dropped
+    m1, wif = rows["M1"], rows["WIF"]
+    assert m1["backers"]["tier1"] == ["Polychain"] and m1["score_parts"]["бонус инвесторы"] == 10
+    assert m1["listed"] == {"okx_spot": True, "hl_perp": True, "solana_liq": None} and m1["holders"] is None
+    assert any("держатели: нет данных (не Solana" in x for x in m1["reasons"]) and m1["age_source"] == "CoinGecko genesis"
+    assert wif["circ_ratio"] == 0.25 and any(f["level"] == "red" and "в обращении только 25%" in f["text"] for f in wif["flags"])
+    assert abs(wif["holders"]["top10_pct"] - 10.0) < 0.01                             # 10 wallets × 10 of supply 1000
+    assert wif["age_days"] == 400 and wif["lp_locked_pct"] == 100 and wif["backers"]["checked"] and wif["backers"]["raises"] == []
+    assert any(x == "инвесторы: нет данных (DefiLlama не знает раундов)" for x in wif["reasons"])
+    assert 0 < wif["coverage"] <= 1 and m1["coverage"] < 1 and 0 <= wif["score"] <= 100
+    assert res["sources"]["coingecko"] and res["sources"]["defillama"] and res["sources"]["okx"]
+    n1 = calls["n"]
+    ms.run(conn, NOW + 60_000, get, post, set(), deadline=10 ** 12)                  # everything cached → no new calls except DexScreener
+    assert calls["n"] - n1 <= 1
+    dead = ms.run(sqlite3.connect(":memory:"), NOW, lambda u: (_ for _ in ()).throw(OSError()), post, set(), deadline=10 ** 12)
+    assert dead["rows"] == [] and "CoinGecko не ответил" in dead["note"]
+
+
+def test_solana_holder_flags():
+    r = _sol_row(holders={"top10_pct": 72.0}, ds_mcap=1e6, ds_fdv=4e6)
+    texts = [(f["level"], f["text"]) for f in mm.sol_flags(r)]
+    assert ("red", "топ-10 кошельков (без пулов) держат 72%") in texts
+    assert any(lv == "yellow" and "в обращении 25%" in t for lv, t in texts)

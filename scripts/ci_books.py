@@ -1,6 +1,7 @@
 """Order-book snapshots from BingX for the panel (web/books.json): bids/asks (price, qty) per coin, so the chart's
 depth band always has bars even when the viewer's browser cannot reach Binance/Bybit directly."""
-import json, time
+import json, os, sys, time
+sys.path.insert(0, os.getcwd())   # run as a script from the repo root (Actions): without this «No module named cnq»
 from cnq.bingx.rest import BingXRest
 from cnq.config import Config
 

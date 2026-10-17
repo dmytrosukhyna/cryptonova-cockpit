@@ -473,6 +473,7 @@ details.sec>summary h2{font-size:12.5px;padding:7px 10px;border-radius:9px;backg
 #deck .dnotes{overflow:auto;border:1px solid rgba(240,198,116,.4);background:rgba(240,198,116,.05);border-radius:14px;padding:14px 16px}#deck .dnotes small{display:block;font-size:10.5px;letter-spacing:.14em;color:#f0c674;margin:6px 0 4px}#deck .dsay{font-size:16px;line-height:1.6;color:#f2f6fb}#deck .dtip{font-size:14px;line-height:1.5;color:#cfdcec}
 #deck .dnav{display:flex;align-items:center;gap:12px;padding:10px 18px 14px;border-top:1px solid var(--line)}#deck .dprog{flex:1;height:4px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}#deck .dprog i{display:block;height:100%;background:linear-gradient(90deg,#7cc4ff,#6fcf97)}
 body.decking #analystBtn{display:none!important}
+@media (max-width:600px){#deck .dtop{flex-wrap:wrap;gap:6px;padding:10px 12px}#deck #dTitle{font-size:12px}#deck #dCount{flex-basis:100%;order:9;font-size:11px}#deck #dLive{display:none}#deck .dbody{padding:12px}#deck .dnav{padding:8px 12px 12px}}
 @media (max-width:900px){#deck .dbody{grid-template-columns:1fr;overflow:auto}#deck .dstage{overflow:visible}#deck .dstage h1{font-size:22px}#deck .dbul{font-size:15px}#deck .dnotes{order:2}#deck .dlive>.card canvas{min-height:240px}}
 </style>
 </head>
@@ -1190,13 +1191,12 @@ const RULE_NAMES={B:'откуп каскада',E:'откуп паники',F:'�
 let MEMES=null, MCAL=null, MACRO=null, MEMES_T=0;
 // ---------------------------------------------------------------- «Что брать на спот» (17.10): one table of top coins by perspective with a clear mark and an «i» explanation (server web/ideas.json)
 let IDEAS=null, OUTLOOK=null, DECK=null, OL_H=load('cnq_ol_h','day');
-function renderOutlook(){ const el=$('#olBox'); if(!el) return; const O=OUTLOOK; const B=O&&(O.btc||(O.assets&&O.assets.BTC)); if(!B){ el.innerHTML=''; return; } const H={day:'День',week:'Неделя',month:'Месяц'}; const h=B[OL_H]||B.day; if(!h){ el.innerHTML=''; return; }
-  const pr=v=>v==null?'—':'$'+Math.round(v).toLocaleString('ru-RU'); const pct=v=>v==null?'':(v>0?'+':'−')+Math.abs(v*(Math.abs(v)<1?100:1)).toFixed(1)+'%';
-  const rg=h.range||{}; const br=h.base_rate_up||{};
+function renderOutlook(){ const el=$('#olBox'); if(!el) return; const O=OUTLOOK; const HZ=O&&O.horizons; if(!HZ){ el.innerHTML=''; return; } const H={day:'Сутки',week:'Неделя',month:'Месяц'}; const h=HZ[OL_H]||HZ.day; if(!h){ el.innerHTML=''; return; }
+  const pr=v=>v==null?'—':Math.round(v).toLocaleString('ru-RU')+' $'; const rg=h.range||{}, br=h.base_rate_up||{};
   el.innerHTML=`<div class="oltabs">${Object.entries(H).map(([k,t])=>`<button data-h="${k}" aria-pressed="${k===OL_H}">${t}</button>`).join('')}</div>
-   <div class="olbox"><div class="olrg"><small>Диапазон на ${H[OL_H]?.toLowerCase()||''} · ~2 из 3 случаев</small><b class="num">${pr(rg.lo)} — ${pr(rg.hi)}</b><em class="muted">${rg.pct!=null?'± '+(+rg.pct).toFixed(1)+'%':''}</em></div>
-   <div class="olrg"><small>Чаще рос в похожем режиме</small><b class="num">${br.p!=null?Math.round(br.p*100)+'%':(typeof br==='number'?Math.round(br*100)+'%':'—')}</b><em class="muted">${br.n?br.n+' случаев'+(br.period?' · '+br.period:''):''}</em></div></div>
-   ${h.text_ru?`<div class="oltxt">${h.text_ru}</div>`:''}${(h.drivers||B.drivers||[]).length?`<ul class="oldr">${(h.drivers||B.drivers).slice(0,5).map(d=>`<li>${typeof d==='string'?d:(d.text_ru||d.t||'')}</li>`).join('')}</ul>`:''}<div class="muted" style="font-size:11px">${O.params_ru||B.params_ru||''}</div>`;
+   <div class="olbox"><div class="olrg"><small>Коридор BTC · 2 из 3 случаев</small><b class="num">${pr(rg.lo)} – ${pr(rg.hi)}</b><em class="muted">±${rg.pm_pct!=null?rg.pm_pct:'—'}% · проверка на 2024–2026: ${rg.check&&rg.check.coverage!=null?Math.round(rg.check.coverage*100)+'%':'—'}</em></div>
+   <div class="olrg"><small>Рос в похожем режиме</small><b class="num ${br.verdict==='coin'?'':br.p>0.5?'pos':'neg'}">${br.p!=null?Math.round(br.p*100)+'%':'—'}</b><em class="muted">${br.verdict_ru||''}${br.n?` · ${br.n} окон${br.period_ru?' · '+br.period_ru:''}`:''}</em></div></div>
+   ${h.text_ru?`<div class="oltxt">${h.text_ru}</div>`:''}${(h.drivers||[]).length?`<details class="edet"><summary>Что может повлиять · ${h.drivers.length}</summary><ul class="oldr">${h.drivers.slice(0,5).map(d=>`<li>${typeof d==='string'?d:(d.text_ru||'')}</li>`).join('')}</ul></details>`:''}<div class="muted" style="font-size:11px">${/^Что используем/.test(O.params_ru||'')?O.params_ru:'Что используем: '+(O.params_ru||'')}</div>`;
   el.querySelectorAll('.oltabs button').forEach(b=>b.addEventListener('click',()=>{ OL_H=b.dataset.h; store('cnq_ol_h',OL_H); renderOutlook(); })); }
 function renderIdeas(){ const el=$('#ideasCard'); if(!el) return; const D=IDEAS; if(!D||!(D.rows||D.ideas||[]).length){ el.hidden=true; return; } el.hidden=false; const rows=(D.rows||D.ideas);
   const pc=v=>v==null?'':(v>=0?'+':'−')+Math.abs(v).toFixed(Math.abs(v)<10?1:0)+'%';
@@ -2004,7 +2004,7 @@ function cardCtlAll(){ document.querySelectorAll('main .card[id],#earn .card[id]
 const DK={i:+load('cnq_deck_i','0')||0,notes:load('cnq_deck_notes','on')!=='off',moved:null};
 function deckRestore(){ const m=DK.moved; if(m&&m.el&&m.ph&&m.ph.parentNode){ m.ph.parentNode.insertBefore(m.el,m.ph); m.ph.remove(); m.el.classList.remove('indeck','collapsed'); if(m.wasHidden) m.el.hidden=true; } DK.moved=null; }
 function deckShow(){ const S=(DECK&&DECK.slides)||[]; if(!S.length) return; DK.i=Math.max(0,Math.min(S.length-1,DK.i)); store('cnq_deck_i',String(DK.i)); const sl=S[DK.i]; deckRestore();
-  $('#dTitle').textContent=DECK.title_ru||('Эфир · неделя '+(DECK.week_of||'')); $('#dCount').textContent=`слайд ${DK.i+1} из ${S.length}${DECK.duration_min_est?' · ≈ '+DECK.duration_min_est+' мин':''}`; $('#dProg').style.width=((DK.i+1)/S.length*100)+'%';
+  $('#dTitle').textContent=DECK.title_ru||('Эфир · '+(DECK.period_ru||DECK.week_of||'')); $('#dCount').textContent=`слайд ${DK.i+1} из ${S.length}${DECK.duration_min_est?' · ≈ '+DECK.duration_min_est+' мин':''}`; $('#dProg').style.width=((DK.i+1)/S.length*100)+'%';
   const st=$('#dStage'); st.innerHTML=`<h1>${sl.title||''}</h1>${(sl.bullets||[]).length?`<ul class="dbul">${sl.bullets.map(b=>`<li>${b}</li>`).join('')}</ul>`:''}<div class="dlive" id="dLiveBox"></div>`;
   const el=sl.show?document.getElementById(sl.show):null; if(sl.show==='fdeskBox'&&el){ try{ el.innerHTML=tradesPanel(); bindFsw(el); }catch(e){} } if(sl.show==='earnBar'&&!el){ try{ if(!$('#efSphere')) earnSkeleton($('#earn')); earnRender(); }catch(e){} }
   const el2=sl.show?document.getElementById(sl.show):null; if(el2){ const ph=document.createComment('deck'); el2.parentNode.insertBefore(ph,el2); DK.moved={el:el2,ph,wasHidden:el2.hidden}; el2.hidden=false; el2.classList.add('indeck'); el2.classList.remove('collapsed'); $('#dLiveBox').appendChild(el2); }

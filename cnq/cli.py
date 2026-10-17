@@ -20,6 +20,11 @@
   python -m cnq.cli macro [--out web]         DXY, US 10Y/2Y, USDJPY, oil, gold, index futures, VIX, Nikkei: value + 1d/5d change → web/macro.json
   python -m cnq.cli ideas [--out web]         one spot table «можно брать / добрать / на небольшую сумму / ждём / не брать» from
                                               research.json + portfolio.json + memes.json (+ markets/decision) → web/ideas.json
+  python -m cnq.cli outlook [--out web]       BTC/ETH/SOL on day / week / month: band of 2 outcomes out of 3 (90-day volatility, history
+                                              2021–2026), share of periods that ended higher in the current BTC regime, A/B forecast score,
+                                              calendar/macro/autopilot drivers → web/outlook.json
+  python -m cnq.cli broadcast [--out web] [--force]   Friday live-show deck (slides: what to say / what to show in the panel);
+                                              rebuilt on Fridays (Kyiv) or when missing/older than 7 days, else only `live` → web/broadcast.json
 """
 from __future__ import annotations
 
@@ -36,7 +41,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -50,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--binance-symbol", default="BTCUSDT")
     ap.add_argument("--cache", default="data/binance")
     ap.add_argument("--out", default="web")
-    ap.add_argument("--force", action="store_true", help="weekly: rebuild and send even if it is not Friday")
+    ap.add_argument("--force", action="store_true", help="weekly / broadcast: rebuild (and send) even if it is not Friday")
     ap.add_argument("--send", action="store_true")
     ap.add_argument("--slot", help="channel: morning|midday|evening|intro (default: by Kyiv time)")
     ap.add_argument("--print", action="store_true", help="channel: print the post instead of sending")
@@ -213,6 +218,23 @@ def main(argv: list[str] | None = None) -> int:
         from .agents import spot_ideas
         d = spot_ideas.write(args.out)
         print(f"ideas.json: btc_bull={d['btc_bull']} evaluated={d['evaluated']} shown={d['shown']} counts={d['counts']} | {d['summary_ru']}")
+    elif args.cmd == "outlook":
+        import os, sqlite3
+        from .agents import outlook
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/agents.sqlite")
+        d = outlook.write(args.out, conn)
+        h = d.get("horizons") or {}
+        print(f"outlook.json: btc={d.get('price')} regime_bull={(d.get('regime') or {}).get('btc_bull')} history={d.get('history')} | "
+              + " | ".join(f"{k}: ±{(v.get('range') or {}).get('pm_pct')}% up={(v.get('base_rate_up') or {}).get('p')} n={(v.get('base_rate_up') or {}).get('n')} "
+                           f"drivers={len(v.get('drivers') or [])}" for k, v in h.items()))
+    elif args.cmd == "broadcast":
+        import os, sqlite3
+        from .agents import broadcast
+        conn = sqlite3.connect("data/agents.sqlite") if os.path.exists("data/agents.sqlite") else None
+        doc, why = broadcast.run(args.out, conn, force=args.force)
+        print(f"broadcast.json: {'rebuilt (' + why + ')' if why else 'live refreshed'} week_of={doc.get('week_of')} slides={len(doc.get('slides') or [])} "
+              f"~{doc.get('duration_min_est')} min ids={[s['id'] for s in doc.get('slides') or []]} errors={doc.get('errors')}")
     elif args.cmd == "macro":
         from .agents import macro_watch
         d = macro_watch.write(args.out)

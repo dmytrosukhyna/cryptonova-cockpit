@@ -250,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
                 cs = universe.get(c["symbol"])
                 if cs:
                     c["candles_long"] = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 22:]]
-            for bx in cfg.b_extra:   # rule-B-only coins (docs/research/universe.md): candles only, excluded from breadth and other rules
+            for bx in cfg.b_extra:   # lab-only alt coins (docs/research/alt100.md): candles only, excluded from breadth and the main accounts
                 cs = store.candles(bx, "15m")
                 if len(cs) >= 96 * 31:
                     rows = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 31:]]

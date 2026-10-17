@@ -160,18 +160,21 @@ def test_panic_breadth_threshold_is_04():
     assert pd.E_BREADTH == 0.4 and pd.E_BASKET_H == 10
 
 
-def test_b_only_coins_trade_only_rule_b_and_skip_breadth():
+def test_extra_alts_trade_only_lab_rules_and_skip_breadth():
+    """17.10: extra alt coins (b_only) feed only the lab (X panic basket, Y basis, L range, W news); the main desks ignore them."""
     conn = sqlite3.connect(":memory:")
     t0 = 1_700_000_000_000
     n = 96 * 31
-    flat = [100.0] * (n - 2)
-    crash = flat + [100.0 * 0.80, 100.0 * 0.80]     # last closed candle −20 % → B candidate shape (wick needed)
-    c = coin("ATOM-USDT", crash, []); c["b_only"] = True
-    c["candles"][-2] = [t0 + (n - 2) * 900_000, 100.0, 100.0, 70.0, 95.0, 100.0]   # long lower wick, close −5 %
-    desk = pd.PaperDesk(conn, "bal")
-    assert desk.stress([c]) == 0.0
-    sigs = desk.signals(c, True, t0 + n * 900_000)
-    assert sigs and all(s["grade"] == "B" for s in sigs)
+    c = coin("ATOM-USDT", [100.0] * n, []); c["b_only"] = True
+    c["candles"][-2] = [t0 + (n - 2) * 900_000, 100.0, 100.0, 90.0, 97.0, 1000.0]   # −3 % candle on 10× volume
+    assert pd.PaperDesk(conn, "bal").stress([c]) == 0.0
+    now = t0 + n * 900_000
+    assert not pd.PaperDesk(conn, "bal").signals(c, True, now)
+    lab = pd.PaperDesk(conn, "lab"); lab._stress = 0.5
+    sigs = lab.signals(c, True, now)
+    assert any(s["grade"] == "X" for s in sigs) and all(s["grade"] in ("L", "W", "X", "Y") for s in sigs)
+    c["basis_1h"] = -0.004
+    assert any(s["grade"] == "Y" for s in lab.signals(c, True, now))
 
 
 def test_rule_d_basis_discount_opens_share_sized_long():

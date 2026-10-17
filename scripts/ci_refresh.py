@@ -22,10 +22,10 @@ for bx, _ in cfg.universe:
     except Exception as e:  # noqa: BLE001
         print("backfill failed", bx, repr(e))
 print(f"backfilled {ok}/{len(cfg.universe)} symbols in {time.time()-t0:.0f}s")
-for bx in cfg.b_extra:   # rule-B-only coins: 75 days is enough (σ over 30 days, store check needs 60)
+for bx in cfg.b_extra:   # lab-only alt coins: 75 days is enough (σ over 30 days, 14-day range, store check needs 60)
     try:
         r = backfill(Config(symbol=bx), store, days=75, intervals=("15m",))
-        print(bx, "15m (B only)", r.get("15m"))
+        print(bx, "15m (lab)", r.get("15m"))
     except Exception as e:  # noqa: BLE001
         print("backfill failed", bx, repr(e))
 sys.exit(0 if ok else 1)

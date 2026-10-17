@@ -17,6 +17,16 @@ EVENTS = [   # (UTC "YYYY-MM-DD HH:MM", type, note)
     ("2027-01-27 19:00", "FOMC", ""), ("2027-03-17 18:00", "FOMC", "с прогнозами ФРС"), ("2027-04-28 18:00", "FOMC", ""),
     ("2027-06-09 18:00", "FOMC", "с прогнозами ФРС"), ("2027-07-28 18:00", "FOMC", ""), ("2027-09-15 18:00", "FOMC", "с прогнозами ФРС"),
     ("2027-10-27 18:00", "FOMC", ""), ("2027-12-08 19:00", "FOMC", "с прогнозами ФРС"),
+    # Bank of Japan (decision ≈ midday Tokyo on day 2 → ≈ 03:00 UTC; boj.or.jp schedule)
+    ("2026-10-30 03:00", "BOJ", ""), ("2026-12-18 03:00", "BOJ", ""), ("2027-01-22 03:00", "BOJ", ""), ("2027-03-18 03:00", "BOJ", ""),
+    ("2027-04-28 03:00", "BOJ", ""), ("2027-06-11 03:00", "BOJ", ""), ("2027-07-22 03:00", "BOJ", ""), ("2027-09-22 03:00", "BOJ", ""),
+    ("2027-10-29 03:00", "BOJ", ""), ("2027-12-17 03:00", "BOJ", ""),
+    # ECB (14:15 CET/CEST; ecb.europa.eu calendar)
+    ("2026-10-29 13:15", "ECB", ""), ("2026-12-17 13:15", "ECB", "с прогнозами"), ("2027-02-04 13:15", "ECB", ""), ("2027-03-18 13:15", "ECB", "с прогнозами"),
+    ("2027-04-29 12:15", "ECB", ""), ("2027-06-10 12:15", "ECB", "с прогнозами"), ("2027-07-22 12:15", "ECB", ""), ("2027-09-09 12:15", "ECB", "с прогнозами"),
+    ("2027-10-28 12:15", "ECB", ""), ("2027-12-16 13:15", "ECB", "с прогнозами"),
+    # US politics / crypto regulation (CLARITY Act failed cloture 49–50 on 15.09.2026; no re-vote date set)
+    ("2026-11-03 23:00", "ELECTION", ""), ("2026-10-20 21:00", "SEC", "приём комментариев к правилам для крипто-активов"),
 ]
 INFO = {   # texts measured on 2023–2026 (docs/research/macro_events.md): only the volatility spike is robust, no tradable direction
     "FOMC": {"name": "ФРС: решение по ставке", "importance": 3,
@@ -28,8 +38,37 @@ INFO = {   # texts measured on 2023–2026 (docs/research/macro_events.md): only
     "NFP": {"name": "Рынок труда США (NFP)", "importance": 2,
             "what": "В первый час биткоин обычно проходит около 0.4%, больше 1% — примерно 1 раз из 5. Через час открывается фондовый рынок США — движение может продолжиться."},
 }
-VERDICT = ("Проверено на 2023–2026 (116 событий): устойчив только всплеск колебаний в первый час после публикации. "
-           "«Сброса» до или после событий на истории нет, фильтры автопилота вокруг событий ухудшали результат — позиции держим как обычно.")
+INFO.update({
+    "BOJ": {"name": "Банк Японии: решение по ставке", "importance": 3,
+            "what": "Повышение ставки в Японии может свернуть «кэрри-трейд» в иене — займы в дешёвой иене, вложенные в рискованные активы. "
+                    "Так было 31.07.2024: через несколько дней, 5 августа, рынки обвалились, биткоин падал больше чем на 15% за день."},
+    "ECB": {"name": "ЕЦБ: решение по ставке", "importance": 1,
+            "what": "Влияет на евро и доллар; на крипту обычно слабее, чем ФРС."},
+    "OPEX": {"name": "Экспирация опционов Deribit", "importance": 1,
+             "what": "Последняя пятница месяца, 08:00 UTC. Перед экспирацией цену часто «тянет» к уровню, где больше всего открытых опционов; после — движение свободнее."},
+    "ELECTION": {"name": "Выборы в Конгресс США", "importance": 3,
+                 "what": "Промежуточные выборы. От нового состава Сената зависит судьба закона о крипторынке (CLARITY Act провалил голосование 15.09.2026, 49 против 50)."},
+    "SEC": {"name": "SEC: регулирование крипты", "importance": 1,
+            "what": "Срок приёма комментариев к правилам SEC для крипто-активов. Само по себе цену обычно не двигает — важно, что будет дальше."},
+})
+
+
+def _opex(now_ms: int, months: int = 6) -> list[tuple[str, str, str]]:
+    """Deribit monthly options expiry: last Friday of the month, 08:00 UTC (quarterly in Mar/Jun/Sep/Dec)."""
+    d = dt.datetime.fromtimestamp(now_ms / 1000, dt.timezone.utc); out = []
+    y, m = d.year, d.month
+    for _ in range(months + 1):
+        nm = dt.date(y + (m == 12), m % 12 + 1, 1)
+        last = nm - dt.timedelta(days=1)
+        fri = last - dt.timedelta(days=(last.weekday() - 4) % 7)
+        out.append((f"{fri:%Y-%m-%d} 08:00", "OPEX", "квартальная" if m in (3, 6, 9, 12) else ""))
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+VERDICT = ("ФРС, инфляция и рынок труда проверены на 2023–2026 (116 событий): устойчив только всплеск колебаний в первый час после публикации. "
+           "«Сброса» до или после событий на истории нет, фильтры автопилота вокруг событий ухудшали результат — позиции держим как обычно. "
+           "Банк Японии, ЕЦБ, экспирация опционов, нефть, облигации и доллар — проверка идёт.")
 
 
 def _from_research() -> list[tuple[str, str, str]]:
@@ -54,7 +93,7 @@ def _ts(s: str) -> int:
 def upcoming(now_ms: int, days: float = 60) -> list[dict]:
     out = []
     seen = set()
-    for t, typ, note in sorted(set(EVENTS) | set(_from_research()), key=lambda x: x[0]):
+    for t, typ, note in sorted(set(EVENTS) | set(_from_research()) | set(_opex(now_ms)), key=lambda x: x[0]):
         if (t, typ) in seen:
             continue
         seen.add((t, typ))
@@ -70,7 +109,7 @@ def post_lines(now_ms: int, days: float = 7) -> list[str]:
     """Plain lines for channel posts: «— ФРС: решение по ставке — 28.10 в 20:00 по Киеву (через 3 дня)»."""
     out = []
     for e in upcoming(now_ms, days):
-        if e["in_hours"] < -1:
+        if e["in_hours"] < -1 or e["importance"] < 2:   # posts mention only events that matter (ФРС, Банк Японии, инфляция, рынок труда, выборы)
             continue
         local = dt.datetime.fromtimestamp(e["time"] / 1000, dt.timezone.utc).astimezone(_kyiv_tz(e["time"]))
         h = e["in_hours"]

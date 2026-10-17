@@ -102,6 +102,8 @@ def test_sol_flags_and_score():
     assert not bad["passed"] and bad["score"] < good["score"]
     unk = _sol_row(); unk.pop("auth")
     assert any(f["level"] == "info" and "не проверены" in f["text"] for f in mm.sol_flags(unk))
+    assert any(f["level"] == "info" and "RugCheck не проверял" in f["text"] for f in mm.sol_flags(unk))
+    assert not any("RugCheck не проверял" in f["text"] for f in mm.sol_flags(_sol_row(rug={"score": 1, "risks": []})))
 
 
 def test_sol_fetch_parsing():

@@ -453,6 +453,8 @@ def sol_flags(r: dict) -> list[dict]:
         add("yellow", "платная реклама на DexScreener (boost) — не сигнал качества")
     if r.get("socials") is False:
         add("yellow", "нет сайта и соцсетей")
+    if r.get("rug") is None:
+        add("info", "RugCheck не проверял (проверяем только 10 самых ликвидных)")
     for x in (r.get("rug") or {}).get("risks") or []:
         lv = (x.get("level") or "").lower()
         if lv in ("danger", "warn"):

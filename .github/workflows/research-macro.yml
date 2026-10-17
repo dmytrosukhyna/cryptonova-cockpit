@@ -1,7 +1,7 @@
 name: research-macro
-# Manual only (no schedule). Macro factor history for docs/research/macro_factors.md: FRED (yields, dollar, yen, oil, VIX,
-# S&P 500, Nasdaq, liquidity) and Yahoo (index futures, DXY, USDJPY, Brent, gold, 10Y, VIX — daily since 2021, hourly
-# 730 days) + a probe of live sources for cnq/agents/macro_watch.py. The research container cannot reach these sites and
+# Manual only (no schedule). Macro factor history for docs/research/macro_factors.md: Yahoo via yfinance (index futures, DXY,
+# USDJPY, oil, gold, 10Y, VIX, Nikkei — daily since 2021, hourly 730 days), US Treasury yields, CBOE VIX, NY Fed reverse repo,
+# Treasury cash balance, FRED (best effort) + a probe of live sources for cnq/agents/macro_watch.py. The research container cannot reach these sites and
 # cannot download artifacts or logs, so the packed data come back as job annotations (scripts/macro_factors_fetch.py
 # --decode). Nothing is committed.
 on:
@@ -18,9 +18,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
+      - run: pip install -q yfinance
       - name: Probe live sources
         continue-on-error: true
         timeout-minutes: 5
+        env:
+          TWELVE_DATA_KEY: ${{ secrets.TWELVE_DATA_KEY }}
         run: |
           python scripts/macro_factors_fetch.py --probe probe.md
           python - <<'PY'

@@ -1048,7 +1048,7 @@ function renderCal(){ const el=$('#calCard'); if(!el) return; const evs=(MCAL&&M
   const fmtK=t=>new Date(t).toLocaleString('ru-RU',{timeZone:'Europe/Kyiv',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   const left=t=>{ const h=(t-Date.now())/3600e3; if(h<0) return 'идёт сейчас'; if(h<1) return `через ${Math.round(h*60)} мин`; if(h<48) return `через ${Math.round(h)} ч`; return `через ${Math.round(h/24)} дн`; };
   el.innerHTML=`<h2>${ico('time')} Календарь событий <span class="r muted">время по Киеву</span></h2>${evs.map(e=>`<div class="cal ${e.time-Date.now()<48*3600e3?'soon':''}"><div><b>${e.name}</b>${e.note?` <small class="muted">${e.note}</small>`:''}<span>${'●'.repeat(e.importance)}${'○'.repeat(3-e.importance)}</span></div><div class="cwhen">${fmtK(e.time)} · <b>${left(e.time)}</b></div><small class="muted">${e.what}</small></div>`).join('')||'<div class="muted enote">Нет событий в ближайшие месяцы.</div>'}
-    <div class="muted enote">Как эти события двигали крипту раньше — проверяем на истории 2023–2026, результат появится здесь.</div>`; }
+    <div class="muted enote">${(MCAL&&MCAL.verdict)||''}</div>`; }
 /* ---- overview: every strategy account in one table («результат всех стратегий») */
 let FUNDJ=null, ARBJ=null, SR_T=0;
 async function loadStratData(){ if(Date.now()-SR_T<5*60000&&FUNDJ) return; SR_T=Date.now();

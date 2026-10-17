@@ -1,7 +1,7 @@
 """Scheduled US macro events that move crypto: FOMC rate decisions (+ press conference), CPI inflation, NFP jobs report.
 Official sources: federalreserve.gov FOMC calendar; bls.gov release schedules (CPI, Employment Situation).
 Times are UTC (US daylight time ends 01.11.2026, starts 14.03.2027 → 14:00 ET = 18:00 UTC in summer, 19:00 UTC in winter;
-08:30 ET = 12:30 / 13:30 UTC). 2027 CPI/NFP dates are not published yet → not listed (never present unknown data as data).
+08:30 ET = 12:30 / 13:30 UTC). 2027 CPI/NFP dates come from scripts/macro_events.json (BLS schedules, status «scheduled»).
 What the events usually do to crypto is measured in docs/research/macro_events.md; until then the text only says what is certain."""
 from __future__ import annotations
 
@@ -18,14 +18,33 @@ EVENTS = [   # (UTC "YYYY-MM-DD HH:MM", type, note)
     ("2027-06-09 18:00", "FOMC", "с прогнозами ФРС"), ("2027-07-28 18:00", "FOMC", ""), ("2027-09-15 18:00", "FOMC", "с прогнозами ФРС"),
     ("2027-10-27 18:00", "FOMC", ""), ("2027-12-08 19:00", "FOMC", "с прогнозами ФРС"),
 ]
-INFO = {
+INFO = {   # texts measured on 2023–2026 (docs/research/macro_events.md): only the volatility spike is robust, no tradable direction
     "FOMC": {"name": "ФРС: решение по ставке", "importance": 3,
-             "what": "Решение по ставке и пресс-конференция главы ФРС через 30 минут. Самое сильное событие для рынка: цена может резко пойти в любую сторону."},
+             "what": "Решение по ставке и через 30 минут пресс-конференция. В первый час биткоин обычно проходит около 0.7% (в 2.7 раза больше обычного), "
+                     "в каждом третьем случае — больше 1%. Направление заранее не угадать. За сутки до решения рынок обычно тише."},
     "CPI": {"name": "Инфляция в США (CPI)", "importance": 2,
-            "what": "Инфляция выше ожиданий — повод бояться высоких ставок, ниже — наоборот. Первые минуты после выхода обычно самые резкие."},
+            "what": "В первый час биткоин обычно проходит около 0.5%, в каждом третьем случае — больше 1%. В 2026 году реакция заметно слабее. "
+                    "Перед публикацией цена чаще немного растёт, чем падает."},
     "NFP": {"name": "Рынок труда США (NFP)", "importance": 2,
-            "what": "Число новых рабочих мест. Сильный отчёт может отодвинуть снижение ставки, слабый — приблизить."},
+            "what": "В первый час биткоин обычно проходит около 0.4%, больше 1% — примерно 1 раз из 5. Через час открывается фондовый рынок США — движение может продолжиться."},
 }
+VERDICT = ("Проверено на 2023–2026 (116 событий): устойчив только всплеск колебаний в первый час после публикации. "
+           "«Сброса» до или после событий на истории нет, фильтры автопилота вокруг событий ухудшали результат — позиции держим как обычно.")
+
+
+def _from_research() -> list[tuple[str, str, str]]:
+    """Future events from scripts/macro_events.json (official Fed/BLS schedules, built by the macro study) — extends the list to 2027."""
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "macro_events.json")
+    try:
+        d = json.load(open(path, encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return []
+    out = []
+    for e in d.get("events", []):
+        if e.get("type") in INFO and e.get("status") == "scheduled" and e.get("utc"):
+            note = "с прогнозами ФРС" if e.get("sep") else ""
+            out.append((e["utc"].replace("T", " ").rstrip("Z"), e["type"], note))
+    return out
 
 
 def _ts(s: str) -> int:
@@ -34,7 +53,11 @@ def _ts(s: str) -> int:
 
 def upcoming(now_ms: int, days: float = 60) -> list[dict]:
     out = []
-    for t, typ, note in EVENTS:
+    seen = set()
+    for t, typ, note in sorted(set(EVENTS) | set(_from_research()), key=lambda x: x[0]):
+        if (t, typ) in seen:
+            continue
+        seen.add((t, typ))
         ms = _ts(t)
         if now_ms - 3 * 3_600_000 <= ms <= now_ms + days * 86_400_000:
             i = INFO[typ]
@@ -70,7 +93,7 @@ def _kyiv_tz(ms: int) -> dt.timezone:
 def write(out: str = "web", now_ms: int | None = None) -> dict:
     now_ms = now_ms or int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)
     d = {"asof": now_ms, "events": upcoming(now_ms, 120),
-         "note": "Официальные даты ФРС и BLS. Время — момент публикации. Даты CPI и NFP на 2027 год ещё не объявлены.",
+         "note": "Официальные даты ФРС и BLS. Время — момент публикации. Даты ФРС на 2027 год — предварительные.", "verdict": VERDICT,
          "sources": ["https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", "https://www.bls.gov/schedule/news_release/cpi.htm",
                      "https://www.bls.gov/ces/publications/news-release-schedule.htm"]}
     os.makedirs(out, exist_ok=True)

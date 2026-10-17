@@ -219,8 +219,8 @@ def test_lab_range_low_limit_fills_only_through_level():
 
 def test_lab_news_rule_trades_strong_fresh_news_once():
     conn = sqlite3.connect(":memory:")
-    from cnq.agents.news import SCHEMA
-    conn.executescript(SCHEMA)
+    from cnq.agents.news import SCHEMA, _migrate
+    conn.executescript(SCHEMA); _migrate(conn)
     t0 = 1_700_000_000_000
     n = 300
     now = t0 + n * 900_000

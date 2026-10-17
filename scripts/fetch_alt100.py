@@ -106,9 +106,7 @@ def probe(_a):
         except Exception as e:  # noqa: BLE001
             rng = f"err {e} {str(b)[:120]}"
         out.append(f"okx rubik {q[:60]}: HTTP {s} {rng}")
-    for j, line in enumerate(out): note(f"probe {j + 1}", line)
-    for n in (8000, 30000, 64000):                                   # how long an annotation survives the API round trip
-        print(f"::warning title=size {n}::" + ("0123456789" * (n // 10)), flush=True)
+    for j, line in enumerate(out): note(f"probe {j + 1}", line, "notice" if j < 10 else "warning")   # ≤ 10 per level per step
 
 
 # ---------------------------------------------------------------------------------------------------------- universe
@@ -314,6 +312,8 @@ def merge(a):
                         open=o, high=h, low=l, close=c, volume_quote=v, open_interest_usd=oi, basis_index_bps=basis.astype(np.float32),
                         is_imputed_metrics=imp, index_close=ixc)
     print(f"merged {len(syms)} coins × {T} bars → {a.out}")
+    txt = " || ".join(notes)
+    for j in range(0, min(len(txt), 10 * 3800), 3800): note(f"fetch notes {j // 3800 + 1}", txt[j:j + 3800])
 
 
 if __name__ == "__main__":

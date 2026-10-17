@@ -16,6 +16,7 @@
   python -m cnq.cli funding [--out web]       paper funding-carry account (spot long + perp short) → web/funding.json
   python -m cnq.cli arb [--out web]           cross-exchange spot spreads net of fees, sampled each run → web/arb.json
   python -m cnq.cli memes [--out web]         HL meme perps + Solana memecoin watchlist + paper «Мем-портфель» → web/memes.json
+  python -m cnq.cli macro [--out web]         DXY, US 10Y/2Y, USDJPY, oil, gold, index futures, VIX, Nikkei: value + 1d/5d change → web/macro.json
 """
 from __future__ import annotations
 
@@ -32,7 +33,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "memes"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "memes", "macro"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -195,6 +196,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"memes.json: {d.get('seconds')}s sources={d['sources']} equity={a['equity']} positions={[p['coin'] for p in a['positions']]} "
               f"hl={[(r['coin'], r['score']) for r in d['hl_memes'][:5]]} sol={[(r['symbol'], r['score'], r['passed']) for r in d['solana'][:5]]} "
               f"events={[e['text'] for e in a['events'][:2]]}")
+    elif args.cmd == "macro":
+        from .agents import macro_watch
+        d = macro_watch.write(args.out)
+        got = [i for i in d["items"] if i["value"] is not None]
+        print(f"macro.json: {len(got)}/{len(d['items'])} items, sources={sorted({i['source'] for i in got})} "
+              f"signals={[i['key'] for i in got if i['signal_ru']]} errors={d['errors'][:3]}")
     elif args.cmd == "channel":
         import os, sqlite3
         from .agents.channel import Channel, kyiv_now

@@ -6,12 +6,47 @@ name: research-macro
 # --decode). Nothing is committed.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "data = download history + publish as annotations; watch = dry run of cnq/agents/macro_watch.py (with and without Yahoo)"
+        required: false
+        default: "data"
 
 permissions:
   contents: read
 
 jobs:
+  watch:
+    if: inputs.mode == 'watch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - name: macro_watch without curl_cffi (Yahoo via urllib, then Treasury / CBOE / ECB fallbacks)
+        run: |
+          python - <<'PY'
+          import json
+          from cnq.agents import macro_watch as mw
+          d = mw.run()
+          s = json.dumps({"items": [[i["key"], i["value"], i["chg_1d"], i["chg_5d"], i["source"], i["asof"], i["signal_ru"][:40]] for i in d["items"]], "errors": d["errors"]}, ensure_ascii=False)
+          print("::notice title=watch urllib::" + s[:3900].replace("%", "%25"))
+          PY
+      - run: pip install -q curl_cffi
+      - name: macro_watch with curl_cffi (as in site.yml)
+        run: |
+          python -m cnq.cli macro --out probe_web
+          python - <<'PY'
+          import json
+          d = json.load(open("probe_web/macro.json"))
+          s = json.dumps({"items": [[i["key"], i["value"], i["chg_1d"], i["chg_5d"], i["source"], i["asof"], i["signal_ru"][:40]] for i in d["items"]], "errors": d["errors"]}, ensure_ascii=False)
+          print("::notice title=watch curl_cffi::" + s[:3900].replace("%", "%25"))
+          PY
+
   fetch:
+    if: inputs.mode != 'watch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

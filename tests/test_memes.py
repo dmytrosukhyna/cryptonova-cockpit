@@ -8,7 +8,7 @@ H, DAY = mm.H, mm.DAY
 NOW = 1_790_000_000_000 - 1_790_000_000_000 % (4 * H) + 20 * 60_000      # 20 min after a 4h boundary
 
 
-def flat_1h(now, px=1.0, vol=1000.0, days=22):
+def flat_1h(now, px=1.0, vol=1e5, days=22):
     """22 days of quiet 1h candles ending with the bar that closes at the last 4h boundary (+ the forming bar)."""
     out = []
     t = now - now % H - days * DAY
@@ -23,7 +23,17 @@ def with_breakout(now, px=1.0, k=6.0):
     b0 = now - now % (4 * H) - 4 * H                      # last CLOSED 4h bar
     for x in c:
         if b0 <= x[0] < b0 + 4 * H:
-            x[2] = px * 1.12; x[4] = px * 1.10; x[5] = 1000.0 * k
+            x[2] = px * 1.12; x[4] = px * 1.10; x[5] = 1e5 * k
+    return c
+
+
+def with_dip(now, px=1.0, close=0.72, days=22):
+    """Quiet market, then the last CLOSED 4h bar falls to `close` (24 h high = px × 1.01) — a fresh dip signal."""
+    c = flat_1h(now, px, days=days)
+    b0 = now - now % (4 * H) - 4 * H
+    for x in c:
+        if b0 <= x[0] < b0 + 4 * H:
+            x[1], x[2], x[3], x[4] = px, px, close * 0.98, close
     return c
 
 
@@ -35,24 +45,38 @@ def no_sol():
     return {"rows": [], "sources": {}}
 
 
-def test_to_4h_and_breakout_metrics():
+def test_to_4h_and_metrics():
     c = with_breakout(NOW)
     b4 = mm.to_4h(c, NOW)
     assert all(b[0] % (4 * H) == 0 and b[0] + 4 * H <= NOW for b in b4)
     r = mm.metrics("WIF", ctx_of(1.10, prev=1.0), c, NOW)
-    assert r["breakout"] is True and r["break_vol_x"] >= 3 and r["break_bar"] == NOW - NOW % (4 * H) - 4 * H
-    assert abs(r["chg24h"] - 10) < 1e-6 and r["above_ma20"] is True
+    assert r["breakout"] is True and r["break_vol_x"] >= 3 and r["signal_bar"] == NOW - NOW % (4 * H) - 4 * H
+    assert abs(r["chg24h"] - 10) < 1e-6 and r["above_ma20"] is True and r["dip_signal"] is False
     q = mm.metrics("WIF", ctx_of(1.0), flat_1h(NOW), NOW)
-    assert q["breakout"] is False and abs(q["chg5d"]) < 1e-9
+    assert q["breakout"] is False and abs(q["chg5d"]) < 1e-9 and q["dip_signal"] is False and q["liq_day"] >= 1e6
+    d = mm.metrics("WIF", ctx_of(0.72), with_dip(NOW), NOW)
+    assert d["dip_signal"] is True and abs(d["dip_dd_pct"] - (0.72 / 1.01 - 1) * 100) < 0.01
+    shallow = mm.metrics("WIF", ctx_of(0.80), with_dip(NOW, close=0.80), NOW)        # −21% → no signal
+    assert shallow["dip_signal"] is False
+    young = mm.metrics("WIF", ctx_of(0.72), with_dip(NOW, days=12), NOW)               # < 20 days of history
+    assert young["dip_signal"] is False and young["new_listing"] is True
+    thin = mm.metrics("WIF", ctx_of(0.72), [x[:5] + [x[5] / 100] for x in with_dip(NOW)], NOW)   # $24k a day
+    assert thin["dip_signal"] is False
 
 
 def test_score_hl_and_signal_text():
-    rows = [mm.metrics(c, ctx_of(p, vol=v, prev=1.0), flat_1h(NOW, 1.0), NOW) for c, p, v in
-            (("A", 1.3, 5e7), ("B", 1.0, 5e7), ("C", 0.9, 5e7), ("D", 1.5, 1e5))]
+    rows = [mm.metrics("A", ctx_of(0.72, vol=5e7), with_dip(NOW), NOW),
+            mm.metrics("B", ctx_of(0.85, vol=5e7), with_dip(NOW, close=0.85), NOW),
+            mm.metrics("C", ctx_of(1.4, vol=5e7, prev=1.0), flat_1h(NOW), NOW),
+            mm.metrics("D", ctx_of(0.72, vol=1e5), with_dip(NOW), NOW)]
     mm.score_hl(rows)
     sc = {r["coin"]: r["score"] for r in rows}
     assert sc["D"] is None and sc["A"] > sc["B"] > sc["C"]
-    assert set(rows[0]["score_parts"]) == {"рост 5д", "рост 24ч", "объём к 7д", "выше 20-дн. средней", "открытый интерес"}
+    assert set(rows[0]["score_parts"]) == {"близость к сигналу", "объём 24ч", "открытый интерес", "погоня"}
+    assert rows[2]["score_parts"]["погоня"] == -20
+    assert mm.signal_text(rows[0]).startswith("сигнал: обвал")
+    assert mm.signal_text(rows[1]).startswith("близко к сигналу")
+    assert mm.signal_text(rows[2]) == "сильный рост за сутки — не догоняем"
     assert mm.signal_text(rows[3]) == "мало объёма — не торгуем"
 
 
@@ -117,7 +141,7 @@ def test_sol_fetch_parsing():
     assert dead["rows"] == [] and not any(dead["sources"].values())
 
 
-def _run(conn, now, px, candles, rule="breakout", funding_h=0.0):
+def _run(conn, now, px, candles, rule="dip", funding_h=0.0):
     old = mm.RULE
     mm.RULE = rule
     try:
@@ -127,30 +151,36 @@ def _run(conn, now, px, candles, rule="breakout", funding_h=0.0):
         mm.RULE = old
 
 
-def test_breakout_entry_then_stop():
+def test_dip_entry_then_stop():
     conn = sqlite3.connect(":memory:")
-    r = _run(conn, NOW, 1.10, {"WIF": with_breakout(NOW)})
+    r = _run(conn, NOW, 0.72, {"WIF": with_dip(NOW)})
     pos = r["account"]["positions"]
-    assert [p["coin"] for p in pos] == ["WIF"] and any(e["text"].startswith("Купили WIF по $1.1000") for e in r["account"]["events"])
-    assert abs(pos[0]["invested"] - 1000 * (1 + mm.COST / 2)) < 0.01 and pos[0]["stop_px"] == 1.10 * 0.75
+    assert [p["coin"] for p in pos] == ["WIF"] and any(e["text"].startswith("Купили WIF по $0.72") for e in r["account"]["events"])
+    assert abs(pos[0]["invested"] - 1000 * (1 + mm.COST / 2)) < 0.01 and abs(pos[0]["stop_px"] - 0.72 * 0.75) < 1e-12
     # same 4h bar again → no second entry; price falls through the stop inside a closed 1h bar
-    r = _run(conn, NOW + 30 * 60_000, 1.05, {"WIF": with_breakout(NOW)})
+    r = _run(conn, NOW + 30 * 60_000, 0.70, {"WIF": with_dip(NOW)})
     assert len(r["account"]["positions"]) == 1
     t2 = NOW + 2 * H
-    c = with_breakout(NOW) + [[NOW - NOW % H + H, 1.05, 1.06, 0.70, 0.80, 1000.0]]
-    r = _run(conn, t2, 0.80, {"WIF": c})
+    c = with_dip(NOW) + [[NOW - NOW % H + H, 0.70, 0.71, 0.45, 0.50, 1e5]]
+    r = _run(conn, t2, 0.50, {"WIF": c})
     acc = r["account"]
     assert acc["positions"] == [] and acc["closed"][0]["why"].startswith("стоп")
-    assert abs(acc["closed"][0]["exit_px"] - 1.10 * 0.75) < 1e-9                  # filled at the stop, not at the bar low
+    assert abs(acc["closed"][0]["exit_px"] - 0.72 * 0.75) < 1e-9                  # filled at the stop, not at the bar low
     assert acc["closed"][0]["pnl_pct"] < -25 and any(e["text"].startswith("Стоп: продали WIF") for e in acc["events"])
     assert abs(acc["equity"] - (10_000 + acc["closed"][0]["pnl_usd"])) < 0.02
-    r = _run(conn, t2 + 30 * 60_000, 0.80, {"WIF": with_breakout(NOW)})   # the old breakout bar is not re-used
+    r = _run(conn, t2 + 30 * 60_000, 0.50, {"WIF": with_dip(NOW)})       # the old signal bar is not re-used
+    assert r["account"]["positions"] == []
+
+
+def test_stale_signal_not_entered():
+    conn = sqlite3.connect(":memory:")
+    r = _run(conn, NOW + 5 * H, 0.72, {"WIF": with_dip(NOW)[:-5]})       # last closed bar is the dip, but runs were missed for 5 h
     assert r["account"]["positions"] == []
 
 
 def test_take_profit_half_then_time_exit_and_funding():
     conn = sqlite3.connect(":memory:")
-    _run(conn, NOW, 1.0, {"WIF": with_breakout(NOW, px=1.0 / 1.10)}, funding_h=0.0001)
+    _run(conn, NOW, 1.0, {"WIF": with_dip(NOW, px=1.4, close=1.0)}, funding_h=0.0001)
     t1 = NOW + 3 * H
     c = flat_1h(NOW, 1.0) + [[NOW - NOW % H + H, 1.0, 1.60, 0.98, 1.40, 1000.0]]
     r = _run(conn, t1, 1.40, {"WIF": c}, funding_h=0.0001)
@@ -167,7 +197,7 @@ def test_take_profit_half_then_time_exit_and_funding():
 
 def test_pending_rule_no_trades_and_no_hl():
     conn = sqlite3.connect(":memory:")
-    r = _run(conn, NOW, 1.10, {"WIF": with_breakout(NOW)}, rule="pending")
+    r = _run(conn, NOW, 0.72, {"WIF": with_dip(NOW)}, rule="pending")
     assert r["account"]["positions"] == [] and r["account"]["equity"] == 10_000
     r = mm.run(conn, NOW + H, hl_ctx_fn=lambda: {}, hl_candles_fn=lambda *a: [], sol_fn=no_sol)
     assert r["hl_memes"] == [] and r["account"]["equity"] == 10_000 and r["warnings"][0].startswith("Hyperliquid не ответил")
@@ -178,15 +208,15 @@ def test_json_shape_and_max_positions():
     conn = sqlite3.connect(":memory:")
     coins = [f"C{i}" for i in range(9)]
     old = mm.RULE, mm.MEME_COINS
-    mm.RULE = "breakout"
+    mm.RULE = "dip"
     try:
-        r = mm.run(conn, NOW, hl_ctx_fn=lambda: {c: ctx_of(1.10) for c in coins},
-                   hl_candles_fn=lambda c, s, e: with_breakout(NOW, k=5 + int(c[1:])), sol_fn=no_sol)
+        r = mm.run(conn, NOW, hl_ctx_fn=lambda: {c: ctx_of(0.74 - 0.01 * int(c[1:])) for c in coins},
+                   hl_candles_fn=lambda c, s, e: with_dip(NOW, close=0.74 - 0.01 * int(c[1:])), sol_fn=no_sol)
     finally:
         mm.RULE = old[0]
     acc = r["account"]
     assert len(acc["positions"]) == mm.MAX_POS
-    assert {p["coin"] for p in acc["positions"]} == {f"C{i}" for i in range(3, 9)}      # strongest volume spikes first
+    assert {p["coin"] for p in acc["positions"]} == {f"C{i}" for i in range(3, 9)}      # deepest dips first
     for k in ("asof", "account", "hl_memes", "solana", "warnings", "research_summary", "sources", "score_formula", "solana_note"):
         assert k in r, k
     for k in ("equity", "pnl_usd", "pnl_pct", "positions", "closed", "events", "rules", "rule_status", "history", "limits"):

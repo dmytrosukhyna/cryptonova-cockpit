@@ -51,7 +51,9 @@ COST = 0.0015                                # round trip; half charged on entry
 STOP, TP, TP_FRAC = -0.25, 0.50, 0.5
 HOLD_H = 72                                  # time exit
 MIN_VOL24 = 1_000_000                        # HL meme must trade ≥ $1M a day to be traded/ranked
-BREAK_K = 3.0                                # breakout bar volume ≥ 3 × median 4h volume of the previous 7 days
+BREAK_K = 3.0                                # breakout bar volume ≥ 3 × median 4h volume of the previous 7 days (shown, not traded)
+DIP = -0.25                                  # dip rule: 4h close ≥ 25% below the 24 h high
+WARMUP_4H = 121                              # ≥ 20 days of 4h bars on HL before a coin is traded (as in the research)
 RULE_STATUS = "эксперимент"
 RULE = "pending"                             # set from the research (docs/research/memes.md)
 RULES_TEXT = "Правило ещё не выбрано: идёт исследование. Сделок нет."
@@ -78,9 +80,10 @@ WARNINGS = [
 
 RESEARCH_SUMMARY = {"status": "в работе", "text": "Исследование ещё не завершено.", "doc": "docs/research/memes.md"}
 
-SCORE_HL = ("балл 0–100 = 35 × место по росту за 5 дней + 20 × место по росту за 24 ч + 20 × место по объёму к среднему за 7 дней "
-            "+ 15 × (цена выше 20-дневной средней) + 10 × место по открытому интересу; «место» — доля мемов, которых монета обгоняет (0…1). "
-            "Мемы с объёмом < $1M в сутки не ранжируются.")
+SCORE_HL = ("балл 0–100 = 50 × близость к сигналу покупки (насколько цена ниже максимума за сутки: 0% → 0, −25% и глубже → 50) "
+            "+ 30 × место по объёму за 24 ч + 20 × место по открытому интересу − 20, если за сутки уже +30% и больше. "
+            "«Место» — доля мемов, которых монета обгоняет (0…1). Рост НЕ награждаем: в истории покупка мемов после роста и "
+            "пробоев давала минус. Мемы с объёмом < $1M в сутки не ранжируются.")
 SCORE_SOL = ("балл 0–100 = импульс (0–30: рост за 6 ч, полный балл от +50%; ×0.5 если за сутки уже > +300% или за час < −15%) "
              "+ рост объёма (0–25: объём последнего часа ×24 к объёму за сутки, полный балл при ×2) "
              "+ ликвидность (0–25: логарифм, $100k = 0, $5M = 25) + возраст пула (0–20: полный балл с 7 дней) "
@@ -191,28 +194,35 @@ def metrics(coin: str, ctx: dict, c1: list[list[float]], now: int) -> dict:
     if len(b4) >= 43:
         last, prev6, prev42 = b4[-1], b4[-7:-1], b4[-43:-1]
         med = _median([b[5] for b in prev42])
-        row["break_bar"] = last[0]
+        row["signal_bar"] = last[0]
+        row["liq_day"] = round(med * 6) if med else None
         row["break_vol_x"] = round(last[5] / med, 2) if med else None
         row["breakout"] = bool(med and last[4] > max(b[2] for b in prev6) and last[5] >= BREAK_K * med)
+        # dip rule (research rule C): last closed 4h close ≥ 25% below the high of the last 24 h (6 bars incl. it), fresh cross
+        dd = last[4] / max(b[2] for b in b4[-6:]) - 1
+        dd_prev = b4[-2][4] / max(b[2] for b in b4[-7:-1]) - 1
+        row["dip_dd_pct"] = round(dd * 100, 2)
+        row["dip_signal"] = bool(len(b4) >= WARMUP_4H and dd <= DIP and dd_prev > DIP and med and med * 6 >= MIN_VOL24)
+        row["new_listing"] = len(b4) < WARMUP_4H
     return row
 
 
 def _rank(rows, key):
+    """{row index: share of the other rows with a strictly smaller value} (ties share a rank)."""
     vals = [(r.get(key), i) for i, r in enumerate(rows) if r.get(key) is not None]
-    vals.sort()
-    out = {}
-    for k, (_, i) in enumerate(vals):
-        out[i] = k / max(1, len(vals) - 1)
-    return out
+    return {i: sum(1 for w, _ in vals if w < v) / max(1, len(vals) - 1) for v, i in vals}
 
 
 def score_hl(rows: list[dict]) -> None:
     liq = [r for r in rows if r["vol24"] >= MIN_VOL24]
-    r5, r24, rv, roi = _rank(liq, "chg5d"), _rank(liq, "chg24h"), _rank(liq, "vol_ratio"), _rank(liq, "oi_usd")
+    rv, roi = _rank(liq, "vol24"), _rank(liq, "oi_usd")
     for i, r in enumerate(liq):
-        parts = {"рост 5д": 35 * r5.get(i, 0), "рост 24ч": 20 * r24.get(i, 0), "объём к 7д": 20 * rv.get(i, 0),
-                 "выше 20-дн. средней": 15 if r.get("above_ma20") else 0, "открытый интерес": 10 * roi.get(i, 0)}
-        r["score"] = round(sum(parts.values()))
+        dd = r.get("dip_dd_pct")
+        if dd is None:
+            dd = r.get("from_high24_pct")
+        parts = {"близость к сигналу": 50 * min(1.0, max(0.0, -(dd or 0) / (-DIP * 100))), "объём 24ч": 30 * rv.get(i, 0),
+                 "открытый интерес": 20 * roi.get(i, 0), "погоня": -20 if (r.get("chg24h") or 0) >= 30 else 0}
+        r["score"] = max(0, round(sum(parts.values())))
         r["score_parts"] = {k: round(v, 1) for k, v in parts.items()}
     for r in rows:
         r.setdefault("score", None)
@@ -221,13 +231,15 @@ def score_hl(rows: list[dict]) -> None:
 def signal_text(r: dict) -> str:
     if r["vol24"] < MIN_VOL24:
         return "мало объёма — не торгуем"
+    if r.get("new_listing"):
+        return "новый листинг — мало истории, не торгуем"
+    if r.get("dip_signal"):
+        return f"сигнал: обвал {r['dip_dd_pct']:.0f}% от максимума за сутки — покупаем по правилу (эксперимент)"
+    dd = r.get("dip_dd_pct")
+    if dd is not None and dd <= -15:
+        return f"близко к сигналу: {dd:.0f}% от максимума за сутки (сигнал с −25%)"
     if r.get("breakout"):
-        return f"пробой 24-часового максимума на объёме ×{r.get('break_vol_x')}"
-    f = r.get("from_high24_pct")
-    if f is not None and f <= -20:
-        return f"обвал {f:.0f}% от максимума за сутки — высокий риск"
-    if r.get("above_ma20") is False:
-        return "ниже 20-дневной средней — слабость"
+        return f"пробой на объёме ×{r.get('break_vol_x')} — в истории такие пробои у мемов чаще разворачивались, не догоняем"
     if (r.get("chg24h") or 0) >= 20:
         return "сильный рост за сутки — не догоняем"
     return "ждём"
@@ -471,17 +483,24 @@ def _usd(x: float) -> str:
 
 def entry_signals(rows: list[dict], held: set[str], conn, now: int) -> list[tuple[str, float, str]]:
     """[(coin, strength, reason)] — coins the RULE wants to buy now. Strongest first."""
-    if RULE != "breakout":
-        return []
     out = []
     for r in rows:
-        if r["coin"] in held or r["vol24"] < MIN_VOL24 or not r.get("breakout"):
+        if r["coin"] in held or r["vol24"] < MIN_VOL24 or "signal_bar" not in r:
             continue
-        bar = r["break_bar"]
-        last = int(_meta(conn, f"last_bar:{r['coin']}", 0))
-        if bar <= last:                       # this 4h bar was already used (entered or exited inside it)
+        if RULE == "dip" and r.get("dip_signal"):
+            why = f"цена упала на {-r['dip_dd_pct']:.0f}% от максимума за сутки (правило «откуп обвала мема»)"
+            strength = -r["dip_dd_pct"]
+        elif RULE == "breakout" and r.get("breakout"):
+            why = f"пробой 24-часового максимума на объёме ×{r.get('break_vol_x')} к обычному"
+            strength = r.get("break_vol_x") or 0
+        else:
             continue
-        out.append((r["coin"], r.get("break_vol_x") or 0, f"пробой 24-часового максимума на объёме ×{r.get('break_vol_x')} к обычному"))
+        bar = r["signal_bar"]
+        if now - (bar + 4 * H) > 4 * H:       # signal bar closed more than 4 h ago (missed runs) — too late to enter
+            continue
+        if bar <= int(_meta(conn, f"last_bar:{r['coin']}", 0)):   # this 4h bar was already used (entered or exited inside it)
+            continue
+        out.append((r["coin"], strength, why))
     return sorted(out, key=lambda x: -x[1])
 
 
@@ -573,7 +592,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
                 break
             cash -= cost_in
             conn.execute("INSERT INTO meme_pos VALUES(?,?,?,?,?,?,?,?,?,?,?)", (coin, px, notional / px, notional / px, cost_in, 0.0, now, 0, 0.0, now - now % H, reason))
-            bar = next((r.get("break_bar") for r in rows if r["coin"] == coin), now)
+            bar = next((r.get("signal_bar") for r in rows if r["coin"] == coin), now)
             _set(conn, f"last_bar:{coin}", bar)
             held.add(coin)
             ev.append((now, f"Купили {coin} по {_px(px)} на ${notional:,.0f} ({SIZE * 100:.0f}% счёта): {reason}. Стоп {_px(px * (1 + STOP))}, "

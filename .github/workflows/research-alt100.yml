@@ -1,0 +1,116 @@
+name: research-alt100
+# Manual only (no schedule, no self-dispatch). Top-100 altcoin research, docs/research/alt100.md:
+#   probe    — what the public sources give from CI (ranking APIs, Binance public archive, OKX index / OI history depth)
+#   data     — universe (CoinGecko top-100 → OKX swap + Binance perp history ≤ 2024-01) + 15m klines / index klines /
+#              5-min OI from data.binance.vision in 4 shards → artifact alt100 (7 days). Nothing is committed.
+#   all      — data, then analyze
+#   analyze  — scripts/alt100_test.py on the alt100 artifact of run `data_run_id`; results are published as the job
+#              summary + annotations (artifact downloads are not reachable from the research container).
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "probe | data | all | analyze"
+        required: true
+        default: "all"
+      data_run_id:
+        description: "for stage=analyze: run id of a research-alt100 run that produced the alt100 artifact"
+        required: false
+        default: ""
+      args:
+        description: "extra arguments for scripts/alt100_test.py (sections), e.g. 'rules portfolio'"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    if: inputs.stage == 'probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - run: python scripts/fetch_alt100.py probe
+
+  universe:
+    if: inputs.stage == 'data' || inputs.stage == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - run: python scripts/fetch_alt100.py universe --top 100 --min-month 2024-01 --out universe.json
+      - uses: actions/upload-artifact@v4
+        with: { name: universe, path: universe.json, retention-days: 7 }
+
+  fetch:
+    needs: universe
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix: { shard: [0, 1, 2, 3] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - uses: actions/download-artifact@v4
+        with: { name: universe }
+      - run: python scripts/fetch_alt100.py fetch --universe universe.json --shard ${{ matrix.shard }} --nshards 4 --out shard_${{ matrix.shard }}.npz
+      - uses: actions/upload-artifact@v4
+        with: { name: "shard_${{ matrix.shard }}", path: "shard_${{ matrix.shard }}.npz", retention-days: 2 }
+
+  merge:
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - uses: actions/download-artifact@v4
+        with: { pattern: "shard_*", merge-multiple: true }
+      - uses: actions/download-artifact@v4
+        with: { name: universe }
+      - run: python scripts/fetch_alt100.py merge shard_*.npz --universe universe.json --out alt100.npz
+      - uses: actions/upload-artifact@v4
+        with: { name: alt100, path: alt100.npz, retention-days: 7 }
+
+  analyze:
+    needs: merge
+    if: always() && (inputs.stage == 'analyze' || (inputs.stage == 'all' && needs.merge.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy pandas
+      - uses: actions/download-artifact@v4
+        if: inputs.stage == 'all'
+        with: { name: alt100 }
+      - uses: actions/download-artifact@v4
+        if: inputs.stage == 'analyze'
+        with:
+          name: alt100
+          run-id: ${{ inputs.data_run_id }}
+          github-token: ${{ github.token }}
+      - name: Alt-100 test
+        env: { ARGS: "${{ inputs.args }}" }
+        run: python scripts/alt100_test.py alt100.npz --md results.md $ARGS
+      - name: Publish results
+        if: always()
+        run: |
+          test -f results.md || exit 0
+          cat results.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/alt100_test.py --annotate results.md

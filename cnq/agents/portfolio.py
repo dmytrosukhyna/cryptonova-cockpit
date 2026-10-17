@@ -349,13 +349,21 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
     state = SpotPortfolio(conn).step(rows, pk, btc_bull, now)
     note = market_note(btc_bull, btc, pk, state)
     llm_note = ""
-    if llm is not None and bool(getattr(llm, "available", False)):
+    # 17.10: this call ran every 30 min and alone used up Groq's free 200k tokens/day (channel fact-check then failed with 429).
+    # Now at most once per 6 hours; in between the last note is reused.
+    conn.execute("CREATE TABLE IF NOT EXISTS portfolio_llm(k TEXT PRIMARY KEY, t INTEGER, note TEXT)")
+    cached = conn.execute("SELECT t, note FROM portfolio_llm WHERE k='note'").fetchone()
+    t_now = now or int(time.time() * 1000)
+    if cached and t_now - cached[0] < 6 * 3_600_000:
+        llm_note = cached[1] or ""
+    elif llm is not None and bool(getattr(llm, "available", False)):
         try:
             llm_note = llm.complete(PORTFOLIO_SYSTEM, json.dumps({"btc_bull": btc_bull, "btc": btc, "picks": {h: pk[h][:5] for h in HORIZONS},
                                                                   "portfolio": {k: state[k] for k in ("positions", "cash_pct", "invested_pct", "index", "actions")}},
                                                                  ensure_ascii=False, default=str)).strip()
+            conn.execute("INSERT OR REPLACE INTO portfolio_llm VALUES('note', ?, ?)", (t_now, llm_note)); conn.commit()
         except Exception:  # noqa: BLE001
-            llm_note = ""
+            llm_note = cached[1] if cached else ""
     hl_spot_list = sorted(hl.get("spot", {}).items(), key=lambda kv: -kv[1]["vol24"])[:15]
     # the other two risk profiles (conservative / high risk) run on the same prices; research cards come from web/research.json
     from .spot_profiles import RiskPortfolio, PROFILES as RP

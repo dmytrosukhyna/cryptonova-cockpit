@@ -178,8 +178,10 @@ def hl_spot() -> list[dict]:
     toks = {t["index"]: t["name"] for t in meta.get("tokens", [])}
     uni = meta.get("universe", [])
     by_name = {pr.get("name"): pr for pr in uni}
-    if ctxs and all(isinstance(c, dict) and c.get("coin") in by_name for c in ctxs):
-        pairs = [(by_name[c["coin"]], c) for c in ctxs]         # align by the pair name each context carries
+    # HL returns more contexts than pairs and in another order (1117 vs 332 on 17.10.2026): align by the pair name each
+    # context carries; contexts without a known pair are skipped. Positional zip only if no context has a name at all.
+    if any(isinstance(c, dict) and c.get("coin") for c in ctxs):
+        pairs = [(by_name[c["coin"]], c) for c in ctxs if isinstance(c, dict) and c.get("coin") in by_name]
     else:
         pairs = list(zip(uni, ctxs))
     best: dict[str, dict] = {}

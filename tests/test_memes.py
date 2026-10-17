@@ -217,7 +217,7 @@ def test_spot_and_btc_context():
     assert [x["token"] for x in sp] == ["WOW"] and sp[0]["chg24h"] == 100.0          # wrapped BTC and thin NEKO dropped
     for u in meta["universe"]:
         u["name"] = "@" + str(u["tokens"][0])
-    shuffled = [dict(ctxs[2], coin="@3"), dict(ctxs[0], coin="@1"), dict(ctxs[1], coin="@2")]  # contexts in another order
+    shuffled = [dict(ctxs[1], coin="@99"), dict(ctxs[2], coin="@3"), dict(ctxs[0], coin="@1"), dict(ctxs[1], coin="@2")]  # extra + reordered
     mm._req = lambda url, body=None, timeout=10, headers=None: [meta, shuffled]
     try:
         sp = mm.hl_spot()

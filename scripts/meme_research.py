@@ -928,7 +928,8 @@ def probe() -> str:
     sp = hl({"type": "spotMetaAndAssetCtxs"}) or [{}, []]
     toks = {t["index"]: t["name"] for t in (sp[0] or {}).get("tokens", [])}
     spv = []
-    for pr, c in zip((sp[0] or {}).get("universe", []), sp[1] or []):
+    byn = {pr.get("name"): pr for pr in (sp[0] or {}).get("universe", [])}
+    for pr, c in [(byn[c["coin"]], c) for c in sp[1] or [] if isinstance(c, dict) and c.get("coin") in byn]:
         try:
             spv.append((toks.get(pr["tokens"][0], pr["name"]), round(float(c.get("dayNtlVlm") or 0) / 1e6, 2)))
         except (KeyError, IndexError, TypeError, ValueError):

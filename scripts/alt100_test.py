@@ -58,6 +58,8 @@ CORE18 = "BTC ETH SOL BNB XRP DOGE ADA AVAX LINK LTC DOT NEAR BCH TRX SUI APT AR
 KEYS = ["open", "high", "low", "close", "volume_quote", "open_interest_usd", "is_imputed_metrics", "basis_index_bps"]
 GAP = 3 * 96                              # a hole > 3 days inside a coin's history = relisting / ticker reuse → keep only after it
 LATE = int(dt.datetime(2024, 2, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+# a ticker that names a different coin in the ranking than in the exchange history → not tested
+REUSED = {"LIT": "CoinGecko's LIT (#89) is Lighter (launched 12.2025); Binance LITUSDT history since 2022 is Litentry, another coin"}
 CLEAN = {}
 
 
@@ -99,7 +101,7 @@ OOS = int(np.searchsorted(times, 1735689600000))          # 2025-01-01
 first = np.array([np.argmax(np.isfinite(C[k])) if np.isfinite(C[k]).any() else T for k in range(NS)])
 core = [k for k, s in enumerate(syms) if s in CORE18]
 alts_all = [k for k in range(NS) if syms[k] not in CORE18]
-elig = [k for k in alts_all if first[k] < T and times[first[k]] < LATE]
+elig = [k for k in alts_all if first[k] < T and times[first[k]] < LATE and syms[k] not in REUSED]
 late = [k for k in alts_all if k not in elig]
 alts = [k for k in elig if RANK.get(syms[k], 0) <= 125]       # the hypothesis: altcoins of the top 100 (≈ market-cap rank ≤ 125 incl. stables)
 alts2 = [k for k in elig if RANK.get(syms[k], 0) > 125]       # extra independent check: ranks 101–200 (top-200 data set only)
@@ -418,14 +420,17 @@ if "data" in SECT:
     if alts2: P(f"Alts ranks 101–200 ({len(alts2)}): " + " ".join(f"{syms[k]}#{RANK.get(syms[k], 0)}" for k in alts2) + "  ")
     if late: P(f"Alts dropped (history starts after 2024-01 once cleaned): {' '.join(syms[k] for k in late)}  ")
     for s, msg in CLEAN.items(): P(f"Cleaned {s}: {msg}  ")
-    P("\n| coin | rank | first bar | OI bars real | basis median bp | basis ≤ −20 share | 2023–26 move |")
-    P("|---|---|---|---|---|---|---|")
+    for s, msg in REUSED.items():
+        if s in syms: P(f"Excluded {s}: {msg}  ")
+    P("\n| coin | rank | first bar | OI bars real | basis median bp | basis ≤ −20 share | 2023–26 move | largest 15m jump |")
+    P("|---|---|---|---|---|---|---|---|")
     b = ap.A["basis_index_bps"]
     for k in core + alts + alts2:
         seg = slice(max(START, first[k]), T)
         oi = (ap.IMP[k, seg] == 0).mean() * 100; bb = b[k, seg]
         mv = C[k, T - 1] / C[k, max(START, first[k])] - 1 if np.isfinite(C[k, T - 1]) else np.nan
-        P(f"| {syms[k]} | {RANK.get(syms[k], 0)} | {DAY[first[k]]} | {oi:.0f}% | {np.nanmedian(bb):+.1f} | {np.nanmean(bb <= -20) * 100:.2f}% | {mv * 100:+.0f}% |")
+        jr = np.nanmax(np.abs(np.log(O[k, seg][1:] / C[k, seg][:-1]))) * 100
+        P(f"| {syms[k]} | {RANK.get(syms[k], 0)} | {DAY[first[k]]} | {oi:.0f}% | {np.nanmedian(bb):+.1f} | {np.nanmean(bb <= -20) * 100:.2f}% | {mv * 100:+.0f}% | {jr:.0f}% |")
     P()
 
 # ---- candidates (computed once) ----

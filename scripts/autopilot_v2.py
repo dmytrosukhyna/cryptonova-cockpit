@@ -77,6 +77,28 @@ def cand_F(oi=-0.12, px=-0.05, delay=1, hold=96, gap=16, stop=0.06):
     return out
 
 
+def cand_D(th=-20.0, n=4, hold=96, gap=96, stop=0.12, delay=1):
+    """Rule D «дисконт фьючерса»: the perp trades ≥20 bp below its spot index on a 1-hour average (basis_index_bps, real
+    metrics only) → long next bar, exit after 24 h, catastrophe stop −12 %. Off by default (d_share=0 in simulate).
+    docs/research/new_signals.md"""
+    b = np.where(IMP == 0, A['basis_index_bps'], np.nan)
+    cs = np.cumsum(np.nan_to_num(b), 1); cn = np.cumsum(np.isfinite(b), 1)
+    m = np.full_like(b, np.nan); m[:, n:] = (cs[:, n:] - cs[:, :-n]) / n
+    m[:, n:][(cn[:, n:] - cn[:, :-n]) < n] = np.nan
+    out = []
+    with np.errstate(invalid='ignore'):
+        M = m <= th
+    for k in range(NS):
+        last = -10 ** 9
+        for i in np.where(M[k])[0]:
+            if i < START or i - last < gap or i + delay + hold + 2 >= T: continue
+            last = i; i0 = i + delay
+            if not np.isfinite(O[k, i0]): continue
+            e = O[k, i0]; x, g = walk(k, i0, 1, e * (1 - stop), None, hold - 1)
+            out.append(dict(rule='D', k=k, i=i0, x=x, ret=g - COST, sf=stop))
+    return out
+
+
 def cand_S(brk_d=5, trend_d=20, trail_d=1, max_d=14, stop=0.08, btc_filter=False):
     """Rule S «свинг»: close above the N-day closing high while above the 20-day mean → long next bar;
     exit when a close falls below the trailing 1-day closing low (after the first hour), stop −8 %, max 14 days.
@@ -109,7 +131,7 @@ def cand_S(brk_d=5, trend_d=20, trail_d=1, max_d=14, stop=0.08, btc_filter=False
 
 
 def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f_share=0.15, f_open=3, lev_cap=3.0, start=10_000.0,
-             s_share=0.0, s_open=0, e_gap=40):
+             s_share=0.0, s_open=0, e_gap=40, d_share=0.0, d_open=0):
     ev = sorted([c for c in cands if c['rule'] in rules], key=lambda c: c['i'])
     byi = collections.defaultdict(list)
     for c in ev: byi[c['i']].append(c)
@@ -136,6 +158,9 @@ def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f
             elif c['rule'] == 'S':
                 if sum(1 for o in open_ if o['rule'] == 'S') >= s_open: continue
                 n = eq * s_share
+            elif c['rule'] == 'D':                      # rule D: share of equity per trade, at most d_open at once
+                if sum(1 for o in open_ if o['rule'] == 'D') >= d_open: continue
+                n = eq * d_share
             else:
                 if sum(1 for o in open_ if o['rule'] == 'B') >= max_open: continue
                 n = min(eq * risk / c['sf'], eq * 3)

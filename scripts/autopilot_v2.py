@@ -131,7 +131,7 @@ def cand_S(brk_d=5, trend_d=20, trail_d=1, max_d=14, stop=0.08, btc_filter=False
 
 
 def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f_share=0.15, f_open=3, lev_cap=3.0, start=10_000.0,
-             s_share=0.0, s_open=0, e_gap=40, d_share=0.0, d_open=0):
+             s_share=0.0, s_open=0, e_gap=40, d_share=0.0, d_open=0, r_share=0.0, r_open=0):
     ev = sorted([c for c in cands if c['rule'] in rules], key=lambda c: c['i'])
     byi = collections.defaultdict(list)
     for c in ev: byi[c['i']].append(c)
@@ -142,6 +142,8 @@ def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f
             if o['x'] < i: eq += o['pnl']; trades.append(o); curve.append((o['x'], eq))
             else: still.append(o)
         open_ = still; held = {o['k'] for o in open_}
+        if r_share:   # rule R (range / limit orders, docs/research/range.md): its positions do not block other rules on the same coin
+            held = {o['k'] for o in open_ if o['rule'] != 'R'}; held_r = {o['k'] for o in open_ if o['rule'] == 'R'}
         gross = sum(o['usd'] for o in open_)
         es = [c for c in byi[i] if c['rule'] == 'E' and c['k'] not in held]
         if es and i - last_e >= e_gap:
@@ -151,6 +153,10 @@ def simulate(cands, rules=('B', 'E', 'F'), risk=0.01, max_open=4, e_share=0.2, f
                 open_.append(dict(c, pnl=n * c['ret'], usd=n)); held.add(c['k']); gross += n
             last_e = i
         for c in byi[i]:
+            if c['rule'] == 'R':                        # rule R: share of equity per trade, at most r_open at once; off by default
+                n = eq * r_share
+                if not r_share or c['k'] in held_r or sum(1 for o in open_ if o['rule'] == 'R') >= r_open or gross + n > eq * lev_cap: continue
+                open_.append(dict(c, pnl=n * c['ret'], usd=n)); held_r.add(c['k']); gross += n; continue
             if c['rule'] == 'E' or c['k'] in held: continue
             if c['rule'] == 'F':
                 if sum(1 for o in open_ if o['rule'] == 'F') >= f_open: continue

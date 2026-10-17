@@ -3,9 +3,9 @@
 Ideas tested on 18 coins, 15m bars 2023-01 → 2026-09:
   1. levels  — buy limit at an intermediate support (1h / 4h fractals, volume-profile nodes 7/30 d, round numbers, all of them),
                stop = level − m·ATR(1h), target = next level up or fixed R; mirror short at resistance (reported separately)
-  2. grid    — when the N-day range is narrow and flat: limit buys every g % below the range middle, each sold at +g %;
+  2. grid    — when the range regime is on: limit buys every g % below the range middle, each sold at +g %;
                the whole grid is abandoned (stop-market) when price breaks the range low by b %
-  3. mr      — range mean reversion: buy limit at the bottom 10–20 % of the N-day range, sell at the middle / top
+  3. mr      — range mean reversion: buy limit at the bottom 10–30 % of the N-day range, sell at the middle / top
   4. calm    — any of the above only while breadth < 0.4 (share of coins down > 3 % in 24 h), the time rule E is silent
 Costs: maker 0.02 % per side for a limit entry and a limit target (0.04 % round trip); a stop or time exit is a market order:
 taker 0.055 % + slippage 0.02 %. Fills: orders are computed at the close of hour h and rest during the NEXT hour only
@@ -13,10 +13,14 @@ taker 0.055 % + slippage 0.02 %. Fills: orders are computed at the close of hour
 the fill bar can hit the stop (counted as a stop) but never the target; a target fills when a later high ≥ target·(1 + 0.01 %);
 if one bar touches both stop and target → stop. Random baseline: same orders, but the entry depth (in ATR units) is taken from
 a random other hour of the same coin, so the timing / volatility is identical and only the "level" information is removed.
-Usage: python scripts/range_test.py [levels|grid|mr|calm|robust|portfolio|all]"""
+Regimes: narrow (width below the coin's past-year median), ADX(4h) < 20, oscillating (many crossings of the N-day mean),
+all with a net move ≤ ½ width; calm = breadth < 0.4. Verdict: nothing passes (docs/research/range.md).
+Usage: python scripts/range_test.py [levels|grid|mr|search|search_lv|search_mr|search_grid|robust|portfolio|why|all]
+(all ≈ 2 h on 1 core; features are cached next to the data as range_feat_v1.npz)"""
 import sys, os, time, collections, numpy as np, pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import autopilot_v2 as ap
+import ap_data
 
 O, H, L, C, V, T, NS, START, DAY = ap.O, ap.H, ap.L, ap.C, ap.V, ap.T, ap.NS, ap.START, ap.DAY
 SYMS = [str(s).replace('USDT', '') for s in ap.syms]
@@ -25,7 +29,6 @@ C_TGT, C_MKT = 2 * MAKER, MAKER + TAKER + SLIP          # limit→limit round tr
 NH = T // 4; H0 = START // 4                             # hourly grid; decision at the close of hour h = 15m bar 4h+3
 DAYS = (T - START) / 96
 YEARS = ('2023', '2024', '2025', '2026')
-import ap_data
 CACHE = os.path.join(os.environ.get('CNQ_RT_CACHE', ap_data.SRC), 'range_feat_v1.npz')     # derived features, rebuilt if missing
 np.seterr(all='ignore')
 
@@ -64,7 +67,7 @@ def adx4h(n=14):
         tr = np.fmax(h4[k] - l4[k], np.fmax(abs(h4[k] - pc), abs(l4[k] - pc)))
         s = pd.DataFrame(dict(tr=tr, p=pdm, n=ndm)).ewm(alpha=1 / n, adjust=False, ignore_na=True).mean()
         pdi = 100 * s.p / s.tr; ndi = 100 * s.n / s.tr; dx = 100 * abs(pdi - ndi) / (pdi + ndi)
-        a = dx.ewm(alpha=1 / n, adjust=False, ignore_na=True).mean().to_numpy()
+        a = dx.ewm(alpha=1 / n, adjust=False, ignore_na=True).mean().to_numpy().copy()
         a[np.isnan(c4[k])] = np.nan
         # value of 4h bar q is known at the close of hour 4q+3 → used for hours 4q+3 … 4q+6
         hh = np.arange(NH); q = (hh - 3) // 4; okq = q >= 0
@@ -103,7 +106,7 @@ def features():
 # ------------------------------------------------------------------------------------------------------- level families
 def pivots(hi, lo, k):
     """Fractal pivots: bar m is a swing low if its low is the lowest of m−k … m+k (ties → first). Known after bar m+k."""
-    n = len(hi); out = []
+    n = len(hi)
     from numpy.lib.stride_tricks import sliding_window_view as sw
     if n < 2 * k + 1: return np.zeros(0), np.zeros(0)
     wl = sw(lo, 2 * k + 1); wh = sw(hi, 2 * k + 1)
@@ -267,12 +270,30 @@ def stats(tr, label='', show=True, base=None):
 
 
 # ----------------------------------------------------------------------------------------------------------- regimes
-def regime(F, kind, N=14, q=50, slope=0.5, adx=None):
-    w, th = F[f'w{N}'], F[f'wq{N}_{q}']
-    rng = (w <= th) & (F[f'slope{N}'] <= slope)
-    if adx is not None: rng &= F['adx'] <= adx
-    calm = F['br'] < 0.4
-    return {'none': np.isfinite(C1), 'range': rng, 'calm': calm, 'range+calm': rng & calm}[kind]
+_XC = {}
+
+
+def crossings(N):
+    """How many times the 1h close crossed its N-day mean during the last N days (many crossings = price oscillates)."""
+    if N not in _XC:
+        sma = roll(C1, 24 * N, 'mean'); sg = np.sign(C1 - sma); cr = np.zeros_like(C1)
+        cr[:, 1:] = (sg[:, 1:] != sg[:, :-1]) & np.isfinite(sg[:, 1:]) & np.isfinite(sg[:, :-1])
+        _XC[N] = roll(cr, 24 * N, 'sum')
+    return _XC[N]
+
+
+def regime(F, kind, N=14, q=50, slope=0.5):
+    """'range' = N-day width below the coin's own past-year median (q) and net move ≤ slope·width;
+    'adx' = ADX(4h) < 20 and net move ≤ slope·width; 'osc' = ≥ 7 (N=7) / 13 (N=14) crossings of the N-day mean
+    (top quarter) and net move ≤ slope·width; 'calm' = breadth < 0.4; 'X+calm' = both."""
+    base, _, c = kind.partition('+')
+    sl = F[f'slope{N}'] <= slope
+    m = {'none': np.isfinite(C1),
+         'range': (F[f'w{N}'] <= F[f'wq{N}_{q}']) & sl,
+         'adx': (F['adx'] < 20) & sl,
+         'osc': (crossings(N) >= (9 if N == 7 else 13)) & sl,
+         'calm': F['br'] < 0.4}[base]
+    return m & (F['br'] < 0.4) if c == 'calm' else m
 
 
 # ------------------------------------------------------------------------------------------------- 1. level strategies
@@ -334,7 +355,7 @@ def run_levels(F):
 
 
 # ------------------------------------------------------------------------------------------------------- 2. range grid
-def grid_episode(k, i0, M, lo, g, b, life, tick=TICK):
+def grid_episode(k, i0, M, lo, g, b, life, tick=TICK, hi=None):
     """Grid started after the close of 15m bar i0: limit buys at M(1−g), M(1−2g) … down to the range low `lo`, each lot sold
     at +g %. A buy level is (re)armed only after a close above it (so it is never a marketable order). Stop-market for the
     whole grid at lo·(1−b) (all open lots sold, taker + slippage); otherwise the grid lives `life` bars, then open lots are
@@ -348,6 +369,9 @@ def grid_episode(k, i0, M, lo, g, b, life, tick=TICK):
     sb = np.flatnonzero(lo_s <= stop)
     jb = sb[0] if len(sb) else None                      # index (relative to i0+1) of the break bar
     jend = jb if jb is not None else len(lo_s) - 1
+    if hi is not None:                                   # upside breakout (close above the range high + b): grid closed
+        su = np.flatnonzero(cl_s[:jend] > hi * (1 + b))
+        if len(su): jend = su[0]
     out = []
     cl_prev = np.r_[C[k, i0], cl_s]                     # close known before each bar
     for p in levels:
@@ -377,7 +401,7 @@ def grid_episode(k, i0, M, lo, g, b, life, tick=TICK):
     return out, i0 + 1 + jend, len(levels), jb is not None
 
 
-def run_grid_cfg(F, OK, N=14, g=0.01, b=0.02, life_d=7, min_levels=2, max_levels=12):
+def run_grid_cfg(F, OK, N=14, g=0.01, b=0.02, life_d=7, min_levels=2, max_levels=12, nfix=0):
     """One grid at a time per coin; a new grid can start at any hour close when OK (regime) holds and the previous ended."""
     hn, ln = F[f'hn{N}'], F[f'ln{N}']
     lots, eps = [], []
@@ -388,10 +412,14 @@ def run_grid_cfg(F, OK, N=14, g=0.01, b=0.02, life_d=7, min_levels=2, max_levels
             i = 4 * h + 3
             if i < free or i + 5 >= T: continue
             M = (hn[k, h] + ln[k, h]) / 2; lo = ln[k, h]
-            nlev = int(np.floor((1 - lo / M) / g + 1e-9))
+            if not (np.isfinite(M) and np.isfinite(lo) and M > lo): continue
+            if nfix:                                   # nfix levels evenly between the middle and the range low
+                gg = (1 - lo / M) / nfix; nlev = nfix
+            else:                                      # fixed step g, at most max_levels levels below the middle
+                gg = g; nlev = int(np.floor((1 - lo / M) / g + 1e-9))
             if nlev < min_levels: continue
-            lo_eff = M * (1 - g * min(nlev, max_levels))
-            tr, e, nl, broke = grid_episode(k, i, M, lo_eff if nlev > max_levels else lo, g, b, life_d * 96)
+            lo_eff = M * (1 - gg * min(nlev, max_levels))
+            tr, e, nl, broke = grid_episode(k, i, M, lo_eff if nlev > max_levels else lo, gg, b, life_d * 96, hi=hn[k, h])
             lots += tr
             pnl = sum(t[3] for t in tr)
             eps.append(dict(k=k, i=i + 1, x=max(e, i + 1), ret=pnl / max(nl, 1), nl=nl, broke=broke, nlots=len(tr), pnl=pnl,
@@ -423,11 +451,13 @@ def run_grid(F):
     res = {}
     for reg in ('none', 'range', 'range+calm'):
         for N in (7, 14):
-            for g in (0.005, 0.01, 0.02):
+            OK = regime(F, reg, N=N)
+            for g in (0.005, 0.01, 0.02, 'n4', 'n8'):
                 for b in (0.01, 0.03):
-                    OK = regime(F, reg, N=N)
-                    lots, eps = run_grid_cfg(F, OK, N=N, g=g, b=b, life_d=N)
-                    lab = f"grid {reg:10} N={N:2d} g={g * 100:.1f}% b={b * 100:.0f}% life={N}d"
+                    nf = int(g[1:]) if isinstance(g, str) else 0
+                    lots, eps = run_grid_cfg(F, OK, N=N, g=g if not nf else 0, b=b, life_d=N, nfix=nf)
+                    gl = f"{g * 100:.1f}%" if not nf else f"{nf} lv"
+                    lab = f"grid {reg:10} N={N:2d} g={gl:5} b={b * 100:.0f}% life={N}d"
                     res[lab] = grid_stats(lots, eps, lab)
     return res
 
@@ -458,8 +488,117 @@ def run_mr(F):
     return res
 
 
-# ------------------------------------------------------------------------------------------------------- 5. portfolio
-def portfolio(cands_R, r_share, r_open, label=''):
+# ------------------------------------------------------------------------------------------- 4. broad parameter search
+REGS = ('none', 'range', 'adx', 'osc', 'calm')
+
+
+def run_search(F, out_json=None, parts=('lv', 'mr', 'grid')):
+    """Every family × parameters × regime; prints one line each. The best lines are re-checked against the random baseline
+    and neighbouring parameters in run_robust()."""
+    import json
+    rows = []
+    def keep(fam, prm, r):
+        rows.append(dict(fam=fam, prm=prm, n=r['n'], tpd=r.get('tpd', 0), avg=r.get('avg', 0), years=r['years'], ok=r['ok']))
+    print('\n=== 4a. levels search (long; short below) ===')
+    for side in ((1, -1) if 'lv' in parts else ()):
+        for fam in ('all', 'fr1h', 'fr4h', 'vp30'):
+            for d in (0.25, 0.5, 1.0):
+                for m in (0.5, 1.0, 2.0):
+                    for tgt in (0.5, 1.0, 'next'):
+                        P, SL, TP, OK = level_orders(F, fam, side, d=d, m=m, tgt=tgt)
+                        for reg in REGS if side > 0 else ('none', 'calm'):
+                            tr = sim_orders(P, SL, TP, OK & regime(F, reg), side)
+                            lab = f"LV {'L' if side > 0 else 'S'} {fam:4} d={d} m={m} tgt={tgt} {reg}"
+                            keep('lv', dict(side=side, fam=fam, d=d, m=m, tgt=tgt, reg=reg), stats(tr, lab))
+    print('\n=== 4b. range mean-reversion search ===')
+    for side in ((1, -1) if 'mr' in parts else ()):
+        for N in (7, 14):
+            for f in (0.1, 0.2, 0.3):
+                for t in (0.5, 0.8):
+                    for s_ in (0.1, 0.25):
+                        P, SL, TP, OK = mr_orders(F, side, N, f, t, s_)
+                        for reg in REGS:
+                            tr = sim_orders(P, SL, TP, OK & regime(F, reg, N=N), side, hold=288)
+                            lab = f"MR {'L' if side > 0 else 'S'} N={N} f={f} t={t} s={s_} {reg}"
+                            keep('mr', dict(side=side, N=N, f=f, t=t, s=s_, reg=reg), stats(tr, lab))
+    print('\n=== 4c. grid search ===')
+    for reg in (REGS if 'grid' in parts else ()):
+        for N in (7, 14):
+            OK = regime(F, reg, N=N)
+            for g in (0.01, 0.02, 'n4'):
+                for b in (0.01, 0.03, 0.10, 1.0):
+                    for life in (N, 30):
+                        nf = int(g[1:]) if isinstance(g, str) else 0
+                        lots, eps = run_grid_cfg(F, OK, N=N, g=0 if nf else g, b=b, life_d=life, nfix=nf)
+                        lab = f"GR {reg:5} N={N} g={g} b={b} life={life}"
+                        r = grid_stats(lots, eps, lab)
+                        keep('grid', dict(reg=reg, N=N, g=g, b=b, life=life), r)
+    if out_json:
+        json.dump(rows, open(out_json, 'w'))
+    return rows
+
+
+# ---------------------------------------------------------------------------- 5. best candidates: baseline, neighbours
+def cfg_trades(F, kind, prm, tick=TICK):
+    if kind == 'lv':
+        P, SL, TP, OK = level_orders(F, prm['fam'], prm['side'], d=prm['d'], m=prm['m'], tgt=prm['tgt'])
+        return sim_orders(P, SL, TP, OK & regime(F, prm['reg']), prm['side'], tick=tick), (P, SL, TP, OK & regime(F, prm['reg']))
+    P, SL, TP, OK = mr_orders(F, prm['side'], prm['N'], prm['f'], prm['t'], prm['s'])
+    OK = OK & regime(F, prm['reg'], N=prm['N'])
+    return sim_orders(P, SL, TP, OK, prm['side'], hold=288, tick=tick), (P, SL, TP, OK)
+
+
+GRIDS = dict(lv=dict(d=(0.25, 0.5, 1.0), m=(0.5, 1.0, 2.0), tgt=(0.5, 1.0, 'next')),
+             mr=dict(N=(7, 14), f=(0.1, 0.2, 0.3), t=(0.5, 0.8), s=(0.1, 0.25)))
+
+
+def per_coin(tr):
+    kc = collections.defaultdict(list)
+    for t in tr: kc[t[0]].append(t[3])
+    return ' '.join(f"{SYMS[k]}{np.mean(v) * 100:+.2f}" for k, v in sorted(kc.items()))
+
+
+def run_robust(F, best):
+    """best: list of (kind, prm) — the strongest lines of the search. For each: random baseline (3 seeds), one-step
+    neighbours of every parameter, fill strictness (touch / 5 ticks), zero maker fee, per-coin averages."""
+    print('\n=== 5. best candidates: random baseline, neighbours, fill strictness, per coin ===')
+    for kind, prm in best:
+        tr, (P, SL, TP, OK) = cfg_trades(F, kind, prm)
+        ra, vals = rnd_avg(F, P, SL, TP, OK, prm['side'], hold=192 if kind == 'lv' else 288)
+        r = stats(tr, f"{kind} {prm}", base=ra)
+        print(f"   random seeds avg %: {' '.join(f'{v:+.3f}' for v in vals)}")
+        print(f"   per coin avg %: {per_coin(tr)}")
+        for tk in (0.0, 0.0005):
+            t2, _ = cfg_trades(F, kind, prm, tick=tk); stats(t2, f"   fill tick {tk * 100:.2f}%")
+        a = np.array([t[3] + (C_TGT if t[4] == 'P' else C_MKT) - (0 if t[4] == 'P' else TAKER + SLIP) for t in tr])
+        print(f"   with zero maker fee: avg {a.mean() * 100:+.3f}%   gross (no costs at all): "
+              f"{np.mean([t[3] + (C_TGT if t[4] == 'P' else C_MKT) for t in tr]) * 100:+.3f}%")
+        for key, vals_ in GRIDS[kind].items():
+            for v in vals_:
+                if v == prm[key]: continue
+                q = dict(prm); q[key] = v
+                t2, _ = cfg_trades(F, kind, q); stats(t2, f"   {key}={v}")
+
+
+def run_grid_robust(F, prm):
+    print(f"\n=== 5g. grid {prm}: neighbours and random start (no regime) ===")
+    def one(q, lab):
+        nf = int(q['g'][1:]) if isinstance(q['g'], str) else 0
+        lots, eps = run_grid_cfg(F, regime(F, q['reg'], N=q['N']), N=q['N'], g=0 if nf else q['g'], b=q['b'], life_d=q['life'], nfix=nf)
+        return grid_stats(lots, eps, lab), lots, eps
+    _, lots, eps = one(prm, 'chosen')
+    kc = collections.defaultdict(float)
+    for e in eps: kc[e['k']] += e['ret'] * 100
+    print('   per coin total %:', ' '.join(f"{SYMS[k]}{v:+.0f}" for k, v in sorted(kc.items())))
+    for key, vals in dict(N=(7, 14), g=(0.01, 0.02, 'n4'), b=(0.01, 0.03, 0.10, 1.0), life=(7, 14, 30), reg=REGS).items():
+        for v in vals:
+            if v == prm[key]: continue
+            q = dict(prm); q[key] = v; one(q, f"   {key}={v}")
+    return lots, eps
+
+
+# ------------------------------------------------------------------------------------------------------- 6. portfolio
+def portfolio(cands_R, r_share, r_open, label='', base_r=None):
     import pickle
     pk = os.path.join(os.path.dirname(CACHE), 'range_base_cands.pkl')
     if os.path.exists(pk):
@@ -470,13 +609,67 @@ def portfolio(cands_R, r_share, r_open, label=''):
     rules = ('B', 'E', 'F', 'D') + (('R',) if r_share > 0 else ())
     eq, tr, cu = ap.simulate(base + cands_R, rules=rules, r_share=r_share, r_open=r_open, **p)
     r, _ = ap.report(eq, tr, cu)
+    better = '' if base_r is None else ('  every year better' if all(r['years'].get(y, 0) > base_r['years'].get(y, 0) for y in YEARS) else '')
+    ys = ' '.join(f"{y}:{r['years'].get(y, 0):>7,}" for y in YEARS)
     print(f"{label:46} final ${r['final']:>9,} CAGR {r['cagr'] * 100:+6.1f}% maxDD {r['maxdd'] * 100:6.1f}% n={r['n']:5d} "
-          f"years {r['years']} R=${r['rules'].get('R', 0):,}", flush=True)
+          f"years {ys} R=${r['rules'].get('R', 0):,}{better}", flush=True)
     return r
+
+
+def run_portfolio(F, best, grid_prm=None):
+    """«норма + D» with and without rule R (share of equity per trade, own cap, does not block other rules)."""
+    print('\n=== 6. portfolio: «норма + D» + rule R (r_share of equity per trade, at most r_open at once) ===')
+    base = portfolio([], 0, 0, 'норма + D (no R)')
+    sets = [(f"{kind} {prm['side']:+d} {prm.get('fam', '')}{prm.get('N', '')} {prm['reg']}", to_cands(cfg_trades(F, kind, prm)[0]))
+            for kind, prm in best]
+    if grid_prm:
+        nf = int(grid_prm['g'][1:]) if isinstance(grid_prm['g'], str) else 0
+        _, eps = run_grid_cfg(F, regime(F, grid_prm['reg'], N=grid_prm['N']), N=grid_prm['N'], g=0 if nf else grid_prm['g'],
+                              b=grid_prm['b'], life_d=grid_prm['life'], nfix=nf)
+        sets.append((f"grid {grid_prm['reg']} N={grid_prm['N']}", [dict(rule='R', k=e['k'], i=e['i'], x=e['x'], ret=e['ret'], sf=0.05) for e in eps]))
+    for lab, cands in sets:
+        for rs, ro in ((0.05, 3), (0.10, 3), (0.10, 6), (0.20, 6)):
+            portfolio(cands, rs, ro, f"+ {lab} {rs:.2f}×{ro}", base_r=base)
+    return base
 
 
 def to_cands(tr):
     return [dict(rule='R', k=t[0], i=t[1], x=t[2], ret=t[3], sf=max(t[5], 1e-4)) for t in tr]
+
+
+# --------------------------------------------------------------------------------------------------------- 7. why
+def run_why(F):
+    """(1) a narrow & flat range is usually followed by a WIDER one (compression → breakout); (2) a market entry at the same
+    hours with a symmetric 1-ATR stop/target is ≈ 0 before costs (engine sanity), while the limit entry at a level is slightly
+    negative before costs — the fill itself is adverse (it fills when price pushes through)."""
+    print('\n=== 7. why ===')
+    sl = slice(H0, None)
+    hi = roll(H1, 168, 'max'); lo = roll(L1, 168, 'min')
+    fr = np.full_like(C1, np.nan); fr[:, :-168] = ((hi - lo) / lo)[:, 168:]
+    ratio = (fr / F['w7'])[:, sl]
+    for reg in ('range', 'adx', 'osc'):
+        m = regime(F, reg, N=14)[:, sl]
+        print(f"next-7-day range ÷ last-7-day range: after '{reg}' {np.nanmedian(ratio[m]):.2f}, other hours {np.nanmedian(ratio[~m]):.2f}")
+    P, SL, TP, OK = level_orders(F, 'all', 1, tgt=1.0)
+    tr = sim_orders(P, SL, TP, OK, 1)
+    g = np.mean([t[3] + (C_TGT if t[4] == 'P' else C_MKT) for t in tr]) * 100
+    res = []
+    for k in range(NS):
+        free = 0
+        for h in np.flatnonzero(OK[k]):
+            i = 4 * h + 3
+            if h < H0 or i < free or i + 200 >= T or not np.isfinite(O[k, i + 1]): continue
+            e = O[k, i + 1]; x, r = ap.walk(k, i + 1, 1, e - F['atr'][k, h], e + F['atr'][k, h], 192); res.append(r); free = x + 1
+    print(f"limit buy at level (all, d=0.5, stop 1 ATR, 1R) gross {g:+.3f}% per trade; market entry same hours, ±1 ATR, gross "
+          f"{np.mean(res) * 100:+.3f}% ({len(res)} trades)")
+
+
+BEST = [('lv', dict(side=1, fam='all', d=0.25, m=2.0, tgt=0.5, reg='calm')),     # most trades in calm markets
+        ('lv', dict(side=1, fam='vp30', d=1.0, m=2.0, tgt=0.5, reg='none')),     # best level line of 540
+        ('mr', dict(side=1, N=14, f=0.3, t=0.8, s=0.25, reg='none')),            # best mean-reversion line (no range filter)
+        ('mr', dict(side=1, N=14, f=0.3, t=0.8, s=0.25, reg='calm'))]
+BEST_GRIDS = [dict(reg='none', N=7, g='n4', b=1.0, life=30),                       # best grid total (no stop, 30 days)
+              dict(reg='osc', N=14, g=0.02, b=1.0, life=30)]                       # best grid with a range filter
 
 
 if __name__ == '__main__':
@@ -485,3 +678,13 @@ if __name__ == '__main__':
     if 'levels' in what or 'all' in what: run_levels(F)
     if 'grid' in what or 'all' in what: run_grid(F)
     if 'mr' in what or 'all' in what: run_mr(F)
+    if 'search' in what or 'all' in what: run_search(F, os.path.join(os.path.dirname(CACHE), 'range_search.json'))
+    for part in ('lv', 'mr', 'grid'):
+        if f'search_{part}' in what: run_search(F, os.path.join(os.path.dirname(CACHE), f'range_search_{part}.json'), parts=(part,))
+    if 'robust' in what or 'all' in what:
+        run_robust(F, BEST)
+        for gp in BEST_GRIDS: run_grid_robust(F, gp)
+    if 'portfolio' in what or 'all' in what:
+        run_portfolio(F, BEST[:1] + BEST[2:], grid_prm=BEST_GRIDS[0])
+        run_portfolio(F, [], grid_prm=BEST_GRIDS[1])
+    if 'why' in what or 'all' in what: run_why(F)

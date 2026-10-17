@@ -176,8 +176,14 @@ def hl_spot() -> list[dict]:
     """Most traded HL spot tokens (HIP-1) — watch only; not all of them are memes."""
     meta, ctxs = _req(HL, {"type": "spotMetaAndAssetCtxs"}, timeout=15)
     toks = {t["index"]: t["name"] for t in meta.get("tokens", [])}
+    uni = meta.get("universe", [])
+    by_name = {pr.get("name"): pr for pr in uni}
+    if ctxs and all(isinstance(c, dict) and c.get("coin") in by_name for c in ctxs):
+        pairs = [(by_name[c["coin"]], c) for c in ctxs]         # align by the pair name each context carries
+    else:
+        pairs = list(zip(uni, ctxs))
     best: dict[str, dict] = {}
-    for pr, c in zip(meta.get("universe", []), ctxs):
+    for pr, c in pairs:
         try:
             base, quote = toks.get(pr["tokens"][0]), toks.get(pr["tokens"][1])
         except (KeyError, IndexError, TypeError):

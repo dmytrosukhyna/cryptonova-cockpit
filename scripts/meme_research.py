@@ -934,6 +934,12 @@ def probe() -> str:
         except (KeyError, IndexError, TypeError, ValueError):
             pass
     show("HL spot top 25 by $M volume", sorted(spv, key=lambda x: -x[1])[:25], 1500)
+    u0 = (sp[0] or {}).get("universe", [])
+    show("HL spot raw: universe[0:3], ctxs[0:3], n_universe, n_ctxs, tokens[0:3], pairs named NEKO/WOW",
+         {"u": u0[:3], "c": (sp[1] or [])[:3], "nu": len(u0), "nc": len(sp[1] or []), "t": (sp[0] or {}).get("tokens", [])[:3],
+          "neko_wow": [(pr, next((t for t in (sp[0] or {}).get("tokens", []) if t["index"] == pr["tokens"][0]), None))
+                       for pr in u0 if any(t["index"] == pr["tokens"][0] and t["name"] in ("NEKO", "WOW") for t in (sp[0] or {}).get("tokens", []))][:3],
+          "ctx_coin_for_neko_wow": [c for c in (sp[1] or []) if c.get("coin") in {pr.get("name") for pr in u0 if any(t["index"] == pr["tokens"][0] and t["name"] in ("NEKO", "WOW") for t in (sp[0] or {}).get("tokens", []))}][:3]}, 3000)
     cg = get("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=meme-token&per_page=250&page=1")
     if isinstance(cg, list):
         syms = {x.get("symbol", "").upper(): x.get("market_cap_rank") for x in cg}

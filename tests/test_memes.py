@@ -215,6 +215,15 @@ def test_spot_and_btc_context():
     finally:
         mm._req = old
     assert [x["token"] for x in sp] == ["WOW"] and sp[0]["chg24h"] == 100.0          # wrapped BTC and thin NEKO dropped
+    for u in meta["universe"]:
+        u["name"] = "@" + str(u["tokens"][0])
+    shuffled = [dict(ctxs[2], coin="@3"), dict(ctxs[0], coin="@1"), dict(ctxs[1], coin="@2")]  # contexts in another order
+    mm._req = lambda url, body=None, timeout=10, headers=None: [meta, shuffled]
+    try:
+        sp = mm.hl_spot()
+    finally:
+        mm._req = old
+    assert [x["token"] for x in sp] == ["WOW"] and sp[0]["px"] == 2.0
     daily = [[NOW - (60 - i) * DAY, 1, 1, 1, 100.0 + i, 1] for i in range(61)]
     b = mm.btc_context(lambda c, s, e, iv: daily, NOW)
     assert b["btc_above_ma50"] is True and abs(b["btc_ma50"] - sum(100.0 + i for i in range(10, 60)) / 50) < 1e-9

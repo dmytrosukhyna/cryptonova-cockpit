@@ -462,7 +462,14 @@ class Channel:
         v = str(facts.get("scenario_verdict") or "")
         if v.startswith("утреннего сценария сегодня не было") and re.search(r"сценари\w* A", out):
             probs.append("утреннего сценария не было — не упоминай «сценарий A» в итогах")
-        heads = re.findall(r"<b>([^<]{3,60})</b>", out)
+        # only SECTION headers count («<b>Главные события:</b>» or a bold line on its own) — bold VALUES may repeat
+        # (17.10: «Фьючерсы: <b>+$0</b>» and «Всего: <b>+$0</b>» blocked the evening post, the template fallback included)
+        heads = []
+        for m in re.finditer(r"<b>([^<]{3,60})</b>", out):
+            ls, le = out.rfind("\n", 0, m.start()) + 1, out.find("\n", m.end())
+            line = out[ls:le if le >= 0 else len(out)].strip()
+            if m.group(1).strip().endswith(":") or line == m.group(0):
+                heads.append(m.group(1).strip())
         if len(heads) != len(set(heads)):
             probs.append("повторяющиеся разделы")
         if re.search(r"\*\*|(^|\s)\*[^*\n]+\*", out):

@@ -94,3 +94,14 @@ def test_factcheck_rejects_then_accepts():
             return {"ok": False, "problems": ["зона подана как цель на завтра"]}
     p = Picky()
     assert ch.write("evening", facts, p) is None and p.n == 3          # never publishes a draft the fact-checker rejected
+
+
+def test_lint_allows_repeated_bold_values_but_not_repeated_sections():
+    """17.10: the evening post was blocked all evening because «+$0» was bold twice (futures and total after the reset)."""
+    tmp = tempfile.mkdtemp()
+    ch = channel.Channel(sqlite3.connect(":memory:"), tmp)
+    ok = ("<b>Итоги дня · 17.10</b>\n\n<b>Итог дня по счетам:</b>\n— Фьючерсы (автопилот): <b>+$0</b>\n— Спот: <b>+$8</b>\n"
+          "— Всего за день: <b>+$0</b>\n\n<b>Что дальше:</b>\n— Сценарий A: рост")
+    assert "повторяющиеся разделы" not in ch.lint(ok, {})
+    bad = ok + "\n\n<b>Что дальше:</b>\n— ещё раз"
+    assert "повторяющиеся разделы" in ch.lint(bad, {})

@@ -457,7 +457,7 @@ if "data" in SECT:
 
 # ---- candidates (computed once) ----
 MK = {}
-if any(s in SECT for s in ("validate", "market", "coins", "portfolio", "lab", "altpilot")):
+if any(s in SECT for s in ("validate", "market", "coins", "portfolio", "lab", "altpilot", "lists", "labx")):
     MK["B"] = gen_B(); MK["B30"] = gen_B(3.0, tag="B30"); MK["B25"] = gen_B(2.5, tag="B25"); MK["B30w3"] = gen_B(3.0, 0.3, "B30w3")
     MK["E"] = gen_E(); MK["E8h"] = gen_E(hold=32, tag="E8h"); MK["E30"] = gen_E(br=0.3, tag="E30")
     MK["F"] = gen_F(); MK["F8"] = gen_F(-0.08, -0.04, tag="F8"); MK["F8h"] = gen_F(hold=32, tag="F8h")
@@ -704,9 +704,46 @@ if "lab" in SECT:
         P(pf_row(f"{tag} (IS best {f_}) on core + alts", lab(on(LM[tag], core + alts)), ("B",), **LAB))
     for tag in ("B25", "B30", "D15", "E8h", "F8", "D15ch"):
         if tag in MK: P(pf_row(f"{tag} alone on core + alts (risk 0.5 % by stop)", lab(on(MK[tag], core + alts)), ("B",), **LAB))
+    for sh in (0.05, 0.02):                                    # the same rules at a small fixed size instead of 0.5 % risk
+        P(pf_row(f"L+N+Q on core 18, fixed {sh * 100:.0f} % of the account per trade, ≤ 12 open",
+                 relabel(on(LM["L"] + LM["N"] + LM["Q"], core), "n"), ("n",), extra=dict(n=dict(share=sh, open=12)), **LAB))
     sz = {t: np.median([c["sf"] for c in LM[t]]) * 100 for t in ("L", "N", "Q")}
     P(f"\nMedian stop distance (incl. costs): L {sz['L']:.2f} %, N {sz['N']:.2f} %, Q {sz['Q']:.2f} % → at 0.5 % risk a position is "
       f"{50 / sz['N']:.0f} % (N) / {50 / sz['Q']:.0f} % (Q) of the account, capped at 300 %.")
+    P()
+
+if "lists" in SECT:
+    P("## IS-pass coin lists (decided on 2023–2024 only)\n")
+    for tag, nmin in (("B", 5), ("B30", 5), ("E", 20), ("F", 5), ("F8h", 5), ("D", 3), ("D25", 3), ("Dch", 3)):
+        for gn, G in GROUPS:
+            ps = is_pass(MK[tag], G, nmin)
+            P(f"{tag} · {gn} ({len(ps)}/{len(G)}): {' '.join(syms[k] for k in ps) or '—'}  ")
+    P()
+
+if "labx" in SECT:
+    PG, PGN = (altsV, "point-in-time top-40 alts") if altsV else (alts, "top-100 alts")
+    P(f"## Lab candidates without hindsight: core 18 + {PGN} (separate $10k each)\n")
+    P(PFH.replace("portfolio («норма» + D, $10k)", "account")); P(PFS)
+    R4 = ("B", "E", "F", "D")
+    def acc(label, cs, rules, **kw): P(pf_row(label, cs, rules, **kw))
+    base = [c for r in "BEFD" for c in on(MK[r], core)]
+    acc("reference: core «норма»+D", base, R4)
+    acc("core, E breadth 0.3 instead of 0.4", [c for c in base if c["rule"] != "E"] + on(MK["E30"], core), R4)
+    acc("core, E exit after 8 h", [c for c in base if c["rule"] != "E"] + [dict(c, rule="E") for c in on(MK["E8h"], core)], R4)
+    acc("core, D exit after 8 h", [c for c in base if c["rule"] != "D"] + [dict(c, rule="D") for c in on(MK["D8h"], core)], R4)
+    agg = (on(MK["B25"], core) + [dict(c, rule="E") for c in on(MK["E30"], core)] + [dict(c, rule="F") for c in on(MK["F8"], core)]
+           + [dict(c, rule="D") for c in on(MK["D15"], core)])
+    acc("core, all loosened: B −2.5σ, E 0.3, F OI −8 %/−4 %, D −15 bp", agg, R4)
+    acc("D −15 bp only on core 18, 10 % ×6", [dict(c, rule="D") for c in on(MK["D15"], core)], ("D",), d_share=0.10, d_open=6)
+    acc("D −20 bp only on core 18, 15 % ×3", on(MK["D"], core), ("D",))
+    pd25 = is_pass(MK["D25"], PG, 3)
+    acc(f"D −25 bp only on {PGN} IS-pass ({len(pd25)}), 15 % ×3", [dict(c, rule="D") for c in on(MK["D25"], pd25)], ("D",))
+    acc(f"core «норма»+D + d −25 bp on {PGN} IS-pass", base + relabel(on(MK["D25"], pd25), "d"), R4 + ("d",), extra=EX)
+    pdc = is_pass(MK["Dch"], PG, 3)
+    acc(f"core «норма»+D + d (chronic skipped) on {PGN} IS-pass ({len(pdc)})", base + relabel(on(MK["Dch"], pdc), "d"), R4 + ("d",), extra=EX)
+    acc(f"E basket only on {PGN} (breadth on core)", on(MK["E"], PG), ("E",))
+    acc(f"B −2.5σ on core + {PGN}, risk 0.5 % ×8", on(MK["B25"], core + PG), ("B",), risk=0.005, max_open=8)
+    acc(f"F 8 h on core + {PGN}, 15 % ×3", [dict(c, rule="F") for c in on(MK["F8h"], core + PG)], ("F",), f_share=0.15)
     P()
 
 P(f"_run time {time.time() - t0:.0f} s_")

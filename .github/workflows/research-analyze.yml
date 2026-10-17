@@ -1,5 +1,5 @@
 name: research-analyze
-# Manual only. Runs scripts/universe_test.py on the okx15m artifact of a research-data run and publishes the
+# Manual only. Runs scripts/<script> (default universe_test.py) on the okx15m artifact of a research-data run and publishes the
 # result tables as the job summary + annotations (readable through the GitHub API; artifact downloads are
 # not reachable from the research container). Nothing is committed.
 on:
@@ -8,6 +8,10 @@ on:
       data_run_id:
         description: "run id of a successful research-data run (artifact okx15m)"
         required: true
+      script:
+        description: "analysis script in scripts/ (takes the .npz path and --md)"
+        required: false
+        default: "universe_test.py"
 
 permissions:
   contents: read
@@ -27,8 +31,11 @@ jobs:
           name: okx15m
           run-id: ${{ inputs.data_run_id }}
           github-token: ${{ github.token }}
-      - name: Universe test (rules B + E)
-        run: python scripts/universe_test.py okx15m.npz --md results.md
+      - name: Analysis script (default universe_test.py — rules B + E)
+        env: { SCRIPT: "${{ inputs.script }}" }
+        run: |
+          case "$SCRIPT" in *[!A-Za-z0-9_.-]*|"") echo "bad script name"; exit 1;; esac
+          python "scripts/$SCRIPT" okx15m.npz --md results.md
       - name: Publish results
         if: always()
         run: |

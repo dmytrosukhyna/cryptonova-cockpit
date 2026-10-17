@@ -105,7 +105,7 @@ def test_three_profiles_share_signals_but_differ():
     c = coin("BTC-USDT", flat, [{"id": "L1", "kind": "support", "lo": 9.96, "hi": 9.99, "center": 9.975, "touches": 3, "status": "ACTIVE"}])
     c["regime"] = {"long": "BULL"}
     out = pd.run(conn, {"coins": [c]}, now=t0 + 300 * 900_000)
-    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp"} and out["profile"] == "bal"
+    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp", "lab"} and out["profile"] == "bal"
     assert not any(out["profiles"][k]["pending"] for k in ("cons", "bal", "aggr"))
     lab = pd.PaperDesk(conn, "aggr", classes={"A", "B", "R", "C"}).step([c], True, t0 + 300 * 900_000)
     assert lab["pending"]   # the same zone would be traded only if class C were enabled
@@ -192,3 +192,26 @@ def test_rule_d_basis_discount_opens_share_sized_long():
     assert d and abs(d[0]["qty"] * d[0]["entry"] - 1500) < 5             # 15 % of $10 000
     c2 = coin("ETH-USDT", [100.0] * n, []); c2["basis_1h"] = -0.0010     # −0.10 % is not deep enough
     assert not [s for s in pd.PaperDesk(conn, "cons").signals(c2, True, now) if s["grade"] == "D"]
+
+
+def test_lab_range_low_limit_fills_only_through_level():
+    conn = sqlite3.connect(":memory:")
+    t0 = 1_700_000_000_000 - (1_700_000_000_000 % 3_600_000)
+    n = 96 * 15
+    # 14+ days oscillating 90..110, now at 100 → range low ≈ 89.6, L entry ≈ 0.3 into the range
+    prices = [100 + 10 * __import__("math").sin(i / 40) for i in range(n)]
+    prices[-100:] = [99.0] * 100                                # calm last day (no broad sell-off → longs allowed)
+    c = coin("ETH-USDT", prices, [], t0); c["candles_long"] = c["candles"]
+    now = t0 + n * 900_000
+    desk = pd.PaperDesk(conn, "lab")
+    res = desk.step([c], True, now)
+    lab = [o for o in res["pending"] if o["grade"] in ("L", "N", "Q")]
+    assert lab, "lab places limit orders inside a range"
+    o = next((x for x in lab if x["grade"] == "L"), lab[0])
+    assert o["expires"] - now <= 3_600_000                       # valid ~1 h
+    # next 15m candle only touches the level (no fill), the one after trades through it (fill)
+    touch = [now, o["entry"] * 1.002, o["entry"] * 1.003, o["entry"] * 1.00005 if o["side"] == "LONG" else o["entry"] * 0.9999, o["entry"] * 1.002, 100.0]
+    rows = c["candles"] + [touch]
+    c2 = dict(c, candles=rows, candles_long=rows)
+    res2 = desk.step([c2], True, now + 900_000)
+    assert not [t for t in res2["open"] if t["id"] == o["id"]] or o["side"] == "SHORT"

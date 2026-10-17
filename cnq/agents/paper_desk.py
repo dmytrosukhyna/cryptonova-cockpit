@@ -41,13 +41,22 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
     "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F", "D"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
              "e_share": 0.30, "f_share": 0.30, "f_open": 3, "d_share": 0.20, "d_open": 3, "prefix": "paper_",
              "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +75% в год, просадка до −29%, все годы в плюсе."},
+    # 17.10: «Лаборатория» — aggressive range/level rules the owner asked to try live although history is ≈0 or negative
+    # (docs/research/range.md). Limit entries only, filled only when price trades through. Separate $10 000, not mirrored.
+    "lab":  {"name": "Лаборатория · агрессивно", "classes": {"L", "N", "Q"}, "confirm": False, "risk": 0.005, "max_open": 12, "tgt_r": 1.5, "riskoff": "shorts",
+             "prefix": "paper_lab_",
+             "about": "Проверка вживую агрессивных правил внутри диапазона: L — покупка у низа диапазона за 14 дней (история +0.30% на сделку, но 2025–26 в минусе), "
+                      "N — отскок от часовой поддержки и Q — шорт от часового сопротивления (история ≈ −0.1% на сделку). Риск 0.5% на сделку, до 12 позиций. Это эксперимент."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
     "exp":  {"name": "Эксперимент · свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
              "about": "Проверка новых правил на живом рынке: свинг-пробой (выше максимума 5 дней в росте, выход ниже вчерашнего минимума) и быстрый откуп резкой свечи. 10% счёта на сделку, до 15 позиций. История: +0.31% и +0.41% на сделку, но в портфеле ≈ 0 — поэтому отдельный счёт."},
 }
 RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций",
-           "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса"}
+           "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса",
+           "L": "покупка у низа диапазона", "N": "отскок от часовой поддержки", "Q": "шорт от часового сопротивления"}
+THROUGH = {"L", "N", "Q"}        # lab limits fill only when price trades through the level by ≥ 0.01 %
+HOLD_L_H, HOLD_N_H = 72, 24
 SHARE_RULES = {"E", "F", "S", "G", "D"}   # sized as a share of equity, own position caps
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
@@ -78,6 +87,31 @@ D_STOP = 0.12
 F_STOP = 0.06          # 16.10: −6 % instead of −12 % — every year positive (2025 −0.29 % → +0.66 % per trade), size raised so risk per trade stays ~1.5 %
 ORDER_TTL_H = 24
 MAX_OPEN = 6
+
+
+def agg1h(c15: list[list], now: int | None = None) -> list[list]:
+    """15m → closed 1h candles [t,o,h,l,c,v] (the running hour is dropped)."""
+    out = []; cur = None
+    for k in c15:
+        t0 = k[0] - (k[0] % 3_600_000)
+        if cur is None or cur[0] != t0:
+            if cur: out.append(cur)
+            cur = [t0, k[1], k[2], k[3], k[4], k[5]]
+        else:
+            cur[2] = max(cur[2], k[2]); cur[3] = min(cur[3], k[3]); cur[4] = k[4]; cur[5] += k[5]
+    if cur and (now is None or cur[0] + 3_600_000 <= now): out.append(cur)
+    return out
+
+
+def fractals(b: list[list], side: str, look: int = 48, w: int = 2) -> list[float]:
+    """Swing lows (side='low') or highs over the last `look` closed bars: a bar beyond its w neighbours on both sides."""
+    xs = []; n = len(b)
+    for i in range(max(w, n - look), n - w):
+        v = b[i][3] if side == "low" else b[i][2]
+        nb = [b[j][3] if side == "low" else b[j][2] for j in range(i - w, i + w + 1) if j != i]
+        if (side == "low" and all(v < x for x in nb)) or (side == "high" and all(v > x for x in nb)):
+            xs.append(v)
+    return xs
 
 
 def agg4h(c15: list[list]) -> list[list]:
@@ -282,6 +316,35 @@ class PaperDesk:
                                 "reason": f"Свинг-пробой: цена закрылась выше максимума 5 дней ({hh:.6g}) и выше средней за 20 дней — монета в росте. "
                                           f"Держим, пока цена не закроется ниже минимума прошлых суток; стоп −{S_STOP*100:.0f}%, максимум 14 дней."})
                     break
+        # lab rules (L/N/Q): limit orders inside the range, valid ~1 h, re-placed every run
+        if self.P["classes"] & {"L", "N", "Q"}:
+            h1 = agg1h(coin.get("candles_long") or c15, now)
+            price = c15[-1][4]; slot = now // 3_600_000
+            if "L" in self.P["classes"] and len(h1) >= 14 * 24:
+                lo = min(x[3] for x in h1[-336:]); hi = max(x[2] for x in h1[-336:]); wdt = hi - lo
+                ent = lo + 0.30 * wdt
+                if wdt > 0 and ent < price <= lo + 0.55 * wdt:
+                    out.append({"id": f"L-{base}-{slot}", "symbol": base, "side": "LONG", "grade": "L", "kind": "RANGE_LOW_LIMIT",
+                                "entry": ent, "stop": lo - 0.25 * wdt, "tps": [lo + 0.80 * wdt] * 3, "parts": [1.0, 0.0, 0.0], "order": "LIMIT",
+                                "hold_h": HOLD_L_H, "ttl_h": 1,
+                                "reason": f"Лаборатория: диапазон 14 дней {lo:.6g}–{hi:.6g}. Лимитка на 30% от низа ({ent:.6g}), цель — 80% диапазона, стоп под низом. Эксперимент."})
+            if ("N" in self.P["classes"] or "Q" in self.P["classes"]) and len(h1) >= 60:
+                trs = [max(h1[i][2] - h1[i][3], abs(h1[i][2] - h1[i - 1][4]), abs(h1[i][3] - h1[i - 1][4])) for i in range(len(h1) - 14, len(h1))]
+                atr1 = sum(trs) / len(trs)
+                lows = [x for x in fractals(h1, "low") if price * 0.98 <= x < price * 0.999]
+                highs = [x for x in fractals(h1, "high") if price * 1.001 < x <= price * 1.02]
+                if "N" in self.P["classes"] and lows and atr1 > 0:
+                    lv = max(lows); st = lv - 0.6 * atr1; up = [x for x in fractals(h1, "high") if x > price]
+                    tg = min(up) if up else lv + 1.5 * (lv - st)
+                    out.append({"id": f"N-{base}-{slot}", "symbol": base, "side": "LONG", "grade": "N", "kind": "H1_SUPPORT_LIMIT",
+                                "entry": lv, "stop": st, "tps": [tg] * 3, "parts": [1.0, 0.0, 0.0], "order": "LIMIT", "hold_h": HOLD_N_H, "ttl_h": 1,
+                                "reason": f"Лаборатория: часовая поддержка {lv:.6g} (локальный минимум). Лимитка на уровне, стоп {st:.6g}, цель {tg:.6g}. Эксперимент: на истории ≈ −0.1% на сделку."})
+                if "Q" in self.P["classes"] and highs and atr1 > 0:
+                    lv = min(highs); st = lv + 0.6 * atr1; dn = [x for x in fractals(h1, "low") if x < price]
+                    tg = max(dn) if dn else lv - 1.5 * (st - lv)
+                    out.append({"id": f"Q-{base}-{slot}", "symbol": base, "side": "SHORT", "grade": "Q", "kind": "H1_RESIST_LIMIT",
+                                "entry": lv, "stop": st, "tps": [tg] * 3, "parts": [1.0, 0.0, 0.0], "order": "LIMIT", "hold_h": HOLD_N_H, "ttl_h": 1,
+                                "reason": f"Лаборатория: часовое сопротивление {lv:.6g} (локальный максимум). Лимитка на продажу, стоп {st:.6g}, цель {tg:.6g}. Эксперимент: шорты на истории слабые."})
         # D: perpetual at a deep discount to its spot index (1-hour average, recorded by basis_watch)
         bz = coin.get("basis_1h")
         if bz is not None and bz <= D_BASIS:
@@ -390,7 +453,7 @@ class PaperDesk:
                 else:
                     self.conn.execute(f"INSERT INTO {self.T_ORD} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (s["id"], base, s["side"], s["grade"], s["kind"], s["entry"], s["stop"], json.dumps(s["tps"]), json.dumps(s["parts"]),
-                                       qty, risk_usd, now, now + ORDER_TTL_H * 3_600_000, "PENDING", s["reason"]))
+                                       qty, risk_usd, now, now + s.get("ttl_h", ORDER_TTL_H) * 3_600_000, "PENDING", s["reason"]))
                     events.append(f"лимитка {s['side']} {base} @ {s['entry']:.6g} ({RULE_RU.get(s['grade'], s['grade'])})")
                 open_syms.add(base)
         self.conn.commit()
@@ -405,11 +468,12 @@ class PaperDesk:
                     continue
                 if c[0] > o["expires"]:
                     break
-                if (o["side"] == "LONG" and c[3] <= o["entry"]) or (o["side"] == "SHORT" and c[2] >= o["entry"]):
+                thr = 0.0001 if o["grade"] in THROUGH else 0.0
+                if (o["side"] == "LONG" and c[3] <= o["entry"] * (1 - thr)) or (o["side"] == "SHORT" and c[2] >= o["entry"] * (1 + thr)):
                     filled = c
                     break
             if filled:
-                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H}.get(o["grade"], HOLD_C_H)
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
@@ -520,7 +584,7 @@ class PaperDesk:
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
         by_grade = {}
-        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D"):
+        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q"):
             ts = [t for t in closed if t["grade"] == g]
             if ts:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),

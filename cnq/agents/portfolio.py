@@ -332,9 +332,11 @@ BAL = {
     "bear_mult": {"core": 2 / 3, "mid": 0.5, "high": 0.0},                  # protection: cash ≈ 55 %
     "drift": 1 / 3,                     # rebalance when a sleeve is off its target by more than a third of the target
     "rebalance_days": 20,               # monthly: first run on the 1st–3rd of a month, ≥ 20 days after the last rebalance
+    "drift_gap_days": 7,                # a drift-triggered rebalance at most once a week
     "regime_confirm_h": 72,             # the BTC regime must hold 3 days before the mode switches: on 2021–26 daily data the
-                                        # raw flag flipped 62 times; 1/3/7/14-day windows gave ×1.85–1.99 and −48 % DD alike,
-                                        # 3 days halves the protection trades vs 1 day (scripts/balanced_backtest.py)
+                                        # raw flag flipped 62 times; 1 / 3 / 7-day windows: ×1.69 / ×1.86 / ×1.96, worst DD
+                                        # −51 / −50 / −50 %, protection trades 201 / 98 / 64 (scripts/balanced_backtest.py). 3 days =
+                                        # compromise between reacting to a crash and whipsaw; longer looked better in-sample only
     "mid_stop": -0.30, "high_stop": -0.35, "body_x": 2.0, "trail": 0.35,
     "mid_min_vol": 5e7, "lead_min_mcap": 3e8, "lead_min_vol": 2e7, "meme_min_mcap": 1e9, "meme_min_vol": 5e7,
     "dead_ath": -90.0,                  # more than −90 % from the all-time high = «мёртвая» монета, not bought
@@ -360,7 +362,8 @@ BAL_RULES = [
     "оценке в своём секторе, по одному на сектор), два самых ликвидных мема по 3% (капитализация от $1 млрд, оборот от $50M) — "
     "покупаем только когда мем на 30%+ ниже максимума за 30 дней; до этого их доля ждёт в кэше.",
     "Ребаланс: 1–3 числа месяца или когда доля корзины ушла от плана больше чем на треть (ядро вне 30–60%, альты вне 20–40%, "
-    "высокий риск выше 26.7%). Ядро и альты возвращаем к плановым долям, выбывших из правил меняем; высокий риск не доливаем.",
+    "высокий риск выше 26.7%), но по перекосу — не чаще раза в неделю. Ядро и альты возвращаем к плановым долям, выбывших из правил "
+    "меняем; если подходящих альтов меньше пяти, их доля ждёт в кэше. Высокий риск не доливаем.",
     "Фиксация в высоком риске: на ×2 от входа продаём половину — тело вернулось; остаток держим без потолка и продаём при откате "
     "35% от пика. Стоп −35% от входа, пока тело не взято. Альты: стоп −30% от входа, место ждёт ребаланса.",
     "Защита: если BTC 3 дня подряд в медвежьем режиме (тот же флаг, что у остальных портфелей), продаём весь высокий риск, "
@@ -368,7 +371,21 @@ BAL_RULES = [
     "3 дня — чтобы не дёргаться: на истории 2021–2026 флаг BTC переключался 62 раза, часто на 1–2 дня.",
     "Комиссия 0.1% с каждой сделки вычитается из счёта. Это учебный счёт, а не совет; рынок может пойти против плана.",
 ]
-BAL_BACKTEST: dict | None = None        # filled from scripts/balanced_backtest.py (see below)
+# Sanity check of the rules on the only long history in the repo — `python scripts/balanced_backtest.py` reproduces these numbers.
+BAL_BACKTEST = {
+    "script": "scripts/balanced_backtest.py", "period": "2021-04-03 → 2026-09-09",
+    "data": "data/daily_closes18.json — 18 крупных монет, дневные закрытия Binance",
+    "result": {"bal": {"final_x": 1.86, "cagr_pct": 12.1, "max_dd_pct": -50.0},
+               "bal_no_protection": {"final_x": 1.97, "cagr_pct": 13.3, "max_dd_pct": -59.7},
+               "btc_hold": {"final_x": 1.37, "cagr_pct": 5.9, "max_dd_pct": -76.7},
+               "cons_50_25_15": {"final_x": 2.45, "cagr_pct": 17.9, "max_dd_pct": -76.2},
+               "equal_weight_18": {"final_x": 1.61, "cagr_pct": 9.2, "max_dd_pct": -76.6}},
+    "bal_by_year_pct": {"2021": 46.9, "2022": -41.2, "2023": 98.7, "2024": 49.2, "2025": -23.2, "2026": -5.3},
+    "text_ru": ("Проверка правил, а не прогноз. История 04.2021 → 09.2026 на 18 крупных монетах (это сегодняшние выжившие — результат "
+                "завышен), без HYPE и мелких лидеров, мем только DOGE, дневные закрытия, комиссия 0.1%. Итог ×1.86 (12% в год), "
+                "худшая просадка −50%. Для сравнения: BTC ×1.37 и −77%; BTC/ETH/SOL 50/25/15 ×2.45 и −76% — доходнее, но падал глубже. "
+                "Правило защиты стоило части дохода (без него ×1.97), но срезало просадку с −60% до −50%. 2022 год: −41%, 2025: −23%."),
+}
 
 
 def _mpct(x: float) -> str:
@@ -550,6 +567,9 @@ class BalancedPortfolio:
     def step(self, rows: list[dict], cards: list[dict], btc_bull: bool, memes: set[str] | None = None, now: int | None = None) -> dict:
         now = now or int(time.time() * 1000)
         memes = memes if memes is not None else meme_symbols(cards)
+        if rows and not any(r.get("hl_perp") or r.get("hl_spot") for r in rows):
+            # Hyperliquid API did not answer this run: skip the «есть на Hyperliquid» filter instead of selling every alt
+            rows = [{**r, "hl_perp": True} for r in rows]
         byrow = {r["symbol"]: r for r in rows}
         live = {r["symbol"]: r["price"] for r in rows if r.get("price")}
         price = dict(live)
@@ -560,7 +580,7 @@ class BalancedPortfolio:
             elif self._m(f"px:{s}"):
                 price[s] = self._m(f"px:{s}")
         actions: list[dict] = []
-        # --- regime with a 24 h confirmation
+        # --- regime with a confirmation window (BAL['regime_confirm_h'])
         seen = 1.0 if btc_bull else 0.0
         mode = self._m("mode")
         mode_changed = False
@@ -607,6 +627,8 @@ class BalancedPortfolio:
         W = self.sleeves_now(price)
         dr = BAL["drift"]
         drift = [k for k in ("core", "mid") if T[k] > 0 and abs(W[k] - T[k]) > T[k] * dr] + (["high"] if W["high"] > T["high"] * (1 + dr) + 1e-9 else [])
+        if now - last_reb < BAL["drift_gap_days"] * DAY_MS:
+            drift = []        # a drift rebalance at most once a week (if fewer than 5 alts qualify, the mid gap cannot be closed anyway)
         cool = self.stopped_recently(now)
         why_reb = "старт" if first else ("смена режима BTC" if mode_changed else ("месячный ребаланс" if monthly else (f"перекос: {', '.join(SLEEVE_RU[k] for k in drift)}" if drift else None)))
         mid_c = bal_mid_candidates(rows, cards, memes, exclude=cool)

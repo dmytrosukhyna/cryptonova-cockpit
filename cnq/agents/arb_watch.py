@@ -254,6 +254,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_books, sam
     return d
 
 
+def _n0(x: float) -> str:
+    return f"{x:,.0f}".replace(",", " ")
+
+
 def _p(x: float) -> str:
     return f"{x * 100:.2f}%"
 
@@ -277,7 +281,7 @@ def explain(d: dict) -> str:
             v, k = next(iter(d["by_venue"].items()))
             parts.append(f"Чаще всего в окнах участвует {v} ({k} из {s['observations']} наблюдений).")
     parts.append(f"Новых окон за сутки {s['windows']}" + (f", обычно {_p(s['median_net'])} чистыми" if s["median_net"] is not None else "") +
-                 (f", в лучшей цене стакана в среднем ${s['median_size_usd']:,.0f}".replace(",", " ") if s["median_size_usd"] is not None else "") +
+                 (f", в лучшей цене стакана в среднем ${_n0(s['median_size_usd'])}" if s["median_size_usd"] is not None else "") +
                  f". Честная оценка — {'+' if s['virtual_pnl_usd'] >= 0 else '−'}${abs(s['virtual_pnl_usd']):,.2f} за сутки "
                  f"(старый подсчёт по маршрутам по $1 000 дал бы ${s['virtual_pnl_naive_usd']:,.2f}).")
     if e.get("count"):

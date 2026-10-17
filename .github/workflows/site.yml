@@ -72,7 +72,7 @@ jobs:
         run: python -m cnq.cli arb --out web || true
       - name: Triangle watch (3 trades inside one exchange) → web/tri.json
         continue-on-error: true
-        timeout-minutes: 3
+        timeout-minutes: 5
         run: python -m cnq.cli tri --out web || true
       - name: Coin research (анкета, топ-100, страх/жадность, капитализация) → web/markets.json, web/research.json
         continue-on-error: true

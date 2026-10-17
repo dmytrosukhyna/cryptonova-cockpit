@@ -210,6 +210,8 @@ def test_bal_drift_rebalance_and_add_keeps_coin_amount():
     for s in ("BTC", "ETH", "SOL"):
         _px(rows, s, 3.0)                                             # core triples → core share far above 60 %
     st = port.step(rows, cards, True, memes, T0 + 2 * DAY)
+    assert not st["actions"] and st["sleeves"]["core"]["now_pct"] > 60     # drift rebalance at most once a week after the last one
+    st = port.step(rows, cards, True, memes, T0 + 8 * DAY)
     assert any(a["symbol"] == "BTC" and a["action"] == "TRIM" for a in st["actions"])
     assert abs(st["sleeves"]["core"]["now_pct"] - 45) < 1 and abs(st["sleeves"]["mid"]["now_pct"] - 30) < 1
     # the ledger's ADD keeps the coin amount exact (harmonic entry): buy 0.5 @100, add 0.5 @50 → worth 0.75 at 50

@@ -412,7 +412,7 @@ def explain(b: dict, positions: list[dict]) -> str:
         parts.append(f"Если закрыть всё сейчас, добавится комиссия за выход −${b['exit_fees_usd']:,.2f}: было бы {_usd(b['if_closed_usd'])}.")
         if b["daily_funding_usd"] > 0:
             be = b["breakeven_days"]
-            parts.append(f"Сейчас {_pl(len(positions), 'позиция', 'позиции', 'позиций')} по ${positions[0]['notional']:,.0f}".replace(",", " ") + f" приносят ≈ ${b['daily_funding_usd']:.2f} в день "
+            parts.append(f"Сейчас {_pl(len(positions), 'позиция', 'позиции', 'позиций')} по $" + f"{positions[0]['notional']:,.0f}".replace(",", " ") + f" приносят ≈ ${b['daily_funding_usd']:.2f} в день "
                          f"(≈ {b['avg_rate_8h'] * 100:.4f}% за 8 ч)" +
                          (f" — минус вместе с выходом окупится примерно за {be:.0f} дн., если ставки не упадут." if be else " — счёт уже в плюсе с учётом выхода."))
         else:

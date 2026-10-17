@@ -154,7 +154,7 @@ def scan(book: dict, fee: float) -> tuple[list[dict], int]:
         caps = [usd[c] * qty if qty and c in usd else None for _, (_, c, qty), _ in legs]
         rows.append({"path": " → ".join(path + [path[0]]), "nodes": ",".join(sorted(tri)), "net": round(mult - 1, 6),
                      "gross": round(mult / (1 - fee) ** 3 - 1, 6), "size_usd": round(min(caps), 2) if all(c is not None for c in caps) else None,
-                     "pairs": ["/".join(lg[2]) for lg in legs]})
+                     "pairs": ["/".join(legs[(k + i) % 3][2]) for i in range(3)]})
     rows.sort(key=lambda r: -r["net"])
     return rows, len(tris)
 
@@ -256,9 +256,9 @@ def run(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_books, sam
 def explain(d: dict) -> str:
     if not d["scanned"]:
         return "Данные ещё копятся: биржи пока не ответили серверу."
-    parts = [f"Треугольник — три обмена внутри одной биржи (например, USDT → BTC → XRP → USDT). Сервер проверяет "
-             f"{d['scanned_total']} треугольников на {len(d['scanned'])} биржах ({', '.join(d['scanned'])}) — все пары к USDT, USDC, "
-             f"FDUSD, BTC, ETH и BNB, в обе стороны."]
+    parts = [f"Треугольник — три обмена внутри одной биржи (например, USDT → BTC → XRP → USDT). Сервер проверяет все "
+             f"треугольники из пар к USDT, USDC, FDUSD, BTC, ETH и BNB, в обе стороны, на биржах {', '.join(d['scanned'])} — "
+             f"всего {d['scanned_total']}."]
     lead = [(v, rows[0]) for v, rows in d["best"].items() if rows]
     if lead:
         v, r = max(lead, key=lambda x: x[1]["net"])
@@ -269,8 +269,8 @@ def explain(d: dict) -> str:
                          "ликвидных пар, а не возможность.")
     s = d["day"]
     if s["samples"]:
-        parts.append(f"За сутки {s['samples']} проверок, новых окон ≥ 0.05% чистыми: {s['windows']}" +
-                     (f" (обычно {s['median_net'] * 100:.2f}%, в стакане ≈ ${s['median_size_usd']:,.0f})".replace(",", " ") if s["median_net"] is not None and s["median_size_usd"] is not None else "") +
+        parts.append(f"За сутки проверок: {s['samples']}, новых окон ≥ 0.05% чистыми: {s['windows']}" +
+                     (f" (обычно {s['median_net'] * 100:.2f}%, в стакане ≈ $" + f"{s['median_size_usd']:,.0f}".replace(",", " ") + ")" if s["median_net"] is not None and s["median_size_usd"] is not None else "") +
                      f", застывших треугольников {s['stuck_triangles']}; виртуально {'+' if s['virtual_pnl_usd'] >= 0 else '−'}${abs(s['virtual_pnl_usd']):,.2f}.")
     off = [v for v in d["venues_all"] if v not in d["venues_ok"]]
     if off:

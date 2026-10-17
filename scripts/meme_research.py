@@ -482,8 +482,10 @@ def portfolio(data, key, W, sigs, strength, hold_days, stop, tp, max_pos=6, size
     prev = eqs[0] if len(eqs) else START
     for m in mk:
         mret[m] = me[m] / prev - 1; prev = me[m]
+    active = {m: v for m, v in mret.items() if abs(v) > 1e-9}          # months without any position are not counted
     return {"final": float(eqs[-1]) if len(eqs) else START, "dd": max_dd(eqs), "trades": len(trades), "per_day": len(trades) / days,
-            "days": days, "from": day(int(tls[0])) if len(tls) else None, "months_pos": float(np.mean([v > 0 for v in mret.values()])) if mret else None,
+            "days": days, "from": day(int(tls[0])) if len(tls) else None, "months_active": len(active),
+            "months_pos": float(np.mean([v > 0 for v in active.values()])) if active else None,
             "mret": mret, "avg": float(np.mean([t["ret"] for t in trades])) if trades else None,
             "win": float(np.mean([t["ret"] > 0 for t in trades])) if trades else None}
 
@@ -699,8 +701,8 @@ def study(data, log=print) -> tuple[str, dict]:
         p = o.get("port") or {}
         return (f"| {o['name']} | {o['n']} | {p.get('per_day', 0):.2f} | {pct(o.get('avg'))} | {pct(o.get('rand_avg'))} | "
                 f"{'—' if o.get('p') is None else f'{o['p']:.2f}'} | {pct(o.get('win'), 0, False)} | {pct(p.get('dd'), 0)} | "
-                f"${p.get('final', START):,.0f} | {pct(p.get('months_pos'), 0, False)} | {pct(o.get('half1'))} / {pct(o.get('half2'))} |")
-    head = ("| правило | сделок | в день | средняя | случайно | p | в плюс | макс. просадка | итог $10k | месяцев в плюсе | 1-я / 2-я половина |\n"
+                f"${p.get('final', START):,.0f} | {pct(p.get('months_pos'), 0, False)} из {p.get('months_active', 0)} | {pct(o.get('half1'))} / {pct(o.get('half2'))} |")
+    head = ("| правило | сделок | в день | средняя | случайно | p | в плюс | макс. просадка | итог $10k | месяцев в плюсе (из месяцев с позициями) | 1-я / 2-я половина |\n"
             "|---|---|---|---|---|---|---|---|---|---|---|")
 
     # ── A breakout (4h) ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -875,7 +877,7 @@ def study(data, log=print) -> tuple[str, dict]:
 
     # ── verdict (criteria fixed before looking) ────────────────────────────────────────────────────────────────────────
     md.append("\n## Критерии «устойчиво» (заданы до прогона)\n")
-    md.append("Средняя после издержек > 0 и выше случайной на ≥ 0.5 п.п. при p ≤ 0.05; обе половины периода в плюсе; ≥ 60% месяцев в плюсе (счёт); "
+    md.append("Средняя после издержек > 0 и выше случайной на ≥ 0.5 п.п. при p ≤ 0.05; обе половины периода в плюсе; ≥ 60% месяцев в плюсе (счёт; месяцы без позиций не считаются); "
               "≥ 30 сделок; повтор на 1ч в плюсе. Для ротации: обгоняет «все поровну» и ≥ 95% случайных прогонов, обе половины в плюсе, ≥ 6 из 9 ячеек в плюсе.\n")
     verdict = {}
     h1r = S["rules"].get("h1", {})

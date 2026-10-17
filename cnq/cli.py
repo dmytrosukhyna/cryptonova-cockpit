@@ -256,6 +256,11 @@ def main(argv: list[str] | None = None) -> int:
                     rows = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 31:]]
                     rep["coins"].append({"symbol": bx, "candles": rows, "levels": [], "regime": {}, "b_only": True})
             res = paper_desk.run(conn, rep)
+            try:   # macro calendar (FOMC / CPI / NFP) → web/calendar.json
+                from .agents import macro_calendar
+                macro_calendar.write(args.out)
+            except Exception as e:  # noqa: BLE001
+                print("calendar:", e)
             write_report(res, os.path.join(args.out, "paper.json"))
             print(f"paper.json: equity={res['equity']} open={len(res['open'])} pending={len(res['pending'])} closed={res['stats']['trades']} events={res['events'][:3]}")
         elif args.cmd == "calibrate":

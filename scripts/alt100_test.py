@@ -101,10 +101,18 @@ OOS = int(np.searchsorted(times, 1735689600000))          # 2025-01-01
 first = np.array([np.argmax(np.isfinite(C[k])) if np.isfinite(C[k]).any() else T for k in range(NS)])
 core = [k for k, s in enumerate(syms) if s in CORE18]
 alts_all = [k for k in range(NS) if syms[k] not in CORE18]
-elig = [k for k in alts_all if first[k] < T and times[first[k]] < LATE and syms[k] not in REUSED]
-late = [k for k in alts_all if k not in elig]
+def _flat(k):                                                 # stale archive series (e.g. a delisted perp kept at one price)
+    seg = slice(max(START, first[k]), T); h, l = H[k, seg], L[k, seg]; ok = np.isfinite(h)
+    return ok.sum() > 0 and (h[ok] == l[ok]).mean() > 0.3
+
+
+FLAT = {syms[k] for k in range(NS) if first[k] < T and _flat(k)}
+elig = [k for k in alts_all if first[k] < T and times[first[k]] < LATE and syms[k] not in REUSED and syms[k] not in FLAT]
+late = [k for k in alts_all if k not in elig and syms[k] not in REUSED and syms[k] not in FLAT]
 alts = [k for k in elig if RANK.get(syms[k], 0) <= 125]       # the hypothesis: altcoins of the top 100 (≈ market-cap rank ≤ 125 incl. stables)
-alts2 = [k for k in elig if RANK.get(syms[k], 0) > 125]       # extra independent check: ranks 101–200 (top-200 data set only)
+alts2 = [k for k in elig if 125 < RANK.get(syms[k], 0) < 9999]  # extra independent check: ranks 101–200
+alts3 = [k for k in elig if RANK.get(syms[k], 0) >= 9999]     # survivorship check: listed by 2023-01 but not in today's top-250 (fallen / delisted)
+GROUPS = [("alts top-100", alts)] + ([("alts 101–200", alts2)] if alts2 else []) + ([("alts outside today's top-250", alts3)] if alts3 else [])
 WARM = 30 * 96
 DAYS = (times[-1] - times[START]) / 86400_000
 DAYS_IS = (times[OOS] - times[START]) / 86400_000 if OOS < T else DAYS
@@ -157,14 +165,14 @@ def gen_E(br=0.4, hold=96, tag="E"):
     return clean(out)
 
 
-def gen_F(oi=-0.12, px=-0.05, hold=96, stop=0.06, tag="F"):
-    return clean([dict(c, tag=tag, H=hold) for c in ap.cand_F(oi=oi, px=px, hold=hold, stop=stop)])
+def gen_F(oi=-0.12, px=-0.05, hold=96, stop=0.06, tag="F", delay=1):
+    return clean([dict(c, tag=tag, H=hold) for c in ap.cand_F(oi=oi, px=px, hold=hold, stop=stop, delay=delay)])
 
 
-def gen_D(th=-20.0, hold=96, tag="D", chronic=None):
+def gen_D(th=-20.0, hold=96, tag="D", chronic=None, delay=1):
     """Rule D (1-hour average basis ≤ th bp → long, exit after `hold` bars, stop −12 %). chronic=x: skip coins whose
     basis median over the previous 7 days is already ≤ x bp (permanently discounted perps: the discount is not a panic)."""
-    cs = ap.cand_D(th=th, hold=hold)
+    cs = ap.cand_D(th=th, hold=hold, delay=delay)
     if chronic is not None:
         b = np.where(ap.IMP == 0, ap.A["basis_index_bps"], np.nan)
         med = pd.DataFrame(b[:, ::4].T).rolling(168, min_periods=84).median().to_numpy().T      # hourly samples, 7 days
@@ -418,6 +426,8 @@ if "data" in SECT:
     P(f"Core ({len(core)}): {' '.join(syms[k] for k in core)}  ")
     P(f"Alts top-100 ({len(alts)}): " + " ".join(f"{syms[k]}#{RANK.get(syms[k], 0)}" for k in alts) + "  ")
     if alts2: P(f"Alts ranks 101–200 ({len(alts2)}): " + " ".join(f"{syms[k]}#{RANK.get(syms[k], 0)}" for k in alts2) + "  ")
+    if alts3: P(f"Alts outside today's top-250 ({len(alts3)}): " + " ".join(syms[k] for k in alts3) + "  ")
+    if FLAT: P(f"Excluded (stale / flat archive series): {' '.join(sorted(FLAT))}  ")
     if late: P(f"Alts dropped (history starts after 2024-01 once cleaned): {' '.join(syms[k] for k in late)}  ")
     for s, msg in CLEAN.items(): P(f"Cleaned {s}: {msg}  ")
     for s, msg in REUSED.items():
@@ -425,22 +435,23 @@ if "data" in SECT:
     P("\n| coin | rank | first bar | OI bars real | basis median bp | basis ≤ −20 share | 2023–26 move | largest 15m jump |")
     P("|---|---|---|---|---|---|---|---|")
     b = ap.A["basis_index_bps"]
-    for k in core + alts + alts2:
+    for k in (core + alts + alts2 if len(alts3) < 40 else core):
         seg = slice(max(START, first[k]), T)
         oi = (ap.IMP[k, seg] == 0).mean() * 100; bb = b[k, seg]
-        mv = C[k, T - 1] / C[k, max(START, first[k])] - 1 if np.isfinite(C[k, T - 1]) else np.nan
+        cl = C[k, seg][np.isfinite(C[k, seg])]; mv = cl[-1] / cl[0] - 1 if len(cl) else np.nan
         jr = np.nanmax(np.abs(np.log(O[k, seg][1:] / C[k, seg][:-1]))) * 100
         P(f"| {syms[k]} | {RANK.get(syms[k], 0)} | {DAY[first[k]]} | {oi:.0f}% | {np.nanmedian(bb):+.1f} | {np.nanmean(bb <= -20) * 100:.2f}% | {mv * 100:+.0f}% | {jr:.0f}% |")
     P()
 
 # ---- candidates (computed once) ----
 MK = {}
-if any(s in SECT for s in ("validate", "market", "coins", "portfolio")):
+if any(s in SECT for s in ("validate", "market", "coins", "portfolio", "lab", "altpilot")):
     MK["B"] = gen_B(); MK["B30"] = gen_B(3.0, tag="B30"); MK["B25"] = gen_B(2.5, tag="B25"); MK["B30w3"] = gen_B(3.0, 0.3, "B30w3")
     MK["E"] = gen_E(); MK["E8h"] = gen_E(hold=32, tag="E8h"); MK["E30"] = gen_E(br=0.3, tag="E30")
     MK["F"] = gen_F(); MK["F8"] = gen_F(-0.08, -0.04, tag="F8"); MK["F8h"] = gen_F(hold=32, tag="F8h")
     MK["D"] = gen_D(); MK["D15"] = gen_D(-15, tag="D15"); MK["D8h"] = gen_D(hold=32, tag="D8h"); MK["Dch"] = gen_D(chronic=-10, tag="Dch")
-    MK["D15ch"] = gen_D(-15, chronic=-10, tag="D15ch")
+    MK["D15ch"] = gen_D(-15, chronic=-10, tag="D15ch"); MK["Dlate"] = gen_D(tag="Dlate", delay=2); MK["D25"] = gen_D(-25, tag="D25")
+    MK["F8hlate"] = gen_F(hold=32, tag="F8hlate", delay=2)
     print(f"candidates built {time.time() - t0:.0f}s: " + ", ".join(f"{k} {len(v)}" for k, v in MK.items()), flush=True)
 
 if "validate" in SECT:
@@ -465,18 +476,16 @@ if "market" in SECT:
         ex = {"B": 5, "E": 20, "F": 5, "D": 3}[tag[0]]
         pas = is_pass(cs, alts, ex)
         P(row(f"{tag} · core", on(cs, core)))
-        P(row(f"{tag} · alts top-100", on(cs, alts)))
-        P(row(f"{tag} · alts top-100 IS-pass ({len(pas)})", on(cs, pas)))
-        if alts2:
-            P(row(f"{tag} · alts 101–200", on(cs, alts2)))
-            p2 = is_pass(cs, alts2, ex); P(row(f"{tag} · alts 101–200 IS-pass ({len(p2)})", on(cs, p2)))
+        for gn, G in GROUPS:
+            p2 = is_pass(cs, G, ex)
+            P(row(f"{tag} · {gn}", on(cs, G))); P(row(f"{tag} · {gn} IS-pass ({len(p2)})", on(cs, p2)))
     P("\nIS-pass = coins with ≥ 5 trades (E: 20, D: 3) in 2023–2024 and average > 0 there; OOS columns show what happened next.\n")
 
 if "coins" in SECT:
     P("## Per alt coin, base rules (IS 2023–24 avg (n) → OOS 2025–26 avg (n))\n")
     P("| coin | B | E | F | D |")
     P("|---|---|---|---|---|")
-    for k in alts + alts2:
+    for k in (alts + alts2 if len(alts3) < 40 else []):
         cells = []
         for r in "BEFD":
             ci = [c for c in MK[r] if c["k"] == k and c["i"] < OOS]; co = [c for c in MK[r] if c["k"] == k and c["i"] >= OOS]
@@ -484,7 +493,7 @@ if "coins" in SECT:
             cells.append((f"{ai:+.1f} ({ni})" if ni else "— (0)") + " → " + (f"{ao:+.1f} ({no})" if no else "— (0)"))
         P(f"| {syms[k]} | " + " | ".join(cells) + " |")
     for r, nmin in (("B", 5), ("E", 20), ("F", 5), ("D", 3)):
-        P(f"\nIS-pass {r}: top-100 {' '.join(syms[k] for k in is_pass(MK[r], alts, nmin)) or '—'}; 101–200 {' '.join(syms[k] for k in is_pass(MK[r], alts2, nmin)) or '—'}  ")
+        P(f"\nIS-pass {r}: " + "; ".join(f"{gn}: {' '.join(syms[k] for k in is_pass(MK[r], G, nmin)) or '—'}" for gn, G in GROUPS) + "  ")
     P()
 
 LM, LA, BEST = {}, {}, {}
@@ -575,61 +584,116 @@ PFS = "|---|---|---|---|---|---|---|---|---|---|---|"
 def relabel(cs, letter): return [dict(c, rule=letter) for c in cs]
 
 
+EX = dict(b=dict(risk=0.01, open=4), f=dict(share=0.25, open=3), d=dict(share=0.15, open=3))
+NMIN = dict(B=5, E=20, F=5, D=3)
+
+
+def best_days(cs, n):
+    d = collections.defaultdict(float)
+    for c in cs: d[DAY[c["i"]]] += c["ret"]
+    return set(sorted(d, key=d.get)[-n:])
+
+
 if "portfolio" in SECT:
     P("## Portfolio: core «норма»+D plus alt-coin candidates\n")
-    P("Same letter = the alt trades share the rule's cap with the core coins; new letter (b, f, d) = own cap, same size. "
-      "IS-pass coin lists are chosen on 2023–2024 only.\n")
+    P("New letter (b, f, d) = alt trades with their own cap and the same size as the core rule (b: risk 1 % ×4, f: 25 % ×3, d: 15 % ×3); "
+      "same letter = they share the core rule's cap. IS-pass coin lists are chosen on 2023–2024 only. "
+      "OOS columns: a fresh $10k from 2025-01-01.\n")
     base = [c for r in "BEFD" for c in on(MK[r], core)]
     R4 = ("B", "E", "F", "D")
-    pas = {r: is_pass(MK[r], alts, n) for r, n in (("B", 5), ("E", 20), ("F", 5), ("D", 3))}
     P(PFH); P(PFS)
     P(pf_row("core 18 (now)", base, R4))
-    for r, lt, ex in (("B", "b", dict(risk=0.01, open=4)), ("F", "f", dict(share=0.25, open=3)), ("D", "d", dict(share=0.15, open=3))):
-        P(pf_row(f"+ {r} on all alts (same letter)", base + on(MK[r], alts), R4))
-        P(pf_row(f"+ {r} on IS-pass alts (same letter, {len(pas[r])})", base + on(MK[r], pas[r]), R4))
-        P(pf_row(f"+ {lt} on IS-pass alts (own cap)", base + relabel(on(MK[r], pas[r]), lt), R4 + (lt,), extra={lt: ex}))
-        P(pf_row(f"+ {lt} on all alts (own cap)", base + relabel(on(MK[r], alts), lt), R4 + (lt,), extra={lt: ex}))
-    P(pf_row("+ E on all alts (same basket)", base + on(MK["E"], alts), R4))
-    P(pf_row(f"+ E on IS-pass alts ({len(pas['E'])})", base + on(MK["E"], pas["E"]), R4))
-    EX = dict(b=dict(risk=0.01, open=4), f=dict(share=0.25, open=3), d=dict(share=0.15, open=3))
-    combo = base + relabel(on(MK["B"], pas["B"]), "b") + relabel(on(MK["F"], pas["F"]), "f") + relabel(on(MK["D"], pas["D"]), "d")
-    P(pf_row("+ b + f + d on IS-pass alts", combo, R4 + ("b", "f", "d"), extra=EX))
-    comboall = base + relabel(on(MK["B"], alts), "b") + relabel(on(MK["F"], alts), "f") + relabel(on(MK["D"], alts), "d")
-    P(pf_row("+ b + f + d on all alts", comboall, R4 + ("b", "f", "d"), extra=EX))
-    if alts2:
-        A2 = alts + alts2
-        pas2 = {r: is_pass(MK[r], A2, n) for r, n in (("B", 5), ("E", 20), ("F", 5), ("D", 3))}
-        c2 = base + relabel(on(MK["B"], pas2["B"]), "b") + relabel(on(MK["F"], pas2["F"]), "f") + relabel(on(MK["D"], pas2["D"]), "d")
-        P(pf_row(f"+ b + f + d on IS-pass top-200 alts (b {len(pas2['B'])}, f {len(pas2['F'])}, d {len(pas2['D'])})", c2, R4 + ("b", "f", "d"), extra=EX))
-        c3 = base + relabel(on(MK["B"], A2), "b") + relabel(on(MK["F"], A2), "f") + relabel(on(MK["D"], A2), "d")
-        P(pf_row("+ b + f + d on all top-200 alts", c3, R4 + ("b", "f", "d"), extra=EX))
-        P(pf_row("+ b on all top-200 alts", base + relabel(on(MK["B"], A2), "b"), R4 + ("b",), extra=EX))
-    P("\n**Aggressive market variants** (replace the rule on core + alts; everything else «норма»+D on core):\n")
+    for gn, G in GROUPS:
+        pas = {r: is_pass(MK[r], G, n) for r, n in NMIN.items()}
+        for r, lt in (("B", "b"), ("F", "f"), ("D", "d")):
+            P(pf_row(f"+ {lt} on {gn} IS-pass ({len(pas[r])})", base + relabel(on(MK[r], pas[r]), lt), R4 + (lt,), extra={lt: EX[lt]}))
+            P(pf_row(f"+ {lt} on all {gn}", base + relabel(on(MK[r], G), lt), R4 + (lt,), extra={lt: EX[lt]}))
+            if gn == "alts top-100": P(pf_row(f"+ {r} on {gn} IS-pass, same letter", base + on(MK[r], pas[r]), R4))
+        P(pf_row(f"+ E on {gn} (same basket)", base + on(MK["E"], G), R4))
+        fd = base + relabel(on(MK["F"], pas["F"]), "f") + relabel(on(MK["D"], pas["D"]), "d")
+        P(pf_row(f"+ f + d on {gn} IS-pass", fd, R4 + ("f", "d"), extra=EX))
+        f8 = base + relabel(on(MK["F8h"], is_pass(MK["F8h"], G, 5)), "f") + relabel(on(MK["D"], pas["D"]), "d")
+        P(pf_row(f"+ f(8 h) + d on {gn} IS-pass", f8, R4 + ("f", "d"), extra=EX))
+        bfd = fd + relabel(on(MK["B"], pas["B"]), "b")
+        P(pf_row(f"+ b + f + d on {gn} IS-pass", bfd, R4 + ("b", "f", "d"), extra=EX))
+    if len(GROUPS) > 1:
+        AG = [k for _, G in GROUPS for k in G]
+        pas = {r: is_pass(MK[r], AG, n) for r, n in NMIN.items()}
+        fd = base + relabel(on(MK["F"], pas["F"]), "f") + relabel(on(MK["D"], pas["D"]), "d")
+        P(pf_row(f"+ f + d on ALL alt groups IS-pass (f {len(pas['F'])}, d {len(pas['D'])})", fd, R4 + ("f", "d"), extra=EX))
+
+    P("\n**Robustness of «+ d» and «+ f» on top-100 alts (IS-pass coins)** — sizing, late entry, higher alt costs, best days removed:\n")
+    P(PFH); P(PFS)
+    pd_ = is_pass(MK["D"], alts, 3); pf_ = is_pass(MK["F"], alts, 5)
+    dA, fA = on(MK["D"], pd_), on(MK["F"], pf_)
+    for lab_, extra in (("d 10 % ×3", dict(d=dict(share=0.10, open=3))), ("d 15 % ×2", dict(d=dict(share=0.15, open=2))),
+                        ("d 15 % ×5", dict(d=dict(share=0.15, open=5))), ("d 20 % ×3", dict(d=dict(share=0.20, open=3)))):
+        P(pf_row(f"+ {lab_}", base + relabel(dA, "d"), R4 + ("d",), extra=extra))
+    P(pf_row("+ d, entry 15 min later", base + relabel(on(MK["Dlate"], pd_), "d"), R4 + ("d",), extra=EX))
+    P(pf_row("+ d, threshold −25 bp", base + relabel(on(MK["D25"], pd_), "d"), R4 + ("d",), extra=EX))
+    P(pf_row("+ d, exit after 8 h", base + relabel(on(MK["D8h"], pd_), "d"), R4 + ("d",), extra=EX))
+    P(pf_row("+ d, chronic-discount coins skipped", base + relabel(on(MK["Dch"], pd_), "d"), R4 + ("d",), extra=EX))
+    for extra_cost in (0.0016, 0.0036):
+        P(pf_row(f"+ d, alt costs {0.14 + extra_cost * 100:.2f} % round trip", base + [dict(c, rule="d", ret=c["ret"] - extra_cost) for c in dA],
+                 R4 + ("d",), extra=EX))
+    for nd in (5, 10, 20):
+        bd = best_days(dA, nd)
+        P(pf_row(f"+ d without its {nd} best days", base + relabel([c for c in dA if DAY[c["i"]] not in bd], "d"), R4 + ("d",), extra=EX))
+    P(pf_row("+ d without 10–11.10.2025", base + relabel([c for c in dA if DAY[c["i"]] not in ("2025-10-10", "2025-10-11")], "d"), R4 + ("d",), extra=EX))
+    P(pf_row("+ f, entry 15 min later (8 h hold)", base + relabel(on(MK["F8hlate"], pf_), "f"), R4 + ("f",), extra=EX))
+    P(pf_row("+ f 8 h hold", base + relabel(on(MK["F8h"], pf_), "f"), R4 + ("f",), extra=EX))
+    P(pf_row("+ f 15 % ×3", base + relabel(fA, "f"), R4 + ("f",), extra=dict(f=dict(share=0.15, open=3))))
+    P(pf_row("+ f, alt costs 0.30 %", base + [dict(c, rule="f", ret=c["ret"] - 0.0016) for c in fA], R4 + ("f",), extra=EX))
+    bd = best_days(fA, 10)
+    P(pf_row("+ f without its 10 best days", base + relabel([c for c in fA if DAY[c["i"]] not in bd], "f"), R4 + ("f",), extra=EX))
+
+    P("\n**Aggressive market variants** (replace the rule on core + top-100 alts; everything else «норма»+D on core):\n")
     P(PFH); P(PFS)
     allk = core + alts
     def swap(r, tag, ks=allk): return [c for c in base if c["rule"] != r] + on(MK[tag], ks)
-    for r, tag in (("B", "B30"), ("B", "B25"), ("B", "B30w3"), ("E", "E8h"), ("E", "E30"), ("F", "F8"), ("F", "F8h"), ("D", "D15"),
+    for r, tag in (("B", "B30"), ("B", "B25"), ("E", "E8h"), ("E", "E30"), ("F", "F8"), ("F", "F8h"), ("D", "D15"),
                    ("D", "D8h"), ("D", "Dch"), ("D", "D15ch")):
         P(pf_row(f"{tag} on core only", swap(r, tag, core), R4))
         P(pf_row(f"{tag} on core + alts", swap(r, tag), R4))
     P()
 
+if "lab" in SECT or "altpilot" in SECT:
+    P("## Separate accounts: alt-only autopilot and aggressive candidates ($10k each)\n")
+    P(PFH.replace("portfolio («норма» + D, $10k)", "account")); P(PFS)
+    R4 = ("B", "E", "F", "D")
+    for gn, G in GROUPS:
+        alt_only = [c for r in "BEFD" for c in on(MK[r], G)]
+        P(pf_row(f"alt-only autopilot «норма»+D, all {gn}", alt_only, R4))
+        P(pf_row(f"alt-only, F + D only, all {gn}", [c for r in "FD" for c in on(MK[r], G)], ("F", "D")))
+        P(pf_row(f"alt-only, D only 15 % ×3, all {gn}", on(MK["D"], G), ("D",)))
+        P(pf_row(f"alt-only, D only 10 % ×6, all {gn}", on(MK["D"], G), ("D",), d_share=0.10, d_open=6))
+    for tag, sh, op in (("D15", 0.10, 6), ("D15ch", 0.10, 6), ("D8h", 0.10, 6), ("Dch", 0.15, 3)):
+        P(pf_row(f"{tag} only, {int(sh * 100)} % ×{op}, core + top-100 alts", [dict(c, rule="D") for c in on(MK[tag], core + alts)], ("D",),
+                 d_share=sh, d_open=op))
+    P(pf_row("E only (basket 20 %), top-100 alts", on(MK["E"], alts), ("E",)))
+    P(pf_row("E8h only (basket 20 %), top-100 alts", [dict(c, rule="E") for c in on(MK["E8h"], alts)], ("E",)))
+    P(pf_row("F8h only 25 % ×3, core + top-100 alts", [dict(c, rule="F") for c in on(MK["F8h"], core + alts)], ("F",)))
+    P(pf_row("F8 (OI −8 %, price −4 %) only 25 % ×3, core + top-100 alts", [dict(c, rule="F") for c in on(MK["F8"], core + alts)], ("F",)))
+    P()
+
 if "lab" in SECT:
-    P("## Lab account (separate $10k, risk 0.5 % per trade by stop distance, ≤ 12 open, one position per coin)\n")
-    P("| set | full: final | CAGR | max DD | trades/day | P&L by year | OOS 2025→: final | CAGR | max DD | trades/day | OOS P&L by rule |")
-    P(PFS)
+    P("## Lab account as configured now (risk 0.5 % per trade by stop distance, ≤ 12 open, one position per coin)\n")
+    P(PFH.replace("portfolio («норма» + D, $10k)", "set")); P(PFS)
     LAB = dict(risk=0.005, max_open=12, e_share=0, f_share=0, f_open=0, d_share=0, d_open=0)
     def lab(cs): return [dict(c, rule="B") for c in cs]         # B branch of simulate = risk-sized, max_open cap
     P(pf_row("L+N+Q (live lab rules) on core 18", lab(on(LM["L"] + LM["N"] + LM["Q"], core)), ("B",), **LAB))
-    P(pf_row("L+N+Q on core + alts", lab(on(LM["L"] + LM["N"] + LM["Q"], core + alts)), ("B",), **LAB))
-    P(pf_row("L only on core + alts", lab(on(LM["L"], core + alts)), ("B",), **LAB))
-    if alts2: P(pf_row("L+N+Q on core + top-200 alts", lab(on(LM["L"] + LM["N"] + LM["Q"], core + alts + alts2)), ("B",), **LAB))
+    P(pf_row("L+N+Q on core + top-100 alts", lab(on(LM["L"] + LM["N"] + LM["Q"], core + alts)), ("B",), **LAB))
+    P(pf_row("L only on core 18", lab(on(LM["L"], core)), ("B",), **LAB))
+    P(pf_row("L only on core + top-100 alts", lab(on(LM["L"], core + alts)), ("B",), **LAB))
+    P(pf_row("N only on core 18", lab(on(LM["N"], core)), ("B",), **LAB))
+    P(pf_row("Q only on core 18", lab(on(LM["Q"], core)), ("B",), **LAB))
     for f_, tag in BEST.items():
-        pas = is_pass(LM[tag], alts + core, 30)
         P(pf_row(f"{tag} (IS best {f_}) on core + alts", lab(on(LM[tag], core + alts)), ("B",), **LAB))
-        P(pf_row(f"{tag} on IS-pass coins ({len(pas)})", lab(on(LM[tag], pas)), ("B",), **LAB))
     for tag in ("B25", "B30", "D15", "E8h", "F8", "D15ch"):
         if tag in MK: P(pf_row(f"{tag} alone on core + alts (risk 0.5 % by stop)", lab(on(MK[tag], core + alts)), ("B",), **LAB))
+    sz = {t: np.median([c["sf"] for c in LM[t]]) * 100 for t in ("L", "N", "Q")}
+    P(f"\nMedian stop distance (incl. costs): L {sz['L']:.2f} %, N {sz['N']:.2f} %, Q {sz['Q']:.2f} % → at 0.5 % risk a position is "
+      f"{50 / sz['N']:.0f} % (N) / {50 / sz['Q']:.0f} % (Q) of the account, capped at 300 %.")
     P()
 
 P(f"_run time {time.time() - t0:.0f} s_")

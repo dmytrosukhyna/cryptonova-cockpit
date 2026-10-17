@@ -18,6 +18,8 @@
   python -m cnq.cli tri [--out web]           triangles inside one exchange (all USDT/USDC/FDUSD/BTC/ETH/BNB pairs) → web/tri.json
   python -m cnq.cli memes [--out web]         HL meme perps + Solana memecoin watchlist + paper «Мем-портфель» → web/memes.json
   python -m cnq.cli macro [--out web]         DXY, US 10Y/2Y, USDJPY, oil, gold, index futures, VIX, Nikkei: value + 1d/5d change → web/macro.json
+  python -m cnq.cli ideas [--out web]         one spot table «можно брать / добрать / на небольшую сумму / ждём / не брать» from
+                                              research.json + portfolio.json + memes.json (+ markets/decision) → web/ideas.json
 """
 from __future__ import annotations
 
@@ -34,7 +36,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -207,6 +209,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"memes.json: {d.get('seconds')}s sources={d['sources']} equity={a['equity']} positions={[p['coin'] for p in a['positions']]} "
               f"hl={[(r['coin'], r['score']) for r in d['hl_memes'][:5]]} sol={[(r['symbol'], r['score'], r['passed']) for r in d['solana'][:5]]} "
               f"events={[e['text'] for e in a['events'][:2]]}")
+    elif args.cmd == "ideas":
+        from .agents import spot_ideas
+        d = spot_ideas.write(args.out)
+        print(f"ideas.json: btc_bull={d['btc_bull']} evaluated={d['evaluated']} shown={d['shown']} counts={d['counts']} | {d['summary_ru']}")
     elif args.cmd == "macro":
         from .agents import macro_watch
         d = macro_watch.write(args.out)

@@ -43,10 +43,10 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
              "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +75% в год, просадка до −29%, все годы в плюсе."},
     # 17.10: «Лаборатория» — aggressive range/level rules the owner asked to try live although history is ≈0 or negative
     # (docs/research/range.md). Limit entries only, filled only when price trades through. Separate $10 000, not mirrored.
-    "lab":  {"name": "Лаборатория · агрессивно", "classes": {"L", "N", "Q"}, "confirm": False, "risk": 0.005, "max_open": 12, "tgt_r": 1.5, "riskoff": "shorts",
-             "prefix": "paper_lab_",
+    "lab":  {"name": "Лаборатория · агрессивно", "classes": {"L", "N", "Q"}, "confirm": False, "risk": 0.005, "max_open": 20, "tgt_r": 1.5, "riskoff": "shorts",
+             "caps": {"L": 7, "N": 8, "Q": 6}, "prefix": "paper_lab_",
              "about": "Проверка вживую агрессивных правил внутри диапазона: L — покупка у низа диапазона за 14 дней (история +0.30% на сделку, но 2025–26 в минусе), "
-                      "N — отскок от часовой поддержки и Q — шорт от часового сопротивления (история ≈ −0.1% на сделку). Риск 0.5% на сделку, до 12 позиций. Это эксперимент."},
+                      "N — отскок от часовой поддержки и Q — шорт от часового сопротивления (история ≈ −0.1% на сделку). Риск 0.5% на сделку, до 20 ордеров и позиций (L до 7, N до 8, Q до 6), 31 монета. Это эксперимент."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
     "exp":  {"name": "Эксперимент · свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
@@ -231,8 +231,9 @@ class PaperDesk:
         c15 = coin["candles"]
         if len(c15) < 200:
             return []
-        if coin.get("b_only"):   # extra coins trade rule B only
-            return [s for s in self.signals({k: v for k, v in coin.items() if k != "b_only"} | {"levels": [], "candles_long": None, "oi_chg4h": None}, btc_bull, now) if s["grade"] == "B"]
+        if coin.get("b_only"):   # extra coins: rule B, and the lab's range/level experiments
+            return [s for s in self.signals({k: v for k, v in coin.items() if k != "b_only"} | {"levels": [], "candles_long": None, "oi_chg4h": None}, btc_bull, now)
+                    if s["grade"] in ("B", "L", "N", "Q")]
         price = c15[-1][4]
         a = _atr(c15) or price * 0.003
         base = coin["symbol"].replace("-USDT", "").replace("USDT", "")
@@ -427,6 +428,9 @@ class PaperDesk:
                 if s["grade"] in ("S", "G", "D") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
                     continue
                 if s["grade"] not in SHARE_RULES and sum(1 for t in self._open() if t["grade"] not in SHARE_RULES) + len(self._pending()) >= self.P["max_open"]:
+                    continue
+                cap = self.P.get("caps", {}).get(s["grade"])
+                if cap is not None and sum(1 for t in self._open() if t["grade"] == s["grade"]) + sum(1 for o in self._pending() if o["grade"] == s["grade"]) >= cap:
                     continue
                 if s["grade"] == "E":
                     notional = eq * self.P.get("e_share", 0.2) / max(1, len(e_sigs))

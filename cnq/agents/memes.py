@@ -55,8 +55,14 @@ BREAK_K = 3.0                                # breakout bar volume ≥ 3 × medi
 DIP = -0.25                                  # dip rule: 4h close ≥ 25% below the 24 h high
 WARMUP_4H = 121                              # ≥ 20 days of 4h bars on HL before a coin is traded (as in the research)
 RULE_STATUS = "эксперимент"
-RULE = "pending"                             # set from the research (docs/research/memes.md)
-RULES_TEXT = "Правило ещё не выбрано: идёт исследование. Сделок нет."
+RULE = "dip"                                 # research rule C (docs/research/memes.md); "breakout" kept for comparison only
+RULES_TEXT = ("Эксперимент «откуп обвала мема». Покупаем мем-фьючерс Hyperliquid, когда 4-часовая свеча закрылась на 25% и больше "
+              "ниже максимума последних суток (монета торгуется на $1M+ в сутки и есть на Hyperliquid не меньше 20 дней). "
+              "На позицию — 10% счёта, не больше 6 позиций сразу. Стоп −25% от цены входа. Половину продаём на +50%, остальное — "
+              "через 3 дня (72 ч). Комиссия с проскальзыванием 0.15% за сделку и фандинг учитываются. "
+              "История 2024–2026: в среднем +3.4% на сделку, 54% сделок в плюсе, но почти весь плюс дали три месяца массовых обвалов "
+              "(08.2024, 12.2024, 10.2025); без них −1% на сделку. Сигналов мало: в 2026 году — 8 за 9.5 месяца. "
+              "Покупку на пробоях и «самых сильных» мемов история не подтвердила (минус во всех вариантах) — так не торгуем.")
 
 # ── Solana filters ─────────────────────────────────────────────────────────────────────────────────────────────────────
 SOL_MIN_LIQ, SOL_MIN_VOL, SOL_MIN_AGE_H = 100_000, 500_000, 24
@@ -73,12 +79,29 @@ RUG_RU = {"mutable metadata": "метаданные можно менять", "t
 WARNINGS = [
     "Мем-монеты — самый рискованный рынок: цена может упасть на 50–90% за день, а токен на DEX — стать нулём (раг, ханипот).",
     "Только маленькие суммы, которые не жалко потерять полностью. Можно потерять 100%.",
-    "Мем-портфель — учебный счёт на $10 000 без реальных денег. Правило — эксперимент: устойчивого преимущества история не доказала.",
+    "Мем-портфель — учебный счёт на $10 000 без реальных денег. Правило — эксперимент: в истории плюс дали в основном редкие массовые обвалы.",
     "Solana-токены — только список наблюдения с сигналами. Мы их не покупаем даже на бумаге: цены с DEX-агрегаторов раз в 30 минут "
     "не дают честно посчитать вход и выход. Проверки безопасности (авторитеты, RugCheck) снижают риск, но не убирают его.",
 ]
 
-RESEARCH_SUMMARY = {"status": "в работе", "text": "Исследование ещё не завершено.", "doc": "docs/research/memes.md"}
+RESEARCH_SUMMARY = {
+    "status": "готово 17.10.2026", "doc": "docs/research/memes.md", "verdict": "надёжного правила нет; лучшее — эксперимент «откуп обвала»",
+    "text": ("Проверили 4 идеи на 40 мем-фьючерсах Hyperliquid (включая 13 уже снятых с торгов), 4-часовые свечи 04.2024 → 10.2026, "
+             "издержки 0.15% и фандинг учтены. Пробой максимума на всплеске объёма: минус во всех 36 вариантах (−0.3…−2.5% на сделку). "
+             "Ротация «держим самые сильные мемы»: минус во всех 9 вариантах, хуже простой корзины. Фильтр «выше 20-дневной средней»: "
+             "тоже минус. Откуп обвала −25% от максимума за сутки: +3.4% на сделку (случайный вход в те же дни −1.9%), 162 сделки, "
+             "просадка счёта −34%, но плюс держится на трёх месяцах массовых обвалов; без них −1% на сделку."),
+    "rules_tested": {
+        "breakout": {"cells_positive": "0/36", "ref_avg_pct": -0.83, "ref_trades": 766, "verdict": "отклонено"},
+        "rotation_top3_5d": {"cells_positive": "0/9", "final_usd": 1068, "base_all_memes_usd": 3790, "verdict": "отклонено"},
+        "trend_ma20_basket": {"final_usd": 557, "verdict": "отклонено"},
+        "dip_25_3d": {"cells_positive": "21/27", "trades": 162, "avg_pct": 3.40, "random_avg_pct": -1.87, "win_rate": 0.54,
+                      "max_dd_pct": -34, "final_usd": 14678, "without_top3_months_avg_pct": -1.03, "verdict": "эксперимент"},
+    },
+    "observed_after_the_fact": ("Откуп работал при массовом обвале мемов (+4.7% на сделку, 101 сделка) и когда BTC ниже 50-дневной "
+                                "средней (+8.9%, 75 сделок); при BTC выше средней −1.4% (87). Это найдено после прогона — в правило не "
+                                "вшито, записываем обстановку каждой сделки и проверяем вживую."),
+}
 
 SCORE_HL = ("балл 0–100 = 50 × близость к сигналу покупки (насколько цена ниже максимума за сутки: 0% → 0, −25% и глубже → 50) "
             "+ 30 × место по объёму за 24 ч + 20 × место по открытому интересу − 20, если за сутки уже +30% и больше. "
@@ -134,15 +157,50 @@ def hl_ctx() -> dict:
     return out
 
 
-def hl_candles(coin: str, start: int, end: int) -> list[list[float]]:
-    """1h candles [t, o, h, l, c, v_usd] (closed and the forming one)."""
-    r = _req(HL, {"type": "candleSnapshot", "req": {"coin": coin, "interval": "1h", "startTime": start, "endTime": end}})
+def hl_candles(coin: str, start: int, end: int, interval: str = "1h") -> list[list[float]]:
+    """Candles [t, o, h, l, c, v_usd] (closed and the forming one)."""
+    r = _req(HL, {"type": "candleSnapshot", "req": {"coin": coin, "interval": interval, "startTime": start, "endTime": end}})
     out = []
     for x in r or []:
         c = _f(x.get("c"))
         if c:
             out.append([int(x["t"]), _f(x["o"]), _f(x["h"]), _f(x["l"]), c, (_f(x.get("v"), 0.0)) * c])
     return sorted(out)
+
+
+SPOT_SKIP = {"USDC", "USDT0", "USDE", "USDHL", "FEUSD", "USDH", "USDXL", "USH", "USR", "HYPE", "UBTC", "UETH", "USOL", "UZEC", "UFART",
+             "UPUMP", "UBONK", "USPX", "UXPL", "UENA", "UMON", "UUUSPX", "XAUT0", "AVAX0", "TAO1", "QQQ", "GLD", "SPCX", "STABLE", "KHYPE", "LHYPE"}
+
+
+def hl_spot() -> list[dict]:
+    """Most traded HL spot tokens (HIP-1) — watch only; not all of them are memes."""
+    meta, ctxs = _req(HL, {"type": "spotMetaAndAssetCtxs"}, timeout=15)
+    toks = {t["index"]: t["name"] for t in meta.get("tokens", [])}
+    best: dict[str, dict] = {}
+    for pr, c in zip(meta.get("universe", []), ctxs):
+        try:
+            base, quote = toks.get(pr["tokens"][0]), toks.get(pr["tokens"][1])
+        except (KeyError, IndexError, TypeError):
+            continue
+        if not base or base.upper() in SPOT_SKIP or base.upper().startswith("USD") or quote not in ("USDC", "USDT0", "USDH", "USDE"):
+            continue
+        px, prev, vol = _f(c.get("markPx")) or _f(c.get("midPx")), _f(c.get("prevDayPx")), _f(c.get("dayNtlVlm"), 0.0)
+        if not px or vol < 100_000 or (base in best and best[base]["vol24"] >= vol):
+            continue
+        best[base] = {"token": base, "px": px, "chg24h": round((px / prev - 1) * 100, 2) if prev else None, "vol24": round(vol)}
+    return sorted(best.values(), key=lambda r: -r["vol24"])[:10]
+
+
+def btc_context(get_candles=None, now: int | None = None) -> dict:
+    """BTC vs its 50-day mean (daily closes). In the research the dip rule worked mostly while BTC was BELOW it."""
+    now = now or int(time.time() * 1000)
+    d = (get_candles or hl_candles)("BTC", now - 70 * DAY, now, "1d")
+    closed = [x[4] for x in d if x[0] + DAY <= now]
+    if len(closed) < 50 or not d:
+        return {}
+    ma = sum(closed[-50:]) / 50
+    px = d[-1][4]
+    return {"btc_px": px, "btc_ma50": round(ma, 2), "btc_above_ma50": px > ma}
 
 
 # ── HL metrics ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -217,9 +275,9 @@ def score_hl(rows: list[dict]) -> None:
     liq = [r for r in rows if r["vol24"] >= MIN_VOL24]
     rv, roi = _rank(liq, "vol24"), _rank(liq, "oi_usd")
     for i, r in enumerate(liq):
-        dd = r.get("dip_dd_pct")
+        dd = r.get("from_high24_pct")                  # current price vs the 24 h high (the signal itself uses closed 4h bars)
         if dd is None:
-            dd = r.get("from_high24_pct")
+            dd = r.get("dip_dd_pct")
         parts = {"близость к сигналу": 50 * min(1.0, max(0.0, -(dd or 0) / (-DIP * 100))), "объём 24ч": 30 * rv.get(i, 0),
                  "открытый интерес": 20 * roi.get(i, 0), "погоня": -20 if (r.get("chg24h") or 0) >= 30 else 0}
         r["score"] = max(0, round(sum(parts.values())))
@@ -235,7 +293,9 @@ def signal_text(r: dict) -> str:
         return "новый листинг — мало истории, не торгуем"
     if r.get("dip_signal"):
         return f"сигнал: обвал {r['dip_dd_pct']:.0f}% от максимума за сутки — покупаем по правилу (эксперимент)"
-    dd = r.get("dip_dd_pct")
+    dd = r.get("from_high24_pct")
+    if dd is None:
+        dd = r.get("dip_dd_pct")
     if dd is not None and dd <= -15:
         return f"близко к сигналу: {dd:.0f}% от максимума за сутки (сигнал с −25%)"
     if r.get("breakout"):
@@ -448,9 +508,9 @@ def score_sol(r: dict) -> None:
 def _ensure(conn: sqlite3.Connection) -> None:
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS meme_pos(coin TEXT PRIMARY KEY, entry_px REAL, qty REAL, qty0 REAL, cost_in REAL, cash_out REAL,
-                                            entry_time INTEGER, tp_done INTEGER, funding REAL, last_bar INTEGER, why TEXT);
+                                            entry_time INTEGER, tp_done INTEGER, funding REAL, last_bar INTEGER, why TEXT, tags TEXT);
         CREATE TABLE IF NOT EXISTS meme_closed(coin TEXT, entry_time INTEGER, exit_time INTEGER, entry_px REAL, exit_px REAL,
-                                               pnl_usd REAL, pnl_pct REAL, why TEXT);
+                                               pnl_usd REAL, pnl_pct REAL, why TEXT, tags TEXT);
         CREATE TABLE IF NOT EXISTS meme_events(time INTEGER, text TEXT);
         CREATE TABLE IF NOT EXISTS meme_equity(time INTEGER PRIMARY KEY, equity REAL);
         CREATE TABLE IF NOT EXISTS meme_meta(k TEXT PRIMARY KEY, v TEXT);
@@ -504,12 +564,25 @@ def entry_signals(rows: list[dict], held: set[str], conn, now: int) -> list[tupl
     return sorted(out, key=lambda x: -x[1])
 
 
+def entry_context(rows: list[dict], market: dict) -> list[str]:
+    """Two conditions the research found after the fact (not part of the rule) — recorded so live trades can confirm or refute them:
+    a market-wide flush (≥ 30% of liquid memes ≥ 15% below their 24 h high) and BTC below its 50-day mean."""
+    liq = [r for r in rows if (r.get("liq_day") or 0) >= MIN_VOL24 and r.get("dip_dd_pct") is not None]
+    if len(liq) >= 4:
+        share = sum(1 for r in liq if r["dip_dd_pct"] <= -15) / len(liq)
+        a = "массовый обвал" if share >= 0.3 else "обвал одной монеты"
+    else:
+        a = "мало ликвидных мемов для оценки"
+    b = market.get("btc_above_ma50")
+    return [a, "BTC: нет данных" if b is None else ("BTC выше 50-дн. средней" if b else "BTC ниже 50-дн. средней")]
+
+
 def manage(conn, ctx: dict, candles: dict, now: int, ev: list) -> float:
     """Funding, stops, take-profits and time exits for open positions. Returns cash."""
     cash = float(_meta(conn, "cash", START_EQUITY))
     last_run = int(_meta(conn, "last_run", now))
     half = COST / 2
-    for coin, epx, qty, qty0, cost_in, cash_out, et, tp_done, fund, last_bar, why in conn.execute("SELECT * FROM meme_pos").fetchall():
+    for coin, epx, qty, qty0, cost_in, cash_out, et, tp_done, fund, last_bar, why, tags in conn.execute("SELECT * FROM meme_pos").fetchall():
         c = ctx.get(coin)
         px = c["px"] if c else None
         if px is None:                          # coin vanished from HL (delisted / API gap): keep, say so once per day
@@ -541,7 +614,7 @@ def manage(conn, ctx: dict, candles: dict, now: int, ev: list) -> float:
             fill, reason, t = closed
             pnl = cash_out - cost_in
             pct = pnl / cost_in * 100 if cost_in else 0
-            conn.execute("INSERT INTO meme_closed VALUES(?,?,?,?,?,?,?,?)", (coin, et, now, epx, fill, round(pnl, 2), round(pct, 2), reason))
+            conn.execute("INSERT INTO meme_closed VALUES(?,?,?,?,?,?,?,?,?)", (coin, et, now, epx, fill, round(pnl, 2), round(pct, 2), reason, tags))
             conn.execute("DELETE FROM meme_pos WHERE coin=?", (coin,))
             # do not re-enter on the same 4h bar
             _set(conn, f"last_bar:{coin}", now - now % (4 * H))
@@ -554,7 +627,7 @@ def manage(conn, ctx: dict, candles: dict, now: int, ev: list) -> float:
 
 
 def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_candles_fn=hl_candles, sol_fn=sol_fetch,
-        deadline_s: float = 50.0) -> dict:
+        spot_fn=hl_spot, btc_fn=btc_context, deadline_s: float = 50.0) -> dict:
     t_start = time.time()
     now = now or int(time.time() * 1000)
     _ensure(conn)
@@ -564,12 +637,15 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     ctx = _safe(hl_ctx_fn) or {}
     sources["hyperliquid"] = bool(ctx)
     held = {r[0] for r in conn.execute("SELECT coin FROM meme_pos")}
-    want = sorted({c for c, x in ctx.items() if x["vol24"] >= MIN_VOL24} | (held & set(ctx)), key=lambda c: -ctx[c]["vol24"])[:40]
+    want = sorted({c for c, x in ctx.items() if x["vol24"] >= 100_000} | (held & set(ctx)), key=lambda c: (c not in held, -ctx[c]["vol24"]))[:30]
     candles: dict[str, list] = {}
-    if want:
+    market, spot = {}, []
+    if ctx:
         start = now - 22 * DAY
         with ThreadPoolExecutor(max_workers=6) as ex:
+            fut_m, fut_s = ex.submit(_safe, btc_fn), ex.submit(_safe, spot_fn)
             res = list(ex.map(lambda c: (c, _safe(hl_candles_fn, c, start, now)), want))
+            market, spot = fut_m.result() or {}, fut_s.result() or []
         candles = {c: v for c, v in res if v}
     rows = [metrics(c, ctx[c], candles.get(c, []), now) for c in ctx]
     score_hl(rows)
@@ -583,6 +659,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
         cash = manage(conn, ctx, candles, now, ev)
         held = {r[0] for r in conn.execute("SELECT coin FROM meme_pos")}
         equity = cash + sum(q * ctx[c]["px"] for c, q in conn.execute("SELECT coin, qty FROM meme_pos") if c in ctx)
+        tags = entry_context(rows, market)
         for coin, strength, reason in entry_signals(rows, held, conn, now):
             if len(held) >= MAX_POS:
                 break
@@ -591,12 +668,12 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
             if cost_in > cash:
                 break
             cash -= cost_in
-            conn.execute("INSERT INTO meme_pos VALUES(?,?,?,?,?,?,?,?,?,?,?)", (coin, px, notional / px, notional / px, cost_in, 0.0, now, 0, 0.0, now - now % H, reason))
+            conn.execute("INSERT INTO meme_pos VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (coin, px, notional / px, notional / px, cost_in, 0.0, now, 0, 0.0, now - now % H, reason, ",".join(tags)))
             bar = next((r.get("signal_bar") for r in rows if r["coin"] == coin), now)
             _set(conn, f"last_bar:{coin}", bar)
             held.add(coin)
-            ev.append((now, f"Купили {coin} по {_px(px)} на ${notional:,.0f} ({SIZE * 100:.0f}% счёта): {reason}. Стоп {_px(px * (1 + STOP))}, "
-                            f"половину продаём на {_px(px * (1 + TP))}, остальное — через {HOLD_H} ч"))
+            ev.append((now, f"Купили {coin} по {_px(px)} на ${notional:,.0f} ({SIZE * 100:.0f}% счёта): {reason}. Обстановка: {', '.join(tags)}. "
+                            f"Стоп {_px(px * (1 + STOP))}, половину продаём на {_px(px * (1 + TP))}, остальное — через {HOLD_H} ч"))
         _set(conn, "cash", cash)
         _set(conn, "last_run", now)
     else:
@@ -628,6 +705,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     conn.execute("DELETE FROM meme_events WHERE time < ?", (now - 60 * DAY,))
     conn.commit()
     out = snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources)
+    out["market"] = market
+    out["hl_spot"] = spot
+    out["hl_spot_note"] = ("Самые торгуемые спот-токены Hyperliquid (HIP-1), без стейблкоинов и обёрток. Не все из них — мемы; "
+                           "проверок безопасности нет; только наблюдение, без сделок.")
     if sol_note:
         out["solana_note"] = sol_note + " " + out["solana_note"]
     out["seconds"] = round(time.time() - t_start, 1)
@@ -662,18 +743,26 @@ def track_sol(conn, rows: list[dict], now: int) -> None:
 def snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources) -> dict:
     cash = float(_meta(conn, "cash", START_EQUITY))
     positions = []
-    for coin, epx, qty, qty0, cost_in, cash_out, et, tp_done, fund, last_bar, why in conn.execute("SELECT * FROM meme_pos ORDER BY entry_time"):
+    for coin, epx, qty, qty0, cost_in, cash_out, et, tp_done, fund, last_bar, why, tags in conn.execute("SELECT * FROM meme_pos ORDER BY entry_time"):
         px = ctx.get(coin, {}).get("px") or epx
         val = qty * px
         pnl = cash_out + val * (1 - COST / 2) - cost_in
         positions.append({"coin": coin, "entry_px": epx, "px": px, "qty": round(qty, 6), "value": round(val, 2), "invested": round(cost_in, 2),
                           "pnl_usd": round(pnl, 2), "pnl_pct": round(pnl / cost_in * 100, 2) if cost_in else None, "entry_time": et,
                           "hours_held": round((now - et) / H, 1), "stop_px": epx * (1 + STOP), "tp_px": epx * (1 + TP), "tp_done": bool(tp_done),
-                          "exit_by": et + HOLD_H * H, "funding_paid": round(fund, 2), "why": why, "price_live": coin in ctx})
+                          "exit_by": et + HOLD_H * H, "funding_paid": round(fund, 2), "why": why, "context": [t for t in (tags or "").split(",") if t],
+                          "price_live": coin in ctx})
     equity = cash + sum(p["value"] for p in positions)
-    closed = [{"coin": c, "entry_time": a, "exit_time": b, "entry_px": e, "exit_px": x, "pnl_usd": p, "pnl_pct": q, "why": w}
-              for c, a, b, e, x, p, q, w in conn.execute("SELECT * FROM meme_closed ORDER BY exit_time DESC LIMIT 50")]
+    closed = [{"coin": c, "entry_time": a, "exit_time": b, "entry_px": e, "exit_px": x, "pnl_usd": p, "pnl_pct": q, "why": w,
+               "context": [t for t in (g or "").split(",") if t]}
+              for c, a, b, e, x, p, q, w, g in conn.execute("SELECT * FROM meme_closed ORDER BY exit_time DESC LIMIT 50")]
     allc = conn.execute("SELECT pnl_usd FROM meme_closed").fetchall()
+    by_ctx: dict[str, dict] = {}
+    for p_, g in conn.execute("SELECT pnl_usd, tags FROM meme_closed"):
+        for t in (g or "").split(","):
+            if t:
+                d = by_ctx.setdefault(t, {"trades": 0, "wins": 0, "sum_pnl": 0.0})
+                d["trades"] += 1; d["wins"] += int(p_ > 0); d["sum_pnl"] = round(d["sum_pnl"] + p_, 2)
     eqh = conn.execute("SELECT time, equity FROM meme_equity ORDER BY time").fetchall()
     step = max(1, -(-len(eqh) // 500))
     hist = [[t, round(e, 2)] for t, e in eqh[::step]]
@@ -689,7 +778,8 @@ def snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources) -> dict
         "account": {"name": NAME, "start_equity": START_EQUITY, "equity": round(equity, 2), "cash": round(cash, 2),
                     "pnl_usd": round(equity - START_EQUITY, 2), "pnl_pct": round((equity / START_EQUITY - 1) * 100, 3),
                     "positions": positions, "closed": closed,
-                    "stats": {"trades": len(allc), "wins": sum(1 for (p,) in allc if p > 0), "sum_pnl": round(sum(p for (p,) in allc), 2)},
+                    "stats": {"trades": len(allc), "wins": sum(1 for (p,) in allc if p > 0), "sum_pnl": round(sum(p for (p,) in allc), 2),
+                              "by_context": by_ctx},
                     "events": events, "history": hist, "rules": RULES_TEXT, "rule": RULE, "rule_status": RULE_STATUS,
                     "limits": {"size_pct": SIZE * 100, "max_positions": MAX_POS, "stop_pct": STOP * 100, "take_profit_pct": TP * 100,
                                "take_profit_part": TP_FRAC, "time_exit_h": HOLD_H, "cost_round_trip_pct": COST * 100}},

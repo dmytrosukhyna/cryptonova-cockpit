@@ -15,6 +15,7 @@
   python -m cnq.cli agents [--send]           run departments (news/fundamentals/risk/editor) → web/decision.json (+post to Telegram)
   python -m cnq.cli funding [--out web]       paper funding-carry account (spot long + perp short) → web/funding.json
   python -m cnq.cli arb [--out web]           cross-exchange spot spreads net of fees, sampled each run → web/arb.json
+  python -m cnq.cli memes [--out web]         HL meme perps + Solana memecoin watchlist + paper «Мем-портфель» → web/memes.json
 """
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "memes"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -181,6 +182,19 @@ def main(argv: list[str] | None = None) -> int:
         d = arb_watch.run(conn)
         write_report(d, os.path.join(args.out, "arb.json"))
         print(f"arb.json: venues={d['venues_ok']} day={d['day']} best_now={d['now'][:1]}")
+    elif args.cmd == "memes":
+        import os, sqlite3
+        from .agents import memes
+        from .terminal.report import write_report
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/agents.sqlite")
+        os.makedirs(args.out, exist_ok=True)
+        d = memes.run(conn)
+        write_report(d, os.path.join(args.out, "memes.json"))
+        a = d["account"]
+        print(f"memes.json: {d.get('seconds')}s sources={d['sources']} equity={a['equity']} positions={[p['coin'] for p in a['positions']]} "
+              f"hl={[(r['coin'], r['score']) for r in d['hl_memes'][:5]]} sol={[(r['symbol'], r['score'], r['passed']) for r in d['solana'][:5]]} "
+              f"events={[e['text'] for e in a['events'][:2]]}")
     elif args.cmd == "channel":
         import os, sqlite3
         from .agents.channel import Channel, kyiv_now

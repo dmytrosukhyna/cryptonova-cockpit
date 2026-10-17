@@ -146,7 +146,7 @@ def _run(conn, now, px, candles, rule="dip", funding_h=0.0):
     mm.RULE = rule
     try:
         return mm.run(conn, now, hl_ctx_fn=lambda: {"WIF": ctx_of(px, funding_h=funding_h), "POPCAT": ctx_of(1.0)},
-                      hl_candles_fn=lambda c, s, e: candles.get(c, flat_1h(now)), sol_fn=no_sol)
+                      hl_candles_fn=lambda c, s, e: candles.get(c, flat_1h(now)), sol_fn=no_sol, spot_fn=list, btc_fn=dict)
     finally:
         mm.RULE = old
 
@@ -168,8 +168,16 @@ def test_dip_entry_then_stop():
     assert abs(acc["closed"][0]["exit_px"] - 0.72 * 0.75) < 1e-9                  # filled at the stop, not at the bar low
     assert acc["closed"][0]["pnl_pct"] < -25 and any(e["text"].startswith("Стоп: продали WIF") for e in acc["events"])
     assert abs(acc["equity"] - (10_000 + acc["closed"][0]["pnl_usd"])) < 0.02
+    assert acc["closed"][0]["context"] == ["мало ликвидных мемов для оценки", "BTC: нет данных"]
+    assert acc["stats"]["by_context"]["BTC: нет данных"]["trades"] == 1 and acc["stats"]["trades"] == 1 and acc["stats"]["wins"] == 0
     r = _run(conn, t2 + 30 * 60_000, 0.50, {"WIF": with_dip(NOW)})       # the old signal bar is not re-used
     assert r["account"]["positions"] == []
+
+
+def test_entry_context_tags():
+    liq = [{"liq_day": 5e6, "dip_dd_pct": d} for d in (-28, -18, -3, -2)]
+    assert mm.entry_context(liq, {"btc_above_ma50": False}) == ["массовый обвал", "BTC ниже 50-дн. средней"]
+    assert mm.entry_context(liq[:1] + [{"liq_day": 5e6, "dip_dd_pct": -1}] * 3, {"btc_above_ma50": True}) == ["обвал одной монеты", "BTC выше 50-дн. средней"]
 
 
 def test_stale_signal_not_entered():
@@ -195,11 +203,28 @@ def test_take_profit_half_then_time_exit_and_funding():
     assert acc["closed"][0]["pnl_usd"] < gross - 1000 and acc["closed"][0]["pnl_usd"] > gross - 1000 - 10
 
 
+def test_spot_and_btc_context():
+    meta = {"tokens": [{"index": 0, "name": "USDC"}, {"index": 1, "name": "WOW"}, {"index": 2, "name": "UBTC"}, {"index": 3, "name": "NEKO"}],
+            "universe": [{"tokens": [1, 0], "name": "@1"}, {"tokens": [2, 0], "name": "@2"}, {"tokens": [3, 0], "name": "@3"}]}
+    ctxs = [{"markPx": "2", "prevDayPx": "1", "dayNtlVlm": "4e7"}, {"markPx": "80000", "prevDayPx": "80000", "dayNtlVlm": "9e8"},
+            {"markPx": "0.5", "prevDayPx": "0.5", "dayNtlVlm": "5e4"}]
+    old = mm._req
+    mm._req = lambda url, body=None, timeout=10, headers=None: [meta, ctxs]
+    try:
+        sp = mm.hl_spot()
+    finally:
+        mm._req = old
+    assert [x["token"] for x in sp] == ["WOW"] and sp[0]["chg24h"] == 100.0          # wrapped BTC and thin NEKO dropped
+    daily = [[NOW - (60 - i) * DAY, 1, 1, 1, 100.0 + i, 1] for i in range(61)]
+    b = mm.btc_context(lambda c, s, e, iv: daily, NOW)
+    assert b["btc_above_ma50"] is True and abs(b["btc_ma50"] - sum(100.0 + i for i in range(10, 60)) / 50) < 1e-9
+
+
 def test_pending_rule_no_trades_and_no_hl():
     conn = sqlite3.connect(":memory:")
     r = _run(conn, NOW, 0.72, {"WIF": with_dip(NOW)}, rule="pending")
     assert r["account"]["positions"] == [] and r["account"]["equity"] == 10_000
-    r = mm.run(conn, NOW + H, hl_ctx_fn=lambda: {}, hl_candles_fn=lambda *a: [], sol_fn=no_sol)
+    r = mm.run(conn, NOW + H, hl_ctx_fn=lambda: {}, hl_candles_fn=lambda *a: [], sol_fn=no_sol, spot_fn=list, btc_fn=dict)
     assert r["hl_memes"] == [] and r["account"]["equity"] == 10_000 and r["warnings"][0].startswith("Hyperliquid не ответил")
     assert r["sources"]["hyperliquid"] is False
 
@@ -211,13 +236,14 @@ def test_json_shape_and_max_positions():
     mm.RULE = "dip"
     try:
         r = mm.run(conn, NOW, hl_ctx_fn=lambda: {c: ctx_of(0.74 - 0.01 * int(c[1:])) for c in coins},
-                   hl_candles_fn=lambda c, s, e: with_dip(NOW, close=0.74 - 0.01 * int(c[1:])), sol_fn=no_sol)
+                   hl_candles_fn=lambda c, s, e: with_dip(NOW, close=0.74 - 0.01 * int(c[1:])), sol_fn=no_sol, spot_fn=list, btc_fn=dict)
     finally:
         mm.RULE = old[0]
     acc = r["account"]
     assert len(acc["positions"]) == mm.MAX_POS
     assert {p["coin"] for p in acc["positions"]} == {f"C{i}" for i in range(3, 9)}      # deepest dips first
-    for k in ("asof", "account", "hl_memes", "solana", "warnings", "research_summary", "sources", "score_formula", "solana_note"):
+    for k in ("asof", "account", "hl_memes", "solana", "warnings", "research_summary", "sources", "score_formula", "solana_note",
+              "market", "hl_spot", "hl_spot_note"):
         assert k in r, k
     for k in ("equity", "pnl_usd", "pnl_pct", "positions", "closed", "events", "rules", "rule_status", "history", "limits"):
         assert k in acc, k

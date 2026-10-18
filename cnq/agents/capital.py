@@ -1,20 +1,30 @@
 """CRYPTO NOVA Портфолио — one sum, the system splits it between our desks (18.10.2026, owner: «человек пополняет $1000, система сама
-распределяет: спот, фьючерсы, фандинг… весь месяц работает, в конце подводит итоги: заработано столько-то, оплата 10%»).
+распределяет: спот, фьючерсы, фандинг… весь месяц работает, в конце подводит итоги: заработано столько-то, оплата 10%»; later the
+same day: «участвовать в разных источниках, в разных секторах — он сам распределит, поймёт, адаптирует; нам нужен результат по профиту»).
 
-A DEMO account of $10 000 (owner: «как будто я вложил настоящие свои 10 тысяч долларов» — his main screen) that starts on the first run and follows the desks the server already runs:
-  • spot     — the CRYPTO NOVA portfolio (portfolio.json → portfolios.ideas, equity_usd);
-  • futures  — CRYPTO NOVA = the desks in the mix: CNPTS «Сбалансированная» (paper.json profiles.bal) and «Импульс BTC»
-               (profiles.imp), equal parts, equity incl. open P&L;
-  • funding  — the funding-carry desk (funding.json equity_mtm);
-  • yield    — stablecoin lending (Aave v3 USDC/USDT + Sky savings rate) at DefiLlama's current base APY (yield_desk.py → yield.json).
-Arbitrage and the triangle are NOT given money: their numbers are virtual estimates from windows the server saw, and a client
-cannot run them (money on several exchanges, robots win those windows in milliseconds). They are shown as «наблюдение».
+A DEMO account of $10 000 (owner: «как будто я вложил настоящие свои 10 тысяч долларов» — his main screen). Six sleeves, each follows
+a desk the server already runs:
+  • spot     — the CRYPTO NOVA portfolio (portfolio.json → portfolios.ideas, equity_usd)                        [directional]
+  • futures  — CRYPTO NOVA signals: «Сбалансированная» (paper.json profiles.bal) + «Импульс BTC» (profiles.imp)  [directional]
+  • funding  — the funding-carry desk (funding.json equity_mtm)                                                  [no direction]
+  • basis    — fixed-rate carry: spot + short dated futures on Deribit, rate locked at entry (basis.json)         [no direction]
+  • yield    — stablecoin lending: Aave v3 USDC/USDT + Sky savings rate (yield.json)                             [no direction]
+  • susde    — yield-bearing dollars, Ethena sUSDe (yield.json accounts.susde)                                    [no direction]
+Arbitrage and the triangle are NOT given money: virtual estimates a client cannot run — shown as «наблюдение».
 
-Each run every sleeve moves by its desk's return since the previous run. Weights are reset once a week (Monday, Kyiv):
-base spot 40 % · futures 25 % · funding 15 % · lending 20 %; a sleeve whose desk lost more than 5 % over the last 30 days gets half its base
-weight, one that gained more than 5 % gets ×1.25, then everything is scaled back to 100 % within the bounds
-(spot 25–55 %, futures 10–40 %, funding 0–25 %, lending 10–40 %). Month summary: start of the calendar month (Kyiv) → now, and 10 % of a
-positive result as the fee («к оплате»). A demo, not a promise: the result can be a minus. Stdlib only."""
+THE ALLOCATOR (v2). It decides two things and explains both in Russian («почему так»):
+  1. How much goes to the directional part (spot + futures) — by the market regime: risk-on (BTC in an uptrend, no broad sell-off)
+     60 %, risk-off 35 % (profile «Сбалансированная»; «Спокойная» 30/15 without futures, «Смелая» 80/55). Spot:futures 2:1, and a
+     sleeve whose desk lost more than 5 % over 30 days gets half, one that gained more than 5 % ×1.25 (the difference goes to /
+     comes from the carry part).
+  2. How the carry part (no bet on the price) is split — by what each source PAYS NOW minus a discount for its risk: lending and
+     the fixed-rate futures carry are risk 2 (no discount), funding and sUSDe risk 3 (−1.5 points). Weights ∝ that score; lending
+     keeps at least 30 % of the carry part (the liquid reserve); caps: funding 20 %, fixed rate 30 %, sUSDe 15 % of the whole sum.
+  When: every Monday; at once when a new source appears; at once when the regime flips (not more often than once a day).
+  Each re-split costs 0.1 % of the money moved (fees). A benchmark «без перераспределения» — the first split held as is — is
+  published next to it: the allocator has to beat it to be worth anything.
+Month summary: start of the calendar month (Kyiv) → now, and 10 % of a positive result as the fee («к оплате»).
+A demo, not a promise: the result can be a minus. Stdlib only."""
 from __future__ import annotations
 
 import datetime as dt
@@ -24,18 +34,25 @@ import sqlite3
 import time
 
 START = 10_000.0
-# 18.10 (owner): + a conservative lending sleeve («кредитование», yield_desk.py) → spot 40 · futures 25 · funding 15 · lending 20
-BASE = {"spot": 0.40, "futures": 0.25, "funding": 0.15, "yield": 0.20}
-BOUNDS = {"spot": (0.25, 0.55), "futures": (0.10, 0.40), "funding": (0.0, 0.25), "yield": (0.10, 0.40)}
+VERSION = 2               # 18.10 v2: six sleeves and the allocator (v1: four sleeves, fixed base ± 30-day tilt) — restarts the demo once
+KEYS = ["spot", "futures", "funding", "basis", "yield", "susde"]
+DIRECTIONAL = ("spot", "futures")
+CARRY = ("funding", "basis", "yield", "susde")
+RISK = {"spot": 4, "futures": 4, "funding": 3, "basis": 2, "yield": 2, "susde": 3}
+DISCOUNT = {2: 0.0, 3: 1.5}                      # percentage points taken off a source's rate for its risk
+CAP = {"funding": 0.20, "basis": 0.30, "susde": 0.15}
+YIELD_FLOOR = 0.30                               # share of the carry part that always stays in lending (liquid reserve)
+DEFAULT_RATE = 2.0                               # a source whose rate is unknown yet
 FEE = 0.10
-# 18.10 (owner): a user picks one of three models (and a couple of options) — the system builds HIS mix from the same sleeves.
+COST = 0.001                                     # a re-split costs 0.1 % of the money moved
+REGIME_GAP_MS = 24 * 3_600_000
+# 18.10 (owner): a user picks one of three models (and a couple of options) — the same allocator with a different appetite for risk.
+PROFILES = {"calm": {"on": 0.30, "off": 0.15, "fut": 0.0}, "balanced": {"on": 0.60, "off": 0.35, "fut": 1 / 3},
+            "bold": {"on": 0.80, "off": 0.55, "fut": 0.40}}
 MODELS = {
-    "calm": {"name_ru": "Спокойная", "about_ru": "Больше кредитования стейблкоинов и ядра BTC/ETH/SOL, без фьючерсов.",
-             "w": {"spot": 0.35, "futures": 0.0, "funding": 0.15, "yield": 0.50}},
-    "balanced": {"name_ru": "Сбалансированная", "about_ru": "Наша основная модель: понемногу везде, доли подстраиваются раз в неделю.",
-                 "w": dict(BASE)},
-    "bold": {"name_ru": "Смелая", "about_ru": "Больше спота и фьючерсов, меньше кредитования — выше и доход, и риск.",
-             "w": {"spot": 0.45, "futures": 0.35, "funding": 0.10, "yield": 0.10}},
+    "calm": {"name_ru": "Спокойная", "about_ru": "Больше доходных источников без ставки на цену (кредитование, фикс-ставка) и ядра BTC/ETH/SOL; без фьючерсов."},
+    "balanced": {"name_ru": "Сбалансированная", "about_ru": "Наша основная модель: понемногу везде; система сама двигает доли по рынку и ставкам."},
+    "bold": {"name_ru": "Смелая", "about_ru": "Больше спота и фьючерсов — выше и доход, и риск; доходные источники как подушка."},
 }
 OPTIONS = {   # toggles that shift a model (applied in order, then normalised)
     "risky_coins": {"name_ru": "Добавить рискованные монеты", "about_ru": "Больше спота с мемами и высоким риском: +10% к споту за счёт кредитования.",
@@ -46,7 +63,10 @@ OPTIONS = {   # toggles that shift a model (applied in order, then normalised)
                    "zero": "futures"},
 }
 NAMES = {"spot": "Спот · CRYPTO NOVA портфель", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)",
-         "yield": "Кредитование стейблкоинов (Aave, Sky)"}
+         "basis": "Фикс-ставка на фьючерсах (BTC/ETH)", "yield": "Кредитование стейблкоинов (Aave, Sky)",
+         "susde": "Доходные доллары (Ethena sUSDe)"}
+SHORT = {"spot": "спот", "futures": "фьючерсы", "funding": "фандинг", "basis": "фикс-ставка", "yield": "кредитование", "susde": "sUSDe"}
+TITLE = {"spot": "Спот", "futures": "Фьючерсы", "funding": "Фандинг", "basis": "Фикс-ставка", "yield": "Кредитование", "susde": "sUSDe"}
 KYIV = dt.timezone(dt.timedelta(hours=3))
 
 
@@ -55,6 +75,10 @@ def _load(out: str, name: str) -> dict:
         return json.load(open(os.path.join(out, name), encoding="utf-8"))
     except Exception:  # noqa: BLE001
         return {}
+
+
+def _susde(out: str) -> dict:
+    return ((_load(out, "yield.json").get("accounts") or {}).get("susde")) or {}
 
 
 def desk_values(out: str) -> dict:
@@ -71,58 +95,132 @@ def desk_values(out: str) -> dict:
     fd = _load(out, "funding.json")
     if fd.get("start_equity"):
         v["funding"] = float(fd["equity_mtm"] if fd.get("equity_mtm") is not None else fd.get("equity", fd["start_equity"]))
+    bd = _load(out, "basis.json")
+    if bd.get("equity") is not None:
+        v["basis"] = float(bd["equity"])
     yd = _load(out, "yield.json")
     if yd.get("equity") is not None:
         v["yield"] = float(yd["equity"])
+    if _susde(out).get("equity") is not None:
+        v["susde"] = float(_susde(out)["equity"])
     return v
 
 
+def _ret(h: list, since: int) -> float | None:
+    h = [x for x in h if x[0] >= since and x[1]]
+    return h[-1][1] / h[0][1] - 1 if len(h) >= 2 else None
+
+
 def desk_30d(out: str, now: int) -> dict:
-    """Return of each desk over the last 30 days (from the desks' own histories), for the weekly tilt."""
+    """Return of each desk over the last 30 days (from the desks' own histories), for the tilt of the directional part."""
     since = now - 30 * 86_400_000
     r = {}
     pf = (_load(out, "portfolio.json").get("portfolios") or {}).get("ideas") or {}
-    h = [x for x in pf.get("history") or [] if x.get("time", 0) >= since and x.get("v")]
-    if h:
-        r["spot"] = h[-1]["v"] / h[0]["v"] - 1
+    x = _ret([[p.get("time", 0), p.get("v")] for p in pf.get("history") or []], since)
+    if x is not None:
+        r["spot"] = x
     prof = _load(out, "paper.json").get("profiles") or {}
-    xs = []
-    for k in ("bal", "imp"):
-        hh = [x for x in (prof.get(k) or {}).get("equity_history") or [] if x.get("time", 0) >= since and x.get("equity")]
-        if hh:
-            xs.append(hh[-1]["equity"] / hh[0]["equity"] - 1)
+    xs = [y for k in ("bal", "imp") if (y := _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get(k) or {}).get("equity_history") or []], since)) is not None]
     if xs:
         r["futures"] = sum(xs) / len(xs)
-    fh = [x for x in _load(out, "funding.json").get("history") or [] if x[0] >= since and x[1]]
-    if fh:
-        r["funding"] = fh[-1][1] / fh[0][1] - 1
-    yh = [x for x in _load(out, "yield.json").get("history") or [] if x[0] >= since and x[1]]
-    if yh:
-        r["yield"] = yh[-1][1] / yh[0][1] - 1
+    for k, h in (("funding", _load(out, "funding.json").get("history")), ("basis", _load(out, "basis.json").get("history")),
+                 ("yield", _load(out, "yield.json").get("history")), ("susde", _susde(out).get("history"))):
+        x = _ret(h or [], since)
+        if x is not None:
+            r[k] = x
     return r
 
 
-def target_weights(r30: dict, available: set) -> dict:
-    w = {}
-    for k, b in BASE.items():
-        if k not in available:
-            continue
+def carry_rates(out: str, now: int) -> dict:
+    """What each no-direction source pays NOW, % a year."""
+    r = {}
+    yd = _load(out, "yield.json")
+    if yd.get("apy_now") is not None:
+        r["yield"] = float(yd["apy_now"])
+    if _susde(out).get("apy_now") is not None:
+        r["susde"] = float(_susde(out)["apy_now"])
+    bd = _load(out, "basis.json")
+    if bd:
+        pos = bd.get("position")
+        rn = bd.get("rate_now")
+        r["basis"] = float(pos["rate"]) if pos else (float(rn) if rn is not None and rn >= (bd.get("min_rate") or 0) else 0.0)
+    h = [x for x in _load(out, "funding.json").get("history") or [] if x[0] >= now - 7 * 86_400_000 and x[1]]
+    if len(h) >= 2 and h[-1][0] - h[0][0] >= 3 * 86_400_000:          # the funding desk's own last week, annualised
+        r["funding"] = (h[-1][1] / h[0][1] - 1) * 365 * 86_400_000 / (h[-1][0] - h[0][0]) * 100
+    return r
+
+
+def regime(out: str) -> tuple[str, str]:
+    p = _load(out, "paper.json")
+    bull = ((_load(out, "decision.json").get("risk") or {}).get("btc_bull"))
+    if p.get("risk_off"):
+        return "off", "на рынке широкая распродажа (падает большинство крупных монет)"
+    if bull is False:
+        return "off", "BTC в нисходящем тренде"
+    return "on", "BTC в восходящем тренде, широкой распродажи нет"
+
+
+def allocate(profile: dict, reg: str, r30: dict, rates: dict, available: set, reason: str | None = None) -> tuple[dict, list]:
+    """Weights of the sleeves (sum 1) and the reasons in Russian."""
+    why = []
+    d = profile[reg]
+    w = {"spot": d * (1 - profile["fut"]), "futures": d * profile["fut"]}
+    why.append(f"Рынок: {'рост' if reg == 'on' else 'осторожность'} — {reason or regime_text(reg)}: на спот и фьючерсы {d*100:.0f}%.")
+    for k in DIRECTIONAL:
         x = r30.get(k)
-        w[k] = b * (0.5 if x is not None and x < -0.05 else 1.25 if x is not None and x > 0.05 else 1.0)
-    s = sum(w.values()) or 1.0
-    w = {k: v / s for k, v in w.items()}
-    fixed: dict = {}
-    for _ in range(len(w) + 1):                          # scale to 100 % inside the bounds: clip, give the rest to the free sleeves
-        free = {k: v for k, v in w.items() if k not in fixed}
-        room = 1.0 - sum(fixed.values())
-        fs = sum(free.values()) or 1.0
-        w = {**fixed, **{k: v / fs * room for k, v in free.items()}}
-        out = {k: v for k, v in w.items() if k not in fixed and not (BOUNDS[k][0] - 1e-9 <= v <= BOUNDS[k][1] + 1e-9)}
-        if not out:
+        if k not in available:
+            w[k] = 0.0
+        elif w[k] and x is not None and x < -0.05:
+            w[k] *= 0.5
+            why.append(f"{TITLE[k]} за 30 дней {x*100:+.1f}% — доля вдвое меньше.")
+        elif w[k] and x is not None and x > 0.05:
+            w[k] *= 1.25
+            why.append(f"{TITLE[k]} за 30 дней {x*100:+.1f}% — доля больше в 1.25 раза.")
+    if w["spot"] + w["futures"] > d + 0.10:          # a good month may add, but not more than 10 points over the regime's share
+        f = (d + 0.10) / (w["spot"] + w["futures"])
+        w = {k: v * f for k, v in w.items()}
+    c = max(0.0, 1.0 - w["spot"] - w["futures"])
+    keys = [k for k in CARRY if k in available]
+    score = {k: max(0.0, (rates.get(k) if rates.get(k) is not None else DEFAULT_RATE) - DISCOUNT[RISK[k]]) for k in keys}
+    for k in keys:
+        rt = rates.get(k)
+        why.append(f"{TITLE[k]}: " + (f"платит {rt:.1f}% годовых" if rt is not None else "ставка ещё неизвестна")
+                   + (f", за риск −{DISCOUNT[RISK[k]]:.1f}" if DISCOUNT[RISK[k]] else "") + f" → оценка {score[k]:.1f}.")
+    cw = {k: 0.0 for k in keys}
+    if "yield" in cw:
+        cw["yield"] = YIELD_FLOOR * c
+    rest, free = c - sum(cw.values()), [k for k in keys]
+    for _ in range(len(keys) + 1):                   # ∝ score, caps fixed one by one, the rest to the others
+        tot = sum(score[k] for k in free)
+        if rest <= 1e-12 or tot <= 0:
             break
-        for k, v in out.items():
-            fixed[k] = min(max(v, BOUNDS[k][0]), BOUNDS[k][1])
-    return {k: round(v, 4) for k, v in w.items()}
+        over = [k for k in free if k in CAP and cw[k] + rest * score[k] / tot > CAP[k] + 1e-12]
+        if not over:
+            for k in free:
+                cw[k] += rest * score[k] / tot
+            rest = 0.0
+            break
+        for k in over:
+            rest -= CAP[k] - cw[k]
+            cw[k] = CAP[k]
+            free.remove(k)
+    if rest > 1e-12:                                  # nothing pays → the reserve
+        if "yield" in cw:
+            cw["yield"] += rest
+        else:
+            w["spot"] = w.get("spot", 0) + rest
+    w.update(cw)
+    w = {k: v for k, v in w.items() if k in available or v > 0}
+    s = sum(w.values()) or 1.0
+    return {k: round(v / s, 4) for k in KEYS if (v := w.get(k)) is not None and k in available}, why
+
+
+def regime_text(reg: str) -> str:
+    return "BTC растёт, распродажи нет" if reg == "on" else "BTC падает или идёт широкая распродажа"
+
+
+def target_weights(r30: dict, available: set, reg: str = "on", rates: dict | None = None, profile: str = "balanced") -> dict:
+    return allocate(PROFILES[profile], reg, r30, rates or {}, available)[0]
 
 
 def _month_start(now: int) -> int:
@@ -135,44 +233,89 @@ def _monday(now: int) -> str:
     return (d - dt.timedelta(days=d.weekday())).strftime("%Y-%m-%d")
 
 
+def _follow(sleeves: dict, last: dict, desks: dict) -> dict:
+    """Each sleeve moves by its desk's return since the previous run."""
+    return {k: (v * desks[k] / last[k] if last.get(k) and desks.get(k) else v) for k, v in sleeves.items()}
+
+
+def _resplit(sleeves: dict, w: dict) -> tuple[dict, float]:
+    total = sum(sleeves.values())
+    moved = sum(abs(total * w.get(k, 0) - sleeves.get(k, 0)) for k in set(w) | set(sleeves)) / 2
+    cost = moved * COST
+    return {k: (total - cost) * x for k, x in w.items()}, cost
+
+
 def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> dict:
     now = now or int(time.time() * 1000)
     conn.execute("CREATE TABLE IF NOT EXISTS capital_state(k TEXT PRIMARY KEY, v TEXT)")
     conn.execute("CREATE TABLE IF NOT EXISTS capital_hist(time INTEGER PRIMARY KEY, value REAL)")
     st = {k: json.loads(v) for k, v in conn.execute("SELECT k, v FROM capital_state")}
     desks = desk_values(out)
+    reg, reason = regime(out)
+    rates = carry_rates(out, now)
     events = []
-    if not st.get("sleeves"):
-        w = target_weights({}, set(desks))
-        st = {"started": now, "sleeves": {k: START * x for k, x in w.items()}, "weights": w, "last": desks, "week": _monday(now),
-              "month_start": _month_start(now), "month_value": START}
-        events.append(f"Старт: ${START:,.0f} разделены — " + ", ".join(f"{NAMES[k]} {x*100:.0f}%" for k, x in w.items()))
+    if (st.get("sleeves") or st.get("models")) and st.get("version") != VERSION:   # the allocator changed → one clean restart
+        old = st.get("sleeves") or st["models"]["balanced"]["sleeves"]
+        prev = {"version": st.get("version", 1), "started": st.get("started"), "ended": now, "value": round(sum(old.values()), 2)}
+        conn.execute("DELETE FROM capital_state")
+        conn.execute("DELETE FROM capital_hist")
+        st = {"previous": prev}
+        events.append(f"Новая версия распределения: 6 источников и умный распределитель — демо-счёт начат заново с ${START:,.0f} "
+                      f"(прошлый запуск закончился на ${prev['value']:,.2f}).")
+    avail = set(desks)
+    if not st.get("models"):
+        r30 = desk_30d(out, now)
+        st = {**st, "version": VERSION, "started": now, "last": desks, "week": _monday(now), "month_start": _month_start(now),
+              "month_value": START, "regime": reg, "split_at": now, "models": {}}
+        for m, prof in PROFILES.items():
+            w, why = allocate(prof, reg, r30, rates, avail, reason)
+            st["models"][m] = {"sleeves": {k: START * x for k, x in w.items()}, "weights": w, "why": why, "hist": [[now, START]]}
+        st["bench"] = {k: START * x for k, x in st["models"]["balanced"]["weights"].items()}
+        events.append(f"Старт: ${START:,.0f} разделены — " + ", ".join(f"{SHORT[k]} {x*100:.0f}%" for k, x in st["models"]["balanced"]["weights"].items()))
     else:
-        for k, val in list(st["sleeves"].items()):          # each sleeve follows its desk since the previous run
-            a, b = st["last"].get(k), desks.get(k)
-            if a and b:
-                st["sleeves"][k] = val * b / a
-        st["last"] = {**st["last"], **desks}
+        last = st["last"]
+        for m in st["models"].values():
+            m["sleeves"] = _follow(m["sleeves"], last, desks)
+        st["bench"] = _follow(st["bench"], last, desks)
+        st["last"] = {**last, **desks}
+        main = st["models"]["balanced"]
         if _month_start(now) != st["month_start"]:          # a new calendar month: the previous one is closed
-            total = sum(st["sleeves"].values())
+            total = sum(main["sleeves"].values())
             prof = total - st["month_value"]
             st.setdefault("months", []).append({"month_start": st["month_start"], "start": round(st["month_value"], 2), "end": round(total, 2),
                                                 "profit": round(prof, 2), "fee": round(max(0.0, prof) * FEE, 2)})
             st["month_start"], st["month_value"] = _month_start(now), total
-        if _monday(now) != st["week"]:                      # weekly re-split by the rule
-            total = sum(st["sleeves"].values())
-            w = target_weights(desk_30d(out, now), set(desks) | set(st["sleeves"]))
-            st["sleeves"] = {k: total * x for k, x in w.items()}
-            st["weights"], st["week"] = w, _monday(now)
-            events.append("Недельное перераспределение: " + ", ".join(f"{NAMES[k]} {x*100:.0f}%" for k, x in w.items()))
-    total = sum(st["sleeves"].values())
+        new = sorted(avail - set(main["sleeves"]))
+        why_now = None
+        if _monday(now) != st["week"]:
+            why_now = "недельный пересчёт"
+        elif new:
+            why_now = "появился новый источник: " + ", ".join(SHORT[k] for k in new)
+        elif reg != st.get("regime") and now - st.get("split_at", 0) >= REGIME_GAP_MS:
+            why_now = "рынок сменил режим: " + reason
+        if why_now:
+            r30 = desk_30d(out, now)
+            for mk, m in st["models"].items():
+                w, why = allocate(PROFILES[mk], reg, r30, rates, avail | set(m["sleeves"]), reason)
+                m["sleeves"], cost = _resplit(m["sleeves"], w)
+                m["weights"], m["why"] = w, why
+                if mk == "balanced":
+                    events.append(f"Перераспределение ({why_now}): " + ", ".join(f"{SHORT[k]} {x*100:.0f}%" for k, x in w.items())
+                                  + f"; комиссии ≈ ${cost:,.2f}.")
+            st["week"], st["regime"], st["split_at"] = _monday(now), reg, now
+    for m in st["models"].values():
+        m["hist"] = (m.get("hist") or [])[-399:] + [[now, round(sum(m["sleeves"].values()), 2)]]
+    main = st["models"]["balanced"]
+    total = sum(main["sleeves"].values())
+    bench = sum(st["bench"].values())
     conn.execute("INSERT OR REPLACE INTO capital_hist VALUES(?, ?)", (now, round(total, 2)))
-    # each desk as an index (100 at the portfolio's start) — the panel builds any user model from these
-    st.setdefault("base_desks", {**desks})
+    st.setdefault("base_desks", {**desks})                   # each desk as an index (100 at the portfolio's start)
     for k, v in desks.items():
         st["base_desks"].setdefault(k, v)
     st["idx"] = (st.get("idx") or [])[-399:] + [[now] + [round(desks[k] / st["base_desks"][k] * 100, 4) if k in desks and st["base_desks"].get(k) else None
-                                                          for k in ("spot", "futures", "funding", "yield")]]
+                                                          for k in KEYS]]
+    st.setdefault("ev", [])
+    st["ev"] = (st["ev"] + [{"t": now, "ru": e} for e in events])[-40:]
     for k, v in st.items():
         conn.execute("INSERT OR REPLACE INTO capital_state VALUES(?, ?)", (k, json.dumps(v)))
     conn.commit()
@@ -180,25 +323,38 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     month_profit = total - st["month_value"]
     arb = (_load(out, "arb.json").get("week") or {}).get("virtual_pnl_usd")
     tri = (_load(out, "tri.json").get("week") or {}).get("virtual_pnl_usd")
-    return {"asof": now, "name": "CRYPTO NOVA Портфолио", "start_usd": START, "started": st["started"], "value_usd": round(total, 2),
-            "pnl_usd": round(total - START, 2), "pnl_pct": round((total / START - 1) * 100, 2),
-            "sleeves": [{"key": k, "name_ru": NAMES[k], "weight": st["weights"].get(k), "value_usd": round(v, 2),
-                         "share_now": round(v / total, 4) if total else None} for k, v in st["sleeves"].items()],
+    w_now = main["weights"]
+    return {"asof": now, "name": "CRYPTO NOVA Портфолио", "version": VERSION, "start_usd": START, "started": st["started"],
+            "value_usd": round(total, 2), "pnl_usd": round(total - START, 2), "pnl_pct": round((total / START - 1) * 100, 2),
+            "sleeves": [{"key": k, "name_ru": NAMES[k], "kind": "directional" if k in DIRECTIONAL else "carry", "risk": RISK[k],
+                         "weight": w_now.get(k), "rate_now": round(rates[k], 2) if k in CARRY and rates.get(k) is not None else None,
+                         "value_usd": round(v, 2), "share_now": round(v / total, 4) if total else None}
+                        for k, v in sorted(main["sleeves"].items(), key=lambda kv: KEYS.index(kv[0]))],
+            "regime": {"key": reg, "ru": ("рост" if reg == "on" else "осторожность"), "why_ru": reason},
+            "why_ru": main.get("why", []), "split_at": st.get("split_at"),
+            "benchmark": {"name_ru": "Без перераспределения (первое распределение, оставленное как есть)", "value_usd": round(bench, 2),
+                          "pnl_usd": round(bench - START, 2), "pnl_pct": round((bench / START - 1) * 100, 2),
+                          "allocator_edge_usd": round(total - bench, 2)},
             "month": {"start": st["month_start"], "start_value": round(st["month_value"], 2), "profit_usd": round(month_profit, 2),
                       "fee_usd": round(max(0.0, month_profit) * FEE, 2), "fee_pct": FEE * 100},
-            "months": st.get("months", []), "history": hist, "events": events,
-            "index_keys": ["spot", "futures", "funding", "yield"], "index_history": st.get("idx", []),
-            "models": {k: {**m, "w": {kk: round(vv, 4) for kk, vv in m["w"].items()}} for k, m in MODELS.items()}, "options": OPTIONS,
+            "months": st.get("months", []), "history": hist, "events": events, "event_log": st["ev"][-20:], "previous": st.get("previous"),
+            "index_keys": KEYS, "index_history": st.get("idx", []),
+            "models": {k: {**MODELS[k], "w": m["weights"], "why_ru": m.get("why", []), "value_usd": round(sum(m["sleeves"].values()), 2),
+                           "pnl_pct": round((sum(m["sleeves"].values()) / START - 1) * 100, 2), "history": m["hist"][-200:]}
+                       for k, m in st["models"].items()},
+            "options": OPTIONS,
             "watch_only": [{"key": "arb", "name_ru": "Арбитраж между биржами", "week_virtual_usd": arb},
                            {"key": "tri", "name_ru": "Треугольный арбитраж", "week_virtual_usd": tri}],
             "rules_ru": [
-                f"Демо-счёт ${START:,.0f}: система сама делит сумму между нашими направлениями и ведёт её месяц.",
-                "Старт: спот 40%, фьючерсы 25%, фандинг 15%, кредитование стейблкоинов 20%. Раз в неделю (понедельник) доли "
-                "пересчитываются: направление, которое за 30 дней потеряло больше 5%, получает половину своей доли, заработавшее "
-                "больше 5% — в 1.25 раза больше; границы: спот 25–55%, фьючерсы 10–40%, фандинг 0–25%, кредитование 10–40%.",
-                "Кредитование — консервативная часть: USDC и USDT отданы в кредит на Aave, USDS — на сберегательной ставке Sky "
-                "(два протокола, чтобы одна ошибка не задела всё); процент плавающий, бонусные токены не считаем; без займов, "
-                "поэтому нет ликвидаций, но остаются риски смарт-контракта и отвязки стейблкоина.",
+                f"Демо-счёт ${START:,.0f}: система сама делит сумму между шестью источниками и ведёт её месяц.",
+                "Активная часть (спот и фьючерсы) зависит от рынка: когда BTC растёт и распродажи нет — 60%, при осторожности — 35%. "
+                "Направление, которое за 30 дней потеряло больше 5%, получает половину доли, заработавшее больше 5% — в 1.25 раза больше.",
+                "Остальное — источники без ставки на цену: кредитование стейблкоинов (Aave, Sky), фикс-ставка на фьючерсах BTC/ETH, "
+                "фандинг и доходные доллары sUSDe. Делим по тому, сколько каждый платит СЕЙЧАС, минус скидка за риск (фандинг и sUSDe −1.5). "
+                "В кредитовании всегда не меньше 30% этой части — резерв; потолки: фандинг 20%, фикс-ставка 30%, sUSDe 15%.",
+                "Пересчёт — каждый понедельник, сразу при новом источнике и при смене режима рынка (не чаще раза в сутки). "
+                "Каждый пересчёт стоит 0.1% от переложенной суммы — это комиссии.",
+                "Рядом показан вариант «без перераспределения»: распределитель полезен, только если обгоняет его.",
                 "Арбитраж и треугольник денег не получают: их цифры — виртуальная оценка, клиент не может их исполнить.",
                 "В конце месяца — итог; 10% от прибыли — оплата (месяц без прибыли бесплатно).",
                 "Это демо, а не обещание: результат может быть и минусом."]}

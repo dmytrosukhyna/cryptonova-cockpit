@@ -22,6 +22,12 @@ from datetime import datetime, timezone
 API = "https://yields.llama.fi/pools"
 DERIBIT = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency={c}&kind=future"
 BASIS_FEES_PCT = 0.3              # spot buy + futures short, in and out (taker fees), % of the sum
+# 18.10 (owner: «участвовать в разных источниках»): a second, separate $10 000 account — yield-bearing dollars (Ethena sUSDe). Its
+# interest comes from perpetual funding (Ethena holds spot and shorts perps), so it pays more than lending and carries more risk
+# (funding can turn negative, USDe can slip from $1 for hours — 0.97 on 10.10.2025, 7-day unstaking). Its own sleeve in Портфолио.
+ACCOUNTS = {"susde": {"name_ru": "Доходные доллары · Ethena sUSDe", "risk": 3, "basket": [("ethena-usde", "Ethereum", "SUSDE", 1.0)],
+                      "about_ru": "Доллары Ethena (sUSDe): доход идёт от фандинга — Ethena держит монеты и шортит перпетуалы. Платит больше "
+                                  "кредитования, но риск выше: фандинг может уйти в минус, USDe может на часы отойти от $1, вывод — 7 дней."}}
 START = 10_000.0
 YEAR_MS = 365 * 86_400_000
 BASKET = [("aave-v3", "Ethereum", "USDC", 0.4), ("aave-v3", "Ethereum", "USDT", 0.3),
@@ -84,7 +90,30 @@ def basis_row(rows: list, cur: str, now: int) -> dict | None:
     days, exp, gross = best
     net = gross - BASIS_FEES_PCT * 365 / days
     return {"name_ru": f"{cur} · спот + шорт фьючерса до {exp:%d.%m.%Y} (ставка фиксируется при входе)", "apy": round(net, 2),
-            "apy_base": round(gross, 2), "tvl_usd": None, "risk": 2, "project": "deribit-basis", "symbol": cur, "days": round(days)}
+            "apy_base": round(gross, 2), "tvl_usd": None, "risk": 2, "project": "deribit-basis", "symbol": cur, "days": round(days),
+            "expiry": int(exp.timestamp() * 1000)}
+
+
+def _rate(pools: list, basket: list) -> tuple[float | None, dict]:
+    rates = {}
+    for proj, chain, sym, share in basket:
+        p = pick(pools, proj, chain, sym)
+        if p and base_apy(p) is not None:
+            rates[sym] = base_apy(p)
+    sh = sum(s for _, _, sym, s in basket if sym in rates)
+    return (sum(rates[sym] * s for _, _, sym, s in basket if sym in rates) / sh if rates else None), rates
+
+
+def _accrue(a: dict | None, apy: float | None, now: int) -> dict:
+    """One account: start at START, then compound at the current APY for the elapsed time (the last known APY if none now)."""
+    if not a or not a.get("equity"):
+        return {"equity": START, "start": now, "last": now, "apy": apy, "history": [[now, START]]}
+    use = a.get("apy") if apy is None else apy
+    if use is not None:
+        a["equity"] *= math.exp(math.log1p(use / 100) * max(0, now - a["last"]) / YEAR_MS)
+    a["last"], a["apy"] = now, (apy if apy is not None else a.get("apy"))
+    a["history"] = (a.get("history") or [])[-500:] + [[now, round(a["equity"], 4)]]
+    return a
 
 
 def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_pools, fetch_fut=None) -> dict:
@@ -130,8 +159,19 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_pools, fe
             row = None
         if row:
             table.append(row)
+    accounts = {}
+    for key, acc in ACCOUNTS.items():
+        apy_a, rates_a = _rate(pools, acc["basket"])
+        a = _accrue(st.get(f"acct_{key}"), apy_a, now)
+        st[f"acct_{key}"] = a
+        conn.execute("INSERT OR REPLACE INTO yield_state VALUES(?, ?)", (f"acct_{key}", json.dumps(a)))
+        accounts[key] = {"name_ru": acc["name_ru"], "risk": acc["risk"], "about_ru": acc["about_ru"], "start_equity": START, "since": a["start"],
+                         "equity": round(a["equity"], 2), "pnl_usd": round(a["equity"] - START, 2), "pnl_pct": round((a["equity"] / START - 1) * 100, 3),
+                         "apy_now": round(a["apy"], 2) if a.get("apy") is not None else None, "stale": apy_a is None,
+                         "history": a["history"][-300:]}
+    conn.commit()
     eq = st["equity"]
-    return {"asof": now, "name": "Доходность · кредитование стейблкоинов", "start_equity": START, "equity": round(eq, 2),
+    return {"accounts": accounts, "asof": now, "name": "Доходность · кредитование стейблкоинов", "start_equity": START, "equity": round(eq, 2),
             "pnl_usd": round(eq - START, 2), "pnl_pct": round((eq / START - 1) * 100, 3), "apy_now": round(st["apy"], 2) if st.get("apy") is not None else None,
             "rates": {k: round(v, 2) for k, v in rates.items()}, "stale": stale, "missing": missing, "error": err,
             "basket": [{"project": pr, "chain": ch, "symbol": sy, "share": sh} for pr, ch, sy, sh in BASKET], "since": st["start"],

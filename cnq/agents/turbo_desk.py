@@ -65,7 +65,7 @@ def _month_start(now: int) -> int:
 def _month_pct(hist: list, now: int) -> float | None:
     ms = _month_start(now)
     before = [h for h in hist if h[0] < ms]
-    base = before[-1][1] if before else (hist[0][1] if hist else None)
+    base = before[-1][1] if before else START          # started this month → from the $10 000 start
     return round((hist[-1][1] / base - 1) * 100, 2) if hist and base else None
 
 

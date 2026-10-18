@@ -1,0 +1,1015 @@
+{
+  "asof": "2026-10-18",
+  "method_note": "Rules taken from official T&C / FAQ / help-centre pages where reachable (fetched 2026-10-18); prices, Trustpilot and history from dated third-party reviews where official pages were not readable. null = not verified.",
+  "firms": [
+    {
+      "id": "hyrotrader",
+      "name": "HyroTrader",
+      "url": "https://www.hyrotrader.com/",
+      "signup_url": "https://www.hyrotrader.com/how-to-start/",
+      "status": "operating",
+      "founded": 2022,
+      "country": "UAE (HYRO TECHNOLOGIES FZ-LLC, RAKEZ); funded stage: HYROTRADER TECHNOLOGIES LTD (BVI); contact address Prague, CZ",
+      "platforms": ["Bybit demo account via API", "BloFin demo via API", "Hyro platform (own, no API keys)", "Tealstreet", "Tiger.com", "CLEO (B-booked vs Binance prices, per CryptoSlate)"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Bybit / BloFin DEMO accounts (exchange demo environment, real market data); official: 'All trading on HyroTrader takes place on simulated (demo) accounts... There is no real-capital stage at any point.'",
+        "pairs": "USDT perpetuals only (600-700+ on Bybit, 80+ on BloFin); spot, USDC perps, COIN-M, options prohibited",
+        "max_leverage": "up to 100x on Bybit, up to 150x BTC/ETH on BloFin (ceiling; effective leverage set in sub-account)"
+      },
+      "api_bots": {
+        "allowed": true,
+        "rule": "T&C §10.2(e) (updated 29 Sep 2026): prohibits any 'trading system, bot, expert advisor, algorithm, script' that 'executes a strategy that is not your own'; 'Automation of your own strategy is permitted'; 'you remain responsible for every order placed on your Trading Account.'",
+        "src": "https://www.hyrotrader.com/terms-and-conditions/"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "T&C §10.2(b) prohibits 'coordinated multi-account trading, mirror trading, group trading'; §10.2(e) bans 'a copy-trading service, account mirroring or replication' and 'a third-party trade-signal, idea or alert service'; §10.2(j) 'placing simulated trades on behalf of any other person'; §10.2(p) bans organising/recruiting for arrangements running multiple coordinated accounts; §4.5 'You may hold only one Account for each program type simultaneously.' FAQ (RU): 'Копировать сделки других трейдеров запрещено.'",
+        "src": "https://www.hyrotrader.com/terms-and-conditions/"
+      },
+      "challenge": {
+        "type": "2-step (also 1-step and Zero-step)",
+        "target_pct": [10, 5],
+        "daily_loss_pct": 5,
+        "daily_loss_basis": "static: start-of-day equity (balance + open PnL) at 00:00 UTC minus fixed % of INITIAL balance (Zero 3%, One 4%, Two 5%); floor does not trail",
+        "max_dd_pct": 10,
+        "max_dd_type": "static",
+        "min_days": "5 per phase (Zero-step: 1)",
+        "time_limit": "unlimited (30-day trading-inactivity and 90-day platform-inactivity rules)",
+        "consistency": "One/Two-Step: no single trading day may count for more than 40% of the profit target (excess not counted); Zero-Step: no single trade >50% of target",
+        "other_rules": "Max realised loss per trade 3% of initial balance (manual review); low-cap coins (mcap <$100M, or 24h vol $0.5-5M, or Innovation Zone) max 5% of initial balance incl. leverage; Martingale banned; cross-account hedging banned; news allowed unless strategy depends solely on news; overnight/weekend holding allowed; stop-loss not required. One-Step: 10% target, 4% daily, 6% max, 5 days. Zero-Step: 10% target, 3% daily, 5% max, fee non-refundable.",
+        "prices": {"10000": 119, "25000": 249, "50000": 379, "100000": 579},
+        "prices_note": "Two-Step list prices; One-Step: 129/299/499/749; 200K: 969 (Two) / 1299 (One). Fee for One/Two-Step is a refundable deposit returned with first payout.",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80, may rise to 90 at firm's discretion (CryptoSlate: 85 after 4 months, 90 after 8 months); Zero-Step fixed 80",
+        "first_payout": "on demand once >= $100 after split; no fixed waiting period",
+        "frequency": "on demand, processed within 24h; each request counts profit only up to 5% of starting balance (excess removed on reset)",
+        "methods": "USDT or USDC",
+        "scaling": "discretionary: eligible to ask at 20% total profit; caps $200K funded / $400K in challenges per trader"
+      },
+      "reliability": {
+        "trustpilot": 4.0,
+        "reviews": 227,
+        "payout_proof": "On-chain payouts on Solana; PropFirmGrade matched 895 payouts worth $763,095 in 90 days to 8 Oct 2026 (same wallets also pay partners). Firm claims $5M+ paid, ~1,700 funded traders (unverified).",
+        "issues": "5% per-payout cap deletes excess profit; marketing implies exchange execution but terms say fully simulated; three contracting entities; deposit not escrowed; 3% per-trade rule enforced manually after the fact; reputation clause can forfeit rewards (PropFirmGrade B- preliminary, CryptoSlate 7.0/10).",
+        "score": 7
+      },
+      "affiliate": true,
+      "affiliate_src": "https://www.hyrotrader.com/affiliate-terms-and-conditions/",
+      "verdict_ru": "Технически идеальна под нас: челлендж — это демо-счёт Bybit, к которому подключается наш API-ключ, боты разрешены. Но только для СВОЕЙ стратегии одного человека — групповая торговля, копирование и сигналы прямо запрещены.",
+      "connect_ru": "Выбрать маршрут Bybit → в Bybit Demo создать API-ключ (чтение + торговля, без вывода) для счёта челленджа → подключить в наш Mac mirror-скрипт как ещё один Bybit-демо счёт. Торговать только USDT-перпетуалы, держать риск на сделку < 3% от стартового баланса, лимит дня 5%, не больше 40% цели за день.",
+      "fit_score": 6,
+      "sources": [
+        "https://www.hyrotrader.com/terms-and-conditions/",
+        "https://www.hyrotrader.com/trading-rules/",
+        "https://www.hyrotrader.com/how-to-start/",
+        "https://www.hyrotrader.com/faq/rules/what-are-the-risk-management-conditions-at-hyrotrader/",
+        "https://www.hyrotrader.com/faq/rules/what-is-the-difference-between-standard-trailing-and-swing-fixed-daily-drawdown/",
+        "https://www.hyrotrader.com/ru/faq/trading-restrictions/is-copy-trading-allowed/",
+        "https://propfirmgrade.com/firms/hyrotrader/",
+        "https://cryptoslate.com/prop-firms/hyrotrader-review/",
+        "https://www.trustpilot.com/review/hyrotrader.com"
+      ]
+    },
+    {
+      "id": "propr",
+      "name": "Propr",
+      "url": "https://www.propr.xyz/",
+      "signup_url": "https://www.propr.xyz/",
+      "status": "operating (new, launched 2026)",
+      "founded": 2026,
+      "country": "British Virgin Islands (Propr Limited, Reg. No. 2211330); built by XBorg studio, backed by SwissBorg (per FundedTrading)",
+      "platforms": ["Propr web app (Hyperliquid perps pricing)", "REST API + Python/JS SDKs"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Hyperliquid prices; terms: 'All Propr accounts, including Funded Accounts, are 100% simulated'; Propr may replicate trades on-chain for its own book (A-book/B-book)",
+        "pairs": "160+ perps (crypto incl. BTC, ETH, SOL, HYPE, SUI; also equities, indices, commodities, FX perps)",
+        "max_leverage": "rulebook: BTC/ETH/SOL 10x, other crypto 2x (site chart shows 5x for BTC/ETH — conflict)"
+      },
+      "api_bots": {
+        "allowed": true,
+        "rule": "Rulebook: 'Automated trading is permitted'; EA/Bot restrictions: 'None'. T&C cl. 8.11: 'The use of automated trading software and AI-driven bots is permitted' provided no platform interference; (c) 'Using a bot strategy that is identical to other users (herd trading) or using off-the-shelf bots without individual customization may be flagged as coordinated trading under Annex 2.' API key pk_live_ per user, 1,200 req/min.",
+        "src": "https://www.propr.xyz/terms"
+      },
+      "copy_trading": {
+        "allowed": "restricted",
+        "rule": "Rulebook (v1.0.5, 27 Jul 2026): 'Copy trading is permitted, including between your own Propr accounts.' T&C (26 Aug 2026) Annex 2 item 5: prohibits 'Running identical or mirror trades across multiple Accounts you control' but 'Copy trading from an external, non-Propr account into a single Account is permitted.' Cl. 8.11(c) herd-trading flag; Annex 1: no third party may access/use your account; cl. 6.2 'You can have only one Account.' Documents conflict.",
+        "src": "https://www.propr.xyz/rules"
+      },
+      "challenge": {
+        "type": "1-step Classic (also Turbo, Pro 1-step and Classic 2-step)",
+        "target_pct": [10],
+        "daily_loss_pct": 3,
+        "daily_loss_basis": "3% of start-of-day balance, equity-based (incl. floating PnL), resets 00:00 UTC",
+        "max_dd_pct": 6,
+        "max_dd_type": "static",
+        "min_days": 0,
+        "time_limit": "none",
+        "consistency": "none (per rulebook)",
+        "other_rules": "Turbo: 9% target / 3% static DD; Pro: 12% / 5% static; Classic 2-step: 5% then 10%, 5% daily, 8% trailing (HWM incl. open profit). ~30 restricted countries; VPN = termination. Fee non-refundable once activated.",
+        "prices": {"10000": 110, "25000": 275, "50000": 495, "100000": 999},
+        "prices_note": "Classic 1-step; Classic 2-step: 100/250/450/749; Turbo: 50/125/245/450.",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80",
+        "first_payout": "on demand, no waiting period, min $20; all positions closed; KYC",
+        "frequency": "on demand, full profit sweep, within 24h",
+        "methods": "USDC on-chain",
+        "scaling": "multiple accounts up to $300K aggregate funded; no formal scaling plan found"
+      },
+      "reliability": {
+        "trustpilot": 4.2,
+        "reviews": 71,
+        "payout_proof": "Each payout published with tx hash on transparency page; firm claimed $880K paid in Aug 2026 (unverified).",
+        "issues": "Very new; rulebook vs T&C conflict on copy trading, bots, leverage; complaints about lag, SL/TP bugs, support delays, a payment-provider incident in Sep 2026; unregulated.",
+        "score": 5
+      },
+      "affiliate": true,
+      "affiliate_src": "https://www.propr.xyz/integrations",
+      "verdict_ru": "Самая «API-шная» крипто-пропка: официальный REST API и SDK, боты разрешены, есть программа для интеграторов ботов (25% пожизненной доли). Но фирма молодая, и в условиях прямо сказано, что одинаковая бот-стратегия у многих пользователей может считаться координированной торговлей.",
+      "connect_ru": "Написать новый коннектор к Propr REST API (ключ pk_live_ из настроек app.propr.xyz). Для многих пользователей — только после письменного согласования с Propr через программу Integrations (как партнёр-бот), иначе риск массовых банов.",
+      "fit_score": 6,
+      "sources": [
+        "https://www.propr.xyz/rules",
+        "https://www.propr.xyz/terms",
+        "https://www.propr.xyz/",
+        "https://propr.xyz/docs/introduction",
+        "https://www.propr.xyz/integrations",
+        "https://fundedtrading.com/propfirm/propr/",
+        "https://www.trustpilot.com/review/propr.xyz"
+      ]
+    },
+    {
+      "id": "breakout",
+      "name": "Breakout / Kraken Prop (owned by Kraken)",
+      "url": "https://www.breakoutprop.com/",
+      "signup_url": "https://www.kraken.com/prop",
+      "status": "operating",
+      "founded": 2023,
+      "country": "US (Breakout Trading Group, LLC, Delaware; funded accounts via Payward Oceanic Ltd., BVI); acquired by Kraken, effective 1 Sep 2025",
+      "platforms": ["Breakout Terminal (web/iOS/Android)", "Kraken Pro storefront (Kraken Prop)", "DXtrade discontinued for new accounts"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated (agreement says orders may alternate between A-Book and B-Book)",
+        "pairs": "60+ crypto markets (Lite adds index contracts)",
+        "max_leverage": "BTC/ETH 5x, all other instruments 2x"
+      },
+      "api_bots": {
+        "allowed": false,
+        "rule": "No public trading API documented; PropRubric (13 Oct 2026): 'no API access; all orders placed manually'. Program Rules prohibit 'Utilizing any third-party strategy, off-the-shelf strategy or one marketed to pass evaluation requirements' and 'Using trading strategies that are difficult to replicate in the live market'.",
+        "src": "https://www.breakoutprop.com/program-rules/"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "Program Rules: 'Any copy trading must be copying your own trades'; prohibited: 'Copying 3rd party strategies including but not limited to copy trading other traders' and analysts' ideas' and 'Executing trade ideas belonging to or inspired by any third-party'. Help centre (3 Sep 2026): prohibits copy trading across users, cross-trader hedging 'including through shared signals, strategies, or timing'; item 10: 'Executing trade ideas copied from a third party, including signals, communities, social media, or research reports'. Also: only one evaluation at a time; no multiple accounts from same household/device/IP.",
+        "src": "https://intercom.help/breakoutprop/en/articles/11644103-what-are-the-rules-for-hedging-and-copy-trading"
+      },
+      "challenge": {
+        "type": "1-step Classic (also 1-step Pro, 1-step Turbo, 2-step)",
+        "target_pct": [10],
+        "daily_loss_pct": 4,
+        "daily_loss_basis": "% of balance at 00:30 UTC (open positions excluded from base), recalculated daily",
+        "max_dd_pct": 6,
+        "max_dd_type": "static",
+        "min_days": 0,
+        "time_limit": "none",
+        "consistency": null,
+        "other_rules": "Pro: 12% target, 3% daily, 5% static; Turbo: 9% target, 3% daily, 3% static; 2-step: 5% then 10%, 5% daily, 8% trailing (stops at starting balance). Trading fee 0.04%/side.",
+        "prices": {"10000": 85, "25000": 215, "50000": 400, "100000": 800},
+        "prices_note": "Classic-equivalent ('Starter') prices from PropRubric for the Kraken Prop storefront (verified 13 Oct 2026); Pro-equivalent: 65/150/280/545; Turbo-equivalent: 40/95/180/330. Official pricing page could not be read.",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80 (90 with paid add-on at purchase)",
+        "first_payout": "on demand once net profit >= $50 (Kraken Prop); all positions closed",
+        "frequency": "on demand, review typically <12h, max 24h",
+        "methods": "Kraken Prop: USD/USDG to Kraken wallet (internal transfer); Breakout standalone: USDC via Rise (per TrailingStopLoss)",
+        "scaling": "not described; $200K combined cap across evaluation + funded"
+      },
+      "reliability": {
+        "trustpilot": 4.7,
+        "reviews": 1183,
+        "payout_proof": "Owned by Kraken (major regulated exchange group) — strongest backing among crypto props; no independent payout total found.",
+        "issues": "Leverage only 5x/2x; manual-only; Trustpilot 'high-risk investments' notice; some conflicting third-party data on plan names and drawdown types.",
+        "score": 8
+      },
+      "affiliate": true,
+      "affiliate_src": "https://intercom.help/breakoutprop/en/articles/10471807-what-are-the-criteria-to-become-a-breakout-affiliate",
+      "verdict_ru": "Самая надёжная крипто-пропка (принадлежит Kraken), но API нет — только ручная торговля, а сторонние стратегии и сигналы запрещены. Подходит только если сам владелец стратегии торгует руками.",
+      "connect_ru": "Только вручную через Breakout Terminal / Kraken Pro: наша панель показывает сигнал, человек сам вводит ордер. Автоматизация через API невозможна.",
+      "fit_score": 2,
+      "sources": [
+        "https://www.breakoutprop.com/program-rules/",
+        "https://intercom.help/breakoutprop/en/articles/11644103-what-are-the-rules-for-hedging-and-copy-trading",
+        "https://intercom.help/breakoutprop/en/articles/11644090-what-trading-practices-are-prohibited-during-the-breakout-evaluation",
+        "https://intercom.help/breakoutprop/en/articles/14215629-does-breakout-offer-two-separate-trading-terminals",
+        "https://proprubric.com/firms/kraken-prop/",
+        "https://trailingstoploss.com/breakout-prop-review/",
+        "https://www.trustpilot.com/review/breakoutprop.com"
+      ]
+    },
+    {
+      "id": "cryptofundtrader",
+      "name": "Crypto Fund Trader (CFT)",
+      "url": "https://cryptofundtrader.com/",
+      "signup_url": "https://cryptofundtrader.com/bybit/",
+      "status": "operating",
+      "founded": 2024,
+      "country": "Switzerland (SWISS RLCRATES AG, Zug; MT5 via RLCRATES S.L., Spain)",
+      "platforms": ["Bybit (own Bybit sub-account + dedicated API key)", "MT5 (not US)", "Match-Trader"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Bybit route uses your own Bybit sub-account with a dedicated API key, but funds are 'virtual'/demo; terms describe trading as simulated",
+        "pairs": "715+ crypto pairs (Bybit route: USDT futures only; spot/options banned)",
+        "max_leverage": "up to 1:100 (Bybit, Advanced MT5/Match); 1:5 on Student/Ascend/Instant"
+      },
+      "api_bots": {
+        "allowed": true,
+        "rule": "No general bot ban; T&C 3.3.1: 'Clients taking evaluations via Bybit must provide a dedicated API Key and Subaccount at the time of activation.' Banned EA types: HFT, tick scalping, arbitrage, news-scalping, multi-account reverse trading EAs. API key linked to evaluation must stay active and unchanged.",
+        "src": "https://cryptofundtrader.com/faq/"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "T&C 7.1(vii): prohibits 'copying trade signals from any type of trading community' and 'Executing trade ideas that belong to or are inspired by third parties'; 7.1(xxiii): bans 'substantially similar trading activity between different traders, third parties, groups, or unrelated accounts'; 7.1(xx): conduct that 'reproduces substantially the same exposure such as matching instrument and direction with materially similar size'; 3.2.4: 'It is strictly prohibited to lend or receive services from/for third parties of any kind.' Copying allowed only between own Break accounts during evaluation.",
+        "src": "https://cryptofundtrader.com/terms-and-conditions/"
+      },
+      "challenge": {
+        "type": "2-phase (also 1-phase, Instant, Break, Ascend)",
+        "target_pct": [8, 5],
+        "daily_loss_pct": 5,
+        "daily_loss_basis": "vs balance at ~00:05 UTC (per CryptoSlate)",
+        "max_dd_pct": 10,
+        "max_dd_type": "static",
+        "min_days": 0,
+        "time_limit": "none",
+        "consistency": "none in evaluation; Break Final Stage: no day > 40% of total profit at payout",
+        "other_rules": "1-phase: 10% target, 4% daily, 6% trailing until +6% then locks. Overnight/weekend holding allowed; news allowed (Ascend: no new risk ±2 min around high-impact news). Paid add-ons (weekly payouts, 90% split) each +20% of fee.",
+        "prices": {"10000": 110, "25000": 240, "50000": 389, "100000": 660},
+        "prices_note": "2-phase; 1-phase: 80/219/369/619. Fees never refunded (per CryptoSlate).",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80 (90 with add-on); Instant 50->90",
+        "first_payout": "after 15 traded days (phased); Break accounts on demand",
+        "frequency": "every 30 calendar days (7 traded days with add-on)",
+        "methods": "bank (EUR/USD), USDT (ERC20/TRC20), USDC, BTC, ETH",
+        "scaling": "phased accounts do not scale ($300K cap); Instant doubles at each +10% up to $1.28M"
+      },
+      "reliability": {
+        "trustpilot": null,
+        "reviews": 1100,
+        "payout_proof": "Firm claims $20.8M paid (unverified).",
+        "issues": "Trustpilot rating WITHHELD: 'unavailable due to a breach of our guidelines', fake reviews removed. Trading name on FINMA warning list since 23 Aug 2024; registered for education/digital products; care-of law-firm address; hidden add-on costs (CryptoSlate 5.9/10).",
+        "score": 4
+      },
+      "affiliate": true,
+      "affiliate_src": "https://cryptofundtrader.com/affiliates/",
+      "verdict_ru": "Есть удобный маршрут через собственный суб-аккаунт Bybit с API, но сигналы, чужие идеи и похожие сделки разных трейдеров запрещены. Плюс красные флаги: Trustpilot скрыл рейтинг за фейковые отзывы, фирма в предупредительном списке FINMA.",
+      "connect_ru": "Технически — API-ключ Bybit суб-аккаунта в наш mirror-скрипт (ключ CFT не трогать, нужен ли отдельный ключ — уточнить у поддержки). Рекомендуем не использовать из-за правил и репутации.",
+      "fit_score": 3,
+      "sources": [
+        "https://cryptofundtrader.com/terms-and-conditions/",
+        "https://cryptofundtrader.com/faq/",
+        "https://cryptofundtrader.com/bybit/",
+        "https://cryptoslate.com/prop-firms/crypto-fund-trader-review/",
+        "https://www.trustpilot.com/review/cryptofundtrader.com"
+      ]
+    },
+    {
+      "id": "bitfunded",
+      "name": "Bitfunded",
+      "url": "https://www.bitfunded.com/",
+      "signup_url": "https://www.bitfunded.com/home/",
+      "status": "operating",
+      "founded": 2023,
+      "country": "UAE (per Terms of Use); Trustpilot contact: Spain",
+      "platforms": ["Bitfunded proprietary app (trader.bitfunded.com)"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated ('Demo Funded Account... in a simulated environment'); separate 'Copy to Earn' product where followers trade live funds",
+        "pairs": "100+ crypto pairs",
+        "max_leverage": "1:5 (per HyroTrader comparison, secondary source)"
+      },
+      "api_bots": {
+        "allowed": null,
+        "rule": "Terms do not address bots directly; ban 'Using software or methods that unfairly manipulate or abuse BitFUNDED's systems' (§13(c)(iv)). A competitor's comparison claims bots are supported via API — not confirmed on official pages.",
+        "src": "https://www.bitfunded.com/terms-of-use/"
+      },
+      "copy_trading": {
+        "allowed": "restricted",
+        "rule": "No explicit copy-trading clause; prohibits 'Using third-party or marketed strategies to pass assessment challenges' (§14(d)(v)), opposite positions across connected accounts (§13(c)(v)), sharing accounts (§6(a)). Firm runs its own 'Copy To Earn' where passed traders become strategy providers for followers' live funds (trader share 10-25%).",
+        "src": "https://www.bitfunded.com/terms-of-use/"
+      },
+      "challenge": {
+        "type": "2-step (also 1-step, Instant)",
+        "target_pct": [8, 5],
+        "daily_loss_pct": 5,
+        "daily_loss_basis": null,
+        "max_dd_pct": null,
+        "max_dd_type": "trailing",
+        "min_days": 5,
+        "time_limit": null,
+        "consistency": null,
+        "other_rules": "Max DD 8-10% EOD trailing per HyroTrader comparison (secondary); 'all-in' >65% of capital in one idea banned (§14(d)(xii)); funded demo max $100K.",
+        "prices": {"10000": null, "25000": null, "50000": null, "100000": 799},
+        "prices_note": "From $79; official page lists $79/$99/$149/$249/$399/$799 without mapping to sizes.",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80, up to 90 (secondary source)",
+        "first_payout": null,
+        "frequency": "every 15 or 30 days (secondary source)",
+        "methods": "crypto (USDT)",
+        "scaling": "up to $100K"
+      },
+      "reliability": {
+        "trustpilot": 4.3,
+        "reviews": 206,
+        "payout_proof": null,
+        "issues": "Trustpilot summary: payout delays, lengthy KYC at withdrawal, sudden rule changes, unclear risk policies; execution/P&L discrepancy complaints.",
+        "score": 5
+      },
+      "affiliate": true,
+      "affiliate_src": "https://www.bitfunded.com/affilitate-partnership-policy/",
+      "verdict_ru": "Небольшая крипто-пропка со своим приложением; API не подтверждён официально, чужие стратегии «для прохождения» запрещены. Интересна другим: после прохождения можно стать копи-трейдером, за которым люди легально идут своими деньгами.",
+      "connect_ru": "Вручную в приложении Bitfunded. Вариант для «многих пользователей»: владелец стратегии сам проходит челлендж и становится провайдером в Copy To Earn — тогда пользователи копируют легально.",
+      "fit_score": 3,
+      "sources": [
+        "https://www.bitfunded.com/terms-of-use/",
+        "https://www.bitfunded.com/copytoearn/",
+        "https://www.bitfunded.com/home/",
+        "https://www.hyrotrader.com/blog/hyrotrader-vs-bitfunded-crypto-prop-trading-compared/",
+        "https://www.trustpilot.com/review/bitfunded.com"
+      ]
+    },
+    {
+      "id": "velotrade",
+      "name": "Velotrade",
+      "url": "https://velotrade.com/",
+      "signup_url": "https://velotrade.com/",
+      "status": "operating (new, prop launched early 2026)",
+      "founded": 2026,
+      "country": "Hong Kong (Velotrade Re Limited)",
+      "platforms": ["DXtrade (REST + WebSocket API)"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated ('No live trading or real capital is involved')",
+        "pairs": "BTCUSD named; other crypto pairs not listed",
+        "max_leverage": "BTC up to 10x"
+      },
+      "api_bots": {
+        "allowed": true,
+        "rule": "T&C cl. 8.3 (1 Jul 2026): 'Use of Expert Advisors (automated trading software) is permitted', 'You remain fully responsible for all trades executed by EAs'; HFT banned (8.2(c)). Firm states full DXtrade REST/WebSocket API on every account, no fee or approval.",
+        "src": "https://velotrade.com/terms"
+      },
+      "copy_trading": {
+        "allowed": "restricted",
+        "rule": "T&C 8.2(h): prohibited 'Replicating trades between your accounts or with other users to manipulate outcomes'; 8.2(g): 'Allowing third parties to access or trade on your Account'; 8.2(m): 'Any strategy that does not reflect genuine trading skill'; one Account per person, $200K combined funded cap.",
+        "src": "https://velotrade.com/terms"
+      },
+      "challenge": {
+        "type": "2-step CLASSIC (also CLASSIC 1-step, PRO 1-step)",
+        "target_pct": [10, 5],
+        "daily_loss_pct": 5,
+        "daily_loss_basis": "resets 00:30 UTC from the higher of balance or equity",
+        "max_dd_pct": 10,
+        "max_dd_type": "static",
+        "min_days": 5,
+        "time_limit": null,
+        "consistency": "none",
+        "other_rules": "CLASSIC 1-step: 10%/4% daily/7% max; PRO 1-step: 10%/3%/3%. Latency arbitrage, tick scalping, grid, cross-account hedging banned; VPS/VPN allowed.",
+        "prices": {"10000": 100, "25000": 225, "50000": 419, "100000": 769},
+        "prices_note": "CLASSIC 2-step; PRO 1-step: 74/165/305/558. Source is Velotrade's own blog.",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "up to 90",
+        "first_payout": null,
+        "frequency": "paid within 24h of approval",
+        "methods": "USDC/USDT on Arbitrum",
+        "scaling": null
+      },
+      "reliability": {
+        "trustpilot": null,
+        "reviews": 8,
+        "payout_proof": "On-chain (Arbiscan) certificates shown on own site.",
+        "issues": "Months-old firm; Trustpilot rating withheld/too few reviews (8 per PropRubric); much of the web 'review' content ranking Velotrade #1 is published by Velotrade itself.",
+        "score": 4
+      },
+      "affiliate": true,
+      "affiliate_src": "https://velotrade.com/affiliates",
+      "verdict_ru": "Есть полноценный API (DXtrade), боты разрешены, копирование запрещено только «для манипуляций» — формулировка мягче, чем у других. Но фирма появилась в 2026 году, отзывов почти нет — только маленькие суммы и на свой страх.",
+      "connect_ru": "Новый коннектор к DXtrade REST/WebSocket API в нашем скрипте. До запуска для многих пользователей — получить письменное разрешение.",
+      "fit_score": 4,
+      "sources": [
+        "https://velotrade.com/terms",
+        "https://velotrade.com/blog/velotrade-review",
+        "https://velotrade.com/blog/best-crypto-prop-firms-algo-traders",
+        "https://proprubric.com/firms/"
+      ]
+    },
+    {
+      "id": "mubite",
+      "name": "Mubite",
+      "url": "https://mubite.com/",
+      "signup_url": "https://mubite.com/",
+      "status": "operating",
+      "founded": 2024,
+      "country": "Czech Republic (Mubite s.r.o., Prague)",
+      "platforms": ["Bybit (via API keys)", "Cleo"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated demo accounts on live data, connected to trader's Bybit/Cleo via API keys",
+        "pairs": "crypto USDT futures",
+        "max_leverage": "1:100"
+      },
+      "api_bots": {
+        "allowed": true,
+        "rule": "Expert Advisors and trading bots are allowed (per FundedTrading review; official page not read).",
+        "src": "https://fundedtrading.com/propfirm/mubite/"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "Group trading, account mirroring and copying trades between accounts are prohibited unless approved under an official scaling plan (per FundedTrading review).",
+        "src": "https://fundedtrading.com/propfirm/mubite/"
+      },
+      "challenge": {
+        "type": "2-step (also 1-step, Instant)",
+        "target_pct": [10, 5],
+        "daily_loss_pct": 5,
+        "daily_loss_basis": null,
+        "max_dd_pct": 8,
+        "max_dd_type": null,
+        "min_days": 10,
+        "time_limit": "none",
+        "consistency": "funded 'Funded Score' checks best-day share",
+        "other_rules": "1-step: 10% target, 4% daily, 6% max (inconsistent across pages).",
+        "prices": {"10000": null, "25000": null, "50000": null, "100000": null},
+        "prices_note": "2-step from $65 (5K) to $1,099 (200K).",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80, up to 90",
+        "first_payout": "on demand after verification (2-step)",
+        "frequency": "every 14 days",
+        "methods": "bank transfer, crypto",
+        "scaling": null
+      },
+      "reliability": {
+        "trustpilot": null,
+        "reviews": 63,
+        "payout_proof": null,
+        "issues": "Trustpilot rating withheld (per PropRubric); inconsistent published rules; review source has commercial relationship.",
+        "score": 4
+      },
+      "affiliate": null,
+      "verdict_ru": "Похожа на HyroTrader (Bybit по API, боты можно), но меньше, моложе и с противоречивыми правилами; групповая торговля и зеркалирование запрещены.",
+      "connect_ru": "API-ключ Bybit в наш mirror-скрипт, как с HyroTrader. Только для своей стратегии и после проверки официальных правил.",
+      "fit_score": 3,
+      "sources": [
+        "https://fundedtrading.com/propfirm/mubite/",
+        "https://proprubric.com/firms/"
+      ]
+    },
+    {
+      "id": "ftmo",
+      "name": "FTMO",
+      "url": "https://ftmo.com/",
+      "signup_url": "https://ftmo.com/en/how-it-works/",
+      "status": "operating",
+      "founded": null,
+      "country": "Czech Republic (FTMO; acquired OANDA, ~$422M per Czech filings)",
+      "platforms": ["MT4", "MT5", "cTrader", "TradingView (DXtrade removed for new accounts 24 Mar 2026)"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated CFDs",
+        "pairs": "crypto CFDs (about 22 pairs per SizeProp; not verified on FTMO)",
+        "max_leverage": null
+      },
+      "api_bots": {
+        "allowed": true,
+        "rule": "FAQ: discretionary, algorithmic and EA-based approaches allowed if 'replicable on live accounts'; server limits 200 open orders, 2,000 positions/day; Forbidden Practices restrict accounts 'operated or managed by automated robots / EAs' causing >2,000 server requests/day and 'ultra-high-speed tools'.",
+        "src": "https://ftmo.com/en/faq/which-instruments-can-i-trade-and-what-strategies-am-i-allowed-to-use/"
+      },
+      "copy_trading": {
+        "allowed": "restricted",
+        "rule": "FAQ 'How many accounts': 'the total capital allocation across all accounts and products is limited to $400,000 per trader or strategy'; applies 'If identical or substantially similar trading is detected across multiple FTMO accounts', 'including trades copied from or based on the same third-party source (such as signal groups or copy-trading services)'; excess → accounts may be suspended. Forbidden Practices: no third party may 'perform simulated trades for you'; no trading 'alone or in concert with other persons'. Blog: popular third-party EA → risk of 'being denied an FTMO Account'.",
+        "src": "https://ftmo.com/en/faq/how-many-accounts-can-i-have/"
+      },
+      "challenge": {
+        "type": "2-step (also 1-step)",
+        "target_pct": [10, 5],
+        "daily_loss_pct": 5,
+        "daily_loss_basis": "5% of initial capital below previous day's closing balance, recalculated 00:00 CE(S)T",
+        "max_dd_pct": 10,
+        "max_dd_type": "static",
+        "min_days": 4,
+        "time_limit": "none",
+        "consistency": "2-step: none in challenge; 1-step: best day <= 50% of total profit (accounts from 12 Oct 2026)",
+        "other_rules": "1-step: 10% target, 3% daily, 10% EOD trailing. Standard funded accounts: news restriction around selected releases and no weekend holding; Swing type removes these (leverage 1:30).",
+        "prices": {"10000": 89, "25000": 250, "50000": 345, "100000": 540},
+        "prices_note": "2-step EUR (Aug 2026); 1-step: 79/199/319/499 EUR (100K 1-step promo EUR 399 / $463).",
+        "currency": "EUR"
+      },
+      "funded": {
+        "split_pct": "2-step 80 -> 90 (scaling/Premium); 1-step 90",
+        "first_payout": "day 14 after first trade, then on request (per Velotrade review)",
+        "frequency": "on request after first payout (per review)",
+        "methods": null,
+        "scaling": "Scaling Plan up to $2M"
+      },
+      "reliability": {
+        "trustpilot": 4.8,
+        "reviews": 52622,
+        "payout_proof": "Largest, longest-running CFD prop; acquired regulated broker OANDA.",
+        "issues": "Trustpilot notes unanswered negative reviews; complaints on withdrawal limits, regional restrictions, account checks.",
+        "score": 9
+      },
+      "affiliate": true,
+      "affiliate_src": "https://ftmo.com/en/affiliate-programme/",
+      "verdict_ru": "Самая надёжная пропка в мире, EA (роботы) разрешены, крипта есть как CFD. Но одна и та же стратегия у всех пользователей вместе ограничена $400 000 суммарно — дальше счета блокируют.",
+      "connect_ru": "Через MT5: наш сигнал → вебхук → EA-мост в MT5 (нужен Windows VPS или MT5 под Wine на Mac). API-ключа биржи нет.",
+      "fit_score": 3,
+      "sources": [
+        "https://ftmo.com/en/faq/how-many-accounts-can-i-have/",
+        "https://ftmo.com/au/forbidden-trading-practices/",
+        "https://ftmo.com/en/faq/which-instruments-can-i-trade-and-what-strategies-am-i-allowed-to-use/",
+        "https://ftmo.com/en/blog/what-to-look-out-for-when-choosing-an-expert-advisor/",
+        "https://ftmo.com/au/trading-objectives/#1-step-max-daily-loss",
+        "https://proptradingvibes.com/blog/ftmo-account-sizes-pricing",
+        "https://tradetheday.com/prop-firms/ftmo/updates",
+        "https://www.trustpilot.com/review/ftmo.com?page=2"
+      ]
+    },
+    {
+      "id": "e8markets",
+      "name": "E8 Markets",
+      "url": "https://e8markets.com/",
+      "signup_url": "https://e8markets.com/",
+      "status": "operating",
+      "founded": 2021,
+      "country": "US (Dallas, TX)",
+      "platforms": ["E8 Terminal (own; Hyperliquid price feed)", "MT5", "Match-Trader", "others"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated; perpetuals product priced from Hyperliquid feed (replaced old crypto offering, Sep 2026)",
+        "pairs": "crypto perps (BTC, ETH, alts)",
+        "max_leverage": "BTC/ETH 15:1, other crypto 2:1 (perpetuals product)"
+      },
+      "api_bots": {
+        "allowed": true,
+        "rule": "Help centre: third-party EAs allowed but 'We limit one strategy per user' and 'we recommend that each user use their own programmed EA'; limits 2,000 server requests and 2,000 positions per day. No public API found for E8 Terminal.",
+        "src": "https://help.e8markets.com/en/articles/5515409-can-i-use-indicators-or-expert-advisors-when-trading-the-e8-account"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "Help centre (14 May 2026): 'E8 Markets allows copy trading across all accounts' you own; 'We do not allow teams to make the same trades or copy trades on our simulated platform'; 'we also do NOT permit signal services'.",
+        "src": "https://help.e8markets.com/en/articles/9453469-is-copy-trading-allowed"
+      },
+      "challenge": {
+        "type": "1-step (E8 One Perpetual / E8 Pro Perpetual)",
+        "target_pct": [6],
+        "daily_loss_pct": 4,
+        "daily_loss_basis": null,
+        "max_dd_pct": 6,
+        "max_dd_type": "trailing",
+        "min_days": 0,
+        "time_limit": "none (one trade every 60 days)",
+        "consistency": null,
+        "other_rules": "E8 One: 6% target, 4% daily (3% in prose — conflict), 6% dynamic DD; E8 Pro: 8% target, 2.5% daily, 8% static. Per TheGodFunded.",
+        "prices": {"10000": null, "25000": null, "50000": null, "100000": null},
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80/90/100 chosen at checkout",
+        "first_payout": "E8 One: after 3 days; Pro: daily requests",
+        "frequency": "on demand",
+        "methods": "Rise, crypto via partners (no direct crypto payouts per PropRubric)",
+        "scaling": null
+      },
+      "reliability": {
+        "trustpilot": null,
+        "reviews": 3307,
+        "payout_proof": "Q1 2026 on-chain payouts showed a double-digit YoY decline (Finance Magnates).",
+        "issues": "Trustpilot rating WITHHELD for guideline breach, fake reviews removed; markets itself as 'SaaS educational simulation platform'.",
+        "score": 5
+      },
+      "affiliate": true,
+      "affiliate_src": "https://e8markets.com/affiliate",
+      "verdict_ru": "Чужие EA формально можно, но «одна стратегия на одного пользователя», команды и сигнальные сервисы запрещены. Trustpilot скрыл рейтинг за фейковые отзывы — не рекомендуем.",
+      "connect_ru": "Через MT5 EA-мост; для E8 Terminal API нет. Для многих пользователей — нельзя.",
+      "fit_score": 2,
+      "sources": [
+        "https://help.e8markets.com/en/articles/9453469-is-copy-trading-allowed",
+        "https://help.e8markets.com/en/articles/5515409-can-i-use-indicators-or-expert-advisors-when-trading-the-e8-account",
+        "https://thegodfunded.com/en/firms/e8crypto/",
+        "https://www.trustpilot.com/review/e8markets.com",
+        "https://www.financemagnates.com/forex/analysis/prop-firm-crypto-payouts-doubled-to-115-million-in-q1-2026-but-growth-has-stalled-since-december/"
+      ]
+    },
+    {
+      "id": "fundednext",
+      "name": "FundedNext",
+      "url": "https://fundednext.com/",
+      "signup_url": "https://fundednext.com/",
+      "status": "operating",
+      "founded": 2022,
+      "country": "UAE (GrowthNext F.Z.E., Ajman; programme run by FundedNext Ltd, Comoros)",
+      "platforms": ["MT4", "MT5", "cTrader", "Match-Trader"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated CFDs",
+        "pairs": "BTC, ETH, XRP vs USD",
+        "max_leverage": "1:1 on crypto"
+      },
+      "api_bots": {
+        "allowed": "restricted",
+        "rule": "Help centre (8 Sep 2026): EAs/bots only on MT4/MT5, only accounts below $50,000, paid add-on; accounts >= $50K 'trade fully manually'; no automation on cTrader/Match-Trader; each EA needs a distinct strategy to avoid identical trades; $300,000 max allocation per EA/bot strategy; pass-the-challenge EAs banned.",
+        "src": "https://help.fundednext.com/en/articles/8020763-is-ea-allowed-in-fundednext"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "Copy trading only between your own FundedNext Challenge accounts (<= $300K combined); copying between different people (family, friends, third parties), account management and cloud copiers (Social Trader Tools, Traders Connect, Duplikum) prohibited; detection by identical entries, lots, timing; violation = immediate termination.",
+        "src": "https://help.fundednext.com/en/articles/8019805-what-is-the-copy-trading-rule-at-fundednext"
+      },
+      "challenge": {
+        "type": "2-step (Stellar)",
+        "target_pct": [8, 5],
+        "daily_loss_pct": 5,
+        "daily_loss_basis": "based on phase initial balance",
+        "max_dd_pct": 10,
+        "max_dd_type": "static",
+        "min_days": 5,
+        "time_limit": "none (60-day inactivity)",
+        "consistency": "none on CFD funded",
+        "other_rules": "3% per-trade risk cap reviewed post-trade; >=70% margin usage = gambling; news-window profits count 40%.",
+        "prices": {"10000": null, "25000": 189.99, "50000": 269.99, "100000": 529.99},
+        "prices_note": "Stellar 2-step; sizes 6K $49.99 / 15K $109.99 / 200K $1,049.99.",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80 base, 90 after scale-up, up to 95 add-on",
+        "first_payout": "2-step: 21 days",
+        "frequency": "2-step every 14 days; 1-step every 5 business days",
+        "methods": "USDT, USDC, RiseWorks",
+        "scaling": "up to $4M"
+      },
+      "reliability": {
+        "trustpilot": 4.5,
+        "reviews": 81913,
+        "payout_proof": "Q1 2026 on-chain $42.7M (largest in FM cohort); claims $350M cumulative, on-chain tracker confirms ~$225.9M.",
+        "issues": "0% replies to negative reviews; complaints about compliance holds and risk-cap deductions.",
+        "score": 7
+      },
+      "affiliate": true,
+      "affiliate_src": "https://fundednext.com/partners",
+      "verdict_ru": "Крупная и платящая фирма, но крипта с плечом 1:1, роботы только на счетах до $50 000 и с лимитом $300 000 на одну стратегию для всех. Для нас почти бесполезна.",
+      "connect_ru": "Только MT5 EA-мост на маленьких счетах; нам не подходит.",
+      "fit_score": 2,
+      "sources": [
+        "https://help.fundednext.com/en/articles/8020763-is-ea-allowed-in-fundednext",
+        "https://help.fundednext.com/en/articles/8019805-what-is-the-copy-trading-rule-at-fundednext",
+        "https://fundedtrading.com/propfirm/fundednext/",
+        "https://www.trustpilot.com/review/fundednext.com",
+        "https://traderpayout.com/prop-firm-news"
+      ]
+    },
+    {
+      "id": "the5ers",
+      "name": "The5ers",
+      "url": "https://the5ers.com/",
+      "signup_url": "https://the5ers.com/high-stakes/",
+      "status": "operating",
+      "founded": 2016,
+      "country": "Israel (Five Percent Online Ltd, Raanana)",
+      "platforms": ["MT5", "cTrader", "Black Arrow (futures)"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated CFDs",
+        "pairs": "crypto CFDs (pairs not listed)",
+        "max_leverage": "1:2 (High Stakes 2-step), 1:0.6 (1-step / 3-step)"
+      },
+      "api_bots": {
+        "allowed": "restricted",
+        "rule": "Help centre: 'You can use any EA you have in your trading account, as long as it does not:' copy other people's signals, tick scalp, latency/reverse/hedge arbitrage, HFT; violators 'canceled, banned, and not refunded'. Prohibited: 'Using an EA from a provider where the trader does not own the source code.'",
+        "src": "https://help.the5ers.com/can-i-use-an-ea-expert-advisor-can-i-set-a-stealth-mode-stop-loss/"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "Prohibited Trading Practices: 'Trade coordination or copy trading with other traders or accounts'; 'EA from a third party, where other traders have the same trades open (copy trading)'; 'Cross-operator coordinated trading, performed alone or in concert with other persons across accounts'; 'Account Management Services'; also 'Bulk trading'.",
+        "src": "https://www.the5ers.com/faqs/prohibited-trading-practices/"
+      },
+      "challenge": {
+        "type": "2-step (High Stakes)",
+        "target_pct": [10, 5],
+        "daily_loss_pct": 5,
+        "daily_loss_basis": null,
+        "max_dd_pct": 10,
+        "max_dd_type": "static",
+        "min_days": "3 profitable days per step (closed P/L >= 0.5% of initial balance)",
+        "time_limit": "none (30-day inactivity closes account)",
+        "consistency": null,
+        "other_rules": "2-minute news freeze on High Stakes; visible stop-loss required (no stealth SL). High Stakes entry prices for 50K/100K lowered and risk limits tightened on 15 Sep 2026.",
+        "prices": {"10000": 69, "25000": null, "50000": null, "100000": null},
+        "prices_note": "10K $69 (June 2026); 50K/100K prices changed 15 Sep 2026 — not re-verified.",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80 -> 100",
+        "first_payout": null,
+        "frequency": "bi-weekly, $150 minimum",
+        "methods": "bank, Rise, crypto (fees apply)",
+        "scaling": "High Stakes up to $500K; Hyper Growth/Bootcamp up to $4M"
+      },
+      "reliability": {
+        "trustpilot": 4.7,
+        "reviews": 40044,
+        "payout_proof": "$43M+ verified via Riseworks (FundedTrading).",
+        "issues": "Discretionary enforcement (e.g., Dec 2025 'bulk trading' closure); payout caps added Sep 2026.",
+        "score": 8
+      },
+      "affiliate": true,
+      "affiliate_src": "https://the5ers.com/partners/",
+      "verdict_ru": "Надёжная фирма, но чужой робот, у которого такие же сделки у других трейдеров, прямо назван копи-трейдингом и запрещён, а плечо на крипту всего 1:2. Нам не подходит.",
+      "connect_ru": "Не рекомендуем; теоретически только собственный EA с исходным кодом в MT5.",
+      "fit_score": 1,
+      "sources": [
+        "https://www.the5ers.com/faqs/prohibited-trading-practices/",
+        "https://help.the5ers.com/can-i-use-an-ea-expert-advisor-can-i-set-a-stealth-mode-stop-loss/",
+        "https://the5ers.com/challenge-programs-bootcamp-high-stakes-hyper-growth-explained/",
+        "https://fundedtrading.com/propfirm/the5ers/",
+        "https://propfirmmatch.com/crypto/prop-firms/the-5-ers",
+        "https://www.trustpilot.com/review/the5ers.com"
+      ]
+    },
+    {
+      "id": "fundingpips",
+      "name": "FundingPips",
+      "url": "https://fundingpips.com/",
+      "signup_url": "https://app.fundingpips.com/register",
+      "status": "operating",
+      "founded": null,
+      "country": "UAE",
+      "platforms": ["MT5", "cTrader", "Match-Trader"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated CFDs",
+        "pairs": null,
+        "max_leverage": null
+      },
+      "api_bots": {
+        "allowed": "restricted",
+        "rule": "Trading Conduct page: third-party EAs 'permitted only when used strictly as a trade or risk manager'; 'Any other use of a third-party EA will result in denial of the evaluation or reward and closure of the account'; personal EAs: 'full automation is permitted with proof of ownership' ('A compiled binary on its own is not proof'). Exception: 1K Instant allows third-party EAs and copiers.",
+        "src": "https://help.fundingpips.com/hc/en-us/articles/34505029138449-Trading-Conduct-and-Security-Standards"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "'Copying trades between different users' accounts is strictly prohibited'; inbound 'copying trades into your FundingPips account from an external source' prohibited; 'Account management by any third party is strictly prohibited'; allowed only own-account copying and outbound copying from a FundingPips master.",
+        "src": "https://help.fundingpips.com/hc/en-us/articles/34505029138449-Trading-Conduct-and-Security-Standards"
+      },
+      "challenge": {
+        "type": "2-step (also 1-step, 2-step Pro, Zero instant)",
+        "target_pct": null,
+        "daily_loss_pct": null,
+        "daily_loss_basis": null,
+        "max_dd_pct": null,
+        "max_dd_type": null,
+        "min_days": null,
+        "time_limit": null,
+        "consistency": "Profit Concentration and Risk-Per-Trade-Idea rules removed 29 Sep 2026",
+        "other_rules": "Rules changed 29 Sep 2026 (min days lowered, splits up to 100%) — re-verify.",
+        "prices": {"10000": 66, "25000": 156, "50000": 289, "100000": 529},
+        "prices_note": "2-step list prices (PropFirmMap, data May 2026); 1-step 99/199/319/555.",
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "60-100 (raised to up to 100 on 29 Sep 2026)",
+        "first_payout": null,
+        "frequency": null,
+        "methods": null,
+        "scaling": null
+      },
+      "reliability": {
+        "trustpilot": 4.5,
+        "reviews": 70702,
+        "payout_proof": null,
+        "issues": "Aug 2026: traders reported forced migration to 'Prime' accounts; futures brand FundingTicks closed Jan 2026 (refunded).",
+        "score": 6
+      },
+      "affiliate": true,
+      "affiliate_src": "https://help.fundingpips.com/hc/en-us/articles/34447107645841-Become-an-Affiliate",
+      "verdict_ru": "Чужой робот разрешён только как помощник по риску, копирование из внешнего источника запрещено. Для нашей автоматической стратегии не подходит.",
+      "connect_ru": "Не подходит (только собственный EA с доказательством авторства).",
+      "fit_score": 1,
+      "sources": [
+        "https://help.fundingpips.com/hc/en-us/articles/34505029138449-Trading-Conduct-and-Security-Standards",
+        "https://help.fundingpips.com/hc/en-us/articles/49580068780817-Trade-Copier",
+        "https://propfirmmap.com/blog/fundingpips-review-2026-trustpilot-rating-safety-grade-challenge-prices",
+        "https://www.trustpilot.com/review/fundingpips.com",
+        "https://traderpayout.com/prop-firm-news"
+      ]
+    },
+    {
+      "id": "alphacapital",
+      "name": "Alpha Capital Group",
+      "url": "https://alphacapitalgroup.uk/",
+      "signup_url": "https://alphacapitalgroup.uk/",
+      "status": "operating",
+      "founded": null,
+      "country": "UK",
+      "platforms": ["MT5", "cTrader", "DXtrade", "TradeLocker"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "Simulated CFDs",
+        "pairs": null,
+        "max_leverage": null
+      },
+      "api_bots": {
+        "allowed": false,
+        "rule": "Help centre (7 Sep 2026): EAs only on MT5 and only as risk-management/trade-assistance tools, pre-approved; prohibited: systems that trade on their own incl. 'third-party bots, fully automated strategies' — 'The use of any such system will result in immediate account closure.' Same EA used by multiple traders may breach the 'No Group Trading' policy.",
+        "src": "https://help.alphacapitalgroup.uk/en/articles/6934236-can-i-use-an-expert-advisor-ea"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "Copying between own Alpha accounts allowed (declare master/slave); external master only with proof of ownership; copying 'signal groups, Telegram channels, or other traders' trades' = 'Group Trading / signal following, which is prohibited'.",
+        "src": "https://alphacapitalgroup.uk/posts/copy-trading-uk-2026-how-it-works-rules-and-prop-firm-policies"
+      },
+      "challenge": {
+        "type": "2-step (Alpha Pro / Alpha Swing)",
+        "target_pct": null,
+        "daily_loss_pct": 4,
+        "daily_loss_basis": "static, from starting balance",
+        "max_dd_pct": 10,
+        "max_dd_type": "static",
+        "min_days": null,
+        "time_limit": null,
+        "consistency": null,
+        "other_rules": "Discounted Alpha Pro prices seen: 10K $77.60, 25K $157.60, 50K $237.60, 100K $397.60 (list prices not verified).",
+        "prices": {"10000": null, "25000": null, "50000": null, "100000": null},
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": "80",
+        "first_payout": null,
+        "frequency": "on demand or bi-weekly",
+        "methods": null,
+        "scaling": null
+      },
+      "reliability": {
+        "trustpilot": null,
+        "reviews": 21673,
+        "payout_proof": null,
+        "issues": "Trustpilot rating WITHHELD for guideline breach, fake reviews removed; PropFirmMap safety grade D.",
+        "score": 4
+      },
+      "affiliate": true,
+      "affiliate_src": "https://aff.alphacapitalgroup.uk/fund",
+      "verdict_ru": "Полностью автоматическая торговля и сторонние боты запрещены, сигналы — тоже. Плюс Trustpilot скрыл рейтинг за фейковые отзывы. Не подходит.",
+      "connect_ru": "Не подходит.",
+      "fit_score": 1,
+      "sources": [
+        "https://help.alphacapitalgroup.uk/en/articles/6934236-can-i-use-an-expert-advisor-ea",
+        "https://alphacapitalgroup.uk/posts/copy-trading-uk-2026-how-it-works-rules-and-prop-firm-policies",
+        "https://propfirmmap.com/blog/alpha-capital-group-review-2026",
+        "https://uk.trustpilot.com/review/alphacapitalgroup.uk?page=2"
+      ]
+    },
+    {
+      "id": "topstep",
+      "name": "Topstep",
+      "url": "https://www.topstep.com/",
+      "signup_url": "https://www.topstep.com/",
+      "status": "operating",
+      "founded": null,
+      "country": "US",
+      "platforms": ["TopstepX (ProjectX API, $29/mo)", "other futures platforms"],
+      "crypto": {
+        "real_exchange": false,
+        "exchange": "CME futures (simulated in Combine/Express); only Micro Bitcoin (MBT) and Micro Ether (MET), marked with restrictions",
+        "pairs": "MBT, MET (CME micro futures)",
+        "max_leverage": "futures contract limits (50K: 5 contracts / 50 micros)"
+      },
+      "api_bots": {
+        "allowed": "restricted",
+        "rule": "TopstepX API (17 Sep 2026): 'Custom automated strategies and bots are allowed via the TopstepX / ProjectX API'; VPS/VPN/remote servers prohibited — 'All trading activity must originate from your personal device'; 'Live funded accounts are not allowed to trade through the ProjectX API.'",
+        "src": "https://help.topstep.com/en/articles/11187768-topstepx-api-access"
+      },
+      "copy_trading": {
+        "allowed": "no",
+        "rule": "Prohibited Conduct: 'Coordinated trading — performing trades in concert with others (including unconnected accounts or third parties)'; 'Trading on behalf of others — including sharing incentives as part of any business arrangement'; 'no coordinated group trading, no account-sharing'.",
+        "src": "https://help.topstep.com/en/articles/10296582-prohibited-conduct"
+      },
+      "challenge": {
+        "type": "1-step Trading Combine (monthly subscription)",
+        "target_pct": null,
+        "daily_loss_pct": null,
+        "daily_loss_basis": null,
+        "max_dd_pct": null,
+        "max_dd_type": null,
+        "min_days": "can pass in 2 days",
+        "time_limit": null,
+        "consistency": "best day < 55% of profit target",
+        "other_rules": "All positions closed by 3:10 PM CT each weekday — no weekend crypto holding.",
+        "prices": {"10000": null, "25000": null, "50000": null, "100000": null},
+        "currency": "USD"
+      },
+      "funded": {
+        "split_pct": null,
+        "first_payout": null,
+        "frequency": null,
+        "methods": null,
+        "scaling": null
+      },
+      "reliability": {
+        "trustpilot": 3.7,
+        "reviews": 14952,
+        "payout_proof": null,
+        "issues": "Replies to 5% of negative reviews; 'high-risk investments' notice.",
+        "score": 7
+      },
+      "affiliate": true,
+      "affiliate_src": "https://www.topstep.com/affiliate-terms-and-conditions",
+      "verdict_ru": "Это фьючерсы CME, а не криптобиржа: только микро-BTC/ETH, позиции закрывать каждый день до 15:10 по Чикаго, VPS запрещён, групповая торговля запрещена. Нам не подходит.",
+      "connect_ru": "Только TopstepX API с личного компьютера (не сервер), и не на live-счетах. Не рекомендуем.",
+      "fit_score": 1,
+      "sources": [
+        "https://help.topstep.com/en/articles/11187768-topstepx-api-access",
+        "https://help.topstep.com/en/articles/10296582-prohibited-conduct",
+        "https://help.topstep.com/en/articles/8284206-when-and-what-products-can-i-trade",
+        "https://help.topstep.com/en/articles/8284197-trading-combine-parameters",
+        "https://www.trustpilot.com/review/topstep.com"
+      ]
+    }
+  ],
+  "avoid": [
+    {
+      "name": "The Funded Trader",
+      "reason_ru": "В 2024 году останавливала выплаты, в 2025–2026 трейдеры сообщают о многомесячных долгах по выплатам, блокировках счетов и сделках «на часть долга»; статус в 2026 неясен.",
+      "src": "https://curvedtrading.com/articles/en/reviews/the-funded-trader-review/"
+    },
+    {
+      "name": "My Crypto Funding (MyCryptoFunding)",
+      "reason_ru": "Крипто-пропка закрылась примерно в апреле 2026 (последняя выплата 24.04.2026), причина не объявлена.",
+      "src": "https://thetrustedprop.com/prop-firms/my-crypto-funding/payouts"
+    },
+    {
+      "name": "MyForexFunds",
+      "reason_ru": "Заморожена в 2023 по делу CFTC (дело закрыто в 2025), объявлен перезапуск на 23.11.2026, но правил и условий ещё нет — ждать минимум полгода после запуска.",
+      "src": "https://propfirmmatch.com/industry-news/myforexfunds-announces-relaunch-for-november-23-2026"
+    },
+    {
+      "name": "True Forex Funds",
+      "reason_ru": "Закрылась в мае 2024 из-за неплатёжеспособности, около 300 трейдеров остались без ~$1.2M.",
+      "src": "https://edge-ledger.io/prop-firm-payout-tracker"
+    },
+    {
+      "name": "Funded Engineer",
+      "reason_ru": "Закрылась в июле 2024, сославшись на финансовые трудности.",
+      "src": "https://vettedpropfirms.com/prop-firms-shutdown/"
+    },
+    {
+      "name": "MyFundedFX / Seacrest Funded",
+      "reason_ru": "Прекратила работу как проп в марте 2026 (переделалась в брокера) после ужесточения правил и замедления выплат.",
+      "src": "https://vettedpropfirms.com/prop-firms-shutdown/"
+    },
+    {
+      "name": "FundingTicks",
+      "reason_ru": "Фьючерсный бренд FundingPips закрыт в январе 2026 (деньги вернули), но были жалобы на задним числом изменённые правила.",
+      "src": "https://edge-ledger.io/prop-firm-payout-tracker"
+    },
+    {
+      "name": "Skilled Funded Traders, Funds For Traders",
+      "reason_ru": "Закрылись в 2024 году.",
+      "src": "https://vettedpropfirms.com/prop-firms-shutdown/"
+    },
+    {
+      "name": "Nexgen ProTrader Funding, FundedSeat, Rev One Trading, DNA Funded",
+      "reason_ru": "Закрылись или объявили о закрытии в августе–октябре 2026 (DNA Funded — сообщения о неактивности на 11.10.2026).",
+      "src": "https://traderpayout.com/prop-firm-news"
+    },
+    {
+      "name": "Lucid Trading (крипто-выплаты)",
+      "reason_ru": "В августе 2026 без объявления прекратила крипто-выплаты трейдерам из 5 азиатских стран.",
+      "src": "https://traderpayout.com/prop-firm-news"
+    },
+    {
+      "name": "Apex Trader Funding (не мошенник, но нам не подходит)",
+      "reason_ru": "Прямо запрещает любую автоматизацию: «No Automation or Algorithm Usage allowed», и копирование сделок с другими трейдерами.",
+      "src": "https://apextraderfunding.com/help-center/getting-started/prohibited-activities/"
+    }
+  ],
+  "recommendation_ru": "Главный вывод: ни одна надёжная проп-компания в 2026 году не разрешает, чтобы много разных людей запускали одну и ту же стратегию из нашей системы — это везде называется «групповой торговлей», «копи-трейдингом» или «сигнальным сервисом» и ведёт к бану всех связанных счетов без выплат. Фирмы ловят это по одинаковым входам, объёмам и времени сделок. Поэтому план такой. 1) HyroTrader — лучший выбор для самого Дмитрия как автора стратегии: челлендж идёт на демо-счёте Bybit через API, наш Mac mirror-скрипт подключается так же, как к текущему Bybit Demo; своя автоматизация разрешена; до $200 000 funded на человека. 2) Propr — запасной вариант с нормальным API и программой для бот-интеграторов; если хотим давать стратегию многим пользователям — только после письменного согласия Propr (официальное партнёрство), фирма молодая, начинать с маленьких счетов. 3) Breakout/Kraken — самая надёжная, но только ручная торговля: годится, если Дмитрий сам руками исполняет свои сигналы. 4) FTMO — если позже пойдём в FX/металлы через MT5-робота; лимит $400 000 суммарно на одну стратегию. Для «многих пользователей» легальный путь — не проп, а копи-трейдинг на бирже (Bybit Copy Trading как мастер-трейдер — проверить условия) или Bitfunded Copy To Earn, где люди копируют своими деньгами.",
+  "notes_ru": [
+    "Все проп-фирмы из списка — симуляция: даже HyroTrader, CFT и Mubite на Bybit работают на ДЕМО-счетах биржи. «Реального суб-аккаунта с реальными деньгами» в 2026 году не нашли ни у кого; выплаты реальные, торговля — нет.",
+    "Самые жёсткие формулировки против нашего сценария: HyroTrader §10.2(b),(e),(p) — запрещены «group trading», «mirror trading», стратегия «not your own», организация схем с несколькими координированными счетами; Propr §8.11(c) — одинаковая бот-стратегия у многих пользователей «may be flagged as coordinated trading»; The5ers — чужой EA с такими же сделками у других = копи-трейдинг; FTMO — $400 000 «per trader or strategy» с учётом сделок из одного стороннего источника.",
+    "Если каждый пользователь «настроит параметры сам», риск остаётся: FundedNext требует, чтобы у каждого EA была своя стратегия, Propr — «individual customization», а детекторы смотрят на совпадение входов. Это не лазейка, а серая зона — без письменного разрешения фирмы не делать.",
+    "Trustpilot скрыл рейтинг за фейковые отзывы у Crypto Fund Trader, E8 Markets и Alpha Capital — серьёзный красный флаг. Crypto Fund Trader ещё и в предупредительном списке FINMA с 23.08.2024.",
+    "У HyroTrader на funded каждая выплата учитывает максимум 5% от стартового баланса — прибыль сверх этого сгорает, поэтому выводить надо часто.",
+    "Ограничение на число счетов: HyroTrader — 1 счёт каждого типа одновременно, Breakout — 1 оценка за раз, Propr — 1 аккаунт и до $300 000 funded суммарно, Velotrade — 1 аккаунт и до $200 000.",
+    "Не смогли прочитать (ограничение инструмента): страницу цен Breakout и страницу интеграций Propr — цифры Breakout взяты из PropRubric (13.10.2026), условия интеграций Propr известны только по заголовку «25% Lifetime Revenue Share for Trading Bots, Terminals & AI Agents».",
+    "Новые крипто-пропки, которые не проверяли глубоко: MyFundedPerps (API, копирование только между своими счетами), HyperPNL, Upscale, Klein Funding, Fundedbit, SizeProp (API-боты запрещены, только браузерная автоматизация)."
+  ]
+}

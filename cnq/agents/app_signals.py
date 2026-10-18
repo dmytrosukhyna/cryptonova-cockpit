@@ -109,6 +109,10 @@ ACCOUNTS = [   # key, name, rules, policy, coin filter
     # 18.10: on 315 signals the flipped trade (opposite side, stop and targets mirrored) earned +0.33 % per trade after fees,
     # positive in both halves of the month — the owner's idea; tested live on demo before anything else
     ("reverse", "Разворот (эксперимент)", "сделка в обратную сторону: стоп и цели зеркально, равными частями по целям + стоп в безубыток после TP1", "rev:ladder_be", False),
+    # 18.10 (owner: «пробовать их стратегию наоборот … не во всех случаях, грамотно»): over 317 signals the flip of their LONGs
+    # (we go short) was positive in BOTH halves of the month (+0.30 / +0.48 % per trade), the flip of their SHORTs turned
+    # negative in the second half (+0.75 → −0.24 %). This is the version published to the app.
+    ("reverse_long", "Разворот только их лонгов", "только их лонги — в шорт, стоп и цели зеркально, равными частями по целям + стоп в безубыток после TP1; их шорты пропускаем", "rev_long:ladder_be", False),
 ]
 WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 
@@ -1624,7 +1628,10 @@ def run_account(rows, key: str, name_ru: str, rules_ru: str, policy: str, use_fi
         if use_filter and (flags.get(r["id"]) or {}).get("skip"):
             skipped += 1
             continue
-        if policy.startswith("rev:"):
+        if policy.startswith("rev_long:") and r["side"] != "LONG":
+            skipped += 1
+            continue
+        if policy.startswith("rev:") or policy.startswith("rev_long:"):
             wi = (sim.get("whatif") or {}).get("rev")
             if not wi or wi.get("fill_t") is None:
                 continue

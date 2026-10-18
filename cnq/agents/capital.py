@@ -6,7 +6,7 @@ A DEMO account of $10 000 (owner: «как будто я вложил насто
   • futures  — CRYPTO NOVA = the desks in the mix: CNPTS «Сбалансированная» (paper.json profiles.bal) and «Импульс BTC»
                (profiles.imp), equal parts, equity incl. open P&L;
   • funding  — the funding-carry desk (funding.json equity_mtm);
-  • yield    — stablecoin lending on Aave v3 at DefiLlama's current supply APY (yield_desk.py → yield.json).
+  • yield    — stablecoin lending (Aave v3 USDC/USDT + Sky savings rate) at DefiLlama's current base APY (yield_desk.py → yield.json).
 Arbitrage and the triangle are NOT given money: their numbers are virtual estimates from windows the server saw, and a client
 cannot run them (money on several exchanges, robots win those windows in milliseconds). They are shown as «наблюдение».
 
@@ -46,7 +46,7 @@ OPTIONS = {   # toggles that shift a model (applied in order, then normalised)
                    "zero": "futures"},
 }
 NAMES = {"spot": "Спот · CRYPTO NOVA портфель", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)",
-         "yield": "Кредитование стейблкоинов (Aave)"}
+         "yield": "Кредитование стейблкоинов (Aave, Sky)"}
 KYIV = dt.timezone(dt.timedelta(hours=3))
 
 
@@ -196,8 +196,9 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
                 "Старт: спот 40%, фьючерсы 25%, фандинг 15%, кредитование стейблкоинов 20%. Раз в неделю (понедельник) доли "
                 "пересчитываются: направление, которое за 30 дней потеряло больше 5%, получает половину своей доли, заработавшее "
                 "больше 5% — в 1.25 раза больше; границы: спот 25–55%, фьючерсы 10–40%, фандинг 0–25%, кредитование 10–40%.",
-                "Кредитование — консервативная часть: USDC и USDT отданы в кредит на Aave под плавающий процент (сейчас — в файле "
-                "yield.json); без займов, поэтому нет ликвидаций, но остаются риски смарт-контракта и отвязки стейблкоина.",
+                "Кредитование — консервативная часть: USDC и USDT отданы в кредит на Aave, USDS — на сберегательной ставке Sky "
+                "(два протокола, чтобы одна ошибка не задела всё); процент плавающий, бонусные токены не считаем; без займов, "
+                "поэтому нет ликвидаций, но остаются риски смарт-контракта и отвязки стейблкоина.",
                 "Арбитраж и треугольник денег не получают: их цифры — виртуальная оценка, клиент не может их исполнить.",
                 "В конце месяца — итог; 10% от прибыли — оплата (месяц без прибыли бесплатно).",
                 "Это демо, а не обещание: результат может быть и минусом."]}

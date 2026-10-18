@@ -45,12 +45,17 @@ def test_weekly_tilt_halves_a_losing_desk_within_bounds():
 def test_yield_desk_accrues_at_the_current_rate_and_keeps_the_last_rate_when_offline():
     from cnq.agents import yield_desk as Y
     conn = sqlite3.connect(":memory:")
-    pools = [{"project": "aave-v3", "chain": "Ethereum", "symbol": "USDC", "apy": 5.0, "tvlUsd": 9e9},
+    pools = [{"project": "aave-v3", "chain": "Ethereum", "symbol": "USDC", "apy": 5.5, "apyBase": 5.0, "apyReward": 0.5, "tvlUsd": 9e9},
              {"project": "aave-v3", "chain": "Ethereum", "symbol": "USDT", "apy": 3.0, "tvlUsd": 5e9},
              {"project": "aave-v3", "chain": "Ethereum", "symbol": "USDC", "apy": 9.0, "tvlUsd": 1e6},     # a small pool is ignored
+             {"project": "aave-v3", "chain": "Ethereum", "symbol": "USDC", "apy": 7.0, "tvlUsd": 2e10, "poolMeta": "e-mode"},  # not the plain market
              {"project": "lido", "chain": "Ethereum", "symbol": "STETH", "apy": 2.8, "tvlUsd": 3e10}]
+    a = Y.step(conn, T0, fetch=lambda: pools)              # base rates only (no reward tokens); Sky missing → average of the rest
+    assert a["equity"] == 10_000 and a["rates"] == {"USDC": 5.0, "USDT": 3.0} and a["missing"] == ["SUSDS"] and not a["stale"]
+    assert abs(a["apy_now"] - (5.0 * 0.4 + 3.0 * 0.3) / 0.7) < 0.01
+    pools.append({"project": "sky-lending", "chain": "Ethereum", "symbol": "SUSDS", "apy": 4.0, "tvlUsd": 5e9})
     a = Y.step(conn, T0, fetch=lambda: pools)
-    assert a["equity"] == 10_000 and a["apy_now"] == 4.0 and a["rates"] == {"USDC": 5.0, "USDT": 3.0}
+    assert a["apy_now"] == 4.1 and a["missing"] == []      # 5×0.4 + 3×0.3 + 4×0.3
     assert any(t["name_ru"].startswith("Lido") for t in a["table"])
     b = Y.step(conn, T0 + 365 * 86_400_000, fetch=lambda: (_ for _ in ()).throw(OSError("down")))   # a year later, API down
-    assert abs(b["equity"] - 10_400) < 0.5 and b["stale"] and b["error"]
+    assert abs(b["equity"] - 10_410) < 0.5 and b["stale"] and b["error"]

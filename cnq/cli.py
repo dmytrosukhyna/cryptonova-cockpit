@@ -243,10 +243,13 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs("data", exist_ok=True)
         conn = sqlite3.connect("data/agents.sqlite")
         d = app_signals.write(args.out, conn)
-        c, p = d["counts"], d["stats"]["policies"]
+        c, p, ac = d["counts"], d["stats"]["policies"], d["accounts"]
         print(f"app_signals.json: api={d['source']['api_ok']} counts={c} candles={d['source']['candles']} "
-              f"app={p['app']['avg_r']}R tp1={p['tp1']['avg_r']}R ladder={p['ladder']['avg_r']}R ladder_be={p['ladder_be']['avg_r']}R "
-              f"last={p['last']['avg_r']}R notes={d['notes_ru'][:3]} | {d['summary_ru']}")
+              f"main ladder_be={p['ladder_be']['avg_pct']}%/{p['ladder_be']['avg_r']}R (n={p['ladder_be']['n']}) | app={p['app']['avg_pct']}% "
+              f"tp1={p['tp1']['avg_pct']}% ladder={p['ladder']['avg_pct']}% last={p['last']['avg_pct']}% | app_flags={d['stats']['app_flags']['agree']}/"
+              f"{d['stats']['app_flags']['n']} | accounts backfill as_is={ac['backfill']['as_is']['equity']} improved={ac['backfill']['improved']['equity']} "
+              f"live as_is={ac['since_live']['as_is']['equity']} improved={ac['since_live']['improved']['equity']} "
+              f"blacklist={[b['coin'] for b in d['coin_filter']['blacklist']]} notes={d['notes_ru'][:3]} | {d['summary_ru']}")
     elif args.cmd == "macro":
         from .agents import macro_watch
         d = macro_watch.write(args.out)

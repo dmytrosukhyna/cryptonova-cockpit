@@ -13,26 +13,35 @@ Each run:
     our table becomes the full history). A signal that leaves /active is marked closed.
  2. Outcome engine, independent of the app's is_completed flags: 15m perpetual candles from the first FULL 15m candle after the
     signal time (no look into prices before the signal) — BingX swap (cnq.bingx.rest), fallback OKX swap, then Binance spot mirror.
-    Candles live in `app_signal_candles` (shared per coin) and are fetched only while a signal is unfinished: until it is resolved,
-    plus 7 days after a stop (to see whether the price came back to TP1). Finished signals keep their result in the row and their
-    candles are pruned (the DB is committed to git).
-      entry: one price → a candle touches it; range → a candle touches any price in it (fill at the candle open if it opened inside
-      the range, else at the near edge). Not touched within 48 h, or TP1 / stop reached first → «не вошёл».
+    The path starts at the candle containing the signal time: 1m candles for the first ~3 hours, 15m after that.
+    Candles live in `app_signal_candles` (shared per coin, closed candles only) and are fetched only while a signal is unfinished:
+    the 1m window once, the 15m path until it is resolved plus 7 days after a stop (did the price come back to TP1?). A signal's
+    15m path only uses candles up to its own verified coverage (`path_until`), so candles cached for later signals never stand in
+    for missing ones. Finished signals keep their result in the row and their candles are pruned (the DB is committed to git).
+      entry: within 0.6 % of the signal minute's open or close → market order (Cornix posts it at once): filled at the entry at the
+      signal time; farther → limit order: one price → a candle touches it; range → a candle touches any price in it (fill at the
+      candle open if it opened inside the range, else at the near edge). Not touched within 48 h, or TP1 / stop reached first →
+      «не вошёл».
       after the fill: stop vs TP1 — which came first, the farthest TP before the stop, time to TP1, max favourable / adverse move.
-      One 15m candle touching both the stop and a target → the stop counts first (cautious). No TP on the fill candle unless the
-      candle opened at the entry. No exit after 14 days → closed at the market («по времени»).
+      One candle touching both the stop and a target → the stop counts first (cautious). For a limit fill no TP on the fill candle
+      unless it opened at the entry. No exit after 14 days → closed at the market («по времени»).
+    The app's targets[].is_completed (real BingX orders via TradeReader) are only used as a cross-check (stats.app_flags).
     Exit policies, in % of price (net of 0.05 % fee per side + 0.02 % slippage = 0.12 % per trade) and in R (R = entry→stop):
+      ladder_be  MAIN (owner 18.10.2026): equal parts at each TP, stop → entry after TP1 — summary, splits and rules use it;
       app        «как в приложении» — the farthest TP reached is the result (the app's showcase, not executable: nobody knows in
                  advance which TP will be the last);
-      tp1        everything at TP1;   ladder  equal parts at each TP, stop stays;   ladder_be  equal parts, stop → entry after TP1;
-      last       everything at the last TP or the stop.
+      tp1        everything at TP1;   ladder  equal parts at each TP, stop stays;   last  everything at the last TP or the stop.
     Leverage only multiplies the % (both reported); a leveraged loss is capped at −100 % of the margin (≈ liquidation at a move of
     100 / leverage − 0.5 %).
  3. Strategy profile from candles at signal time: direction vs 4h trend (EMA50/EMA200), RSI14 1h/4h, distance from the 24 h / 7 d
     high and low, last 4 h move, ATR %, BTC 4h trend, hour / weekday, coin, leverage, TP / stop distances and R:R → entry type
     («покупка отката в восходящем тренде», «шорт на перекупленности», …) and simple splits of winners vs losers.
  4. Proposals: a handful of explainable rules evaluated on the stored history, before / after with sample sizes; anything with fewer
-    than 30 resolved signals is «рано судить». No number is invented — every figure comes from the stored rows.
+    than 30 resolved signals is «рано судить». No number is invented — every figure comes from the stored rows. Among them the
+    walk-forward coin filter: skip a coin when ≥ 6 of its signals resolved BEFORE this one and ≥ 50 % were a stop without TP.
+ 5. Two demo accounts (`accounts`): «как приходят сигналы» (ladder, no filter) and «с улучшениями» (ladder_be + coin filter);
+    $10 000, margin 5 % of equity at entry, the signal's leverage capped at 20×, the sim's fees, compounded in closing order;
+    views `since_live` (signals from 18.10.2026 00:00 Kyiv — the forward test) and `backfill` (from the first stored signal).
 Stdlib only; the API fetch and the candle fetch are injectable (tests run without network)."""
 from __future__ import annotations
 
@@ -46,7 +55,7 @@ import statistics
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 API_BASE = "https://app.crypto-capital.app"
 API_ACTIVE = API_BASE + "/api/signals/active"
@@ -58,8 +67,10 @@ BROWSER_UA = {"User-Agent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 
               "Accept": "application/json"}
 PLAIN_UA = {"User-Agent": "Mozilla/5.0 cryptonova/1.0"}
 
-M15, H1, H4, DAY = 900_000, 3_600_000, 14_400_000, 86_400_000
-IV_MS = {"15m": M15, "1h": H1, "4h": H4}
+M1, M15, H1, H4, DAY = 60_000, 900_000, 3_600_000, 14_400_000, 86_400_000
+IV_MS = {"1m": M1, "15m": M15, "1h": H1, "4h": H4}
+M1_WINDOW_MS = 3 * H1       # the first 3 hours after the signal are checked on 1m candles, 15m after that
+MARKET_TOL_PCT = 0.6        # entry within 0.6 % of the price at the signal minute = market order (filled at the signal time)
 FILL_WINDOW_MS = 48 * H1
 MAX_HOLD_MS = 14 * DAY
 AFTER_MS = 7 * DAY
@@ -67,17 +78,27 @@ FEE_PCT, SLIP_PCT = 0.05, 0.02
 COST_PCT = 2 * FEE_PCT + SLIP_PCT
 MIN_SAMPLE = 30
 LEV_CAP = 10
-SIM_VERSION = 1
+SIM_VERSION = 2             # 2: market fill at the signal minute + 1m path for the first 3 h; strict path coverage
 MAX_FETCH_FAIL = 6
 
-POLICIES = [   # key, name, executable
+POLICIES = [   # key, name, executable — the first one is the main policy (owner 18.10.2026), the rest are for comparison
+    ("ladder_be", "Равными частями на каждом TP, после TP1 стоп в точку входа", True),
     ("app", "Как в приложении: итог = самый дальний достигнутый TP", False),
     ("tp1", "Всё закрыть на TP1", True),
     ("ladder", "Равными частями на каждом TP, стоп на месте", True),
-    ("ladder_be", "Равными частями на каждом TP, после TP1 стоп в точку входа", True),
     ("last", "Всё держать до последнего TP или стопа", True),
 ]
-BASELINE = "ladder"
+MAIN_POLICY = BASELINE = "ladder_be"   # summary, splits, filter rules and the panel use it
+
+# Walk-forward coin filter: skip a coin when ≥ 6 of its signals resolved BEFORE this one and ≥ 50 % of them were a stop without TP
+COIN_FILTER_MIN, COIN_FILTER_SHARE = 6, 0.5
+# Demo accounts
+ACCOUNT_START, ACCOUNT_MARGIN_SHARE, ACCOUNT_LEV_CAP = 10_000.0, 0.05, 20
+LIVE_START_MS = int(datetime(2026, 10, 18, tzinfo=timezone(timedelta(hours=3))).timestamp() * 1000)   # 18.10.2026 00:00 Kyiv (EEST)
+ACCOUNTS = [   # key, name, rules, policy, coin filter
+    ("as_is", "Как приходят сигналы", "равными частями по целям, стоп на месте", "ladder", False),
+    ("improved", "С улучшениями", "равными частями по целям + стоп в безубыток после TP1 + фильтр монет", "ladder_be", True),
+]
 WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 
 KNOWN_KEYS = {"signal_id", "name", "entry_point", "stop_lost", "actual_price", "actual_precent", "leverage_x", "date",
@@ -379,7 +400,7 @@ class KlineSource:
 
     def _okx(self, symbol, iv, start, end):
         base, k = self._base_scale(symbol)
-        bar = {"15m": "15m", "1h": "1H", "4h": "4H"}[iv]
+        bar = {"1m": "1m", "15m": "15m", "1h": "1H", "4h": "4H"}[iv]
         ms = IV_MS[iv]
         out, t, pages = {}, start, 0
         while t <= end and pages < 15:
@@ -450,14 +471,21 @@ CREATE TABLE IF NOT EXISTS app_signals (
   raw TEXT, name TEXT, symbol TEXT, side TEXT, entry_lo REAL, entry_hi REAL, sl REAL, leverage REAL, t_signal INTEGER,
   targets TEXT, is_vip INTEGER, app_best_tp INTEGER, actual_price REAL, actual_pct REAL, problems TEXT, plan TEXT,
   sim TEXT, features TEXT, sim_version INTEGER, path_until INTEGER, ctx_done INTEGER DEFAULT 0,
-  resolved_at INTEGER, done INTEGER DEFAULT 0, fetch_fail INTEGER DEFAULT 0);
+  resolved_at INTEGER, done INTEGER DEFAULT 0, fetch_fail INTEGER DEFAULT 0, m1_done INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS app_signal_candles (
   symbol TEXT, interval TEXT, t INTEGER, o REAL, h REAL, l REAL, c REAL, PRIMARY KEY (symbol, interval, t));
 """
 
 
+MIGRATIONS = {"m1_done": "INTEGER DEFAULT 0"}     # columns added after the first server run (ALTER on the existing table)
+
+
 def ensure_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    have = {r[1] for r in conn.execute("PRAGMA table_info(app_signals)")}
+    for col, decl in MIGRATIONS.items():
+        if col not in have:
+            conn.execute(f"ALTER TABLE app_signals ADD COLUMN {col} {decl}")
     conn.commit()
 
 
@@ -537,9 +565,45 @@ def _have(conn, symbol, iv, start, end, share=0.9) -> bool:
     return n >= share * max(1, (end - start) // IV_MS[iv])
 
 
-def _fetch_range(conn, klines, budget, symbol, iv, start, end) -> tuple[bool, int | None]:
-    """Fetch [start, end] in 1440-candle windows. → (complete, open time of the last candle received)."""
+def _first_missing(conn, symbol, iv, start, end) -> int | None:
+    """First candle open time in [start, end] (aligned to the interval) that is not in the cache; None when all are there."""
     ms = IV_MS[iv]
+    t = (start + ms - 1) // ms * ms
+    for (ct,) in conn.execute("SELECT t FROM app_signal_candles WHERE symbol=? AND interval=? AND t>=? AND t<=? ORDER BY t",
+                              (symbol, iv, t, end)):
+        if ct != t:
+            return t
+        t += ms
+    return t if t <= end else None
+
+
+def _m1_end(t0: int) -> int:
+    """End of the 1m window: the first 15m boundary at least 3 hours after the signal minute."""
+    sm = t0 // M1 * M1
+    return -(-(sm + M1_WINDOW_MS) // M15) * M15
+
+
+def build_path(t0: int, m1: list, c15: list, m1_final: bool, now: int, path_until: int | None = None) -> tuple[list | None, str]:
+    """Candles from the one containing the signal time: 1m for the first ~3 h, then 15m. → (path, source) or (None, why).
+    m1 / c15 are cached rows [[t, o, h, l, c], …]; m1_final = the 1m window was fetched for good (or is unavailable);
+    path_until = this signal's own verified 15m coverage (the shared cache may hold other signals' candles after a hole)."""
+    sm, S = t0 // M1 * M1, _m1_end(t0)
+    q = [list(r[:5]) + [M15] for r in c15 if path_until is not None and r[0] <= path_until]
+    a = [list(r[:5]) + [M1] for r in m1 if sm <= r[0] < S]
+    if a and a[0][0] <= sm + 5 * M1 and (m1_final or now < S + M1):
+        return a + [r for r in q if r[0] >= S], "1m"
+    if not m1_final:
+        return None, "wait_1m"
+    q0 = t0 // M15 * M15                                  # no 1m data anywhere: 15m from the candle containing the signal
+    q = [r for r in q if r[0] >= q0]
+    return (q, "15m") if q and q[0][0] == q0 else (None, "no_start")
+
+
+def _fetch_range(conn, klines, budget, symbol, iv, start, end, now: int | None = None) -> tuple[bool, int | None]:
+    """Fetch [start, end] in 1440-candle windows; only CLOSED candles are stored (a forming one would be cached as final).
+    → (complete, open time of the last candle stored)."""
+    ms = IV_MS[iv]
+    now = now if now is not None else int(time.time() * 1000)
     step = ms * 1440
     t, last = start, None
     while t <= end:
@@ -548,65 +612,87 @@ def _fetch_range(conn, klines, budget, symbol, iv, start, end) -> tuple[bool, in
         rows = klines(symbol, iv, t, min(t + step - 1, end))
         rows = [r for r in rows or [] if t <= int(r[0]) <= end]
         if rows:
-            _store_candles(conn, symbol, iv, rows)
-            last = int(rows[-1][0])
-            t = last + ms
+            last_t = int(rows[-1][0])
+            rows = [r for r in rows if int(r[0]) + ms <= now]
+            if rows:
+                _store_candles(conn, symbol, iv, rows)
+                last = int(rows[-1][0])
+            t = last_t + ms
         else:
             t += step
     return True, last
 
 
 # ------------------------------------------------------------------------------------------------------------ simulation
-def _first_full(t: int) -> int:
-    return (t // M15 + 1) * M15
+def _dur(c) -> int:
+    return c[5] if len(c) > 5 else M15
 
 
 def simulate(sig: dict, candles: list, now: int) -> dict:
-    """Path of one signal over 15m candles [[t, o, h, l, c], …]. sig: side, entry_lo, entry_hi, sl, tps (prices by level), t, leverage."""
+    """Path of one signal over candles [[t, o, h, l, c, duration_ms], …] that start with the candle containing the signal time
+    (build_path: 1m for the first ~3 h, 15m after). sig: side, entry_lo, entry_hi, sl, tps (prices by level), t, leverage.
+    Entry within MARKET_TOL_PCT of the signal candle's open or close → market order, filled at the entry at the signal time;
+    farther → limit order that needs a touch within 48 h."""
     s = 1 if sig["side"] == "LONG" else -1
     lo, hi, sl, tps, t0 = sig["entry_lo"], sig["entry_hi"], sig["sl"], list(sig["tps"]), sig["t"]
     lev = max(1.0, float(sig.get("leverage") or 1.0))
     n = len(tps)
     res = {"v": SIM_VERSION, "state": "pending", "n_tps": n, "best_tp": 0, "first": None, "ended": None, "resolved_at": None,
            "policies": {}, "ambiguous": 0}
-    p0 = _first_full(t0)
-    cs = [c for c in candles if c[0] >= p0]
+    cs = [c for c in candles if c[0] + _dur(c) > t0]
     if not cs:
+        res["reason"] = "no_candles"
         return res
-    res["ref_price"] = cs[0][1]
+    c0 = cs[0]
+    if c0[0] > t0:                                   # the cache does not reach back to the signal → no verdict yet
+        res["reason"] = "no_start"
+        return res
+    res["ref_price"] = c0[1]
     res["last_price"], res["last_t"] = cs[-1][4], cs[-1][0]
+    res["path_src"] = "1m" if _dur(c0) == M1 else "15m"
     mid = (lo + hi) / 2
-    if abs(cs[0][1] / mid - 1) > 0.5:
+    if abs(c0[1] / mid - 1) > 0.5:
         res.update(state="bad_data", reason="price_mismatch")
         return res
+
+    def dist(px):
+        return abs(min(max(px, lo), hi) - px) / px * 100
+
+    d0 = min(dist(c0[1]), dist(c0[4]))
+    res["entry_dist_pct"] = round(d0, 3)
     tp1 = tps[0]
     fill_i = fill = None
     at_open = False
-    for i, c in enumerate(cs):
-        if c[0] >= t0 + FILL_WINDOW_MS:
-            break
-        o, h, l = c[1], c[2], c[3]
-        if l <= hi and h >= lo:
-            if lo <= o <= hi:
-                fill, at_open = o, True
-            else:
-                fill = hi if o > hi else lo
-            fill_i = i
-            break
-        fav, adv = (h, l) if s > 0 else (l, h)
-        if s * (fav - tp1) >= 0:
-            res.update(state="not_filled", reason="tp1_before_entry", resolved_at=c[0])
+    if d0 <= MARKET_TOL_PCT:
+        res["entry_mode"] = "market"
+        fill, fill_i, at_open, fill_t = (lo if lo == hi else min(max(c0[1], lo), hi)), 0, True, t0
+    else:
+        res["entry_mode"] = "limit"
+        for i, c in enumerate(cs):
+            if c[0] >= t0 + FILL_WINDOW_MS:
+                break
+            o, h, l = c[1], c[2], c[3]
+            if l <= hi and h >= lo:
+                if lo <= o <= hi:
+                    fill, at_open = o, True
+                else:
+                    fill = hi if o > hi else lo
+                fill_i = i
+                break
+            fav, adv = (h, l) if s > 0 else (l, h)
+            if s * (fav - tp1) >= 0:
+                res.update(state="not_filled", reason="tp1_before_entry", resolved_at=max(c[0], t0))
+                return res
+            if s * (adv - sl) <= 0:
+                res.update(state="not_filled", reason="sl_before_entry", resolved_at=max(c[0], t0))
+                return res
+        if fill_i is None:
+            if cs[-1][0] + _dur(cs[-1]) >= t0 + FILL_WINDOW_MS:
+                res.update(state="not_filled", reason="no_touch", resolved_at=t0 + FILL_WINDOW_MS)
             return res
-        if s * (adv - sl) <= 0:
-            res.update(state="not_filled", reason="sl_before_entry", resolved_at=c[0])
-            return res
-    if fill_i is None:
-        if cs[-1][0] + M15 >= t0 + FILL_WINDOW_MS or now >= t0 + FILL_WINDOW_MS + DAY:
-            res.update(state="not_filled", reason="no_touch", resolved_at=t0 + FILL_WINDOW_MS)
-        return res
+        fill_t = max(cs[fill_i][0], t0)
 
     F = fill
-    fill_t = cs[fill_i][0]
     risk_pct = s * (F - sl) / F * 100
     if risk_pct <= 0:
         res.update(state="bad_data", reason="stop_inside_entry")
@@ -622,9 +708,10 @@ def simulate(sig: dict, candles: list, now: int) -> dict:
     be_t, be_best, sl_t, liq_t, end_t, ended, exit_px, end_i = None, 0, None, None, None, None, None, None
     mfe = mae = 0.0
     for j in range(fill_i, len(cs)):
-        tc, o, h, l, cl = cs[j][:5]
-        if tc >= fill_t + MAX_HOLD_MS:
-            ended, end_t, exit_px, end_i = "timeout", tc, cs[j - 1][4], j - 1
+        tc0, o, h, l, cl = cs[j][:5]
+        tc = max(tc0, t0)                                # event time (the signal candle starts before the signal)
+        if tc0 >= fill_t + MAX_HOLD_MS:
+            ended, end_t, exit_px, end_i = "timeout", tc0, cs[j - 1][4], j - 1
             break
         first = j == fill_i
         fav, adv = (h, l) if s > 0 else (l, h)
@@ -663,7 +750,7 @@ def simulate(sig: dict, candles: list, now: int) -> dict:
     if ended == "sl":   # did the price come back to TP1 within 7 days after the stop? (stop too tight?)
         after = [c for c in cs[end_i + 1:] if c[0] <= sl_t + AFTER_MS]
         hit = any(s * ((c[2] if s > 0 else c[3]) - tp1) >= 0 for c in after)
-        covered = cs[-1][0] + M15 >= sl_t + AFTER_MS
+        covered = cs[-1][0] + _dur(cs[-1]) >= sl_t + AFTER_MS
         res["after_tp1"] = True if hit else (False if covered else None)
     mtm = exit_px if ended == "timeout" else None
     pol = {}
@@ -863,13 +950,34 @@ def _sim_ready(sig: dict) -> bool:
     return bool(sig["symbol"] and sig["side"] and sig["entry_lo"] and sig["sl"] and sig["t"] and sig["tps"])
 
 
+def _sim_from_cache(conn, sig: dict, m1_final: bool, now: int, path_until: int | None) -> dict:
+    t0, sym = sig["t"], sig["symbol"]
+    path, why = build_path(t0, _candles(conn, sym, "1m", t0 // M1 * M1, _m1_end(t0)),
+                           _candles(conn, sym, "15m", t0 // M15 * M15, now + M15), m1_final, now, path_until)
+    if path is None:
+        return {"v": SIM_VERSION, "state": "pending", "reason": why, "policies": {}, "n_tps": len(sig["tps"]), "best_tp": 0}
+    return simulate(sig, path, now)
+
+
 def process(conn, now: int, klines, budget: _Budget, notes: list) -> dict:
-    """Fetch what each unfinished signal still needs (within the budget) and recompute its outcome from the cache."""
+    """Fetch what each unfinished signal still needs (within the budget) and recompute its outcome from the cache.
+    Order per signal: the 1m window after the signal (decides market vs limit fill and the first hours), the 15m path, the
+    context at signal time. Candles already in the shared per-coin cache are not fetched again."""
     cur = conn.cursor()
     cur.row_factory = sqlite3.Row
-    conn.execute("UPDATE app_signals SET done=0, sim=NULL, path_until=NULL WHERE sim_version IS NOT NULL AND sim_version<>?", (SIM_VERSION,))
+    if conn.execute("SELECT COUNT(*) FROM app_signals WHERE sim_version IS NOT NULL AND sim_version<>?", (SIM_VERSION,)).fetchone()[0]:
+        conn.execute("UPDATE app_signals SET done=0, sim=NULL, path_until=NULL, m1_done=0 WHERE sim_version IS NOT NULL AND sim_version<>?",
+                     (SIM_VERSION,))
+        # version 1 also cached the candle still forming at fetch time; the newest 15m candle per coin may be partial → refetch it
+        conn.execute("DELETE FROM app_signal_candles WHERE interval='15m' AND (symbol, t) IN "
+                     "(SELECT symbol, MAX(t) FROM app_signal_candles WHERE interval='15m' GROUP BY symbol)")
     rows = cur.execute("SELECT * FROM app_signals WHERE done=0 ORDER BY (status='active') DESC, t_signal DESC").fetchall()
     st = {"unfinished": len(rows), "fetch_errors": 0, "skipped_budget": 0}
+
+    def note(msg):
+        if len(notes) < 40:
+            notes.append(msg)
+
     for r in rows:
         sig = _row_sig(r)
         sid = sig["id"]
@@ -878,49 +986,68 @@ def process(conn, now: int, klines, budget: _Budget, notes: list) -> dict:
                          (json.dumps({"v": SIM_VERSION, "state": "bad_data", "reason": "parse"}), SIM_VERSION, sid))
             continue
         sym, t0 = sig["symbol"], sig["t"]
-        p0 = _first_full(t0)
-        fail = r["fetch_fail"] or 0
-        ok_any, path_complete = False, True
+        fail0 = r["fetch_fail"] or 0          # runs in a row with every source failing
+        ok_any, path_complete, failed, short = False, True, False, False
+        # 1. 1m window [signal minute, ~3 h]
+        m1_final = bool(r["m1_done"])
+        if not m1_final:
+            sm, S = t0 // M1 * M1, _m1_end(t0)
+            w_end = min(S - M1, now // M1 * M1 - M1)
+            try:
+                miss = _first_missing(conn, sym, "1m", sm, w_end) if w_end >= sm else None
+                complete = True
+                if miss is not None:
+                    complete, _ = _fetch_range(conn, klines, budget, sym, "1m", miss, w_end, now)
+                    if complete:
+                        ok_any = True
+                if complete and now >= S + M1:
+                    m1_final = True
+                elif not complete:
+                    short = True
+            except Exception as e:  # noqa: BLE001
+                failed = True
+                st["fetch_errors"] += 1
+                note(f"свечи 1m {sym}: {str(e)[:120]}")
+                m1_final = fail0 + 1 >= MAX_FETCH_FAIL
+            if m1_final:
+                conn.execute("UPDATE app_signals SET m1_done=1 WHERE signal_id=?", (sid,))
+        # 2. 15m path from the candle containing the signal, window by window; stop once the outcome (+7 days after a stop) is covered
         path_until = r["path_until"]
         prev = json.loads(r["sim"]) if r["sim"] else {}
         stop_at = prev.get("done_at") if prev.get("state") == "closed" else None
-        # 1. path candles (15m), window by window; stop as soon as the outcome (+7 days after a stop) is covered
+        q0 = t0 // M15 * M15
+        last_closed = now // M15 * M15 - M15
         for _ in range(8):
-            start = path_until + M15 if path_until is not None else p0
-            end = now if stop_at is None else min(now, stop_at + M15)
+            start = path_until + M15 if path_until is not None else q0
+            end = last_closed if stop_at is None else min(last_closed, stop_at + M15)
             if start > end:
                 break
-            w_end = min(end, start + 1440 * M15 - 1)
-            try:
-                complete, last = _fetch_range(conn, klines, budget, sym, "15m", start, w_end)
-            except Exception as e:  # noqa: BLE001
-                fail += 1
-                st["fetch_errors"] += 1
-                path_complete = False
-                if len(notes) < 40:
-                    notes.append(f"свечи {sym}: {str(e)[:120]}")
-                break
-            if not complete:
-                st["skipped_budget"] += 1
-                path_complete = False
-                break
-            ok_any = True
-            if last is not None:
-                new_until = last if last + M15 <= now else last - M15      # the candle still forming is fetched again next run
-            else:
-                new_until = (w_end // M15) * M15 if w_end + M15 <= now else None   # an empty window in the past is skipped
-            if new_until is None or new_until < start:
-                break
-            path_until = new_until
+            w_end = min(end, start + 1439 * M15)
+            miss = _first_missing(conn, sym, "15m", start, w_end)
+            if miss is not None:
+                try:
+                    complete, _ = _fetch_range(conn, klines, budget, sym, "15m", miss, w_end, now)
+                except Exception as e:  # noqa: BLE001
+                    failed = True
+                    st["fetch_errors"] += 1
+                    path_complete = False
+                    note(f"свечи {sym}: {str(e)[:120]}")
+                    break
+                if not complete:
+                    short = True
+                    path_complete = False
+                    break
+                ok_any = True
+            path_until = w_end                     # [start, w_end] is now cached or fetched (holes left by the source stay holes)
             conn.execute("UPDATE app_signals SET path_until=? WHERE signal_id=?", (path_until, sid))
-            sim = simulate(sig, _candles(conn, sym, "15m", p0, now + M15), now)
+            sim = _sim_from_cache(conn, sig, m1_final, now, path_until)
             if sim["state"] == "closed":
                 stop_at = sim["done_at"]
             elif sim["state"] in ("not_filled", "bad_data"):
                 break
             if w_end >= end:
                 break
-        # 2. context at signal time (once): coin 1h + 4h, BTC 4h
+        # 3. context at signal time (once): coin 1h + 4h, BTC 4h
         ctx_done = bool(r["ctx_done"])
         if not ctx_done:
             got_all = True
@@ -928,23 +1055,25 @@ def process(conn, now: int, klines, budget: _Budget, notes: list) -> dict:
                 if _have(conn, s2, iv, st_ + IV_MS[iv] * 5, t0 - IV_MS[iv]):
                     continue
                 try:
-                    complete, _ = _fetch_range(conn, klines, budget, s2, iv, st_, t0)
+                    complete, _ = _fetch_range(conn, klines, budget, s2, iv, st_, t0, now)
                     got_all = got_all and complete
+                    short = short or not complete
                 except Exception as e:  # noqa: BLE001
                     got_all = False
-                    fail += 1
-                    if len(notes) < 40:
-                        notes.append(f"контекст {s2} {iv}: {str(e)[:100]}")
-            if got_all or fail >= MAX_FETCH_FAIL:
+                    failed = True
+                    note(f"контекст {s2} {iv}: {str(e)[:100]}")
+            if got_all or (failed and fail0 + 1 >= MAX_FETCH_FAIL):
                 feat = compute_features(sig, _candles(conn, sym, "1h", t0 - 200 * H1, t0), _candles(conn, sym, "4h", t0 - 250 * H4, t0),
                                         _candles(conn, "BTC-USDT", "4h", t0 - 250 * H4, t0))
                 conn.execute("UPDATE app_signals SET features=?, ctx_done=1 WHERE signal_id=?", (json.dumps(feat), sid))
                 ctx_done = True
-        # 3. outcome from the cache
-        cs = _candles(conn, sym, "15m", p0, now + M15)
-        sim = simulate(sig, cs, now)
-        if not cs and (fail >= MAX_FETCH_FAIL or (path_complete and ok_any and now > t0 + FILL_WINDOW_MS + DAY)):
-            sim = {"v": SIM_VERSION, "state": "no_data", "reason": "candles"}
+        st["skipped_budget"] += int(short)
+        # 4. outcome from the cache
+        sim = _sim_from_cache(conn, sig, m1_final, now, path_until)
+        has_any = conn.execute("SELECT 1 FROM app_signal_candles WHERE symbol=? AND interval IN ('1m','15m') AND t>=? LIMIT 1",
+                               (sym, t0 // M15 * M15)).fetchone()
+        if not has_any and ((failed and fail0 + 1 >= MAX_FETCH_FAIL) or (path_complete and m1_final and now > t0 + FILL_WINDOW_MS + DAY)):
+            sim = {"v": SIM_VERSION, "state": "no_data", "reason": "candles", "policies": {}}
         state = sim["state"]
         if state in ("bad_data", "no_data", "not_filled"):
             done = 1
@@ -953,13 +1082,13 @@ def process(conn, now: int, klines, budget: _Budget, notes: list) -> dict:
         else:
             done = 0
         if done and not ctx_done:
-            if state in ("bad_data", "no_data") or fail >= MAX_FETCH_FAIL:
+            if state in ("bad_data", "no_data") or (failed and fail0 + 1 >= MAX_FETCH_FAIL):
                 pf = plan_features(sig)
                 conn.execute("UPDATE app_signals SET features=?, ctx_done=1 WHERE signal_id=?", (json.dumps(dict(pf, archetype=archetype(pf))), sid))
             else:
                 done = 0          # keep it until the context at signal time is in
         conn.execute("UPDATE app_signals SET sim=?, sim_version=?, resolved_at=?, done=?, fetch_fail=? WHERE signal_id=?",
-                     (json.dumps(sim), SIM_VERSION, sim.get("resolved_at"), done, 0 if ok_any else fail, sid))
+                     (json.dumps(sim), SIM_VERSION, sim.get("resolved_at"), done, 0 if ok_any else fail0 + int(failed), sid))
         conn.commit()
     return st
 
@@ -967,14 +1096,24 @@ def process(conn, now: int, klines, budget: _Budget, notes: list) -> dict:
 def prune(conn, now: int) -> int:
     """Finished signals keep their result; drop candles no unfinished signal needs (the DB is committed to git)."""
     need: dict[str, int] = {}
+    m1_need: dict[str, list] = {}
     for sym, t in conn.execute("SELECT symbol, t_signal FROM app_signals WHERE done=0 AND symbol IS NOT NULL AND t_signal IS NOT NULL"):
         need[sym] = min(need.get(sym, t), t)
+        m1_need.setdefault(sym, []).append((t // M1 * M1, _m1_end(t)))
     before = conn.total_changes
     for (sym,) in conn.execute("SELECT DISTINCT symbol FROM app_signal_candles WHERE interval='15m'").fetchall():
         if sym not in need:
             conn.execute("DELETE FROM app_signal_candles WHERE symbol=? AND interval='15m'", (sym,))
         else:
             conn.execute("DELETE FROM app_signal_candles WHERE symbol=? AND interval='15m' AND t<?", (sym, need[sym] - DAY))
+    for (sym,) in conn.execute("SELECT DISTINCT symbol FROM app_signal_candles WHERE interval='1m'").fetchall():
+        wins = m1_need.get(sym)
+        if not wins:
+            conn.execute("DELETE FROM app_signal_candles WHERE symbol=? AND interval='1m'", (sym,))
+            continue
+        keep = " OR ".join("(t>=? AND t<?)" for _ in wins)
+        conn.execute(f"DELETE FROM app_signal_candles WHERE symbol=? AND interval='1m' AND NOT ({keep})",
+                     [sym] + [x for w in wins for x in w])
     oldest_ctx = conn.execute("SELECT MIN(t_signal) FROM app_signals WHERE ctx_done=0 AND done=0").fetchone()[0]
     cutoff = min(oldest_ctx or now, now) - 60 * DAY
     conn.execute("DELETE FROM app_signal_candles WHERE interval IN ('1h','4h') AND t<?", (cutoff,))
@@ -1065,12 +1204,38 @@ def build_stats(rows) -> dict:
             coins.setdefault(r["coin"], []).append(r)
     top = sorted(coins.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:10]
     st["by_coin"] = [{"coin": c, "signals": len(v), **grp(v)} for c, v in top]
-    # the app's own is_completed flags vs prices
-    cmp_ = [r for r in res if r["targets"]]
-    st["app_flags"] = {"n": len(cmp_), "agree": sum(1 for r in cmp_ if r["app_best_tp"] == r["sim"].get("best_tp")),
-                       "app_more": sum(1 for r in cmp_ if r["app_best_tp"] > r["sim"].get("best_tp", 0)),
-                       "app_less": sum(1 for r in cmp_ if r["app_best_tp"] < r["sim"].get("best_tp", 0))}
+    # entry type: market (entry within 0.6 % of the price at the signal minute) vs limit (needs a touch within 48 h)
+    modes = {}
+    for r in rows:
+        m = r["sim"].get("entry_mode")
+        if m:
+            modes.setdefault(m, []).append(r)
+    st["entry_modes"] = {m: {"signals": len(v), "not_filled": sum(1 for r in v if r["sim"].get("state") == "not_filled"), **grp(v)}
+                         for m, v in sorted(modes.items())}
+    st["path_src"] = {k: sum(1 for r in rows if r["sim"].get("path_src") == k and r["sim"].get("state") not in (None, "pending"))
+                      for k in ("1m", "15m")}
+    st["median_entry_dist_pct"] = _median([r["sim"].get("entry_dist_pct") for r in rows])
+    st["app_flags"] = app_flags_check(rows)
     return st
+
+
+def app_flags_check(rows) -> dict:
+    """The app's targets[].is_completed come from real BingX orders (TradeReader). Compare with our price check on signals the
+    app has closed and we have a verdict for (not filled counts as 0 TPs on our side)."""
+    cmp_ = [r for r in rows if r["status"] == "closed" and r["targets"] and r["sim"].get("state") in ("closed", "not_filled")]
+    ours = lambda r: r["sim"].get("best_tp", 0) if r["sim"].get("state") == "closed" else 0   # noqa: E731
+    dis = [r for r in cmp_ if ours(r) != r["app_best_tp"]]
+    by_mode = {}
+    for r in cmp_:
+        m = r["sim"].get("entry_mode") or "—"
+        b = by_mode.setdefault(m, {"n": 0, "agree": 0})
+        b["n"] += 1
+        b["agree"] += int(ours(r) == r["app_best_tp"])
+    return {"n": len(cmp_), "agree": len(cmp_) - len(dis), "agree_share": round((len(cmp_) - len(dis)) / len(cmp_), 3) if cmp_ else None,
+            "app_more": sum(1 for r in dis if r["app_best_tp"] > ours(r)), "app_less": sum(1 for r in dis if r["app_best_tp"] < ours(r)),
+            "within_one_tp": sum(1 for r in cmp_ if abs(ours(r) - r["app_best_tp"]) <= 1), "by_entry_mode": by_mode,
+            "disagreements": [{"id": r["id"], "coin": r["coin"], "ours": ours(r), "app": r["app_best_tp"], "state": r["sim"].get("state"),
+                               "reason": r["sim"].get("reason"), "entry_mode": r["sim"].get("entry_mode")} for r in dis[:10]]}
 
 
 def _split(label_ru, rows, fn, labels: dict) -> dict:
@@ -1202,7 +1367,8 @@ def _verdict_filter(n, before, after, skipped):
     return f"без заметной разницы ({before['avg_r']:+.2f}R → {after['avg_r']:+.2f}R)"
 
 
-def build_proposals(rows) -> list[dict]:
+def build_proposals(rows, flags: dict | None = None) -> list[dict]:
+    flags = flags if flags is not None else coin_filter_flags(rows)
     res = _resolved(rows)
     n = len(res)
     out = []
@@ -1217,7 +1383,7 @@ def build_proposals(rows) -> list[dict]:
         app = _ev(common, "app")
         v = (f"рано судить: закрытых сигналов {len(common)} < {MIN_SAMPLE}" if _small(len(common)) else
              (f"лучший исполнимый выход сейчас — «{names[bk]}»: {bst['avg_r']:+.2f}R на сделку против {base['avg_r']:+.2f}R"
-              if bk != BASELINE else f"текущая база («{names[BASELINE]}») и так лучшая из исполнимых: {bst['avg_r']:+.2f}R"))
+              if bk != BASELINE else f"основной способ («{names[BASELINE]}») и так лучший из исполнимых: {bst['avg_r']:+.2f}R"))
         if app["avg_r"] is not None and bst["avg_r"] is not None:
             v += f". Витрина приложения показывает {app['avg_r']:+.2f}R — это потолок, не реальный результат"
         out.append({"id": "exit_policy", "rule_ru": "Выбрать способ выхода по целям", "n": len(common), "before": base, "after": bst,
@@ -1234,7 +1400,7 @@ def build_proposals(rows) -> list[dict]:
         v = _verdict_filter(n, before, after, skipped)
         if extra_note and not _small(n):
             v += ". " + extra_note
-        out.append({"id": pid, "rule_ru": rule_ru, "n": n, "known": len(known), "skipped": skipped["n"], "before": before,
+        out.append({"id": pid, "rule_ru": rule_ru, "n": n, "known": len(known), "skipped": len(skip), "before": before,
                     "after": after, "skipped_stats": skipped, "verdict_ru": v})
 
     filt("skip_vs_btc", "Не брать сигналы против тренда BTC 4h (EMA50/EMA200)",
@@ -1243,6 +1409,10 @@ def build_proposals(rows) -> list[dict]:
          lambda r: None if r["feat"].get("with_trend") is None else not r["feat"]["with_trend"])
     filt("skip_rsi_wrong", "Не брать лонг при RSI 1h ≥ 70 и шорт при RSI 1h ≤ 30",
          lambda r: r["feat"].get("rsi_wrong"))
+    filt("coin_filter", f"Фильтр монет: не брать монету, если у неё ≥{COIN_FILTER_MIN} прошлых закрытых сигналов и "
+                        f"≥{COIN_FILTER_SHARE * 100:.0f}% из них — стоп без единого TP (считается только по прошлому)",
+         lambda r: (flags.get(r["id"]) or {}).get("skip"),
+         "правило экспериментальное: соседние пороги (например ≥8 сигналов) на флагах приложения не подтвердились")
     # 4. stop to entry after TP1
     both = [r for r in res if _pol(r, "ladder") and _pol(r, "ladder_be")]
     b, a = _ev(both, "ladder"), _ev(both, "ladder_be")
@@ -1312,6 +1482,122 @@ def build_proposals(rows) -> list[dict]:
     return out
 
 
+def _stop_no_tp(r) -> bool:
+    return r["sim"].get("ended") == "sl" and r["sim"].get("best_tp", 0) == 0
+
+
+def _coin_history(rows) -> dict[str, list]:
+    out: dict[str, list] = {}
+    for r in sorted(_resolved(rows), key=lambda x: x["sim"].get("resolved_at") or 0):
+        if r["coin"] and r["sim"].get("resolved_at"):
+            out.setdefault(r["coin"], []).append((r["sim"]["resolved_at"], _stop_no_tp(r)))
+    return out
+
+
+def coin_filter_flags(rows) -> dict[str, dict]:
+    """Walk-forward: at each signal's time only that coin's signals RESOLVED BEFORE it count (no look into the future)."""
+    hist = _coin_history(rows)
+    out = {}
+    for r in rows:
+        if not r.get("t") or not r.get("coin"):
+            continue
+        past = [x for ra, x in hist.get(r["coin"], []) if ra < r["t"]]
+        n, k = len(past), sum(past)
+        out[r["id"]] = {"past": n, "stops": k, "skip": n >= COIN_FILTER_MIN and k / n >= COIN_FILTER_SHARE}
+    return out
+
+
+def coin_blacklist(rows, now: int) -> list[dict]:
+    """Coins the filter would skip right now."""
+    out = []
+    for coin, past in _coin_history(rows).items():
+        past = [x for ra, x in past if ra <= now]
+        n, k = len(past), sum(past)
+        if n >= COIN_FILTER_MIN and k / n >= COIN_FILTER_SHARE:
+            out.append({"coin": coin, "n": n, "stops_no_tp": k, "share": round(k / n, 3)})
+    return sorted(out, key=lambda x: (-x["share"], -x["n"], x["coin"]))
+
+
+def _margin_return(r: dict, net: float, lev: float) -> float:
+    """% of margin for a closed trade at leverage `lev`: net % × leverage, −100 % at most; a stop beyond the liquidation price
+    (≈ 100 / leverage − 0.5 % against the position) loses the whole margin."""
+    sim = r["sim"]
+    if lev > 1 and sim.get("first") == "sl" and (sim.get("risk_pct") or 0) >= 100.0 / lev - 0.5:
+        return -100.0
+    return max(net * lev, -100.0)
+
+
+def run_account(rows, key: str, name_ru: str, rules_ru: str, policy: str, use_filter: bool, start_t: int, now: int,
+                flags: dict) -> dict:
+    """Demo account: $10 000, margin 5 % of the (realized) equity at entry, leverage = the signal's capped at 20×, the sim's fees;
+    trades opened at the fill and closed when the policy closes, compounded in time order."""
+    trades, skipped = [], 0
+    for r in rows:
+        sim = r["sim"]
+        if not r["t"] or r["t"] < start_t or sim.get("fill") is None or sim.get("state") not in ("open", "closed"):
+            continue
+        if use_filter and (flags.get(r["id"]) or {}).get("skip"):
+            skipped += 1
+            continue
+        p = _pol(r, policy)
+        trades.append({"r": r, "open_t": sim["fill_t"], "close_t": p["t"] if p else None, "net": p["net"] if p else None,
+                       "lev": min(float(r["leverage"] or 1.0), ACCOUNT_LEV_CAP)})
+    events = [(tr["open_t"], 0, i) for i, tr in enumerate(trades)] + [(tr["close_t"], 1, i) for i, tr in enumerate(trades) if tr["close_t"]]
+    equity = peak = ACCOUNT_START
+    max_dd, curve, closed = 0.0, [[start_t, ACCOUNT_START]], []
+    for t, kind, i in sorted(events, key=lambda e: (e[0], e[1])):
+        tr = trades[i]
+        if kind == 0:
+            tr["margin"] = equity * ACCOUNT_MARGIN_SHARE
+            continue
+        m = _margin_return(tr["r"], tr["net"], tr["lev"])
+        pnl = tr["margin"] * m / 100.0
+        equity += pnl
+        peak = max(peak, equity)
+        max_dd = max(max_dd, (peak - equity) / peak * 100 if peak else 0.0)
+        curve.append([t, round(equity, 2)])
+        r = tr["r"]
+        closed.append({"id": r["id"], "coin": r["coin"], "side": r["side"], "opened": tr["open_t"], "closed": t,
+                       "leverage": tr["lev"], "margin": round(tr["margin"], 2), "pnl_usd": round(pnl, 2), "pnl_pct": round(m, 2),
+                       "outcome_ru": _state_ru(r["sim"], r["status"])})
+    opened = []
+    for tr in trades:
+        if tr["close_t"]:
+            continue
+        r, sim = tr["r"], tr["r"]["sim"]
+        s_ = 1 if r["side"] == "LONG" else -1
+        px = sim.get("last_price")
+        m = max(s_ * (px - sim["fill"]) / sim["fill"] * 100 * tr["lev"], -100.0) if px else None
+        opened.append({"id": r["id"], "coin": r["coin"], "side": r["side"], "opened": tr["open_t"], "leverage": tr["lev"],
+                       "margin": round(tr.get("margin") or 0.0, 2), "best_tp": sim.get("best_tp", 0), "price": px,
+                       "unrealized_pct": round(m, 2) if m is not None else None,
+                       "unrealized_usd": round((tr.get("margin") or 0.0) * m / 100, 2) if m is not None else None})
+    wins = sum(1 for c in closed if c["pnl_usd"] > 0)
+    unreal = sum(o["unrealized_usd"] or 0.0 for o in opened)
+    return {"key": key, "name_ru": name_ru, "rules_ru": rules_ru, "policy": policy, "coin_filter": use_filter,
+            "start": ACCOUNT_START, "start_t": start_t, "equity": round(equity, 2), "equity_with_open": round(equity + unreal, 2),
+            "pnl_usd": round(equity - ACCOUNT_START, 2), "pnl_pct": round((equity / ACCOUNT_START - 1) * 100, 2),
+            "trades": len(closed), "wins": wins, "winrate": round(wins / len(closed), 3) if closed else None,
+            "max_dd_pct": round(max_dd, 2), "skipped_by_filter": skipped, "open": opened,
+            "last": sorted(closed, key=lambda c: -c["closed"])[:10], "curve": curve}
+
+
+def build_accounts(rows, now: int, flags: dict) -> dict:
+    ts = [r["t"] for r in rows if r["t"]]
+    first = min(ts) if ts else now
+    first_ru = datetime.fromtimestamp(first / 1000, timezone(timedelta(hours=3))).strftime("%d.%m.%Y")
+    views = {"since_live": (LIVE_START_MS, "Живой тест: сигналы с 18.10.2026 00:00 по Киеву"),
+             "backfill": (first, f"Если бы начали {first_ru} — на истории (не живой результат)")}
+    out = {"params": {"start": ACCOUNT_START, "margin_share": ACCOUNT_MARGIN_SHARE, "lev_cap": ACCOUNT_LEV_CAP, "cost_pct": COST_PCT,
+                      "note_ru": f"Старт $10 000, маржа на сделку 5% от капитала на момент входа, плечо как в сигнале, но не больше "
+                                 f"{ACCOUNT_LEV_CAP}x, комиссии {COST_PCT:.2f}% от цены на сделку, убыток на сделку не больше маржи; "
+                                 f"результаты складываются по времени закрытия."}}
+    for view, (start_t, label) in views.items():
+        out[view] = {"label_ru": label, "start_t": start_t,
+                     **{k: run_account(rows, k, nm, rules, pol, filt, start_t, now, flags) for k, nm, rules, pol, filt in ACCOUNTS}}
+    return out
+
+
 def _f(x, nd=6):
     return None if x is None else round(float(x), nd)
 
@@ -1326,7 +1612,7 @@ def _pl(n: int, one: str, few: str, many: str) -> str:
 def _state_ru(sim: dict, status: str) -> str:
     st = sim.get("state")
     if st == "pending":
-        return "ждёт входа"
+        return "ждём свечи для проверки" if sim.get("reason") in ("wait_1m", "no_start", "no_candles") else "ждёт входа"
     if st == "not_filled":
         return {"tp1_before_entry": "не вошёл — цена ушла к TP1 без входа", "sl_before_entry": "не вошёл — стоп раньше входа"}.get(
             sim.get("reason"), "не вошёл за 48 ч")
@@ -1387,7 +1673,11 @@ def build_doc(conn, now: int, notes: list, api: dict, sources: dict) -> dict:
     counts = {"total": len(rows), "active": sum(1 for r in rows if r["status"] == "active"),
               "closed": sum(1 for r in rows if r["status"] == "closed"), "resolved": sims.count("closed"),
               "not_filled": sims.count("not_filled"), "open": sims.count("open"), "pending": sims.count("pending") + sims.count(None),
-              "no_data": sims.count("bad_data") + sims.count("no_data")}
+              "no_data": sims.count("bad_data") + sims.count("no_data"),
+              "entry_market": sum(1 for r in rows if r["sim"].get("entry_mode") == "market"),
+              "entry_limit": sum(1 for r in rows if r["sim"].get("entry_mode") == "limit"),
+              "waiting_candles": sum(1 for r in rows if r["sim"].get("state") in ("pending", None) and r["sim"].get("reason") in
+                                     (None, "wait_1m", "no_start", "no_candles"))}
     stats = build_stats(rows)
     active = []
     for r in rows:
@@ -1406,28 +1696,36 @@ def build_doc(conn, now: int, notes: list, api: dict, sources: dict) -> dict:
         if len(recent) >= 30:
             break
     profile = build_profile(rows)
-    proposals = build_proposals(rows)
+    flags = coin_filter_flags(rows)
+    for a in active:
+        a["coin_filter_skip"] = bool((flags.get(a["id"]) or {}).get("skip"))
+    proposals = build_proposals(rows, flags)
+    accounts = build_accounts(rows, now, flags)
+    blacklist = coin_blacklist(rows, now)
     # summary from numbers only
     P = stats["policies"]
     parts = [f"Отслежено {counts['total']} {_pl(counts['total'], 'сигнал', 'сигнала', 'сигналов')} приложения: активных сейчас "
-             f"{counts['active']}, закрыто по нашей проверке ценами {counts['resolved']}, не вошли {counts['not_filled']}."]
+             f"{counts['active']}, закрыто по нашей проверке ценами {counts['resolved']}, не вошли {counts['not_filled']} "
+             f"(рыночных входов {counts['entry_market']}, лимитных {counts['entry_limit']})."]
     if counts["resolved"]:
-        a, b, c = P["app"], P["tp1"], P[BASELINE]
-        parts.append(f"По правилу приложения (самый дальний TP) средний итог {a['avg_pct']:+.2f}% на сделку без плеча, "
-                     f"но реально исполнимо: всё на TP1 — {b['avg_pct']:+.2f}%, равными частями по целям — {c['avg_pct']:+.2f}% (после комиссий).")
+        m, a, b = P[MAIN_POLICY], P["app"], P["tp1"]
+        parts.append(f"Основной способ — равными частями по целям, после TP1 стоп в точку входа: {m['avg_pct']:+.2f}% на сделку без плеча "
+                     f"после комиссий ({m['avg_r']:+.2f}R, в плюс {m['winrate'] * 100:.0f}% сделок); для сравнения витрина приложения "
+                     f"(самый дальний TP) {a['avg_pct']:+.2f}%, всё на TP1 {b['avg_pct']:+.2f}%.")
         if stats["tp_reach"].get("tp1") is not None and stats["sl_share"] is not None:
             parts.append(f"TP1 достигнут в {stats['tp_reach']['tp1'] * 100:.0f}% закрытых сигналов, стоп раньше TP1 — в {stats['sl_share'] * 100:.0f}%.")
+    bf = accounts["backfill"]
+    if bf["improved"]["trades"]:
+        parts.append(f"Демо-счёт «{bf['improved']['name_ru']}» на истории: $10 000 → ${bf['improved']['equity']:,.0f} "
+                     f"({bf['improved']['pnl_pct']:+.1f}%), «{bf['as_is']['name_ru']}» — ${bf['as_is']['equity']:,.0f} "
+                     f"({bf['as_is']['pnl_pct']:+.1f}%).".replace(",", " "))
     if counts["resolved"] < MIN_SAMPLE:
-        parts.append(f"Закрытых сигналов {counts['resolved']} — меньше {MIN_SAMPLE}, выводы предварительные.")
-    else:
-        ex = next((p for p in proposals if p["id"] == "exit_policy"), None)
-        if ex and ex.get("after_policy"):
-            nm = dict((k, nm) for k, nm, _ in POLICIES)[ex["after_policy"]]
-            parts.append(f"Лучший исполнимый выход по истории: «{nm}» ({ex['after']['avg_r']:+.2f}R в среднем).")
+        parts = parts[:3] + [f"Закрытых сигналов {counts['resolved']} — меньше {MIN_SAMPLE}, выводы предварительные."]
     method = [
         "Итог считаем сами по свечам 15m бессрочных фьючерсов (BingX, запасные OKX и Binance), флаги «достигнут» из приложения не используем — только сравниваем.",
-        "Отсчёт с первой полной 15-минутной свечи после времени сигнала. Вход: одна цена — свеча её коснулась; диапазон — коснулась любой цены диапазона. Нет касания 48 ч, или раньше входа дошли до TP1 / стопа — «не вошёл».",
-        "Если одна 15-минутная свеча задела и стоп, и цель — считаем, что первым был стоп (осторожно). На свече входа цели не засчитываем, если вход был не по открытию свечи.",
+        f"Отсчёт с минуты сигнала: первые 3 часа по 1-минутным свечам, дальше по 15-минутным. Вход в пределах {MARKET_TOL_PCT}% от цены в минуту сигнала — рыночный (Cornix ставит ордер сразу): считаем исполненным по цене входа в момент сигнала.",
+        "Вход дальше от рынка — лимитный ордер: нужно касание цены входа (или любой цены диапазона) в течение 48 ч. Нет касания, или раньше дошли до TP1 / стопа — «не вошёл».",
+        "Если одна свеча задела и стоп, и цель — считаем, что первым был стоп (осторожно). Для лимитного входа на свече касания цели не засчитываем, если вход был не по её открытию.",
         f"Комиссия 0.05% на вход и 0.05% на выход + 0.02% проскальзывание = {COST_PCT:.2f}% от цены на сделку. R — расстояние от входа до стопа. Плечо только умножает % (убыток на маржу не больше −100%).",
         "Позиция без выхода 14 дней закрывается по рынку («по времени»). После стопа ещё 7 дней смотрим, вернулась ли цена к TP1.",
         f"Всё, где закрытых сигналов меньше {MIN_SAMPLE}, помечено «рано судить».",
@@ -1437,12 +1735,24 @@ def build_doc(conn, now: int, notes: list, api: dict, sources: dict) -> dict:
         if r["sim"].get("state") in ("bad_data", "no_data"):
             k = f"{r['sim'].get('reason') or r['sim'].get('state')}"
             bad.setdefault(k, []).append(r["coin"] or r["name"] or r["id"])
+    af = stats["app_flags"]
+    if af["n"]:
+        notes = notes + [f"Флаги приложения (реальные ордера BingX через TradeReader) против нашей проверки ценами: совпал самый дальний TP "
+                         f"в {af['agree']} из {af['n']} закрытых сигналов, расхождение не больше одной цели — в {af['within_one_tp']}."
+                         + (" Расхождения (id: наш TP / TP приложения): " + ", ".join(
+                             f"{d['id']} {d['coin']}: {d['ours']}/{d['app']}" + (" (не вошёл)" if d["state"] == "not_filled" else "")
+                             for d in af["disagreements"]) if af["disagreements"] else "")]
     if bad:
         notes = notes + ["Без проверки ценой: " + "; ".join(f"{k} ×{len(v)} ({', '.join(sorted({str(x) for x in v})[:6])})"
                                                           for k, v in sorted(bad.items()))]
     return {"asof": now, "source": {"api": [API_ACTIVE, API_HISTORY], "api_ok": api, "candles": sources},
-            "policies": [{"key": k, "name_ru": nm, "executable": ex} for k, nm, ex in POLICIES], "baseline": BASELINE,
+            "policies": [{"key": k, "name_ru": nm, "executable": ex, "main": k == MAIN_POLICY} for k, nm, ex in POLICIES],
+            "main_policy": MAIN_POLICY, "baseline": BASELINE,
             "counts": counts, "stats": stats, "active": active, "recent": recent, "profile": profile, "proposals": proposals,
+            "accounts": accounts,
+            "coin_filter": {"rule_ru": f"Не брать монету, если у неё ≥{COIN_FILTER_MIN} закрытых сигналов в прошлом и ≥"
+                                       f"{COIN_FILTER_SHARE * 100:.0f}% из них — стоп без единого TP",
+                            "min_signals": COIN_FILTER_MIN, "stop_share": COIN_FILTER_SHARE, "blacklist": blacklist},
             "summary_ru": " ".join(parts[:4]), "method_ru": method, "notes_ru": notes}
 
 

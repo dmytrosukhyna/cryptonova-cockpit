@@ -1,5 +1,5 @@
-"""CRYPTO NOVΛ app signals: tolerant parsing, path simulation on synthetic 15m candles, exit-policy maths, history upsert,
-features/profile/proposals and the shape of web/app_signals.json — no network (API and candles are injected)."""
+"""CRYPTO NOVΛ app signals: tolerant parsing, market vs limit fill, path simulation on synthetic 1m + 15m candles, exit-policy
+maths, history upsert, features/profile/proposals and the shape of web/app_signals.json — no network (API and candles injected)."""
 import json
 import math
 import os
@@ -8,20 +8,26 @@ import tempfile
 
 from cnq.agents import app_signals as aps
 
-M15, H1, H4, DAY = aps.M15, aps.H1, aps.H4, aps.DAY
+M1, M15, H1, H4, DAY = aps.M1, aps.M15, aps.H1, aps.H4, aps.DAY
 T0 = 1_790_000_100_000 // M15 * M15          # aligned to 15m
-TS = T0 + 5 * 60_000                           # signal 5 minutes into the candle → first full candle = T0 + 15m
+TS = T0 + 5 * M1                               # signal 5 minutes into the 15m candle (minute-aligned)
+SM = TS                                        # the signal minute
 P0 = T0 + M15
 COST = aps.COST_PCT
 
 
-def _bars(path, start=P0):
-    """path = list of (o, h, l, c) → [[t, o, h, l, c], …] 15m candles from `start`."""
+def _bars(path, start=SM, ms=M1):
+    """path = list of (o, h, l, c) → simulation candles [[t, o, h, l, c, duration], …] from `start` (1m by default)."""
+    return [[start + i * ms, *c, ms] for i, c in enumerate(path)]
+
+
+def _flat(px, n, start, ms=M15):
+    return [[start + i * ms, px, px * 1.001, px * 0.999, px, ms] for i in range(n)]
+
+
+def _q(path, start=T0):
+    """Cache rows (no duration) of 15m candles from `start` — what the fake exchange serves."""
     return [[start + i * M15, *c] for i, c in enumerate(path)]
-
-
-def _flat(px, n, start):
-    return [[start + i * M15, px, px * 1.001, px * 0.999, px] for i in range(n)]
 
 
 def _sig(side="LONG", lo=100.0, hi=100.0, sl=95.0, tps=(105.0, 110.0, 115.0), lev=10.0, t=TS, sym="BTC-USDT"):
@@ -86,21 +92,22 @@ def test_extract_list_variants():
 
 # ------------------------------------------------------------------------------------------------ simulation
 def test_tp1_then_stop():
-    cs = _bars([(100.5, 100.8, 99.8, 100.2),      # fill at 100 (touched), opened above → no TP on this candle
+    cs = _bars([(100.5, 100.8, 99.8, 100.2),      # 0.2–0.5 % from the entry → market fill at 100 at the signal time
                 (100.2, 105.5, 100.1, 105.0),     # TP1
                 (105.0, 105.2, 101.0, 101.5),
                 (101.5, 101.6, 94.0, 94.5)])      # back through entry → stop
     sim = aps.simulate(_sig(), cs, P0 + 10 * DAY)
     assert sim["state"] == "closed" and sim["ended"] == "sl" and sim["best_tp"] == 1 and sim["first"] == "tp1"
     assert sim["fill"] == 100.0 and abs(sim["risk_pct"] - 5.0) < 1e-9
-    assert sim["time_to_tp1_h"] == round((P0 + M15 - TS) / H1, 2)
+    assert sim["entry_mode"] == "market" and sim["fill_t"] == TS and sim["path_src"] == "1m"
+    assert sim["time_to_tp1_h"] == round(M1 / H1, 2)
     p = sim["policies"]
     assert abs(p["app"]["net"] - (5.0 - COST)) < 1e-9                        # farthest TP reached = TP1
     assert abs(p["tp1"]["net"] - (5.0 - COST)) < 1e-9
     assert abs(p["last"]["net"] - (-5.0 - COST)) < 1e-9
     assert abs(p["ladder"]["net"] - (5.0 / 3 + 2 / 3 * -5.0 - COST)) < 1e-3   # 1/3 at TP1, 2/3 at the stop
     assert abs(p["ladder_be"]["net"] - (5.0 / 3 - COST)) < 1e-3               # 1/3 at TP1, rest at entry
-    assert sim["be_t"] == P0 + 3 * M15 and abs(p["tp1"]["r"] - (5.0 - COST) / 5.0) < 1e-9
+    assert sim["be_t"] == SM + 3 * M1 and abs(p["tp1"]["r"] - (5.0 - COST) / 5.0) < 1e-9
     assert abs(p["tp1"]["lev"] - (5.0 - COST) * 10) < 1e-6
     assert sim["after_tp1"] is None                                             # 7 days after the stop not covered yet
 
@@ -116,9 +123,9 @@ def test_stop_first_and_same_candle_is_cautious():
 
 
 def test_never_filled_within_48h_and_missed_to_tp1():
-    cs = _flat(103.0, 200, P0)                         # long entry 100, price stays at 103 → no touch
+    cs = _flat(103.0, 200, SM)                         # long entry 100, price stays at 103 (3 % away → limit) → no touch
     sim = aps.simulate(_sig(), cs, P0 + 3 * DAY)
-    assert sim["state"] == "not_filled" and sim["reason"] == "no_touch" and sim["policies"] == {}
+    assert sim["state"] == "not_filled" and sim["reason"] == "no_touch" and sim["policies"] == {} and sim["entry_mode"] == "limit"
     sim_early = aps.simulate(_sig(), cs[:50], P0 + 50 * M15)
     assert sim_early["state"] == "pending"
     cs2 = _bars([(103.0, 103.5, 102.5, 103.0), (103.0, 106.0, 102.8, 105.5)])
@@ -132,19 +139,19 @@ def test_range_entry_fill_and_all_targets():
                 (99.5, 104.5, 99.4, 104.0),        # TP1
                 (104.0, 108.2, 103.9, 108.0)])     # TP2 = last target
     sim = aps.simulate(sig, cs, P0 + DAY)
-    assert sim["fill"] == 100.0 and sim["ended"] == "last_tp" and sim["best_tp"] == 2
+    assert sim["entry_mode"] == "limit" and sim["fill"] == 100.0 and sim["ended"] == "last_tp" and sim["best_tp"] == 2
     p = sim["policies"]
     assert abs(p["last"]["net"] - (8.0 - COST)) < 1e-9 and abs(p["app"]["net"] - (8.0 - COST)) < 1e-9
     assert abs(p["ladder"]["net"] - (6.0 - COST)) < 1e-9 and abs(p["ladder_be"]["net"] - (6.0 - COST)) < 1e-9
     assert abs(p["tp1"]["net"] - (4.0 - COST)) < 1e-9
-    # price opens inside the range → filled at the open
+    # price opens inside the range → market, filled at the open
     sim2 = aps.simulate(sig, _bars([(99.0, 99.2, 98.8, 99.1), (99.1, 104.1, 99.0, 104.0)]), P0 + DAY)
-    assert sim2["fill"] == 99.0 and sim2["best_tp"] == 1
+    assert sim2["entry_mode"] == "market" and sim2["fill"] == 99.0 and sim2["best_tp"] == 1
 
 
 def test_short_signal_and_timeout():
     sig = _sig(side="SHORT", lo=100.0, hi=100.0, sl=105.0, tps=(95.0, 90.0), lev=5)
-    cs = _bars([(99.8, 100.2, 99.7, 100.0)]) + _flat(97.0, 14 * 96 + 5, P0 + M15)
+    cs = _bars([(99.8, 100.2, 99.7, 100.0)]) + _flat(97.0, 14 * 96 + 5, SM + M1)
     sim = aps.simulate(sig, cs, P0 + 20 * DAY)
     assert sim["fill"] == 100.0 and sim["ended"] == "timeout" and sim["best_tp"] == 0
     assert abs(sim["policies"]["last"]["pct"] - 3.0) < 1e-9          # short from 100, closed at 97 after 14 days
@@ -178,18 +185,26 @@ def test_upsert_keeps_history_when_api_drops_old_signals():
     assert conn.execute("SELECT status FROM app_signals WHERE signal_id='4'").fetchone()[0] == "active"
 
 
-def _market(sym_paths):
-    """Fake klines: 15m from explicit bars per symbol (flat around them otherwise), 1h/4h synthetic uptrend."""
+def _market(sym_paths, m1_paths=None, calls=None):
+    """Fake klines. 15m: explicit bars per symbol, flat after the last one. 1m: explicit 1m bars if given, else each 15m bar
+    repeated as 15 one-minute bars with the same OHLC. 1h/4h: a synthetic uptrend."""
+    m1_paths = m1_paths or {}
+
     def klines(symbol, iv, start, end):
+        if calls is not None:
+            calls.append((symbol, iv))
         ms = aps.IV_MS[iv]
-        if iv == "15m":
+        if iv in ("15m", "1m"):
             bars = {b[0]: b for b in sym_paths.get(symbol, [])}
-            out = []
-            t = (start + ms - 1) // ms * ms
-            last_px = None
+            m1 = {b[0]: b for b in m1_paths.get(symbol, [])}
+            out, t = [], (start + ms - 1) // ms * ms
             while t <= end:
-                if t in bars:
-                    out.append(list(bars[t])); last_px = bars[t][4]
+                if iv == "1m" and t in m1:
+                    out.append(list(m1[t][:5]))
+                elif (t // M15 * M15) in bars:
+                    b = bars[t // M15 * M15]
+                    if iv == "15m" or not m1 or t > max(m1):
+                        out.append([t, *b[1:5]])
                 elif bars and t > max(bars):
                     px = bars[max(bars)][4]
                     out.append([t, px, px * 1.0005, px * 0.9995, px])
@@ -209,9 +224,9 @@ def _market(sym_paths):
 def test_run_end_to_end_json_shape(tmp_path=None):
     tmp = tempfile.mkdtemp() if tmp_path is None else str(tmp_path)
     conn = sqlite3.connect(":memory:")
-    win = _bars([(100.5, 100.8, 99.8, 100.2), (100.2, 105.5, 100.1, 105.0), (105.0, 110.4, 104.9, 110.0), (110.0, 115.5, 109.9, 115.0)])
+    win = _q([(100.5, 100.8, 99.8, 100.2), (100.2, 105.5, 100.1, 105.0), (105.0, 110.4, 104.9, 110.0), (110.0, 115.5, 109.9, 115.0)])
     paths = {"BTC-USDT": win, "ETH-USDT": [[b[0], b[1] * 20, b[2] * 20, b[3] * 20, b[4] * 20] for b in
-                                           _bars([(100.0, 100.5, 99.5, 100.2), (100.2, 100.4, 94.0, 95.0)])]}
+                                           _q([(100.0, 100.5, 99.5, 100.2), (100.2, 100.4, 94.0, 95.0)])]}
     api = {aps.API_ACTIVE: {"code": 1, "body": [_api_item(10, t=P0 + 20 * M15 + 60_000, name="BTC/USDT")], "error_message": None, "date": 0},
            aps.API_HISTORY: {"code": 1, "body": [_api_item(1, done=(1, 2, 3)),
                                                  _api_item(2, entry="2000", sl="1900", tps=("2100", "2200"), name="ETHUSDT", done=(1,))],
@@ -235,6 +250,15 @@ def test_run_end_to_end_json_shape(tmp_path=None):
     a = d["active"][0]
     assert a["id"] == "10" and a["price"] is not None and "to_sl_pct" in a and a["targets"][0]["hit"] in (True, False)
     assert d["profile"]["n_signals"] == 3 and d["profile"]["summary_ru"]
+    assert c["entry_market"] == 2 and c["entry_limit"] == 1 and d["stats"]["path_src"]["1m"] == 3
+    assert st["app_flags"]["disagreements"][0]["id"] == "2" and any("2 ETH: 0/1" in n for n in d["notes_ru"])
+    assert d["main_policy"] == "ladder_be" and d["policies"][0]["key"] == "ladder_be" and d["policies"][0]["main"]
+    assert "Основной способ" in d["summary_ru"]
+    bf = d["accounts"]["backfill"]
+    assert bf["as_is"]["trades"] == 2 and bf["improved"]["trades"] == 2 and d["accounts"]["since_live"]["as_is"]["trades"] == 0
+    assert bf["as_is"]["curve"][0] == [bf["start_t"], 10000.0] and d["coin_filter"]["blacklist"] == []
+    assert "coin_filter_skip" in a
+    assert conn.execute("SELECT COUNT(*) FROM app_signal_candles WHERE interval IN ('1m','15m')").fetchone()[0] == 0   # all finished → pruned
     assert any(p["id"] == "exit_policy" for p in d["proposals"])
     assert all("рано судить" in p["verdict_ru"] for p in d["proposals"])          # 2 resolved signals < 30
     assert "меньше 30" in d["summary_ru"]
@@ -272,7 +296,7 @@ def test_proposals_with_enough_history():
                                                                "hour_utc": i % 24, "side": "LONG", "leverage": 20.0}})
     props = {p["id"]: p for p in aps.build_proposals(rows)}
     b = props["skip_vs_btc"]
-    assert b["n"] == 36 and b["skipped"] == 18 and b["before"]["avg_r"] == 0.0 and b["after"]["avg_r"] == 1.0
+    assert b["n"] == 36 and b["skipped"] == 18 and b["before"]["avg_r"] == -0.25 and b["after"]["avg_r"] == 0.5   # main policy = ladder_be
     assert b["verdict_ru"].startswith("помогает")
     assert props["be_after_tp1"]["verdict_ru"].startswith("вредит")      # 1R winners cut to 0.5R, losers unchanged
     assert props["skip_rsi_wrong"]["skipped"] == 0 and "почти нечего" in props["skip_rsi_wrong"]["verdict_ru"]
@@ -294,7 +318,7 @@ def test_features_indicators():
 
 def test_budget_exhaustion_resumes_next_run_and_plan_change_resets():
     conn = sqlite3.connect(":memory:")
-    paths = {"BTC-USDT": _bars([(100.5, 100.8, 99.8, 100.2), (100.2, 115.5, 100.1, 115.0)])}
+    paths = {"BTC-USDT": _q([(100.5, 100.8, 99.8, 100.2), (100.2, 115.5, 100.1, 115.0)])}
     api = {aps.API_ACTIVE: {"code": 1, "body": []}, aps.API_HISTORY: {"code": 1, "body": [_api_item(1), _api_item(2, t=TS + H1)]}}
     now = P0 + 3 * DAY
     d1 = aps.run(conn, now=now, fetch_json=lambda u: api[u], klines=_market(paths), budget_s=30, max_requests=1)
@@ -309,8 +333,8 @@ def test_budget_exhaustion_resumes_next_run_and_plan_change_resets():
 
 def test_stop_then_back_to_tp1_within_7_days():
     conn = sqlite3.connect(":memory:")
-    bars = _bars([(100.0, 100.5, 99.5, 100.2), (100.2, 100.4, 94.0, 95.0)]) + _flat(96.0, 96 * 2, P0 + 2 * M15)
-    bars += _bars([(96.0, 106.0, 95.9, 105.5)], start=bars[-1][0] + M15)               # day ~2: back above TP1 = 105
+    bars = _q([(100.0, 100.5, 99.5, 100.2), (100.2, 100.4, 94.0, 95.0)]) + [r[:5] for r in _flat(96.0, 96 * 2, T0 + 2 * M15)]
+    bars += _q([(96.0, 106.0, 95.9, 105.5)], start=bars[-1][0] + M15)                  # day ~2: back above TP1 = 105
     api = {aps.API_ACTIVE: {"code": 1, "body": []}, aps.API_HISTORY: {"code": 1, "body": [_api_item(1)]}}
     d = aps.run(conn, now=P0 + 5 * DAY, fetch_json=lambda u: api[u], klines=_market({"BTC-USDT": bars}), budget_s=30, max_requests=50)
     assert d["counts"]["resolved"] == 1
@@ -318,3 +342,119 @@ def test_stop_then_back_to_tp1_within_7_days():
     assert sim["ended"] == "sl" and sim["after_tp1"] is True
     assert conn.execute("SELECT done FROM app_signals").fetchone()[0] == 1           # answer known before the 7 days end
     assert d["profile"]["stop_then_tp1"] == {"n": 1, "tp1_after_sl": 1}
+
+
+# ------------------------------------------------------------------------------------------------ fill rule + 1m path
+def test_market_fill_within_tolerance_counts_the_signal_minute():
+    cs = _bars([(100.55, 105.2, 100.4, 105.0)])                 # 0.5 % above the entry → market; TP1 inside the signal minute
+    sim = aps.simulate(_sig(), cs, P0 + DAY)
+    assert sim["entry_mode"] == "market" and sim["fill"] == 100.0 and sim["fill_t"] == TS
+    assert sim["best_tp"] == 1 and sim["time_to_tp1_h"] == 0.0 and sim["entry_dist_pct"] <= aps.MARKET_TOL_PCT
+    both = aps.simulate(_sig(), _bars([(100.3, 105.2, 94.8, 100.0)]), P0 + DAY)   # stop and TP1 in the same minute → stop
+    assert both["entry_mode"] == "market" and both["ended"] == "sl" and both["best_tp"] == 0
+
+
+def test_limit_fill_beyond_tolerance_needs_a_touch():
+    cs = _bars([(100.8, 100.9, 100.7, 100.8),                    # 0.7–0.8 % away → limit order
+                (100.8, 100.85, 100.6, 100.7),
+                (100.7, 105.3, 99.9, 104.0)])                     # touches 100 (fill) and TP1 in the same candle → TP not counted
+    sim = aps.simulate(_sig(), cs, P0 + DAY)
+    assert sim["entry_mode"] == "limit" and sim["fill"] == 100.0 and sim["fill_t"] == SM + 2 * M1 and sim["best_tp"] == 0
+    assert sim["state"] == "open"
+
+
+def test_1m_path_then_15m():
+    S = aps._m1_end(TS)
+    m1 = [[t, 100.0, 100.2, 99.9, 100.1] for t in range(SM, S, M1)]
+    m1[30] = [SM + 30 * M1, 100.1, 105.1, 100.0, 104.0]             # TP1 at minute 30
+    m1[31:] = [[r[0], 103.0, 103.5, 102.5, 103.0] for r in m1[31:]]  # stays above the entry afterwards
+    c15 = [[S + i * M15, 103.0, 103.5, 102.5, 103.0] for i in range(2)] + [[S + 2 * M15, 103.0, 103.1, 94.5, 95.0]]
+    c15 += [[S + 3 * M15, 95.0, 95.5, 94.0, 95.0]]                 # beyond this signal's verified coverage → ignored
+    path, src = aps.build_path(TS, m1, c15, True, P0 + DAY, path_until=S + 2 * M15)
+    assert src == "1m" and len(path) == len(m1) + 3 and path[0][5] == M1 and path[-1][5] == M15
+    sim = aps.simulate(_sig(), path, P0 + DAY)
+    assert sim["tp_t"][0] == SM + 30 * M1 and sim["sl_t"] == S + 2 * M15 and sim["ended"] == "sl" and sim["best_tp"] == 1
+    assert sim["be_t"] == S + 2 * M15 and sim["policies"]["ladder_be"]["t"] == S + 2 * M15   # entry passed on the way to the stop
+
+
+def test_build_path_waits_falls_back_and_ignores_foreign_cache():
+    c15 = [[T0 + i * M15, 100.0, 100.2, 99.8, 100.0] for i in range(10)]
+    assert aps.build_path(TS, [], c15, False, P0 + DAY, T0 + 9 * M15) == (None, "wait_1m")
+    path, src = aps.build_path(TS, [], c15, True, P0 + DAY, T0 + 9 * M15)
+    assert src == "15m" and path[0][0] == T0 and len(path) == 10          # no 1m anywhere → 15m from the containing candle
+    later = [[T0 + 5 * DAY + i * M15, 120.0, 120.2, 119.8, 120.0] for i in range(10)]
+    assert aps.build_path(TS, [], later, True, P0 + 6 * DAY, None) == (None, "no_start")
+
+
+def test_old_signal_with_only_later_candles_in_cache_stays_pending():
+    """The first live run: a signal not reached by the budget was simulated on candles cached for later signals → fake «не вошёл»."""
+    conn = sqlite3.connect(":memory:")
+    aps.ensure_schema(conn)
+    aps._store_candles(conn, "BTC-USDT", "15m", [[T0 + 5 * DAY + i * M15, 120.0, 120.2, 119.8, 120.0] for i in range(400)])
+    sim = aps._sim_from_cache(conn, dict(_sig(), id="x"), True, T0 + 10 * DAY, None)
+    assert sim["state"] == "pending" and sim["reason"] == "no_start"
+
+
+def test_schema_migration_adds_columns_to_an_old_table():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE app_signals (signal_id TEXT PRIMARY KEY, first_seen INTEGER, sim TEXT, sim_version INTEGER, done INTEGER)")
+    aps.ensure_schema(conn)
+    assert "m1_done" in {r[1] for r in conn.execute("PRAGMA table_info(app_signals)")}
+
+
+# ------------------------------------------------------------------------------------------------ coin filter + demo accounts
+def _row(i, t, coin="AAA", side="LONG", lev=10.0, state="closed", ended="sl", best=0, fill_t=None, close_dt=H1,
+         nets=None, risk=2.0, first=None, last_price=None, status="closed"):
+    nets = nets or {}
+    pol = {k: {"closed": True, "net": v, "pct": v + COST, "lev": v * lev, "r": v / risk, "t": (fill_t or t) + close_dt}
+           for k, v in nets.items()}
+    sim = {"state": state, "ended": ended if state == "closed" else None, "best_tp": best, "n_tps": 5, "fill": 100.0,
+           "fill_t": fill_t or t, "resolved_at": (fill_t or t) + close_dt if state == "closed" else None, "risk_pct": risk,
+           "first": first or ("sl" if best == 0 and ended == "sl" else "tp1"), "policies": pol, "last_price": last_price}
+    return {"id": str(i), "t": t, "coin": coin, "side": side, "leverage": lev, "status": status, "sim": sim, "feat": {},
+            "targets": [], "app_best_tp": 0, "name": coin + "-USDT"}
+
+
+def test_coin_filter_is_walk_forward():
+    base = T0
+    rows = [_row(i, base + i * DAY) for i in range(6)]                                # 6 stops without TP, each resolved 1 h later
+    rows.append(_row(6, base + 5 * DAY + 30 * 60_000))                               # 30 min after #5 was published: #5 not resolved yet
+    rows.append(_row(7, base + 7 * DAY, ended="last_tp", best=5))                    # 6 past stops → skipped
+    rows += [_row(10 + i, base + i * DAY, coin="BBB", ended="sl" if i < 2 else "last_tp", best=0 if i < 2 else 5) for i in range(7)]
+    f = aps.coin_filter_flags(rows)
+    assert f["5"] == {"past": 5, "stops": 5, "skip": False}
+    assert f["6"]["past"] == 5 and not f["6"]["skip"]                                # no look at the unresolved #5
+    assert f["7"] == {"past": 7, "stops": 7, "skip": True}
+    assert not any(f[str(10 + i)]["skip"] for i in range(7))
+    bl = aps.coin_blacklist(rows, base + 30 * DAY)
+    assert bl == [{"coin": "AAA", "n": 8, "stops_no_tp": 7, "share": 0.875}]
+    p = {x["id"]: x for x in aps.build_proposals(rows, f)}["coin_filter"]
+    assert p["skipped"] == 1 and "рано судить" in p["verdict_ru"]                    # 15 resolved < 30
+
+
+def test_demo_accounts_compound_in_time_order():
+    L0 = aps.LIVE_START_MS
+    rows = [
+        _row(1, L0 - 5 * DAY, coin="AAA", lev=25.0, ended="last_tp", best=5, close_dt=H1, nets={"ladder": 1.0, "ladder_be": 0.5}),
+        _row(2, L0 - 5 * DAY + 30 * 60_000, coin="BBB", lev=10.0, close_dt=3 * H1, nets={"ladder": -2.0, "ladder_be": -2.0}),
+        _row(3, L0 + H1, coin="CCC", lev=20.0, risk=6.0, close_dt=H1, nets={"ladder": -6.0, "ladder_be": -6.0}),   # stop beyond liquidation
+        _row(4, L0 + 3 * H1, coin="DDD", lev=10.0, state="open", last_price=101.0, status="active"),
+    ]
+    flags = {"2": {"skip": True}}
+    acc = aps.build_accounts(rows, L0 + DAY, flags)
+    bf, live = acc["backfill"], acc["since_live"]
+    a = bf["as_is"]
+    # #1 opens with $500 margin (5 % of 10 000), #2 opens 30 min later still at 10 000 → $500; #1 +1 % × 20 (capped) = +$100;
+    # #2 −2 % × 10 = −$100; #3 opens at 10 000 → $500, stop beyond liquidation → −$500
+    assert a["trades"] == 3 and a["wins"] == 1 and a["equity"] == 9500.0 and a["pnl_pct"] == -5.0
+    assert [c[1] for c in a["curve"]] == [10000.0, 10100.0, 10000.0, 9500.0]
+    assert a["max_dd_pct"] == round((10100 - 9500) / 10100 * 100, 2)
+    assert a["last"][0]["id"] == "3" and a["last"][0]["pnl_pct"] == -100.0 and a["last"][-1]["leverage"] == 20.0
+    assert len(a["open"]) == 1 and a["open"][0]["unrealized_pct"] == 10.0 and a["open"][0]["margin"] == 475.0
+    im = bf["improved"]
+    assert im["skipped_by_filter"] == 1 and im["trades"] == 2 and im["equity"] == round(10000 + 50 - 0.05 * 10050, 2)
+    assert live["as_is"]["trades"] == 1 and live["as_is"]["equity"] == 9500.0 and "18.10.2026" in live["label_ru"]
+    assert "на истории" in bf["label_ru"]
+    for k in ("key", "name_ru", "rules_ru", "start", "equity", "pnl_usd", "pnl_pct", "trades", "wins", "winrate", "max_dd_pct",
+              "open", "last", "curve"):
+        assert k in a, k

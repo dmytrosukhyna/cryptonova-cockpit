@@ -79,7 +79,7 @@ FEE_PCT, SLIP_PCT = 0.05, 0.02
 COST_PCT = 2 * FEE_PCT + SLIP_PCT
 MIN_SAMPLE = 30
 LEV_CAP = 10
-SIM_VERSION = 3             # 2: market fill at the signal minute + 1m path for the first 3 h; strict path coverage; 3: what-if variants
+SIM_VERSION = 4             # 2: market fill at the signal minute + 1m path for the first 3 h; strict path coverage; 3: what-if variants; 4: what-if close times (reverse account)
 WHATIF = {   # «что если» on the same price path: the owner asked whether flipping the signal or changing the stop would work
     "rev": "Разворот: та же сделка в обратную сторону (стоп и цели зеркально)",
     "wide15": "Стоп в 1.5 раза дальше, цели те же",
@@ -106,6 +106,9 @@ LIVE_START_MS = int(datetime(2026, 10, 18, tzinfo=timezone(timedelta(hours=3))).
 ACCOUNTS = [   # key, name, rules, policy, coin filter
     ("as_is", "Как приходят сигналы", "равными частями по целям, стоп на месте", "ladder", False),
     ("improved", "С улучшениями", "равными частями по целям + стоп в безубыток после TP1 + фильтр монет", "ladder_be", True),
+    # 18.10: on 315 signals the flipped trade (opposite side, stop and targets mirrored) earned +0.33 % per trade after fees,
+    # positive in both halves of the month — the owner's idea; tested live on demo before anything else
+    ("reverse", "Разворот (эксперимент)", "сделка в обратную сторону: стоп и цели зеркально, равными частями по целям + стоп в безубыток после TP1", "rev:ladder_be", False),
 ]
 WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 
@@ -995,7 +998,9 @@ def whatif(sig: dict, path: list, now: int) -> dict:
             continue
         pol = r.get("policies") or {}
         out[key] = {"state": r.get("state"), "first": r.get("first"), "best_tp": r.get("best_tp"),
-                    "be": (pol.get("ladder_be") or {}).get("net"), "last": (pol.get("last") or {}).get("net")}
+                    "be": (pol.get("ladder_be") or {}).get("net"), "last": (pol.get("last") or {}).get("net"),
+                    "t_be": (pol.get("ladder_be") or {}).get("t"), "t_last": (pol.get("last") or {}).get("t"),
+                    "risk_pct": r.get("risk_pct"), "fill": r.get("fill"), "fill_t": r.get("fill_t")}
     return out
 
 
@@ -1619,6 +1624,15 @@ def run_account(rows, key: str, name_ru: str, rules_ru: str, policy: str, use_fi
         if use_filter and (flags.get(r["id"]) or {}).get("skip"):
             skipped += 1
             continue
+        if policy.startswith("rev:"):
+            wi = (sim.get("whatif") or {}).get("rev")
+            if not wi or wi.get("fill_t") is None:
+                continue
+            closed_ = wi.get("t_be") if wi.get("state") == "closed" else None
+            rr = {**r, "side": "SHORT" if r["side"] == "LONG" else "LONG", "sim": {**sim, "first": wi.get("first"), "risk_pct": wi.get("risk_pct")}}
+            trades.append({"r": rr, "open_t": wi["fill_t"], "close_t": closed_, "net": wi.get("be") if closed_ else None,
+                           "lev": min(float(r["leverage"] or 1.0), ACCOUNT_LEV_CAP)})
+            continue
         p = _pol(r, policy)
         trades.append({"r": r, "open_t": sim["fill_t"], "close_t": p["t"] if p else None, "net": p["net"] if p else None,
                        "lev": min(float(r["leverage"] or 1.0), ACCOUNT_LEV_CAP)})
@@ -1799,6 +1813,9 @@ def build_doc(conn, now: int, notes: list, api: dict, sources: dict) -> dict:
         parts.append(f"Демо-счёт «{bf['improved']['name_ru']}» на истории: $10 000 → ${bf['improved']['equity']:,.0f} "
                      f"({bf['improved']['pnl_pct']:+.1f}%), «{bf['as_is']['name_ru']}» — ${bf['as_is']['equity']:,.0f} "
                      f"({bf['as_is']['pnl_pct']:+.1f}%).".replace(",", " "))
+    rv = bf.get("reverse") or {}
+    if rv.get("trades"):
+        parts.append(f"Если делать наоборот (разворот сигнала, эксперимент): $10 000 → ${rv['equity']:,.0f} ({rv['pnl_pct']:+.1f}%) на той же истории.".replace(",", " "))
     if counts["resolved"] < MIN_SAMPLE:
         parts = parts[:3] + [f"Закрытых сигналов {counts['resolved']} — меньше {MIN_SAMPLE}, выводы предварительные."]
     method = [
@@ -1833,7 +1850,7 @@ def build_doc(conn, now: int, notes: list, api: dict, sources: dict) -> dict:
             "coin_filter": {"rule_ru": f"Не брать монету, если у неё ≥{COIN_FILTER_MIN} закрытых сигналов в прошлом и ≥"
                                        f"{COIN_FILTER_SHARE * 100:.0f}% из них — стоп без единого TP",
                             "min_signals": COIN_FILTER_MIN, "stop_share": COIN_FILTER_SHARE, "blacklist": blacklist},
-            "summary_ru": " ".join(parts[:4]), "method_ru": method, "notes_ru": notes}
+            "summary_ru": " ".join(parts[:5]), "method_ru": method, "notes_ru": notes}
 
 
 # ------------------------------------------------------------------------------------------------------------ entry points

@@ -57,7 +57,10 @@ def _load_wide():
     keys = ["open", "high", "low", "close", "volume_quote", "long_liq_usd", "short_liq_usd", "open_interest_usd", "funding_rate_pct",
             "future_cvd_15m", "spot_cvd_15m", "ls_ratio_top", "taker_volume_ratio", "is_imputed_metrics", "basis_index_bps"]
     shape = z["close"].shape
-    A = {k: (z[k].astype(float) if k in z.files else np.full(shape, np.nan)) for k in keys}
+    nan = np.broadcast_to(np.float32(np.nan), shape)                # missing series: one read-only NaN view, no memory
+    A = {k: (z[k].astype(np.float32) if k in z.files else nan) for k in keys}
+    if "is_imputed_metrics" not in z.files:
+        A["is_imputed_metrics"] = np.broadcast_to(np.float32(0), shape)
     return list(z["syms"]), z["times"], A
 
 
@@ -82,7 +85,7 @@ class _Data:
 
     def _eligible(self, n):
         """[coin, bar] True while the coin is among the n most traded by trailing 30-day quote volume (known at that bar)."""
-        V = np.nan_to_num(self.V)
+        V = np.nan_to_num(self.V.astype(np.float64))
         cs = np.cumsum(V, axis=1)
         w = 30 * 96
         el = np.zeros(self.C.shape, dtype=bool)
@@ -125,14 +128,14 @@ class _Data:
 
     def rolling(self, x, n, fn="max"):
         """Rolling max/min/mean/std over the last n bars INCLUDING the current one."""
-        from numpy.lib.stride_tricks import sliding_window_view as sw
-        out = np.full_like(x, np.nan)
-        w = sw(x, n, axis=1)
-        f = {"max": np.nanmax, "min": np.nanmin, "mean": np.nanmean, "std": np.nanstd, "sum": np.nansum}[fn]
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            out[:, n - 1:] = f(w, axis=-1)
+        # pandas rolling, column by column (a sliding-window copy of [coins × bars × n] does not fit in memory for n ≈ 96)
+        import pandas as pd
+        r = pd.DataFrame(np.asarray(x, dtype=np.float64).T).rolling(n, min_periods=1)
+        v = {"max": r.max, "min": r.min, "mean": r.mean, "sum": r.sum, "std": lambda: r.std(ddof=0)}[fn]().to_numpy().T
+        if fn == "sum":
+            v = np.nan_to_num(v)                                         # as np.nansum: an all-NaN window sums to 0
+        out = np.full(np.shape(x), np.nan, dtype=np.result_type(x, np.float32))
+        out[:, n - 1:] = v[:, n - 1:]
         return out
 
     def rsi(self, n=14, x=None):

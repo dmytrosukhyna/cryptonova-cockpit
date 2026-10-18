@@ -100,7 +100,7 @@ def exits(mb):
 
 
 def exit_ru(name, mb):
-    h = lambda b: f"{b} баров (~{b / 4:g} ч)" if b < 96 else f"{b} баров (~{b / 96:g} сут)"  # noqa: E731
+    h = lambda b: f"~{b / 4:g} ч ({b} × 15 мин)" if b < 96 else f"~{b / 96:g} сут ({b} × 15 мин)"  # noqa: E731
     return {
         "1tp_1r": f"стоп 2 ATR(15м); одна цель 1R (= 2 ATR); иначе выход по времени через {h(mb)}",
         "1tp_2r": f"стоп 2 ATR(15м); одна цель 2R (= 4 ATR); иначе выход по времени через {h(mb)}",
@@ -332,6 +332,7 @@ def side_ru(s):
 
 def texts(r):
     p, s, ex = r["params"], r["side"], exit_ru(r["exit"], r["mb"])
+    ex = ex[0].upper() + ex[1:]
     idea = r["idea"]
     if idea == "donch":
         days = {96: "1 дня", 288: "3 дней", 480: "5 дней"}[p["N"]]
@@ -378,11 +379,12 @@ def texts(r):
         rule = (f"{side_ru(s).capitalize()}, когда свеча 15м закрылась {'выше максимума' if s > 0 else 'ниже минимума'} "
                 f"последних {days} при объёме > 2× среднего за сутки и {reg}; не чаще раза в сутки по монете. {ex}.")
     else:
-        nm = {"or4h": "диапазона первых 4 часов дня", "or8h": "диапазона первых 8 часов дня",
-              "prevday": "максимума/минимума вчерашнего дня"}[p["range"]]
+        hl = "максимума" if s > 0 else "минимума"
+        nm = {"or4h": f"{hl} первых 4 часов дня (UTC)", "or8h": f"{hl} первых 8 часов дня (UTC)",
+              "prevday": f"вчерашнего {hl}"}[p["range"]]
         name = f"Пробой {nm} ({side_ru(s)})"
         rule = (f"{side_ru(s).capitalize()}: первая за сутки (UTC) 15-минутная свеча, закрывшаяся "
-                f"{'выше верхней' if s > 0 else 'ниже нижней'} границы {nm}. {ex}.")
+                f"{'выше' if s > 0 else 'ниже'} {nm}. {ex}.")
     return name, rule
 
 

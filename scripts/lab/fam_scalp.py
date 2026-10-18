@@ -652,7 +652,20 @@ def main():
         "Минутки — Bitstamp BTC/USD спот (история + файл обновлений, до 2026-09-29), а торговать бот будет фьючерсы — "
         "микроструктура, спред и фитили другие; правило «одна монета ≤ 50 % прибыли» для одной монеты BTC не выполнимо по "
         "определению, поэтому для минуток есть отдельное поле passes_ex_coin_rule. "
-        f"Всего проверено вариантов: {TRIED}.")
+        f"Всего проверено вариантов: {TRIED}. ")
+    n_pass = {v: sum(passes(r[k]) for r in results) for v, k in (("taker", "stats"), ("maker", "stats_maker"), ("limit", "stats_limit"))}
+    gross = lambda r, p: (r["stats"].get(p) or {}).get("avg_pct", -9) + COST * 100
+    best = max(results, key=lambda r: gross(r, "train"))
+    notes += (
+        f"Итог: проходят правила лаборатории — при рыночных ордерах {n_pass['taker']} из {len(results)}, при лимитных 0,04 % "
+        f"(все исполнены) {n_pass['maker']}, при реалистичном лимите {n_pass['limit']}. Самая сильная находка до комиссий — "
+        f"«{best['name_ru']}»: {gross(best, 'train'):+.3f} % на TRAIN и {gross(best, 'test'):+.3f} % на TEST за сделку до "
+        f"комиссий (эффект устойчивый, но меньше комиссии тейкера 0,14 %); после комиссий: рынок "
+        f"{best['stats']['test']['avg_pct']:+.3f} %, лимит-все-исполнены {best['stats_maker']['test']['avg_pct']:+.3f} %, "
+        f"реалистичный лимит {best['stats_limit']['test']['avg_pct']:+.3f} % на TEST. Остальные идеи дают до комиссий "
+        f"0–0,05 % за сделку — меньше любых реальных издержек. Вывод: отдельного скальпинга с перевесом нет; торговать его "
+        f"рыночными ордерами — гарантированный минус, лимитные ордера не спасают из-за того, что исполняются в основном "
+        f"плохие сделки.")
     path = os.path.join(HERE, "results", "scalp.json")
     report(path, "scalp", results, TRIED, notes)
     log(f"wrote {path}")

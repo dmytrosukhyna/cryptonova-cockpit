@@ -71,7 +71,8 @@ def exit_ru(name: str, ex: dict) -> str:
         tgt = f"1 цель {dist(tps[0][0])} (закрываем всё)"
     else:
         share = int(round(tps[0][1] * 100))
-        tgt = f"{len(tps)} цели/целей {'/'.join(dist(t[0]) for t in tps)} по {share} %"
+        word = "цели" if len(tps) in (2, 3, 4) else "целей"
+        tgt = f"{len(tps)} {word} {'/'.join(dist(t[0]) for t in tps)} по {share} %"
         if ex.get("trail_atr"):
             tgt = f"1 цель {dist(tps[0][0])} на {share} %, остаток — трейлинг-стоп {_f(ex['trail_atr'])}×ATR"
     be = ", после первой цели стоп в безубыток" if ex.get("be_after_tp1") else ""
@@ -218,6 +219,26 @@ def train_top_share(trades):
     by = np.bincount(k[m], weights=r[m], minlength=D.NS)
     tot = by[by > 0].sum()
     return round(float(by.max() / tot), 2) if tot > 0 else None
+
+
+def robustness(trades):
+    """How much the average depends on a few trades / a few days: avg without the best 1 % of trades, the median trade,
+    and the average of DAILY averages (each entry day weighs the same — signals on many coins at once are one bet)."""
+    from harness import TRAIN_END
+    out = {}
+    if not trades:
+        return out
+    e = np.array([t["e"] for t in trades]); r = np.array([t["ret"] for t in trades])
+    te = D.times[e] >= TRAIN_END
+    day = D.times[e] // 86_400_000
+    for nm, m in (("train", ~te), ("test", te)):
+        if m.sum() < 20:
+            continue
+        x = np.sort(r[m])
+        dd = pd.Series(r[m]).groupby(day[m]).mean()
+        out[nm] = {"avg_wo_top1pct": round(float(x[:int(len(x) * .99)].mean() * 100), 3), "median_pct": round(float(np.median(x) * 100), 3),
+                   "day_weighted_avg_pct": round(float(dd.mean() * 100), 3), "days": int(len(dd))}
+    return out
 
 
 def side_split(trades):
@@ -372,7 +393,8 @@ def main():
             opp = find(idea, opp_mode, r["p"], r["exit"])
             other_best = best.get((idea, opp_mode))
             E = cache_entries[(idea, mode, tuple(sorted(r["p"].items())))]
-            split = side_split(run(E, EX[r["exit"]]))
+            T_best = run(E, EX[r["exit"]])
+            split = side_split(T_best)
             res = dict(
                 id=f"fade_{idea}_{mode}",
                 name_ru=NAME_RU[(idea, mode)],
@@ -384,6 +406,7 @@ def main():
                 paired_opposite={"mode": opp_mode, "train": opp["st"]["train"], "test": opp["st"]["test"], "pos_years": opp["st"]["pos_years"]},
                 beats_other_best_on_train=bool(other_best and r["st"]["train"]["avg_pct"] > other_best["st"]["train"]["avg_pct"]),
                 side_split=split,
+                robustness=robustness(T_best),
                 train_top_coin_share=r["tr_top"],
                 selection_ru="лучшая средняя на 2021–24 среди вариантов с ≥ 300 сделок и без монеты > 50 % прибыли 2021–24",
                 neighbors=[{"params": q["p"], "train_avg": q["st"]["train"].get("avg_pct"), "test_avg": q["st"]["test"].get("avg_pct"),
@@ -408,6 +431,7 @@ def main():
             role="original" if m == "fade" else "flip",
             sens_hold_72h={"train": sens[m]["train"], "test": sens[m]["test"], "pos_years": sens[m]["pos_years"]},
             monthly_avg_pct={k: round(v[1], 3) for k, v in monthly[m].items()},
+            robustness=robustness(run(cache_entries[("D", m, tuple(sorted(app_p.items())))], EX["app5"])),
         ))
     return rows, best, results, tried, exit_rank, exit_tab, app_pair, sens, month_info, t_start
 
@@ -443,7 +467,9 @@ def notes(results, tried, exit_rank, exit_tab, app_pair, month_info):
         f"выход за максимум/минимум 24 или 72 ч, копия сигнала приложения «шорт после роста против аптренда»), и их флип — то же самое, "
         f"но вход в сторону движения. 18 монет, 15-минутки, 2021–2026, комиссия 0,14 % за сделку. Параметры выбирали только по 2021–2024, "
         f"проверка — 2025–2026. Всего вариантов (сигнал × сторона × выход): {tried}.",
-        f"Итог: ни один вариант не прошёл фильтры ({n_pass} из {len(results)}). Оригинал (против движения) теряет почти везде.",
+        (f"Итог: ни один вариант не прошёл фильтры (0 из {len(results)})." if n_pass == 0 else
+         f"Итог: формально фильтры прошли {n_pass} из {len(results)}: " + ", ".join(f"«{r['name_ru']}»" for r in results if passes(r["stats"])) + ".")
+        + " Оригинал (против движения) теряет почти везде.",
         f"Флип против оригинала, с планом приложения (стоп 1,6 %, 5 целей, безубыток), на тех же сигналах: "
         f"2021–2024 оригинал {pc(tr_f)}, флип {pc(tr_g)}; 2025–2026 оригинал {pc(te_f)}, флип {pc(te_g)} за сделку "
         f"(флип лучше в {win_tr} из {len(two)} идей на 2021–24 и в {win_te} из {len(two)} на 2025–26). "
@@ -475,6 +501,16 @@ def notes(results, tried, exit_rank, exit_tab, app_pair, month_info):
                f"на других монетах и на новых данных, а не готовая стратегия. " if v1 else "")
             + "С планом приложения (ранняя цель 0,8 %) этот же лонг не зарабатывает — прибыль дают редкие большие движения за сутки, "
               "медианная сделка в минусе.")
+        rb = u1.get("robustness", {}).get("test")
+        if rb:
+            parts.append(
+                f"Насколько это надёжно: на 2025–26 без 1 % лучших сделок средняя {pc(rb['avg_wo_top1pct'])}, медианная сделка {pc(rb['median_pct'])}; "
+                f"если каждый день считать одинаково (в дни общего роста сигнал есть сразу на многих монетах), средняя {pc(rb['day_weighted_avg_pct'])} "
+                f"за {rb['days']} дней. "
+                + ("То есть прибыль делают несколько дней сильного роста всего рынка, а в обычный день с сигналом "
+                   "этот лонг теряет. Мы считаем результат слабым: прохождение фильтров — на грани и держится на редких днях."
+                   if rb["day_weighted_avg_pct"] < 0 or rb["avg_wo_top1pct"] < 0 else
+                   "Результат не держится на одной-двух сделках или днях."))
     parts.append(
         f"Выходы: для оригинала лучше всего «{EXIT_RU[rk['fade'][0]]}», для флипа — «{EXIT_RU[rk['flip'][0]]}» (по 2021–24). "
         f"Для флипа: 5 целей приложения {pc(ex_flip['app5'][0])} / {pc(ex_flip['app5'][1])}, 3 цели {pc(ex_flip['app3'][0])} / {pc(ex_flip['app3'][1])}, "

@@ -567,6 +567,14 @@ def test_ideas_first_run_weights_cash_and_unpriceable_skips():
     src3["cg"]["A1"] *= 1.1
     st3 = port.step(src3, _ideas(rows, T0), T0 + 3_600_000)                          # the index moves with the live price
     assert st3["index"] > st2["index"] and {p["symbol"]: p for p in st3["positions"]}["A1"]["pnl_pct"] == 10.0
+    # 18.10: every holding has a horizon — core long (no stop), «можно брать» mid (stop −20 %), small short (stop −35 %, ×2 half)
+    b3 = {p["symbol"]: p for p in st3["positions"]}
+    assert b3["BTC"]["horizon"] == "long" and b3["BTC"]["levels"]["stop"] is None and b3["BTC"]["held_days"] == 0.0
+    assert b3["A1"]["horizon"] == "mid" and abs(b3["A1"]["levels"]["stop"] - 11.0 * 0.8) < 1e-6 and b3["A1"]["levels"]["take_half"] is None
+    assert b3["M1"]["horizon"] == "short" and abs(b3["M1"]["levels"]["take_half"] - 0.02) < 1e-9 and "2–4 недели" in b3["M1"]["horizon_ru"]
+    hz = st3["horizons"]
+    assert [hz[h]["n"] for h in ("long", "mid", "short")] == [2, 6, 3] and abs(sum(hz[h]["share_pct"] for h in hz) - st3["invested_pct"]) < 1.5
+    assert hz["mid"]["base"]["days"] == 60 and "быть лучше" in hz["mid"]["base"]["ru"] and hz["long"]["plan_ru"]
 
 
 def test_ideas_avoid_stops_body_trailing_and_cooldown():

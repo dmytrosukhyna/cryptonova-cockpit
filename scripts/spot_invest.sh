@@ -3,6 +3,8 @@
 #   bash scripts/spot_invest.sh          → shows what it would buy / sell, places nothing
 #   bash scripts/spot_invest.sh --run    → places the orders once
 #   bash scripts/spot_invest.sh --run --loop 900   → keeps the account in line every 15 minutes
+#   bash scripts/spot_invest.sh --portfolio --run --loop 900   → only the Портфолио's spot share in coins (60 % while BTC is above
+#                                                     its 200-day average, 20 % below), the rest in USDT — the system rebalances itself
 # Keys come from ~/.cryptonova.env (BYBIT_API_KEY / BYBIT_API_SECRET) and never leave this Mac.
 cd "$(dirname "$0")/.." || exit 1
 [ -f ~/.cryptonova.env ] && source ~/.cryptonova.env

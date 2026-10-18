@@ -8,6 +8,9 @@ weights) and makes the Bybit spot holdings match those weights on the account's 
   python -m cnq.execution.spot_mirror            → shows the plan (what it would buy / sell), places nothing
   python -m cnq.execution.spot_mirror --run      → places the orders (Bybit demo; real account only with CNQ_LIVE_TRADING=yes)
   python -m cnq.execution.spot_mirror --run --loop 900   → every 15 minutes
+  python -m cnq.execution.spot_mirror --portfolio [--run]  → only the SPOT SHARE of «CRYPTO NOVA Портфолио» goes into coins
+                                                            (capital.json → sleeve «spot» weight: 60 % of the sum while BTC is above
+                                                            its 200-day average, 20 % below — the tested rule), the rest stays USDT
 
 Rules: sells first, then buys; an order only when the gap is at least max($10, 2 % of equity); coins that Bybit does not list
 as <COIN>USDT spot stay in USDT (logged); the portfolio's own cash share stays in USDT; market orders (buy by USDT amount,
@@ -24,6 +27,7 @@ import urllib.request
 from .bybit_trade import BybitTrader
 
 SRC = os.environ.get("CNQ_SPOT_SRC", "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/portfolio.json")
+CAP_SRC = os.environ.get("CNQ_CAPITAL_SRC", "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/capital.json")
 LOG = "data/spot_mirror.jsonl"
 MIN_USD = 10.0
 MIN_GAP = 0.02
@@ -37,14 +41,22 @@ def log(ev: dict) -> None:
         f.write(json.dumps(ev, ensure_ascii=False) + "\n")
 
 
-def targets(portfolio: dict) -> dict:
-    """{COIN: market weight} of the CRYPTO NOVA portfolio's open positions (the rest of the account is its cash)."""
+def targets(portfolio: dict, scale: float = 1.0) -> dict:
+    """{COIN: market weight} of the CRYPTO NOVA portfolio's open positions (the rest of the account is its cash), × scale."""
     p = (portfolio.get("portfolios") or {}).get("ideas") or {}
     out = {}
     for x in p.get("positions") or []:
         if (x.get("status") or "OPEN") == "OPEN" and x.get("weight"):
-            out[str(x["symbol"]).upper()] = float(x["weight"])
+            out[str(x["symbol"]).upper()] = float(x["weight"]) * scale
     return out
+
+
+def spot_share(capital: dict) -> float | None:
+    """The spot sleeve's target weight in «CRYPTO NOVA Портфолио» (None if the file has none)."""
+    for s in capital.get("sleeves") or []:
+        if s.get("key") == "spot" and s.get("weight") is not None:
+            return max(0.0, min(1.0, float(s["weight"])))
+    return None
 
 
 class SpotAccount:
@@ -118,8 +130,8 @@ def plan(tg: dict, usdt: float, held: dict, acct) -> tuple[list, dict]:
     return orders, {"equity": round(equity, 2), "usdt": round(usdt, 2), "skipped": skipped, "gap_min": round(gap_min, 2)}
 
 
-def step(acct, portfolio: dict, run: bool) -> dict:
-    tg = targets(portfolio)
+def step(acct, portfolio: dict, run: bool, scale: float = 1.0) -> dict:
+    tg = targets(portfolio, scale)
     if not tg:
         log({"ev": "no_targets"})
         return {"orders": [], "done": []}
@@ -138,21 +150,31 @@ def step(acct, portfolio: dict, run: bool) -> dict:
     return {"orders": orders, "done": done, **info}
 
 
-def fetch_portfolio() -> dict:
-    with urllib.request.urlopen(SRC, timeout=20) as r:
+def fetch_portfolio(url: str = SRC) -> dict:
+    with urllib.request.urlopen(url, timeout=20) as r:
         return json.loads(r.read().decode())
 
 
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     run = "--run" in argv
+    by_cap = "--portfolio" in argv
     loop = int(argv[argv.index("--loop") + 1]) if "--loop" in argv else 0
     bx = BybitTrader()
     acct = SpotAccount(bx)
-    print(f"CRYPTO NOVA портфель → Bybit spot ({bx.mode}). {'Размещаю ордера.' if run else 'Только план, без ордеров (добавь --run).'}")
+    print(f"CRYPTO NOVA портфель → Bybit spot ({bx.mode}). {'Размещаю ордера.' if run else 'Только план, без ордеров (добавь --run).'}"
+          + (" Доля спота — из «CRYPTO NOVA Портфолио»." if by_cap else ""))
     while True:
         try:
-            step(acct, fetch_portfolio(), run)
+            scale = 1.0
+            if by_cap:
+                sh = spot_share(fetch_portfolio(CAP_SRC))
+                if sh is None:
+                    log({"ev": "no_capital_share"})
+                    raise RuntimeError("capital.json has no spot share — nothing changed")
+                scale = sh
+                log({"ev": "spot_share", "share": sh})
+            step(acct, fetch_portfolio(), run, scale)
         except Exception as e:  # noqa: BLE001
             log({"ev": "error", "error": str(e)[:200]})
         if not loop:

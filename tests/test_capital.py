@@ -53,16 +53,30 @@ def test_regime_flip_moves_money_to_carry_but_not_more_than_once_a_day():
     conn = sqlite3.connect(":memory:")
     world(d)
     K.run(conn, d, T0)
-    world(d, risk_off=True)
+    world(d, risk_off=True)                                # a short panic alone does not switch the regime (not supported by the test)
+    assert K.run(conn, d, T0 + 1800_000)["regime"]["key"] == "on"
+    world(d, bull=False)
     a = K.run(conn, d, T0 + 3_600_000)                     # within a day of the start split → wait
     assert a["events"] == [] and a["regime"]["key"] == "off"
     b = K.run(conn, d, T0 + 25 * 3_600_000)
     w = {s["key"]: s["weight"] for s in b["sleeves"]}
-    assert abs(w["spot"] + w["futures"] - 0.35) < 1e-3 and "режим" in b["events"][0] and "комиссии" in b["events"][0]
+    assert abs(w["spot"] + w["futures"] - 0.20) < 1e-3 and "режим" in b["events"][0] and "комиссии" in b["events"][0]
     assert b["value_usd"] < 10_000 and b["benchmark"]["allocator_edge_usd"] < 0         # the move cost fees
     world(d)
     c = K.run(conn, d, T0 + 26 * 3_600_000)               # flips back within a day → no new move
-    assert c["events"] == [] and abs(sum(s["weight"] for s in c["sleeves"] if s["key"] in ("spot", "futures")) - 0.35) < 1e-3
+    assert c["events"] == [] and abs(sum(s["weight"] for s in c["sleeves"] if s["key"] in ("spot", "futures")) - 0.20) < 1e-3
+
+
+def test_spot_cash_earns_the_lending_rate():
+    d = tempfile.mkdtemp()
+    conn = sqlite3.connect(":memory:")
+    world(d)
+    json.dump({"portfolios": {"ideas": {"equity_usd": 10_000.0, "cash_pct": 10, "history": []}}}, open(os.path.join(d, "portfolio.json"), "w"))
+    a = K.run(conn, d, T0)
+    b = K.run(conn, d, T0 + 36 * 3_600_000)               # 1.5 days later, same week, desk unchanged → only the cash interest
+    sa = {s["key"]: s["value_usd"] for s in a["sleeves"]}["spot"]
+    sb = {s["key"]: s["value_usd"] for s in b["sleeves"]}["spot"]
+    assert b["events"] == [] and abs(sb - sa * (1 + 0.10 * 0.04 * 1.5 / 365)) < 0.01 and sb > sa
 
 
 def test_new_source_gets_money_at_once_and_old_version_restarts_once():

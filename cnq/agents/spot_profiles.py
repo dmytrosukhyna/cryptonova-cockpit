@@ -34,6 +34,7 @@ left the snapshot keeps its last seen price (`px:SYM` in the meta table). Tables
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 from datetime import datetime, timezone
@@ -345,6 +346,52 @@ IDEAS_RULES = [
     "ценовые правила (стопы, ×2, трейлинг).",
     "Это проверка таблицы на учебном счёте, а не совет и не прогноз: результат может оказаться минусом.",
 ]
+# 18.10 (owner: «на спот краткосрочные, среднесрочные и долгосрочные стратегии — каких целей мы ожидаем, на какой период»).
+# Every holding belongs to one horizon by its role; the rules above ARE the horizon's plan. Next to it — the market's base rate for
+# that class and period (scripts/lab/horizons.py → horizons.json: what the AVERAGE coin of the class did, 2023-06 → 2026-10, by the
+# BTC regime). It is a yardstick, not a forecast: our picks have to beat it — that is the target.
+HORIZONS = {
+    "long": {"name_ru": "Долгосрочная", "period_ru": "6–12 месяцев", "days": (180, 365), "who_ru": "ядро: BTC, ETH, SOL",
+             "plan_ru": "Держим через циклы, без стопа; доля 15%, доливаем, если упала ниже 11%. Сколько всего денег в споте, решает "
+                        "Портфолио по режиму BTC: выше 200-дневной средней — больше, ниже — меньше."},
+    "mid": {"name_ru": "Среднесрочная", "period_ru": "1–3 месяца", "days": (30, 90), "who_ru": "крупные альты «можно брать / добрать»",
+            "plan_ru": "Стоп −20% от входа; продаём, если таблица поставила «не брать»; по понедельникам продаём «ждём» с минусом 10% и больше."},
+    "short": {"name_ru": "Краткосрочная", "period_ru": "2–4 недели", "days": (14, 30), "who_ru": "небольшие суммы: мемы и высокий риск",
+              "plan_ru": "Стоп −35%; на ×2 продаём половину — вложенное вернулось; остаток держим до отката 35% от пика."},
+}
+
+
+def _load_hz() -> dict:
+    try:
+        return json.load(open(os.path.join(os.path.dirname(__file__), "horizons.json"), encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+HZ = _load_hz()
+
+
+def horizon_of(kind: str, est: str) -> str:
+    return "long" if kind == "core" else "short" if est == "small" else "mid"
+
+
+def horizon_base(h: str, btc_bull) -> dict | None:
+    """The market's yardstick for horizon h in the current BTC regime (unknown regime → «рост»)."""
+    st, cls = HZ.get("stats") or {}, (HZ.get("classes") or {}).get(h) or {}
+    reg = "off" if btc_bull is False else "on"
+    a, rc = st.get(f"{h}_{reg}_all"), st.get(f"{h}_{reg}_recent")
+    if not a or not cls:
+        return None
+    days = cls["days"]
+    def sg(x: float) -> str:
+        return f"{x:+.0f}%".replace("-", "−")
+    ru = (f"Ориентир рынка — средняя монета этого класса в 2023–2026 при {'росте BTC' if reg == 'on' else 'BTC ниже 200-дневной средней'}: "
+          f"за {days} дней в половине случаев от {sg(a['p25'])} до {sg(a['p75'])}, середина {sg(a['p50'])}, в плюсе {a['pos']:.0f}% случаев")
+    if rc:
+        ru += f"; в 2025–2026 середина {sg(rc['p50'])}, в плюсе {rc['pos']:.0f}%"
+    return {"days": days, "regime": reg, "all": a, "recent": rc, "ru": ru + ". Наша цель — быть лучше этого ориентира."}
+
+
 IDEAS_SRC = ("cg", "meme", "hl")          # price sources of portfolio.run in priority order
 IDEAS_SRC_RU = {"cg": "CoinGecko", "meme": "список мемов", "hl": "спот Hyperliquid", "ideas": "цена из таблицы",
                 "last": "последняя известная цена"}
@@ -639,7 +686,14 @@ class IdeasPortfolio:
             sl["small" if est == "small" else "buy"] += mv / V
             r = smap.get(s)
             ret = px / p["entry"] - 1 if px and p["entry"] else None
-            out.append({**p, "bucket": kind, "kind_ru": KIND_RU.get(kind, kind), "role": est, "role_ru": IDEAS_ROLE_RU.get(est, est),
+            h = horizon_of(kind, est)
+            held = (now - p["entry_time"]) / DAY if p.get("entry_time") else None
+            hz = {"horizon": h, "horizon_ru": f"{HORIZONS[h]['name_ru']} · {HORIZONS[h]['period_ru']}", "horizon_days": list(HORIZONS[h]["days"]),
+                  "held_days": round(held, 1) if held is not None else None,
+                  "horizon_over": bool(held is not None and held > HORIZONS[h]["days"][1]),
+                  "levels": {"stop": round(p["entry"] * (1 + (P["stop_small"] if h == "short" else P["stop_buy"])), 8) if h != "long" and p.get("entry") else None,
+                             "take_half": round(p["entry"] * P["body_x"], 8) if h == "short" and p.get("entry") and not p.get("fixes") else None}}
+            out.append({**p, **hz, "bucket": kind, "kind_ru": KIND_RU.get(kind, kind), "role": est, "role_ru": IDEAS_ROLE_RU.get(est, est),
                         "name": names.get(s) or s, "weight": round(mv / V, 4), "cost_weight": round(p["weight"], 6),
                         "target_weight": P["small_w"] if est == "small" else P["core_w"] if kind == "core" else P["buy_w"],
                         "price": px, "price_live": s in live, "price_src": psrc.get(s),
@@ -649,6 +703,12 @@ class IdeasPortfolio:
                         "table_why_ru": (r or {}).get("why_ru"), "reco": ideas_reco(kind, est, p, px, r, fresh)})
         cash = rp.cash() / V
         started, last_weekly = rp._meta("started"), rp._meta("last_weekly")
+        bull = (ideas or {}).get("btc_bull")
+        horizons = {h: {**{k: (list(v) if isinstance(v, tuple) else v) for k, v in d.items()},
+                        "share_pct": round(sum(x["weight"] for x in out if x["horizon"] == h) * 100, 1),
+                        "n": sum(1 for x in out if x["horizon"] == h),
+                        "pnl_usd": round(sum(x["pnl_usd"] for x in out if x["horizon"] == h), 2),
+                        "base": horizon_base(h, bull)} for h, d in HORIZONS.items()}
         return {"key": P["key"], "name": P["name"], "about": IDEAS_ABOUT, "status": P["status"], "experiment": False, "ours": True,
                 "positions": out, "cash_pct": round(cash * 100), "invested_pct": round((1 - cash) * 100), "index": idx,
                 "equity_usd": round(10_000 * V, 2), "start_usd": 10_000, "history": hist, "actions": actions,
@@ -657,7 +717,7 @@ class IdeasPortfolio:
                 "sleeves": {"buy": {"label": "ядро и «можно брать / добрать»", "target_pct": round((3 * P["core_w"] + (P["buy_n"] - 3) * P["buy_w"]) * 100, 1), "now_pct": round(sl["buy"] * 100, 1)},
                             "small": {"label": "на небольшую сумму", "target_pct": round(P["small_n"] * P["small_w"] * 100, 1), "now_pct": round(sl["small"] * 100, 1)},
                             "cash": {"label": "кэш", "target_pct": round(P["min_cash"] * 100, 1), "now_pct": round(cash * 100, 1)}},
-                "rules_ru": IDEAS_RULES,
+                "rules_ru": IDEAS_RULES, "horizons": horizons,
                 "ideas": {"asof": (ideas or {}).get("asof"), "fresh": fresh, "note_ru": note,
                           "summary_ru": (ideas or {}).get("summary_ru") if fresh else None},
                 "not_bought": not_bought,

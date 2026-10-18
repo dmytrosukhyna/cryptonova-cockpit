@@ -42,3 +42,14 @@ def test_dry_run_places_nothing():
     acct = FakeAcct(1_000.0, {}, listed={"BTC"}, prices={"BTC": 80_000.0})
     r = SM.step(acct, pf, run=False)
     assert r["orders"] and not acct.sent
+
+
+def test_portfolio_mode_scales_the_coins_to_the_portfolio_spot_share():
+    pf = {"portfolios": {"ideas": {"positions": [{"symbol": "BTC", "weight": 0.5}, {"symbol": "ETH", "weight": 0.4}]}}}
+    cap = {"sleeves": [{"key": "spot", "weight": 0.2}, {"key": "yield", "weight": 0.3}]}
+    assert SM.spot_share(cap) == 0.2 and SM.spot_share({}) is None
+    tg = SM.targets(pf, SM.spot_share(cap))
+    assert abs(tg["BTC"] - 0.10) < 1e-9 and abs(tg["ETH"] - 0.08) < 1e-9     # BTC below its 200-day average → 20 % of the sum in coins
+    acct = FakeAcct(10_000.0, {}, {"BTC", "ETH"}, {"BTC": 100_000.0, "ETH": 4_000.0})
+    r = SM.step(acct, pf, run=False, scale=0.2)
+    assert [(o["coin"], o["usd"]) for o in r["orders"]] == [("BTC", 1000.0), ("ETH", 800.0)] and acct.sent == []

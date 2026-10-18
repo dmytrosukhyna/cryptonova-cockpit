@@ -60,3 +60,18 @@ def test_mix_seeds_each_new_source_and_drops_a_losing_one():
     assert not ok and st["n"] == 10 and st["avg_pct"] < 0
     pub = SF.public(conn, T0 + 4)
     assert pub["name"] == "CRYPTO NOVA" and [m["in_mix"] for m in pub["mix"] if m["key"] == "imp"] == [False]
+
+
+def test_run_on_a_fresh_db_and_on_an_old_table_without_source():
+    """18.10: run() called live_ok() before the table / column existed — the server step failed silently for hours."""
+    import json, os, sqlite3, tempfile
+    from cnq.agents import signal_feed as F
+    d = tempfile.mkdtemp()
+    json.dump({"profiles": {"bal": {"open": [], "closed": []}, "imp": {"open": [], "closed": []}}}, open(os.path.join(d, "paper.json"), "w"))
+    doc = F.run(sqlite3.connect(":memory:"), d, 1_792_000_000_000)
+    assert "error" not in doc and os.path.exists(os.path.join(d, "signals_feed.json"))
+    old = sqlite3.connect(":memory:")
+    old.execute("""CREATE TABLE signal_feed(id TEXT PRIMARY KEY, symbol TEXT, side TEXT, grade TEXT, entry REAL, stop REAL, opened INTEGER,
+                   open_text TEXT, msg_id INTEGER, seeded INTEGER, closed INTEGER, exit_kind TEXT, pnl_pct REAL, close_text TEXT, close_msg_id INTEGER)""")
+    doc = F.run(old, d, 1_792_000_000_000)
+    assert "error" not in doc and "source" in {r[1] for r in old.execute("PRAGMA table_info(signal_feed)")}

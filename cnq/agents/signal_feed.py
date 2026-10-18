@@ -115,6 +115,7 @@ def ensure(conn: sqlite3.Connection) -> None:
 
 def live_ok(conn: sqlite3.Connection, source: str, now: int) -> tuple[bool, dict]:
     """A source stays in the mix unless its closed signals of the last 30 days average below zero (with ≥ 10 closed)."""
+    ensure(conn)                     # 18.10 fix: run() asked before the table / the «source» column existed → the step failed
     xs = [r[0] for r in conn.execute("SELECT pnl_pct FROM signal_feed WHERE source=? AND closed>=? AND pnl_pct IS NOT NULL AND seeded IN (0, 2)",
                                      (source, now - LIVE_DAYS * 86_400_000))]
     st = {"n": len(xs), "avg_pct": round(sum(xs) / len(xs), 2) if xs else None, "wins": sum(1 for x in xs if x > 0)}
@@ -198,6 +199,7 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> d
         paper = json.load(open(os.path.join(out, "paper.json"), encoding="utf-8"))
     except Exception as e:  # noqa: BLE001
         return {"error": f"paper.json: {e}"}
+    ensure(conn)
     res = {}
     for k, _, _ in SOURCES:
         desk = (paper.get("profiles") or {}).get(k) or {}

@@ -75,7 +75,7 @@ def compose(out: str = "web") -> str:
         eq = prof.get("equity")
         if eq:
             fut_res = eq + sum(o.get("open_pnl_usd") or 0 for o in opened) - 10_000
-        L.append(f"По фьючерсам, стратегия «{prof.get('name') or 'Сбалансированная'}»: " + "; ".join(parts) + "."
+        L.append(f"По фьючерсам, CNPTS «{prof.get('name') or 'Сбалансированная'}»: " + "; ".join(parts) + "."
                  + (f" Счёт {usd(10_000 + fut_res)}." if fut_res is not None else ""))
     spot_res = None
     pf = _load(out, "portfolio.json") or {}
@@ -87,7 +87,7 @@ def compose(out: str = "web") -> str:
     elif sp.get("index"):
         spot_res = 10_000 * sp["index"] / 100 - 10_000
     if spot_res is not None:
-        nm = "AI-портфель" if sp_key == "ideas" else (sp.get("name_short") or "Умеренный")
+        nm = "CNPTS, AI-портфель" if sp_key == "ideas" else (sp.get("name_short") or "Умеренный")
         L.append(f"По споту, {nm}: {'в плюсе на ' + usd(spot_res) if spot_res > 5 else 'в минусе на ' + usd(spot_res) if spot_res < -5 else 'около нуля'}.")
     # every desk counts in «Заработано всего»: funding carry (real demo), arbitrage and triangle (virtual estimates)
     extra = {}

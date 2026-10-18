@@ -186,9 +186,20 @@ def carry_rates(out: str, now: int) -> dict:
 
 
 def regime(out: str) -> tuple[str, str]:
-    """BTC above its 200-day average and up over 90 days → «рост». A short panic does not switch it (selling into a panic was not
-    supported by the test); an unknown flag keeps «рост»."""
-    bull = ((_load(out, "decision.json").get("risk") or {}).get("btc_bull"))
+    """BTC above its 200-day average and up over 60 days → «рост» (18.10 robustness test, scripts/lab/regime_robust.py: 20 variants
+    of SMA 100–250 × lookback none/30/60/90/120 all beat fixed 40 % (+88 %); 60 days was best or near best for every SMA —
+    SMA200 + 60 d: +197 %, drawdown −25 %, 2025 +15 %, 2026 +9 % vs SMA200 + 90 d: +183 %, −26 %, +13 %, +3 %). Uses the terminal's
+    daily BTC figures (decision.json coins → BTC regime: sma200, r60, price); without them — the system-wide btc_bull flag
+    (200-day average + 90 days). A short panic does not switch it; an unknown state keeps «рост»."""
+    dec = _load(out, "decision.json")
+    btc = next((c for c in dec.get("coins") or [] if str(c.get("symbol", "")).startswith("BTC")), None) or {}
+    rg = btc.get("regime") or {}
+    px, sma, r60 = btc.get("price"), rg.get("sma200"), rg.get("r60")
+    if px and sma and r60 is not None and r60 == r60:
+        if px > sma and r60 > 0:
+            return "on", f"BTC выше своей 200-дневной средней и за 60 дней в плюсе ({r60 * 100:+.0f}%)"
+        return "off", ("BTC ниже своей 200-дневной средней" if px <= sma else f"BTC за 60 дней в минусе ({r60 * 100:+.0f}%)")
+    bull = (dec.get("risk") or {}).get("btc_bull")
     if bull is False:
         return "off", "BTC ниже своей 200-дневной средней или за 90 дней в минусе"
     return "on", "BTC выше своей 200-дневной средней и за 90 дней в плюсе"
@@ -429,7 +440,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
             "rules_ru": [
                 f"Демо-счёт ${START:,.0f}: система сама делит сумму между шестью источниками и ведёт её месяц.",
                 "Часть со ставкой на рост (спот, активный спот, фьючерсы) зависит от рынка: когда BTC выше своей 200-дневной средней и "
-                "за 90 дней в плюсе — 70%, иначе — 20%. Проверено на 2023–2026: так +203% против +100% при постоянных 40%, просадка −26% "
+                "за 60 дней в плюсе — 70%, иначе — 20% (из 20 вариантов настройки 60 дней — лучший или близкий к лучшему при любой средней). Проверено на 2023–2026: так +203% против +100% при постоянных 40%, просадка −26% "
                 "вместо −31%, плюс в каждом году. В росте доходные доллары — подушка, в падении — основное место для денег. "
                 "Направление, которое за 30 дней потеряло больше 5%, получает половину доли, заработавшее больше 5% — в 1.25 раза больше.",
                 "Свободные доллары внутри спота (его кэш) тоже работают — под ставку кредитования.",

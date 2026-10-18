@@ -199,3 +199,19 @@ def test_models_are_ranked_by_result_per_drawdown_only_after_four_weeks():
     r = K.rank_models(m, 30 * 86_400_000, 0)
     # calm +2 % / dd 0 → 2/2 = 1.0; balanced +6 % / −4.6 % → 1.30; bold +7 % / −14.8 % → 0.47
     assert r["ready"] and r["leader"] == "balanced" and [x["key"] for x in r["rows"]] == ["balanced", "calm", "bold"]
+
+
+
+def test_regime_uses_btc_200d_average_and_60d_return_when_the_terminal_has_them():
+    d = tempfile.mkdtemp()
+    def dec(price, sma, r60, bull=True):
+        json.dump({"risk": {"btc_bull": bull}, "coins": [{"symbol": "BTC-USDT", "price": price, "regime": {"sma200": sma, "r60": r60}}]},
+                  open(os.path.join(d, "decision.json"), "w"))
+    dec(80_000, 74_000, 0.12)
+    assert K.regime(d)[0] == "on" and "60 дней" in K.regime(d)[1]
+    dec(80_000, 74_000, -0.03)
+    assert K.regime(d) == ("off", "BTC за 60 дней в минусе (-3%)")
+    dec(70_000, 74_000, 0.05, bull=True)
+    assert K.regime(d)[0] == "off"
+    json.dump({"risk": {"btc_bull": False}}, open(os.path.join(d, "decision.json"), "w"))   # no terminal figures → the system flag
+    assert K.regime(d)[0] == "off"

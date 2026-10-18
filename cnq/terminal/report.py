@@ -41,6 +41,7 @@ def regime(cs15: list[Candle]) -> dict:
     last = c[-1]
     r3 = last / c[-4] - 1; r7 = last / c[-8] - 1; r28 = last / c[-29] - 1
     r90 = last / c[-91] - 1 if n > 91 else float("nan")
+    r60 = last / c[-61] - 1 if n > 61 else float("nan")       # 18.10: the allocator's regime uses 60 days (robustness test)
     hh20 = a["h"][-21:-1].max(); ll20 = a["l"][-21:-1].min()
     sma200 = c[-200:].mean() if n >= 200 else c.mean()
     rv30 = float(np.std(np.diff(np.log(c[-31:]))) * math.sqrt(365))
@@ -55,7 +56,7 @@ def regime(cs15: list[Candle]) -> dict:
         mid, mid_note = "DOWN_NO_BREAKOUT", "тренд вниз, но без обновления минимума 20 дней — ждать"
     long_ = "BULL" if last > sma200 and (math.isnan(r90) or r90 > 0) else ("BEAR" if last < sma200 else "MIXED")
     return {"short": short, "mid": mid, "mid_note": mid_note, "long": long_,
-            "r3": r3, "r7": r7, "r28": r28, "r90": r90, "hh20": float(hh20), "ll20": float(ll20),
+            "r3": r3, "r7": r7, "r28": r28, "r60": r60, "r90": r90, "hh20": float(hh20), "ll20": float(ll20),
             "sma200": float(sma200), "atr_d": float(atr_d[-1]), "atr_pct": float(atr_d[-1] / last * 100),
             "rv30": rv30, "vol_weight": min(1.0, 0.30 / rv30) if rv30 > 0 else 0.0}
 

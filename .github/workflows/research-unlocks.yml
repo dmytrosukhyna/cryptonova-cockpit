@@ -17,3 +17,4 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install numpy
       - run: python scripts/unlocks_study.py
+      - run: python scripts/unlocks_study.py --focus

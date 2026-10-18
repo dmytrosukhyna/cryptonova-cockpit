@@ -104,6 +104,21 @@ def stats(xs):
             "win_pct": round(float((v > 0).mean()) * 100), "worst_pct": round(float(v.min()) * 100, 1)}
 
 
+def focus_notes(loaded, btc, pc):
+    """Do the strong groups (big unlocks, one-off cliffs) still work in 2026, or is the edge fading everywhere?"""
+    groups = [("all", lambda e: True), ("≥ 20% circ", lambda e: pc(e) >= 20), ("≥ 5% circ", lambda e: pc(e) >= 5),
+              ("one-off cliff", lambda e: e["event_class"] == "one_off_cliff"),
+              ("cliff ≥ 5%", lambda e: e["event_class"] == "one_off_cliff" and pc(e) >= 5)]
+    for kb, ja in ((30, 0), (14, 0), (30, 3)):
+        out = {}
+        for lab, fn in groups:
+            rs = [(x["ev"]["date"][:4], trade(x, btc, kb, ja, 0.35)) for x in loaded if fn(x["ev"])]
+            out[lab] = {y: stats([r[1] for yy, r in rs if r and (y == "all" or yy == y)]) for y in ("all", "2024", "2025", "2026")}
+        note(f"unlocks · focus {kb} d before → +{ja} d, stop 35%, hedged", json.dumps(out, ensure_ascii=False))
+    worst = sorted(((trade(x, btc, 30, 0, None) or (0, 0))[1], x["ev"]["symbol"], x["ev"]["date"]) for x in loaded)[:8]
+    note("unlocks · worst (30 d → 0, no stop, hedged)", "; ".join(f"{s} {d} {r * 100:.0f}%" for r, s, d in worst))
+
+
 def main():
     data = json.load(open(os.path.join(os.path.dirname(__file__), "lab", "data", "unlocks_2024_2026.json"), encoding="utf-8"))
     today = dt.datetime.now(dt.timezone.utc).date()
@@ -112,9 +127,14 @@ def main():
     with ThreadPoolExecutor(12) as ex:
         loaded = [x for x in ex.map(load, evs) if x]
     btc = daily("BTCUSDT", dt.date(2023, 11, 1), today)
-    note("unlocks", f"{len(evs)} events, {len(loaded)} with a Binance perp ≥ 45 d before and ≥ 7 d after; "
-                    f"one-off cliffs {sum(1 for x in loaded if x['ev']['event_class'] == 'one_off_cliff')}, "
-                    f"team/investors {sum(1 for x in loaded if x['ev']['recipients'] in ('team', 'investors', 'team+investors'))}")
+    focus = "--focus" in sys.argv      # a 2nd workflow step: GitHub keeps only 10 notices per step
+    if not focus:
+        note("unlocks", f"{len(evs)} events, {len(loaded)} with a Binance perp ≥ 45 d before and ≥ 7 d after; "
+                        f"one-off cliffs {sum(1 for x in loaded if x['ev']['event_class'] == 'one_off_cliff')}, "
+                        f"team/investors {sum(1 for x in loaded if x['ev']['recipients'] in ('team', 'investors', 'team+investors'))}")
+    pc = lambda e: e.get("pct_circ") or 0            # noqa: E731
+    if focus:
+        return focus_notes(loaded, btc, pc)
     grid = []
     for kb, ja, stop in itertools.product((30, 14, 7, 3, 1), (0, 3, 7), (None, 0.2, 0.35)):
         rs = [(x, trade(x, btc, kb, ja, stop)) for x in loaded]
@@ -138,23 +158,10 @@ def main():
             out[lab] = {"raw": stats([r[0] for r in rs if r]), "hedged": stats([r[1] for r in rs if r])}
         note(f"unlocks · split {name} (14 d before → day 0)", json.dumps(out, ensure_ascii=False))
     team = ("team", "investors", "team+investors")
-    pc = lambda e: e.get("pct_circ") or 0            # noqa: E731
     split("class", [("one-off cliff", lambda e: e["event_class"] == "one_off_cliff"), ("periodic", lambda e: e["event_class"] == "periodic_tranche")])
     split("recipients", [("team/investors", lambda e: e["recipients"] in team), ("other", lambda e: e["recipients"] not in team)])
     split("size", [("< 2%", lambda e: 0 < pc(e) < 2), ("2–5%", lambda e: 2 <= pc(e) < 5), ("5–20%", lambda e: 5 <= pc(e) < 20), ("≥ 20%", lambda e: pc(e) >= 20)])
     split("year", [(y, (lambda yy: lambda e: e["date"][:4] == yy)(y)) for y in ("2024", "2025", "2026")])
-    # focus: do the strong groups (big unlocks, one-off cliffs) still work in 2026, or is the edge fading everywhere?
-    groups = [("all", lambda e: True), ("≥ 20% circ", lambda e: pc(e) >= 20), ("≥ 5% circ", lambda e: pc(e) >= 5),
-              ("one-off cliff", lambda e: e["event_class"] == "one_off_cliff"),
-              ("cliff ≥ 5%", lambda e: e["event_class"] == "one_off_cliff" and pc(e) >= 5)]
-    for kb, ja in ((30, 0), (14, 0), (30, 3)):
-        out = {}
-        for lab, fn in groups:
-            rs = [(x["ev"]["date"][:4], trade(x, btc, kb, ja, 0.35)) for x in loaded if fn(x["ev"])]
-            out[lab] = {y: stats([r[1] for yy, r in rs if r and (y == "all" or yy == y)]) for y in ("all", "2024", "2025", "2026")}
-        note(f"unlocks · focus {kb} d before → +{ja} d, stop 35%, hedged", json.dumps(out, ensure_ascii=False))
-    worst = sorted(((trade(x, btc, 30, 0, None) or (0, 0))[1], x["ev"]["symbol"], x["ev"]["date"]) for x in loaded)[:8]
-    note("unlocks · worst (30 d → 0, no stop, hedged)", "; ".join(f"{s} {d} {r * 100:.0f}%" for r, s, d in worst))
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
             fh.write("## Шорт перед разлоками\n```\n" + json.dumps(best, ensure_ascii=False, indent=1) + "\n```\n")

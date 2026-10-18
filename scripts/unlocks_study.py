@@ -143,6 +143,18 @@ def main():
     split("recipients", [("team/investors", lambda e: e["recipients"] in team), ("other", lambda e: e["recipients"] not in team)])
     split("size", [("< 2%", lambda e: 0 < pc(e) < 2), ("2–5%", lambda e: 2 <= pc(e) < 5), ("5–20%", lambda e: 5 <= pc(e) < 20), ("≥ 20%", lambda e: pc(e) >= 20)])
     split("year", [(y, (lambda yy: lambda e: e["date"][:4] == yy)(y)) for y in ("2024", "2025", "2026")])
+    # focus: do the strong groups (big unlocks, one-off cliffs) still work in 2026, or is the edge fading everywhere?
+    groups = [("all", lambda e: True), ("≥ 20% circ", lambda e: pc(e) >= 20), ("≥ 5% circ", lambda e: pc(e) >= 5),
+              ("one-off cliff", lambda e: e["event_class"] == "one_off_cliff"),
+              ("cliff ≥ 5%", lambda e: e["event_class"] == "one_off_cliff" and pc(e) >= 5)]
+    for kb, ja in ((30, 0), (14, 0), (30, 3)):
+        out = {}
+        for lab, fn in groups:
+            rs = [(x["ev"]["date"][:4], trade(x, btc, kb, ja, 0.35)) for x in loaded if fn(x["ev"])]
+            out[lab] = {y: stats([r[1] for yy, r in rs if r and (y == "all" or yy == y)]) for y in ("all", "2024", "2025", "2026")}
+        note(f"unlocks · focus {kb} d before → +{ja} d, stop 35%, hedged", json.dumps(out, ensure_ascii=False))
+    worst = sorted(((trade(x, btc, 30, 0, None) or (0, 0))[1], x["ev"]["symbol"], x["ev"]["date"]) for x in loaded)[:8]
+    note("unlocks · worst (30 d → 0, no stop, hedged)", "; ".join(f"{s} {d} {r * 100:.0f}%" for r, s, d in worst))
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
             fh.write("## Шорт перед разлоками\n```\n" + json.dumps(best, ensure_ascii=False, indent=1) + "\n```\n")

@@ -699,3 +699,27 @@ def test_ideas_core_is_btc_heavy_and_trimmed_back_on_monday():
     by = {p["symbol"]: p for p in st["positions"]}
     assert a["action"] == "TRIM" and "больше плана 30%" in a["reason"] and abs(by["BTC"]["weight"] - 0.30) < 0.002
     assert sp.core_target("BTC") == 0.30 and sp.core_target("SOL") == 0.05 and sp.core_target("XYZ") == 0.10
+
+
+def test_ideas_alt_above_plan_is_trimmed_on_monday_and_the_cash_tops_up_btc():
+    """19.10: a non-core «можно брать» coin above 1.2× its 7.5 % plan is trimmed back at the Monday review; the freed cash tops BTC up."""
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows, T0), T0)                                              # Wednesday: bought at plan
+    src1 = copy.deepcopy(src)
+    src1["cg"]["A1"] *= 1.6                                                           # an alt runs to ≈ 11–12 % of the account
+    src1["cg"]["BTC"] *= 0.55                                                         # BTC falls under ¾ of its 30 % plan
+    rows1 = copy.deepcopy(rows)
+    _set(rows1, "A1", price=src1["cg"]["A1"])
+    _set(rows1, "BTC", price=src1["cg"]["BTC"])
+    tue = T0 + DAY
+    st = port.step(src1, _ideas(rows1, tue), tue)
+    assert not [a for a in st["actions"] if a["symbol"] == "A1" and a["action"] == "TRIM"]   # not Monday → kept
+    mon = T0 + 5 * DAY + 3_600_000
+    st = port.step(src1, _ideas(rows1, mon), mon)
+    acts = {(a["symbol"], a["action"]): a for a in st["actions"]}
+    assert ("A1", "TRIM") in acts and "больше плановых 7.5%" in acts[("A1", "TRIM")]["reason"]
+    by = {p["symbol"]: p for p in st["positions"]}
+    v = by["A1"]["value_usd"] / (st["index"] * 100)
+    assert abs(v - 0.075) < 0.003 and ("BTC", "ADD") in acts

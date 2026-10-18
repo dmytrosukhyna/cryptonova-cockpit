@@ -658,6 +658,26 @@ class IdeasPortfolio:
                 live.add(s)
                 held[s] = {"symbol": s}
                 n_small, n_buy = (n_small + 1, n_buy) if small else (n_small, n_buy + 1)
+            # 19.10 (owner: «сделки почти все в минус … нужна понятная модель»): the portfolio had drifted ALT-heavy — 5 alts bought at
+            # 10 % each before the 7.5 % plan, BTC 13 % of its 30 % plan, no free cash to top it up. At the Monday review (and once on
+            # the first run of this rule) a non-core «можно брать» coin above 1.2× its plan is trimmed back to the plan; the cash goes
+            # to the core top-up just below (lab 2023–2026: BTC+ETH+SOL +239 % vs a broad alt basket −57 %; BTC fell least in 2025–26)
+            once = not rp._meta("plan_trim_v1")
+            if weekly or once:
+                rp._set_meta("plan_trim_v1", now)
+                V = self.value(price)
+                for p in rp.positions():
+                    s = p["symbol"]
+                    kind, est = self._split(p["bucket"])
+                    if kind == "core" or est == "small" or s not in price or not V or not p["entry"]:
+                        continue
+                    mw = p["weight"] * price[s] / p["entry"] / V
+                    if mw > P["buy_w"] * 1.2:
+                        neww = P["buy_w"] * V * p["entry"] / price[s]
+                        actions.append(rp._act(now, s, "TRIM", neww, price[s],
+                                               f"План: {s} {mw*100:.1f}% счёта — больше плановых {P['buy_w']*100:.1f}%; лишнее продаём, "
+                                               "деньги идут в ядро — BTC главная монета портфеля.", None))
+                        rp._set_cash(rp.cash() - (p["weight"] - neww) * price[s] / p["entry"] * P["fee"])
             # core: trimmed back to plan at the Monday review when it grew past 1.5× the plan; topped up when under ¾ of it
             V = self.value(price)
             for p in rp.positions():

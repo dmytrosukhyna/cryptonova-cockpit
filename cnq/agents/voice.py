@@ -79,13 +79,29 @@ def compose(out: str = "web") -> str:
                  + (f" Счёт {usd(10_000 + fut_res)}." if fut_res is not None else ""))
     spot_res = None
     pf = _load(out, "portfolio.json") or {}
-    sp = (pf.get("portfolios") or {}).get("mod") or pf.get("portfolio") or {}
-    if sp.get("index"):
+    # 18.10 (owner): the header and the brief show OUR strategies (CNPTS «Сбалансированная» + the AI portfolio), not the leader
+    sp_key = "ideas" if (pf.get("portfolios") or {}).get("ideas") else "mod"
+    sp = (pf.get("portfolios") or {}).get(sp_key) or pf.get("portfolio") or {}
+    if sp.get("equity_usd") is not None and sp.get("start_usd"):
+        spot_res = float(sp["equity_usd"]) - float(sp["start_usd"])
+    elif sp.get("index"):
         spot_res = 10_000 * sp["index"] / 100 - 10_000
-        L.append(f"По споту, портфель «{sp.get('name_short') or 'Умеренный'}»: {'в плюсе на ' + usd(spot_res) if spot_res > 5 else 'в минусе на ' + usd(spot_res) if spot_res < -5 else 'около нуля'}.")
+    if spot_res is not None:
+        nm = "AI-портфель" if sp_key == "ideas" else (sp.get("name_short") or "Умеренный")
+        L.append(f"По споту, {nm}: {'в плюсе на ' + usd(spot_res) if spot_res > 5 else 'в минусе на ' + usd(spot_res) if spot_res < -5 else 'около нуля'}.")
+    # every desk counts in «Заработано всего»: funding carry (real demo), arbitrage and triangle (virtual estimates)
+    extra = {}
+    fd = _load(out, "funding.json") or {}
+    if fd.get("start_equity"):
+        extra["funding"] = float(fd.get("equity_mtm") if fd.get("equity_mtm") is not None else fd.get("equity", fd["start_equity"])) - float(fd["start_equity"])
+    for k in ("arb", "tri"):
+        w = ((_load(out, f"{k}.json") or {}).get("week") or {}).get("virtual_pnl_usd")
+        if w is not None:
+            extra[k] = float(w)
     if fut_res is not None and spot_res is not None:
-        tot = fut_res + spot_res
-        L.append(f"Заработано всего — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}.")
+        tot = fut_res + spot_res + sum(extra.values())
+        L.append(f"Заработано всего — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}"
+                 + (", вместе с фандингом и арбитражем." if extra else "."))
     markets = _load(out, "markets.json") or {}
     btc = next((t for t in markets.get("top", []) if t.get("symbol") == "BTC"), None)
     stress = (paper.get("stress") or {}).get("level") if isinstance(paper.get("stress"), dict) else None
@@ -100,8 +116,10 @@ def compose(out: str = "web") -> str:
     if imp:
         L.append("Из новостей стоит отметить: " + re.sub(r"\.$", "", imp.get("title") or imp["reasoning"]) + ".")
     L.append("Если понадоблюсь — на связи.")
-    compose.keys = {"fut": "bal", "spot": "mod", "fut_open": len(prof.get("open") or []) if prof else None,
-                    "total": round((fut_res or 0) + (spot_res or 0)) if fut_res is not None and spot_res is not None else None,
+    compose.keys = {"fut": "bal", "spot": sp_key, "fut_open": len(prof.get("open") or []) if prof else None,
+                    "total": round((fut_res or 0) + (spot_res or 0) + sum(extra.values())) if fut_res is not None and spot_res is not None else None,
+                    "parts": {"fut": round(fut_res) if fut_res is not None else None, "spot": round(spot_res) if spot_res is not None else None,
+                              **{k: round(v, 2) for k, v in extra.items()}},
                     "btc": btc.get("price") if btc else None}
     return " ".join(L)
 

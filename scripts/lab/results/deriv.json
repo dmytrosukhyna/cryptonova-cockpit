@@ -1,0 +1,1396 @@
+{
+ "family": "deriv",
+ "tried": 334,
+ "notes_ru": "Производные данные (фандинг, OI, ликвидации, CVD, тейкеры, лонг/шорт, базис) до 2023 г. в основном восстановлены (is_imputed_metrics=1), поэтому все правила этой семьи судятся только на реальных барах с 2023-01: TRAIN = 2023-01 → 2024-12 (выбор параметров), TEST = 2025-01 → 2026-09 (только проверка). Лет всего 4 (2023–2026), поэтому правило лет здесь — «≥ 3 из 4 положительных»; harness.passes() требует 4 из 6 и для этой семьи означает «все 4 года в плюсе» (поле passes), отдельно записано passes_3of4. Открытый интерес переведён в монеты (OI в $ / цена): в долларах он двигается вместе с ценой, и «цена растёт, OI падает» было бы наполовину арифметикой. Ликвидации по альткоинам имеют постоянный «пол» (~0.2–0.5 млн $ на свечу даже в тишине) — похоже на оценочные данные; поэтому используются только всплески относительно собственной медианы и 30-дневного перцентиля. Правила B, E, F, D не перетестировались; у каждого результата указано, какая доля входов попадает в ±4 ч от их сигналов (overlap_BEFD_4h). Случайный вход для сравнения (20 000 реальных баров 2023+): лонг 1tp_1r: train -0.153 / test -0.197; лонг time: train -0.072 / test -0.258; лонг time_4d: train +0.367 / test -0.707; шорт 1tp_1r: train -0.129 / test -0.086; шорт time: train -0.253 / test -0.004; шорт time_4d: train -0.631 / test +0.230. Всего проверено вариантов: 334 (сигнал × выход + проверки соседних порогов), выбор лучшего в каждой идее — по среднему на TRAIN при n ≥ 60. Итог: по правилу «≥ 3 из 4 лет» проходят — Падение с закрытием позиций → лонг (test +0.109 %, перекрытие с B/E/F/D 61 %); Шорт-сквиз (test +0.088 %, перекрытие с B/E/F/D 20 %); по строгому правилу harness (все 4 года) — Падение с закрытием позиций → лонг, Шорт-сквиз. Фандинг, тейкерские всплески, CVD-дивергенции, перекос топ-трейдеров, премия базиса и «толпа против фандинга» на TEST не лучше случайного входа (≈ минус издержки).",
+ "results": [
+  {
+   "id": "deriv_fund_short",
+   "name_ru": "Перегретый фандинг → шорт",
+   "rule_ru": "Фандинг монеты в верхних 1 % её же истории за 90 дней и не ниже 0.015 % за период, а цена за 8 ч не выросла — лонгисты переплачивают, открываем шорт со следующей свечи.",
+   "exit": {
+    "sl_atr": 2.0,
+    "tps": [
+     [
+      2.0,
+      1.0
+     ]
+    ],
+    "max_bars": 96,
+    "name": "1tp_2r"
+   },
+   "params": {
+    "fund_pctl": 0.99,
+    "fund_floor": 0.015,
+    "stall_8h": true,
+    "gap": 96,
+    "variant": "q99_stall"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 437,
+     "avg_pct": 0.009,
+     "win": 0.378,
+     "pf": 1.01,
+     "sum_pct": 3.8
+    },
+    "train": {
+     "n": 412,
+     "avg_pct": -0.055,
+     "win": 0.369,
+     "pf": 0.96,
+     "sum_pct": -22.6
+    },
+    "test": {
+     "n": 25,
+     "avg_pct": 1.054,
+     "win": 0.52,
+     "pf": 3.05,
+     "sum_pct": 26.4
+    },
+    "years": {
+     "2023": {
+      "n": 218,
+      "avg_pct": -0.334,
+      "win": 0.339,
+      "pf": 0.75,
+      "sum_pct": -72.8
+     },
+     "2024": {
+      "n": 194,
+      "avg_pct": 0.259,
+      "win": 0.402,
+      "pf": 1.2,
+      "sum_pct": 50.2
+     },
+     "2025": {
+      "n": 17,
+      "avg_pct": 1.883,
+      "win": 0.647,
+      "pf": 6.16,
+      "sum_pct": 32.0
+     },
+     "2026": {
+      "n": 8,
+      "avg_pct": -0.708,
+      "win": 0.25,
+      "pf": 0.15,
+      "sum_pct": -5.7
+     }
+    },
+    "pos_years": 2,
+    "years_n": 3,
+    "max_dd_sum_pct": -110.5,
+    "top_coin_share": 0.21,
+    "per_day": 0.33,
+    "median_hold_h": 4.0
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.076,
+    "E": 0.082,
+    "F": 0.071,
+    "D": 0.007,
+    "any": 0.142
+   },
+   "random_same_side_avg_pct": {
+    "train": -0.129,
+    "test": -0.051
+   },
+   "idea_grid": {
+    "variants": 28,
+    "train_pos_share": 0.0,
+    "test_pos_share": 0.43
+   },
+   "sides": [
+    -1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 103,
+     "day_avg_pct": -0.212,
+     "day_win": 0.417
+    },
+    "test": {
+     "days": 16,
+     "day_avg_pct": 0.149,
+     "day_win": 0.375
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "deriv_fund_long",
+   "name_ru": "Отрицательный фандинг → лонг",
+   "rule_ru": "Фандинг монеты в нижних 1 % её истории за 90 дней и ниже −0.005 % — шортисты переплачивают, открываем лонг.",
+   "exit": {
+    "sl_pct": 0.1,
+    "tps": [],
+    "max_bars": 384,
+    "name": "time_4d"
+   },
+   "params": {
+    "fund_pctl": 0.01,
+    "fund_cap": -0.005,
+    "stall_8h": false,
+    "gap": 96,
+    "variant": "q99"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 680,
+     "avg_pct": 0.492,
+     "win": 0.488,
+     "pf": 1.16,
+     "sum_pct": 334.3
+    },
+    "train": {
+     "n": 329,
+     "avg_pct": 1.985,
+     "win": 0.535,
+     "pf": 1.8,
+     "sum_pct": 653.1
+    },
+    "test": {
+     "n": 351,
+     "avg_pct": -0.908,
+     "win": 0.444,
+     "pf": 0.75,
+     "sum_pct": -318.8
+    },
+    "years": {
+     "2023": {
+      "n": 136,
+      "avg_pct": 1.585,
+      "win": 0.493,
+      "pf": 1.69,
+      "sum_pct": 215.5
+     },
+     "2024": {
+      "n": 193,
+      "avg_pct": 2.267,
+      "win": 0.565,
+      "pf": 1.86,
+      "sum_pct": 437.6
+     },
+     "2025": {
+      "n": 239,
+      "avg_pct": -1.433,
+      "win": 0.414,
+      "pf": 0.65,
+      "sum_pct": -342.5
+     },
+     "2026": {
+      "n": 112,
+      "avg_pct": 0.211,
+      "win": 0.509,
+      "pf": 1.08,
+      "sum_pct": 23.6
+     }
+    },
+    "pos_years": 3,
+    "years_n": 4,
+    "max_dd_sum_pct": -504.4,
+    "top_coin_share": 0.26,
+    "per_day": 0.52,
+    "median_hold_h": 96.0
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.029,
+    "E": 0.146,
+    "F": 0.094,
+    "D": 0.166,
+    "any": 0.29
+   },
+   "random_same_side_avg_pct": {
+    "train": 0.367,
+    "test": -0.707
+   },
+   "idea_grid": {
+    "variants": 28,
+    "train_pos_share": 0.43,
+    "test_pos_share": 0.04
+   },
+   "sides": [
+    1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 175,
+     "day_avg_pct": 1.096,
+     "day_win": 0.491
+    },
+    "test": {
+     "days": 208,
+     "day_avg_pct": -0.741,
+     "day_win": 0.428
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "deriv_oi_weak_short",
+   "name_ru": "Рост без новых денег → шорт",
+   "rule_ru": "Цена за 4 ч выросла сильно (≥ 1.5σ), а открытый интерес в монетах упал (≤ −2.0σ) — это закрытие шортов, а не новые покупки; продаём рост.",
+   "exit": {
+    "sl_atr": 2.0,
+    "tps": [
+     [
+      0.5,
+      0.2
+     ],
+     [
+      1.0,
+      0.2
+     ],
+     [
+      1.5,
+      0.2
+     ],
+     [
+      2.0,
+      0.2
+     ],
+     [
+      2.5,
+      0.2
+     ]
+    ],
+    "be_after_tp1": true,
+    "max_bars": 96,
+    "name": "5tp_be"
+   },
+   "params": {
+    "z_price_4h": 1.5,
+    "z_oi_4h": -2.0,
+    "gap": 16,
+    "variant": "zp1.5_zoi2.0"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 1605,
+     "avg_pct": -0.263,
+     "win": 0.548,
+     "pf": 0.67,
+     "sum_pct": -422.4
+    },
+    "train": {
+     "n": 910,
+     "avg_pct": -0.192,
+     "win": 0.562,
+     "pf": 0.74,
+     "sum_pct": -174.5
+    },
+    "test": {
+     "n": 695,
+     "avg_pct": -0.357,
+     "win": 0.531,
+     "pf": 0.61,
+     "sum_pct": -247.9
+    },
+    "years": {
+     "2023": {
+      "n": 480,
+      "avg_pct": -0.252,
+      "win": 0.517,
+      "pf": 0.66,
+      "sum_pct": -120.8
+     },
+     "2024": {
+      "n": 430,
+      "avg_pct": -0.125,
+      "win": 0.612,
+      "pf": 0.83,
+      "sum_pct": -53.7
+     },
+     "2025": {
+      "n": 387,
+      "avg_pct": -0.348,
+      "win": 0.568,
+      "pf": 0.67,
+      "sum_pct": -134.8
+     },
+     "2026": {
+      "n": 308,
+      "avg_pct": -0.367,
+      "win": 0.484,
+      "pf": 0.5,
+      "sum_pct": -113.1
+     }
+    },
+    "pos_years": 0,
+    "years_n": 4,
+    "max_dd_sum_pct": -430.2,
+    "top_coin_share": null,
+    "per_day": 1.19,
+    "median_hold_h": 2.75
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.05,
+    "E": 0.168,
+    "F": 0.108,
+    "D": 0.057,
+    "any": 0.216
+   },
+   "random_same_side_avg_pct": {
+    "train": -0.129,
+    "test": -0.099
+   },
+   "idea_grid": {
+    "variants": 24,
+    "train_pos_share": 0.0,
+    "test_pos_share": 0.0
+   },
+   "sides": [
+    -1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 280,
+     "day_avg_pct": -0.122,
+     "day_win": 0.475
+    },
+    "test": {
+     "days": 236,
+     "day_avg_pct": -0.096,
+     "day_win": 0.504
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "deriv_oi_weak_long",
+   "name_ru": "Падение с закрытием позиций → лонг",
+   "rule_ru": "Цена за 4 ч сильно упала (≤ −2.5σ) и открытый интерес в монетах тоже упал (≤ −2.0σ) — лонги вынесло; покупаем (родственник правила F, но мягче).",
+   "exit": {
+    "sl_atr": 4.0,
+    "tps": [],
+    "max_bars": 96,
+    "name": "time"
+   },
+   "params": {
+    "z_price_4h": -2.5,
+    "z_oi_4h": -2.0,
+    "gap": 16,
+    "variant": "zp2.5_zoi2.0"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 1505,
+     "avg_pct": 0.667,
+     "win": 0.514,
+     "pf": 1.4,
+     "sum_pct": 1004.5
+    },
+    "train": {
+     "n": 919,
+     "avg_pct": 1.023,
+     "win": 0.573,
+     "pf": 1.66,
+     "sum_pct": 940.6
+    },
+    "test": {
+     "n": 586,
+     "avg_pct": 0.109,
+     "win": 0.42,
+     "pf": 1.06,
+     "sum_pct": 64.0
+    },
+    "years": {
+     "2023": {
+      "n": 522,
+      "avg_pct": 1.23,
+      "win": 0.613,
+      "pf": 2.32,
+      "sum_pct": 641.8
+     },
+     "2024": {
+      "n": 397,
+      "avg_pct": 0.753,
+      "win": 0.521,
+      "pf": 1.32,
+      "sum_pct": 298.8
+     },
+     "2025": {
+      "n": 312,
+      "avg_pct": 0.306,
+      "win": 0.433,
+      "pf": 1.15,
+      "sum_pct": 95.5
+     },
+     "2026": {
+      "n": 274,
+      "avg_pct": -0.115,
+      "win": 0.405,
+      "pf": 0.93,
+      "sum_pct": -31.6
+     }
+    },
+    "pos_years": 3,
+    "years_n": 4,
+    "max_dd_sum_pct": -269.1,
+    "top_coin_share": 0.12,
+    "per_day": 1.12,
+    "median_hold_h": 24.0
+   },
+   "passes_3of4": true,
+   "overlap_BEFD_4h": {
+    "B": 0.189,
+    "E": 0.48,
+    "F": 0.365,
+    "D": 0.071,
+    "any": 0.607
+   },
+   "random_same_side_avg_pct": {
+    "train": -0.072,
+    "test": -0.258
+   },
+   "idea_grid": {
+    "variants": 24,
+    "train_pos_share": 1.0,
+    "test_pos_share": 0.5
+   },
+   "sides": [
+    1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 229,
+     "day_avg_pct": 0.752,
+     "day_win": 0.568
+    },
+    "test": {
+     "days": 191,
+     "day_avg_pct": -0.27,
+     "day_win": 0.372
+    }
+   },
+   "without_BEFD_overlap": {
+    "train": {
+     "n": 282,
+     "avg_pct": 1.178,
+     "win": 0.56,
+     "pf": 2.09,
+     "sum_pct": 332.3
+    },
+    "test": {
+     "n": 309,
+     "avg_pct": -0.455,
+     "win": 0.411,
+     "pf": 0.66,
+     "sum_pct": -140.6
+    },
+    "pos_years": 2,
+    "years": {
+     "2023": 1.0,
+     "2024": 1.498,
+     "2025": -0.569,
+     "2026": -0.364
+    }
+   },
+   "plateau_same_exit": {
+    "zp2.0_zoi1.5": {
+     "train": 0.707,
+     "test": -0.211,
+     "test_n": 1232,
+     "pos_years": 2
+    },
+    "zp2.0_zoi2.0": {
+     "train": 0.814,
+     "test": -0.135,
+     "test_n": 834,
+     "pos_years": 2
+    },
+    "zp2.0_zoi2.5": {
+     "train": 0.787,
+     "test": 0.272,
+     "test_n": 545,
+     "pos_years": 3
+    },
+    "zp2.5_zoi1.5": {
+     "train": 0.934,
+     "test": 0.057,
+     "test_n": 808,
+     "pos_years": 3
+    },
+    "zp2.5_zoi2.5": {
+     "train": 0.914,
+     "test": 0.511,
+     "test_n": 416,
+     "pos_years": 3
+    },
+    "zp3.0_zoi1.5": {
+     "train": 1.175,
+     "test": 0.262,
+     "test_n": 486,
+     "pos_years": 3
+    },
+    "zp3.0_zoi2.0": {
+     "train": 1.24,
+     "test": 0.58,
+     "test_n": 373,
+     "pos_years": 4
+    },
+    "zp3.0_zoi2.5": {
+     "train": 1.275,
+     "test": 0.887,
+     "test_n": 274,
+     "pos_years": 3
+    }
+   },
+   "passes": true
+  },
+  {
+   "id": "deriv_oi_cont",
+   "name_ru": "Движение на новых позициях → по тренду",
+   "rule_ru": "Цена за 4 ч сильно сдвинулась (≥ 2.5σ) и открытый интерес в монетах при этом вырос (≥ 2.0σ) — входим по направлению движения.",
+   "exit": {
+    "sl_atr": 4.0,
+    "tps": [],
+    "max_bars": 96,
+    "name": "time"
+   },
+   "params": {
+    "z_price_4h": 2.5,
+    "z_oi_4h": 2.0,
+    "gap": 16,
+    "variant": "zp2.5_zoi2.0"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 2626,
+     "avg_pct": -0.272,
+     "win": 0.392,
+     "pf": 0.87,
+     "sum_pct": -714.6
+    },
+    "train": {
+     "n": 1465,
+     "avg_pct": -0.097,
+     "win": 0.399,
+     "pf": 0.96,
+     "sum_pct": -141.6
+    },
+    "test": {
+     "n": 1161,
+     "avg_pct": -0.493,
+     "win": 0.382,
+     "pf": 0.76,
+     "sum_pct": -572.9
+    },
+    "years": {
+     "2023": {
+      "n": 707,
+      "avg_pct": -0.253,
+      "win": 0.376,
+      "pf": 0.88,
+      "sum_pct": -179.2
+     },
+     "2024": {
+      "n": 758,
+      "avg_pct": 0.05,
+      "win": 0.421,
+      "pf": 1.02,
+      "sum_pct": 37.5
+     },
+     "2025": {
+      "n": 665,
+      "avg_pct": -0.676,
+      "win": 0.377,
+      "pf": 0.7,
+      "sum_pct": -449.4
+     },
+     "2026": {
+      "n": 496,
+      "avg_pct": -0.249,
+      "win": 0.389,
+      "pf": 0.87,
+      "sum_pct": -123.6
+     }
+    },
+    "pos_years": 1,
+    "years_n": 4,
+    "max_dd_sum_pct": -936.4,
+    "top_coin_share": 0.4,
+    "per_day": 1.95,
+    "median_hold_h": 24.0
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.035,
+    "E": 0.174,
+    "F": 0.04,
+    "D": 0.057,
+    "any": 0.225
+   },
+   "random_same_side_avg_pct": null,
+   "idea_grid": {
+    "variants": 24,
+    "train_pos_share": 0.0,
+    "test_pos_share": 0.29
+   },
+   "sides": [
+    -1,
+    1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 491,
+     "day_avg_pct": -0.341,
+     "day_win": 0.371
+    },
+    "test": {
+     "days": 382,
+     "day_avg_pct": -0.734,
+     "day_win": 0.361
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "deriv_sqz",
+   "name_ru": "Шорт-сквиз",
+   "rule_ru": "На зелёной свече ликвидации шортов выше 99.9-процентного уровня за 30 дней и втрое больше ликвидаций лонгов; покупаем по движению.",
+   "exit": {
+    "sl_atr": 4.0,
+    "tps": [],
+    "max_bars": 96,
+    "name": "time"
+   },
+   "params": {
+    "sliq_pctl_30d": 0.999,
+    "imbalance": 3,
+    "mode": "follow",
+    "gap": 16,
+    "variant": "q0.999_follow"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 2016,
+     "avg_pct": 0.4,
+     "win": 0.446,
+     "pf": 1.21,
+     "sum_pct": 805.8
+    },
+    "train": {
+     "n": 1101,
+     "avg_pct": 0.659,
+     "win": 0.468,
+     "pf": 1.35,
+     "sum_pct": 725.5
+    },
+    "test": {
+     "n": 915,
+     "avg_pct": 0.088,
+     "win": 0.421,
+     "pf": 1.05,
+     "sum_pct": 80.3
+    },
+    "years": {
+     "2023": {
+      "n": 526,
+      "avg_pct": 0.144,
+      "win": 0.43,
+      "pf": 1.08,
+      "sum_pct": 75.9
+     },
+     "2024": {
+      "n": 575,
+      "avg_pct": 1.13,
+      "win": 0.503,
+      "pf": 1.59,
+      "sum_pct": 649.5
+     },
+     "2025": {
+      "n": 493,
+      "avg_pct": 0.313,
+      "win": 0.446,
+      "pf": 1.16,
+      "sum_pct": 154.4
+     },
+     "2026": {
+      "n": 422,
+      "avg_pct": -0.176,
+      "win": 0.391,
+      "pf": 0.91,
+      "sum_pct": -74.1
+     }
+    },
+    "pos_years": 3,
+    "years_n": 4,
+    "max_dd_sum_pct": -380.5,
+    "top_coin_share": 0.17,
+    "per_day": 1.5,
+    "median_hold_h": 24.0
+   },
+   "passes_3of4": true,
+   "overlap_BEFD_4h": {
+    "B": 0.042,
+    "E": 0.159,
+    "F": 0.065,
+    "D": 0.044,
+    "any": 0.204
+   },
+   "random_same_side_avg_pct": {
+    "train": -0.072,
+    "test": -0.258
+   },
+   "idea_grid": {
+    "variants": 36,
+    "train_pos_share": 0.31,
+    "test_pos_share": 0.19
+   },
+   "sides": [
+    1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 408,
+     "day_avg_pct": -0.158,
+     "day_win": 0.412
+    },
+    "test": {
+     "days": 311,
+     "day_avg_pct": -0.517,
+     "day_win": 0.36
+    }
+   },
+   "without_BEFD_overlap": {
+    "train": {
+     "n": 862,
+     "avg_pct": 0.611,
+     "win": 0.457,
+     "pf": 1.33,
+     "sum_pct": 526.3
+    },
+    "test": {
+     "n": 742,
+     "avg_pct": 0.01,
+     "win": 0.418,
+     "pf": 1.01,
+     "sum_pct": 7.5
+    },
+    "pos_years": 3,
+    "years": {
+     "2023": 0.043,
+     "2024": 1.142,
+     "2025": -0.112,
+     "2026": 0.155
+    }
+   },
+   "plateau_same_exit": {
+    "q0.998_imb2": {
+     "train": 0.6,
+     "test": 0.075,
+     "test_n": 1672,
+     "pos_years": 3
+    },
+    "q0.998_imb3": {
+     "train": 0.61,
+     "test": 0.055,
+     "test_n": 1659,
+     "pos_years": 3
+    },
+    "q0.998_imb5": {
+     "train": 0.59,
+     "test": 0.037,
+     "test_n": 1638,
+     "pos_years": 3
+    },
+    "q0.999_imb2": {
+     "train": 0.662,
+     "test": 0.085,
+     "test_n": 919,
+     "pos_years": 3
+    },
+    "q0.999_imb5": {
+     "train": 0.663,
+     "test": 0.046,
+     "test_n": 898,
+     "pos_years": 3
+    },
+    "q0.9995_imb2": {
+     "train": 0.634,
+     "test": 0.127,
+     "test_n": 636,
+     "pos_years": 3
+    },
+    "q0.9995_imb3": {
+     "train": 0.631,
+     "test": 0.132,
+     "test_n": 633,
+     "pos_years": 3
+    },
+    "q0.9995_imb5": {
+     "train": 0.61,
+     "test": 0.068,
+     "test_n": 622,
+     "pos_years": 4
+    }
+   },
+   "passes": true
+  },
+  {
+   "id": "deriv_cvd",
+   "name_ru": "Дивергенция CVD",
+   "rule_ru": "Цена на 96-свечном максимуме (минимуме), а кумулятивная дельта фьючерсов в другой половине своего диапазона — против движения; торгуем разворот.",
+   "exit": {
+    "sl_atr": 2.0,
+    "tps": [
+     [
+      2.0,
+      1.0
+     ]
+    ],
+    "max_bars": 96,
+    "name": "1tp_2r"
+   },
+   "params": {
+    "lookback": 96,
+    "kind": "futures CVD in the other half of its range",
+    "gap": 16,
+    "variant": "fut_L96"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 15718,
+     "avg_pct": -0.117,
+     "win": 0.341,
+     "pf": 0.87,
+     "sum_pct": -1837.4
+    },
+    "train": {
+     "n": 8818,
+     "avg_pct": -0.097,
+     "win": 0.345,
+     "pf": 0.89,
+     "sum_pct": -854.0
+    },
+    "test": {
+     "n": 6900,
+     "avg_pct": -0.143,
+     "win": 0.337,
+     "pf": 0.83,
+     "sum_pct": -983.5
+    },
+    "years": {
+     "2023": {
+      "n": 3638,
+      "avg_pct": -0.105,
+      "win": 0.348,
+      "pf": 0.87,
+      "sum_pct": -381.4
+     },
+     "2024": {
+      "n": 5180,
+      "avg_pct": -0.091,
+      "win": 0.342,
+      "pf": 0.9,
+      "sum_pct": -472.6
+     },
+     "2025": {
+      "n": 4497,
+      "avg_pct": -0.148,
+      "win": 0.339,
+      "pf": 0.84,
+      "sum_pct": -663.4
+     },
+     "2026": {
+      "n": 2403,
+      "avg_pct": -0.133,
+      "win": 0.333,
+      "pf": 0.83,
+      "sum_pct": -320.1
+     }
+    },
+    "pos_years": 0,
+    "years_n": 4,
+    "max_dd_sum_pct": -1894.5,
+    "top_coin_share": 0.85,
+    "per_day": 11.67,
+    "median_hold_h": 3.0
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.006,
+    "E": 0.022,
+    "F": 0.003,
+    "D": 0.01,
+    "any": 0.037
+   },
+   "random_same_side_avg_pct": null,
+   "idea_grid": {
+    "variants": 24,
+    "train_pos_share": 0.0,
+    "test_pos_share": 0.08
+   },
+   "sides": [
+    -1,
+    1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 717,
+     "day_avg_pct": 0.061,
+     "day_win": 0.469
+    },
+    "test": {
+     "days": 602,
+     "day_avg_pct": 0.033,
+     "day_win": 0.447
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "deriv_taker",
+   "name_ru": "Всплеск агрессивных покупок/продаж",
+   "rule_ru": "Отношение агрессивных покупок к продажам за 4 свеч. в крайних 1.0 % за 30 дней; входим против всплеска.",
+   "exit": {
+    "sl_atr": 4.0,
+    "tps": [],
+    "max_bars": 96,
+    "name": "time"
+   },
+   "params": {
+    "bars": 4,
+    "pctl_30d": 0.99,
+    "mode": "fade",
+    "gap": 16,
+    "variant": "n4_q0.99_fade"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 23878,
+     "avg_pct": -0.093,
+     "win": 0.347,
+     "pf": 0.91,
+     "sum_pct": -2223.8
+    },
+    "train": {
+     "n": 12651,
+     "avg_pct": -0.046,
+     "win": 0.35,
+     "pf": 0.96,
+     "sum_pct": -583.4
+    },
+    "test": {
+     "n": 11227,
+     "avg_pct": -0.146,
+     "win": 0.344,
+     "pf": 0.87,
+     "sum_pct": -1640.4
+    },
+    "years": {
+     "2023": {
+      "n": 5928,
+      "avg_pct": 0.017,
+      "win": 0.348,
+      "pf": 1.02,
+      "sum_pct": 100.2
+     },
+     "2024": {
+      "n": 6723,
+      "avg_pct": -0.102,
+      "win": 0.352,
+      "pf": 0.91,
+      "sum_pct": -683.6
+     },
+     "2025": {
+      "n": 6789,
+      "avg_pct": -0.133,
+      "win": 0.35,
+      "pf": 0.89,
+      "sum_pct": -900.8
+     },
+     "2026": {
+      "n": 4438,
+      "avg_pct": -0.167,
+      "win": 0.334,
+      "pf": 0.82,
+      "sum_pct": -739.7
+     }
+    },
+    "pos_years": 1,
+    "years_n": 4,
+    "max_dd_sum_pct": -2709.3,
+    "top_coin_share": 0.63,
+    "per_day": 17.73,
+    "median_hold_h": 17.5
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.003,
+    "E": 0.02,
+    "F": 0.003,
+    "D": 0.006,
+    "any": 0.028
+   },
+   "random_same_side_avg_pct": null,
+   "idea_grid": {
+    "variants": 48,
+    "train_pos_share": 0.0,
+    "test_pos_share": 0.0
+   },
+   "sides": [
+    -1,
+    1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 724,
+     "day_avg_pct": -0.085,
+     "day_win": 0.39
+    },
+    "test": {
+     "days": 610,
+     "day_avg_pct": -0.173,
+     "day_win": 0.346
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "deriv_ls",
+   "name_ru": "Крайний перекос топ-трейдеров",
+   "rule_ru": "Соотношение лонг/шорт топ-трейдеров (уровень) в крайних 0.5 % за 30 дней; идём вместе с топ-трейдерами.",
+   "exit": {
+    "sl_pct": 0.1,
+    "tps": [],
+    "max_bars": 384,
+    "name": "time_4d"
+   },
+   "params": {
+    "kind": "level",
+    "pctl_30d": 0.995,
+    "mode": "follow",
+    "gap": 96,
+    "variant": "level_q0.995_follow"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 4299,
+     "avg_pct": 0.013,
+     "win": 0.458,
+     "pf": 1.0,
+     "sum_pct": 57.6
+    },
+    "train": {
+     "n": 2457,
+     "avg_pct": 0.331,
+     "win": 0.472,
+     "pf": 1.1,
+     "sum_pct": 812.1
+    },
+    "test": {
+     "n": 1842,
+     "avg_pct": -0.41,
+     "win": 0.441,
+     "pf": 0.87,
+     "sum_pct": -754.5
+    },
+    "years": {
+     "2023": {
+      "n": 1218,
+      "avg_pct": 0.617,
+      "win": 0.498,
+      "pf": 1.23,
+      "sum_pct": 751.5
+     },
+     "2024": {
+      "n": 1239,
+      "avg_pct": 0.049,
+      "win": 0.446,
+      "pf": 1.01,
+      "sum_pct": 60.6
+     },
+     "2025": {
+      "n": 991,
+      "avg_pct": -0.936,
+      "win": 0.412,
+      "pf": 0.75,
+      "sum_pct": -927.7
+     },
+     "2026": {
+      "n": 851,
+      "avg_pct": 0.204,
+      "win": 0.475,
+      "pf": 1.08,
+      "sum_pct": 173.2
+     }
+    },
+    "pos_years": 3,
+    "years_n": 4,
+    "max_dd_sum_pct": -1449.4,
+    "top_coin_share": 0.24,
+    "per_day": 3.19,
+    "median_hold_h": 96.0
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.023,
+    "E": 0.092,
+    "F": 0.04,
+    "D": 0.025,
+    "any": 0.12
+   },
+   "random_same_side_avg_pct": null,
+   "idea_grid": {
+    "variants": 52,
+    "train_pos_share": 0.04,
+    "test_pos_share": 0.17
+   },
+   "sides": [
+    -1,
+    1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 683,
+     "day_avg_pct": 0.056,
+     "day_win": 0.466
+    },
+    "test": {
+     "days": 559,
+     "day_avg_pct": -0.316,
+     "day_win": 0.435
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "deriv_basis_prem",
+   "name_ru": "Премия фьючерса → шорт",
+   "rule_ru": "Фьючерс за последний час в среднем дороже спота сильнее, чем в 99.8 % случаев за 30 дней (и не меньше 5 б.п.) — шорт.",
+   "exit": {
+    "sl_atr": 2.0,
+    "tps": [
+     [
+      2.0,
+      1.0
+     ]
+    ],
+    "max_bars": 96,
+    "name": "1tp_2r"
+   },
+   "params": {
+    "basis_1h_pctl_30d": 0.998,
+    "floor_bps": 5,
+    "gap": 96,
+    "variant": "q0.998"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 1091,
+     "avg_pct": -0.18,
+     "win": 0.366,
+     "pf": 0.87,
+     "sum_pct": -196.4
+    },
+    "train": {
+     "n": 820,
+     "avg_pct": -0.03,
+     "win": 0.37,
+     "pf": 0.97,
+     "sum_pct": -24.3
+    },
+    "test": {
+     "n": 271,
+     "avg_pct": -0.635,
+     "win": 0.354,
+     "pf": 0.67,
+     "sum_pct": -172.1
+    },
+    "years": {
+     "2023": {
+      "n": 362,
+      "avg_pct": 0.021,
+      "win": 0.392,
+      "pf": 1.02,
+      "sum_pct": 7.4
+     },
+     "2024": {
+      "n": 458,
+      "avg_pct": -0.069,
+      "win": 0.352,
+      "pf": 0.94,
+      "sum_pct": -31.8
+     },
+     "2025": {
+      "n": 159,
+      "avg_pct": -0.536,
+      "win": 0.415,
+      "pf": 0.75,
+      "sum_pct": -85.3
+     },
+     "2026": {
+      "n": 112,
+      "avg_pct": -0.775,
+      "win": 0.268,
+      "pf": 0.5,
+      "sum_pct": -86.8
+     }
+    },
+    "pos_years": 1,
+    "years_n": 4,
+    "max_dd_sum_pct": -334.9,
+    "top_coin_share": 0.31,
+    "per_day": 0.81,
+    "median_hold_h": 3.75
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.057,
+    "E": 0.089,
+    "F": 0.075,
+    "D": 0.026,
+    "any": 0.13
+   },
+   "random_same_side_avg_pct": {
+    "train": -0.129,
+    "test": -0.051
+   },
+   "idea_grid": {
+    "variants": 14,
+    "train_pos_share": 0.0,
+    "test_pos_share": 0.07
+   },
+   "sides": [
+    -1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 210,
+     "day_avg_pct": -0.055,
+     "day_win": 0.438
+    },
+    "test": {
+     "days": 144,
+     "day_avg_pct": -0.141,
+     "day_win": 0.41
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "deriv_crowd",
+   "name_ru": "Толпа набирает позиции против фандинга",
+   "rule_ru": "Фандинг в крайних 5 % истории, открытый интерес в монетах за сутки вырос на 10 %+, а цена за сутки почти не сдвинулась (±3 %) — входим против переплачивающей стороны.",
+   "exit": {
+    "sl_pct": 0.1,
+    "tps": [],
+    "max_bars": 384,
+    "name": "time_4d"
+   },
+   "params": {
+    "fund_pctl": "95/5",
+    "oi_24h": 0.1,
+    "flat_24h": 0.03,
+    "gap": 96,
+    "variant": "oi0.1"
+   },
+   "stats": {
+    "label": "",
+    "all": {
+     "n": 176,
+     "avg_pct": 0.698,
+     "win": 0.534,
+     "pf": 1.23,
+     "sum_pct": 122.9
+    },
+    "train": {
+     "n": 128,
+     "avg_pct": 0.714,
+     "win": 0.57,
+     "pf": 1.26,
+     "sum_pct": 91.4
+    },
+    "test": {
+     "n": 48,
+     "avg_pct": 0.656,
+     "win": 0.438,
+     "pf": 1.18,
+     "sum_pct": 31.5
+    },
+    "years": {
+     "2023": {
+      "n": 74,
+      "avg_pct": 1.853,
+      "win": 0.608,
+      "pf": 1.92,
+      "sum_pct": 137.1
+     },
+     "2024": {
+      "n": 54,
+      "avg_pct": -0.846,
+      "win": 0.519,
+      "pf": 0.78,
+      "sum_pct": -45.7
+     },
+     "2025": {
+      "n": 30,
+      "avg_pct": 0.357,
+      "win": 0.467,
+      "pf": 1.09,
+      "sum_pct": 10.7
+     },
+     "2026": {
+      "n": 18,
+      "avg_pct": 1.153,
+      "win": 0.389,
+      "pf": 1.38,
+      "sum_pct": 20.8
+     }
+    },
+    "pos_years": 3,
+    "years_n": 4,
+    "max_dd_sum_pct": -168.4,
+    "top_coin_share": 0.34,
+    "per_day": 0.13,
+    "median_hold_h": 96.0
+   },
+   "passes_3of4": false,
+   "overlap_BEFD_4h": {
+    "B": 0.011,
+    "E": 0.08,
+    "F": 0.04,
+    "D": 0.119,
+    "any": 0.21
+   },
+   "random_same_side_avg_pct": null,
+   "idea_grid": {
+    "variants": 14,
+    "train_pos_share": 0.07,
+    "test_pos_share": 0.36
+   },
+   "sides": [
+    -1,
+    1
+   ],
+   "day_clustered": {
+    "train": {
+     "days": 105,
+     "day_avg_pct": 1.076,
+     "day_win": 0.59
+    },
+    "test": {
+     "days": 44,
+     "day_avg_pct": 0.403,
+     "day_win": 0.432
+    }
+   },
+   "passes": false
+  }
+ ]
+}

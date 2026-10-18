@@ -8,6 +8,8 @@ weights) and makes the Bybit spot holdings match those weights on the account's 
   python -m cnq.execution.spot_mirror            → shows the plan (what it would buy / sell), places nothing
   python -m cnq.execution.spot_mirror --run      → places the orders (Bybit demo; real account only with CNQ_LIVE_TRADING=yes)
   python -m cnq.execution.spot_mirror --run --loop 900   → every 15 minutes
+  python -m cnq.execution.spot_mirror --exchange okx …      → the same on OKX (cnq/execution/okx_spot.py; OKX demo by default)
+  python -m cnq.execution.spot_mirror --keep SOL,LINK …     → coins the mirror never touches (kept aside by the owner)
   python -m cnq.execution.spot_mirror --portfolio [--run]  → only the SPOT SHARE of «CRYPTO NOVA Портфолио» goes into coins
                                                             (capital.json → sleeve «spot» weight: 60 % of the sum while BTC is above
                                                             its 200-day average, 20 % below — the tested rule), the rest stays USDT
@@ -130,13 +132,18 @@ def plan(tg: dict, usdt: float, held: dict, acct) -> tuple[list, dict]:
     return orders, {"equity": round(equity, 2), "usdt": round(usdt, 2), "skipped": skipped, "gap_min": round(gap_min, 2)}
 
 
-def step(acct, portfolio: dict, run: bool, scale: float = 1.0) -> dict:
-    tg = targets(portfolio, scale)
+def step(acct, portfolio: dict, run: bool, scale: float = 1.0, keep: set | None = None) -> dict:
+    """keep: coins the mirror never touches (not sold, not bought, not counted) — e.g. a long-term bag the owner keeps aside."""
+    keep = {c.upper() for c in keep or ()}
+    tg = {c: w for c, w in targets(portfolio, scale).items() if c not in keep}
     if not tg:
         log({"ev": "no_targets"})
         return {"orders": [], "done": []}
     usdt, held = acct.holdings()
+    held = {c: h for c, h in held.items() if c not in keep}
     orders, info = plan(tg, usdt, held, acct)
+    if keep:
+        info["kept_aside"] = sorted(keep)
     log({"ev": "plan", **info, "orders": orders})
     done = []
     if run:
@@ -160,10 +167,18 @@ def main(argv=None) -> int:
     run = "--run" in argv
     by_cap = "--portfolio" in argv
     loop = int(argv[argv.index("--loop") + 1]) if "--loop" in argv else 0
-    bx = BybitTrader()
-    acct = SpotAccount(bx)
-    print(f"CRYPTO NOVA портфель → Bybit spot ({bx.mode}). {'Размещаю ордера.' if run else 'Только план, без ордеров (добавь --run).'}"
-          + (" Доля спота — из «CRYPTO NOVA Портфолио»." if by_cap else ""))
+    keep = set(argv[argv.index("--keep") + 1].upper().split(",")) if "--keep" in argv else set()
+    exch = argv[argv.index("--exchange") + 1].lower() if "--exchange" in argv else "bybit"
+    if exch == "okx":
+        from .okx_spot import OkxSpot
+        acct = OkxSpot()
+        mode, venue = acct.mode, "OKX"
+    else:
+        bx = BybitTrader()
+        acct = SpotAccount(bx)
+        mode, venue = bx.mode, "Bybit"
+    print(f"CRYPTO NOVA портфель → {venue} spot ({mode}). {'Размещаю ордера.' if run else 'Только план, без ордеров (добавь --run).'}"
+          + (" Доля спота — из «CRYPTO NOVA Портфолио»." if by_cap else "") + (f" Не трогаем: {', '.join(sorted(keep))}." if keep else ""))
     while True:
         try:
             scale = 1.0
@@ -174,7 +189,7 @@ def main(argv=None) -> int:
                     raise RuntimeError("capital.json has no spot share — nothing changed")
                 scale = sh
                 log({"ev": "spot_share", "share": sh})
-            step(acct, fetch_portfolio(), run, scale)
+            step(acct, fetch_portfolio(), run, scale, keep)
         except Exception as e:  # noqa: BLE001
             log({"ev": "error", "error": str(e)[:200]})
         if not loop:

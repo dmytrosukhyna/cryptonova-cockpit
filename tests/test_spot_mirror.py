@@ -53,3 +53,47 @@ def test_portfolio_mode_scales_the_coins_to_the_portfolio_spot_share():
     acct = FakeAcct(10_000.0, {}, {"BTC", "ETH"}, {"BTC": 100_000.0, "ETH": 4_000.0})
     r = SM.step(acct, pf, run=False, scale=0.2)
     assert [(o["coin"], o["usd"]) for o in r["orders"]] == [("BTC", 1000.0), ("ETH", 800.0)] and acct.sent == []
+
+
+def test_keep_aside_coins_are_never_sold_or_counted():
+    pf = {"portfolios": {"ideas": {"positions": [{"symbol": "BTC", "weight": 0.5}, {"symbol": "SOL", "weight": 0.2}]}}}
+    acct = FakeAcct(5_000.0, {"SOL": {"qty": 30.0, "usd": 3_000.0}, "BONK": {"qty": 1e9, "usd": 2_000.0}}, {"BTC", "SOL", "BONK"},
+                    {"BTC": 100_000.0, "SOL": 100.0, "BONK": 0.000002})
+    r = SM.step(acct, pf, run=False, keep={"bonk", "sol"})
+    assert r["equity"] == 5_000.0 and [(o["coin"], o["side"]) for o in r["orders"]] == [("BTC", "Buy")] and r["kept_aside"] == ["BONK", "SOL"]
+
+
+def test_okx_account_signs_and_maps_the_interface():
+    import base64, hashlib, hmac, io, json as _j
+    from cnq.execution.okx_spot import OkxSpot
+    sent = []
+
+    class R(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def opener(req):
+        sent.append(req)
+        u = req.full_url
+        if "/account/balance" in u:
+            d = [{"details": [{"ccy": "USDT", "cashBal": "1000", "eqUsd": "1000"}, {"ccy": "SOL", "cashBal": "2", "eqUsd": "200"},
+                              {"ccy": "DUST", "cashBal": "5", "eqUsd": "0.2"}]}]
+        elif "/public/instruments" in u:
+            d = [{"instId": "SOL-USDT", "state": "live", "lotSz": "0.0001"}]
+        elif "/market/ticker" in u:
+            d = [{"last": "100.5"}]
+        else:
+            d = [{"ordId": "777", "sCode": "0"}]
+        return R(_j.dumps({"code": "0", "data": d}).encode())
+
+    a = OkxSpot("k", "s", "p", live=False, opener=opener)
+    usdt, held = a.holdings()
+    assert usdt == 1000 and held == {"SOL": {"qty": 2.0, "usd": 200.0}}                  # dust under $1 ignored
+    assert a.instrument("SOL")["lotSizeFilter"]["basePrecision"] == "0.0001" and a.price("SOL") == 100.5
+    assert a.market("SOL", "Buy", 50, True) == {"orderId": "777"}
+    h = dict(sent[-1].header_items())
+    body = sent[-1].data.decode()
+    assert _j.loads(body) == {"instId": "SOL-USDT", "tdMode": "cash", "side": "buy", "ordType": "market", "sz": "50", "tgtCcy": "quote_ccy"}
+    ts = h["Ok-access-timestamp"]
+    want = base64.b64encode(hmac.new(b"s", (ts + "POST" + "/api/v5/trade/order" + body).encode(), hashlib.sha256).digest()).decode()
+    assert h["Ok-access-sign"] == want and h["X-simulated-trading"] == "1" and h["Ok-access-passphrase"] == "p"

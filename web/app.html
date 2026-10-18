@@ -476,6 +476,14 @@ details.sec>summary h2{font-size:12.5px;padding:7px 10px;border-radius:9px;backg
 body.decking #analystBtn{display:none!important}
 @media (max-width:600px){#deck .dtop{flex-wrap:wrap;gap:6px;padding:10px 12px}#deck #dTitle{font-size:12px}#deck #dCount{flex-basis:100%;order:9;font-size:11px}#deck #dLive{display:none}#deck .dbody{padding:12px}#deck .dnav{padding:8px 12px 12px}}
 @media (max-width:900px){#deck .dbody{grid-template-columns:1fr;overflow:auto}#deck .dstage{overflow:visible}#deck .dstage h1{font-size:22px}#deck .dbul{font-size:15px}#deck .dnotes{order:2}#deck .dlive>.card canvas{min-height:240px}}
+/* ---- «Лаборатория» */
+.labsum{display:grid;gap:2px;margin:4px 0 8px}.labsum b{font-size:14px}.labsum span{font-size:12px}
+details.labr{border-bottom:1px solid var(--line)}details.labr>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0}details.labr>summary::-webkit-details-marker{display:none}
+.lbadge{font-size:10.5px;padding:2px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}.lnm{display:grid;min-width:0}.lnm small{font-size:11px;color:var(--muted)}
+details.labr>summary .num{font-family:var(--mono);text-align:right;display:grid;font-size:13px}details.labr>summary .num small{font-size:10px;color:var(--muted)}
+.lbody{display:grid;gap:6px;padding:0 0 10px;font-size:12.5px;line-height:1.5}.lkpi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.lkpi span{border:1px solid var(--line2);border-radius:10px;padding:6px 9px;display:grid;font-size:10.5px;color:var(--muted)}.lkpi b{font-family:var(--mono);font-size:14px}.lkpi em{font-style:normal;font-size:10.5px}
+.lyrs{display:flex;gap:3px;flex-wrap:wrap}.ly{font-family:var(--mono);font-size:10px;padding:0 4px;border-radius:4px;border:1px solid currentColor}
+@media (max-width:760px){.lkpi{grid-template-columns:1fr 1fr}}
 /* ---- «Проп-компании» */
 body:not(.tab-futures) #propCard{display:none!important}
 @media (max-width:1150px){body.tab-futures #propCard{order:3}}
@@ -1431,7 +1439,7 @@ function renderIvan(){ const el=$('#ivanCard'); if(!el) return; const pass=load(
    ${(I.spot||[]).length?`<div class="muted" style="font-size:11.5px;margin-top:6px">Спот: ${I.spot.length} последних сделок (покупки и продажи без плеча).</div>`:''}<div class="muted" style="font-size:11.5px;margin-top:6px">${I.note||''}</div>`; }
 async function loadMemesCal(){ if(Date.now()-MEMES_T<5*60000&&MEMES) return; MEMES_T=Date.now();
   try{ MEMES=await (await fetch('./memes.json',{cache:'no-store'})).json(); }catch(e){ MEMES=null; }
-  try{ MCAL=await (await fetch('./calendar.json',{cache:'no-store'})).json(); }catch(e){ MCAL=null; } try{ MACRO=await (await fetch('./macro.json',{cache:'no-store'})).json(); }catch(e){ MACRO=null; } try{ const r=await fetch('./ideas.json',{cache:'no-store'}); IDEAS=r.ok?await r.json():null; }catch(e){ IDEAS=null; } try{ const r=await fetch('./outlook.json',{cache:'no-store'}); OUTLOOK=r.ok?await r.json():null; }catch(e){ OUTLOOK=null; } try{ const r=await fetch('./app_signals.json',{cache:'no-store'}); SIGS=r.ok?await r.json():null; }catch(e){ SIGS=null; } try{ const r=await fetch('./whales_top.json',{cache:'no-store'}); WTOP=r.ok?await r.json():null; }catch(e){ WTOP=null; } try{ const r=await fetch('./prop.json',{cache:'no-store'}); PROP=r.ok?await r.json():null; }catch(e){ PROP=null; } try{ const r=await fetch('./broadcast.json',{cache:'no-store'}); DECK=r.ok?await r.json():null; }catch(e){ DECK=null; } }
+  try{ MCAL=await (await fetch('./calendar.json',{cache:'no-store'})).json(); }catch(e){ MCAL=null; } try{ MACRO=await (await fetch('./macro.json',{cache:'no-store'})).json(); }catch(e){ MACRO=null; } try{ const r=await fetch('./ideas.json',{cache:'no-store'}); IDEAS=r.ok?await r.json():null; }catch(e){ IDEAS=null; } try{ const r=await fetch('./outlook.json',{cache:'no-store'}); OUTLOOK=r.ok?await r.json():null; }catch(e){ OUTLOOK=null; } try{ const r=await fetch('./app_signals.json',{cache:'no-store'}); SIGS=r.ok?await r.json():null; }catch(e){ SIGS=null; } try{ const r=await fetch('./whales_top.json',{cache:'no-store'}); WTOP=r.ok?await r.json():null; }catch(e){ WTOP=null; } try{ const r=await fetch('./prop.json',{cache:'no-store'}); PROP=r.ok?await r.json():null; }catch(e){ PROP=null; } try{ const r=await fetch('./lab.json',{cache:'no-store'}); LABR=r.ok?await r.json():null; }catch(e){ LABR=null; } try{ const r=await fetch('./broadcast.json',{cache:'no-store'}); DECK=r.ok?await r.json():null; }catch(e){ DECK=null; } }
 const usdK=v=>v==null?'—':v>=1e9?'$'+(v/1e9).toFixed(1)+' млрд':v>=1e6?'$'+(v/1e6).toFixed(1)+'M':v>=1e3?'$'+Math.round(v/1e3)+'k':'$'+Math.round(v);
 function renderMemes(){ const el=$('#memesCard'); if(!el) return; const M=MEMES; if(!M){ el.innerHTML=`<h2>🐸 Мем-сектор</h2><div class="muted enote">Сканер мемкоинов загружается — данные обновляются сервером раз в 30 минут.</div>`; return; }
   const A=M.account||{}, pnl=A.pnl_usd||0;
@@ -1900,6 +1908,7 @@ $('#radarClose').addEventListener('click',()=>{ $('#radarOv').hidden=true; });
 // ---------- futures desk at the top of the Futures tab: open trades (live P&L, progress to target/stop), orders, recent closed
 function tradesPanel(){ fsysBody(); const head=`<h2>Фьючерсы</h2>${stratSwitch()}`;
   if(FSYS==='tests'&&TSEL==='memes') return memesPanel(head);
+  if(FSYS==='tests'&&TSEL==='research') return labPanel(head);
   if(FSYS==='tests'&&TSEL==='ivan'&&IS_GUEST) return `<div class="fdesk">${head}<div class="romanbox"><b>Иван тест</b><div class="muted">Закрытый тест стратегии партнёра: данные его счёта видит только владелец системы. Итоги сравнения публикуем, когда тест закончится.</div></div></div>`;
   if(FSYS==='tests'&&TSEL==='roman') return `<div class="fdesk">${head}<div class="romanbox"><b>Роман тест</b><div class="muted">${IS_GUEST?'Закрытый тест стратегии партнёра готовится к запуску. Итоги сравнения покажем здесь, когда тест начнётся.':'Место для стратегии Романа. Подключим так же, как Ивана: ключ биржи только для чтения на твоём Маке, данные зашифрованы и видны только тебе. Как будут данные — здесь появятся его счёт, сделки и сравнение с остальными.'}</div></div></div>`;
   if(FSYS==='app'||(FSYS==='tests'&&(TSEL==='ivan'||TSEL==='whales'))) return `<div class="fdesk">${head}</div>`;
@@ -1917,10 +1926,10 @@ const TESTS_HASH='ROdIZ334R2yDxsFY7tmgo85pp104R5jz__T9uHqMAW4';   // sha('cnq:'+
 let TESTS_OK=!IS_GUEST;   // 18.10: «Тесты стратегий» is internal — only the owner sees it
 (async()=>{ const m=location.search.match(/[?&]tests=([a-z0-9]+)/i); if(!m) return; try{ if(await sha(m[1].toLowerCase())===TESTS_HASH){ store('cnq_tests','1'); TESTS_OK=true; try{ renderBelow(); }catch(e){} } }catch(e){} })();
 let FSYS=load('cnq_fsys','cn'); if(!['cn','app','tests'].includes(FSYS)) FSYS='cn';
-let TSEL=load('cnq_tsel','ivan'); if(!['ivan','roman','memes','exp','lab','whales'].includes(TSEL)) TSEL='ivan';
+let TSEL=load('cnq_tsel','research'); if(!['research','ivan','roman','memes','exp','lab','whales'].includes(TSEL)) TSEL='research';
 let CNPROF=load('cnq_cnprof',''); if(!['cons','bal','aggr'].includes(CNPROF)) CNPROF=['cons','bal','aggr'].includes(PROF)?PROF:'bal';
 const FSYS_META={cn:['CNPTS','CRYPTO NOVA Prediction Trading System'],app:['CRYPTO NOVA App','тест сигналов приложения'],tests:['Тесты стратегий','проверяем, что работает']};
-const TESTS=[['ivan','Иван'],['roman','Роман'],['memes','Мемкоины'],['exp','Свинг'],['lab','Новые идеи'],['whales','Киты · копирование']];
+const TESTS=[['research','Лаборатория'],['ivan','Иван'],['roman','Роман'],['memes','Мемкоины'],['exp','Свинг'],['lab','Новые идеи'],['whales','Киты · копирование']];
 function setProf(k){ if(!STRATS[k]||PROF===k) return; PROF=k; store('cnq_profile',PROF); SET.riskPct=STRATS[PROF].risk; store('cnq_risk',String(SET.riskPct)); try{ renderAccounts(); }catch(e){} }
 function tRes(k){ const pr=(PAPER&&PAPER.profiles)||{};
   if(k==='ivan'){ return IVAN&&IVAN.equity_hist&&IVAN.equity_hist.length?IVAN.equity-IVAN.equity_hist[0][1]:null; }
@@ -1947,6 +1956,23 @@ function bindFsw(el){
 function fsysBody(){ const b=document.body; ['cn','app','tests'].forEach(k=>b.classList.toggle('fsys-'+k,FSYS===k)); b.classList.toggle('fsys-ivan',FSYS==='tests'&&TSEL==='ivan'); b.classList.toggle('fsys-whales',FSYS==='tests'&&TSEL==='whales'); }
 // the right profile behind the desk on first load
 if(FSYS==='cn'&&!['cons','bal','aggr'].includes(PROF)) PROF=CNPROF; if(FSYS==='tests'&&(TSEL==='exp'||TSEL==='lab')) PROF=TSEL;
+// ---------------------------------------------------------------- «Лаборатория» (18.10): many strategy ideas tested the same honest way on 2020–2026 history (web/lab.json, scripts/lab)
+let LABR=null, LAB_F=load('cnq_lab_f','all');
+function exRu(ex){ if(!ex) return ''; const t=ex.tps||[]; const p=[]; p.push(ex.sl_pct!=null?`стоп ${(ex.sl_pct*100).toFixed(1)}%`:`стоп ${ex.sl_atr} ATR`); p.push(!t.length?'без цели — выход по времени':t.length===1?`1 цель (${t[0][0]}R)`:`${t.length} цели (${t.map(x=>x[0]+'R').join(', ')})`); if(ex.be_after_tp1) p.push('после первой цели стоп в безубыток'); if(ex.trail_atr) p.push('дальше трейлинг'); if(ex.max_bars) p.push(`до ${ex.max_bars>=8?Math.round(ex.max_bars/4)+' ч':ex.max_bars*15+' мин'}`); return p.join(' · '); }
+function labPanel(head){ const D=LABR; if(!D||!(D.items||[]).length) return `<div class="fdesk">${head}<div class="romanbox"><b>Лаборатория стратегий</b><div class="muted">Идёт проверка идей на истории 2020–2026: против движения и разворот сигналов, тренд и пробои, фандинг/ОИ/ликвидации, скальпинг. Результаты появятся здесь — каждая стратегия с правилом входа, выходом и цифрами по годам.</div></div></div>`;
+  const pc=v=>v==null?'—':(v>0?'+':'')+(+v).toFixed(2)+'%';
+  const fams=[['all','Все'],['pass','Прошли'],...(D.families||[]).map(f=>[f.key,f.name_ru])];
+  const list=(D.items||[]).filter(x=>LAB_F==='all'||(LAB_F==='pass'?x.passes:x.family===LAB_F));
+  const yrs=st=>{ const Y=st.years||{}; return Object.entries(Y).map(([y,v])=>`<span class="ly ${v.n>=10?(v.avg_pct>0?'pos':'neg'):'muted'}" title="${y}: ${v.n||0} сд., ${pc(v.avg_pct)}">${String(y).slice(2)}</span>`).join(''); };
+  const row=x=>{ const st=x.stats||{}, te=st.test||{}, tr=st.train||{}; return `<details class="labr ${x.passes?'ok':''}"><summary><span class="lbadge ${x.passes?'pos':'neg'}">${x.passes?'прошла':'нет'}</span><span class="lnm"><b>${x.name_ru||x.id}</b><small>${x.family_ru}${st.per_day!=null?` · ${st.per_day} сд./день`:''}</small></span><span class="num ${te.avg_pct>0?'pos':te.avg_pct<0?'neg':''}">${pc(te.avg_pct)}<small>2025–26 · ${te.n||0} сд.</small></span></summary>
+    <div class="lbody"><div>${x.rule_ru||''}</div><div class="muted">Выход: ${exRu(x.exit)}</div>
+     <div class="lkpi"><span>Подбор 2021–24<b class="${tr.avg_pct>0?'pos':'neg'}">${pc(tr.avg_pct)}</b><em>${tr.n||0} сд. · в плюсе ${tr.win!=null?Math.round(tr.win*100)+'%':'—'}</em></span><span>Проверка 2025–26<b class="${te.avg_pct>0?'pos':'neg'}">${pc(te.avg_pct)}</b><em>${te.n||0} сд. · в плюсе ${te.win!=null?Math.round(te.win*100)+'%':'—'}</em></span><span>Годы в плюсе<b>${st.pos_years??'—'} из ${st.years_n??'—'}</b><em class="lyrs">${yrs(st)}</em></span></div>
+     ${st.data?`<div class="muted" style="font-size:11px">Данные: ${st.data}</div>`:''}</div></details>`; };
+  return `<div class="fdesk">${head}<div class="labsum"><b>Лаборатория стратегий</b><span class="muted">проверено ${D.n} стратегий (всего вариантов ${D.tried}) · прошли проверку <b class="${D.passed?'pos':''}">${D.passed}</b> · обновлено ${fmtT(D.asof)}</span></div>
+   <div class="strat fsw labf">${fams.map(([k,n])=>`<button data-labf="${k}" aria-pressed="${LAB_F===k}">${n}</button>`).join('')}</div>
+   ${list.map(row).join('')||'<div class="empty">Пусто.</div>'}
+   <details class="edet"><summary>Как проверяли</summary><div class="muted" style="font-size:12px;display:grid;gap:4px">${(D.method_ru||[]).map(t=>`<div>• ${t}</div>`).join('')}${(D.families||[]).filter(f=>f.notes_ru).map(f=>`<div><b>${f.name_ru}:</b> ${f.notes_ru}</div>`).join('')}</div></details></div>`; }
+document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closest('[data-labf]'); if(!b) return; LAB_F=b.dataset.labf; store('cnq_lab_f',LAB_F); try{ renderBelow(); }catch(_){} });
 function memesPanel(head){ const A=MEMES&&MEMES.account; if(!A) return `<div class="fdesk">${head}<div class="empty">Мем-тест загружается.</div></div>`; const pnl=A.equity-(A.start_equity||10000); const st=A.stats||{};
   const pos=(A.positions||[]).map(p=>`<div class="mrow"><b>${p.coin}</b><span>вход ${fmtP(p.entry_px)} · сейчас ${fmtP(p.px)} · стоп ${fmtP(p.stop_px)}</span><span class="num ${p.pnl_usd>=0?'pos':'neg'}">${p.pnl_usd>=0?'+':'−'}$${Math.abs(p.pnl_usd).toFixed(0)}</span></div>`).join('')||'<div class="empty">Позиций нет — ждём сигнал «откуп обвала» (мем упал на 25%+ от максимума суток).</div>';
   const cl=(A.closed||[]).slice(0,6).map(t=>`<div class="mrow"><b>${t.coin}</b><span class="muted">${t.reason_ru||t.reason||'закрыта'}${t.closed?' · '+fmtT(t.closed):''}</span><span class="num ${(t.pnl_usd||0)>=0?'pos':'neg'}">${(t.pnl_usd||0)>=0?'+':'−'}$${Math.abs(t.pnl_usd||0).toFixed(0)}</span></div>`).join('');

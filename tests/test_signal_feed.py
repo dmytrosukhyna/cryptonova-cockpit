@@ -41,3 +41,22 @@ def test_cascade_short_uses_desk_targets_descending():
     t = trade(3, grade="B", side="SHORT", entry=100.0, stop=103.0, tps=json.dumps([97.0, 97.0, 97.0]))
     txt = SF.open_text(t)
     assert "Short" in txt and "Leverage: Isolated 5x" in txt and "Take-Profit Targets:\n1) 97.00\nStop" in txt and "24 ч" not in txt
+
+
+def test_mix_seeds_each_new_source_and_drops_a_losing_one():
+    conn = sqlite3.connect(":memory:")
+    sent = []
+    send = lambda text, reply_to=None: sent.append(text) or 1
+    SF.step(conn, {"open": [trade(1)]}, T0, send=send, source="bal")             # first run of bal → seeded
+    SF.step(conn, {"open": [trade(2, grade="K")]}, T0, send=send, source="imp")  # first run of imp → seeded too
+    assert sent == []
+    SF.step(conn, {"open": [trade(3, grade="K")]}, T0 + 1, send=send, source="imp")
+    assert len(sent) == 1 and "12 ч" in sent[0] and "альт догоняет рывок BTC" in sent[0]
+    # 10 closed losers in 30 days → imp drops out of the mix; its new trades are recorded but not posted
+    for i in range(10, 20):
+        SF.step(conn, {"open": [trade(i, grade="K")]}, T0 + 2, send=send, source="imp")
+        SF.step(conn, {"open": [], "closed": [dict(trade(i, grade="K"), closed=T0 + 3, exit_kind="STOP", pnl_usd=-10.0)]}, T0 + 3, send=send, source="imp")
+    ok, st = SF.live_ok(conn, "imp", T0 + 4)
+    assert not ok and st["n"] == 10 and st["avg_pct"] < 0
+    pub = SF.public(conn, T0 + 4)
+    assert pub["name"] == "CRYPTO NOVA" and [m["in_mix"] for m in pub["mix"] if m["key"] == "imp"] == [False]

@@ -21,10 +21,22 @@ import sqlite3
 import time
 
 PROFILE = "bal"
-LEV = {"B": 5, "E": 3, "F": 3, "D": 3}          # isolated leverage per rule: wide catastrophe stops (−6…−12 %) → 3×, cascade (tight stop) → 5×
+# 18.10 (owner): the app publishes ONE signal set called CRYPTO NOVA — a mix of whatever currently works. CNPTS (the panel,
+# the lab, the demo desks) keeps testing everything and decides what goes in. A source is in the mix when it passed the lab's
+# strict check on history (or is a live CNPTS desk) AND its live record is not negative; it drops out when its last 30 days
+# of closed signals average below zero (at least 10 closed). The app's own signals go in through the server bridge with the
+# «smart» rule (with BTC's last 4 h candle → as they are, against it → flipped); see app_signals.py ACCOUNTS["smart"].
+SOURCES = [   # desk key, name for people, why it is in
+    ("bal", "откуп падений (CNPTS)", "основная стратегия CNPTS: откуп каскадов, паники, сброса позиций и дисконта фьючерса"),
+    ("imp", "Импульс BTC", "прошла самую строгую проверку «Лаборатории»: 2025 и 2026 в плюсе, без 3 лучших дней тоже"),
+]
+LIVE_MIN_N = 10
+LIVE_DAYS = 30
+LEV = {"B": 5, "E": 3, "F": 3, "D": 3, "K": 3}          # isolated leverage per rule: wide catastrophe stops (−6…−12 %) → 3×, cascade (tight stop) → 5×
 RULE_RU = {"B": "откуп каскада ликвидаций", "E": "откуп паники", "F": "откуп сброса позиций", "D": "откуп дисконта фьючерса",
-           "A": "откуп гэпа"}
-TIME_EXIT = {"E", "F", "D"}
+           "A": "откуп гэпа", "K": "альт догоняет рывок BTC"}
+TIME_EXIT = {"E", "F", "D", "K"}
+HOLD_H = {"E": 24, "F": 24, "D": 24, "K": 12}
 
 
 def _fmt(p: float) -> str:
@@ -55,7 +67,7 @@ def open_text(t: dict) -> str:
     lines += [f"{i}) {_fmt(p)}" for i, p in enumerate(targets(t), 1)]
     lines += ["Stop Targets:", f"1) {_fmt(float(t['stop']))}"]
     if g in TIME_EXIT:
-        lines.append("Выход по времени через 24 ч — пришлём «Close».")
+        lines.append(f"Выход по времени через {HOLD_H.get(g, 24)} ч — пришлём «Close».")
     return "\n".join(lines)
 
 
@@ -94,15 +106,28 @@ def ensure(conn: sqlite3.Connection) -> None:
     conn.execute("""CREATE TABLE IF NOT EXISTS signal_feed(id TEXT PRIMARY KEY, symbol TEXT, side TEXT, grade TEXT, entry REAL, stop REAL,
                     opened INTEGER, open_text TEXT, msg_id INTEGER, seeded INTEGER, closed INTEGER, exit_kind TEXT, pnl_pct REAL,
                     close_text TEXT, close_msg_id INTEGER)""")
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(signal_feed)")}
+    if "source" not in cols:
+        conn.execute("ALTER TABLE signal_feed ADD COLUMN source TEXT")
+        conn.execute("UPDATE signal_feed SET source=? WHERE source IS NULL", (PROFILE,))
     conn.commit()
 
 
-def step(conn: sqlite3.Connection, desk: dict, now: int | None = None, send=_send) -> dict:
-    """desk = paper.json profiles[PROFILE]. Returns {'opened': [...], 'closed': [...]} for this run."""
+def live_ok(conn: sqlite3.Connection, source: str, now: int) -> tuple[bool, dict]:
+    """A source stays in the mix unless its closed signals of the last 30 days average below zero (with ≥ 10 closed)."""
+    xs = [r[0] for r in conn.execute("SELECT pnl_pct FROM signal_feed WHERE source=? AND closed>=? AND pnl_pct IS NOT NULL AND seeded IN (0, 2)",
+                                     (source, now - LIVE_DAYS * 86_400_000))]
+    st = {"n": len(xs), "avg_pct": round(sum(xs) / len(xs), 2) if xs else None, "wins": sum(1 for x in xs if x > 0)}
+    return (len(xs) < LIVE_MIN_N or st["avg_pct"] >= 0), st
+
+
+def step(conn: sqlite3.Connection, desk: dict, now: int | None = None, send=_send, source: str = PROFILE, active: bool = True) -> dict:
+    """desk = paper.json profiles[source]. Returns {'opened': [...], 'closed': [...]} for this run. A source that is out of the
+    mix (`active` False) still records its trades (so its live record keeps counting) but they are not posted."""
     now = now or int(time.time() * 1000)
     ensure(conn)
     known = {r[0]: r for r in conn.execute("SELECT id, msg_id, closed FROM signal_feed")}
-    first = not known and not conn.execute("SELECT 1 FROM signal_feed LIMIT 1").fetchone()
+    first = not conn.execute("SELECT 1 FROM signal_feed WHERE source=? LIMIT 1", (source,)).fetchone()
     out = {"opened": [], "closed": []}
     for t in desk.get("open") or []:
         if t["id"] in known:
@@ -110,14 +135,15 @@ def step(conn: sqlite3.Connection, desk: dict, now: int | None = None, send=_sen
         txt = open_text(t)
         seeded = 1 if first else 0
         mid = None
-        if not seeded:
+        if not seeded and active:
             try:
                 mid = send(txt)
             except Exception as e:  # noqa: BLE001
                 print("signal feed send:", e)
-        conn.execute("INSERT INTO signal_feed VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                     (t["id"], t["symbol"], t["side"], t.get("grade"), t["entry"], t["stop"], t.get("opened") or now, txt, mid, seeded,
-                      None, None, None, None, None))
+        conn.execute("INSERT INTO signal_feed(id, symbol, side, grade, entry, stop, opened, open_text, msg_id, seeded, source) "
+                     "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                     (t["id"], t["symbol"], t["side"], t.get("grade"), t["entry"], t["stop"], t.get("opened") or now, txt, mid,
+                      seeded if active else 2, source))      # seeded 2 = recorded while the source was out of the mix
         out["opened"].append(t["id"])
     for t in desk.get("closed") or []:
         row = known.get(t["id"])
@@ -140,20 +166,31 @@ def step(conn: sqlite3.Connection, desk: dict, now: int | None = None, send=_sen
 
 def public(conn: sqlite3.Connection, now: int | None = None) -> dict:
     now = now or int(time.time() * 1000)
-    keys = ("id", "symbol", "side", "grade", "entry", "stop", "opened", "open_text", "msg_id", "seeded", "closed", "exit_kind", "pnl_pct", "close_text")
+    keys = ("id", "symbol", "side", "grade", "entry", "stop", "opened", "open_text", "msg_id", "seeded", "closed", "exit_kind", "pnl_pct", "close_text",
+            "source")
     rows = [dict(zip(keys, r)) for r in conn.execute(f"SELECT {', '.join(keys)} FROM signal_feed ORDER BY opened DESC LIMIT 200")]
-    done = [r for r in rows if r["closed"] and r["pnl_pct"] is not None and not r["seeded"]]
+    done = [r for r in rows if r["closed"] and r["pnl_pct"] is not None and r["seeded"] == 0]
     wins = sum(1 for r in done if r["pnl_pct"] > 0)
+    names = {k: n for k, n, _ in SOURCES}
     for r in rows:
         r["rule_ru"] = RULE_RU.get(r["grade"] or "", r["grade"])
+        r["source_ru"] = names.get(r["source"] or PROFILE, r["source"])
         r["posted"] = bool(r.pop("msg_id"))
-    return {"asof": now, "profile": PROFILE, "channel_on": bool(os.environ.get("CNQ_SIGNALS_CHAT")),
-            "stats": {"signals": sum(1 for r in rows if not r["seeded"]), "closed": len(done), "wins": wins,
+    mix = []
+    for k, n, why in SOURCES:
+        ok, st = live_ok(conn, k, now)
+        mix.append({"key": k, "name_ru": n, "why_ru": why, "in_mix": ok, "live_30d": st})
+    mix.append({"key": "app_smart", "name_ru": "сигналы приложения через «умный разворот»", "in_mix": True,
+                "why_ru": "их сигнал по ходу последней 4-часовой свечи BTC — как есть, против неё — наоборот; публикует мост на сервере приложения",
+                "live_30d": None})
+    return {"asof": now, "name": "CRYPTO NOVA", "profile": PROFILE, "mix": mix, "channel_on": bool(os.environ.get("CNQ_SIGNALS_CHAT")),
+            "stats": {"signals": sum(1 for r in rows if r["seeded"] == 0), "closed": len(done), "wins": wins,
                       "avg_pct": round(sum(r["pnl_pct"] for r in done) / len(done), 2) if done else None},
             "items": rows,
-            "about_ru": ("Наши собственные сигналы: каждая сделка стратегии CNPTS «Сбалансированная» в формате Cornix (пара, сторона, "
-                         "плечо, вход, цели, стоп). Сделки с выходом по времени закрываются сообщением «Close» через 24 ч, как на демо-счёте. "
-                         "Канал для Cornix включается, когда задан CNQ_SIGNALS_CHAT; до этого сигналы только здесь.")}
+            "about_ru": ("CRYPTO NOVA — один набор сигналов для приложения, смесь того, что сейчас работает. CNPTS постоянно проверяет "
+                         "все стратегии и решает, что входит в смесь: стратегия попадает сюда, если прошла проверку на истории или это живой "
+                         "счёт CNPTS, и выпадает, если за 30 дней её закрытые сигналы в среднем в минусе. Формат — как у Cornix (пара, сторона, "
+                         "плечо, вход, цели, стоп); выход по времени закрывается сообщением «Close».")}
 
 
 def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> dict:
@@ -161,8 +198,11 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> d
         paper = json.load(open(os.path.join(out, "paper.json"), encoding="utf-8"))
     except Exception as e:  # noqa: BLE001
         return {"error": f"paper.json: {e}"}
-    desk = (paper.get("profiles") or {}).get(PROFILE) or {}
-    res = step(conn, desk, now)
+    res = {}
+    for k, _, _ in SOURCES:
+        desk = (paper.get("profiles") or {}).get(k) or {}
+        ok, _ = live_ok(conn, k, now or int(time.time() * 1000))
+        res[k] = step(conn, desk, now, source=k, active=ok)
     doc = public(conn, now)
     doc["this_run"] = res
     with open(os.path.join(out, "signals_feed.json"), "w", encoding="utf-8") as f:

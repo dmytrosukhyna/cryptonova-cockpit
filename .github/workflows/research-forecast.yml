@@ -1,0 +1,20 @@
+name: research-forecast
+# Manual only. «Прогнозный движок»: which public factors predict BTC 1 / 7 / 30 days ahead, tested blind (walk-forward).
+# scripts/forecast_study.py — Binance archive, Fear & Greed, DefiLlama stablecoins, FRED, Wikipedia, GDELT, Farside.
+# Results: annotations + job summary.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy pandas scikit-learn
+      - run: python scripts/forecast_study.py

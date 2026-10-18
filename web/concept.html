@@ -44,6 +44,8 @@ a:hover{text-decoration:underline}
 /* top bar */
 .top{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(6,11,22,.72);border-bottom:1px solid var(--line)}
 .top .wrap{display:flex;align-items:center;gap:20px;height:60px}
+.back{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;border:1px solid var(--line2);color:var(--fg);font-weight:700;font-size:13.5px;white-space:nowrap}
+.back .ico{transform:rotate(180deg);width:18px;height:18px}.back:hover{text-decoration:none;background:rgba(124,196,255,.08)}
 .logo{font-weight:800;letter-spacing:.18em;font-size:15px;white-space:nowrap;color:var(--fg)}
 .logo i{color:var(--acc);font-style:normal}
 .nav{display:flex;gap:4px;margin-left:auto}
@@ -220,7 +222,7 @@ footer p{margin:0;max-width:72ch;line-height:1.55}
 @media (max-width:640px){
   .wrap{padding:0 16px}
   .top .wrap{height:56px}
-  .logo{font-size:13.5px;letter-spacing:.14em}
+  .logo{font-size:12.5px;letter-spacing:.12em}.top .wrap{gap:10px}.back{padding:7px 10px}.top .btn .ico{display:none}
   .btn{padding:8px 12px;font-size:13px}
   .hero{padding:52px 0 36px}
   section{padding:52px 0}
@@ -268,6 +270,7 @@ footer p{margin:0;max-width:72ch;line-height:1.55}
 
 <header class="top">
   <div class="wrap">
+    <a class="back" href="app.html" id="backBtn" aria-label="Назад"><svg class="ico"><use href="#i-arrow"/></svg>Назад</a>
     <div class="logo">CRYPTO NOV<i>Λ</i></div>
     <nav class="nav" aria-label="Разделы">
       <a href="#how">Устройство</a><a href="#principles">Принципы</a><a href="#proof">Проверки</a><a href="#next">Дальше</a><a href="#road">План</a><a href="#risks">Риски</a>
@@ -494,6 +497,8 @@ footer p{margin:0;max-width:72ch;line-height:1.55}
 
 <script>
 (function(){
+  // «Назад»: back to the page we came from (the panel) when there is one, else open the panel
+  var bb=document.getElementById('backBtn'); bb.addEventListener('click',function(e){ try{ if(document.referrer&&new URL(document.referrer).origin===location.origin&&history.length>1){ e.preventDefault(); history.back(); } }catch(err){} });
   // reveal on scroll
   var els=[].slice.call(document.querySelectorAll('.rv'));
   if('IntersectionObserver' in window){

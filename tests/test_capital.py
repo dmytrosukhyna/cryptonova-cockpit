@@ -22,14 +22,14 @@ def test_split_follow_desks_and_monthly_fee():
     world(d)
     a = K.run(conn, d, T0)
     w = {s["key"]: s["weight"] for s in a["sleeves"]}
-    assert w == {"spot": 0.5, "futures": 0.3, "funding": 0.2} and a["value_usd"] == 1000.0
+    assert w == {"spot": 0.5, "futures": 0.3, "funding": 0.2} and a["value_usd"] == 10000.0
     assert [x["key"] for x in a["watch_only"]] == ["arb", "tri"] and a["watch_only"][0]["week_virtual_usd"] == 24.0
     # spot +10 %, futures: bal +4 % and imp 0 % → +2 %, funding −1 %
     world(d, spot=11_000, bal=10_400, imp=10_000, fund=9_900)
     b = K.run(conn, d, T0 + 3_600_000)
     v = {s["key"]: s["value_usd"] for s in b["sleeves"]}
-    assert abs(v["spot"] - 550) < 0.01 and abs(v["futures"] - 306) < 0.01 and abs(v["funding"] - 198) < 0.01
-    assert abs(b["value_usd"] - 1054) < 0.01 and b["month"]["fee_usd"] == round(b["month"]["profit_usd"] * 0.10, 2) > 0
+    assert abs(v["spot"] - 5500) < 0.1 and abs(v["futures"] - 3060) < 0.1 and abs(v["funding"] - 1980) < 0.1
+    assert abs(b["value_usd"] - 10540) < 0.1 and b["month"]["fee_usd"] == round(b["month"]["profit_usd"] * 0.10, 2) > 0
     json.dumps(b)
 
 

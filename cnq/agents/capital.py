@@ -1,7 +1,7 @@
-"""CRYPTO NOVA Капитал — one sum, the system splits it between our desks (18.10.2026, owner: «человек пополняет $1000, система сама
+"""CRYPTO NOVA Портфолио — one sum, the system splits it between our desks (18.10.2026, owner: «человек пополняет $1000, система сама
 распределяет: спот, фьючерсы, фандинг… весь месяц работает, в конце подводит итоги: заработано столько-то, оплата 10%»).
 
-A DEMO account of $1 000 that starts on the first run and follows the desks the server already runs:
+A DEMO account of $10 000 (owner: «как будто я вложил настоящие свои 10 тысяч долларов» — his main screen) that starts on the first run and follows the desks the server already runs:
   • spot     — the CRYPTO NOVA portfolio (portfolio.json → portfolios.ideas, equity_usd);
   • futures  — CRYPTO NOVA = the desks in the mix: CNPTS «Сбалансированная» (paper.json profiles.bal) and «Импульс BTC»
                (profiles.imp), equal parts, equity incl. open P&L;
@@ -22,7 +22,7 @@ import os
 import sqlite3
 import time
 
-START = 1_000.0
+START = 10_000.0
 BASE = {"spot": 0.50, "futures": 0.30, "funding": 0.20}
 BOUNDS = {"spot": (0.30, 0.60), "futures": (0.15, 0.45), "funding": (0.0, 0.30)}
 FEE = 0.10
@@ -148,7 +148,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     month_profit = total - st["month_value"]
     arb = (_load(out, "arb.json").get("week") or {}).get("virtual_pnl_usd")
     tri = (_load(out, "tri.json").get("week") or {}).get("virtual_pnl_usd")
-    return {"asof": now, "name": "CRYPTO NOVA Капитал", "start_usd": START, "started": st["started"], "value_usd": round(total, 2),
+    return {"asof": now, "name": "CRYPTO NOVA Портфолио", "start_usd": START, "started": st["started"], "value_usd": round(total, 2),
             "pnl_usd": round(total - START, 2), "pnl_pct": round((total / START - 1) * 100, 2),
             "sleeves": [{"key": k, "name_ru": NAMES[k], "weight": st["weights"].get(k), "value_usd": round(v, 2),
                          "share_now": round(v / total, 4) if total else None} for k, v in st["sleeves"].items()],

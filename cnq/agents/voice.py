@@ -106,10 +106,17 @@ def compose(out: str = "web") -> str:
         w = ((_load(out, f"{k}.json") or {}).get("week") or {}).get("virtual_pnl_usd")
         if w is not None:
             extra[k] = float(w)
-    if fut_res is not None and spot_res is not None:
+    cap = _load(out, "capital.json") or {}
+    if cap.get("value_usd") is not None:
+        # 18.10 (owner): the main screen is «CRYPTO NOVA Портфолио» — $10 000 as if real, split by the system
+        tot = float(cap["pnl_usd"])
+        L.append(f"Портфолио CRYPTO NOVA — {usd(cap['value_usd'])}: за всё время {result(tot)}.")
+    elif fut_res is not None and spot_res is not None:
         tot = fut_res + spot_res + sum(extra.values())
         L.append(f"Заработано всего — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}"
                  + (", вместе с фандингом и арбитражем." if extra else "."))
+    else:
+        tot = None
     markets = _load(out, "markets.json") or {}
     btc = next((t for t in markets.get("top", []) if t.get("symbol") == "BTC"), None)
     stress = (paper.get("stress") or {}).get("level") if isinstance(paper.get("stress"), dict) else None
@@ -125,7 +132,7 @@ def compose(out: str = "web") -> str:
         L.append("Из новостей стоит отметить: " + re.sub(r"\.$", "", imp.get("title") or imp["reasoning"]) + ".")
     L.append("Если понадоблюсь — на связи.")
     compose.keys = {"fut": "cryptonova", "spot": sp_key, "fut_open": len(prof.get("open") or []) if prof else None,
-                    "total": round((fut_res or 0) + (spot_res or 0) + sum(extra.values())) if fut_res is not None and spot_res is not None else None,
+                    "total": round(tot) if tot is not None else None, "mode": "portfolio" if cap.get("value_usd") is not None else "desks",
                     "parts": {"fut": round(fut_res) if fut_res is not None else None, "spot": round(spot_res) if spot_res is not None else None,
                               **{k: round(v, 2) for k, v in extra.items()}},
                     "btc": btc.get("price") if btc else None}

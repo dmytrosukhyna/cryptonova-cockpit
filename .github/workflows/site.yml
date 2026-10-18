@@ -105,7 +105,7 @@ jobs:
       - name: Spot ideas (one table «можно брать / добрать / на небольшую сумму / ждём / не брать» from research + portfolios + memes) → web/ideas.json
         continue-on-error: true
         run: python -m cnq.cli ideas --out web || true
-      - name: CRYPTO NOVA Капитал — one $1 000 demo sum split between spot / futures / funding → web/capital.json
+      - name: CRYPTO NOVA Портфолио — one $10 000 demo sum split between spot / futures / funding → web/capital.json
         continue-on-error: true
         run: python -m cnq.cli capital --out web
       - name: Forecast calibration (A/B записывается и проверяется) → web/calibration.json

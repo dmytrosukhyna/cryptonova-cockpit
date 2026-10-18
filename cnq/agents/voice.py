@@ -75,8 +75,16 @@ def compose(out: str = "web") -> str:
         eq = prof.get("equity")
         if eq:
             fut_res = eq + sum(o.get("open_pnl_usd") or 0 for o in opened) - 10_000
-        L.append(f"По фьючерсам, CNPTS «{prof.get('name') or 'Сбалансированная'}»: " + "; ".join(parts) + "."
-                 + (f" Счёт {usd(10_000 + fut_res)}." if fut_res is not None else ""))
+            # 18.10: our futures result = CRYPTO NOVA = the desks in the mix (CNPTS «Сбалансированная» + «Импульс BTC») + the app's
+            # selected signals («умный разворот», live part)
+            imp = (paper.get("profiles") or {}).get("imp") or {}
+            if imp.get("equity") is not None:
+                fut_res += imp["equity"] + sum(o.get("open_pnl_usd") or 0 for o in imp.get("open") or []) - 10_000
+            sm = (((_load(out, "app_signals.json") or {}).get("accounts") or {}).get("since_live") or {}).get("smart") or {}
+            if sm.get("equity") is not None:
+                fut_res += sm.get("equity_with_open", sm["equity"]) - 10_000
+        L.append("По фьючерсам, CRYPTO NOVA: " + "; ".join(parts) + "."
+                 + (f" Итог {result(fut_res)}." if fut_res is not None else ""))
     spot_res = None
     pf = _load(out, "portfolio.json") or {}
     # 18.10 (owner): the header and the brief show OUR strategies (CNPTS «Сбалансированная» + the AI portfolio), not the leader
@@ -87,7 +95,7 @@ def compose(out: str = "web") -> str:
     elif sp.get("index"):
         spot_res = 10_000 * sp["index"] / 100 - 10_000
     if spot_res is not None:
-        nm = "CNPTS, AI-портфель" if sp_key == "ideas" else (sp.get("name_short") or "Умеренный")
+        nm = "портфель CRYPTO NOVA" if sp_key == "ideas" else (sp.get("name_short") or "Умеренный")
         L.append(f"По споту, {nm}: {'в плюсе на ' + usd(spot_res) if spot_res > 5 else 'в минусе на ' + usd(spot_res) if spot_res < -5 else 'около нуля'}.")
     # every desk counts in «Заработано всего»: funding carry (real demo), arbitrage and triangle (virtual estimates)
     extra = {}
@@ -116,7 +124,7 @@ def compose(out: str = "web") -> str:
     if imp:
         L.append("Из новостей стоит отметить: " + re.sub(r"\.$", "", imp.get("title") or imp["reasoning"]) + ".")
     L.append("Если понадоблюсь — на связи.")
-    compose.keys = {"fut": "bal", "spot": sp_key, "fut_open": len(prof.get("open") or []) if prof else None,
+    compose.keys = {"fut": "cryptonova", "spot": sp_key, "fut_open": len(prof.get("open") or []) if prof else None,
                     "total": round((fut_res or 0) + (spot_res or 0) + sum(extra.values())) if fut_res is not None and spot_res is not None else None,
                     "parts": {"fut": round(fut_res) if fut_res is not None else None, "spot": round(spot_res) if spot_res is not None else None,
                               **{k: round(v, 2) for k, v in extra.items()}},

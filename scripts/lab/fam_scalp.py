@@ -375,6 +375,9 @@ def part_a():
             side = np.where(real & (z > kx), sgn, np.where(real & (z < -kx), -sgn, 0)).astype(np.int8)
             sig[f"{mode}_z{kx}"] = (side != 0, side, {"taker_z": kx, "mode": mode})
     b = search_a("A5 taker burst", sig, min_n=200, start=t23, train=(ms(2023), HN.TRAIN_END))
+    if b is None:            # wide set: no taker-flow data → no variant qualifies
+        log("A5 taker burst: no data on this set — skipped")
+        return [x for x in out if x]
     _, _, sname, ename, E, ex, sp = b
     dir_ru = "в ту же сторону (за покупателями — лонг)" if sp["mode"] == "follow" else "против всплеска (после рывка покупок — шорт)"
     out.append(finalize_a("scalp_taker_burst", "Всплеск рыночных покупок/продаж (taker)",

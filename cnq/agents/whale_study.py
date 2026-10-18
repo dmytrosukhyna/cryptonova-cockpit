@@ -177,7 +177,7 @@ def load_fills(conn, addr: str, since: int) -> list[dict]:
 
 
 # ------------------------------------------------------------------------------------------------------------ analysis
-def round_trips(fills: list[dict], since: int = 0) -> tuple[list[dict], float]:
+def round_trips(fills: list[dict], since: int = 0, marks: dict | None = None, now: int | None = None) -> tuple[list[dict], float]:
     """Fills (time-sorted) → round trips per coin. A trip opens when the position leaves 0 and closes when it returns to 0
     (a flip closes one trip and opens the next at the same fill). Trips already open at the first fill of the window are
     skipped (entry unknown). → (complete trips, total P&L of all fills in the window incl. partial trips)."""
@@ -220,6 +220,16 @@ def round_trips(fills: list[dict], since: int = 0) -> tuple[list[dict], float]:
             if abs(new) <= eps or start * new < 0:
                 trips.append(_close(cur, f))
                 cur = _open(coin, f, new, 0.0) if start * new < 0 and abs(new) > eps else None
+        # a position still open now counts at the current price — a trader who sits on losers must not look like a winner
+        mk = _f((marks or {}).get(coin)) if marks else 0.0
+        if cur is not None and mk > 0 and now:
+            entry = cur["in_usd"] / cur["in_sz"] if cur["in_sz"] else cur["first_px"]
+            left = max(0.0, cur["in_sz"] - cur["out_sz"])
+            sg = 1 if cur["side"] == "LONG" else -1
+            trips.append({"coin": coin, "side": cur["side"], "open_t": cur["open_t"], "close_t": now, "hold_h": round((now - cur["open_t"]) / H1, 2),
+                          "entry": entry, "exit": mk, "ret_pct": round(sg * (mk / entry - 1) * 100, 3) if entry else None,
+                          "notional": round(cur["max_sz"] * entry, 2), "pnl": round(cur["pnl"] + sg * (mk - entry) * left, 2),
+                          "fills": cur["fills"], "open": True})
     trips.sort(key=lambda t: t["open_t"])
     return trips, total
 
@@ -320,7 +330,8 @@ def copy_test(trips: list[dict], candles: dict, delay_min: int) -> dict:
         if not cs:
             nodata += 1
             continue
-        a, b = price_at(cs, tr["open_t"] + D), price_at(cs, tr["close_t"] + D)
+        a = price_at(cs, tr["open_t"] + D)
+        b = cs[-1][4] if tr.get("open") else price_at(cs, tr["close_t"] + D)
         if not a or not b:
             nodata += 1
             continue
@@ -338,8 +349,11 @@ def copy_test(trips: list[dict], candles: dict, delay_min: int) -> dict:
 
 
 def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list, candles: dict, now: int, too_active: bool) -> dict:
-    trips = [t for t in trips if t["open_t"] >= now - WINDOW]
+    trips = [t for t in trips if t["open_t"] >= now - WINDOW or t.get("open")]
     n = len(trips)
+    open_tr = [t for t in trips if t.get("open")]
+    open_upnl = sum(t["pnl"] for t in open_tr)
+    total = total + sum(t["pnl"] for t in open_tr)
     wins = [t for t in trips if t["pnl"] > 0]; losses = [t for t in trips if t["pnl"] <= 0]
     gp, gl = sum(t["pnl"] for t in wins), -sum(t["pnl"] for t in losses)
     holds = [t["hold_h"] for t in trips]
@@ -370,7 +384,7 @@ def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list,
          "best_share": round(best["pnl"] / gp, 2) if best and gp > 0 else None,
          "lev_now": round(st.median(levs), 1) if levs else None, "positions": positions[:8],
          "recent": sorted(trips, key=lambda t: -t["close_t"])[:12], "copy": {str(d): v for d, v in copies.items()},
-         "portfolio": pf_stats, "too_active": too_active}
+         "portfolio": pf_stats, "too_active": too_active, "open_trips": len(open_tr), "open_upnl": round(open_upnl, 2)}
     why = []
     if too_active:
         why.append("слишком частые сделки (больше 8000 исполнений за 45 дней) — скопировать нельзя")
@@ -379,7 +393,9 @@ def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list,
     if hold_med is not None and hold_med < MIN_HOLD_H:
         why.append(f"держит слишком коротко (медиана {hold_med * 60:.0f} мин)")
     if total <= 0:
-        why.append("за 30 дней в минусе")
+        why.append("за 30 дней в минусе (с учётом открытых позиций)")
+    elif open_upnl < 0 and -open_upnl > 0.5 * (total - open_upnl):
+        why.append(f"держит открытые позиции в минусе ({_usd(open_upnl)}) — прибыль закрытых сделок обманчива")
     if p["pf"] is not None and p["pf"] < MIN_PF:
         why.append(f"прибыль/убыток {p['pf']} < {MIN_PF}")
     p["eligible"] = not why
@@ -406,6 +422,8 @@ def describe(p: dict) -> str:
     if p["win"] is not None:
         pf_s = "убыточных сделок не было" if (p["pf"] or 0) >= 99 else f"прибыль к убытку {p['pf']}"
         parts.append(f"Прибыльных сделок {p['win'] * 100:.0f}%, {pf_s}." + (f" Плечо сейчас ~{p['lev_now']:.0f}×." if p["lev_now"] else ""))
+    if p.get("open_trips"):
+        parts.append(f"Сейчас открыто {p['open_trips']} позиций, по ним {_usd(p['open_upnl'])} (уже учтено в результате).")
     if p["best_share"] is not None and p["best_share"] >= 0.5:
         parts.append(f"Осторожно: половина прибыли — одна сделка ({p['best']['coin']} {_usd(p['best']['pnl'])}).")
     c = p["copy"].get("30") or {}
@@ -870,12 +888,26 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             continue
         if c.get("src") == "okx":
             trips, total = okx_trips(conn, c["addr"], since)
+            st_ = json.loads(r[3]) if r[3] else {}
+            for x in st_.get("okx") or []:            # open sub-positions at the mark price
+                try:
+                    side = (x.get("posSide") or "").lower()
+                    if side == "net":
+                        side = "long" if _f(x.get("subPos")) > 0 else "short"
+                    e_, m_ = _f(x.get("openAvgPx")), _f(x.get("markPx"))
+                    sg = 1 if side == "long" else -1
+                    trips.append({"coin": _okx_coin(x.get("instId")), "side": "LONG" if side == "long" else "SHORT", "open_t": int(x.get("openTime")),
+                                  "close_t": now, "hold_h": round((now - int(x.get("openTime"))) / H1, 2), "entry": e_, "exit": m_,
+                                  "ret_pct": round(sg * (m_ / e_ - 1) * 100, 3) if e_ and m_ else None, "notional": round(_f(x.get("margin")) * _f(x.get("lever"), 1.0), 2),
+                                  "pnl": round(_f(x.get("upl")), 2), "fills": 1, "open": True})
+                except Exception:  # noqa: BLE001
+                    continue
             for t in trips:
                 t["coin"] = hl_name(t["coin"], mids) or t["coin"]
             pos = okx_positions(json.loads(r[3])) if r[3] else []
             pfs = {}
         else:
-            trips, total = round_trips(load_fills(conn, c["addr"], now - FETCH_WINDOW), since)
+            trips, total = round_trips(load_fills(conn, c["addr"], now - FETCH_WINDOW), since, marks=mids, now=now)
             pos = norm_positions(json.loads(r[3])) if r[3] else []
             pfs = portfolio_stats(json.loads(r[2])) if r[2] else {}
         if c["addr"] in states:

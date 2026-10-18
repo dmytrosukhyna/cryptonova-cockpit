@@ -50,3 +50,10 @@ def test_access_codes_add_list_remove_with_fake_github():
     assert code.startswith("NOVA-") and store["doc"]["codes"][0]["h"] == A.code_hash(code.lower()) and code not in json.dumps(store["doc"])
     assert A.main(["remove", "роман"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0 and store["doc"]["codes"] == []
     assert A.main(["remove", "нет такого"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 1
+    # 18.10: monthly paid access — a 31-day code; a new month replaces the person's old code
+    assert A.main(["month", "Клиент"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0 and "31 день" in lines[-1]
+    c1 = store["doc"]["codes"][0]
+    assert c1["label"] == "Клиент" and abs(c1["until"] - c1["created"] - 31 * 86_400_000) < 1000
+    assert A.main(["month", "Клиент"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0
+    assert len(store["doc"]["codes"]) == 1 and store["doc"]["codes"][0]["h"] != c1["h"]
+    assert A.main(["list"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0 and " · до " in lines[-1]

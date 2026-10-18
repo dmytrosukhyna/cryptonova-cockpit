@@ -43,7 +43,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -251,6 +251,12 @@ def main(argv: list[str] | None = None) -> int:
         doc, why = broadcast.run(args.out, conn, force=args.force)
         print(f"broadcast.json: {'rebuilt (' + why + ')' if why else 'live refreshed'} week_of={doc.get('week_of')} slides={len(doc.get('slides') or [])} "
               f"~{doc.get('duration_min_est')} min ids={[s['id'] for s in doc.get('slides') or []]} errors={doc.get('errors')}")
+    elif args.cmd == "capital":
+        import os, sqlite3
+        from .agents import capital
+        os.makedirs("data", exist_ok=True)
+        d = capital.run(sqlite3.connect("data/agents.sqlite"), args.out)
+        print(f"capital.json: ${d['value_usd']} ({d['pnl_pct']}%) sleeves={[(s['key'], s['weight']) for s in d['sleeves']]} month={d['month']}")
     elif args.cmd == "signalfeed":
         import os, sqlite3
         from .agents import signal_feed

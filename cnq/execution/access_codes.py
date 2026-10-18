@@ -3,6 +3,7 @@
     bash scripts/access_code.sh add "Имя"      → prints a new code for that person (e.g. NOVA-7K3P-Q9WD)
     bash scripts/access_code.sh list           → who has a code
     bash scripts/access_code.sh remove "Имя"   → the code stops working
+    bash scripts/access_code.sh month "Имя"    → a code valid for 31 days (paid access; a new one each month)
 
 Only a hash of each code is published (web/access.json: sha256('cnq:' + code), base64url — the same as the panel's
 sha()), so the file does not reveal the codes. A guest who enters a valid code gets the invited view («Тесты
@@ -34,10 +35,13 @@ def code_hash(code: str) -> str:
     return base64.urlsafe_b64encode(hashlib.sha256(("cnq:" + c).encode()).digest()).decode().rstrip("=")
 
 
-def add(doc: dict, label: str, now: int, level: str = "tests") -> tuple[dict, str]:
+def add(doc: dict, label: str, now: int, level: str = "tests", days: int | None = None) -> tuple[dict, str]:
     code = new_code()
     doc = dict(doc or {})
-    doc["codes"] = [c for c in doc.get("codes") or []] + [{"h": code_hash(code), "label": label.strip()[:60], "level": level, "created": now}]
+    row = {"h": code_hash(code), "label": label.strip()[:60], "level": level, "created": now}
+    if days:
+        row["until"] = now + days * 86_400_000          # the panel refuses the code after this moment (monthly paid access)
+    doc["codes"] = [c for c in doc.get("codes") or []] + [row]
     doc["v"] = 1
     return doc, code
 
@@ -83,15 +87,20 @@ def main(argv=None, env=None, http=None, out=print) -> int:
         codes = doc.get("codes") or []
         out("Коды доступа:" if codes else "Кодов пока нет.")
         for c in codes:
-            out(f" — {c.get('label') or 'без имени'} · выдан {time.strftime('%d.%m.%Y', time.localtime((c.get('created') or 0) / 1000))}")
+            till = f" · до {time.strftime('%d.%m.%Y', time.localtime(c['until'] / 1000))}" if c.get("until") else " · бессрочно"
+            out(f" — {c.get('label') or 'без имени'} · выдан {time.strftime('%d.%m.%Y', time.localtime((c.get('created') or 0) / 1000))}{till}")
         return 0
-    if cmd == "add":
+    if cmd in ("add", "month"):
         label = " ".join(argv[1:]).strip() or "гость"
-        doc, code = add(doc, label, int(time.time() * 1000))
+        days = 31 if cmd == "month" else None
+        if cmd == "month":                                      # the person's previous monthly code is replaced
+            doc, _ = remove(doc, label)
+        doc, code = add(doc, label, int(time.time() * 1000), days=days)
         if not _put(doc, sha, tok, repo, http, f"access: code for {label}"):
             out("GitHub не принял файл — код не создан.")
             return 1
-        out(f"Код для «{label}»:  {code}\nОн заработает через 5–10 минут. Человек открывает cryptonova.vip → «У меня есть код доступа» → вводит код.")
+        till = f"\nДействует 31 день — до {time.strftime('%d.%m.%Y', time.localtime(time.time() + 31 * 86400))}." if days else ""
+        out(f"Код для «{label}»:  {code}\nОн заработает через 5–10 минут. Человек открывает cryptonova.vip → «У меня есть код доступа» → вводит код.{till}")
         return 0
     if cmd == "remove":
         label = " ".join(argv[1:]).strip()
@@ -104,7 +113,7 @@ def main(argv=None, env=None, http=None, out=print) -> int:
             return 1
         out(f"Код «{label}» отключён (через 5–10 минут).")
         return 0
-    out("Команды: add \"Имя\" · list · remove \"Имя\"")
+    out("Команды: add \"Имя\" · month \"Имя\" · list · remove \"Имя\"")
     return 1
 
 

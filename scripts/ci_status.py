@@ -43,6 +43,15 @@ for f, max_h in WATCH.items():
         st["stale"].append({"file": f, "why": f"не обновлялся {(now - a_) / 3.6e6:.1f} ч"})
     elif err:
         st["stale"].append({"file": f, "why": f"ошибка: {str(err)[:100]}"})
+try:   # the unlock calendar is kept by hand / by the weekly review: older than 3 weeks → it misses new unlocks
+    import datetime as _dt
+    built = json.load(open("web/tokenomics.json")).get("calendar_built")
+    age = (_dt.date.today() - _dt.date.fromisoformat(built)).days if built else None
+    if age is None or age > 21:
+        st["stale"].append({"file": "scripts/lab/data/unlocks_upcoming.json",
+                            "why": "календаря разлоков нет" if age is None else f"календарь разлоков собран {age} дн. назад — обновить"})
+except Exception:  # noqa: BLE001
+    pass
 for x in st["stale"]:
     print(f"::warning title=stale {x['file']}::{x['why']}")
 os.makedirs("web", exist_ok=True)

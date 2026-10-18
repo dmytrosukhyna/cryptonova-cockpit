@@ -244,3 +244,50 @@ def test_realised_dilution_is_measured_from_our_own_snapshots_and_lowers_the_sco
     d1 = rows_by_sym(si.build(inp, NOW))
     assert d1["UNLK"]["score"] == max(0, d0["UNLK"]["score"] - 10) and d1["FLAT"]["score"] == d0["FLAT"]["score"]
     assert any(c["key"] == "supply" and "10.0%" in c["t"] for c in d1["UNLK"]["checks"]) and d1["UNLK"]["status"] == d0["UNLK"]["status"]
+
+
+def test_big_unlock_ahead_means_wait_small_unlock_is_only_a_fact():
+    """18.10 (scripts/unlocks_study.py): an unlock of ≥ 20 % of the circulating supply within 30 days → «ждём» for a non-core
+    coin; 5–20 % → a fact line, status unchanged; the core is never gated."""
+    cs = [card("ALTA", "mod", 48), card("ALTB", "mod", 48), card("BTC", "cons", 55, price=80000)]
+    inp = inputs(cards=cs, picks={"short": [], "mid": [pick("ALTA", 70), pick("ALTB", 70)], "long": []})
+    d0 = rows_by_sym(si.build(inp, NOW))
+    assert d0["ALTA"]["status"] == "buy" and d0["ALTB"]["status"] == "buy"
+    inp["tokenomics"] = {"tokens": {}, "unlocks_next": {
+        "ALTA": {"date": "2026-11-01", "days": 12, "pct_circ": 25.0, "event_class": "one_off_cliff"},
+        "ALTB": {"date": "2026-11-01", "days": 12, "pct_circ": 8.0},
+        "BTC": {"date": "2026-11-01", "days": 12, "pct_circ": 50.0}}}
+    d1 = rows_by_sym(si.build(inp, NOW))
+    a, b = d1["ALTA"], d1["ALTB"]
+    assert a["status"] == "wait" and "разлок 25%" in a["why_ru"] and any(c["key"] == "unlock" and c["ok"] is False for c in a["checks"])
+    assert b["status"] == "buy" and any(c["key"] == "unlock" and c["ok"] is None and "8%" in c["t"] for c in b["checks"])
+    assert d1["BTC"]["status"] == d0["BTC"]["status"] and not any(c["key"] == "unlock" for c in d1["BTC"]["checks"])
+
+
+def test_unlock_calendar_window_and_forward_watch(tmp_path):
+    import sqlite3
+    from cnq.agents import tokenomics as T
+    day = 86_400_000
+    t0 = T._day_ms("2026-10-18") + 3_600_000
+    cal = {"built": "2026-10-18", "events": [
+        {"symbol": "monx", "date": "2026-11-10", "pct_circ": 40.0, "event_class": "one_off_cliff", "source": "https://x"},
+        {"symbol": "MONX", "date": "2026-10-25", "pct_circ": 2.0},
+        {"symbol": "FAR", "date": "2026-12-31", "pct_circ": 90.0},
+        {"symbol": "PAST", "date": "2026-10-10", "pct_circ": 30.0},
+        {"symbol": "BAD", "date": "soon", "pct_circ": 30.0}]}
+    nx = T.upcoming(cal, t0)
+    assert set(nx) == {"MONX"} and nx["MONX"]["pct_circ"] == 40.0 and nx["MONX"]["days"] == 23
+    conn = sqlite3.connect(":memory:")
+    mk = lambda p, b: {"top": [{"symbol": "MONX", "price": p}, {"symbol": "BTC", "price": b}]}   # noqa: E731
+    w = T.unlock_watch(conn, mk(1.0, 100.0), cal, t0)
+    assert w["resolved"] == 0 and w["open"][0]["symbol"] == "MONX" and w["open"][0]["days_before_seen"] == 23
+    T.unlock_watch(conn, mk(2.0, 100.0), cal, t0 + 5 * day)               # first sight is kept
+    w = T.unlock_watch(conn, mk(0.8, 110.0), cal, t0 + 23 * day)          # the unlock day: coin −20 %, BTC +10 %
+    assert w["resolved"] == 1 and w["last"][0]["vs_btc_pct"] == -30.0 and w["lagged_share_pct"] == 100
+    p = tmp_path / "cal.json"
+    p.write_text(json.dumps(cal))
+    (tmp_path / "markets.json").write_text(json.dumps(mk(1.0, 100.0)))
+    d = T.run(str(tmp_path), fetch=lambda u: (_ for _ in ()).throw(OSError("offline")), conn=sqlite3.connect(":memory:"),
+              now=t0, calendar=str(p))
+    assert d["unlocks_next"]["MONX"]["days"] == 23 and d["calendar_built"] == "2026-10-18" and d["unlock_watch"]["open"]
+    assert json.load(open(tmp_path / "tokenomics.json"))["unlocks_next"]["MONX"]["pct_circ"] == 40.0

@@ -11,6 +11,10 @@ No new data and no forecasts: the module only re-reads what the other department
                                    `from_high30_pct` (distance from the 30-day high, a lower-bound estimate);
   • tokenomics.json `tokens`    — 18.10: holders revenue from DefiLlama (buybacks / burns / payouts): a fact line in the «i» and a
                                    score bonus (≤ +10, 2 points per 1 % of market cap a year) — never a pass / fail check;
+  • tokenomics.json `unlocks_next` — 18.10: the next unlock within 30 days (our calendar of public sources). Our study
+                                   (scripts/unlocks_study.py, 287 unlocks 2024–2026): ≥ 20 % of the circulating supply → the coin
+                                   lagged BTC by ≈15 % over the 30 days before (3 of 4 cases) → «ждём» for non-core coins until the
+                                   unlock; 5–20 % → a fact line only (the effect faded in 2026);
   • markets.json   `top`        — 24 h volume (liquidity);  decision.json `coins` — support zones and the 20-day high for the
                                    18 futures coins of the terminal (used for «цена у поддержки» and the 30-day-high estimate).
 Missing files are skipped; a coin missing a value simply does not pass the check that needs it (never a guess).
@@ -80,6 +84,7 @@ RATING_SMALL = 35        # research rating for «на небольшую сум�
 CONSULTANT_BUY = 60      # consultant max(mid, long) for a large alt; the mod portfolio buys mid ideas from 60
 ADD_MID, ADD_LONG = 60, 70   # panel's «Можно добрать»: consultant mid ≥ 60 or long ≥ 70
 OVERHEAT_7D, OVERHEAT_30D = 40.0, 120.0
+UNLOCK_BIG, UNLOCK_WARN = 20.0, 5.0   # unlock in ≤ 30 days, % of circulating: ≥ 20 → «ждём» (non-core), ≥ 5 → a fact line
 DIP_30D = -30.0          # ≥ 30 % below the 30-day high (meme desk and «Сбалансированный» meme rule)
 DEAD_ATH = -90.0         # ≥ 90 % below the all-time high = «мёртвая монета» (portfolio.BAL["dead_ath"])
 DILUTION_FDV = 2.0       # FDV / market cap ≥ 2 → half or more of the tokens are still to come
@@ -251,6 +256,7 @@ def _gather(inp: dict, now: int) -> tuple[dict, dict]:
     bt = (((pf.get("portfolios") or {}).get("bal") or {}).get("backtest") or {}).get("result") or {}
     ctx = {"btc_bull": btc_bull, "names": names, "core_bt": bt.get("cons_50_25_15"),
            "tok": ((inp.get("tokenomics") or {}).get("tokens")) or {},
+           "unl": ((inp.get("tokenomics") or {}).get("unlocks_next")) or {},
            "sources": {k: (v or {}).get("asof") for k, v in inp.items() if isinstance(v, dict)}}
     return coins, ctx
 
@@ -488,6 +494,18 @@ def evaluate(sym: str, s: dict, ctx: dict) -> dict:
                     why = f"Высокий риск, просадка {_pct(hi30)} от максимума 30 дней — небольшой суммой"
         if status is None:
             status, (why, dkey) = "wait", reason
+
+    # ---- upcoming unlock (18.10, tokenomics.json `unlocks_next`; study scripts/unlocks_study.py, 287 unlocks 2024–2026) ----
+    un = (ctx.get("unl") or {}).get(sym)
+    upct = _num((un or {}).get("pct_circ"))
+    if un and upct is not None and upct >= UNLOCK_WARN and kind != "core":
+        when = "сегодня" if un["days"] == 0 else f"через {un['days']} дн."
+        big = upct >= UNLOCK_BIG
+        chk("unlock", f"{when} ({un['date']}) разлок {upct:g}% монет в обращении", False if big else None)
+        if big and status in ("buy", "add", "small"):
+            status, dkey = "wait", "unlock"
+            why = (f"{when[:1].upper() + when[1:]} разлок {upct:g}% монет в обращении — до разлока не берём: в 2024–2026 такие "
+                   "монеты за 30 дней до разлока отставали от BTC в среднем на 15%")
 
     # ---- holders revenue (18.10, tokenomics.json): the protocol pays its token holders (buybacks / burns / payouts) ----
     tk = (ctx.get("tok") or {}).get(sym) or {}

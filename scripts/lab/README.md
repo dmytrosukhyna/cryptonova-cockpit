@@ -14,3 +14,10 @@ Everything is tested the same way (`harness.py`):
 Families: `fam_fade.py` (app-like counter-trend signals and their flip), `fam_trend.py` (breakouts, pullbacks,
 squeezes, BTC lead), `fam_deriv.py` (funding, open interest, liquidations, CVD, taker flow, basis),
 `fam_scalp.py` (short holds, sessions, 1-minute BTC).
+
+Wide universe (18.10, owner: "18 coins is too few — at least top-50"): `CNQ_LAB_SET=wide` loads
+`alt100_all2023.npz` (every Binance USDT-M perpetual listed by 2023-01, delisted ones included — built by
+`research-alt100.yml` stage=data universe=all2023 and published as release `lab-data-all2023`). A coin is traded only
+while it is in the top-50 by trailing 30-day volume at that moment (`CNQ_LAB_TOPN`), so there is no look-ahead in the
+choice of coins. Liquidations, funding and CVD are not in that file. Data starts 2022-11 → train 2023–2024,
+test 2025–2026, year rule ≥ 3 of 4.

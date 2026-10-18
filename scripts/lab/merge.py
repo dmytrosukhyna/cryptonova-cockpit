@@ -2,7 +2,10 @@
 import glob
 import json
 import os
+import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FAM_RU = {"fade": "Против движения и разворот", "trend": "Тренд и пробои", "deriv": "Деривативы: фандинг, ОИ, ликвидации",
@@ -17,6 +20,8 @@ def slim(st):
 def main():
     fams, items, tried = [], [], 0
     for p in sorted(glob.glob(os.path.join(HERE, "results", "*.json"))):
+        if os.path.basename(p).startswith("_"):
+            continue
         with open(p, encoding="utf-8") as f:
             d = json.load(f)
         fam = d.get("family") or os.path.basename(p)[:-5]
@@ -24,6 +29,8 @@ def main():
         tried += d.get("tried") or 0
         for r in d.get("results") or []:
             st = r.get("stats") or {}
+            from harness import passes as _passes        # the current pass rule (a family may have run with an older one)
+            r["passes"] = _passes(st)
             items.append({"family": fam, "family_ru": FAM_RU.get(fam, fam), "id": r.get("id"), "name_ru": r.get("name_ru"),
                           "rule_ru": r.get("rule_ru"), "exit": r.get("exit"), "params": r.get("params"), "passes": bool(r.get("passes")),
                           "stats": slim(st)})

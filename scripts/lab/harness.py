@@ -47,9 +47,23 @@ TRAIN_END = int(_dt.datetime(2025, 1, 1, tzinfo=_dt.timezone.utc).timestamp() * 
 TRAIN_START = int(_dt.datetime(2021, 1, 1, tzinfo=_dt.timezone.utc).timestamp() * 1000)
 
 
+WIDE = os.environ.get("CNQ_LAB_SET", "") == "wide"           # CNQ_LAB_SET=wide → the wide universe (alt100.npz, all2023)
+WIDE_PATH = os.environ.get("CNQ_LAB_WIDE", "/tmp/claude-0/-home-claude/5491f1a8-ca5d-58c4-b6e0-e27b29449aba/scratchpad/lab/alt100_all2023.npz")
+TOPN = int(os.environ.get("CNQ_LAB_TOPN", "50"))              # point-in-time: trade a coin only while it is in the top-N by 30-day volume
+
+
+def _load_wide():
+    z = np.load(WIDE_PATH, allow_pickle=True)
+    keys = ["open", "high", "low", "close", "volume_quote", "long_liq_usd", "short_liq_usd", "open_interest_usd", "funding_rate_pct",
+            "future_cvd_15m", "spot_cvd_15m", "ls_ratio_top", "taker_volume_ratio", "is_imputed_metrics", "basis_index_bps"]
+    shape = z["close"].shape
+    A = {k: (z[k].astype(float) if k in z.files else np.full(shape, np.nan)) for k in keys}
+    return list(z["syms"]), z["times"], A
+
+
 class _Data:
     def __init__(self):
-        syms, times, A = load()
+        syms, times, A = _load_wide() if WIDE else load()
         self.syms = [str(s) for s in syms]
         self.times = np.asarray(times, dtype=np.int64)
         self.O, self.H, self.L, self.C = A["open"], A["high"], A["low"], A["close"]
@@ -64,6 +78,21 @@ class _Data:
         self.hour = ((self.times // 3_600_000) % 24).astype(int)
         self.dow = ((self.times // 86_400_000 + 3) % 7).astype(int)        # 0 = Monday
         self.ATR = self._atr(14)
+        self.ELIG = self._eligible(TOPN) if WIDE else None
+
+    def _eligible(self, n):
+        """[coin, bar] True while the coin is among the n most traded by trailing 30-day quote volume (known at that bar)."""
+        V = np.nan_to_num(self.V)
+        cs = np.cumsum(V, axis=1)
+        w = 30 * 96
+        el = np.zeros(self.C.shape, dtype=bool)
+        for i in range(w, self.T, 96):                      # re-ranked once a day, applied to the next day
+            vol = cs[:, i] - cs[:, i - w]
+            ok = np.isfinite(self.C[:, i]) & (vol > 0)
+            order = np.argsort(-np.where(ok, vol, -1))
+            top = order[:n][ok[order[:n]]]
+            el[top, i + 1:min(self.T, i + 97)] = True
+        return el
 
     def _atr(self, n):
         H, L, C = self.H, self.L, self.C
@@ -156,6 +185,8 @@ def entries_from_mask(mask, side, gap: int = 16, start: int | None = None):
         last = -10 ** 9
         for i in idx:
             if i < t0 or i + 1 >= d.T or i - last < gap:
+                continue
+            if d.ELIG is not None and not d.ELIG[k, i]:
                 continue
             sg = int(sd[k, i]) if sd is not None else int(side)
             if sg == 0:
@@ -290,7 +321,9 @@ def stats(trades, label: str = "") -> dict:
 
 def passes(st: dict) -> bool:
     te = st.get("test") or {}
-    return (te.get("n", 0) >= 60 and (te.get("avg_pct") or -1) > 0.05 and st.get("pos_years", 0) >= 4
+    yn = st.get("years_n", 0)
+    need = 4 if yn >= 6 else 3 if yn >= 4 else max(1, yn)          # 6 years (2021–26) → 4; 4 years (2023–26, wide set) → 3
+    return (te.get("n", 0) >= 60 and (te.get("avg_pct") or -1) > 0.05 and st.get("pos_years", 0) >= need
             and (st.get("top_coin_share") or 1) <= 0.5)
 
 

@@ -225,3 +225,22 @@ def test_tokenomics_joins_holders_revenue_to_symbols():
           {"name": "Uniswap", "slug": "uniswap", "symbol": "UNI", "parentProtocol": "parent#uniswap"}]
     t = T.build(ov, pr)
     assert t["HYPE"]["holders_rev_30d_usd"] == 70_000_000 and "ONDO" not in t and t["UNI"]["holders_rev_1y_usd"] == 20_000_000
+
+
+def test_realised_dilution_is_measured_from_our_own_snapshots_and_lowers_the_score():
+    import sqlite3
+    from cnq.agents import tokenomics as T
+    conn = sqlite3.connect(":memory:")
+    day = 86_400_000
+    t0 = 1_790_000_000_000
+    T.supply_growth(conn, {"top": [{"symbol": "UNLK", "mcap": 1e9, "price": 1.0}, {"symbol": "FLAT", "mcap": 1e9, "price": 1.0}]}, t0)
+    assert T.supply_growth(conn, {"top": [{"symbol": "UNLK", "mcap": 1e9, "price": 1.0}]}, t0 + 10 * day) == {}      # too early
+    g = T.supply_growth(conn, {"top": [{"symbol": "UNLK", "mcap": 1.1e9, "price": 1.0}, {"symbol": "FLAT", "mcap": 1.2e9, "price": 1.2}]}, t0 + 30 * day)
+    assert g == {"UNLK": 10.0, "FLAT": 0.0}
+    cs = [card("UNLK", "mod", 48), card("FLAT", "mod", 48)]
+    inp = inputs(cards=cs, picks={"short": [], "mid": [pick("UNLK", 70), pick("FLAT", 70)], "long": []})
+    d0 = rows_by_sym(si.build(inp, NOW))
+    inp["tokenomics"] = {"tokens": {"UNLK": {"supply_30d_pct": 10.0}, "FLAT": {"supply_30d_pct": 0.0}}}
+    d1 = rows_by_sym(si.build(inp, NOW))
+    assert d1["UNLK"]["score"] == max(0, d0["UNLK"]["score"] - 10) and d1["FLAT"]["score"] == d0["FLAT"]["score"]
+    assert any(c["key"] == "supply" and "10.0%" in c["t"] for c in d1["UNLK"]["checks"]) and d1["UNLK"]["status"] == d0["UNLK"]["status"]

@@ -500,12 +500,18 @@ def evaluate(sym: str, s: dict, ctx: dict) -> dict:
                 + " — выкуп, сжигание или выплаты", None)
         elif kind == "mid" and ctx.get("tok"):
             chk("holders", "держатели дохода протокола не получают (по DefiLlama) — рост держится только на спросе", None)
+    sg = _num(tk.get("supply_30d_pct"))
+    if sg is not None and sg >= 2 and kind != "core":
+        chk("supply", f"за 30 дней монет в обращении стало больше на {sg:.1f}% — идут разлоки; по исследованию Keyrock около 90% "
+                      "крупных разлоков давили на цену", None)
 
     # ---- score ----
     parts = [(v, w) for v, w in ((R, 0.5), (C, 0.3), (M, 0.2)) if v is not None]
     score = round(sum(v * w for v, w in parts) / sum(w for _, w in parts)) if parts else 0
     if hy is not None and kind != "meme":         # a real yield to holders lifts the coin in the order (≤ +10 points)
         score = min(100, score + round(min(10.0, hy * 100 * 2)))
+    if sg is not None and sg >= 2 and kind != "core":   # realised dilution (unlocks) pushes it down (≤ −10 points)
+        score = max(0, score - round(min(10.0, sg * 2)))
 
     # ---- info for the «i» popup: 2–5 short sentences, the deciding check first ----
     first = lambda xs: sorted(xs, key=lambda c: c["key"] != dkey)   # noqa: E731

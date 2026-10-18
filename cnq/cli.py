@@ -265,8 +265,10 @@ def main(argv: list[str] | None = None) -> int:
         print("channel_watch.json: " + "; ".join(f"{k}: done={c['forecasts']} open={c['open']} hit={c['hit_rate_pct']} up={c['always_up_pct']} err={c['error']}"
                                                   for k, c in d["channels"].items()))
     elif args.cmd == "tokenomics":
+        import os, sqlite3
         from .agents import tokenomics
-        d = tokenomics.run(args.out)
+        os.makedirs("data", exist_ok=True)
+        d = tokenomics.run(args.out, conn=sqlite3.connect("data/agents.sqlite"))
         print(f"tokenomics.json: {len(d['tokens'])} tokens with holders revenue; top {[t['symbol'] for t in d['top'][:8]]} error={d['error']}")
     elif args.cmd == "listings":
         import os, sqlite3

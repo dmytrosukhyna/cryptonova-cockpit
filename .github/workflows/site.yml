@@ -76,7 +76,7 @@ jobs:
         run: python -m cnq.cli tri --out web || true
       - name: CRYPTO NOVA app signals (публичный API приложения → история, проверка ценами, профиль стратегии, правила) → web/app_signals.json
         continue-on-error: true
-        timeout-minutes: 6
+        timeout-minutes: 9
         run: python -m cnq.cli appsignals --out web || true
       - name: Coin research (анкета, топ-100, страх/жадность, капитализация) → web/markets.json, web/research.json
         continue-on-error: true
@@ -86,6 +86,7 @@ jobs:
         run: python -m cnq.cli whales --out web
       - name: Top traders study (Hyperliquid + OKX lead traders, copy test, «Киты» copy desk) → web/whales_top.json
         continue-on-error: true
+        timeout-minutes: 5
         run: python -m cnq.cli whalestudy --out web
       - name: Spot portfolio department → web/portfolio.json
         continue-on-error: true

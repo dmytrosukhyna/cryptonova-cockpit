@@ -70,6 +70,7 @@ PLAIN_UA = {"User-Agent": "Mozilla/5.0 cryptonova/1.0"}
 M1, M15, H1, H4, DAY = 60_000, 900_000, 3_600_000, 14_400_000, 86_400_000
 IV_MS = {"1m": M1, "15m": M15, "1h": H1, "4h": H4}
 M1_WINDOW_MS = 3 * H1       # the first 3 hours after the signal are checked on 1m candles, 15m after that
+BACKLOG_BIG, BACKLOG_REQUESTS, BACKLOG_SECONDS = 60, 650, 330
 MARKET_TOL_PCT = 0.6        # entry within 0.6 % of the price at the signal minute = market order (filled at the signal time)
 FILL_WINDOW_MS = 48 * H1
 MAX_HOLD_MS = 14 * DAY
@@ -1783,6 +1784,12 @@ def run(conn, now: int | None = None, fetch_json=None, klines=None, budget_s: fl
         for ex in pstats_["examples"][:2]:
             notes.append("Пример непонятного сигнала: " + json.dumps(ex, ensure_ascii=False)[:300])
     src = klines or KlineSource()
+    try:                            # a big backlog (first backfill, a simulator upgrade) gets a bigger budget so it clears in 1–2 runs
+        backlog = conn.execute("SELECT COUNT(*) FROM app_signals WHERE done=0").fetchone()[0]
+    except sqlite3.Error:
+        backlog = 0
+    if backlog > BACKLOG_BIG and klines is None:
+        max_requests, budget_s = max(max_requests, BACKLOG_REQUESTS), max(budget_s, BACKLOG_SECONDS)
     budget = _Budget(budget_s, max_requests)
     st = process(conn, now, src, budget, notes)
     pruned = prune(conn, now)

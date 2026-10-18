@@ -510,7 +510,7 @@ for r in results:
 os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
 report(os.path.join(HERE, "results", "deriv.json"), "deriv", results, TRIED, NOTES)
 import json  # noqa: E402
-with open(os.path.join(HERE, "results", "_deriv_all_variants.json"), "w", encoding="utf-8") as f:
+with open(os.path.join(HERE, "results", f"_deriv_all_variants{__import__('harness').SUFFIX}.json"), "w", encoding="utf-8") as f:
     json.dump({"tried": TRIED, "baseline": {f"{sg}_{ex}": v for (sg, ex), v in BASE.items()}, "variants": ALL}, f, ensure_ascii=False, default=float)
 
 print(f"\n{'idea':14} {'variant':22} {'exit':9} {'trN':>5} {'trAvg':>7} {'teN':>5} {'teAvg':>7} {'tePF':>5} yrs  top  pass 3/4  overlap  years")

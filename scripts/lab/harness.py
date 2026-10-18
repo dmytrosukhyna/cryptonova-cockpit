@@ -50,6 +50,8 @@ TRAIN_START = int(_dt.datetime(2021, 1, 1, tzinfo=_dt.timezone.utc).timestamp() 
 WIDE = os.environ.get("CNQ_LAB_SET", "") == "wide"           # CNQ_LAB_SET=wide → the wide universe (alt100.npz, all2023)
 WIDE_PATH = os.environ.get("CNQ_LAB_WIDE", "/tmp/claude-0/-home-claude/5491f1a8-ca5d-58c4-b6e0-e27b29449aba/scratchpad/lab/alt100_all2023.npz")
 TOPN = int(os.environ.get("CNQ_LAB_TOPN", "50"))              # point-in-time: trade a coin only while it is in the top-N by 30-day volume
+SUFFIX = f"_wide{TOPN}" if WIDE else ""                       # result files of a wide run: results/<family>_wide50.json
+UNIVERSE_RU = f"топ-{TOPN} по объёму" if WIDE else "18"
 
 
 def _load_wide():
@@ -61,7 +63,7 @@ def _load_wide():
     A = {k: (z[k].astype(np.float32) if k in z.files else nan) for k in keys}
     if "is_imputed_metrics" not in z.files:
         A["is_imputed_metrics"] = np.broadcast_to(np.float32(0), shape)
-    return list(z["syms"]), z["times"], A
+    return [f"{x}USDT" for x in z["syms"]], z["times"], A                # same names as the 18-coin set (BTCUSDT …)
 
 
 class _Data:
@@ -398,5 +400,10 @@ def report(path: str, family: str, results: list, tried: int, notes_ru: str = ""
     """results: [{id, name_ru, rule_ru, exit, params, stats}] → JSON for the panel / merge step."""
     for r in results:
         r["passes"] = passes(r["stats"])
+    if SUFFIX:
+        root, ext = os.path.splitext(path)
+        path, family = root + SUFFIX + ext, family + SUFFIX
+        notes_ru = (f"Широкий набор: все фьючерсы Binance с 2023 года (с удалёнными), в торговле только монеты из топ-{TOPN} "
+                    f"по объёму за 30 дней на тот момент; обучение 2023–2024, проверка 2025–2026. " + notes_ru)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump({"family": family, "tried": tried, "notes_ru": notes_ru, "results": results}, f, ensure_ascii=False, indent=1, default=float)
+        json.dump({"family": family, "universe": "wide" if SUFFIX else "core18", "topn": TOPN if SUFFIX else 18, "tried": tried, "notes_ru": notes_ru, "results": results}, f, ensure_ascii=False, indent=1, default=float)

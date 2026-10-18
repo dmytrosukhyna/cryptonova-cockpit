@@ -151,6 +151,55 @@ def study(a):
                      # one listing = 5 % of an account, no overlap limit: account-level result per year ≈ 5 % × sum
                      "acct_5pct_by_year": {int(y): round(float(v[yrs == y].sum()) * 5, 1) for y in sorted(set(yrs))}})
     res["grid"] = grid
+    # 18.10 (2nd pass): the chosen rule (4 h / 14 d / stop +30 %) split by what we can know at entry — the listing's first 4 h move,
+    # its first-4 h turnover, the funding sign at entry and the BTC regime (BTC above its 200-day average, Binance archive daily)
+    if a.splits:
+        btc = []
+        for mo in months_between("2022-01", today.strftime("%Y-%m")):
+            st, bb = http(f"{VISION}/monthly/klines/BTCUSDT/1d/BTCUSDT-1d-{mo}.zip", binary=True)
+            if st == 200:
+                btc += read_zip(bb)
+        btc.sort(key=lambda r: int(r[0]))
+        day_t = np.array([int(r[0]) for r in btc]); day_c = np.array([float(r[4]) for r in btc])
+        def btc_bull(ms):
+            i = np.searchsorted(day_t, ms) - 1
+            return bool(i >= 200 and day_c[i] > day_c[i - 200:i].mean()) if i >= 0 else None
+        rows = []
+        for d in data:
+            r = short(d, 4, 14, 0.3)
+            if r is None:
+                continue
+            m4 = d["c"][3] / d["o"][0] - 1 if len(d["c"]) > 4 else None
+            q4 = float(d["q"][:4].sum())
+            f0 = None
+            if len(d["fv"]):
+                k = np.searchsorted(d["ft"], d["t"][4]) - 1
+                f0 = float(d["fv"][k]) if k >= 0 else None
+            rows.append({"ret": r[0], "m4": m4, "q4": q4, "f0": f0, "bull": btc_bull(d["t"][4]),
+                         "year": dt.datetime.fromtimestamp(d["listed"] / 1000, dt.timezone.utc).year})
+        def bucket(name, key):
+            out = {}
+            for lab, fn in key:
+                v = np.array([x["ret"] for x in rows if fn(x)])
+                rec = np.array([x["ret"] for x in rows if fn(x) and x["year"] >= 2025])
+                if len(v) >= 15:
+                    out[lab] = {"n": len(v), "avg_pct": round(float(v.mean()) * 100, 2), "win_pct": round(float((v > 0).mean()) * 100),
+                                "n_2025_26": len(rec), "avg_2025_26_pct": round(float(rec.mean()) * 100, 2) if len(rec) else None}
+            note(f"listings · split by {name}", json.dumps(out, ensure_ascii=False))
+            return out
+        qs = sorted(x["q4"] for x in rows)
+        q_lo, q_hi = (qs[len(qs) // 3], qs[2 * len(qs) // 3]) if qs else (0, 0)
+        res["splits"] = {
+            "first_4h_move": bucket("first 4h move", [("упала ≥ 10%", lambda x: x["m4"] is not None and x["m4"] <= -0.10),
+                                                      ("−10…+10%", lambda x: x["m4"] is not None and -0.10 < x["m4"] < 0.10),
+                                                      ("выросла ≥ 10%", lambda x: x["m4"] is not None and x["m4"] >= 0.10),
+                                                      ("выросла ≥ 30%", lambda x: x["m4"] is not None and x["m4"] >= 0.30)]),
+            "first_4h_turnover": bucket("first 4h turnover", [("нижняя треть", lambda x: x["q4"] <= q_lo), ("средняя", lambda x: q_lo < x["q4"] <= q_hi),
+                                                              ("верхняя треть", lambda x: x["q4"] > q_hi)]),
+            "funding_at_entry": bucket("funding at entry", [("отрицательный (шорты платят)", lambda x: x["f0"] is not None and x["f0"] < 0),
+                                                            ("≥ 0", lambda x: x["f0"] is not None and x["f0"] >= 0)]),
+            "btc_regime": bucket("BTC regime", [("BTC выше 200-дневной", lambda x: x["bull"] is True), ("BTC ниже", lambda x: x["bull"] is False)]),
+        }
     res["share_positive"] = round(sum(1 for g in grid if g["avg_pct"] > 0) / max(1, len(grid)) * 100)
     res["share_positive_2025_26"] = round(sum(1 for g in grid if (g["recent_avg_pct"] or -1) > 0) / max(1, len(grid)) * 100)
     with open(a.out, "w") as fh:
@@ -173,4 +222,5 @@ def study(a):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="listings.json")
+    ap.add_argument("--splits", action="store_true", help="split the chosen rule by what is known at entry")
     study(ap.parse_args())

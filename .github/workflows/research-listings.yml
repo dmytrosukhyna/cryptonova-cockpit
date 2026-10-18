@@ -16,6 +16,6 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install numpy
-      - run: python scripts/listings_study.py --out listings.json
+      - run: python scripts/listings_study.py --out listings.json --splits
       - uses: actions/upload-artifact@v4
         with: { name: listings, path: listings.json, retention-days: 7 }

@@ -374,6 +374,47 @@ def overheat(d: pd.DataFrame) -> None:
                     row[y] = round(float((1 + ry).prod() - 1) * 100, 1)
             res[start[:4]][k] = row
     note("forecast · overheat rules", json.dumps(res, ensure_ascii=False))
+    risk(d, r, bull, base)
+
+
+def risk(d: pd.DataFrame, r: pd.Series, bull: pd.Series, base: pd.Series) -> None:
+    """Step 3: predict RISK, not direction. Volatility clusters (calm follows calm, storms follow storms), so size by it:
+    exposure = regime share × (typical volatility ÷ current volatility), clipped to 0.5–1.5×; typical = median of the 30-day
+    volatility over the past 365 days (no look-ahead). Also: how well today's 30-day volatility predicts the next 30 days'."""
+    lr = np.log(d["close"]).diff()
+    v30 = lr.rolling(30).std()
+    fut = lr[::-1].rolling(30).std()[::-1].shift(-1)          # realised volatility of the NEXT 30 days
+    pred = {y: round(float(v30[(v30.index.year == int(y)) & fut.notna() & v30.notna()]
+                           .corr(fut[(fut.index.year == int(y)) & fut.notna() & v30.notna()])), 2) for y in YEARS}
+    typ = v30.rolling(365, min_periods=180).median()
+    res = {}
+    for cap in (1.0, 1.5):
+        k = (typ / v30).clip(0.5, cap)
+        for name, e0 in (("regime", base), ("buy_hold", pd.Series(1.0, index=d.index))):
+            e = (e0 * k).clip(upper=1.0)
+            v, cur = e.values.copy(), np.nan                            # trade only on a change of 5 points or more
+            for i, x in enumerate(v):
+                if not np.isnan(x) and (np.isnan(cur) or abs(x - cur) >= 0.05):
+                    cur = x
+                v[i] = cur
+            e = pd.Series(v, index=e.index)
+            res[f"{name}×vol(cap {cap})"] = e
+    res["regime"] = base
+    res["buy_hold"] = pd.Series(1.0, index=d.index)
+    out = {}
+    ok = (d.index >= "2021-01-01") & r.notna() & v30.notna() & typ.notna()
+    for k_, e in res.items():
+        e = e[ok]
+        ret = e * r[ok] + (1 - e) * CASH / 365 - COST * e.diff().abs().fillna(0)
+        eq = (1 + ret).cumprod()
+        row = {"total_pct": round(float(eq.iloc[-1] - 1) * 100), "max_dd_pct": round(float((eq / eq.cummax() - 1).min()) * 100),
+               "avg_exposure": round(float(e.mean()), 2)}
+        for y in YEARS:
+            ry = ret[ret.index.year == int(y)]
+            if len(ry) > 20:
+                row[y] = round(float((1 + ry).prod() - 1) * 100, 1)
+        out[k_] = row
+    note("forecast · risk sizing", json.dumps({"vol_predicts_next_30d_corr": pred, "rules": out}, ensure_ascii=False))
 
 
 def main():

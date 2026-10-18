@@ -9,6 +9,13 @@ funding paid/received, 0.14 % costs, stop filled 1 % worse):
     every year (2023 +0.4 %, 2024 +0.9 %, 2025 +4.6 %, 2026 +2.5 % a trade); 5 % of the account per listing → about +55 % (2025)
     and +33 % (2026) a year. Chosen from 80 variants — some optimism is built in; the live desk is the real test.
 
+Second pass (18.10, the same 729 listings, the chosen rule split by what is known at entry):
+  • the first 4 h move: fell ≥ 10 % → +11.1 % a trade (2025–26 +11.5 %); −10…+10 % → +1.6 % (+2.3 %); ROSE ≥ 10 % → −1.6 %
+    (−0.1 %) — shorting a listing that is being pumped gets squeezed → those are SKIPPED;
+  • the first 4 h turnover: lowest third −0.9 % (+0.2 %), middle +2.0 % (+3.5 %), top third +6.8 % (+8.2 %) → thin ones are
+    skipped (on BingX: < $2M traded by the entry — an absolute floor, BingX volumes differ from Binance's);
+  • funding at entry and the BTC regime: positive either way — not used.
+
 Live rules (BingX perpetuals — the venue our server reaches): a contract not seen before is a listing (its launchTime if BingX gives
 one, else the first time this server saw it; the first run only remembers the existing list). 4 h after the listing (and not later
 than 24 h — a stale one is skipped): short 5 % of the account at the market price, no leverage beyond 1×; stop +30 % from the
@@ -28,10 +35,13 @@ BASE = "https://open-api.bingx.com/openApi/swap/v2/quote"
 START = 10_000.0
 DELAY_H, MAX_AGE_H, HOLD_D = 4, 24, 14
 STOP, SHARE, MAX_OPEN = 0.30, 0.05, 20
+SKIP_PUMP = 0.10                 # rose ≥ 10 % from the first seen price by the entry → not shorted (study: −1.6 % a trade)
+MIN_QVOL = 2_000_000             # USDT traded on BingX by the entry (24 h figure = since listing) — thinner ones are skipped
 FEE = 0.0005
 H = 3_600_000
 NAME = "Шорт листингов"
-ABOUT = ("Шортим новые фьючерсы через 4 часа после листинга: 5% счёта на монету, стоп +30%, выход через 14 дней. Проверка на "
+ABOUT = ("Шортим новые фьючерсы через 4 часа после листинга: 5% счёта на монету, стоп +30%, выход через 14 дней. Пропускаем "
+         "те, что за первые часы выросли на 10% и больше (их выносит вверх) и с тонким оборотом. Проверка на "
          "729 листингах Binance 2023–2026 (с фандингом и комиссиями): цена через 30 дней в середине −12%, через 90 — −28%; шорт по этим "
          "правилам +2.6% на сделку, плюс в каждом году. Но каждая десятая монета улетает вверх больше чем на 50% — поэтому стоп "
          "обязателен. Демо-счёт $10 000, BingX.")
@@ -51,11 +61,12 @@ def fetch_market() -> dict:
         s = c.get("symbol") or ""
         if s.endswith("-USDT") and str(c.get("status", 1)) in ("1", "True", "true"):
             lt = c.get("launchTime")
-            out[s] = {"launch": int(lt) if lt not in (None, "", 0, "0") else None, "price": None, "high24": None, "funding": None}
+            out[s] = {"launch": int(lt) if lt not in (None, "", 0, "0") else None, "price": None, "high24": None, "funding": None, "qvol": None}
     for x in _get(f"{BASE}/ticker?timestamp={ts}").get("data") or []:
         if x.get("symbol") in out:
             out[x["symbol"]]["price"] = float(x["lastPrice"]) if x.get("lastPrice") not in (None, "", "0") else None
             out[x["symbol"]]["high24"] = float(x["highPrice"]) if x.get("highPrice") not in (None, "", "0") else None
+            out[x["symbol"]]["qvol"] = float(x["quoteVolume"]) if x.get("quoteVolume") not in (None, "") else None
     for x in _get(f"{BASE}/premiumIndex?timestamp={ts}").get("data") or []:
         if x.get("symbol") in out and x.get("lastFundingRate") not in (None, ""):
             out[x["symbol"]]["funding"] = float(x["lastFundingRate"])
@@ -68,6 +79,8 @@ def _db(conn: sqlite3.Connection):
       CREATE TABLE IF NOT EXISTS lst_trades(id TEXT PRIMARY KEY, symbol TEXT, listed INTEGER, opened INTEGER, entry REAL, stop REAL,
         qty REAL, expires INTEGER, funding_usd REAL, last_t INTEGER, closed INTEGER, exit REAL, exit_kind TEXT, pnl_usd REAL);
       CREATE TABLE IF NOT EXISTS lst_equity(time INTEGER PRIMARY KEY, equity REAL);""")
+    if "first_px" not in [r[1] for r in conn.execute("PRAGMA table_info(lst_known)")]:
+        conn.execute("ALTER TABLE lst_known ADD COLUMN first_px REAL")
 
 
 def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -> dict:
@@ -86,7 +99,8 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
             listed = m["launch"] if (m["launch"] and not seeded) else (None if seeded else now)
             if not seeded and m["launch"] and m["launch"] < now - 3 * 86_400_000:
                 seeded = 1                                    # BingX says it launched long ago — not a fresh listing
-            conn.execute("INSERT INTO lst_known VALUES(?,?,?,?)", (s, listed, now, seeded))
+            conn.execute("INSERT INTO lst_known(symbol, listed, first_seen, seeded, first_px) VALUES(?,?,?,?,?)",
+                         (s, listed, now, seeded, m.get("price")))
             if not seeded:
                 events.append(f"Новый фьючерс на BingX: {s.replace('-USDT', '')} — шорт через {DELAY_H} ч после листинга.")
     if first_run and mk:
@@ -123,7 +137,8 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
     equity_closed = START + realized
     # open new shorts
     traded = {r[0] for r in conn.execute("SELECT symbol FROM lst_trades")}
-    for s, listed, first_seen, seeded in conn.execute("SELECT symbol, listed, first_seen, seeded FROM lst_known WHERE seeded = 0").fetchall():
+    for s, listed, first_seen, seeded, first_px in conn.execute(
+            "SELECT symbol, listed, first_seen, seeded, first_px FROM lst_known WHERE seeded = 0").fetchall():
         if s in traded or not listed or len(opens) >= MAX_OPEN:
             continue
         age = now - listed
@@ -133,6 +148,18 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
         if age > MAX_AGE_H * H:
             conn.execute("UPDATE lst_known SET seeded = 2 WHERE symbol = ?", (s,))      # missed the window (server was down) — skip
             events.append(f"{s.replace('-USDT', '')}: окно входа пропущено (листинг {age / H:.0f} ч назад) — не шортим.")
+            continue
+        if not first_px:                                # first price comes with the first run that sees a price
+            conn.execute("UPDATE lst_known SET first_px = ? WHERE symbol = ?", (px, s))
+            first_px = px
+        mv = px / first_px - 1
+        qv = (mk.get(s) or {}).get("qvol")
+        why_skip = (f"выросла на {mv * 100:.0f}% с первой цены — такие листинги шортить невыгодно (на истории −1.6% на сделку)"
+                    if mv >= SKIP_PUMP else
+                    f"оборот ${qv / 1e6:.1f}M — тонкий рынок (на истории нижняя треть по обороту ≈ 0)" if qv is not None and qv < MIN_QVOL else None)
+        if why_skip:
+            conn.execute("UPDATE lst_known SET seeded = 3 WHERE symbol = ?", (s,))
+            events.append(f"{s.replace('-USDT', '')}: не шортим — {why_skip}.")
             continue
         qty = equity_closed * SHARE / px
         tid = f"LST-{s}-{now // H}"

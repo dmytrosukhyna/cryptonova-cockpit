@@ -9,8 +9,8 @@ H = 3_600_000
 T0 = 1_792_000_000_000
 
 
-def mk(**coins):
-    return lambda: {s: {"launch": None, "price": p, "high24": p, "funding": f} for s, (p, f) in coins.items()}
+def mk(qvol=5e6, **coins):
+    return lambda: {s: {"launch": None, "price": p, "high24": p, "funding": f, "qvol": qvol} for s, (p, f) in coins.items()}
 
 
 def test_first_run_only_remembers_then_shorts_a_new_listing_after_4h():
@@ -50,3 +50,17 @@ def test_run_puts_the_desk_into_paper_json():
     L.run(sqlite3.connect(":memory:"), d, T0, mk(**{"BTC-USDT": (1.0, 0.0)}))
     p = json.load(open(os.path.join(d, "paper.json")))
     assert p["profiles"]["lst"]["name"] == "Шорт листингов" and [x["key"] for x in p["profile_list"]] == ["bal", "lst"]
+
+
+
+def test_pumped_and_thin_listings_are_skipped():
+    conn = sqlite3.connect(":memory:")
+    L.step(conn, T0, mk(**{"BTC-USDT": (1.0, 0.0)}))
+    L.step(conn, T0 + H, mk(**{"BTC-USDT": (1.0, 0.0), "PUMP-USDT": (1.0, 0.0), "THIN-USDT": (1.0, 0.0), "OK-USDT": (1.0, 0.0)}))
+    x = L.step(conn, T0 + 6 * H, mk(**{"BTC-USDT": (1.0, 0.0), "PUMP-USDT": (1.15, 0.0), "OK-USDT": (0.95, 0.0)}))
+    assert [t["symbol"] for t in x["open"]] == ["OK"] and any("PUMP: не шортим — выросла на 15%" in e for e in x["events"])
+    conn2 = sqlite3.connect(":memory:")
+    L.step(conn2, T0, mk(**{"BTC-USDT": (1.0, 0.0)}))
+    L.step(conn2, T0 + H, mk(qvol=5e5, **{"BTC-USDT": (1.0, 0.0), "THIN-USDT": (1.0, 0.0)}))
+    y = L.step(conn2, T0 + 6 * H, mk(qvol=5e5, **{"BTC-USDT": (1.0, 0.0), "THIN-USDT": (1.0, 0.0)}))
+    assert y["open"] == [] and any("THIN: не шортим — оборот $0.5M" in e for e in y["events"])

@@ -411,7 +411,7 @@ def top_test_days(r, k=3):
             continue
         d = dt.datetime.fromtimestamp(tt / 1000, dt.timezone.utc).strftime("%Y-%m-%d")
         n_, s_ = by.get(d, (0, 0.0))
-        by[d] = (n_ + 1, s_ + t["ret"] * 100)
+        by[d] = (n_ + 1, s_ + float(t["ret"]) * 100)
     tot = sum(v[1] for v in by.values())
     top = sorted(by.items(), key=lambda kv: -kv[1][1])[:k]
     return {"test_sum_pct": round(tot, 1), "days": [{"day": d, "trades": n_, "sum_pct": round(s_, 1)} for d, (n_, s_) in top]}
@@ -1147,8 +1147,8 @@ def make_notes(results, league, grid, ctrl, npass_all, gross_sw):
             ("Единственное, что стабильно в плюсе, — " if g["test_pos_share"] >= 0.6 else "Отдельно: ")
             + f"покупка после резкого ночного или выходного обвала (идея 7, лонг): в плюсе на "
             f"2025–26 {g['test_pos_share']:.0%} вариантов этой сетки, выбранный вариант «{nl[0]['name_ru']}» — "
-            f"{pct(st['train'].get('avg_pct'))} % на сделку на обучении и {pct(st['test'].get('avg_pct'))} % на 2025–26. Но сделок мало "
-            f"({st['test'].get('n', 0)} за 2025–26), прибыль делают несколько дней общего обвала, после которых рынок отскочил "
+            f"{pct(st['train'].get('avg_pct'))} % на сделку на обучении и {pct(st['test'].get('avg_pct'))} % на 2025–26. Но сделок немного "
+            f"({st['test'].get('n', 0)} за 2025–26), а прибыль делают несколько дней общего обвала, после которых рынок отскочил "
             f"(лучшие дни: {', '.join(DATE_RU(x['day']) + ' — сделок ' + str(x['trades']) + ', в сумме ' + pct(x['sum_pct'], 0) + ' %' for x in nl[0]['top_test_days']['days'])}; "
             f"сумма всех сделок 2025–26 — {pct(nl[0]['top_test_days']['test_sum_pct'], 0)} %; счёт на 5 "
             f"позиций без 3 лучших дней {pct(pf.get('test_ex3_pct'), 1)} %), а 2026 год {'в минусе' if (ys.get(2026) or 0) <= 0 else 'в плюсе'} "

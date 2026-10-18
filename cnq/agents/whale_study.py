@@ -401,7 +401,8 @@ def describe(p: dict) -> str:
         side = "чаще в лонг" if p["long_share"] >= 0.6 else "чаще в шорт" if p["long_share"] <= 0.4 else "в обе стороны"
         parts.append(f"Торгует {side} ({p['long_share'] * 100:.0f}% сделок — лонги); на лонгах {_usd(p['pnl_long'])}, на шортах {_usd(p['pnl_short'])}.")
     if p["win"] is not None:
-        parts.append(f"Прибыльных сделок {p['win'] * 100:.0f}%, прибыль к убытку {p['pf']}." + (f" Плечо сейчас ~{p['lev_now']:.0f}×." if p["lev_now"] else ""))
+        pf_s = "убыточных сделок не было" if (p["pf"] or 0) >= 99 else f"прибыль к убытку {p['pf']}"
+        parts.append(f"Прибыльных сделок {p['win'] * 100:.0f}%, {pf_s}." + (f" Плечо сейчас ~{p['lev_now']:.0f}×." if p["lev_now"] else ""))
     if p["best_share"] is not None and p["best_share"] >= 0.5:
         parts.append(f"Осторожно: половина прибыли — одна сделка ({p['best']['coin']} {_usd(p['best']['pnl'])}).")
     c = p["copy"].get("30") or {}

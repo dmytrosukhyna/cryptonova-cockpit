@@ -325,6 +325,15 @@ def main(argv: list[str] | None = None) -> int:
                 cs = universe.get(c["symbol"])
                 if cs:
                     c["candles_long"] = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 22:]]
+            try:   # class T (lab, 18.10): BTC vs the EMA of its 15m closes over 4 800 bars (≈ 50 days), as in scripts/lab/fam_trend.py
+                bcs = next((v for k, v in universe.items() if k.startswith("BTC")), None)
+                if bcs and len(bcs) >= 96 * 30:
+                    a_, e_ = 2 / 4801, bcs[0].close
+                    for k in bcs[1:]:
+                        e_ = a_ * k.close + (1 - a_) * e_
+                    rep["btc_ema50d"] = {"ema": e_, "close": bcs[-1].close, "bull": bcs[-1].close > e_, "bars": len(bcs)}
+            except Exception as e:  # noqa: BLE001
+                print("btc ema50d:", e)
             for bx in cfg.b_extra:   # lab-only alt coins (docs/research/alt100.md): candles only, excluded from breadth and the main accounts
                 cs = store.candles(bx, "15m")
                 if len(cs) >= 96 * 31:

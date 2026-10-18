@@ -49,17 +49,22 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
              "caps": {"L": 7, "W": 4}, "max_notional": 0.10, "x_share": 0.05, "x_open": 4, "y_share": 0.15, "y_open": 3, "j_share": 0.15, "j_open": 1, "prefix": "paper_lab_",
              "about": "Эксперименты вживую (на истории не доказаны): L — покупка у низа 14-дневного диапазона лимиткой (история +0.30% на сделку, 2025–26 в минусе), W — сделка по сильной новости, X — откуп паники на 36 ликвидных альткоинах (+4% в год вслепую), Y — откуп дисконта фьючерса на альткоинах (+12% в год вслепую, просадка −37%). 17.10 убраны N/Q — на истории они обнуляли счёт. Не больше 10% счёта на сделку."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
+    # 18.10: first «Лаборатория» rule that passed the strict check (scripts/lab/fam_trend.py, idea 6) — its own $10 000, not mirrored.
+    # 5 slots × 20 % of the account = exactly the 5-slot account the lab judged (2025–26: +19.7 %, max drawdown −49 %).
+    "brk":  {"name": "Пробой", "classes": {"T"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
+             "t_share": 0.20, "t_open": 5, "prefix": "paper_brk_",
+             "about": "Из «Лаборатории», прошла строгую проверку: лонг на пробое максимума 5 дней с объёмом ×2, только когда BTC выше своей 50-дневной средней; стоп 8 ATR (15м), выход через 2 дня. До 5 позиций по 20% счёта. История 2025–2026: +0.75% на сделку, счёт +20%, просадка до −49%."},
     "exp":  {"name": "Свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
              "about": "Проверка новых правил на живом рынке: свинг-пробой (выше максимума 5 дней в росте, выход ниже вчерашнего минимума) и быстрый откуп резкой свечи. 10% счёта на сделку, до 15 позиций. История: +0.31% и +0.41% на сделку, но в портфеле ≈ 0 — поэтому отдельный счёт."},
 }
 RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций",
-           "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса",
+           "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса", "T": "пробой 5 дней при росте BTC",
            "L": "покупка у низа диапазона", "N": "отскок от часовой поддержки", "Q": "шорт от часового сопротивления",
            "W": "сделка по сильной новости", "X": "откуп паники на альткоине", "Y": "откуп дисконта на альткоине", "J": "разворот после Никкей"}
 THROUGH = {"L", "N", "Q"}        # lab limits fill only when price trades through the level by ≥ 0.01 %
 HOLD_L_H, HOLD_N_H = 72, 24
-SHARE_RULES = {"E", "F", "S", "G", "D", "X", "Y", "J"}   # sized as a share of equity, own position caps
+SHARE_RULES = {"E", "F", "S", "G", "D", "X", "Y", "J", "T"}   # sized as a share of equity, own position caps
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
@@ -86,6 +91,10 @@ G_STOP = 0.03
 HOLD_D_H = 24          # class D (17.10): perp ≥ 0.20 % below its spot index on a 1-hour average → long 24 h, stop −12 % (docs/research/new_signals.md)
 D_BASIS = -0.0020
 D_STOP = 0.12
+HOLD_T_H = 48          # class T (18.10, lab): close above the 5-day high on 2× volume while BTC > its 50-day EMA → long 48 h, stop 8 ATR(15m)
+T_BRK = 96 * 5
+T_ATR = 8.0
+T_VOL = 2.0
 F_STOP = 0.06          # 16.10: −6 % instead of −12 % — every year positive (2025 −0.29 % → +0.66 % per trade), size raised so risk per trade stays ~1.5 %
 ORDER_TTL_H = 24
 MAX_OPEN = 6
@@ -338,6 +347,20 @@ class PaperDesk:
                                 "reason": f"Свинг-пробой: цена закрылась выше максимума 5 дней ({hh:.6g}) и выше средней за 20 дней — монета в росте. "
                                           f"Держим, пока цена не закроется ниже минимума прошлых суток; стоп −{S_STOP*100:.0f}%, максимум 14 дней."})
                     break
+        # T (lab, 18.10): close above the highest high of the previous 5 days on > 2× the 24-hour average volume, BTC above its 50-day EMA
+        if "T" in self.P["classes"] and getattr(self, "_btc50", None) and self._btc50.get("bull") and len(cl) >= T_BRK + 100:
+            for j in range(len(cl) - 4, len(cl) - 1):          # the last three closed bars (runs are ~30 min apart)
+                hh = max(k[2] for k in cl[j - T_BRK:j]); vavg = sum(k[5] for k in cl[j - 96:j]) / 96
+                if cl[j][4] > hh and vavg > 0 and cl[j][5] > T_VOL * vavg:
+                    entry = c15[-1][4]
+                    at = _atr(cl[j - 30:j + 1]) or entry * 0.003
+                    out.append({"id": f"T-{base}-{cl[j][0] // 86_400_000}", "symbol": base, "side": "LONG", "grade": "T", "kind": "BREAKOUT_5D",
+                                "entry": entry, "stop": entry - T_ATR * at, "tps": [entry * 3] * 3, "parts": [1.0, 0.0, 0.0],
+                                "order": "MARKET", "hold_h": HOLD_T_H,
+                                "reason": f"Пробой 5 дней: закрытие {cl[j][4]:.6g} выше максимума 5 дней ({hh:.6g}) на объёме {cl[j][5] / vavg:.1f}× среднего за сутки; "
+                                          f"BTC выше своей 50-дневной средней. Из «Лаборатории»: на 2025–2026 +0.75% на сделку, но прибыль неровная. "
+                                          f"Выход через 48 ч, широкий стоп {T_ATR:g} ATR ({(T_ATR * at / entry) * 100:.1f}%), 20% счёта."})
+                    break
         # lab rules (L/N/Q): limit orders inside the range, valid ~1 h, re-placed every run
         if self.P["classes"] & {"L", "N", "Q"}:
             h1 = agg1h(coin.get("candles_long") or c15, now)
@@ -496,7 +519,7 @@ class PaperDesk:
                     continue
                 if s["grade"] == "F" and sum(1 for t in self._open() if t["grade"] == "F") >= self.P.get("f_open", 3):
                     continue
-                if s["grade"] in ("S", "G", "D", "X", "Y", "J") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
+                if s["grade"] in ("S", "G", "D", "X", "Y", "J", "T") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
                     continue
                 if s["grade"] not in SHARE_RULES and sum(1 for t in self._open() if t["grade"] not in SHARE_RULES) + len(self._pending()) >= self.P["max_open"]:
                     continue
@@ -511,12 +534,12 @@ class PaperDesk:
                     notional = eq * self.P.get("f_share", 0.15)
                     qty = notional / s["entry"]
                     risk_usd = notional * F_STOP
-                elif s["grade"] in ("S", "G", "D", "X", "Y", "J"):
+                elif s["grade"] in ("S", "G", "D", "X", "Y", "J", "T"):
                     if s["grade"] == "X" and any(t["grade"] == "X" and now - t["opened"] < E_BASKET_H * 3_600_000 and t["opened"] != now for t in self._open()):
                         continue   # one alt panic basket per 10 h
                     notional = eq * self.P.get(s["grade"].lower() + "_share", 0.1)
                     qty = notional / s["entry"]
-                    risk_usd = notional * {"S": S_STOP, "G": G_STOP, "D": D_STOP, "X": E_STOP, "Y": D_STOP, "J": 0.20}[s["grade"]]
+                    risk_usd = (s["entry"] - s["stop"]) * qty if s["grade"] == "T" else notional * {"S": S_STOP, "G": G_STOP, "D": D_STOP, "X": E_STOP, "Y": D_STOP, "J": 0.20}[s["grade"]]
                 else:
                     risk_usd = eq * self.P["risk"]
                     r = abs(s["entry"] - s["stop"])
@@ -553,7 +576,7 @@ class PaperDesk:
                     filled = c
                     break
             if filled:
-                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H, "W": 48, "X": HOLD_E_H, "Y": HOLD_D_H, "J": 24}.get(o["grade"], HOLD_C_H)
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H, "W": 48, "X": HOLD_E_H, "Y": HOLD_D_H, "J": 24, "T": HOLD_T_H}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
@@ -664,7 +687,7 @@ class PaperDesk:
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
         by_grade = {}
-        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q", "W", "X", "Y", "J"):
+        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q", "W", "X", "Y", "J", "T"):
             ts = [t for t in closed if t["grade"] == g]
             if ts:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),
@@ -874,9 +897,10 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
             nikkei = {"chg": float(it["chg_1d"]), "date": str(it["asof"])[:10]}
     except Exception:  # noqa: BLE001
         pass
+    btc50 = report.get("btc_ema50d")       # class T: BTC vs its 50-day EMA (computed from the full 15m store in cli.py)
     snaps = {}
     for k in PROFILES:
-        d = PaperDesk(conn, k); d._nikkei = nikkei
+        d = PaperDesk(conn, k); d._nikkei = nikkei; d._btc50 = btc50
         snaps[k] = d.step(report["coins"], btc_bull, now)
         if k in just_reset:
             snaps[k]["events"].insert(0, just_reset[k]["note_ru"])

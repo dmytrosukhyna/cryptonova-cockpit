@@ -105,7 +105,7 @@ def test_three_profiles_share_signals_but_differ():
     c = coin("BTC-USDT", flat, [{"id": "L1", "kind": "support", "lo": 9.96, "hi": 9.99, "center": 9.975, "touches": 3, "status": "ACTIVE"}])
     c["regime"] = {"long": "BULL"}
     out = pd.run(conn, {"coins": [c]}, now=t0 + 300 * 900_000)
-    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp", "lab"} and out["profile"] == "bal"
+    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp", "lab", "brk"} and out["profile"] == "bal"
     assert not any(out["profiles"][k]["pending"] for k in ("cons", "bal", "aggr"))
     lab = pd.PaperDesk(conn, "aggr", classes={"A", "B", "R", "C"}).step([c], True, t0 + 300 * 900_000)
     assert lab["pending"]   # the same zone would be traded only if class C were enabled
@@ -144,6 +144,29 @@ def test_swing_breakout_opens_and_trails_out():
     c2 = coin("ETH-USDT", more, []); c2["candles_long"] = c2["candles"]
     res2 = desk.step([c2], True, t0 + len(more) * 900_000)
     assert not res2["open"] and res2["closed"][0]["exit_kind"] == "TRAIL"
+
+
+def test_lab_breakout_needs_volume_and_btc_above_its_50_day_ema():
+    """18.10 class T («Пробой»): close above the 5-day high on > 2× the 24-hour volume, only while BTC > its 50-day EMA; 48 h, stop 8 ATR."""
+    t0 = 1_700_000_000_000
+    n = 96 * 7
+    prices = [100.0] * (n - 3) + [103.0, 103.0, 103.0]
+    c = coin("ETH-USDT", prices, []); c["candles_long"] = c["candles"]
+    for k in c["candles"][-3:-1]:
+        k[5] = 300.0                                             # 3× the usual volume on the breakout bars
+    now = t0 + n * 900_000
+    bull, bear = {"bull": True, "ema": 1.0, "close": 2.0}, {"bull": False, "ema": 2.0, "close": 1.0}
+    d = pd.PaperDesk(sqlite3.connect(":memory:"), "brk"); d._btc50 = bear
+    assert not d.step([c], True, now)["open"]                    # BTC below its 50-day EMA → no trade
+    d = pd.PaperDesk(sqlite3.connect(":memory:"), "brk"); d._btc50 = bull
+    res = d.step([c], True, now)
+    assert len(res["open"]) == 1 and res["open"][0]["grade"] == "T"
+    t = res["open"][0]
+    assert abs(t["qty"] * t["entry"] - 2000) < 10                # 20 % of $10 000
+    assert t["stop"] < t["entry"] * 0.97 and t["expires"] - t["opened"] == 48 * 3_600_000
+    c2 = coin("ETH-USDT", prices, []); c2["candles_long"] = c2["candles"]          # same breakout, ordinary volume → nothing
+    d = pd.PaperDesk(sqlite3.connect(":memory:"), "brk"); d._btc50 = bull
+    assert not d.step([c2], True, now)["open"]
 
 
 def test_main_desks_ignore_experimental_rules():

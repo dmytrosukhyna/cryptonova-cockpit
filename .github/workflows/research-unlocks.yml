@@ -1,0 +1,19 @@
+name: research-unlocks
+# Manual only. «Шорт перед разлоками» study: scripts/unlocks_study.py on scripts/lab/data/unlocks_2024_2026.json + the Binance
+# public archive (daily klines + funding). Results: annotations + job summary.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - run: python scripts/unlocks_study.py

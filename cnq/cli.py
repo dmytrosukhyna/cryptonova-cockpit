@@ -43,7 +43,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -173,6 +173,20 @@ def main(argv: list[str] | None = None) -> int:
         d = whales.run(conn)
         write_report(d, os.path.join(args.out, "whales.json"))
         print(f"whales.json: available={d.get('available')} whales={len(d.get('whales', []))} coins={len(d.get('coins', []))} changes={len(d.get('changes', []))} bias={(d.get('summary') or {}).get('bias')}")
+    elif args.cmd == "whalestudy":
+        import os, sqlite3
+        from .agents import whale_study
+        from .terminal.report import write_report
+        conn = sqlite3.connect("data/agents.sqlite")
+        os.makedirs(args.out, exist_ok=True)
+        d = whale_study.run(conn)
+        write_report(d, os.path.join(args.out, "whales_top.json"))
+        fn = d.get("funnel") or {}
+        dk = d.get("desk") or {}
+        print(f"whales_top.json: complete={d.get('complete')} studied={fn.get('studied')} eligible={fn.get('eligible')} top={fn.get('top')} "
+              f"waiting={fn.get('waiting')} candles_waiting={fn.get('candles_waiting')} desk={dk.get('equity')} open={len(dk.get('open') or [])} notes={len(d.get('notes_ru') or [])}")
+        for n in (d.get("notes_ru") or [])[:5]:
+            print("  note:", n)
     elif args.cmd == "funding":
         import os, sqlite3
         from .agents import funding_desk

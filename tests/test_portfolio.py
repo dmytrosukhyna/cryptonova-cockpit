@@ -70,7 +70,7 @@ def test_risk_profiles_cash_ledger():
     conn = sqlite3.connect(":memory:"); now = 1_700_000_000_000
     c = RiskPortfolio(conn, "cons"); st = c.step({"BTC": 100, "ETH": 10, "SOL": 1}, [], [], now)
     assert st["index"] == 100.0 and st["cash_pct"] == 10 and len(st["positions"]) == 3
-    assert c.step({"BTC": 120, "ETH": 10, "SOL": 1}, [], [], now + 86400000)["index"] == 110.0
+    assert c.step({"BTC": 120, "ETH": 10, "SOL": 1}, [], [], now + 86400000)["index"] == 112.0
     h = RiskPortfolio(conn, "high"); cards = [{"symbol": "WOW", "risk": "high", "rating": 70, "chg7": 30, "on_hl": True}]
     st = h.step({"WOW": 1.0}, cards, [{"symbol": "NEKO", "chg24": 12, "vol24": 9e6, "price": 5.0}], now)
     assert [p["symbol"] for p in st["positions"]] == ["WOW", "NEKO"] and st["cash_pct"] == 90
@@ -307,17 +307,17 @@ def test_cons_monthly_rebalance_uses_market_weights():
     d10 = int(datetime(2026, 9, 10, tzinfo=timezone.utc).timestamp() * 1000)
     c = RiskPortfolio(conn, "cons")
     c.step({"BTC": 100.0, "ETH": 10.0, "SOL": 1.0}, [], [], d10)
-    px = {"BTC": 200.0, "ETH": 10.0, "SOL": 1.0}                                 # BTC doubles: cost weight still 50 %, market weight 67 %
+    px = {"BTC": 200.0, "ETH": 10.0, "SOL": 1.0}                                 # BTC doubles: cost weight still 60 %, market weight 75 %
     st = c.step(dict(px), [], [], d10 + DAY)
-    assert not st["actions"] and st["index"] == 150.0                             # not the 1st–3rd → no rebalance
+    assert not st["actions"] and st["index"] == 160.0                             # not the 1st–3rd → no rebalance
     oct1 = int(datetime(2026, 10, 1, 6, tzinfo=timezone.utc).timestamp() * 1000)
     st = c.step(dict(px), [], [], oct1)
     acts = {(a["symbol"], a["action"]) for a in st["actions"]}
     assert ("BTC", "TRIM") in acts and ("ETH", "ADD") in acts and ("SOL", "ADD") in acts and "рыночным долям" in st["actions"][0]["reason"]
-    assert st["index"] == 150.0                                                   # rebalancing moves value, it does not create it
+    assert st["index"] == 160.0                                                   # rebalancing moves value, it does not create it
     V = c.value(px)
     mw = {p["symbol"]: c._mv(p, px) / V for p in c.positions()}
-    assert abs(mw["BTC"] - 0.50) < 1e-6 and abs(mw["ETH"] - 0.25) < 1e-6 and abs(mw["SOL"] - 0.15) < 1e-6 and abs(c.cash() / V - 0.10) < 1e-6
+    assert abs(mw["BTC"] - 0.60) < 1e-6 and abs(mw["ETH"] - 0.20) < 1e-6 and abs(mw["SOL"] - 0.10) < 1e-6 and abs(c.cash() / V - 0.10) < 1e-6
     # inside the ±5 p.p. band → nothing next month
     px2 = {"BTC": 210.0, "ETH": 10.0, "SOL": 1.0}
     nov1 = int(datetime(2026, 11, 1, 6, tzinfo=timezone.utc).timestamp() * 1000)
@@ -542,15 +542,16 @@ def test_ideas_first_run_weights_cash_and_unpriceable_skips():
     by = {p["symbol"]: p for p in st["positions"]}
     big = {s for s, p in by.items() if p["role"] in ("buy", "add")}
     assert big == {"BTC", "ETH", "A1", "A2", "A3", "A4", "A5", "A6"}                 # at most 8; ADD1 has no place left
-    assert {s for s, p in by.items() if p["role"] == "small"} == {"M1", "M2", "M3"}           # at most 3 (18.10)
-    # 18.10: core BTC / ETH 15 %, other «можно брать» 7.5 %, small 2.5 % (index ≈ 100 → market weight ≈ cost weight)
-    assert all(abs(by[s]["weight"] - (0.15 if s in ("BTC", "ETH") else 0.075)) < 0.001 for s in big)
-    assert all(abs(by[f"M{i}"]["weight"] - 0.025) < 0.001 for i in range(1, 4))
+    # 18.10 evening: core BTC 30 % / ETH 10 % (SOL 5 %), other «можно брать» 7.5 %, small 2.5 % — here 40 + 6 × 7.5 = 85 % leaves
+    # room for two small ones before the 10 % cash floor (index ≈ 100 → market weight ≈ cost weight)
+    assert {s for s, p in by.items() if p["role"] == "small"} == {"M1", "M2"}
+    assert all(abs(by[s]["weight"] - {"BTC": 0.30, "ETH": 0.10}.get(s, 0.075)) < 0.001 for s in big)
+    assert all(abs(by[f"M{i}"]["weight"] - 0.025) < 0.001 for i in range(1, 3))
     assert st["cash_pct"] >= 10 and port.rp.cash() >= 0.10 * st["index"] / 100 - 1e-9 and 99.85 < st["index"] < 100   # fees 0.1 %
     skips = {a["symbol"]: a["reason"] for a in st["actions"] if a["action"] == "SKIP"}
     assert set(skips) == {"NAMESAKE", "NOPX"} and "другой токен" in skips["NAMESAKE"] and "нет живой цены" in skips["NOPX"]
     nb = {x["symbol"]: x["why_ru"] for x in st["not_bought"]}
-    assert "8 мест" in nb["ADD1"] and "3 места" in nb["M4"] and "3 места" in nb["M5"] and "W1" not in nb and "X1" not in nb
+    assert "8 мест" in nb["ADD1"] and all("кэш" in nb[m] for m in ("M3", "M4", "M5")) and "W1" not in nb and "X1" not in nb
     for k in ("key", "name", "about", "positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions"):
         assert k in st, k
     assert st["key"] == "ideas" and st["name"] == "CRYPTO NOVA портфель" and st["ours"] and not st["experiment"] and "не обещаем" in st["about"]
@@ -560,9 +561,9 @@ def test_ideas_first_run_weights_cash_and_unpriceable_skips():
     for p in st["positions"]:
         assert p["reco"]["k"] in ("hold", "add", "trim", "sell") and p["reco"]["t"] and p["reco"]["why"]
         assert p["status"] == "OPEN" and "pnl_usd" in p and abs(p["value_usd"] - 10_000 * p["weight"] * st["index"] / 100) < 1
-    assert abs(st["sleeves"]["buy"]["now_pct"] - 75) < 0.5 and abs(st["sleeves"]["small"]["now_pct"] - 7.5) < 0.5
+    assert abs(st["sleeves"]["buy"]["now_pct"] - 85) < 0.5 and abs(st["sleeves"]["small"]["now_pct"] - 5) < 0.5
     st2 = port.step(src, _ideas(rows, T0), T0 + 1_800_000)          # nothing changed → no trades (places full → no SKIP either)
-    assert not st2["actions"] and all(a["action"] != "SKIP" for a in st2["recent_actions"]) and len(st2["recent_actions"]) == 11
+    assert not st2["actions"] and all(a["action"] != "SKIP" for a in st2["recent_actions"]) and len(st2["recent_actions"]) == 10
     src3 = copy.deepcopy(src)
     src3["cg"]["A1"] *= 1.1
     st3 = port.step(src3, _ideas(rows, T0), T0 + 3_600_000)                          # the index moves with the live price
@@ -573,7 +574,7 @@ def test_ideas_first_run_weights_cash_and_unpriceable_skips():
     assert b3["A1"]["horizon"] == "mid" and abs(b3["A1"]["levels"]["stop"] - 11.0 * 0.8) < 1e-6 and b3["A1"]["levels"]["take_half"] is None
     assert b3["M1"]["horizon"] == "short" and abs(b3["M1"]["levels"]["take_half"] - 0.02) < 1e-9 and "2–4 недели" in b3["M1"]["horizon_ru"]
     hz = st3["horizons"]
-    assert [hz[h]["n"] for h in ("long", "mid", "short")] == [2, 6, 3] and abs(sum(hz[h]["share_pct"] for h in hz) - st3["invested_pct"]) < 1.5
+    assert [hz[h]["n"] for h in ("long", "mid", "short")] == [2, 6, 2] and abs(sum(hz[h]["share_pct"] for h in hz) - st3["invested_pct"]) < 1.5
     assert hz["mid"]["base"]["days"] == 60 and "быть лучше" in hz["mid"]["base"]["ru"] and hz["long"]["plan_ru"]
 
 
@@ -598,7 +599,7 @@ def test_ideas_avoid_stops_body_trailing_and_cooldown():
     assert not {("A3", "SELL"), ("BTC", "SELL"), ("M3", "SELL")} & set(acts)
     by = {p["symbol"]: p for p in st["positions"]}
     assert by["M2"]["fixes"] == 1 and by["M2"]["reco"]["t"] == "Едет бесплатно" and abs(by["M2"]["cost_weight"] - 0.025 / 1.001 / 2) < 1e-6
-    # 18.10: the core has no stop and is topped back up to 15 % when it falls under 11 % (cash permitting)
+    # 18.10: the core has no stop and is topped back up to its plan (BTC 30 %) when it falls under ¾ of it (cash permitting)
     assert ("BTC", "ADD") in acts and "доливаем" in acts[("BTC", "ADD")]["reason"]
     assert -40.0 < by["BTC"]["pnl_pct"] < 0 and by["BTC"]["reco"]["k"] == "hold"
     assert by["A3"]["reco"]["k"] == "sell" and by["A3"]["reco"]["t"] == "У стопа −20%"
@@ -619,7 +620,9 @@ def test_ideas_avoid_stops_body_trailing_and_cooldown():
     st = port.step(src1, _ideas(rows1, T0 + 14 * DAY), T0 + 14 * DAY)
     assert ("A2", "BUY") not in {(a["symbol"], a["action"]) for a in st["actions"]}
     st = port.step(src1, _ideas(rows1, T0 + 15 * DAY + 3_600_000), T0 + 15 * DAY + 3_600_000)
-    assert ("A2", "BUY") in {(a["symbol"], a["action"]) for a in st["actions"]}
+    why = {x["symbol"]: x["why_ru"] for x in st["not_bought"]}.get("A2", "")
+    # after 14 days the cooldown is over; here the BTC top-up used the free cash, so A2 now waits for cash, not for the cooldown
+    assert ("A2", "BUY") in {(a["symbol"], a["action"]) for a in st["actions"]} or ("снова не раньше" not in why and "кэш" in why)
 
 
 def test_ideas_weekly_review_on_monday_once():
@@ -675,3 +678,24 @@ def test_ideas_stale_or_missing_table_no_buys_but_holdings_priced():
     st = port.step(src1, _ideas(rows2, t, statuses={"A6": {"status": "avoid", "status_ru": "не брать", "why_ru": "мёртвая монета",
                                                            "kind": "mid", "price": 16.0}}), t + 60_000)
     assert {(a["symbol"], a["action"]) for a in st["actions"]} >= {("A6", "SELL"), ("A1", "SELL")}
+
+
+def test_ideas_core_is_btc_heavy_and_trimmed_back_on_monday():
+    """18.10 evening: core BTC 30 % / ETH 10 % / SOL 5 %; a core coin that grew past 1.5× its plan is trimmed back at the Monday review."""
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows, T0), T0)                                              # Wednesday
+    src1 = copy.deepcopy(src)
+    src1["cg"]["BTC"] *= 2.5
+    rows1 = copy.deepcopy(rows)
+    _set(rows1, "BTC", price=src1["cg"]["BTC"])
+    tue = T0 + DAY
+    st = port.step(src1, _ideas(rows1, tue), tue)
+    assert not [a for a in st["actions"] if a["symbol"] == "BTC"]                    # not Monday → no trim
+    mon = T0 + 5 * DAY + 3_600_000
+    st = port.step(src1, _ideas(rows1, mon), mon)
+    a = next(x for x in st["actions"] if x["symbol"] == "BTC")
+    by = {p["symbol"]: p for p in st["positions"]}
+    assert a["action"] == "TRIM" and "больше плана 30%" in a["reason"] and abs(by["BTC"]["weight"] - 0.30) < 0.002
+    assert sp.core_target("BTC") == 0.30 and sp.core_target("SOL") == 0.05 and sp.core_target("XYZ") == 0.10

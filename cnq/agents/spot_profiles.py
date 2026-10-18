@@ -40,8 +40,11 @@ import time
 from datetime import datetime, timezone
 
 PROFILES = {
-    "cons": {"name": "Консервативный", "prefix": "spot_cons_", "core": {"BTC": 0.50, "ETH": 0.25, "SOL": 0.15}, "cash": 0.10, "band": 0.05,
-             "about": "BTC 50 %, ETH 25 %, SOL 15 %, кэш 10 %. Без стопов — ядро держим через циклы. Раз в месяц (1–3 числа) смотрим "
+    # 18.10 (owner: «всё больше верю в биткоин — самый надёжный актив»): BTC 60 / ETH 20 / SOL 10 (was 50 / 25 / 15). Test 2023-06 →
+    # 2026-10 (scripts/lab, daily): held as is, BTC-heavier = smaller drawdown (−57 % vs −60 %) and better 2025 (−8 % vs −10 %) and
+    # 2026 (−10 % vs −11 %); with the BTC-regime switch of Портфолио all mixes end close (+184…+201 %, drawdown −29…−30 %).
+    "cons": {"name": "Консервативный", "prefix": "spot_cons_", "core": {"BTC": 0.60, "ETH": 0.20, "SOL": 0.10}, "cash": 0.10, "band": 0.05,
+             "about": "BTC 60 %, ETH 20 %, SOL 10 %, кэш 10 %. Без стопов — ядро держим через циклы. Раз в месяц (1–3 числа) смотрим "
                       "рыночные доли: если какая-то ушла от плана больше чем на 5 п.п., возвращаем все доли к плану."},
     "high": {"name": "Высокий риск", "prefix": "spot_high_", "core": {}, "cash": 0.50, "slots": 10, "slot_w": 0.05,
              "meme_w": 0.05, "meme_max": 0.06, "meme_cap": 0.25, "cooldown_d": 30,
@@ -311,7 +314,9 @@ IDEAS = {
     # 2023-03 → 2026-10): core BTC / ETH / SOL 15 % each (topped back up when the market moves one under 11 %), other
     # «можно брать / добрать» coins 7.5 % each, high-risk «на небольшую сумму» 2.5 % each, at most 3 → 45 + 37.5 + 7.5 = 90 % + cash 10 %
     "buy_w": 0.075, "buy_n": 8,           # table status «можно брать» / «можно добрать»: at most 8 coins (the core included)
-    "core_w": 0.15, "core_floor": 0.11,
+    # 18.10 evening (owner: «всё больше верю в биткоин»): the core is BTC-heavy — BTC 30 / ETH 10 / SOL 5 (45 % as before); a core
+    # coin is topped up when it drifts under ¾ of its plan and, at the Monday review, trimmed back when it grew past 1.5× its plan
+    "core_w": {"BTC": 0.30, "ETH": 0.10, "SOL": 0.05}, "core_floor": 0.73, "core_trim": 1.5,
     "small_w": 0.025, "small_n": 3,       # table status «можно на небольшую сумму»: 2.5 % each, at most 3 coins
     "min_cash": 0.10, "fee": 0.001,       # cash ≥ 10 % after a buy; 0.1 % of every traded notional (the 10 % / 2.5 % include it)
     "stop_buy": -0.20,                    # buy/add coins except core (the table's «ядро» BTC/ETH/SOL — no stop)
@@ -321,17 +326,18 @@ IDEAS = {
     "stale_h": 3,                         # ideas.json older than this → no buys
     "px_tol": 0.25,                       # a live price within 25 % of the table's (or the last seen) price = the same coin, not a namesake
 }
-IDEAS_ABOUT = ("Наш портфель CRYPTO NOVA: сам покупает то, что советует таблица «Что брать на спот». Старт $10 000. Ядро BTC, ETH, SOL — "
-               "по 15% (доливаем, если доля упала ниже 11%), остальные «можно брать» и «можно добрать» — по 7.5%, всего не больше 8 монет вместе с ядром; «можно на небольшую сумму» — по 2.5%, "
+IDEAS_ABOUT = ("Наш портфель CRYPTO NOVA: сам покупает то, что советует таблица «Что брать на спот». Старт $10 000. Ядро — BTC 30%, ETH 10%, "
+               "SOL 5% (доливаем, если доля упала ниже ¾ плана; продаём лишнее, если выросла больше чем в 1.5 раза), остальные «можно брать» и «можно добрать» — по 7.5%, всего не больше 8 монет вместе с ядром; «можно на небольшую сумму» — по 2.5%, "
                "не больше 3; кэш не меньше 10%, комиссия 0.1% с каждой сделки. Продаём, если таблица поставила «не брать»; стоп −20% от "
                "входа (ядро BTC, ETH, SOL — без стопа); для небольшой суммы стоп −35%, на ×2 продаём половину, остаток — до отката 35% от "
                "пика; по понедельникам продаём монеты со статусом «ждём» и минусом 10% и больше. Проданную монету 14 дней не берём. "
                "Результат не обещаем — может быть и минус.")
 IDEAS_RULES = [
     "Что покупаем: строки таблицы «Что брать на спот» с прошлого прогона сервера (таблица считается сразу после портфелей). "
-    "Ядро BTC, ETH, SOL — по 15% счёта; остальные «можно брать» и «можно добрать» — по 7.5%; всего не больше 8 монет вместе с ядром; "
-    "«можно на небольшую сумму» — по 2.5%, не больше 3. Порядок — как в таблице. Одна покупка на монету: не доливаем и не усредняем, "
-    "кроме ядра — его доливаем до 15%, если доля упала ниже 11%.",
+    "Ядро — BTC 30%, ETH 10%, SOL 5% счёта (биткоин — главный: в 2025–2026 он падал меньше ETH и SOL); остальные «можно брать» и "
+    "«можно добрать» — по 7.5%; всего не больше 8 монет вместе с ядром; «можно на небольшую сумму» — по 2.5%, не больше 3. Порядок — "
+    "как в таблице. Одна покупка на монету: не доливаем и не усредняем, кроме ядра — его доливаем до плана, если доля упала ниже ¾ "
+    "плана, а по понедельникам продаём лишнее, если доля выросла больше чем в 1.5 раза от плана.",
     "Кэш не меньше 10%: покупку, после которой кэша стало бы меньше, пропускаем. Комиссия 0.1% с каждой покупки и продажи "
     "вычитается из счёта (10% и 2.5% — вместе с комиссией).",
     "Цена: живая цена сервера (CoinGecko, список мемов, спот Hyperliquid), и она отличается от цены в таблице не больше чем на 25% — "
@@ -352,7 +358,7 @@ IDEAS_RULES = [
 # BTC regime). It is a yardstick, not a forecast: our picks have to beat it — that is the target.
 HORIZONS = {
     "long": {"name_ru": "Долгосрочная", "period_ru": "6–12 месяцев", "days": (180, 365), "who_ru": "ядро: BTC, ETH, SOL",
-             "plan_ru": "Держим через циклы, без стопа; доля 15%, доливаем, если упала ниже 11%. Сколько всего денег в споте, решает "
+             "plan_ru": "Держим через циклы, без стопа: BTC 30%, ETH 10%, SOL 5%; доливаем до плана, если доля упала ниже ¾ плана, лишнее продаём по понедельникам. Сколько всего денег в споте, решает "
                         "Портфолио по режиму BTC: выше 200-дневной средней — больше, ниже — меньше."},
     "mid": {"name_ru": "Среднесрочная", "period_ru": "1–3 месяца", "days": (30, 90), "who_ru": "крупные альты «можно брать / добрать»",
             "plan_ru": "Стоп −20% от входа; продаём, если таблица поставила «не брать»; по понедельникам продаём «ждём» с минусом 10% и больше."},
@@ -369,6 +375,12 @@ def _load_hz() -> dict:
 
 
 HZ = _load_hz()
+
+
+def core_target(sym: str) -> float:
+    """The plan weight of a core coin in the CRYPTO NOVA портфель (BTC 30 % / ETH 10 % / SOL 5 %; another core coin 10 %)."""
+    cw = IDEAS["core_w"]
+    return cw.get(sym, 0.10) if isinstance(cw, dict) else float(cw)
 
 
 def horizon_of(kind: str, est: str) -> str:
@@ -613,7 +625,7 @@ class IdeasPortfolio:
                 if st not in ("buy", "add", "small") or not s or s in held:
                     continue
                 small = st == "small"
-                w = P["small_w"] if small else P["core_w"] if (r.get("kind") == "core") else P["buy_w"]
+                w = P["small_w"] if small else core_target(s) if (r.get("kind") == "core") else P["buy_w"]
                 st_ru = r.get("status_ru") or st
                 px = k = why_not = None
                 if s in cool:
@@ -646,25 +658,31 @@ class IdeasPortfolio:
                 live.add(s)
                 held[s] = {"symbol": s}
                 n_small, n_buy = (n_small + 1, n_buy) if small else (n_small, n_buy + 1)
-            # core top-up: BTC / ETH / SOL back to 15 % when they drift under 11 % of the account (cash ≥ 10 % stays)
+            # core: trimmed back to plan at the Monday review when it grew past 1.5× the plan; topped up when under ¾ of it
             V = self.value(price)
             for p in rp.positions():
                 s = p["symbol"]
                 kind, _ = self._split(p["bucket"])
-                if kind != "core" or s not in price or not V:
+                if kind != "core" or s not in price or not V or not p["entry"]:
+                    continue
+                T = core_target(s)
+                mw = p["weight"] * price[s] / p["entry"] / V
+                if weekly and mw > T * P["core_trim"]:
+                    neww = T * V * p["entry"] / price[s]
+                    actions.append(rp._act(now, s, "TRIM", neww, price[s],
+                                           f"Ядро: {s} {mw*100:.0f}% счёта — больше плана {T*100:.0f}% в {mw / T:.1f} раза; лишнее продаём "
+                                           "(недельный пересмотр).", None))
+                    rp._set_cash(rp.cash() - (p["weight"] - neww) * price[s] / p["entry"] * P["fee"])
                     continue
                 st = (smap.get(s) or {}).get("status")
-                if st not in ("buy", "add"):
+                if st not in ("buy", "add") or mw >= T * P["core_floor"]:
                     continue
-                mw = p["weight"] * price[s] / p["entry"] / V if p["entry"] else 0
-                if mw >= P["core_floor"]:
-                    continue
-                add = min((P["core_w"] - mw) * V, rp.cash() - P["min_cash"] * V) / (1 + P["fee"])
+                add = min((T - mw) * V, rp.cash() - P["min_cash"] * V) / (1 + P["fee"])
                 if add < 0.005:                       # less than 0.5 % of the account free above the cash floor → wait
                     continue
                 actions.append(rp._act(now, s, "ADD", p["weight"] + add, price[s],
-                                       f"Ядро: {s} {mw*100:.0f}% счёта — доливаем до {P['core_w']*100:.0f}% (ядро держим крупным: "
-                                       "на 2023–2026 BTC+ETH+SOL выросли на 239%, а широкая корзина альтов упала на 57%).", p["bucket"]))
+                                       f"Ядро: {s} {mw*100:.0f}% счёта — доливаем до {T*100:.0f}% (ядро держим крупным, BTC — больше всех: "
+                                       "в 2025–2026 он падал меньше ETH и SOL; на 2023–2026 BTC+ETH+SOL +239%, широкая корзина альтов −57%).", p["bucket"]))
                 rp._set_cash(rp.cash() - add * P["fee"])
         self.conn.commit()
         return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
@@ -695,7 +713,7 @@ class IdeasPortfolio:
                              "take_half": round(p["entry"] * P["body_x"], 8) if h == "short" and p.get("entry") and not p.get("fixes") else None}}
             out.append({**p, **hz, "bucket": kind, "kind_ru": KIND_RU.get(kind, kind), "role": est, "role_ru": IDEAS_ROLE_RU.get(est, est),
                         "name": names.get(s) or s, "weight": round(mv / V, 4), "cost_weight": round(p["weight"], 6),
-                        "target_weight": P["small_w"] if est == "small" else P["core_w"] if kind == "core" else P["buy_w"],
+                        "target_weight": P["small_w"] if est == "small" else core_target(s) if kind == "core" else P["buy_w"],
                         "price": px, "price_live": s in live, "price_src": psrc.get(s),
                         "pnl_pct": round(ret * 100, 2) if ret is not None else None,
                         "pnl_usd": round(10_000 * (mv - p["weight"]), 2), "value_usd": round(10_000 * mv, 2),
@@ -714,7 +732,7 @@ class IdeasPortfolio:
                 "equity_usd": round(10_000 * V, 2), "start_usd": 10_000, "history": hist, "actions": actions,
                 "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in
                                    self.conn.execute(f"SELECT time,symbol,action,weight,price,reason FROM {rp.T_ACT} ORDER BY time DESC LIMIT 20").fetchall()],
-                "sleeves": {"buy": {"label": "ядро и «можно брать / добрать»", "target_pct": round((3 * P["core_w"] + (P["buy_n"] - 3) * P["buy_w"]) * 100, 1), "now_pct": round(sl["buy"] * 100, 1)},
+                "sleeves": {"buy": {"label": "ядро и «можно брать / добрать»", "target_pct": round((sum(P["core_w"].values()) + (P["buy_n"] - 3) * P["buy_w"]) * 100, 1), "now_pct": round(sl["buy"] * 100, 1)},
                             "small": {"label": "на небольшую сумму", "target_pct": round(P["small_n"] * P["small_w"] * 100, 1), "now_pct": round(sl["small"] * 100, 1)},
                             "cash": {"label": "кэш", "target_pct": round(P["min_cash"] * 100, 1), "now_pct": round(cash * 100, 1)}},
                 "rules_ru": IDEAS_RULES, "horizons": horizons,

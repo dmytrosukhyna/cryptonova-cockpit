@@ -54,6 +54,10 @@ jobs:
       - name: Paper desk ($10k demo futures account) → web/paper.json
         continue-on-error: true
         run: python -m cnq.cli paper --out web
+      - name: Шорт листингов (new BingX perps, short 4 h after listing; demo) → web/paper.json profiles.lst
+        continue-on-error: true
+        timeout-minutes: 3
+        run: python -m cnq.cli listings --out web
       - name: Our own signals in Cornix format (CNPTS «Сбалансированная») → web/signals_feed.json; Telegram only if CNQ_SIGNALS_CHAT is set
         continue-on-error: true
         env:

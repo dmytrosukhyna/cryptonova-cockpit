@@ -43,7 +43,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -257,6 +257,12 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs("data", exist_ok=True)
         d = yield_desk.run(sqlite3.connect("data/agents.sqlite"), args.out)
         print(f"yield.json: equity={d['equity']} apy={d['apy_now']} rates={d['rates']} stale={d['stale']} error={d['error']} table={len(d['table'])}")
+    elif args.cmd == "listings":
+        import os, sqlite3
+        from .agents import listing_desk
+        os.makedirs("data", exist_ok=True)
+        d = listing_desk.run(sqlite3.connect("data/agents.sqlite"), args.out)
+        print(f"listings: watching={d['watching']} equity={d['equity']} open={[t['symbol'] for t in d['open']]} events={d['events'][:5]} error={d['error']}")
     elif args.cmd == "basis":
         import os, sqlite3
         from .agents import basis_desk

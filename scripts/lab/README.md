@@ -27,3 +27,6 @@ coin moves at once. `stats()` now also gives `test_day_avg` (average of daily av
 without its 3 best days) and `pf5` (a 5-slot account: one position per coin, 1/5 of capital each, signals skipped when
 the slots are busy). `passes()` requires the test average without the 3 best days > 0, the 5-slot account > 0 on TEST and positive in
 most years, and at least 3 counted years (`test_day_avg` is shown, not required).
+
+Recency (18.10, owner: "old rules rarely work in today's market; the last two years matter most"): the 5-slot account
+must be positive in 2025 and in 2026 separately, and on 2025–26 without its 3 best days; per-trade `test_ex3_avg` is shown only.

@@ -1,0 +1,1497 @@
+{
+ "family": "trend_wide50",
+ "universe": "wide",
+ "topn": 50,
+ "tried": 712,
+ "notes_ru": "Широкий набор: все фьючерсы Binance с 2023 года (с удалёнными), в торговле только монеты из топ-50 по объёму за 30 дней на тот момент; обучение 2023–2024, проверка 2025–2026. Семейство «тренд»: 6 идей — пробой канала 1/3/5 дней (с фильтром объёма и без), откат к EMA по часовому тренду, пробой после сжатия Боллинджера, альт догоняет BTC, пробой дневного диапазона/вчерашнего дня, пробой канала с фильтром рынка (тренд BTC или «пробой всего рынка»); лонг и шорт отдельно. Проверено 712 вариантов (сигнал × сторона × выход + проверка длины удержания). Параметры и выход выбирались только на 2023–2024 (лучшее среднее на сделку при n ≥ 200 и оба года 2023–2024 в плюсе). Прошли критерий: 0 из 12. НО прошедшие варианты держатся на нескольких днях, когда рвануло почти всё сразу: без 3 лучших дней теста среднее на сделку — . Фильтр «пробой всего рынка», посчитанный честно (по уже случившимся пробоям за сутки), этот эффект не ловит. Идея 6 (фильтр рынка) добавлена после того, как увидели, что простой пробой вверх теряет в 2022-м, — параметры выбраны на трейне, но сам выбор идеи уже не полностью «слепой». Выходы: узкий стоп 2 ATR(15м) с целями 1–3R и трейлинг после первой цели почти никогда не дают плюса на трейне (плюсовых вариантов 2%–9%; среднее от -0.20 до -0.16 % на сделку) — 15-минутный шум выбивает стоп раньше, чем развивается движение, а комиссия 0,14 % съедает маленькие цели. Лучше всего — выход по времени с широким стопом: стоп 4 ATR (плюсовых вариантов на трейне 23%) и аварийный стоп 8 ATR (33%, выбран лучшим в 41 сигналах из 86). Важно: большая часть плюса лонгов — просто рост рынка. Контроль «покупать каждую монету каждый день в 00:00 UTC, стоп 8 ATR, выход через 2 суток» даёт трейн -0.02 %, тест -0.29 %; шорт тем же способом — трейн -0.38 %, тест +0.11 %. Пробои вверх лучше этого контроля (импульс есть), но в 2022-м всё равно теряют; пробои вниз, сжатия и шорты после падения BTC хуже случайного шорта — на 15м после резкого пробоя вниз цена чаще откатывает (материал для семейства fade). У «альт догоняет BTC» условие «альт отстал» ничего не добавляет: просто лонг всех альтов после часа роста BTC ≥ 2 % даёт похожий результат на большем числе сделок. Сделки по одной монете могут перекрываться (харнесс считает каждую отдельно), так что сумма процентов — не доходность счёта.",
+ "results": [
+  {
+   "id": "trend_donch_long",
+   "name_ru": "Пробой канала 3 дней (лонг)",
+   "rule_ru": "Лонг, когда 15-минутная свеча закрылась выше максимума последних 3 дней при объёме свечи > 2× среднего за сутки; вход на открытии следующей свечи, не чаще раза в сутки по монете. Аварийный стоп 8 ATR(15м), без целей; выход по времени через ~2 сут (192 × 15 мин).",
+   "exit": {
+    "sl_atr": 8.0,
+    "tps": [],
+    "max_bars": 192,
+    "name": "wide_time"
+   },
+   "params": {
+    "N": 288,
+    "vol": "v96x2",
+    "side": 1,
+    "gap": 96,
+    "max_bars": 192
+   },
+   "stats": {
+    "test_day_avg": -1.215,
+    "test_days": 580,
+    "test_ex3_avg": -0.522,
+    "pf5": {
+     "slots": 5,
+     "taken": 2909,
+     "skipped": 9671,
+     "train_pct": 12.7,
+     "test_pct": -44.9,
+     "years": {
+      "2023": 21.7,
+      "2024": -9.0,
+      "2025": -3.1,
+      "2026": -41.9
+     },
+     "pos_years": 1,
+     "max_dd_pct": -129.6
+    },
+    "label": "",
+    "all": {
+     "n": 12580,
+     "avg_pct": 0.086,
+     "win": 0.423,
+     "pf": 1.03,
+     "sum_pct": 1086.2
+    },
+    "train": {
+     "n": 6914,
+     "avg_pct": 0.289,
+     "win": 0.442,
+     "pf": 1.1,
+     "sum_pct": 1999.3
+    },
+    "test": {
+     "n": 5666,
+     "avg_pct": -0.161,
+     "win": 0.4,
+     "pf": 0.94,
+     "sum_pct": -913.0
+    },
+    "years": {
+     "2023": {
+      "n": 3453,
+      "avg_pct": 0.275,
+      "win": 0.429,
+      "pf": 1.1,
+      "sum_pct": 951.0
+     },
+     "2024": {
+      "n": 3461,
+      "avg_pct": 0.303,
+      "win": 0.454,
+      "pf": 1.1,
+      "sum_pct": 1048.3
+     },
+     "2025": {
+      "n": 3228,
+      "avg_pct": -0.49,
+      "win": 0.385,
+      "pf": 0.84,
+      "sum_pct": -1581.0
+     },
+     "2026": {
+      "n": 2438,
+      "avg_pct": 0.274,
+      "win": 0.419,
+      "pf": 1.1,
+      "sum_pct": 667.9
+     }
+    },
+    "pos_years": 3,
+    "years_n": 4,
+    "max_dd_sum_pct": -2538.3,
+    "top_coin_share": 0.08,
+    "per_day": 9.08,
+    "median_hold_h": 48.0,
+    "hold_sensitivity": {
+     "mb96": {
+      "train": 0.025,
+      "test": -0.091,
+      "pos_years": 3
+     },
+     "mb384": {
+      "train": 0.393,
+      "test": -0.414,
+      "pos_years": 3
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 678,
+      "avg_pct_without_top3_days": 0.096,
+      "avg_pct_without_top10_days": -0.207
+     },
+     "test": {
+      "entry_days": 580,
+      "avg_pct_without_top3_days": -0.522,
+      "avg_pct_without_top10_days": -0.879
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_donch_short",
+   "name_ru": "Пробой канала 1 дня (шорт)",
+   "rule_ru": "Шорт, когда 15-минутная свеча закрылась ниже минимума последних 1 дня; вход на открытии следующей свечи, не чаще раза в сутки по монете. Стоп 2 ATR(15м); одна цель 1R (= 2 ATR); иначе выход по времени через ~2 сут (192 × 15 мин).",
+   "exit": {
+    "sl_atr": 2.0,
+    "tps": [
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "max_bars": 192,
+    "name": "1tp_1r"
+   },
+   "params": {
+    "N": 96,
+    "vol": "none",
+    "side": -1,
+    "gap": 96,
+    "max_bars": 192
+   },
+   "stats": {
+    "test_day_avg": -0.418,
+    "test_days": 643,
+    "test_ex3_avg": -0.101,
+    "pf5": {
+     "slots": 5,
+     "taken": 15815,
+     "skipped": 12038,
+     "train_pct": -195.7,
+     "test_pct": -138.8,
+     "years": {
+      "2023": -108.6,
+      "2024": -87.1,
+      "2025": -66.9,
+      "2026": -71.9
+     },
+     "pos_years": 0,
+     "max_dd_pct": -340.5
+    },
+    "label": "",
+    "all": {
+     "n": 27853,
+     "avg_pct": -0.144,
+     "win": 0.51,
+     "pf": 0.83,
+     "sum_pct": -4023.2
+    },
+    "train": {
+     "n": 14265,
+     "avg_pct": -0.205,
+     "win": 0.5,
+     "pf": 0.78,
+     "sum_pct": -2928.7
+    },
+    "test": {
+     "n": 13588,
+     "avg_pct": -0.081,
+     "win": 0.521,
+     "pf": 0.9,
+     "sum_pct": -1094.5
+    },
+    "years": {
+     "2023": {
+      "n": 6800,
+      "avg_pct": -0.205,
+      "win": 0.499,
+      "pf": 0.76,
+      "sum_pct": -1395.2
+     },
+     "2024": {
+      "n": 7465,
+      "avg_pct": -0.205,
+      "win": 0.502,
+      "pf": 0.79,
+      "sum_pct": -1533.5
+     },
+     "2025": {
+      "n": 7644,
+      "avg_pct": -0.059,
+      "win": 0.525,
+      "pf": 0.93,
+      "sum_pct": -451.8
+     },
+     "2026": {
+      "n": 5944,
+      "avg_pct": -0.108,
+      "win": 0.515,
+      "pf": 0.86,
+      "sum_pct": -642.7
+     }
+    },
+    "pos_years": 0,
+    "years_n": 4,
+    "max_dd_sum_pct": -4142.6,
+    "top_coin_share": 0.12,
+    "per_day": 20.1,
+    "median_hold_h": 1.75,
+    "hold_sensitivity": {
+     "mb96": {
+      "train": -0.21,
+      "test": -0.083,
+      "pos_years": 0
+     },
+     "mb384": {
+      "train": -0.203,
+      "test": -0.079,
+      "pos_years": 0
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 701,
+      "avg_pct_without_top3_days": -0.231,
+      "avg_pct_without_top10_days": -0.263
+     },
+     "test": {
+      "entry_days": 643,
+      "avg_pct_without_top3_days": -0.101,
+      "avg_pct_without_top10_days": -0.136
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_pullback_long",
+   "name_ru": "Откат к EMA50 (1ч) по тренду (лонг)",
+   "rule_ru": "Лонг: на часовом графике EMA50 выше EMA200, цена за последние 12 свечей 15м коснулась EMA50 (1ч), а текущая зелёная свеча вернулась за линию и закрылась выше максимума предыдущей свечи. Аварийный стоп 8 ATR(15м), без целей; выход по времени через ~1 сут (96 × 15 мин).",
+   "exit": {
+    "sl_atr": 8.0,
+    "tps": [],
+    "max_bars": 96,
+    "name": "wide_time"
+   },
+   "params": {
+    "level_1h": "EMA50",
+    "W": 12,
+    "trigger": "prevhigh",
+    "side": 1,
+    "gap": 32,
+    "max_bars": 96
+   },
+   "stats": {
+    "test_day_avg": -0.544,
+    "test_days": 633,
+    "test_ex3_avg": -0.671,
+    "pf5": {
+     "slots": 5,
+     "taken": 5793,
+     "skipped": 26636,
+     "train_pct": -121.8,
+     "test_pct": -173.0,
+     "years": {
+      "2023": -9.8,
+      "2024": -112.1,
+      "2025": -140.6,
+      "2026": -32.4
+     },
+     "pos_years": 0,
+     "max_dd_pct": -384.1
+    },
+    "label": "",
+    "all": {
+     "n": 32429,
+     "avg_pct": -0.249,
+     "win": 0.43,
+     "pf": 0.88,
+     "sum_pct": -8082.5
+    },
+    "train": {
+     "n": 19160,
+     "avg_pct": -0.018,
+     "win": 0.45,
+     "pf": 0.99,
+     "sum_pct": -352.0
+    },
+    "test": {
+     "n": 13269,
+     "avg_pct": -0.583,
+     "win": 0.401,
+     "pf": 0.72,
+     "sum_pct": -7730.4
+    },
+    "years": {
+     "2023": {
+      "n": 9945,
+      "avg_pct": 0.053,
+      "win": 0.454,
+      "pf": 1.03,
+      "sum_pct": 524.6
+     },
+     "2024": {
+      "n": 9215,
+      "avg_pct": -0.095,
+      "win": 0.445,
+      "pf": 0.96,
+      "sum_pct": -876.6
+     },
+     "2025": {
+      "n": 6741,
+      "avg_pct": -0.78,
+      "win": 0.395,
+      "pf": 0.66,
+      "sum_pct": -5260.8
+     },
+     "2026": {
+      "n": 6528,
+      "avg_pct": -0.378,
+      "win": 0.407,
+      "pf": 0.8,
+      "sum_pct": -2469.7
+     }
+    },
+    "pos_years": 1,
+    "years_n": 4,
+    "max_dd_sum_pct": -10726.5,
+    "top_coin_share": 0.09,
+    "per_day": 23.4,
+    "median_hold_h": 24.0,
+    "hold_sensitivity": {
+     "mb48": {
+      "train": -0.043,
+      "test": -0.42,
+      "pos_years": 0
+     },
+     "mb192": {
+      "train": 0.016,
+      "test": -0.972,
+      "pos_years": 1
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 709,
+      "avg_pct_without_top3_days": -0.097,
+      "avg_pct_without_top10_days": -0.247
+     },
+     "test": {
+      "entry_days": 633,
+      "avg_pct_without_top3_days": -0.671,
+      "avg_pct_without_top10_days": -0.824
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_pullback_short",
+   "name_ru": "Откат к EMA50 (1ч) по тренду (шорт)",
+   "rule_ru": "Шорт: на часовом графике EMA50 ниже EMA200, цена за последние 12 свечей 15м коснулась EMA50 (1ч), а текущая красная свеча вернулась за линию и закрылась ниже минимума 4 предыдущих свечей. Стоп 4 ATR(15м); 30 % позиции на 1R (= 4 ATR), затем стоп в безубыток и трейлинг 4 ATR от лучшего закрытия; максимум ~2 сут (192 × 15 мин).",
+   "exit": {
+    "sl_atr": 4.0,
+    "tps": [
+     [
+      1.0,
+      0.3
+     ]
+    ],
+    "be_after_tp1": true,
+    "trail_atr": 4.0,
+    "max_bars": 192,
+    "name": "wide_trail"
+   },
+   "params": {
+    "level_1h": "EMA50",
+    "W": 12,
+    "trigger": "hh4",
+    "side": -1,
+    "gap": 32,
+    "max_bars": 96
+   },
+   "stats": {
+    "test_day_avg": 0.034,
+    "test_days": 629,
+    "test_ex3_avg": -0.083,
+    "pf5": {
+     "slots": 5,
+     "taken": 6174,
+     "skipped": 27104,
+     "train_pct": -48.5,
+     "test_pct": 82.0,
+     "years": {
+      "2023": -26.4,
+      "2024": -22.1,
+      "2025": 65.4,
+      "2026": 16.6
+     },
+     "pos_years": 2,
+     "max_dd_pct": -114.9
+    },
+    "label": "",
+    "all": {
+     "n": 33278,
+     "avg_pct": -0.004,
+     "win": 0.522,
+     "pf": 1.0,
+     "sum_pct": -144.7
+    },
+    "train": {
+     "n": 16036,
+     "avg_pct": -0.017,
+     "win": 0.524,
+     "pf": 0.99,
+     "sum_pct": -271.2
+    },
+    "test": {
+     "n": 17242,
+     "avg_pct": 0.007,
+     "win": 0.521,
+     "pf": 1.01,
+     "sum_pct": 126.4
+    },
+    "years": {
+     "2023": {
+      "n": 7994,
+      "avg_pct": -0.05,
+      "win": 0.517,
+      "pf": 0.95,
+      "sum_pct": -401.0
+     },
+     "2024": {
+      "n": 8042,
+      "avg_pct": 0.016,
+      "win": 0.53,
+      "pf": 1.01,
+      "sum_pct": 129.9
+     },
+     "2025": {
+      "n": 9889,
+      "avg_pct": 0.068,
+      "win": 0.518,
+      "pf": 1.05,
+      "sum_pct": 668.7
+     },
+     "2026": {
+      "n": 7353,
+      "avg_pct": -0.074,
+      "win": 0.525,
+      "pf": 0.94,
+      "sum_pct": -542.3
+     }
+    },
+    "pos_years": 2,
+    "years_n": 4,
+    "max_dd_sum_pct": -2539.9,
+    "top_coin_share": 0.06,
+    "per_day": 24.01,
+    "median_hold_h": 12.25,
+    "hold_sensitivity": {
+     "mb48": {
+      "train": -0.044,
+      "test": -0.047,
+      "pos_years": 1
+     },
+     "mb192": {
+      "train": -0.02,
+      "test": 0.029,
+      "pos_years": 2
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 697,
+      "avg_pct_without_top3_days": -0.071,
+      "avg_pct_without_top10_days": -0.151
+     },
+     "test": {
+      "entry_days": 629,
+      "avg_pct_without_top3_days": -0.083,
+      "avg_pct_without_top10_days": -0.188
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_squeeze_long",
+   "name_ru": "Пробой после сжатия Боллинджера (лонг)",
+   "rule_ru": "Лонг: ширина полос Боллинджера (20, 2σ) в последние 16 свечей была в нижних 10 % за 5 дней, и свеча впервые закрылась выше верхней полосы. Аварийный стоп 8 ATR(15м), без целей; выход по времени через ~1 сут (96 × 15 мин).",
+   "exit": {
+    "sl_atr": 8.0,
+    "tps": [],
+    "max_bars": 96,
+    "name": "wide_time"
+   },
+   "params": {
+    "q": 0.1,
+    "R": 16,
+    "side": 1,
+    "gap": 48,
+    "max_bars": 96
+   },
+   "stats": {
+    "test_day_avg": -0.624,
+    "test_days": 647,
+    "test_ex3_avg": -0.453,
+    "pf5": {
+     "slots": 5,
+     "taken": 6493,
+     "skipped": 34149,
+     "train_pct": -78.7,
+     "test_pct": -151.5,
+     "years": {
+      "2023": -9.2,
+      "2024": -69.5,
+      "2025": -53.2,
+      "2026": -98.4
+     },
+     "pos_years": 0,
+     "max_dd_pct": -295.6
+    },
+    "label": "",
+    "all": {
+     "n": 40642,
+     "avg_pct": -0.264,
+     "win": 0.411,
+     "pf": 0.85,
+     "sum_pct": -10718.1
+    },
+    "train": {
+     "n": 21541,
+     "avg_pct": -0.153,
+     "win": 0.417,
+     "pf": 0.91,
+     "sum_pct": -3303.7
+    },
+    "test": {
+     "n": 19101,
+     "avg_pct": -0.388,
+     "win": 0.405,
+     "pf": 0.78,
+     "sum_pct": -7414.4
+    },
+    "years": {
+     "2023": {
+      "n": 10780,
+      "avg_pct": -0.046,
+      "win": 0.414,
+      "pf": 0.97,
+      "sum_pct": -492.0
+     },
+     "2024": {
+      "n": 10761,
+      "avg_pct": -0.261,
+      "win": 0.419,
+      "pf": 0.86,
+      "sum_pct": -2811.7
+     },
+     "2025": {
+      "n": 10654,
+      "avg_pct": -0.375,
+      "win": 0.419,
+      "pf": 0.8,
+      "sum_pct": -3999.5
+     },
+     "2026": {
+      "n": 8447,
+      "avg_pct": -0.404,
+      "win": 0.388,
+      "pf": 0.76,
+      "sum_pct": -3414.9
+     }
+    },
+    "pos_years": 0,
+    "years_n": 4,
+    "max_dd_sum_pct": -12564.3,
+    "top_coin_share": 0.16,
+    "per_day": 29.33,
+    "median_hold_h": 24.0,
+    "hold_sensitivity": {
+     "mb48": {
+      "train": -0.195,
+      "test": -0.292,
+      "pos_years": 0
+     },
+     "mb192": {
+      "train": -0.152,
+      "test": -0.565,
+      "pos_years": 0
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 725,
+      "avg_pct_without_top3_days": -0.234,
+      "avg_pct_without_top10_days": -0.361
+     },
+     "test": {
+      "entry_days": 647,
+      "avg_pct_without_top3_days": -0.453,
+      "avg_pct_without_top10_days": -0.552
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_squeeze_short",
+   "name_ru": "Пробой после сжатия Боллинджера (шорт)",
+   "rule_ru": "Шорт: ширина полос Боллинджера (20, 2σ) в последние 16 свечей была в нижних 10 % за 5 дней, и свеча впервые закрылась ниже нижней полосы. Стоп 2 ATR(15м); одна цель 1R (= 2 ATR); иначе выход по времени через ~1 сут (96 × 15 мин).",
+   "exit": {
+    "sl_atr": 2.0,
+    "tps": [
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "max_bars": 96,
+    "name": "1tp_1r"
+   },
+   "params": {
+    "q": 0.1,
+    "R": 16,
+    "side": -1,
+    "gap": 48,
+    "max_bars": 96
+   },
+   "stats": {
+    "test_day_avg": -0.15,
+    "test_days": 648,
+    "test_ex3_avg": -0.142,
+    "pf5": {
+     "slots": 5,
+     "taken": 24374,
+     "skipped": 17840,
+     "train_pct": -286.9,
+     "test_pct": -270.3,
+     "years": {
+      "2023": -141.5,
+      "2024": -145.4,
+      "2025": -158.7,
+      "2026": -111.6
+     },
+     "pos_years": 0,
+     "max_dd_pct": -560.8
+    },
+    "label": "",
+    "all": {
+     "n": 42214,
+     "avg_pct": -0.128,
+     "win": 0.508,
+     "pf": 0.79,
+     "sum_pct": -5382.8
+    },
+    "train": {
+     "n": 22493,
+     "avg_pct": -0.122,
+     "win": 0.512,
+     "pf": 0.81,
+     "sum_pct": -2745.4
+    },
+    "test": {
+     "n": 19721,
+     "avg_pct": -0.134,
+     "win": 0.504,
+     "pf": 0.78,
+     "sum_pct": -2637.4
+    },
+    "years": {
+     "2023": {
+      "n": 11325,
+      "avg_pct": -0.116,
+      "win": 0.508,
+      "pf": 0.8,
+      "sum_pct": -1314.6
+     },
+     "2024": {
+      "n": 11168,
+      "avg_pct": -0.128,
+      "win": 0.517,
+      "pf": 0.81,
+      "sum_pct": -1430.9
+     },
+     "2025": {
+      "n": 11020,
+      "avg_pct": -0.15,
+      "win": 0.495,
+      "pf": 0.77,
+      "sum_pct": -1650.5
+     },
+     "2026": {
+      "n": 8701,
+      "avg_pct": -0.113,
+      "win": 0.515,
+      "pf": 0.8,
+      "sum_pct": -986.9
+     }
+    },
+    "pos_years": 0,
+    "years_n": 4,
+    "max_dd_sum_pct": -5403.7,
+    "top_coin_share": 0.21,
+    "per_day": 30.46,
+    "median_hold_h": 1.5,
+    "hold_sensitivity": {
+     "mb48": {
+      "train": -0.124,
+      "test": -0.134,
+      "pos_years": 0
+     },
+     "mb192": {
+      "train": -0.122,
+      "test": -0.134,
+      "pos_years": 0
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 728,
+      "avg_pct_without_top3_days": -0.129,
+      "avg_pct_without_top10_days": -0.142
+     },
+     "test": {
+      "entry_days": 648,
+      "avg_pct_without_top3_days": -0.142,
+      "avg_pct_without_top10_days": -0.155
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_btclead_long",
+   "name_ru": "Альт догоняет BTC (лонг)",
+   "rule_ru": "Лонг альткоина: BTC за последний час вырос на ≥ 2 % (без условия, что альт отстал) — входим в сторону BTC. Аварийный стоп 8 ATR(15м), без целей; выход по времени через ~12 ч (48 × 15 мин).",
+   "exit": {
+    "sl_atr": 8.0,
+    "tps": [],
+    "max_bars": 48,
+    "name": "wide_time"
+   },
+   "params": {
+    "btc_1h": 0.02,
+    "alt_lt_frac": null,
+    "side": 1,
+    "gap": 16,
+    "max_bars": 48
+   },
+   "stats": {
+    "test_day_avg": 0.218,
+    "test_days": 77,
+    "test_ex3_avg": -0.194,
+    "pf5": {
+     "slots": 5,
+     "taken": 972,
+     "skipped": 10223,
+     "train_pct": 83.2,
+     "test_pct": 38.8,
+     "years": {
+      "2023": 25.2,
+      "2024": 58.0,
+      "2025": 29.1,
+      "2026": 9.7
+     },
+     "pos_years": 4,
+     "max_dd_pct": -14.3
+    },
+    "label": "",
+    "all": {
+     "n": 11195,
+     "avg_pct": 0.521,
+     "win": 0.523,
+     "pf": 1.4,
+     "sum_pct": 5836.0
+    },
+    "train": {
+     "n": 6899,
+     "avg_pct": 0.708,
+     "win": 0.548,
+     "pf": 1.57,
+     "sum_pct": 4884.3
+    },
+    "test": {
+     "n": 4296,
+     "avg_pct": 0.222,
+     "win": 0.483,
+     "pf": 1.16,
+     "sum_pct": 951.7
+    },
+    "years": {
+     "2023": {
+      "n": 2598,
+      "avg_pct": 0.555,
+      "win": 0.512,
+      "pf": 1.43,
+      "sum_pct": 1441.8
+     },
+     "2024": {
+      "n": 4301,
+      "avg_pct": 0.8,
+      "win": 0.569,
+      "pf": 1.65,
+      "sum_pct": 3442.6
+     },
+     "2025": {
+      "n": 2386,
+      "avg_pct": 0.236,
+      "win": 0.494,
+      "pf": 1.15,
+      "sum_pct": 562.0
+     },
+     "2026": {
+      "n": 1910,
+      "avg_pct": 0.204,
+      "win": 0.469,
+      "pf": 1.16,
+      "sum_pct": 389.7
+     }
+    },
+    "pos_years": 4,
+    "years_n": 4,
+    "max_dd_sum_pct": -1469.9,
+    "top_coin_share": 0.03,
+    "per_day": 8.16,
+    "median_hold_h": 12.0,
+    "hold_sensitivity": {
+     "mb24": {
+      "train": 0.458,
+      "test": 0.151,
+      "pos_years": 3
+     },
+     "mb96": {
+      "train": 0.902,
+      "test": -0.042,
+      "pos_years": 3
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 114,
+      "avg_pct_without_top3_days": 0.474,
+      "avg_pct_without_top10_days": 0.106
+     },
+     "test": {
+      "entry_days": 77,
+      "avg_pct_without_top3_days": -0.194,
+      "avg_pct_without_top10_days": -0.599
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_btclead_short",
+   "name_ru": "Альт догоняет BTC (шорт)",
+   "rule_ru": "Шорт альткоина: BTC за последний час упал на ≥ 1 % (без условия, что альт отстал) — входим в сторону BTC. Стоп 2 ATR(15м); одна цель 1R (= 2 ATR); иначе выход по времени через ~12 ч (48 × 15 мин).",
+   "exit": {
+    "sl_atr": 2.0,
+    "tps": [
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "max_bars": 48,
+    "name": "1tp_1r"
+   },
+   "params": {
+    "btc_1h": 0.01,
+    "alt_lt_frac": null,
+    "side": -1,
+    "gap": 16,
+    "max_bars": 48
+   },
+   "stats": {
+    "test_day_avg": -0.036,
+    "test_days": 314,
+    "test_ex3_avg": -0.088,
+    "pf5": {
+     "slots": 5,
+     "taken": 5101,
+     "skipped": 46224,
+     "train_pct": -68.7,
+     "test_pct": -5.6,
+     "years": {
+      "2023": -65.8,
+      "2024": -2.9,
+      "2025": 26.3,
+      "2026": -32.0
+     },
+     "pos_years": 1,
+     "max_dd_pct": -89.7
+    },
+    "label": "",
+    "all": {
+     "n": 51325,
+     "avg_pct": -0.094,
+     "win": 0.516,
+     "pf": 0.91,
+     "sum_pct": -4808.5
+    },
+    "train": {
+     "n": 28235,
+     "avg_pct": -0.138,
+     "win": 0.504,
+     "pf": 0.87,
+     "sum_pct": -3902.1
+    },
+    "test": {
+     "n": 23090,
+     "avg_pct": -0.039,
+     "win": 0.531,
+     "pf": 0.96,
+     "sum_pct": -906.4
+    },
+    "years": {
+     "2023": {
+      "n": 10535,
+      "avg_pct": -0.244,
+      "win": 0.472,
+      "pf": 0.77,
+      "sum_pct": -2569.6
+     },
+     "2024": {
+      "n": 17700,
+      "avg_pct": -0.075,
+      "win": 0.523,
+      "pf": 0.93,
+      "sum_pct": -1332.6
+     },
+     "2025": {
+      "n": 12516,
+      "avg_pct": 0.021,
+      "win": 0.55,
+      "pf": 1.02,
+      "sum_pct": 265.2
+     },
+     "2026": {
+      "n": 10574,
+      "avg_pct": -0.111,
+      "win": 0.508,
+      "pf": 0.88,
+      "sum_pct": -1171.6
+     }
+    },
+    "pos_years": 1,
+    "years_n": 4,
+    "max_dd_sum_pct": -5027.0,
+    "top_coin_share": 0.09,
+    "per_day": 37.41,
+    "median_hold_h": 1.75,
+    "hold_sensitivity": {
+     "mb24": {
+      "train": -0.125,
+      "test": -0.041,
+      "pos_years": 1
+     },
+     "mb96": {
+      "train": -0.129,
+      "test": -0.013,
+      "pos_years": 1
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 382,
+      "avg_pct_without_top3_days": -0.186,
+      "avg_pct_without_top10_days": -0.241
+     },
+     "test": {
+      "entry_days": 314,
+      "avg_pct_without_top3_days": -0.088,
+      "avg_pct_without_top10_days": -0.155
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_daily_long",
+   "name_ru": "Пробой максимума первых 8 часов дня (UTC) (лонг)",
+   "rule_ru": "Лонг: первая за сутки (UTC) 15-минутная свеча, закрывшаяся выше максимума первых 8 часов дня (UTC). Аварийный стоп 8 ATR(15м), без целей; выход по времени через ~1 сут (96 × 15 мин).",
+   "exit": {
+    "sl_atr": 8.0,
+    "tps": [],
+    "max_bars": 96,
+    "name": "wide_time"
+   },
+   "params": {
+    "range": "or8h",
+    "side": 1,
+    "gap": 1,
+    "max_bars": 96
+   },
+   "stats": {
+    "test_day_avg": -0.962,
+    "test_days": 654,
+    "test_ex3_avg": -0.328,
+    "pf5": {
+     "slots": 5,
+     "taken": 6214,
+     "skipped": 29521,
+     "train_pct": -189.2,
+     "test_pct": -196.3,
+     "years": {
+      "2023": -74.0,
+      "2024": -115.2,
+      "2025": -136.8,
+      "2026": -59.5
+     },
+     "pos_years": 0,
+     "max_dd_pct": -465.9
+    },
+    "label": "",
+    "all": {
+     "n": 35735,
+     "avg_pct": -0.163,
+     "win": 0.428,
+     "pf": 0.92,
+     "sum_pct": -5824.0
+    },
+    "train": {
+     "n": 18847,
+     "avg_pct": -0.09,
+     "win": 0.435,
+     "pf": 0.95,
+     "sum_pct": -1687.9
+    },
+    "test": {
+     "n": 16888,
+     "avg_pct": -0.245,
+     "win": 0.421,
+     "pf": 0.87,
+     "sum_pct": -4136.2
+    },
+    "years": {
+     "2023": {
+      "n": 9344,
+      "avg_pct": -0.016,
+      "win": 0.433,
+      "pf": 0.99,
+      "sum_pct": -148.1
+     },
+     "2024": {
+      "n": 9503,
+      "avg_pct": -0.162,
+      "win": 0.437,
+      "pf": 0.92,
+      "sum_pct": -1539.7
+     },
+     "2025": {
+      "n": 9557,
+      "avg_pct": -0.268,
+      "win": 0.436,
+      "pf": 0.87,
+      "sum_pct": -2562.3
+     },
+     "2026": {
+      "n": 7331,
+      "avg_pct": -0.215,
+      "win": 0.401,
+      "pf": 0.88,
+      "sum_pct": -1573.9
+     }
+    },
+    "pos_years": 0,
+    "years_n": 4,
+    "max_dd_sum_pct": -8816.5,
+    "top_coin_share": 0.16,
+    "per_day": 25.79,
+    "median_hold_h": 24.0,
+    "hold_sensitivity": {
+     "mb48": {
+      "train": -0.1,
+      "test": -0.173,
+      "pos_years": 0
+     },
+     "mb192": {
+      "train": 0.077,
+      "test": -0.337,
+      "pos_years": 2
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 727,
+      "avg_pct_without_top3_days": -0.182,
+      "avg_pct_without_top10_days": -0.344
+     },
+     "test": {
+      "entry_days": 654,
+      "avg_pct_without_top3_days": -0.328,
+      "avg_pct_without_top10_days": -0.48
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_daily_short",
+   "name_ru": "Пробой минимума первых 8 часов дня (UTC) (шорт)",
+   "rule_ru": "Шорт: первая за сутки (UTC) 15-минутная свеча, закрывшаяся ниже минимума первых 8 часов дня (UTC). Стоп 2 ATR(15м); одна цель 1R (= 2 ATR); иначе выход по времени через ~1 сут (96 × 15 мин).",
+   "exit": {
+    "sl_atr": 2.0,
+    "tps": [
+     [
+      1.0,
+      1.0
+     ]
+    ],
+    "max_bars": 96,
+    "name": "1tp_1r"
+   },
+   "params": {
+    "range": "or8h",
+    "side": -1,
+    "gap": 1,
+    "max_bars": 96
+   },
+   "stats": {
+    "test_day_avg": -0.34,
+    "test_days": 641,
+    "test_ex3_avg": -0.153,
+    "pf5": {
+     "slots": 5,
+     "taken": 17434,
+     "skipped": 20670,
+     "train_pct": -155.6,
+     "test_pct": -192.3,
+     "years": {
+      "2023": -106.3,
+      "2024": -49.3,
+      "2025": -112.2,
+      "2026": -80.1
+     },
+     "pos_years": 0,
+     "max_dd_pct": -356.2
+    },
+    "label": "",
+    "all": {
+     "n": 38104,
+     "avg_pct": -0.129,
+     "win": 0.513,
+     "pf": 0.84,
+     "sum_pct": -4920.7
+    },
+    "train": {
+     "n": 19592,
+     "avg_pct": -0.12,
+     "win": 0.519,
+     "pf": 0.85,
+     "sum_pct": -2350.9
+    },
+    "test": {
+     "n": 18512,
+     "avg_pct": -0.139,
+     "win": 0.506,
+     "pf": 0.82,
+     "sum_pct": -2569.8
+    },
+    "years": {
+     "2023": {
+      "n": 9533,
+      "avg_pct": -0.156,
+      "win": 0.512,
+      "pf": 0.8,
+      "sum_pct": -1483.6
+     },
+     "2024": {
+      "n": 10059,
+      "avg_pct": -0.086,
+      "win": 0.526,
+      "pf": 0.9,
+      "sum_pct": -867.4
+     },
+     "2025": {
+      "n": 10498,
+      "avg_pct": -0.12,
+      "win": 0.514,
+      "pf": 0.85,
+      "sum_pct": -1254.5
+     },
+     "2026": {
+      "n": 8014,
+      "avg_pct": -0.164,
+      "win": 0.494,
+      "pf": 0.78,
+      "sum_pct": -1315.2
+     }
+    },
+    "pos_years": 0,
+    "years_n": 4,
+    "max_dd_sum_pct": -5019.5,
+    "top_coin_share": 0.09,
+    "per_day": 27.5,
+    "median_hold_h": 1.75,
+    "hold_sensitivity": {
+     "mb48": {
+      "train": -0.127,
+      "test": -0.137,
+      "pos_years": 0
+     },
+     "mb192": {
+      "train": -0.121,
+      "test": -0.137,
+      "pos_years": 0
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 723,
+      "avg_pct_without_top3_days": -0.143,
+      "avg_pct_without_top10_days": -0.173
+     },
+     "test": {
+      "entry_days": 641,
+      "avg_pct_without_top3_days": -0.153,
+      "avg_pct_without_top10_days": -0.182
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_regime_long",
+   "name_ru": "Пробой канала 5 дней по тренду BTC (лонг)",
+   "rule_ru": "Лонг, когда свеча 15м закрылась выше максимума последних 5 дней при объёме > 2× среднего за сутки и на часовом графике BTC EMA50 выше EMA200; не чаще раза в сутки по монете. Аварийный стоп 8 ATR(15м), без целей; выход по времени через ~2 сут (192 × 15 мин).",
+   "exit": {
+    "sl_atr": 8.0,
+    "tps": [],
+    "max_bars": 192,
+    "name": "wide_time"
+   },
+   "params": {
+    "N": 480,
+    "vol": "v96x2",
+    "regime": "btc_1h",
+    "side": 1,
+    "gap": 96,
+    "max_bars": 192
+   },
+   "stats": {
+    "test_day_avg": -0.955,
+    "test_days": 315,
+    "test_ex3_avg": -0.235,
+    "pf5": {
+     "slots": 5,
+     "taken": 1698,
+     "skipped": 5531,
+     "train_pct": 138.4,
+     "test_pct": 44.5,
+     "years": {
+      "2023": 101.7,
+      "2024": 36.7,
+      "2025": -28.3,
+      "2026": 72.9
+     },
+     "pos_years": 3,
+     "max_dd_pct": -63.4
+    },
+    "label": "",
+    "all": {
+     "n": 7229,
+     "avg_pct": 0.39,
+     "win": 0.442,
+     "pf": 1.14,
+     "sum_pct": 2822.1
+    },
+    "train": {
+     "n": 4237,
+     "avg_pct": 0.406,
+     "win": 0.447,
+     "pf": 1.14,
+     "sum_pct": 1718.6
+    },
+    "test": {
+     "n": 2992,
+     "avg_pct": 0.369,
+     "win": 0.435,
+     "pf": 1.14,
+     "sum_pct": 1103.6
+    },
+    "years": {
+     "2023": {
+      "n": 2080,
+      "avg_pct": 0.469,
+      "win": 0.45,
+      "pf": 1.17,
+      "sum_pct": 975.8
+     },
+     "2024": {
+      "n": 2157,
+      "avg_pct": 0.344,
+      "win": 0.444,
+      "pf": 1.11,
+      "sum_pct": 742.7
+     },
+     "2025": {
+      "n": 1719,
+      "avg_pct": -0.146,
+      "win": 0.42,
+      "pf": 0.95,
+      "sum_pct": -251.2
+     },
+     "2026": {
+      "n": 1273,
+      "avg_pct": 1.064,
+      "win": 0.455,
+      "pf": 1.44,
+      "sum_pct": 1354.8
+     }
+    },
+    "pos_years": 3,
+    "years_n": 4,
+    "max_dd_sum_pct": -1045.1,
+    "top_coin_share": 0.04,
+    "per_day": 5.26,
+    "median_hold_h": 48.0,
+    "hold_sensitivity": {
+     "mb96": {
+      "train": 0.12,
+      "test": 0.255,
+      "pos_years": 3
+     },
+     "mb384": {
+      "train": 0.703,
+      "test": 0.136,
+      "pos_years": 3
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 439,
+      "avg_pct_without_top3_days": 0.19,
+      "avg_pct_without_top10_days": -0.165
+     },
+     "test": {
+      "entry_days": 315,
+      "avg_pct_without_top3_days": -0.235,
+      "avg_pct_without_top10_days": -0.757
+     }
+    }
+   },
+   "passes": false
+  },
+  {
+   "id": "trend_regime_short",
+   "name_ru": "Пробой канала 3 дней по тренду BTC (шорт)",
+   "rule_ru": "Шорт, когда свеча 15м закрылась ниже минимума последних 3 дней при объёме > 2× среднего за сутки и на часовом графике BTC EMA50 ниже EMA200; не чаще раза в сутки по монете. Стоп 4 ATR(15м); 30 % позиции на 1R (= 4 ATR), затем стоп в безубыток и трейлинг 4 ATR от лучшего закрытия; максимум ~4 сут (384 × 15 мин).",
+   "exit": {
+    "sl_atr": 4.0,
+    "tps": [
+     [
+      1.0,
+      0.3
+     ]
+    ],
+    "be_after_tp1": true,
+    "trail_atr": 4.0,
+    "max_bars": 384,
+    "name": "wide_trail"
+   },
+   "params": {
+    "N": 288,
+    "vol": "v96x2",
+    "regime": "btc_1h",
+    "side": -1,
+    "gap": 96,
+    "max_bars": 192
+   },
+   "stats": {
+    "test_day_avg": -0.647,
+    "test_days": 289,
+    "test_ex3_avg": -0.243,
+    "pf5": {
+     "slots": 5,
+     "taken": 1865,
+     "skipped": 5578,
+     "train_pct": 24.3,
+     "test_pct": 14.9,
+     "years": {
+      "2023": -5.2,
+      "2024": 29.5,
+      "2025": 15.0,
+      "2026": -0.2
+     },
+     "pos_years": 2,
+     "max_dd_pct": -32.3
+    },
+    "label": "",
+    "all": {
+     "n": 7443,
+     "avg_pct": 0.032,
+     "win": 0.536,
+     "pf": 1.02,
+     "sum_pct": 237.0
+    },
+    "train": {
+     "n": 3366,
+     "avg_pct": -0.06,
+     "win": 0.531,
+     "pf": 0.97,
+     "sum_pct": -200.3
+    },
+    "test": {
+     "n": 4077,
+     "avg_pct": 0.107,
+     "win": 0.541,
+     "pf": 1.06,
+     "sum_pct": 437.3
+    },
+    "years": {
+     "2023": {
+      "n": 1647,
+      "avg_pct": -0.075,
+      "win": 0.508,
+      "pf": 0.96,
+      "sum_pct": -123.6
+     },
+     "2024": {
+      "n": 1719,
+      "avg_pct": -0.045,
+      "win": 0.553,
+      "pf": 0.98,
+      "sum_pct": -76.7
+     },
+     "2025": {
+      "n": 2298,
+      "avg_pct": 0.21,
+      "win": 0.536,
+      "pf": 1.11,
+      "sum_pct": 483.3
+     },
+     "2026": {
+      "n": 1779,
+      "avg_pct": -0.026,
+      "win": 0.547,
+      "pf": 0.98,
+      "sum_pct": -45.9
+     }
+    },
+    "pos_years": 1,
+    "years_n": 4,
+    "max_dd_sum_pct": -1341.2,
+    "top_coin_share": 0.05,
+    "per_day": 5.37,
+    "median_hold_h": 12.0,
+    "hold_sensitivity": {
+     "mb96": {
+      "train": -0.143,
+      "test": 0.129,
+      "pos_years": 2
+     },
+     "mb384": {
+      "train": -0.086,
+      "test": 0.105,
+      "pos_years": 1
+     }
+    },
+    "day_concentration": {
+     "train": {
+      "entry_days": 261,
+      "avg_pct_without_top3_days": -0.312,
+      "avg_pct_without_top10_days": -0.704
+     },
+     "test": {
+      "entry_days": 289,
+      "avg_pct_without_top3_days": -0.243,
+      "avg_pct_without_top10_days": -0.607
+     }
+    }
+   },
+   "passes": false
+  }
+ ]
+}

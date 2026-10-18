@@ -168,12 +168,15 @@ _SIM_CHECKED = False
 def finalize_a(rid, name_ru, rule_ru, E, ex, params):
     """Taker (harness), maker (cost 0.0004, all fills), realistic limit (own sim) stats for the chosen variant."""
     global _SIM_CHECKED
+    if not E:                 # e.g. the wide set has no taker-flow data, or no hour qualifies → no result for this idea
+        log(f"{rid}: no entries on this data set — skipped")
+        return None
     Tg = run(E, ex, cost=0.0)
     taker = [dict(t, ret=t["ret"] - COST) for t in Tg]
     maker = [dict(t, ret=t["ret"] - MAKER) for t in Tg]
-    k = np.array([e[0] for e in E])
-    i = np.array([e[1] for e in E])
-    sg = np.array([e[2] for e in E])
+    k = np.array([e[0] for e in E], dtype=int)
+    i = np.array([e[1] for e in E], dtype=int)
+    sg = np.array([e[2] for e in E], dtype=int)
     sd = D.ATR[k, i] * ex.get("sl_atr", 2.0)
     tp_r = ex["tps"][0][0] if ex.get("tps") else None
     if not _SIM_CHECKED:   # cross-check own simulator against harness.run on the same entries
@@ -378,7 +381,7 @@ def part_a():
                           f"Если доля агрессивных покупок к продажам за 15 мин отклонилась от нормы последних суток больше чем на "
                           f"{sp['taker_z']:g} сигмы, входим {dir_ru} на открытии следующей свечи; {exit_ru(ex)}. Только 2023+ "
                           f"(TRAIN 2023–2024). {COSTS_RU}", E, ex, dict(sp, exit=ename, data_from="2023-01")))
-    return out
+    return [x for x in out if x]
 
 
 # ═════════════════════════════════════════════════════ PART B (BTC 1m, own simulator) ══

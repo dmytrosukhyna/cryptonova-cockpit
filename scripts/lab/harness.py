@@ -365,7 +365,14 @@ def portfolio(trades, slots: int = 5) -> dict:
     o = np.argsort(tx)
     cum = np.cumsum(r[o])
     years = {int(y): round(float(r[yx == y].sum()), 1) for y in sorted(set(yx.tolist()))}
-    return {"slots": slots, "taken": int(len(taken)), "skipped": int(len(trades) - len(taken)),
+    te = tx >= TRAIN_END
+    ex3 = None
+    if te.any():                                   # the account on TEST without its 3 best days (by the day a trade closed)
+        dd_ = tx[te] // 86_400_000
+        ud, inv = np.unique(dd_, return_inverse=True)
+        dsum = np.bincount(inv, weights=r[te])
+        ex3 = round(float(dsum.sum() - np.sort(dsum)[::-1][:3].sum()), 1)
+    return {"slots": slots, "test_ex3_pct": ex3, "taken": int(len(taken)), "skipped": int(len(trades) - len(taken)),
             "train_pct": round(float(r[(tx >= TRAIN_START) & (tx < TRAIN_END)].sum()), 1), "test_pct": round(float(r[tx >= TRAIN_END].sum()), 1),
             "years": years, "pos_years": sum(1 for v in years.values() if v > 0),
             "max_dd_pct": round(float((cum - np.maximum.accumulate(np.concatenate([[0.0], cum]))[1:]).min()), 1)}
@@ -385,7 +392,12 @@ def passes(st: dict) -> bool:
         # the 5-slot account is what would really be traded: it must earn on TEST and in most years;
         # and the per-trade test average must survive dropping the 3 best days. (test_day_avg is shown, not required:
         # a day with 1 trade weighs as much as a day with 20 there.)
-        ok = ((st.get("test_ex3_avg") or -1) > 0 and (pf.get("test_pct") or -1) > 0 and pf.get("pos_years", 0) >= need)
+        # 18.10 (owner): the market of the last two years is what matters — the account must earn in 2025 AND in 2026,
+        # and still be positive on 2025–26 without its 3 best days. (The per-trade test without the 3 best days is shown, not required:
+        # a 5-slot account cannot take the 20 trades of a market-wide day anyway.)
+        ys = pf.get("years") or {}
+        ok = ((pf.get("test_pct") or -1) > 0 and (pf.get("test_ex3_pct") or -1) > 0 and pf.get("pos_years", 0) >= need
+              and (ys.get(2025, ys.get("2025")) or -1) > 0 and (ys.get(2026, ys.get("2026")) or -1) > 0)
     return ok
 
 

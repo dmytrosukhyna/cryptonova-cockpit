@@ -400,6 +400,23 @@ def evaluate(idea, side, params, mask, gap=16, start=None, ext=None, mb=MB):
         f"train {tr.get('avg_pct')} (n {tr.get('n')})  test {te.get('avg_pct')} (n {te.get('n')})")
 
 
+def top_test_days(r, k=3):
+    """The chosen variant re-run (same entries, same exit — not a new variant): its k best TEST days by summed return."""
+    E, exa, gap, start = ENTRIES[pkey(r["idea"], r["side"], r["params"])]
+    T = run_struct(E, exa, r["ex"]) if "sl_rule" in r["ex"] else run(E, r["ex"])
+    by = {}
+    for t in T:
+        tt = int(D.times[t["e"]])
+        if tt < HN.TRAIN_END:
+            continue
+        d = dt.datetime.fromtimestamp(tt / 1000, dt.timezone.utc).strftime("%Y-%m-%d")
+        n_, s_ = by.get(d, (0, 0.0))
+        by[d] = (n_ + 1, s_ + t["ret"] * 100)
+    tot = sum(v[1] for v in by.values())
+    top = sorted(by.items(), key=lambda kv: -kv[1][1])[:k]
+    return {"test_sum_pct": round(tot, 1), "days": [{"day": d, "trades": n_, "sum_pct": round(s_, 1)} for d, (n_, s_) in top]}
+
+
 def train_pos_years(st):
     ys = st.get("years", {})
     return sum(1 for y in TRAIN_YEARS if ys.get(y, {}).get("n", 0) >= 10 and ys[y]["avg_pct"] > 0)
@@ -1010,7 +1027,7 @@ def main():
             tr=("2023–2024" if (WIDE or r["idea"] in DERIV_IDEAS) else "2021–2024"), n=nmin(r["idea"]))
         res = {"id": f"manip_{r['idea']}_{'long' if r['side'] > 0 else 'short'}", "name_ru": name, "rule_ru": rule,
                "exit": dict(r["ex"], name=r["exit"]), "params": params, "selection_ru": sel,
-               "idea_grid": grid.get((r["idea"], r["side"])), "stats": st}
+               "idea_grid": grid.get((r["idea"], r["side"])), "top_test_days": top_test_days(r), "stats": st}
         if r["idea"] == "liq" and r["side"] in ctrl:
             cs_ = ctrl[r["side"]]
             res["control_without_liq_filter"] = {"train": cs_.get("train"), "test": cs_.get("test"), "pf5": cs_.get("pf5")}
@@ -1044,6 +1061,14 @@ def main():
         f"maxrss {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MB")
 
 
+MONTHS_RU = ("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
+
+
+def DATE_RU(d):
+    y, m, dd = d.split("-")
+    return f"{int(dd)} {MONTHS_RU[int(m) - 1]} {y}"
+
+
 def make_notes(results, league, grid, ctrl, npass_all, gross_sw):
     """Plain-Russian summary for the owner; every number is filled from this run."""
     tr_p = ("2023–2024" if WIDE else
@@ -1065,6 +1090,28 @@ def make_notes(results, league, grid, ctrl, npass_all, gross_sw):
     out.append(f"Итог: прошли все фильтры лаборатории {len(passed)} из {len(results)} лучших вариантов"
                + (": " + "; ".join(f"«{r['name_ru']}»" for r in passed) if passed else "")
                + f". Если не выбирать, а просто посчитать — проходят {npass_all} из {len(REC)} вариантов.")
+    lucky = [r for r in REC if passes(r["stats"])]
+    chosen_keys = {(r["id"], json.dumps(r["exit"], sort_keys=True, default=float)) for r in results}
+    lucky = [r for r in lucky if (f"manip_{r['idea']}_{'long' if r['side'] > 0 else 'short'}",
+                                  json.dumps(dict(r["ex"], name=r["exit"]), sort_keys=True, default=float)) not in chosen_keys]
+    if lucky and len(lucky) <= 3:
+        parts = []
+        for r in lucky:
+            st, pf = r["stats"], r["stats"].get("pf5") or {}
+            ys = pf.get("years") or {}
+            ch = [x for x in results if x["id"] == f"manip_{r['idea']}_{'long' if r['side'] > 0 else 'short'}"]
+            parts.append(
+                f"«{texts(r)[0]}», выход «{EXIT_SHORT_RU[r['exit']]}»"
+                + (f" ({r['params'].get('kind') == 'weekend' and 'вход в понедельник на ' or ''}"
+                   f"{'открытии Европы' if r['params'].get('session') == 'eu' else 'открытии США'})" if r["idea"] == "night" else "")
+                + f": на 2025–26 {pct(st['test'].get('avg_pct'))} % на сделку (сделок {st['test'].get('n', 0)}), счёт на 5 позиций "
+                f"2025 {pct(ys.get(2025), 1)} %, 2026 {pct(ys.get(2026), 1)} %, без 3 лучших дней {pct(pf.get('test_ex3_pct'), 1)} %; "
+                f"на обучении {pct(st['train'].get('avg_pct'))} %"
+                + (f" — меньше, чем у выбранного варианта этой идеи ({pct(ch[0]['stats']['train'].get('avg_pct'))} %), поэтому по "
+                   "правилам он не выбран" if ch else ""))
+        out.append("Не выбранные по обучению, но формально прошедшие варианты: " + "; ".join(parts) + ". Найти 1–3 «прошедших» среди "
+                   f"{len(REC)} вариантов можно и случайно, а выбрать их можно, только посмотрев на 2025–26, — поэтому это кандидат "
+                   "для проверки на новых данных (вперёд), а не готовое правило.")
     # sweep-type ideas
     sw = [r for r in REC if r["idea"] in SWEEP_IDEAS and (r["stats"].get("test") or {}).get("n", 0) >= 30]
     if sw and gross_sw is not None:
@@ -1097,16 +1144,30 @@ def make_notes(results, league, grid, ctrl, npass_all, gross_sw):
         st, pf = nl[0]["stats"], nl[0]["stats"].get("pf5") or {}
         ys = pf.get("years") or {}
         out.append(
-            f"Единственное, что стабильно в плюсе, — покупка после резкого ночного или выходного обвала (идея 7, лонг): в плюсе на "
+            ("Единственное, что стабильно в плюсе, — " if g["test_pos_share"] >= 0.6 else "Отдельно: ")
+            + f"покупка после резкого ночного или выходного обвала (идея 7, лонг): в плюсе на "
             f"2025–26 {g['test_pos_share']:.0%} вариантов этой сетки, выбранный вариант «{nl[0]['name_ru']}» — "
             f"{pct(st['train'].get('avg_pct'))} % на сделку на обучении и {pct(st['test'].get('avg_pct'))} % на 2025–26. Но сделок мало "
-            f"({st['test'].get('n', 0)} за 2025–26), прибыль делают несколько дней общего обвала, после которых рынок отскочил (счёт на 5 "
+            f"({st['test'].get('n', 0)} за 2025–26), прибыль делают несколько дней общего обвала, после которых рынок отскочил "
+            f"(лучшие дни: {', '.join(DATE_RU(x['day']) + ' — сделок ' + str(x['trades']) + ', в сумме ' + pct(x['sum_pct'], 0) + ' %' for x in nl[0]['top_test_days']['days'])}; "
+            f"сумма всех сделок 2025–26 — {pct(nl[0]['top_test_days']['test_sum_pct'], 0)} %; счёт на 5 "
             f"позиций без 3 лучших дней {pct(pf.get('test_ex3_pct'), 1)} %), а 2026 год {'в минусе' if (ys.get(2026) or 0) <= 0 else 'в плюсе'} "
             f"({pct(ys.get(2026), 1)} %). Похоже, это не «манипуляция ночью», а отскок после паники"
             + (" — фильтры лаборатории он не проходит." if not passes(st) else " — фильтры лаборатории он проходит, но на малом числе сделок.")
             + (" Продавать ночной/выходной рост (шорт) не работает." if not any(passes(r["stats"]) for r in results if r["id"] == "manip_night_short") else ""))
     # exits
     st_l = league.get("sweep_type") or {}
+
+    def win(en):
+        w = [r["stats"]["test"]["win"] for r in sw if r["exit"] == en]
+        return float(np.mean(w)) if w else None
+    w1, w2, ws = win("1tp_1r"), win("1tp_2r"), win("struct_2r")
+    win_txt = ""
+    if None not in (w1, w2, ws):
+        win_txt = (f"Почему не работает ни один выход: при цели, равной стопу (1R), цель берётся в {w1:.0%} сделок; при цели вдвое "
+                   f"дальше стопа (2R) — в {w2:.0%}, а со стопом сразу за тенью выноса (классика «охоты за стопами») — в {ws:.0%}. "
+                   "Ровно столько дала бы монетка (50 % и 33 % — это ноль до комиссий), поэтому любая схема целей теряет примерно "
+                   "комиссию. Стоп за тенью выноса не даёт преимущества: цена возвращается за тень так же часто, как уходит к цели.")
     if st_l:
         rank = sorted(st_l.items(), key=lambda kv: -(kv[1].get("train_mean") or -9))
         best = rank[0]
@@ -1116,9 +1177,7 @@ def make_notes(results, league, grid, ctrl, npass_all, gross_sw):
             f"{pct(best[1]['train_mean'], 3)} %, 2025–26 {pct(best[1]['test_mean'], 3)} % на сделку)"
             + (", но и он в среднем не прибыльный; " if (best[1]["test_mean"] or 0) <= 0 else "; ")
             + "; ".join(f"«{EXIT_SHORT_RU[en]}» — {pct(v['train_mean'], 3)} % / {pct(v['test_mean'], 3)} %" for en, v in rank[1:])
-            + ". " + (f"Классический для «охоты за стопами» стоп сразу за тенью выноса — среди худших: плюсовых вариантов на 2025–26 "
-                      f"{max(v['test_pos_share'] or 0 for _, v in sr):.0%}. Тень обычно близко к входу, и обычный 15-минутный шум выбивает такой "
-                      "стоп раньше, чем цена успевает уйти к цели." if sr else ""))
+            + ". " + win_txt)
     cn = league.get("crowd_night") or {}
     if cn:
         b2 = max(cn.items(), key=lambda kv: (kv[1].get("train_mean") or -9))

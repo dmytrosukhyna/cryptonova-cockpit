@@ -13,7 +13,8 @@ Everything is tested the same way (`harness.py`):
 
 Families: `fam_fade.py` (app-like counter-trend signals and their flip), `fam_trend.py` (breakouts, pullbacks,
 squeezes, BTC lead), `fam_deriv.py` (funding, open interest, liquidations, CVD, taker flow, basis),
-`fam_scalp.py` (short holds, sessions, 1-minute BTC).
+`fam_scalp.py` (short holds, sessions, 1-minute BTC), `fam_manip.py` (liquidity grabs: sweep & reclaim of obvious levels,
+equal highs/lows, liquidation/OI-backed sweeps, failed breakouts, round numbers, crowded-OI flush, night/weekend moves).
 
 Wide universe (18.10, owner: "18 coins is too few — at least top-50"): `CNQ_LAB_SET=wide` loads
 `alt100_all2023.npz` (every Binance USDT-M perpetual listed by 2023-01, delisted ones included — built by

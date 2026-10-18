@@ -54,6 +54,12 @@ jobs:
       - name: Paper desk ($10k demo futures account) → web/paper.json
         continue-on-error: true
         run: python -m cnq.cli paper --out web
+      - name: Our own signals in Cornix format (CNPTS «Сбалансированная») → web/signals_feed.json; Telegram only if CNQ_SIGNALS_CHAT is set
+        continue-on-error: true
+        env:
+          CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
+          CNQ_SIGNALS_CHAT: ${{ secrets.CNQ_SIGNALS_CHAT }}
+        run: python -m cnq.cli signalfeed --out web
       - name: Funding carry → web/funding.json
         continue-on-error: true
         run: python -m cnq.cli funding --out web || true
@@ -159,7 +165,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase -X theirs origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done

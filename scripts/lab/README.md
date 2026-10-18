@@ -25,4 +25,5 @@ test 2025–2026, year rule ≥ 3 of 4.
 Robustness rule (18.10, after the deriv and trend reports): the per-trade average can be carried by a few days when every
 coin moves at once. `stats()` now also gives `test_day_avg` (average of daily averages), `test_ex3_avg` (test average
 without its 3 best days) and `pf5` (a 5-slot account: one position per coin, 1/5 of capital each, signals skipped when
-the slots are busy). `passes()` requires all three to be positive on TEST, and at least 3 counted years.
+the slots are busy). `passes()` requires the test average without the 3 best days > 0, the 5-slot account > 0 on TEST and positive in
+most years, and at least 3 counted years (`test_day_avg` is shown, not required).

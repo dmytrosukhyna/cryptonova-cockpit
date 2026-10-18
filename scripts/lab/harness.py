@@ -380,7 +380,10 @@ def passes(st: dict) -> bool:
     # robustness (added 18.10; older result files without these fields are judged on the old rule until re-run)
     if ok and "test_day_avg" in st:
         pf = st.get("pf5") or {}
-        ok = (st["test_day_avg"] > 0 and (st.get("test_ex3_avg") or -1) > 0 and (pf.get("test_pct") or -1) > 0)
+        # the 5-slot account is what would really be traded: it must earn on TEST and in most years;
+        # and the per-trade test average must survive dropping the 3 best days. (test_day_avg is shown, not required:
+        # a day with 1 trade weighs as much as a day with 20 there.)
+        ok = ((st.get("test_ex3_avg") or -1) > 0 and (pf.get("test_pct") or -1) > 0 and pf.get("pos_years", 0) >= need)
     return ok
 
 

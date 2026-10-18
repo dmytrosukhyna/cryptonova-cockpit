@@ -112,6 +112,11 @@ ACCOUNTS = [   # key, name, rules, policy, coin filter
     # 18.10 (owner: «пробовать их стратегию наоборот … не во всех случаях, грамотно»): over 317 signals the flip of their LONGs
     # (we go short) was positive in BOTH halves of the month (+0.30 / +0.48 % per trade), the flip of their SHORTs turned
     # negative in the second half (+0.75 → −0.24 %). This is the version published to the app.
+    # 18.10 (owner: «не бездумно разворачивать — их удачные идеи использовать, неудачные превращать в удачные»): a signal that
+    # goes WITH Bitcoin's last closed 4-hour candle is taken as is, one that goes AGAINST it is flipped; both held to the last
+    # target or the stop. Set in advance (sign only, no threshold); on 315 signals positive in every quarter of the month
+    # (+0.64 / +0.56 / +0.27 / +0.24 % per trade), while «flip everything» fell to −0.02 % in the last quarter.
+    ("smart", "Умный разворот", "по ходу последней 4-часовой свечи BTC — как есть, против неё — наоборот; всё до последней цели или стопа", "smart:last", False),
     ("reverse_long", "Разворот только их лонгов", "только их лонги — в шорт, стоп и цели зеркально, равными частями по целям + стоп в безубыток после TP1; их шорты пропускаем", "rev_long:ladder_be", False),
 ]
 WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
@@ -1627,6 +1632,24 @@ def run_account(rows, key: str, name_ru: str, rules_ru: str, policy: str, use_fi
             continue
         if use_filter and (flags.get(r["id"]) or {}).get("skip"):
             skipped += 1
+            continue
+        if policy.startswith("smart:"):
+            mv = (r.get("feat") or {}).get("btc_move4h_pct")
+            if mv is None or not mv:
+                skipped += 1
+                continue
+            if (r["side"] == "LONG") == (mv > 0):                 # with BTC's last 4 h candle → take the signal as it is
+                p = _pol(r, "last")
+                trades.append({"r": r, "open_t": sim["fill_t"], "close_t": p["t"] if p else None, "net": p["net"] if p else None,
+                               "lev": min(float(r["leverage"] or 1.0), ACCOUNT_LEV_CAP)})
+                continue
+            wi = (sim.get("whatif") or {}).get("rev")                # against it → flipped, held to the last (mirrored) target or stop
+            if not wi or wi.get("fill_t") is None:
+                continue
+            closed_ = wi.get("t_last") if wi.get("state") == "closed" else None
+            rr = {**r, "side": "SHORT" if r["side"] == "LONG" else "LONG", "sim": {**sim, "first": wi.get("first"), "risk_pct": wi.get("risk_pct")}}
+            trades.append({"r": rr, "open_t": wi["fill_t"], "close_t": closed_, "net": wi.get("last") if closed_ else None,
+                           "lev": min(float(r["leverage"] or 1.0), ACCOUNT_LEV_CAP)})
             continue
         if policy.startswith("rev_long:") and r["side"] != "LONG":
             skipped += 1

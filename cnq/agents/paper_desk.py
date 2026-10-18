@@ -59,6 +59,15 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
     "imp":  {"name": "Импульс BTC", "classes": {"K"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "k_share": 0.20, "k_open": 5, "prefix": "paper_imp_",
              "about": "Из «Лаборатории», прошла самую строгую проверку: когда BTC за час вырос на 2.5% и больше, покупаем самые ликвидные альткоины — они догоняют. Выход через 12 ч, широкий стоп 8 ATR, до 5 позиций по 20% счёта. История: 2025 и 2026 в плюсе, счёт +34% за 2025–2026, просадка −12% (топ-50, с 2023); в обвальном 2022 — минус."},
+    # 18.10 (owner: «активный спот — сопровождать, открывать позиции на сильных движениях, чтобы постоянно рос»): the same rule
+    # as «Импульс BTC», but as SPOT trades — long only, no leverage (5 × 20 % of the account at most), spot fees 0.1 % per side
+    # instead of 0.05 %. Lab (top-50, 2023-03 → 2026-10, after 0.14 % costs): +0.22 % a trade in 2025–26, a 5-slot account
+    # +29 % in 2025 and +10 % in 2026, max drawdown −14 %; with spot fees about 0.06 % a trade less. The active part of the spot.
+    "imps": {"name": "Активный спот · Импульс BTC", "classes": {"K"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0,
+             "riskoff": "shorts", "k_share": 0.20, "k_open": 5, "fee": 0.001, "spot": True, "prefix": "paper_imps_",
+             "about": "Активная часть спота: когда BTC за час вырос на 2.5% и больше, покупаем на споте самые ликвидные альткоины — они "
+                      "обычно догоняют. Без плеча, до 5 позиций по 20% счёта, выход через 12 ч, широкий стоп. Комиссия спота 0.1%. "
+                      "История (топ-50, 2025–2026): +0.2% на сделку, счёт +29% в 2025 и +10% в 2026, просадка до −14%. Не обещание."},
     "exp":  {"name": "Свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
              "about": "Проверка новых правил на живом рынке: свинг-пробой (выше максимума 5 дней в росте, выход ниже вчерашнего минимума) и быстрый откуп резкой свечи. 10% счёта на сделку, до 15 позиций. История: +0.31% и +0.41% на сделку, но в портфеле ≈ 0 — поэтому отдельный счёт."},
@@ -215,6 +224,7 @@ class PaperDesk:
         self.conn = conn
         self.profile = profile
         self.P = dict(PROFILES[profile])
+        self.fee = self.P.get("fee", FEE)          # 18.10: spot desks pay the spot fee
         if classes is not None:        # research/tests: trade an explicit class set (e.g. class C) on this desk
             self.P["classes"] = set(classes)
         px = self.P["prefix"]
@@ -570,10 +580,10 @@ class PaperDesk:
                 else:
                     risk_usd = eq * self.P["risk"]
                     r = abs(s["entry"] - s["stop"])
-                    qty = risk_usd / (r + s["entry"] * (2 * FEE + SLIP))
+                    qty = risk_usd / (r + s["entry"] * (2 * self.fee + SLIP))
                     cap_qty = eq * self.P.get("max_notional", 3.0) / s["entry"]   # 17.10: tight stops must not mean 60 % of the account in one trade
                     if qty > cap_qty:
-                        qty = cap_qty; risk_usd = qty * (r + s["entry"] * (2 * FEE + SLIP))
+                        qty = cap_qty; risk_usd = qty * (r + s["entry"] * (2 * self.fee + SLIP))
                 if s["order"] == "MARKET":
                     fill = s["entry"] * (1 + SLIP)
                     self.conn.execute(f"INSERT INTO {self.T_TR} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -607,8 +617,8 @@ class PaperDesk:
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
-                pnl = (sgn * (o["stop"] * (1 - sgn * SLIP) - o["entry"]) * o["qty"] - o["stop"] * o["qty"] * FEE) if stopped else 0.0
-                pnl_r = (pnl - o["entry"] * o["qty"] * FEE) / o["risk_usd"] if stopped else 0.0
+                pnl = (sgn * (o["stop"] * (1 - sgn * SLIP) - o["entry"]) * o["qty"] - o["stop"] * o["qty"] * self.fee) if stopped else 0.0
+                pnl_r = (pnl - o["entry"] * o["qty"] * self.fee) / o["risk_usd"] if stopped else 0.0
                 self.conn.execute(f"INSERT INTO {self.T_TR} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                   (o["id"], o["symbol"], o["side"], o["grade"], o["kind"], o["entry"], o["stop"], o["stop"], o["tps"], o["parts"],
                                    o["qty"], 0.0 if stopped else o["qty"], o["risk_usd"], filled[0], filled[0] + hold * 3_600_000,
@@ -639,20 +649,20 @@ class PaperDesk:
                     low_1d = min(k[4] for k in cands[ci - S_TRAIL:ci])
                     if c[4] < low_1d and c[4] > stop_now:
                         px = c[4] * (1 - SLIP)
-                        pnl += (px - t["entry"]) * qty_left - px * qty_left * FEE
+                        pnl += (px - t["entry"]) * qty_left - px * qty_left * self.fee
                         qty_left = 0; closed = c[0]; exit_kind = "TRAIL"
                         break
                 hi, lo = c[2], c[3]
                 stop_hit = lo <= stop_now if sgn == 1 else hi >= stop_now
                 if stop_hit:
                     px = stop_now * (1 - sgn * SLIP)
-                    pnl += sgn * (px - t["entry"]) * qty_left - px * qty_left * FEE
+                    pnl += sgn * (px - t["entry"]) * qty_left - px * qty_left * self.fee
                     qty_left = 0; closed = c[0]; exit_kind = "STOP" if hit == 0 else "BREAKEVEN"
                     break
                 while hit < len(tps) and parts[hit] > 0 and ((sgn == 1 and hi >= tps[hit]) or (sgn == -1 and lo <= tps[hit])):
                     part_qty = t["qty"] * parts[hit]
                     px = tps[hit]
-                    pnl += sgn * (px - t["entry"]) * part_qty - px * part_qty * FEE
+                    pnl += sgn * (px - t["entry"]) * part_qty - px * part_qty * self.fee
                     qty_left -= part_qty; hit += 1
                     if hit == 1:
                         stop_now = t["entry"]
@@ -661,10 +671,10 @@ class PaperDesk:
                     break
                 if c[0] >= t["expires"]:
                     px = c[4] * (1 - sgn * SLIP)
-                    pnl += sgn * (px - t["entry"]) * qty_left - px * qty_left * FEE
+                    pnl += sgn * (px - t["entry"]) * qty_left - px * qty_left * self.fee
                     qty_left = 0; closed = c[0]; exit_kind = "TIME"
                     break
-            entry_fee = t["entry"] * t["qty"] * FEE
+            entry_fee = t["entry"] * t["qty"] * self.fee
             pnl_r = (pnl - entry_fee) / t["risk_usd"] if t["risk_usd"] else 0
             self.conn.execute(f"UPDATE {self.T_TR} SET qty_left=?, stop_now=?, tps_hit=?, pnl_usd=?, pnl_r=?, closed=?, exit_kind=?, last_bar=? WHERE id=?",
                               (qty_left, stop_now, hit, pnl, pnl_r, closed, exit_kind, last_bar, t["id"]))
@@ -673,7 +683,7 @@ class PaperDesk:
                 events.append(f"закрыт {t['side']} {t['symbol']}: {exit_kind}, {pnl - entry_fee:+.2f}$ ({pnl_r:+.2f}R)")
         self.conn.commit()
         # 4. equity = start + realized (closed) ; open P&L marked separately
-        realized_total = sum((r[0] or 0) - (r[1] or 0) * (r[2] or 0) * FEE for r in
+        realized_total = sum((r[0] or 0) - (r[1] or 0) * (r[2] or 0) * self.fee for r in
                              self.conn.execute(f"SELECT pnl_usd, entry, qty FROM {self.T_TR} WHERE closed IS NOT NULL").fetchall())
         equity = round(START_EQUITY + realized_total, 2)
         # the curve is mark-to-market (open P&L included) — drawdowns are visible, not hidden until the stop
@@ -704,7 +714,7 @@ class PaperDesk:
                 "expires", "closed", "exit_kind", "pnl_usd", "pnl_r", "tps_hit", "reason", "last_bar")
         closed = [dict(zip(keys, r)) for r in self.conn.execute(f"SELECT * FROM {self.T_TR} WHERE closed IS NOT NULL ORDER BY closed DESC LIMIT 100").fetchall()]
         for t in closed:
-            t["tps"] = json.loads(t["tps"]); t["parts"] = json.loads(t["parts"]); t["net_usd"] = round(t["pnl_usd"] - t["entry"] * t["qty"] * FEE, 2)
+            t["tps"] = json.loads(t["tps"]); t["parts"] = json.loads(t["parts"]); t["net_usd"] = round(t["pnl_usd"] - t["entry"] * t["qty"] * self.fee, 2)
         n = len(closed); wins = [t for t in closed if t["net_usd"] > 0]
         try:
             eqh = [{"time": a, "equity": (m if m is not None else b)} for a, b, m in self.conn.execute(f"SELECT time,equity,mtm FROM {self.T_EQ} ORDER BY time").fetchall()]

@@ -105,7 +105,7 @@ def test_three_profiles_share_signals_but_differ():
     c = coin("BTC-USDT", flat, [{"id": "L1", "kind": "support", "lo": 9.96, "hi": 9.99, "center": 9.975, "touches": 3, "status": "ACTIVE"}])
     c["regime"] = {"long": "BULL"}
     out = pd.run(conn, {"coins": [c]}, now=t0 + 300 * 900_000)
-    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp", "lab", "brk", "imp"} and out["profile"] == "bal"
+    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp", "lab", "brk", "imp", "imps"} and out["profile"] == "bal"
     assert not any(out["profiles"][k]["pending"] for k in ("cons", "bal", "aggr"))
     lab = pd.PaperDesk(conn, "aggr", classes={"A", "B", "R", "C"}).step([c], True, t0 + 300 * 900_000)
     assert lab["pending"]   # the same zone would be traded only if class C were enabled
@@ -188,6 +188,10 @@ def test_btc_impulse_buys_the_most_traded_alts_only_after_a_jump():
     assert syms == ["A2", "A3", "A4", "A5", "A6"] and all(t["grade"] == "K" for t in res["open"])
     t = res["open"][0]
     assert abs(t["qty"] * t["entry"] - 2000) < 10 and t["expires"] - t["opened"] == 12 * 3_600_000
+    # 18.10: the same rule as active SPOT trades — same entries, spot fee 0.1 % per side, longs only
+    s = pd.PaperDesk(sqlite3.connect(":memory:"), "imps")
+    rs = s.step([jump] + list(alts.values()), True, now)
+    assert s.fee == 0.001 and sorted(x["symbol"] for x in rs["open"]) == syms and all(x["side"] == "LONG" for x in rs["open"])
 
 
 def test_main_desks_ignore_experimental_rules():

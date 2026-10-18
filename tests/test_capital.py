@@ -9,9 +9,11 @@ T0 = 1_792_000_000_000   # a Saturday
 
 
 def world(d, spot=10_000.0, bal=10_000.0, imp=10_000.0, fund=10_000.0, hist=None, yld=10_000.0, susde=10_000.0, basis=10_000.0,
-          risk_off=False, bull=True, rates=(4.0, 6.0, 6.0), with_basis=True):
-    json.dump({"portfolios": {"ideas": {"equity_usd": spot, "history": hist or []}}}, open(os.path.join(d, "portfolio.json"), "w"))
-    json.dump({"risk_off": risk_off, "profiles": {"bal": {"equity": bal, "open": [], "equity_history": []}, "imp": {"equity": imp, "open": [], "equity_history": []}}},
+          risk_off=False, bull=True, rates=(4.0, 6.0, 6.0), with_basis=True, act=10_000.0, cons=100.0):
+    json.dump({"portfolios": {"ideas": {"equity_usd": spot, "history": hist or []}, "cons": {"equity_usd": None, "index": cons, "history": []}}},
+              open(os.path.join(d, "portfolio.json"), "w"))
+    json.dump({"risk_off": risk_off, "profiles": {"bal": {"equity": bal, "open": [], "equity_history": []}, "imp": {"equity": imp, "open": [], "equity_history": []},
+                                                  "imps": {"equity": act, "open": [], "equity_history": []}}},
               open(os.path.join(d, "paper.json"), "w"))
     json.dump({"risk": {"btc_bull": bull}}, open(os.path.join(d, "decision.json"), "w"))
     json.dump({"start_equity": 10_000.0, "equity_mtm": fund, "history": []}, open(os.path.join(d, "funding.json"), "w"))
@@ -30,20 +32,21 @@ def test_allocator_splits_by_regime_and_rates_then_sleeves_follow_their_desks():
     world(d)
     a = K.run(conn, d, T0)
     w = {s["key"]: s["weight"] for s in a["sleeves"]}
-    # risk-on: 60 % directional (spot 40, futures 20); carry 40 %: lending ≥ 12 %, the rest ∝ rate − risk discount
-    # (lending 4, sUSDe 6 − 1.5 = 4.5, fixed rate 6, funding unknown 2 − 1.5 = 0.5)
-    assert w["spot"] == 0.4 and w["futures"] == 0.2 and abs(sum(w.values()) - 1) < 1e-3
-    assert w["basis"] > w["susde"] > w["funding"] > 0 and w["yield"] >= 0.12 and abs(w["basis"] - 0.28 * 6 / 15) < 1e-3
+    # risk-on: 70 % directional (spot portfolio 42, active spot 10.5, futures 17.5); carry 30 %: lending ≥ 9 %, the rest ∝ rate −
+    # risk discount (lending 4, sUSDe 6 − 1.5 = 4.5, fixed rate 6, funding unknown 2 − 1.5 = 0.5)
+    assert w["spot"] == 0.42 and w["active"] == 0.105 and w["futures"] == 0.175 and abs(sum(w.values()) - 1) < 1e-3
+    assert w["basis"] > w["susde"] > w["funding"] > 0 and w["yield"] >= 0.09 and abs(w["basis"] - 0.21 * 6 / 15) < 1e-3
     assert a["regime"]["key"] == "on" and any("Фикс-ставка" in x for x in a["why_ru"]) and a["value_usd"] == 10_000
     assert [x["key"] for x in a["watch_only"]] == ["arb", "tri"] and a["watch_only"][0]["week_virtual_usd"] == 24.0
     world(d, spot=11_000, bal=10_400, imp=10_000, fund=9_900, yld=10_050, basis=10_020)
     b = K.run(conn, d, T0 + 3_600_000)
     v = {s["key"]: s["value_usd"] for s in b["sleeves"]}
-    assert abs(v["spot"] - 4400) < 0.1 and abs(v["futures"] - 2040) < 0.1 and abs(v["yield"] - 10_000 * w["yield"] * 1.005) < 0.1
+    assert abs(v["spot"] - 4620) < 0.1 and abs(v["futures"] - 1785) < 0.1 and abs(v["yield"] - 10_000 * w["yield"] * 1.005) < 0.1
     assert b["benchmark"]["value_usd"] == b["value_usd"] and b["events"] == []          # no re-split yet → equal to the benchmark
-    assert b["index_keys"] == K.KEYS and b["index_history"][-1][1:3] == [110.0, 102.0]
+    assert b["index_keys"] == K.IDX_KEYS and b["index_history"][-1][1:3] == [110.0, 102.0]
     assert set(b["models"]) == {"calm", "balanced", "bold"} and all(abs(sum(m["w"].values()) - 1) < 1e-3 for m in b["models"].values())
-    assert b["models"]["calm"]["w"]["futures"] == 0 and b["models"]["bold"]["w"]["spot"] > w["spot"]
+    dirw = lambda m: sum(b["models"][m]["w"].get(k, 0) for k in ("spot", "active", "futures"))
+    assert b["models"]["calm"]["w"]["futures"] == 0 and dirw("calm") < dirw("balanced") < dirw("bold") and b["models"]["bold"]["w"]["active"] > w["active"]
     assert b["month"]["profit_usd"] > 0 and abs(b["month"]["fee_usd"] - b["month"]["profit_usd"] * 0.10) < 0.01
     json.dumps(b)
 
@@ -60,11 +63,11 @@ def test_regime_flip_moves_money_to_carry_but_not_more_than_once_a_day():
     assert a["events"] == [] and a["regime"]["key"] == "off"
     b = K.run(conn, d, T0 + 25 * 3_600_000)
     w = {s["key"]: s["weight"] for s in b["sleeves"]}
-    assert abs(w["spot"] + w["futures"] - 0.20) < 1e-3 and "режим" in b["events"][0] and "комиссии" in b["events"][0]
+    assert abs(w["spot"] + w["active"] + w["futures"] - 0.20) < 1e-3 and "режим" in b["events"][0] and "комиссии" in b["events"][0]
     assert b["value_usd"] < 10_000 and b["benchmark"]["allocator_edge_usd"] < 0         # the move cost fees
     world(d)
     c = K.run(conn, d, T0 + 26 * 3_600_000)               # flips back within a day → no new move
-    assert c["events"] == [] and abs(sum(s["weight"] for s in c["sleeves"] if s["key"] in ("spot", "futures")) - 0.20) < 1e-3
+    assert c["events"] == [] and abs(sum(s["weight"] for s in c["sleeves"] if s["key"] in ("spot", "active", "futures")) - 0.20) < 1e-3
 
 
 def test_spot_cash_earns_the_lending_rate():
@@ -166,9 +169,33 @@ def test_basis_desk_locks_the_rate_waits_when_low_and_rolls_at_expiry():
 def test_tilt_halves_a_losing_directional_desk_and_the_difference_goes_to_carry():
     avail = set(K.KEYS)
     w, why = K.allocate(K.PROFILES["balanced"], "on", {"spot": -0.08, "futures": 0.07}, {"yield": 4.0, "basis": 5.0, "susde": 5.0}, avail)
-    assert abs(w["spot"] - 0.2) < 1e-3 and abs(w["futures"] - 0.25) < 1e-3 and abs(sum(w.values()) - 1) < 1e-3
-    assert any("вдвое" in x for x in why) and w["yield"] >= 0.3 * 0.55 - 1e-3 and w["susde"] <= 0.15
+    assert abs(w["spot"] - 0.21) < 1e-3 and abs(w["futures"] - 0.21875) < 1e-3 and abs(w["active"] - 0.105) < 1e-3
+    assert abs(sum(w.values()) - 1) < 1e-3 and any("вдвое" in x for x in why) and w["susde"] <= 0.15
     w, _ = K.allocate(K.PROFILES["bold"], "on", {"spot": 0.2, "futures": 0.2}, {}, avail)     # a great month adds ≤ 10 points
-    assert abs(w["spot"] + w["futures"] - 0.9) < 1e-3
+    assert abs(w["spot"] + w["active"] + w["futures"] - 0.95) < 1e-3
     w, _ = K.allocate(K.PROFILES["balanced"], "on", {}, {"yield": 4.0, "basis": 0.0, "susde": 1.0, "funding": -3.0}, avail)
-    assert w["basis"] == 0 and w["funding"] == 0 and w["susde"] == 0 and abs(w["yield"] - 0.4) < 1e-3   # nothing else pays → reserve
+    assert w["basis"] == 0 and w["funding"] == 0 and w["susde"] == 0 and abs(w["yield"] - 0.3) < 1e-3   # nothing else pays → reserve
+    w, _ = K.allocate(K.PROFILES["balanced"], "on", {}, {}, avail - {"active"})                 # active desk not running yet → spot
+    assert w.get("active", 0) == 0 and abs(w["spot"] - 0.525) < 1e-3
+
+
+def test_calm_holds_the_core_portfolio_and_does_not_trade_actively():
+    d = tempfile.mkdtemp()
+    conn = sqlite3.connect(":memory:")
+    world(d)
+    a = K.run(conn, d, T0)
+    cw = a["models"]["calm"]["w"]
+    assert cw["futures"] == 0 and cw["active"] == 0 and cw["spot"] == 0.35
+    world(d, cons=110.0)                                    # only the conservative core portfolio moved (+10 %)
+    b = K.run(conn, d, T0 + 3_600_000)
+    assert abs(b["models"]["calm"]["value_usd"] - 10_350) < 0.5 and b["value_usd"] == 10_000      # balanced holds the CRYPTO NOVA портфель
+
+
+def test_models_are_ranked_by_result_per_drawdown_only_after_four_weeks():
+    m = {"calm": {"hist": [[0, 10_000], [1, 10_200]]}, "balanced": {"hist": [[0, 10_000], [1, 10_800], [2, 10_300], [3, 10_600]]},
+         "bold": {"hist": [[0, 10_000], [1, 11_500], [2, 9_800], [3, 10_700]]}}
+    r = K.rank_models(m, 10 * 86_400_000, 0)
+    assert not r["ready"] and r["leader"] is None and "28 дней" in r["ru"]
+    r = K.rank_models(m, 30 * 86_400_000, 0)
+    # calm +2 % / dd 0 → 2/2 = 1.0; balanced +6 % / −4.6 % → 1.30; bold +7 % / −14.8 % → 0.47
+    assert r["ready"] and r["leader"] == "balanced" and [x["key"] for x in r["rows"]] == ["balanced", "calm", "bold"]

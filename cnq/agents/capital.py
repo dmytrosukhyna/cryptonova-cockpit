@@ -2,9 +2,11 @@
 распределяет: спот, фьючерсы, фандинг… весь месяц работает, в конце подводит итоги: заработано столько-то, оплата 10%»; later the
 same day: «участвовать в разных источниках, в разных секторах — он сам распределит, поймёт, адаптирует; нам нужен результат по профиту»).
 
-A DEMO account of $10 000 (owner: «как будто я вложил настоящие свои 10 тысяч долларов» — his main screen). Six sleeves, each follows
-a desk the server already runs:
-  • spot     — the CRYPTO NOVA portfolio (portfolio.json → portfolios.ideas, equity_usd)                        [directional]
+A DEMO account of $10 000 (owner: «как будто я вложил настоящие свои 10 тысяч долларов» — his main screen). Seven sleeves, each
+follows a desk the server already runs:
+  • spot     — the model's spot portfolio: CRYPTO NOVA портфель (portfolios.ideas) or, for «Спокойная», «Консервативный»
+               (portfolios.cons: BTC/ETH/SOL held)                                                              [directional]
+  • active   — active spot trading: «Импульс BTC» on spot, no leverage, spot fees (paper.json profiles.imps)     [directional]
   • futures  — CRYPTO NOVA signals: «Сбалансированная» (paper.json profiles.bal) + «Импульс BTC» (profiles.imp)  [directional]
   • funding  — the funding-carry desk (funding.json equity_mtm)                                                  [no direction]
   • basis    — fixed-rate carry: spot + short dated futures on Deribit, rate locked at entry (basis.json)         [no direction]
@@ -14,10 +16,11 @@ Arbitrage and the triangle are NOT given money: virtual estimates a client canno
 
 THE ALLOCATOR (v2). It decides two things and explains both in Russian («почему так»):
   1. How much goes to the directional part (spot + futures) — by the BTC regime: «рост» (BTC above its 200-day average and up over
-     90 days — the same flag as the rest of the system) 60 %, otherwise 20 % (profile «Сбалансированная»; «Спокойная» 30/10 without
-     futures, «Смелая» 80/35). Tested 18.10 on 2023-06 → 2026-10 daily data (BTC/ETH/SOL basket + stables at 4 %): fixed 40 % spot
+     90 days — the same flag as the rest of the system) 70 %, otherwise 20 % (profile «Сбалансированная»; «Спокойная» 35/10 without
+     futures and active trades, «Смелая» 85/35; see PROFILES). Tested 18.10 on 2023-06 → 2026-10 daily data (BTC/ETH/SOL basket + stables at 4 %): fixed 40 % spot
      +100 % (max drawdown −31 %), 60/35 by regime +162 % (−30 %), 60/20 +168 % (−23 %) and better in every year incl. 2025 (+11 %)
-     and 2026 (+3 %); the lower the share outside «рост», the better 2025–26 and the drawdown, for every share inside it. A short-
+     and 2026 (+3 %); 70/20 +203 % (−26 %), better again in every year; the lower the share outside «рост», the better 2025–26 and
+     the drawdown, for every share inside it. A short-
      term «broad sell-off» flag and «buy the dip with the stables» were NOT used: the dip rule won 2023–24 and lost 2025–26 (most
      of 96 variants). Spot:futures 2:1, and a
      sleeve whose desk lost more than 5 % over 30 days gets half, one that gained more than 5 % ×1.25 (the difference goes to /
@@ -40,11 +43,12 @@ import time
 
 START = 10_000.0
 VERSION = 2               # 18.10 v2: six sleeves and the allocator (v1: four sleeves, fixed base ± 30-day tilt) — restarts the demo once
-KEYS = ["spot", "futures", "funding", "basis", "yield", "susde"]
-DIRECTIONAL = ("spot", "futures")
+KEYS = ["spot", "active", "futures", "funding", "basis", "yield", "susde"]
+IDX_KEYS = ["spot", "futures", "funding", "basis", "yield", "susde", "active"]   # index_history columns (new desks go last)
+DIRECTIONAL = ("spot", "active", "futures")
 CARRY = ("funding", "basis", "yield", "susde")
 # 18.10 backtest (scripts/lab/portfolio_rules.py): regime shares 0.5–0.7 × 0.10–0.35 — lower «off» better in 2025–26 every time
-RISK = {"spot": 4, "futures": 4, "funding": 3, "basis": 2, "yield": 2, "susde": 3}
+RISK = {"spot": 4, "active": 4, "futures": 4, "funding": 3, "basis": 2, "yield": 2, "susde": 3}
 DISCOUNT = {2: 0.0, 3: 1.5}                      # percentage points taken off a source's rate for its risk
 CAP = {"funding": 0.20, "basis": 0.30, "susde": 0.15}
 YIELD_FLOOR = 0.30                               # share of the carry part that always stays in lending (liquid reserve)
@@ -53,12 +57,26 @@ FEE = 0.10
 COST = 0.001                                     # a re-split costs 0.1 % of the money moved
 REGIME_GAP_MS = 24 * 3_600_000
 # 18.10 (owner): a user picks one of three models (and a couple of options) — the same allocator with a different appetite for risk.
-PROFILES = {"calm": {"on": 0.30, "off": 0.10, "fut": 0.0}, "balanced": {"on": 0.60, "off": 0.20, "fut": 1 / 3},
-            "bold": {"on": 0.80, "off": 0.35, "fut": 0.40}}
+# Later the same evening (owner: «консервативная — больше холда, меньше торговли; умеренная — монеты динамичнее и немного спотовой
+# торговли; агрессивная — больше покупать-продавать, переставлять; и всё грамотно застраховано»):
+#   on / off — the directional share when BTC is above / below its 200-day average (tested: 0.7/0.2 → +203 %, drawdown −26 %,
+#              better than 0.6/0.2 in every year 2023–2026; the owner: «сейчас бычий рынок — кредитование важнее в медвежьем»);
+#   fut / act — parts of the directional share in futures signals and in ACTIVE SPOT trading (imps: «Импульс BTC» on spot — the
+#              only active rule that passed the lab on 2025–26); the rest is the spot portfolio;
+#   spot — which spot portfolio the model holds: calm = «Консервативный» (BTC 50 / ETH 25 / SOL 15, almost no trades),
+#          the others = CRYPTO NOVA портфель (core + table alts + small high-risk).
+# Protection for every model: the BTC-regime switch (tested: drawdown −23…−26 % vs −31 % fixed), stops on the alts and on the
+# active trades, max 5 active positions, the reserve in lending.
+PROFILES = {"calm": {"on": 0.35, "off": 0.10, "fut": 0.0, "act": 0.0, "spot": {"spot_cons": 1.0}},
+            "balanced": {"on": 0.70, "off": 0.20, "fut": 0.25, "act": 0.15, "spot": {"spot": 1.0}},
+            "bold": {"on": 0.85, "off": 0.35, "fut": 0.35, "act": 0.30, "spot": {"spot": 1.0}}}
 MODELS = {
-    "calm": {"name_ru": "Спокойная", "about_ru": "Больше доходных источников без ставки на цену (кредитование, фикс-ставка) и ядра BTC/ETH/SOL; без фьючерсов."},
-    "balanced": {"name_ru": "Сбалансированная", "about_ru": "Наша основная модель: понемногу везде; система сама двигает доли по рынку и ставкам."},
-    "bold": {"name_ru": "Смелая", "about_ru": "Больше спота и фьючерсов — выше и доход, и риск; доходные источники как подушка."},
+    "calm": {"name_ru": "Спокойная", "about_ru": "Держим ядро BTC 50% / ETH 25% / SOL 15% почти без сделок; когда BTC ниже своей 200-дневной "
+                                                 "средней — большая часть уходит в доходные доллары. Без фьючерсов и активной торговли."},
+    "balanced": {"name_ru": "Сбалансированная", "about_ru": "CRYPTO NOVA портфель (ядро и отобранные альты), немного активной торговли на споте "
+                                                         "и фьючерсов; доли система двигает сама — по рынку и по ставкам."},
+    "bold": {"name_ru": "Смелая", "about_ru": "Больше активной торговли на споте (Импульс BTC) и фьючерсов — выше и доход, и риск. Защита та же: "
+                                             "режим BTC, стопы, не больше 5 активных позиций, резерв в кредитовании."},
 }
 OPTIONS = {   # toggles that shift a model (applied in order, then normalised)
     "risky_coins": {"name_ru": "Добавить рискованные монеты", "about_ru": "Больше спота с мемами и высоким риском: +10% к споту за счёт кредитования.",
@@ -68,11 +86,11 @@ OPTIONS = {   # toggles that shift a model (applied in order, then normalised)
     "no_futures": {"name_ru": "Без фьючерсов", "about_ru": "Фьючерсная часть уходит в спот и кредитование поровну.",
                    "zero": "futures"},
 }
-NAMES = {"spot": "Спот · CRYPTO NOVA портфель", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)",
+NAMES = {"spot": "Спот · портфель", "active": "Активный спот · Импульс BTC", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)",
          "basis": "Фикс-ставка на фьючерсах (BTC/ETH)", "yield": "Кредитование стейблкоинов (Aave, Sky)",
          "susde": "Доходные доллары (Ethena sUSDe)"}
-SHORT = {"spot": "спот", "futures": "фьючерсы", "funding": "фандинг", "basis": "фикс-ставка", "yield": "кредитование", "susde": "sUSDe"}
-TITLE = {"spot": "Спот", "futures": "Фьючерсы", "funding": "Фандинг", "basis": "Фикс-ставка", "yield": "Кредитование", "susde": "sUSDe"}
+SHORT = {"spot": "спот", "active": "активный спот", "futures": "фьючерсы", "funding": "фандинг", "basis": "фикс-ставка", "yield": "кредитование", "susde": "sUSDe"}
+TITLE = {"spot": "Спот", "active": "Активный спот", "futures": "Фьючерсы", "funding": "Фандинг", "basis": "Фикс-ставка", "yield": "Кредитование", "susde": "sUSDe"}
 KYIV = dt.timezone(dt.timedelta(hours=3))
 
 
@@ -90,10 +108,18 @@ def _susde(out: str) -> dict:
 def desk_values(out: str) -> dict:
     """Current equity of each desk (any unit — only the ratio between runs matters). Missing → not in the dict."""
     v = {}
-    pf = (_load(out, "portfolio.json").get("portfolios") or {}).get("ideas") or {}
-    if pf.get("equity_usd") is not None:
-        v["spot"] = float(pf["equity_usd"])
+    pfs = _load(out, "portfolio.json").get("portfolios") or {}
+    for key, name in (("spot", "ideas"), ("spot_cons", "cons")):
+        pf = pfs.get(name) or {}
+        val = pf.get("equity_usd")
+        if val is None:                                  # some spot desks publish only their index (100 at start)
+            val = pf.get("index") if pf.get("index") is not None else ((pf.get("history") or [{}])[-1].get("v"))
+        if val:
+            v[key] = float(val)
     prof = _load(out, "paper.json").get("profiles") or {}
+    d = prof.get("imps") or {}
+    if d.get("equity") is not None:
+        v["active"] = float(d["equity"]) + sum(float(o.get("open_pnl_usd") or 0) for o in d.get("open") or [])
     fut = [float(d["equity"]) + sum(float(o.get("open_pnl_usd") or 0) for o in d.get("open") or [])
            for k in ("bal", "imp") if (d := prof.get(k)) and d.get("equity") is not None]
     if fut:
@@ -126,6 +152,9 @@ def desk_30d(out: str, now: int) -> dict:
     if x is not None:
         r["spot"] = x
     prof = _load(out, "paper.json").get("profiles") or {}
+    x = _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get("imps") or {}).get("equity_history") or []], since)
+    if x is not None:
+        r["active"] = x
     xs = [y for k in ("bal", "imp") if (y := _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get(k) or {}).get("equity_history") or []], since)) is not None]
     if xs:
         r["futures"] = sum(xs) / len(xs)
@@ -169,8 +198,13 @@ def allocate(profile: dict, reg: str, r30: dict, rates: dict, available: set, re
     """Weights of the sleeves (sum 1) and the reasons in Russian."""
     why = []
     d = profile[reg]
-    w = {"spot": d * (1 - profile["fut"]), "futures": d * profile["fut"]}
-    why.append(f"Рынок: {'рост' if reg == 'on' else 'осторожность'} — {reason or regime_text(reg)}: на спот и фьючерсы {d*100:.0f}%.")
+    act = profile.get("act", 0.0)
+    w = {"spot": d * (1 - profile["fut"] - act), "active": d * act, "futures": d * profile["fut"]}
+    why.append(f"Рынок: {'рост' if reg == 'on' else 'осторожность'} — {reason or regime_text(reg)}: на рост (спот, активный спот, фьючерсы) {d*100:.0f}%.")
+    for k in ("active", "futures"):                  # a desk that isn't running yet: its share stays in the spot portfolio
+        if k not in available and "spot" in available:
+            w["spot"] += w[k]
+            w[k] = 0.0
     for k in DIRECTIONAL:
         x = r30.get(k)
         if k not in available:
@@ -181,10 +215,10 @@ def allocate(profile: dict, reg: str, r30: dict, rates: dict, available: set, re
         elif w[k] and x is not None and x > 0.05:
             w[k] *= 1.25
             why.append(f"{TITLE[k]} за 30 дней {x*100:+.1f}% — доля больше в 1.25 раза.")
-    if w["spot"] + w["futures"] > d + 0.10:          # a good month may add, but not more than 10 points over the regime's share
-        f = (d + 0.10) / (w["spot"] + w["futures"])
+    if sum(w.values()) > d + 0.10:                   # a good month may add, but not more than 10 points over the regime's share
+        f = (d + 0.10) / sum(w.values())
         w = {k: v * f for k, v in w.items()}
-    c = max(0.0, 1.0 - w["spot"] - w["futures"])
+    c = max(0.0, 1.0 - sum(w.values()))
     keys = [k for k in CARRY if k in available]
     score = {k: max(0.0, (rates.get(k) if rates.get(k) is not None else DEFAULT_RATE) - DISCOUNT[RISK[k]]) for k in keys}
     for k in keys:
@@ -238,12 +272,15 @@ def _monday(now: int) -> str:
     return (d - dt.timedelta(days=d.weekday())).strftime("%Y-%m-%d")
 
 
-def _follow(sleeves: dict, last: dict, desks: dict, spot_bonus: float = 1.0) -> dict:
-    """Each sleeve moves by its desk's return since the previous run; the spot sleeve also earns the lending rate on its cash."""
-    out = {k: (v * desks[k] / last[k] if last.get(k) and desks.get(k) else v) for k, v in sleeves.items()}
-    if "spot" in out:
-        out["spot"] *= spot_bonus
-    return out
+def _follow(sleeves: dict, last: dict, desks: dict, spot_bonus: float = 1.0, spot_mix: dict | None = None) -> dict:
+    """Each sleeve moves by its desk's return since the previous run; the spot sleeve follows the model's spot portfolio(s)
+    (spot_mix: {desk: share}) and also earns the lending rate on its cash."""
+    out = {k: (v * desks[k] / last[k] if last.get(k) and desks.get(k) else v) for k, v in sleeves.items() if k != "spot"}
+    if "spot" in sleeves:
+        mix = {k: x for k, x in (spot_mix or {"spot": 1.0}).items() if last.get(k) and desks.get(k)}
+        r = sum(x * desks[k] / last[k] for k, x in mix.items()) / sum(mix.values()) if mix else 1.0
+        out["spot"] = sleeves["spot"] * r * spot_bonus
+    return {k: out[k] for k in sleeves}
 
 
 def spot_cash_bonus(out: str, rates: dict, dt_ms: int) -> float:
@@ -264,6 +301,29 @@ def _resplit(sleeves: dict, w: dict) -> tuple[dict, float]:
     return {k: (total - cost) * x for k, x in w.items()}, cost
 
 
+def rank_models(models: dict, now: int, started: int) -> dict:
+    """18.10 (owner: «самая эффективная среди стратегий будет нашей»): models by result per unit of drawdown. A verdict only after
+    28 days — a week or two of numbers decides nothing."""
+    rows = []
+    for k, m in models.items():
+        h = [v for _, v in m.get("hist") or []]
+        if not h:
+            continue
+        peak, dd = h[0], 0.0
+        for v in h:
+            peak = max(peak, v)
+            dd = min(dd, v / peak - 1)
+        pnl = h[-1] / START - 1
+        rows.append({"key": k, "name_ru": MODELS[k]["name_ru"], "pnl_pct": round(pnl * 100, 2), "max_dd_pct": round(dd * 100, 2),
+                     "score": round(pnl / max(0.02, -dd), 3)})
+    rows.sort(key=lambda r: -r["score"])
+    days = (now - started) / 86_400_000
+    ready = days >= 28 and len(rows) >= 2
+    return {"rows": rows, "days": round(days, 1), "ready": ready, "leader": rows[0]["key"] if ready else None,
+            "ru": (f"Лидер за {days:.0f} дн. по доходу с учётом просадки: «{rows[0]['name_ru']}»." if ready else
+                   f"Сравнение моделей — через 28 дней (прошло {days:.0f}); раньше цифры ничего не решают.")}
+
+
 def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> dict:
     now = now or int(time.time() * 1000)
     conn.execute("CREATE TABLE IF NOT EXISTS capital_state(k TEXT PRIMARY KEY, v TEXT)")
@@ -281,7 +341,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
         st = {"previous": prev}
         events.append(f"Новая версия распределения: 6 источников и умный распределитель — демо-счёт начат заново с ${START:,.0f} "
                       f"(прошлый запуск закончился на ${prev['value']:,.2f}).")
-    avail = set(desks)
+    avail = set(desks) & set(KEYS)
     if not st.get("models"):
         r30 = desk_30d(out, now)
         st = {**st, "version": VERSION, "started": now, "last": desks, "week": _monday(now), "month_start": _month_start(now),
@@ -294,9 +354,9 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     else:
         last = st["last"]
         bonus = spot_cash_bonus(out, rates, now - st.get("t_last", now))
-        for m in st["models"].values():
-            m["sleeves"] = _follow(m["sleeves"], last, desks, bonus)
-        st["bench"] = _follow(st["bench"], last, desks, bonus)
+        for mk, m in st["models"].items():
+            m["sleeves"] = _follow(m["sleeves"], last, desks, bonus, PROFILES[mk]["spot"])
+        st["bench"] = _follow(st["bench"], last, desks, bonus, PROFILES["balanced"]["spot"])
         st["last"] = {**last, **desks}
         main = st["models"]["balanced"]
         if _month_start(now) != st["month_start"]:          # a new calendar month: the previous one is closed
@@ -334,7 +394,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     for k, v in desks.items():
         st["base_desks"].setdefault(k, v)
     st["idx"] = (st.get("idx") or [])[-399:] + [[now] + [round(desks[k] / st["base_desks"][k] * 100, 4) if k in desks and st["base_desks"].get(k) else None
-                                                          for k in KEYS]]
+                                                          for k in IDX_KEYS]]
     st.setdefault("ev", [])
     st["ev"] = (st["ev"] + [{"t": now, "ru": e} for e in events])[-40:]
     for k, v in st.items():
@@ -359,17 +419,18 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
             "month": {"start": st["month_start"], "start_value": round(st["month_value"], 2), "profit_usd": round(month_profit, 2),
                       "fee_usd": round(max(0.0, month_profit) * FEE, 2), "fee_pct": FEE * 100},
             "months": st.get("months", []), "history": hist, "events": events, "event_log": st["ev"][-20:], "previous": st.get("previous"),
-            "index_keys": KEYS, "index_history": st.get("idx", []),
+            "index_keys": IDX_KEYS, "index_history": st.get("idx", []),
             "models": {k: {**MODELS[k], "w": m["weights"], "why_ru": m.get("why", []), "value_usd": round(sum(m["sleeves"].values()), 2),
                            "pnl_pct": round((sum(m["sleeves"].values()) / START - 1) * 100, 2), "history": m["hist"][-200:]}
                        for k, m in st["models"].items()},
-            "options": OPTIONS,
+            "models_rank": rank_models(st["models"], now, st["started"]), "options": OPTIONS,
             "watch_only": [{"key": "arb", "name_ru": "Арбитраж между биржами", "week_virtual_usd": arb},
                            {"key": "tri", "name_ru": "Треугольный арбитраж", "week_virtual_usd": tri}],
             "rules_ru": [
                 f"Демо-счёт ${START:,.0f}: система сама делит сумму между шестью источниками и ведёт её месяц.",
-                "Активная часть (спот и фьючерсы) зависит от рынка: когда BTC выше своей 200-дневной средней и за 90 дней в плюсе — 60%, "
-                "иначе — 20%. Проверено на 2023–2026: так +168% против +100% при постоянных 40%, просадка −23% вместо −31%, плюс в каждом году. "
+                "Часть со ставкой на рост (спот, активный спот, фьючерсы) зависит от рынка: когда BTC выше своей 200-дневной средней и "
+                "за 90 дней в плюсе — 70%, иначе — 20%. Проверено на 2023–2026: так +203% против +100% при постоянных 40%, просадка −26% "
+                "вместо −31%, плюс в каждом году. В росте доходные доллары — подушка, в падении — основное место для денег. "
                 "Направление, которое за 30 дней потеряло больше 5%, получает половину доли, заработавшее больше 5% — в 1.25 раза больше.",
                 "Свободные доллары внутри спота (его кэш) тоже работают — под ставку кредитования.",
                 "Остальное — источники без ставки на цену: кредитование стейблкоинов (Aave, Sky), фикс-ставка на фьючерсах BTC/ETH, "
@@ -378,6 +439,10 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
                 "Пересчёт — каждый понедельник, сразу при новом источнике и при смене режима рынка (не чаще раза в сутки). "
                 "Каждый пересчёт стоит 0.1% от переложенной суммы — это комиссии.",
                 "Рядом показан вариант «без перераспределения»: распределитель полезен, только если обгоняет его.",
+                "Три модели: Спокойная — держим ядро BTC/ETH/SOL почти без сделок; Сбалансированная — CRYPTO NOVA портфель, немного "
+                "активной торговли и фьючерсов; Смелая — больше активной торговли и фьючерсов. Активная торговля — «Импульс BTC» на споте "
+                "(единственное активное правило, прошедшее проверку на 2025–2026). Через 4 недели сравниваем модели по доходу с учётом "
+                "просадки — лучшая становится основной.",
                 "Арбитраж и треугольник денег не получают: их цифры — виртуальная оценка, клиент не может их исполнить.",
                 "В конце месяца — итог; 10% от прибыли — оплата (месяц без прибыли бесплатно).",
                 "Это демо, а не обещание: результат может быть и минусом."]}

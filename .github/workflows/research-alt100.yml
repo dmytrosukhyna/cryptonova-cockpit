@@ -94,6 +94,27 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: alt100, path: alt100.npz, retention-days: 7 }
 
+  # 18.10: the strategy lab needs the wide universe locally — publish the merged file as a release asset
+  # (release downloads are reachable from the research container, workflow artifacts are not)
+  release:
+    needs: merge
+    if: inputs.stage == 'data' || inputs.stage == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: alt100 }
+      - name: Upload alt100.npz to release lab-data-${{ inputs.universe || 'cap' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: lab-data-${{ inputs.universe || 'cap' }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Research data for scripts/lab (not code): 15m Binance USDT-M klines + OI + basis, universe ${{ inputs.universe || 'cap' }}." --latest=false
+          gh release upload "$TAG" alt100.npz --clobber
+
   analyze:
     needs: merge
     if: always() && (inputs.stage == 'analyze' || (inputs.stage == 'all' && needs.merge.result == 'success'))

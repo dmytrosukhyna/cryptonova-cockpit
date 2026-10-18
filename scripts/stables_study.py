@@ -145,7 +145,27 @@ def funding_part():
     return out
 
 
+def pendle_part():
+    """Pendle fixed-rate markets on dollars (PT, held to maturity) — DefiLlama lists them under project «pendle»; the PT rate
+    is the fixed rate locked at purchase. ≥ $10M, any exposure flag."""
+    s, b = http("https://yields.llama.fi/pools")
+    pools = json.loads(b)["data"] if s == 200 else []
+    pen = [p for p in pools if p.get("project") == "pendle" and "USD" in (p.get("symbol") or "").upper() and (p.get("tvlUsd") or 0) >= 1e7]
+    pen = sorted(pen, key=lambda p: -p["tvlUsd"])[:16]
+    with ThreadPoolExecutor(8) as ex:
+        hs = list(ex.map(lambda p: hist_stats(chart(p["pool"])), pen))
+    rows = [{"name": f"{p['symbol']} · {p['chain']} · {p.get('poolMeta') or ''}", "tvl_m": round(p["tvlUsd"] / 1e6),
+             "apy": round(float(p.get("apy") or 0), 2), "base": round(float(p.get("apyBase") or 0), 2),
+             "reward": round(float(p.get("apyReward") or 0), 2), "stable": p.get("stablecoin"), "exposure": p.get("exposure"),
+             "underlying": p.get("underlyingTokens"), **h} for p, h in zip(pen, hs)]
+    note("stables · Pendle markets on dollars", json.dumps(rows, ensure_ascii=False))
+    projects = sorted({p.get("project") for p in pools if "pendle" in (p.get("project") or "")})
+    note("stables · Pendle projects on DefiLlama", json.dumps(projects))
+
+
 def main():
+    if "--pendle" in sys.argv:
+        return pendle_part()
     rows = pools_part()
     fund = funding_part()
     best = [{"name": x["name"], "risk": x["risk"], "net_mean_1y": x["net_mean_1y"], "mean": x.get("mean"), "p10": x.get("p10"),

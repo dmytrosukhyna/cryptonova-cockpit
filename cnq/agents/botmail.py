@@ -23,6 +23,20 @@ WELCOME = ("Здравствуйте! Это бот платформы <b>CRYPTO
            "разбираем новости и их последствия — и каждый вечер проверяем свой же утренний прогноз.\n\n"
            "Канал с обзорами: @crypto_nova_news\n"
            "Доступ к самой платформе откроем скоро — вы в списке. Если есть вопрос, просто напишите сюда: отвечаем в течение дня.")
+# 18.10 (owner): «Подключить» on the panel opens t.me/<bot>?start=connect_<strategy>. The bot explains the terms and tells the owner.
+CONNECT_NAMES = {"cryptonova": "CRYPTO NOVA (отобранные сигналы)", "portfolio": "CRYPTO NOVA портфель", "exp": "Волна", "brk": "Прорыв",
+                 "imp": "Импульс", "lab": "Эксперименты", "memes": "Мем-радар", "whales": "По следам китов",
+                 "cons": "портфель «Консервативный»", "mod": "портфель «Умеренный»", "high": "портфель «Высокий риск»",
+                 "meme": "портфель «Мемы»", "bal": "портфель «Сбалансированный»"}
+CONNECT = ("Вы выбрали: <b>{name}</b>.\n\n"
+           "<b>Как подключиться</b>\n"
+           "1. Администратор CRYPTO NOVA напишет вам сюда и поможет подключить стратегию к вашей бирже — ключ API только с правом "
+           "торговли, без права вывода средств. Деньги всегда остаются на вашем счёте.\n"
+           "2. Система торгует по стратегии, вы видите все сделки и результат.\n"
+           "3. <b>Оплата — 10% от прибыли за месяц, в USDT.</b> Месяц без прибыли — бесплатно. В конце месяца бот пришлёт отчёт "
+           "и сумму к оплате; чтобы продолжить пользоваться системой, её нужно оплатить.\n\n"
+           "Важно: торговля связана с риском, прошлый результат не гарантирует будущий. Начните с суммы, которую не страшно потерять.\n\n"
+           "Мы получили вашу заявку — администратор свяжется с вами в течение дня.")
 HELP = ("Система CRYPTO NOVA:\n— утренний обзор рынка (08:00 Киев), разбор главных новостей днём, итоги дня вечером;\n"
         "— сценарии A/B с вероятностью и честной проверкой;\n— три демо-стратегии и три спот-портфеля по риску;\n"
         "— зоны, стакан, киты Hyperliquid, карта перекупленности;\n— голосовой ассистент и автоматическая торговля под вашими ключами.\n\n"
@@ -73,6 +87,32 @@ class Mailbox:
         r = self.conn.execute("SELECT v FROM bot_meta WHERE k='owner_chat'").fetchone()
         return int(r[0]) if r else None
 
+    def lead(self, chat_id: int, username: str | None, first_name: str | None, what: str, now: int) -> None:
+        self.conn.execute("CREATE TABLE IF NOT EXISTS bot_leads(time INTEGER, chat_id INTEGER, username TEXT, first_name TEXT, strategy TEXT, notified INTEGER)")
+        self.conn.execute("INSERT INTO bot_leads VALUES(?,?,?,?,?,0)", (now, chat_id, username, first_name, what))
+
+    def notify_leads(self, token: str, owner_chat: int | None) -> int:
+        """Tell the owner about new connection requests (once each)."""
+        if not owner_chat:
+            return 0
+        try:
+            rows = self.conn.execute("SELECT rowid, username, first_name, strategy, chat_id FROM bot_leads WHERE notified=0").fetchall()
+        except sqlite3.OperationalError:
+            return 0
+        n = 0
+        for rid, un, fn, what, cid in rows:
+            who = f"@{un}" if un else (fn or f"id {cid}")
+            try:
+                _api(token, "sendMessage", {"chat_id": owner_chat, "parse_mode": "HTML", "disable_web_page_preview": True,
+                                            "text": f"Заявка на подключение: <b>{CONNECT_NAMES.get(what, what)}</b>\nОт: {who}"
+                                                    + (f" (<a href=\"tg://user?id={cid}\">написать</a>)" if not un else "")})
+                self.conn.execute("UPDATE bot_leads SET notified=1 WHERE rowid=?", (rid,))
+                n += 1
+            except Exception:  # noqa: BLE001
+                pass
+        self.conn.commit()
+        return n
+
     def poll(self, token: str, answer_fn=None, now: int | None = None) -> dict:
         """Read new updates, welcome newcomers, answer messages (answer_fn(text, chat) -> reply or None), remember chats."""
         now = now or int(time.time() * 1000)
@@ -96,7 +136,11 @@ class Mailbox:
                 self.conn.execute("INSERT INTO bot_chats VALUES(?,?,?,?,?,1)", (cid, frm.get("username"), frm.get("first_name"), now, now)); n_new += 1
             text = (m.get("text") or "").strip()
             reply = None
-            if text.startswith("/start"):
+            if text.startswith("/start connect_"):
+                what = text.split("connect_", 1)[1].strip().split()[0][:24]
+                reply = CONNECT.format(name=CONNECT_NAMES.get(what, "стратегия CRYPTO NOVA"))
+                self.lead(cid, frm.get("username"), frm.get("first_name"), what, now)
+            elif text.startswith("/start"):
                 reply = WELCOME
             elif text.startswith("/help"):
                 reply = HELP
@@ -137,4 +181,5 @@ def run(conn: sqlite3.Connection, llm=None, token: str | None = None, owner: str
     res = mb.poll(token, answer)
     res["profile_set"] = prof
     res["owner_chat"] = mb.owner_chat(owner or os.environ.get("CNQ_TG_OWNER") or "dmytrosukhyna")
+    res["leads_sent"] = mb.notify_leads(token, res["owner_chat"])
     return res

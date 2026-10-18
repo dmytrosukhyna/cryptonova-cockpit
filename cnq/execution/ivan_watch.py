@@ -441,7 +441,7 @@ def _http(method: str, url: str, headers: dict, data: bytes | None = None, timeo
         return r.status, (json.loads(body) if body else None)
 
 
-def publish_ivan(blob: dict, token: str, repo: str = DEFAULT_REPO, http=None) -> bool:
+def publish_ivan(blob: dict, token: str, repo: str = DEFAULT_REPO, http=None, path: str = PATH, message: str = "ivan: update") -> bool:
     """PUT web/ivan.enc.json through the GitHub contents API (GET sha first), like mirror.publish does for bybit.json.
     Only an encrypted blob is accepted: any field outside v/alg/asof/salt/nonce/ct/tag → ValueError, nothing is sent."""
     if not token:
@@ -449,7 +449,7 @@ def publish_ivan(blob: dict, token: str, repo: str = DEFAULT_REPO, http=None) ->
     if not isinstance(blob, dict) or not {"salt", "nonce", "ct", "tag"} <= set(blob) or set(blob) - BLOB_KEYS:
         raise ValueError("ivan: refusing to publish a payload that is not the encrypted blob")
     http = http or _http
-    url = f"https://api.github.com/repos/{repo}/contents/{PATH}"
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
     hdr = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-ivan"}
     sha = None
     try:
@@ -458,7 +458,7 @@ def publish_ivan(blob: dict, token: str, repo: str = DEFAULT_REPO, http=None) ->
             sha = js.get("sha")
     except Exception:  # noqa: BLE001
         pass
-    data = {"message": "ivan: update", "branch": "main",
+    data = {"message": message, "branch": "main",
             "content": base64.b64encode(json.dumps(blob, separators=(",", ":")).encode()).decode(), **({"sha": sha} if sha else {})}
     st, _ = http("PUT", url, {**hdr, "Content-Type": "application/json"}, json.dumps(data).encode())
     return st in (200, 201)

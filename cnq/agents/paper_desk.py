@@ -34,13 +34,13 @@ RISK = 0.01
 PROFILES = {   # one strategy — "Автопилот" — at three risk levels. Rules: B cascade buyback, E panic-climax basket, F open-interest flush
                # (+A FX gap). Retest (R) is not traded: whole-portfolio backtests (scripts/autopilot_backtest.py, scripts/autopilot_v2.py)
                # showed it adds drawdown (−57 %) without adding profit. Numbers below: 18 coins, 2023-01 → 2026-09, costs included.
-    "cons": {"name": "Автопилот · осторожно", "classes": {"A", "B", "E", "F", "D"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts",
+    "cons": {"name": "Консервативная", "classes": {"A", "B", "E", "F", "D"}, "confirm": True, "risk": 0.005, "max_open": 2, "tgt_r": 1.5, "riskoff": "shorts",
              "e_share": 0.10, "f_share": 0.15, "f_open": 2, "d_share": 0.10, "d_open": 2, "prefix": "paper_cons_",
              "about": "Откуп каскада ликвидаций, откуп паники, откуп сброса позиций и (с 17.10, испытание) откуп дисконта фьючерса; риск 0.5% на сделку, малые доли счёта. История 2023–2026: ≈ +19% в год, просадка до −9%, все годы в плюсе."},
-    "bal":  {"name": "Автопилот · норма", "classes": {"A", "B", "E", "F", "D"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
+    "bal":  {"name": "Сбалансированная", "classes": {"A", "B", "E", "F", "D"}, "confirm": False, "risk": 0.01, "max_open": 4, "tgt_r": 2.0, "riskoff": "shorts",
              "e_share": 0.20, "f_share": 0.25, "f_open": 3, "d_share": 0.15, "d_open": 3, "prefix": "paper_bal_",
              "about": "Откуп каскада ликвидаций, откуп паники (корзина 20% счёта), откуп сброса позиций (25% счёта, стоп −6%, до 3) и с 17.10 откуп дисконта фьючерса (15% счёта, до 3); риск 1%. История 2023–2026: ≈ +50% в год, просадка до −18%, все годы в плюсе."},
-    "aggr": {"name": "Автопилот · агрессивно", "classes": {"A", "B", "E", "F", "D"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
+    "aggr": {"name": "Агрессивная", "classes": {"A", "B", "E", "F", "D"}, "confirm": False, "risk": 0.015, "max_open": 6, "tgt_r": 2.0, "riskoff": "shorts",
              "e_share": 0.30, "f_share": 0.30, "f_open": 3, "d_share": 0.20, "d_open": 3, "prefix": "paper_",
              "about": "Те же правила, больше газа: риск 1.5%, корзина паники 30%, сброс позиций 30% счёта на сделку. История 2023–2026: ≈ +75% в год, просадка до −29%, все годы в плюсе."},
     # 17.10: «Тест новых идей» (key `lab`, formerly «Лаборатория») — aggressive range/level rules the owner asked to try live although history is ≈0 or negative
@@ -49,7 +49,7 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
              "caps": {"L": 7, "W": 4}, "max_notional": 0.10, "x_share": 0.05, "x_open": 4, "y_share": 0.15, "y_open": 3, "j_share": 0.15, "j_open": 1, "prefix": "paper_lab_",
              "about": "Эксперименты вживую (на истории не доказаны): L — покупка у низа 14-дневного диапазона лимиткой (история +0.30% на сделку, 2025–26 в минусе), W — сделка по сильной новости, X — откуп паники на 36 ликвидных альткоинах (+4% в год вслепую), Y — откуп дисконта фьючерса на альткоинах (+12% в год вслепую, просадка −37%). 17.10 убраны N/Q — на истории они обнуляли счёт. Не больше 10% счёта на сделку."},
     # 16.10: experimental account — more trades per day, separate $10 000, not mirrored to Bybit. docs/research/swing.md
-    "exp":  {"name": "Эксперимент · свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
+    "exp":  {"name": "Свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
              "about": "Проверка новых правил на живом рынке: свинг-пробой (выше максимума 5 дней в росте, выход ниже вчерашнего минимума) и быстрый откуп резкой свечи. 10% счёта на сделку, до 15 позиций. История: +0.31% и +0.41% на сделку, но в портфеле ≈ 0 — поэтому отдельный счёт."},
 }

@@ -22,10 +22,10 @@ KS = (0.5, 0.75, 1.0)
 FUNDED_DAYS = 180
 MAX_PHASE_DAYS = 365
 VARIANTS = {   # live profiles (cnq/agents/paper_desk.PROFILES) without the FX-gap rule A
-    "cons": dict(name_ru="Автопилот · осторожно", rules=('B', 'E', 'F', 'D'), risk=0.005, max_open=2, e_share=0.10, f_share=0.15, f_open=2, d_share=0.10, d_open=2),
-    "bal": dict(name_ru="Автопилот · норма", rules=('B', 'E', 'F', 'D'), risk=0.01, max_open=4, e_share=0.20, f_share=0.25, f_open=3, d_share=0.15, d_open=3),
+    "cons": dict(name_ru="Консервативная", rules=('B', 'E', 'F', 'D'), risk=0.005, max_open=2, e_share=0.10, f_share=0.15, f_open=2, d_share=0.10, d_open=2),
+    "bal": dict(name_ru="Сбалансированная", rules=('B', 'E', 'F', 'D'), risk=0.01, max_open=4, e_share=0.20, f_share=0.25, f_open=3, d_share=0.15, d_open=3),
     # prop mode: the same rules, fewer positions at once (crash-buys are correlated: they lose on the same day)
-    "prop": dict(name_ru="Автопилот · проп-режим", rules=('B', 'E', 'F', 'D'), risk=0.0075, max_open=2, e_share=0.12, f_share=0.15, f_open=1, d_share=0.10, d_open=1),
+    "prop": dict(name_ru="Проп-режим (меньше позиций сразу)", rules=('B', 'E', 'F', 'D'), risk=0.0075, max_open=2, e_share=0.12, f_share=0.15, f_open=1, d_share=0.10, d_open=1),
 }
 GUARDS = (None, 0.6)          # daily stop of our own: close everything and pause till tomorrow at 60 % of the firm's daily limit
 

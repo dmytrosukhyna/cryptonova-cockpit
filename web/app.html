@@ -489,7 +489,8 @@ details.pfirm{border:1px solid var(--line2);border-radius:14px;background:var(--
 .pgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.pgrid span{border:1px solid var(--line);border-radius:10px;padding:6px 9px;display:grid}
 .pprices{display:flex;flex-wrap:wrap;gap:6px}.pprices span{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px}
 .prules{display:grid;gap:6px}.prules>div{display:grid;gap:1px}
-.pexam{border:1px solid rgba(124,196,255,.4);background:rgba(124,196,255,.06);border-radius:10px;padding:8px 10px;display:grid;gap:2px}.pexam b{font-family:var(--mono);font-size:16px}
+.pexam{border:1px solid rgba(124,196,255,.4);background:rgba(124,196,255,.06);border-radius:10px;padding:8px 10px;display:grid;gap:6px}.popts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.popt{display:grid;gap:1px}.popt small{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.popt b{font-family:var(--mono);font-size:16px}.popt span{font-size:11.5px;color:var(--muted)}
+@media (max-width:760px){.popts{grid-template-columns:1fr}}
 .pconn{border-left:3px solid var(--acc);padding:4px 10px;display:grid;gap:2px}.pact{display:flex;gap:8px;flex-wrap:wrap}.pact a{text-decoration:none}
 .pavoid{display:grid;gap:2px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px}.pavoid a{color:var(--acc);font-size:11.5px}
 @media (max-width:760px){details.pfirm>summary{grid-template-columns:minmax(0,1fr) 70px 70px}.pgrid{grid-template-columns:1fr 1fr}}
@@ -1268,7 +1269,8 @@ function renderProp(){ const el=$('#propBody'); const P=PROP; if(!el||!P) return
   const pc=v=>v==null?'—':Array.isArray(v)?v.map(x=>x+'%').join(' → '):v+'%';
   const usd=v=>v==null?'—':'$'+(+v).toLocaleString('ru-RU');
   const firms=P.firms.slice().sort((a,b)=>(b.fit_score||0)-(a.fit_score||0)||((b.reliability||{}).score||0)-((a.reliability||{}).score||0));
-  const exam=f=>{ const e=f.exam; if(!e) return ''; if(e.skipped_ru) return `<div class="pexam muted">${e.skipped_ru}</div>`; const b=e.best||{}; return `<div class="pexam"><small>Наша стратегия на их экзамене (история 2023–2026)</small><b>${b.pass_rate!=null?Math.round(b.pass_rate*100)+'% сдач':'—'}</b><span>${e.verdict_ru||''}</span></div>`; };
+  const opt=(r,t)=>{ if(!r) return ''; const lvl={0.5:'половина размера',0.75:'¾ размера',1:'полный размер'}[r.k]||('×'+r.k); return `<div class="popt"><small>${t}</small><b>${Math.round(r.pass_rate*100)}% сдач</b><span>${r.variant_ru}, ${lvl}${r.guard?', свой дневной стоп':''} · за 90 дней сдаётся ${Math.round(r.pass_90d*100)}%${r.days_median!=null?` · обычно ${Math.round(r.days_median)} дн.`:''}${r.funded_survive_6m!=null?` · счёт живёт 6 мес. в ${Math.round(r.funded_survive_6m*100)}%${r.funded_month_pct!=null?`, ${r.funded_month_pct>0?'+':''}${r.funded_month_pct}%/мес`:''}`:''}</span></div>`; };
+  const exam=f=>{ const e=f.exam; if(!e) return ''; if(e.skipped_ru) return `<div class="pexam muted">Наша стратегия: ${e.skipped_ru}</div>`; return `<div class="pexam"><small>Наша стратегия на их экзамене · история 2023–2026</small><div class="popts">${opt(e.safe,'Надёжнее')}${e.fast&&e.fast!==e.safe?opt(e.fast,'Быстрее'):''}</div></div>`; };
   const card=f=>{ const ch=f.challenge||{}, fu=f.funded||{}, rl=f.reliability||{}, cr=f.crypto||{};
     return `<details class="pfirm ${(f.fit_score||0)>=6?'top':''}"><summary><span class="pname"><b>${f.name}</b><small>${f.status||''}${f.founded?' · с '+f.founded:''}</small></span><span class="pscore"><small>подходит нам</small><b>${f.fit_score??'—'}/10</b></span><span class="pscore"><small>надёжность</small><b>${rl.score??'—'}/10</b></span></summary>
       <div class="pbody"><div class="pverd">${f.verdict_ru||''}</div>
@@ -1283,7 +1285,8 @@ function renderProp(){ const el=$('#propBody'); const P=PROP; if(!el||!P) return
        ${f.connect_ru?`<div class="pconn"><small>Как подключить нашу стратегию</small>${f.connect_ru}</div>`:''}
        <div class="pact">${f.signup_url?`<a class="ib" href="${f.signup_url}" target="_blank" rel="noopener">Регистрация →</a>`:''}${f.url?`<a class="ib sm" href="${f.url}" target="_blank" rel="noopener">Сайт</a>`:''}${(f.copy_trading||{}).src?`<a class="ib sm" href="${f.copy_trading.src}" target="_blank" rel="noopener">Правила</a>`:''}</div></div></details>`; };
   el.innerHTML=`<div class="pwarn"><b>Важно до регистрации</b><div>Ни одна надёжная проп-компания не разрешает, чтобы много людей запускали одну и ту же стратегию (это «групповая торговля» / копирование — бан всех связанных счетов без выплат; фирмы ловят одинаковые входы и время сделок). Разрешено: автоматизация <b>своей</b> стратегии на <b>своём</b> счёте. Для многих пользователей законные пути — копитрейдинг на бирже (мы — мастер-трейдер) или официальное партнёрство с фирмой.</div></div>
-    ${P.recommendation_ru?`<div class="pcard"><small>Вывод</small><div>${P.recommendation_ru}</div></div>`:''}
+    ${P.headline_ru?`<div class="pcard" style="border-color:rgba(240,198,116,.55);background:rgba(240,198,116,.06)"><small>Наша стратегия и проп — честно</small><div>${P.headline_ru}</div></div>`:''}
+    ${P.recommendation_ru?`<div class="pcard"><small>Вывод по фирмам</small><div>${P.recommendation_ru}</div></div>`:''}
     ${P.strategy&&P.strategy.variants?`<div class="pcard"><small>Как мы проверяли нашу стратегию</small><div class="muted">${(P.method_ru||[]).join(' ')}</div></div>`:''}
     <h3 class="ph">Фирмы — от самых подходящих</h3>${firms.map(card).join('')}
     ${(P.avoid||[]).length?`<h3 class="ph">Не связываться</h3>${P.avoid.map(a=>`<div class="pavoid"><b>${a.name}</b><span class="muted">${a.reason_ru||''}</span>${a.src?` <a href="${a.src}" target="_blank" rel="noopener">источник</a>`:''}</div>`).join('')}`:''}

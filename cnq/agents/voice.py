@@ -72,39 +72,44 @@ def compose(out: str = "web") -> str:
             parts.append(f"в работе {deals(n)}, {'она' if n == 1 else 'они'} сейчас {result(upnl)}")
         else:
             parts.append("открытых сделок нет — автопилот ждёт свой сигнал")
-        L.append("По фьючерсам " + "; ".join(parts) + ".")
         eq = prof.get("equity")
         if eq:
             fut_res = eq + sum(o.get("open_pnl_usd") or 0 for o in opened) - 10_000
+        L.append(f"По фьючерсам, стратегия «{prof.get('name') or 'Сбалансированная'}»: " + "; ".join(parts) + "."
+                 + (f" Счёт {usd(10_000 + fut_res)}." if fut_res is not None else ""))
     spot_res = None
     pf = _load(out, "portfolio.json") or {}
     sp = (pf.get("portfolios") or {}).get("mod") or pf.get("portfolio") or {}
     if sp.get("index"):
         spot_res = 10_000 * sp["index"] / 100 - 10_000
-        L.append(f"По споту {'вышли в плюс на ' + usd(spot_res) if spot_res > 5 else 'пока в минусе на ' + usd(spot_res) if spot_res < -5 else 'держимся около нуля'}.")
+        L.append(f"По споту, портфель «{sp.get('name_short') or 'Умеренный'}»: {'в плюсе на ' + usd(spot_res) if spot_res > 5 else 'в минусе на ' + usd(spot_res) if spot_res < -5 else 'около нуля'}.")
     if fut_res is not None and spot_res is not None:
         tot = fut_res + spot_res
-        L.append(f"Общий результат по двум счетам — {'плюс' if tot >= 0 else 'минус'} {usd(tot)}.")
+        L.append(f"Заработано всего — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}.")
     markets = _load(out, "markets.json") or {}
     btc = next((t for t in markets.get("top", []) if t.get("symbol") == "BTC"), None)
     stress = (paper.get("stress") or {}).get("level") if isinstance(paper.get("stress"), dict) else None
     if btc:
         ch = btc.get("chg24") or 0
-        trend = "растёт" if ch >= 0.5 else "снижается" if ch <= -0.5 else "стоит на месте"
-        L.append(f"Рынок {'в панике, ' if (stress or 0) >= 2 else ''}{trend}: биткоин {spoken_price(btc['price'])}.")
+        trend = "растёт" if ch >= 0.5 else "снижается" if ch <= -0.5 else "почти не изменился"
+        L.append(f"{'Рынок в панике. ' if (stress or 0) >= 2 else ''}Биткоин {spoken_price(btc['price'])}, за сутки {trend}"
+                 + (f" ({'+' if ch > 0 else '−'}{abs(ch):.1f}%)".replace(".", ",") if abs(ch) >= 0.1 else "") + ".")
     dec = _load(out, "decision.json") or {}
     imp = next((i for i in (dec.get("news") or {}).get("impacts", []) if (i.get("magnitude") or 0) >= 4 and i.get("reasoning") and not str(i["reasoning"]).startswith("mock")
                 and time.time() * 1000 - (i.get("created") or 0) < 24 * 3600_000 and not _latin(i["reasoning"])), None)
     if imp:
-        L.append("Из новостей важно одно: " + re.sub(r"\.$", "", imp["reasoning"]) + ".")
-    L.append("Автопилот работает, если понадоблюсь — на связи.")
+        L.append("Из новостей стоит отметить: " + re.sub(r"\.$", "", imp.get("title") or imp["reasoning"]) + ".")
+    L.append("Если понадоблюсь — на связи.")
+    compose.keys = {"fut": "bal", "spot": "mod", "fut_open": len(prof.get("open") or []) if prof else None,
+                    "total": round((fut_res or 0) + (spot_res or 0)) if fut_res is not None and spot_res is not None else None,
+                    "btc": btc.get("price") if btc else None}
     return " ".join(L)
 
 
 def run(out: str = "web") -> dict:
     text = compose(out)
     os.makedirs(out, exist_ok=True)
-    res = {"asof": int(time.time() * 1000), "text": text, "voice": VOICE, "audio": None}
+    res = {"asof": int(time.time() * 1000), "text": text, "voice": VOICE, "audio": None, "keys": getattr(compose, "keys", None)}
     # edge-tts sometimes answers «No audio was received» → retry, then the second Microsoft voice, then Google (gTTS).
     # Without audio the panel falls back to the browser voice, which sounds robotic — so try hard.
     errs = []

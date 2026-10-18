@@ -28,6 +28,23 @@ START = 10_000.0
 BASE = {"spot": 0.40, "futures": 0.25, "funding": 0.15, "yield": 0.20}
 BOUNDS = {"spot": (0.25, 0.55), "futures": (0.10, 0.40), "funding": (0.0, 0.25), "yield": (0.10, 0.40)}
 FEE = 0.10
+# 18.10 (owner): a user picks one of three models (and a couple of options) — the system builds HIS mix from the same sleeves.
+MODELS = {
+    "calm": {"name_ru": "Спокойная", "about_ru": "Больше кредитования стейблкоинов и ядра BTC/ETH/SOL, без фьючерсов.",
+             "w": {"spot": 0.35, "futures": 0.0, "funding": 0.15, "yield": 0.50}},
+    "balanced": {"name_ru": "Сбалансированная", "about_ru": "Наша основная модель: понемногу везде, доли подстраиваются раз в неделю.",
+                 "w": dict(BASE)},
+    "bold": {"name_ru": "Смелая", "about_ru": "Больше спота и фьючерсов, меньше кредитования — выше и доход, и риск.",
+             "w": {"spot": 0.45, "futures": 0.35, "funding": 0.10, "yield": 0.10}},
+}
+OPTIONS = {   # toggles that shift a model (applied in order, then normalised)
+    "risky_coins": {"name_ru": "Добавить рискованные монеты", "about_ru": "Больше спота с мемами и высоким риском: +10% к споту за счёт кредитования.",
+                    "shift": {"spot": +0.10, "yield": -0.10}},
+    "more_defi": {"name_ru": "Больше DeFi-кредитования", "about_ru": "+10% в кредитование стейблкоинов (малый риск) за счёт фьючерсов и спота.",
+                  "shift": {"yield": +0.10, "futures": -0.05, "spot": -0.05}},
+    "no_futures": {"name_ru": "Без фьючерсов", "about_ru": "Фьючерсная часть уходит в спот и кредитование поровну.",
+                   "zero": "futures"},
+}
 NAMES = {"spot": "Спот · CRYPTO NOVA портфель", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)",
          "yield": "Кредитование стейблкоинов (Aave)"}
 KYIV = dt.timezone(dt.timedelta(hours=3))
@@ -150,6 +167,12 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
             events.append("Недельное перераспределение: " + ", ".join(f"{NAMES[k]} {x*100:.0f}%" for k, x in w.items()))
     total = sum(st["sleeves"].values())
     conn.execute("INSERT OR REPLACE INTO capital_hist VALUES(?, ?)", (now, round(total, 2)))
+    # each desk as an index (100 at the portfolio's start) — the panel builds any user model from these
+    st.setdefault("base_desks", {**desks})
+    for k, v in desks.items():
+        st["base_desks"].setdefault(k, v)
+    st["idx"] = (st.get("idx") or [])[-399:] + [[now] + [round(desks[k] / st["base_desks"][k] * 100, 4) if k in desks and st["base_desks"].get(k) else None
+                                                          for k in ("spot", "futures", "funding", "yield")]]
     for k, v in st.items():
         conn.execute("INSERT OR REPLACE INTO capital_state VALUES(?, ?)", (k, json.dumps(v)))
     conn.commit()
@@ -164,6 +187,8 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
             "month": {"start": st["month_start"], "start_value": round(st["month_value"], 2), "profit_usd": round(month_profit, 2),
                       "fee_usd": round(max(0.0, month_profit) * FEE, 2), "fee_pct": FEE * 100},
             "months": st.get("months", []), "history": hist, "events": events,
+            "index_keys": ["spot", "futures", "funding", "yield"], "index_history": st.get("idx", []),
+            "models": {k: {**m, "w": {kk: round(vv, 4) for kk, vv in m["w"].items()}} for k, m in MODELS.items()}, "options": OPTIONS,
             "watch_only": [{"key": "arb", "name_ru": "Арбитраж между биржами", "week_virtual_usd": arb},
                            {"key": "tri", "name_ru": "Треугольный арбитраж", "week_virtual_usd": tri}],
             "rules_ru": [

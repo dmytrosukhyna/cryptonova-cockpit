@@ -30,7 +30,10 @@ def test_split_follow_desks_and_monthly_fee():
     b = K.run(conn, d, T0 + 3_600_000)
     v = {s["key"]: s["value_usd"] for s in b["sleeves"]}
     assert abs(v["spot"] - 4400) < 0.1 and abs(v["futures"] - 2550) < 0.1 and abs(v["funding"] - 1485) < 0.1 and abs(v["yield"] - 2010) < 0.1
-    assert abs(b["value_usd"] - 10445) < 0.1 and b["month"]["fee_usd"] == round(b["month"]["profit_usd"] * 0.10, 2) > 0
+    assert abs(b["value_usd"] - 10445) < 0.1
+    # each desk as an index from the start → any user model can be valued from these
+    assert b["index_keys"] == ["spot", "futures", "funding", "yield"] and b["index_history"][-1][1:] == [110.0, 102.0, 99.0, 100.5]
+    assert set(b["models"]) == {"calm", "balanced", "bold"} and all(abs(sum(m["w"].values()) - 1) < 1e-6 for m in b["models"].values()) and b["month"]["fee_usd"] == round(b["month"]["profit_usd"] * 0.10, 2) > 0
     json.dumps(b)
 
 

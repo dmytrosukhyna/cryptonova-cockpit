@@ -31,6 +31,18 @@ import pandas as pd
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from harness import D, entries_from_mask, run, stats, grid_exits, report, passes  # noqa: E402
+import harness as _H  # noqa: E402
+
+WIDE = bool(getattr(_H, "WIDE", False))                      # CNQ_LAB_SET=wide → wide universe, data from 2022-11 (train = 2023–24)
+UNIVERSE_RU = getattr(_H, "UNIVERSE_RU", "18")
+
+
+def _periods(txt: str) -> str:
+    """Period / universe labels in the Russian texts (the wide set starts in 2022-11, so its TRAIN is 2023–2024)."""
+    if not WIDE:
+        return txt
+    return (txt.replace("18 монет, 15-минутки, 2021–2026", f"монеты: {UNIVERSE_RU}, 15-минутки, 2023–2026")
+            .replace("2021–2024", "2023–2024").replace("2021–24", "2023–24"))
 
 warnings.filterwarnings("ignore")
 
@@ -84,10 +96,11 @@ def build_features():
     t0 = time.time()
     C, H, L = D.C, D.H, D.L
     lr = np.diff(np.log(C), axis=1, prepend=np.nan)
-    vol = pd.DataFrame(lr.T).rolling(672, min_periods=400).std().values.T          # 7-day std of 15m log returns, window ends at i
+    vol = pd.DataFrame(lr.T).rolling(672, min_periods=400).std().values.T.astype(np.float32)   # 7-day std of 15m log returns, ends at i
+    del lr
     F = {"vol": vol}
     for N in (4, 16):
-        F[f"z{N}"] = D.ret(N) / (vol * np.sqrt(N))
+        F[f"z{N}"] = (D.ret(N) / (vol * np.sqrt(N))).astype(np.float32)
     F["rsi15"] = D.rsi(14)
     r1h = np.full_like(C, np.nan)
     for p in range(4):                                                              # 1h-equivalent RSI: closes i, i-4, i-8, …
@@ -98,7 +111,7 @@ def build_features():
     for N in (96, 288):                                                             # previous N-bar extreme: bars i-N … i-1
         mx = pd.DataFrame(H.T).rolling(N, min_periods=N).max().values.T
         mn = pd.DataFrame(L.T).rolling(N, min_periods=N).min().values.T
-        pmx, pmn = np.full_like(C, np.nan), np.full_like(C, np.nan)
+        pmx, pmn = np.full(C.shape, np.nan, np.float32), np.full(C.shape, np.nan, np.float32)
         pmx[:, 1:], pmn[:, 1:] = mx[:, :-1], mn[:, :-1]
         F[f"pmx{N}"], F[f"pmn{N}"] = pmx, pmn
     print(f"features {time.time() - t0:.1f}s", flush=True)
@@ -408,7 +421,7 @@ def main():
                 side_split=split,
                 robustness=robustness(T_best),
                 train_top_coin_share=r["tr_top"],
-                selection_ru="лучшая средняя на 2021–24 среди вариантов с ≥ 300 сделок и без монеты > 50 % прибыли 2021–24",
+                selection_ru=_periods("лучшая средняя на 2021–24 среди вариантов с ≥ 300 сделок и без монеты > 50 % прибыли 2021–24"),
                 neighbors=[{"params": q["p"], "train_avg": q["st"]["train"].get("avg_pct"), "test_avg": q["st"]["test"].get("avg_pct"),
                             "pos_years": q["st"]["pos_years"]}
                            for q in rows if q["idea"] == idea and q["mode"] == mode and q["exit"] == r["exit"]],
@@ -496,21 +509,28 @@ def notes(results, tried, exit_rank, exit_tab, app_pair, month_info):
             f"{u1['stats']['pos_years']} из {u1['stats']['years_n']}, фильтры {'пройдены' if passes(u1['stats']) else 'не пройдены'}; "
             f"все 6 наборов параметров с этим выходом: 2021–24 от {pc(min(nb_tr))} до {pc(max(nb_tr))}, 2025–26 от {pc(min(nb))} до {pc(max(nb))}. "
             + (f"Без правила «не больше 50 % прибыли с одной монеты» победил бы вариант {v1['params']} "
-               f"({pc(v1['train']['avg_pct'])} / {pc(v1['test'].get('avg_pct'))}), но он держится на DOGE в 2021 году. "
+               f"({pc(v1['train']['avg_pct'])} / {pc(v1['test'].get('avg_pct'))}), но {int(round((v1['train_top_coin_share'] or 0) * 100))} % "
+               f"его прибыли за 2021–24 дала одна монета. "
                f"Правило по монете на 2021–24 добавлено после первого прогона, поэтому этот результат — гипотеза, которую надо проверить "
                f"на других монетах и на новых данных, а не готовая стратегия. " if v1 else "")
             + "С планом приложения (ранняя цель 0,8 %) этот же лонг не зарабатывает — прибыль дают редкие большие движения за сутки, "
               "медианная сделка в минусе.")
         rb = u1.get("robustness", {}).get("test")
         if rb:
+            st1 = u1["stats"]
+            pf5 = (st1.get("pf5") or {}).get("test_pct")
+            fragile = rb["day_weighted_avg_pct"] < 0 or rb["avg_wo_top1pct"] < 0
             parts.append(
                 f"Насколько это надёжно: на 2025–26 без 1 % лучших сделок средняя {pc(rb['avg_wo_top1pct'])}, медианная сделка {pc(rb['median_pct'])}; "
                 f"если каждый день считать одинаково (в дни общего роста сигнал есть сразу на многих монетах), средняя {pc(rb['day_weighted_avg_pct'])} "
-                f"за {rb['days']} дней. "
-                + ("То есть прибыль делают несколько дней сильного роста всего рынка, а в обычный день с сигналом "
-                   "этот лонг теряет. Мы считаем результат слабым: прохождение фильтров — на грани и держится на редких днях."
-                   if rb["day_weighted_avg_pct"] < 0 or rb["avg_wo_top1pct"] < 0 else
-                   "Результат не держится на одной-двух сделках или днях."))
+                f"за {rb['days']} дней"
+                + (f"; без 3 лучших дней {pc(st1.get('test_ex3_avg'))}; счёт на 5 позиций за 2025–26: {pc(pf5)} капитала" if "test_day_avg" in st1 else "")
+                + ". "
+                + ("То есть прибыль делают несколько дней сильного роста всего рынка, а в обычный день с сигналом этот лонг теряет. "
+                   if fragile else "Результат не держится на одной-двух сделках или днях. ")
+                + ("Поэтому по правилу устойчивости лаборатории фильтры не пройдены — это не рабочая стратегия, а подсказка для семейства «тренд»."
+                   if not passes(st1) and "test_day_avg" in st1 else
+                   "Мы считаем результат слабым: прохождение фильтров — на грани и держится на редких днях." if fragile else ""))
     parts.append(
         f"Выходы: для оригинала лучше всего «{EXIT_RU[rk['fade'][0]]}», для флипа — «{EXIT_RU[rk['flip'][0]]}» (по 2021–24). "
         f"Для флипа: 5 целей приложения {pc(ex_flip['app5'][0])} / {pc(ex_flip['app5'][1])}, 3 цели {pc(ex_flip['app3'][0])} / {pc(ex_flip['app3'][1])}, "
@@ -524,7 +544,7 @@ def notes(results, tried, exit_rank, exit_tab, app_pair, month_info):
         "Оговорки: сделки по разным монетам в один момент сильно связаны (весь рынок двигается вместе), поэтому реальная надёжность ниже, "
         "чем кажется по числу сделок; данные заканчиваются 09.09.2026, то есть период сигналов приложения (сентябрь–октябрь 2026) почти не попал "
         "в проверку; наша копия сигналов приблизительная — точных правил приложения мы не знаем; производные метрики не использовались.")
-    return " ".join(parts)
+    return _periods(" ".join(parts))
 
 
 if __name__ == "__main__":

@@ -634,9 +634,12 @@ def main():
     res_a = part_a()
     log(f"Part A done, tried so far {TRIED}")
     import gc
-    HN._D = None          # Part B does not need the 15m arrays; the box has a ~2 GB memory limit
-    gc.collect()
-    res_b = part_b()
+    if getattr(HN, "WIDE", False):   # wide universe: only Part A (Part B is BTC 1m, the same in both sets)
+        res_b = []
+    else:
+        HN._D = None          # Part B does not need the 15m arrays; the box has a ~2 GB memory limit
+        gc.collect()
+        res_b = part_b()
     log(f"Part B done, tried total {TRIED}")
     results = res_a + res_b
     notes = (

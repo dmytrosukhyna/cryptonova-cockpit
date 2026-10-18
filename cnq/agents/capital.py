@@ -10,8 +10,15 @@ follows a desk the server already runs:
   • futures  — CRYPTO NOVA signals: «Сбалансированная» (paper.json profiles.bal) + «Импульс BTC» (profiles.imp)  [directional]
   • funding  — the funding-carry desk (funding.json equity_mtm)                                                  [no direction]
   • basis    — fixed-rate carry: spot + short dated futures on Deribit, rate locked at entry (basis.json)         [no direction]
-  • yield    — stablecoin lending: Aave v3 USDC/USDT + Sky savings rate (yield.json)                             [no direction]
+  • yield    — stablecoin lending: Sky savings rate (sUSDS) + Aave v3 USDC + Aave savings GHO (yield.json)      [no direction]
   • susde    — yield-bearing dollars, Ethena sUSDe (yield.json accounts.susde)                                    [no direction]
+  • listings — short of new listings (paper.json profiles.lst) — 19.10 (owner: «если свободные стейблы дадут лучше результат в
+               других сферах — думать как и что»): the best use of free dollars we found — on history (729 Binance listings,
+               5 % of an account per listing) 2025 +55 %, 2026 +33 % a year (2023 +2 %, 2024 +6 %) against ≈ 4 % in lending.
+               It gets money ONLY after its own live test passes (LST_GATE: ≥ 20 closed demo trades, on average ≥ +1 % a trade
+               after fees and funding); then a fixed part of the dollars (PROFILES lst: calm 0, balanced 8 %, bold 12 %, never
+               more than half the dollar part), halved after a 30-day loss over 5 %; the gate failing later takes the money back
+                                                                                                           [short, risk 4]
 Arbitrage and the triangle are NOT given money: virtual estimates a client cannot run — shown as «наблюдение».
 
 THE ALLOCATOR (v2). It decides two things and explains both in Russian («почему так»):
@@ -43,12 +50,13 @@ import time
 
 START = 10_000.0
 VERSION = 2               # 18.10 v2: six sleeves and the allocator (v1: four sleeves, fixed base ± 30-day tilt) — restarts the demo once
-KEYS = ["spot", "active", "futures", "funding", "basis", "yield", "susde"]
-IDX_KEYS = ["spot", "futures", "funding", "basis", "yield", "susde", "active"]   # index_history columns (new desks go last)
+KEYS = ["spot", "active", "futures", "funding", "basis", "yield", "susde", "listings"]
+IDX_KEYS = ["spot", "futures", "funding", "basis", "yield", "susde", "active", "listings"]   # index_history columns (new desks go last)
 DIRECTIONAL = ("spot", "active", "futures")
 CARRY = ("funding", "basis", "yield", "susde")
 # 18.10 backtest (scripts/lab/portfolio_rules.py): regime shares 0.5–0.7 × 0.10–0.35 — lower «off» better in 2025–26 every time
-RISK = {"spot": 4, "active": 4, "futures": 4, "funding": 3, "basis": 2, "yield": 2, "susde": 3}
+RISK = {"spot": 4, "active": 4, "futures": 4, "funding": 3, "basis": 2, "yield": 2, "susde": 3, "listings": 4}
+LST_GATE = {"trades": 20, "avg_trade_pct": 1.0}  # the listing short gets dollars only after this live record (criteria of «Концепция»)
 DISCOUNT = {2: 0.0, 3: 1.5}                      # percentage points taken off a source's rate for its risk
 CAP = {"funding": 0.20, "basis": 0.30, "susde": 0.15}
 YIELD_FLOOR = 0.30                               # share of the carry part that always stays in lending (liquid reserve)
@@ -67,9 +75,9 @@ REGIME_GAP_MS = 24 * 3_600_000
 #          the others = CRYPTO NOVA портфель (core + table alts + small high-risk).
 # Protection for every model: the BTC-regime switch (tested: drawdown −23…−26 % vs −31 % fixed), stops on the alts and on the
 # active trades, max 5 active positions, the reserve in lending.
-PROFILES = {"calm": {"on": 0.35, "off": 0.10, "fut": 0.0, "act": 0.0, "spot": {"spot_cons": 1.0}},
-            "balanced": {"on": 0.70, "off": 0.20, "fut": 0.25, "act": 0.15, "spot": {"spot": 1.0}},
-            "bold": {"on": 0.85, "off": 0.35, "fut": 0.35, "act": 0.30, "spot": {"spot": 1.0}}}
+PROFILES = {"calm": {"on": 0.35, "off": 0.10, "fut": 0.0, "act": 0.0, "lst": 0.0, "spot": {"spot_cons": 1.0}},
+            "balanced": {"on": 0.70, "off": 0.20, "fut": 0.25, "act": 0.15, "lst": 0.08, "spot": {"spot": 1.0}},
+            "bold": {"on": 0.85, "off": 0.35, "fut": 0.35, "act": 0.30, "lst": 0.12, "spot": {"spot": 1.0}}}
 MODELS = {
     "calm": {"name_ru": "Спокойная", "about_ru": "Держим ядро BTC 60% / ETH 20% / SOL 10% почти без сделок; когда BTC ниже своей 200-дневной "
                                                  "средней — большая часть уходит в доходные доллары. Без фьючерсов и активной торговли."},
@@ -88,9 +96,11 @@ OPTIONS = {   # toggles that shift a model (applied in order, then normalised)
 }
 NAMES = {"spot": "Спот · портфель", "active": "Активный спот · Импульс BTC", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)",
          "basis": "Фикс-ставка на фьючерсах (BTC/ETH)", "yield": "Кредитование стейблкоинов (Aave, Sky)",
-         "susde": "Доходные доллары (Ethena sUSDe)"}
-SHORT = {"spot": "спот", "active": "активный спот", "futures": "фьючерсы", "funding": "фандинг", "basis": "фикс-ставка", "yield": "кредитование", "susde": "sUSDe"}
-TITLE = {"spot": "Спот", "active": "Активный спот", "futures": "Фьючерсы", "funding": "Фандинг", "basis": "Фикс-ставка", "yield": "Кредитование", "susde": "sUSDe"}
+         "susde": "Доходные доллары (Ethena sUSDe)", "listings": "Шорт новых листингов"}
+SHORT = {"spot": "спот", "active": "активный спот", "futures": "фьючерсы", "funding": "фандинг", "basis": "фикс-ставка", "yield": "кредитование",
+         "susde": "sUSDe", "listings": "шорт листингов"}
+TITLE = {"spot": "Спот", "active": "Активный спот", "futures": "Фьючерсы", "funding": "Фандинг", "basis": "Фикс-ставка", "yield": "Кредитование",
+         "susde": "sUSDe", "listings": "Шорт листингов"}
 KYIV = dt.timezone(dt.timedelta(hours=3))
 
 
@@ -103,6 +113,13 @@ def _load(out: str, name: str) -> dict:
 
 def _susde(out: str) -> dict:
     return ((_load(out, "yield.json").get("accounts") or {}).get("susde")) or {}
+
+
+def lst_gate(out: str) -> tuple[bool, dict]:
+    """Has the listing-short demo desk earned real dollars? (≥ 20 closed trades, ≥ +1 % a trade on average)."""
+    s = (((_load(out, "paper.json").get("profiles") or {}).get("lst") or {}).get("stats")) or {}
+    n, avg = s.get("trades") or 0, s.get("avg_trade_pct")
+    return bool(n >= LST_GATE["trades"] and avg is not None and avg >= LST_GATE["avg_trade_pct"]), {"trades": n, "avg_trade_pct": avg}
 
 
 def desk_values(out: str) -> dict:
@@ -135,6 +152,9 @@ def desk_values(out: str) -> dict:
         v["yield"] = float(yd["equity"])
     if _susde(out).get("equity") is not None:
         v["susde"] = float(_susde(out)["equity"])
+    d = prof.get("lst") or {}
+    if d.get("equity") is not None:                      # tracked always (index), given money only after the gate
+        v["listings"] = float(d["equity"])
     return v
 
 
@@ -155,6 +175,9 @@ def desk_30d(out: str, now: int) -> dict:
     x = _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get("imps") or {}).get("equity_history") or []], since)
     if x is not None:
         r["active"] = x
+    x = _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get("lst") or {}).get("equity_history") or []], since)
+    if x is not None:
+        r["listings"] = x
     xs = [y for k in ("bal", "imp") if (y := _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get(k) or {}).get("equity_history") or []], since)) is not None]
     if xs:
         r["futures"] = sum(xs) / len(xs)
@@ -179,6 +202,9 @@ def carry_rates(out: str, now: int) -> dict:
         pos = bd.get("position")
         rn = bd.get("rate_now")
         r["basis"] = float(pos["rate"]) if pos else (float(rn) if rn is not None and rn >= (bd.get("min_rate") or 0) else 0.0)
+    ok, s = lst_gate(out)
+    if ok:
+        r.update({"listings_ok": True, "listings_n": s["trades"], "listings_avg": s["avg_trade_pct"]})
     h = [x for x in _load(out, "funding.json").get("history") or [] if x[0] >= now - 7 * 86_400_000 and x[1]]
     if len(h) >= 2 and h[-1][0] - h[0][0] >= 3 * 86_400_000:          # the funding desk's own last week, annualised
         r["funding"] = (h[-1][1] / h[0][1] - 1) * 365 * 86_400_000 / (h[-1][0] - h[0][0]) * 100
@@ -230,6 +256,18 @@ def allocate(profile: dict, reg: str, r30: dict, rates: dict, available: set, re
         f = (d + 0.10) / sum(w.values())
         w = {k: v * f for k, v in w.items()}
     c = max(0.0, 1.0 - sum(w.values()))
+    if "listings" in available:
+        wl = 0.0
+        if rates.get("listings_ok") and profile.get("lst"):
+            wl = min(profile["lst"], c * 0.5)
+            x = r30.get("listings")
+            why.append(f"Шорт листингов прошёл живую проверку ({rates.get('listings_n', 0)} сделок, в среднем "
+                       f"{rates.get('listings_avg', 0):+.1f}% на сделку) — из долларов {wl*100:.0f}% на шорт новых монет.")
+            if x is not None and x < -0.05:
+                wl *= 0.5
+                why.append(f"Шорт листингов за 30 дней {x*100:+.1f}% — доля вдвое меньше.")
+        w["listings"] = wl
+        c -= wl
     keys = [k for k in CARRY if k in available]
     score = {k: max(0.0, (rates.get(k) if rates.get(k) is not None else DEFAULT_RATE) - DISCOUNT[RISK[k]]) for k in keys}
     for k in keys:
@@ -353,6 +391,8 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
         events.append(f"Новая версия распределения: 6 источников и умный распределитель — демо-счёт начат заново с ${START:,.0f} "
                       f"(прошлый запуск закончился на ${prev['value']:,.2f}).")
     avail = set(desks) & set(KEYS)
+    if not rates.get("listings_ok"):                     # tracked, but not a source of its own until its live test passes
+        avail.discard("listings")
     if not st.get("models"):
         r30 = desk_30d(out, now)
         st = {**st, "version": VERSION, "started": now, "last": desks, "week": _monday(now), "month_start": _month_start(now),
@@ -418,7 +458,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     w_now = main["weights"]
     return {"asof": now, "name": "CRYPTO NOVA Портфолио", "version": VERSION, "start_usd": START, "started": st["started"],
             "value_usd": round(total, 2), "pnl_usd": round(total - START, 2), "pnl_pct": round((total / START - 1) * 100, 2),
-            "sleeves": [{"key": k, "name_ru": NAMES[k], "kind": "directional" if k in DIRECTIONAL else "carry", "risk": RISK[k],
+            "sleeves": [{"key": k, "name_ru": NAMES[k], "kind": "directional" if k in DIRECTIONAL else ("short" if k == "listings" else "carry"), "risk": RISK[k],
                          "weight": w_now.get(k), "rate_now": round(rates[k], 2) if k in CARRY and rates.get(k) is not None else None,
                          "value_usd": round(v, 2), "share_now": round(v / total, 4) if total else None}
                         for k, v in sorted(main["sleeves"].items(), key=lambda kv: KEYS.index(kv[0]))],
@@ -454,6 +494,9 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
                 "активной торговли и фьючерсов; Смелая — больше активной торговли и фьючерсов. Активная торговля — «Импульс BTC» на споте "
                 "(единственное активное правило, прошедшее проверку на 2025–2026). Через 4 недели сравниваем модели по доходу с учётом "
                 "просадки — лучшая становится основной.",
+                "Шорт новых листингов — лучшее применение свободных долларов на истории (2025 +55%, 2026 +33% в год против ≈4% в "
+                "кредитовании), но рискованное: деньги он получает только после живой проверки — 20 закрытых демо-сделок и в среднем "
+                "не меньше +1% на сделку. Тогда — 8% суммы в Сбалансированной и 12% в Смелой (Спокойная без него).",
                 "Арбитраж и треугольник денег не получают: их цифры — виртуальная оценка, клиент не может их исполнить.",
                 "В конце месяца — итог; 10% от прибыли — оплата (месяц без прибыли бесплатно).",
                 "Это демо, а не обещание: результат может быть и минусом."]}

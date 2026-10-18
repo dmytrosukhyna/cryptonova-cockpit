@@ -218,3 +218,30 @@ def test_regime_uses_btc_200d_average_and_60d_return_when_the_terminal_has_them(
     assert K.regime(d)[0] == "off"
     json.dump({"risk": {"btc_bull": False}}, open(os.path.join(d, "decision.json"), "w"))   # no terminal figures → the system flag
     assert K.regime(d)[0] == "off"
+
+
+def test_listing_short_gets_dollars_only_after_its_live_test_passes():
+    """19.10: the listing short is tracked from the start but is not a source of its own until ≥ 20 closed demo trades average
+    ≥ +1 %; then balanced 8 %, bold up to 12 % (never more than half the dollar part), calm 0 — taken from the dollars."""
+    d = tempfile.mkdtemp()
+    conn = sqlite3.connect(":memory:")
+    world(d)
+
+    def lst(trades, avg, eq=10_000.0):
+        p = json.load(open(os.path.join(d, "paper.json")))
+        p["profiles"]["lst"] = {"equity": eq, "open": [], "equity_history": [], "stats": {"trades": trades, "avg_trade_pct": avg}}
+        json.dump(p, open(os.path.join(d, "paper.json"), "w"))
+    lst(12, 3.0)
+    a = K.run(conn, d, T0)
+    assert "listings" not in {s["key"] for s in a["sleeves"]} and "listings" in a["index_keys"]
+    assert a["index_history"][-1][-1] == 100.0                     # tracked as an index all the same
+    lst(25, 0.4)                                                    # enough trades, not enough profit → still nothing
+    b = K.run(conn, d, T0 + 3_600_000)
+    assert "listings" not in {s["key"] for s in b["sleeves"]}
+    lst(25, 2.1)
+    c = K.run(conn, d, T0 + 2 * 3_600_000)
+    w = {s["key"]: s["weight"] for s in c["sleeves"]}
+    assert "новый источник: шорт листингов" in c["events"][0] and w["listings"] == 0.08 and abs(sum(w.values()) - 1) < 1e-3
+    assert c["models"]["calm"]["w"].get("listings", 0) == 0 and abs(c["models"]["bold"]["w"]["listings"] - 0.075) < 1e-3
+    assert any("Шорт листингов прошёл живую проверку (25 сделок" in x for x in c["why_ru"])
+    assert next(s for s in c["sleeves"] if s["key"] == "listings")["kind"] == "short"

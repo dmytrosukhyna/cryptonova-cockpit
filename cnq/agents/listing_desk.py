@@ -191,12 +191,14 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
         t.update({"symbol": t["symbol"].replace("-USDT", ""), "side": "SHORT", "grade": "LST", "net_usd": round(t["pnl_usd"], 2)})
     n = conn.execute("SELECT COUNT(*) FROM lst_trades WHERE closed IS NOT NULL").fetchone()[0]
     wins = conn.execute("SELECT COUNT(*) FROM lst_trades WHERE closed IS NOT NULL AND pnl_usd > 0").fetchone()[0]
+    avg_trade = conn.execute("SELECT AVG(pnl_usd / (qty * entry)) FROM lst_trades WHERE closed IS NOT NULL AND qty > 0 AND entry > 0").fetchone()[0]
     first = conn.execute("SELECT MIN(time) FROM lst_equity").fetchone()[0] or now
     return {"asof": now, "profile": "lst", "name": NAME, "about": ABOUT, "start_equity": START, "since": first, "reset": None,
             "equity": round(equity, 2), "pnl_usd": round(equity - START, 2), "pnl_pct": round((equity / START - 1) * 100, 2),
             "open_pnl_usd": round(open_pnl, 2), "open": out_open, "pending": [], "closed": closed,
             "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "max_dd_pct": round(dd * 100, 2),
-                      "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0)},
+                      "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0),
+                      "avg_trade_pct": round(avg_trade * 100, 2) if avg_trade is not None else None},
             "equity_history": eqh, "events": events, "error": err, "watching": len(mk),
             "rules": f"шорт через {DELAY_H} ч после листинга, {int(SHARE * 100)}% счёта, стоп +{int(STOP * 100)}%, выход через {HOLD_D} дней, "
                      f"до {MAX_OPEN} позиций, комиссия 0.05%/сторона, фандинг учитывается"}

@@ -25,6 +25,8 @@
                                               calendar/macro/autopilot drivers → web/outlook.json
   python -m cnq.cli broadcast [--out web] [--force]   Friday live-show deck (slides: what to say / what to show in the panel);
                                               rebuilt on Fridays (Kyiv) or when missing/older than 7 days, else only `live` → web/broadcast.json
+  python -m cnq.cli appsignals [--out web]    CRYPTO NOVΛ app signals (public /api/signals/active + /history) → agents.sqlite history,
+                                              outcomes checked on 15m candles under 5 exit policies, strategy profile, rules → web/app_signals.json
 """
 from __future__ import annotations
 
@@ -41,7 +43,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -235,6 +237,16 @@ def main(argv: list[str] | None = None) -> int:
         doc, why = broadcast.run(args.out, conn, force=args.force)
         print(f"broadcast.json: {'rebuilt (' + why + ')' if why else 'live refreshed'} week_of={doc.get('week_of')} slides={len(doc.get('slides') or [])} "
               f"~{doc.get('duration_min_est')} min ids={[s['id'] for s in doc.get('slides') or []]} errors={doc.get('errors')}")
+    elif args.cmd == "appsignals":
+        import os, sqlite3
+        from .agents import app_signals
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/agents.sqlite")
+        d = app_signals.write(args.out, conn)
+        c, p = d["counts"], d["stats"]["policies"]
+        print(f"app_signals.json: api={d['source']['api_ok']} counts={c} candles={d['source']['candles']} "
+              f"app={p['app']['avg_r']}R tp1={p['tp1']['avg_r']}R ladder={p['ladder']['avg_r']}R ladder_be={p['ladder_be']['avg_r']}R "
+              f"last={p['last']['avg_r']}R notes={d['notes_ru'][:3]} | {d['summary_ru']}")
     elif args.cmd == "macro":
         from .agents import macro_watch
         d = macro_watch.write(args.out)

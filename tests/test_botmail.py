@@ -46,3 +46,9 @@ def test_connect_deep_link_explains_terms_and_tells_the_owner_once():
     assert mb.notify_leads("t", 555) == 1 and mb.notify_leads("t", 555) == 0
     note = [d for m, d in calls if m == "sendMessage"][0]
     assert note["chat_id"] == 555 and "@ivan_k" in note["text"] and "CRYPTO NOVA" in note["text"]
+
+
+def test_connect_name_reads_the_users_model_and_options():
+    assert botmail.connect_name("capital_bold_r_d") == "CRYPTO NOVA Портфолио · модель «Смелая» + рискованные монеты, больше DeFi-кредитования"
+    assert botmail.connect_name("capital_calm") == "CRYPTO NOVA Портфолио · модель «Спокойная»"
+    assert botmail.connect_name("cryptonova").startswith("CRYPTO NOVA") and botmail.connect_name("zzz") == "стратегия CRYPTO NOVA"

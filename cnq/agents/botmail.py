@@ -29,6 +29,21 @@ CONNECT_NAMES = {"cryptonova": "CRYPTO NOVA (отобранные сигналы
                  "imp": "Импульс", "lab": "Эксперименты", "memes": "Мем-радар", "whales": "По следам китов",
                  "cons": "портфель «Консервативный»", "mod": "портфель «Умеренный»", "high": "портфель «Высокий риск»",
                  "meme": "портфель «Мемы»", "bal": "портфель «Сбалансированный»"}
+MODEL_RU = {"calm": "Спокойная", "balanced": "Сбалансированная", "bold": "Смелая"}
+OPTION_RU = {"r": "рискованные монеты", "d": "больше DeFi-кредитования", "n": "без фьючерсов"}
+
+
+def connect_name(what: str) -> str:
+    """connect_capital_bold_r_d → «CRYPTO NOVA Портфолио · модель «Смелая» + рискованные монеты, больше DeFi-кредитования»."""
+    if what in CONNECT_NAMES:
+        return CONNECT_NAMES[what]
+    parts = what.split("_")
+    if parts and parts[0] == "capital" and len(parts) > 1 and parts[1] in MODEL_RU:
+        opts = [OPTION_RU[p] for p in parts[2:] if p in OPTION_RU]
+        return f"CRYPTO NOVA Портфолио · модель «{MODEL_RU[parts[1]]}»" + (" + " + ", ".join(opts) if opts else "")
+    return "стратегия CRYPTO NOVA"
+
+
 CONNECT = ("Вы выбрали: <b>{name}</b>.\n\n"
            "<b>Как подключиться</b>\n"
            "1. Администратор CRYPTO NOVA напишет вам сюда и поможет подключить стратегию к вашей бирже — ключ API только с правом "
@@ -105,7 +120,7 @@ class Mailbox:
             who = f"@{un}" if un else (fn or f"id {cid}")
             try:
                 _api(token, "sendMessage", {"chat_id": owner_chat, "parse_mode": "HTML", "disable_web_page_preview": True,
-                                            "text": f"Заявка на подключение: <b>{CONNECT_NAMES.get(what, what)}</b>\nОт: {who}"
+                                            "text": f"Заявка на подключение: <b>{connect_name(what)}</b>\nОт: {who}"
                                                     + (f" (<a href=\"tg://user?id={cid}\">написать</a>)" if not un else "")})
                 self.conn.execute("UPDATE bot_leads SET notified=1 WHERE rowid=?", (rid,))
                 n += 1
@@ -138,8 +153,8 @@ class Mailbox:
             text = (m.get("text") or "").strip()
             reply = None
             if text.startswith("/start connect_"):
-                what = text.split("connect_", 1)[1].strip().split()[0][:24]
-                reply = CONNECT.format(name=CONNECT_NAMES.get(what, "стратегия CRYPTO NOVA"))
+                what = text.split("connect_", 1)[1].strip().split()[0][:40]
+                reply = CONNECT.format(name=connect_name(what))
                 self.lead(cid, frm.get("username"), frm.get("first_name"), what, now)
             elif text.startswith("/start"):
                 reply = WELCOME

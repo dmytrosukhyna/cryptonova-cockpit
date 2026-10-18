@@ -329,8 +329,57 @@ def trade(d: pd.DataFrame, prob7: pd.Series) -> dict:
     return out
 
 
+def overheat(d: pd.DataFrame) -> None:
+    """Step 2 (18.10, after the first run): no blind model beat the baselines, but four «crowd» factors kept the same sign every
+    year — greed (Fear & Greed), leverage (funding), stretch above SMA200 and the 90-day run-up all point to WEAKER returns
+    ahead. Test a fixed, simple rule on top of our regime: each factor's percentile within its own past 365 days (no look-ahead),
+    averaged and smoothed over 7 days = «перегрев толпы» 0–1. Bull regime and heat > X → 45 % instead of 70 %; optional mirror: bear regime and heat < 1 − X
+    (panic) → 35 % instead of 20 %."""
+    comps = ["fear_greed", "funding_7d", "gap_sma200", "ret_90d"]
+    pr = pd.DataFrame({c: d[c].rolling(365, min_periods=180).apply(lambda x: float((x[:-1] < x[-1]).mean()), raw=True)
+                       for c in comps})
+    heat = pr.mean(axis=1, skipna=True).where(pr.notna().sum(axis=1) >= 3).rolling(7, min_periods=5).mean()   # weekly, less churn
+    out_ic = {}
+    for h in (7, 30):
+        fwd = np.log(d["close"]).shift(-h) - np.log(d["close"])
+        out_ic[f"{h}d"] = {y: round(float(heat[(heat.index.year == int(y)) & heat.notna() & fwd.notna()].rank()
+                                       .corr(fwd[(heat.index.year == int(y)) & heat.notna() & fwd.notna()].rank())), 3)
+                           for y in ["2019", "2020"] + YEARS}
+    now_heat = round(float(heat.dropna().iloc[-1]), 2) if heat.notna().any() else None
+    note("forecast · overheat IC", json.dumps({"ic_by_year": out_ic, "heat_today": now_heat,
+                                               "parts_today": {c: round(float(pr[c].dropna().iloc[-1]), 2) for c in comps if pr[c].notna().any()}},
+                                              ensure_ascii=False))
+    r = d["close"].pct_change().shift(-1)
+    sma = d["close"].rolling(200).mean()
+    bull = (d["close"] > sma) & (d["close"] / d["close"].shift(60) > 1)
+    base = 0.2 + 0.5 * bull.astype(float)
+    rules = {"regime": base}
+    for X in (0.7, 0.8, 0.9):
+        trim = base.where(~(bull & (heat > X)), 0.45)
+        rules[f"trim>{X}"] = trim
+        rules[f"trim>{X}+panic<{round(1 - X, 1)}"] = trim.where(~(~bull & (heat < 1 - X)), 0.35)
+    res = {}
+    for start in ("2019-01-01", "2021-01-01"):
+        ok = (d.index >= start) & r.notna() & heat.notna()
+        res[start[:4]] = {}
+        for k, e in rules.items():
+            e = e[ok]
+            ret = e * r[ok] + (1 - e) * CASH / 365 - COST * e.diff().abs().fillna(0)
+            eq = (1 + ret).cumprod()
+            row = {"total_pct": round(float(eq.iloc[-1] - 1) * 100), "max_dd_pct": round(float((eq / eq.cummax() - 1).min()) * 100),
+                   "changes": int((e.diff().abs() > 0).sum())}
+            for y in ["2019", "2020"] + YEARS:
+                ry = ret[ret.index.year == int(y)]
+                if len(ry) > 20:
+                    row[y] = round(float((1 + ry).prod() - 1) * 100, 1)
+            res[start[:4]][k] = row
+    note("forecast · overheat rules", json.dumps(res, ensure_ascii=False))
+
+
 def main():
     d, cover = build()
+    if "--overheat" in sys.argv:
+        return overheat(d)
     feats = [c for c in d.columns if c not in ("close", "vol", "taker")]
     note("forecast · data", json.dumps({"rows": len(d), "from": str(d.index.min().date()), "to": str(d.index.max().date()),
                                         "sources": cover, "factors": len(feats)}, ensure_ascii=False))

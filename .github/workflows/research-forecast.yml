@@ -18,3 +18,4 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install numpy pandas scikit-learn
       - run: python scripts/forecast_study.py
+      - run: python scripts/forecast_study.py --overheat

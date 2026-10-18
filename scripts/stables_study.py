@@ -150,7 +150,7 @@ def pendle_part():
     is the fixed rate locked at purchase. ≥ $10M, any exposure flag."""
     s, b = http("https://yields.llama.fi/pools")
     pools = json.loads(b)["data"] if s == 200 else []
-    pen = [p for p in pools if p.get("project") == "pendle" and "USD" in (p.get("symbol") or "").upper() and (p.get("tvlUsd") or 0) >= 1e7]
+    pen = [p for p in pools if "pendle" in (p.get("project") or "") and "USD" in (p.get("symbol") or "").upper() and (p.get("tvlUsd") or 0) >= 1e7]
     pen = sorted(pen, key=lambda p: -p["tvlUsd"])[:16]
     with ThreadPoolExecutor(8) as ex:
         hs = list(ex.map(lambda p: hist_stats(chart(p["pool"])), pen))

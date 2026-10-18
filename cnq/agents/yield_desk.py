@@ -2,8 +2,11 @@
 консервативная стратегия, процент выше, чем в банке»).
 
 A $10 000 demo desk that SUPPLIES stablecoins to lending markets (no borrowing → nothing to liquidate, no price risk of a coin),
-spread over two protocols so one bug can't take everything: USDC 40 % and USDT 30 % on Aave v3 (Ethereum), USDS 30 % in the Sky
-savings rate (sUSDS). Every run it reads the current BASE supply APY (apyBase — token rewards can be switched off any day, so
+spread over two protocols so one bug can't take everything: USDS 40 % in the Sky savings rate (sUSDS), USDC 30 % lent on Aave v3
+(Ethereum), GHO 30 % in Aave's savings vault (sGHO). 19.10.2026 (owner: «если свободные стейблы дадут лучше результат в других
+сферах — думать как и что»; scripts/stables_study.py, every dollar pool ≥ $100M with a year of history): USDT on Aave paid the
+least (3.1 % now, 3.1 % average over the year) → replaced by sGHO (4.5 %, a rate set by Aave governance and paid from Aave's
+revenue, money not lent out, instant withdrawal, no slashing — aave.com/docs/ecosystem/gho/sgho). Basket rate 3.6 % → ≈ 4.0 %. Every run it reads the current BASE supply APY (apyBase — token rewards can be switched off any day, so
 they are not counted) from DefiLlama's public yields API (https://yields.llama.fi/pools) and accrues interest for the time since
 the previous run at that rate. Items the API doesn't return this run are left out of the average (listed in "missing"). The rate is VARIABLE
 (set by demand for loans), not fixed. Risks that remain: the protocol's smart contracts, a stablecoin losing its peg, and the
@@ -30,12 +33,14 @@ ACCOUNTS = {"susde": {"name_ru": "Доходные доллары · Ethena sUSD
                                   "кредитования, но риск выше: фандинг может уйти в минус, USDe может на часы отойти от $1, вывод — 7 дней."}}
 START = 10_000.0
 YEAR_MS = 365 * 86_400_000
-BASKET = [("aave-v3", "Ethereum", "USDC", 0.4), ("aave-v3", "Ethereum", "USDT", 0.3),
-          ("sky-lending", "Ethereum", "SUSDS", 0.3)]                                     # (project, chain, symbol, share)
+BASKET = [("sky-lending", "Ethereum", "SUSDS", 0.4), ("aave-v3", "Ethereum", "USDC", 0.3),
+          ("aave-v3", "Ethereum", "SGHO", 0.3)]                                     # (project, chain, symbol, share)
 SHOW = [("aave-v3", "Ethereum", "USDC", "Aave · USDC (кредитование)", 1), ("aave-v3", "Ethereum", "USDT", "Aave · USDT (кредитование)", 1),
         ("aave-v3", "Ethereum", "WETH", "Aave · ETH (кредитование)", 2), ("lido", "Ethereum", "STETH", "Lido · стейкинг ETH", 2),
         ("sky-lending", "Ethereum", "SUSDS", "Sky · сберегательная ставка USDS", 1), ("compound-v3", "Ethereum", "USDC", "Compound · USDC (кредитование)", 2),
-        ("aave-v3", "Base", "USDC", "Aave · USDC в сети Base", 2), ("ethena-usde", "Ethereum", "SUSDE", "Ethena · sUSDe (доход от фандинга)", 3)]
+        ("aave-v3", "Base", "USDC", "Aave · USDC в сети Base", 2), ("ethena-usde", "Ethereum", "SUSDE", "Ethena · sUSDe (доход от фандинга)", 3),
+        ("aave-v3", "Ethereum", "SGHO", "Aave · сберегательный GHO (sGHO)", 1), ("spark-savings", "Ethereum", "USDC", "Spark · сберегательная ставка USDC", 1),
+        ("maple", "Ethereum", "USDC", "Maple · syrupUSDC (кредиты институционалам)", 3)]
 
 
 def fetch_pools(timeout: int = 40) -> list:
@@ -176,9 +181,9 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_pools, fe
             "rates": {k: round(v, 2) for k, v in rates.items()}, "stale": stale, "missing": missing, "error": err,
             "basket": [{"project": pr, "chain": ch, "symbol": sy, "share": sh} for pr, ch, sy, sh in BASKET], "since": st["start"],
             "history": st["history"][-300:], "table": table,
-            "about_ru": ("Консервативная часть: стейблкоины в двух местах — USDC и USDT отданы в кредит на Aave (Ethereum), USDS лежит "
-                         "на сберегательной ставке Sky. Мы ничего не занимаем, поэтому нечего ликвидировать, и нет риска падения цены монеты. "
-                         f"Ставка плавающая, сейчас около {st['apy']:.1f}% годовых (без бонусных токенов, только то, что платят заёмщики). "
+            "about_ru": ("Консервативная часть: стейблкоины в двух протоколах — USDS на сберегательной ставке Sky, USDC в кредит на Aave "
+                         "(Ethereum), GHO в сберегательном хранилище Aave (sGHO, вывод сразу). Мы ничего не занимаем, поэтому нечего ликвидировать, и нет риска падения цены монеты. "
+                         f"Ставка плавающая, сейчас около {st['apy']:.1f}% годовых (без бонусных токенов). "
                          "Риски: ошибка в смарт-контракте, отвязка стейблкоина от доллара, падение ставки. Это демо: проценты начисляются "
                          "по текущей ставке DefiLlama." if st.get("apy") is not None else
                          "Консервативная часть: кредитование стейблкоинов на Aave и сберегательная ставка Sky. Ставка появится после первого обновления.")}

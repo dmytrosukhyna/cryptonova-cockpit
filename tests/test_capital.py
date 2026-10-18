@@ -107,15 +107,18 @@ def test_yield_desk_accrues_at_the_current_rate_and_keeps_the_last_rate_when_off
              {"project": "aave-v3", "chain": "Ethereum", "symbol": "USDC", "apy": 9.0, "tvlUsd": 1e6},     # a small pool is ignored
              {"project": "aave-v3", "chain": "Ethereum", "symbol": "USDC", "apy": 7.0, "tvlUsd": 2e10, "poolMeta": "e-mode"},  # not the plain market
              {"project": "lido", "chain": "Ethereum", "symbol": "STETH", "apy": 2.8, "tvlUsd": 3e10}]
-    a = Y.step(conn, T0, fetch=lambda: pools)              # base rates only (no reward tokens); Sky missing → average of the rest
-    assert a["equity"] == 10_000 and a["rates"] == {"USDC": 5.0, "USDT": 3.0} and a["missing"] == ["SUSDS"] and not a["stale"]
-    assert abs(a["apy_now"] - (5.0 * 0.4 + 3.0 * 0.3) / 0.7) < 0.01
+    a = Y.step(conn, T0, fetch=lambda: pools)              # base rates only (no reward tokens); Sky and sGHO missing → USDC alone
+    assert a["equity"] == 10_000 and a["rates"] == {"USDC": 5.0} and a["missing"] == ["SUSDS", "SGHO"] and not a["stale"]
+    assert a["apy_now"] == 5.0                              # USDT is no longer in the basket (19.10: replaced by sGHO)
     pools.append({"project": "sky-lending", "chain": "Ethereum", "symbol": "SUSDS", "apy": 4.0, "tvlUsd": 5e9})
     a = Y.step(conn, T0, fetch=lambda: pools)
-    assert a["apy_now"] == 4.1 and a["missing"] == []      # 5×0.4 + 3×0.3 + 4×0.3
-    assert any(t["name_ru"].startswith("Lido") for t in a["table"])
+    assert abs(a["apy_now"] - (4.0 * 0.4 + 5.0 * 0.3) / 0.7) < 0.01 and a["missing"] == ["SGHO"]
+    pools.append({"project": "aave-v3", "chain": "Ethereum", "symbol": "SGHO", "apy": 4.5, "tvlUsd": 2e8})
+    a = Y.step(conn, T0, fetch=lambda: pools)
+    assert a["apy_now"] == 4.45 and a["missing"] == []     # 4×0.4 + 5×0.3 + 4.5×0.3
+    assert any(t["name_ru"].startswith("Lido") for t in a["table"]) and any("sGHO" in t["name_ru"] for t in a["table"])
     b = Y.step(conn, T0 + 365 * 86_400_000, fetch=lambda: (_ for _ in ()).throw(OSError("down")))   # a year later, API down
-    assert abs(b["equity"] - 10_410) < 0.5 and b["stale"] and b["error"]
+    assert abs(b["equity"] - 10_445) < 0.5 and b["stale"] and b["error"]
 
 
 def test_basis_row_takes_the_furthest_dated_futures_and_annualises_net_of_fees():

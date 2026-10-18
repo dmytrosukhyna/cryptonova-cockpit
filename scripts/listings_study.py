@@ -108,7 +108,7 @@ def short(L: dict, delay_h: int, hold_d: int, stop) -> tuple | None:
             exit_i = e + int(hit[0])
             ret = -(stop + SLIP)
     if ret is None:
-        ret = ent / c[x] - 1
+        ret = 1 - c[x] / ent                                         # linear USDT-M short: (entry − exit) / entry
     m = (L["ft"] >= t[e]) & (L["ft"] < t[exit_i] + H)
     fund = float(L["fv"][m].sum()) if len(L["fv"]) else 0.0           # short receives +rate
     return ret + fund - COST, fund, int(L["listed"])

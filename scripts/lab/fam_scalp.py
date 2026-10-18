@@ -219,7 +219,7 @@ def part_a():
     sig = {}
     for kx in (2.5, 3.5):
         big = rng > kx * atr_prev
-        side = np.where(big & (C < O) & (clv < 0.25), 1, np.where(big & (C > O) & (clv > 0.75), -1, 0))
+        side = np.where(big & (C < O) & (clv < 0.25), 1, np.where(big & (C > O) & (clv > 0.75), -1, 0)).astype(np.int8)
         sig[f"k{kx}"] = (side != 0, side, {"range_atr": kx, "close_at_extreme": "нижняя/верхняя четверть"})
     b = search_a("A1 spike-revert", sig)
     _, _, sname, ename, E, ex, sp = b
@@ -247,7 +247,7 @@ def part_a():
     sig = {}
     for base, dev, ks in (("ema20", dev_e, (2.5, 3.5)), ("vwap", dev_v, (4.0, 6.0))):
         for kx in ks:
-            side = np.where(dev < -kx, 1, np.where(dev > kx, -1, 0))
+            side = np.where(dev < -kx, 1, np.where(dev > kx, -1, 0)).astype(np.int8)
             sig[f"{base}_k{kx}"] = (side != 0, side, {"base": base, "dev_atr": kx})
     b = search_a("A2 mean-dev revert", sig)
     _, _, sname, ename, E, ex, sp = b
@@ -255,6 +255,9 @@ def part_a():
     out.append(finalize_a("scalp_meandev_revert", "Возврат к средней после сильного отклонения",
                           f"Если цена закрытия ушла от {base_ru} дальше чем на {sp['dev_atr']:g}×ATR, входим в сторону средней на "
                           f"открытии следующей свечи; {exit_ru(ex)}. {COSTS_RU}", E, ex, dict(sp, exit=ename)))
+    del ema20, cpv, cv, bpv, bv, vwap, dev_e, dev_v, tp_, vv, sig, b, E
+    import gc
+    gc.collect()
 
     # ── A3 session opening-range breakout (DST-aware) ──
     d0 = int(D.times[0] // 86_400_000)
@@ -277,7 +280,7 @@ def part_a():
 
     def orb(opens, m, W=4):
         mask = np.zeros((NS, T), bool)
-        side = np.zeros((NS, T), int)
+        side = np.zeros((NS, T), np.int8)
         for s in opens:
             orh, orl = np.nanmax(H[:, s:s + m], 1), np.nanmin(L[:, s:s + m], 1)
             cw = C[:, s + m:s + m + W]
@@ -312,14 +315,20 @@ def part_a():
     hour_next = (D.hour + 1) % 24                        # bar i opens at hh:45 → the entry bar opens at (hh+1):00
     m45 = np.broadcast_to(minute == 45, (NS, T))
     best4 = None
+    # hour scan on TRAIN entries only, with the own simulator (identical to harness.run for these exits — checked above;
+    # harness.run on ~900k entries does not fit the 2 GB memory limit of this box)
+    i_tr0 = int(np.searchsorted(D.times, HN.TRAIN_START))
+    i_tr1 = int(np.searchsorted(D.times, HN.TRAIN_END)) - 1
+    kk_, ii_ = np.nonzero(m45[:, :i_tr1] & np.isfinite(ATR[:, :i_tr1]))
+    sel = ii_ >= i_tr0
+    kk_, ii_ = kk_[sel], ii_[sel]
     for mb in (2, 4):
         ex = dict(sl_atr=3.0, tps=[], max_bars=mb)
-        E = entries_from_mask(m45, 1, gap=1)
-        Tg = run(E, ex, cost=0.0)
-        r = np.array([t["ret"] for t in Tg])
-        ei = np.array([t["i"] for t in Tg])
+        S = sim(O, H, L, C, kk_, ii_, np.ones(len(ii_)), ATR[kk_, ii_] * 3.0, None, mb, "market")
+        r, ei = S["gross"], S["i"]
         hrs, yrs = hour_next[ei], D.year[ei + 1]
-        trm = (D.times[ei + 1] >= HN.TRAIN_START) & (D.times[ei + 1] < HN.TRAIN_END)
+        trm = np.ones(len(r), bool)
+        del S
         cand = []
         for h in range(24):
             TRIED += 1
@@ -360,7 +369,7 @@ def part_a():
     sig = {}
     for kx in (2.0, 2.5):
         for mode, sgn in (("follow", 1), ("fade", -1)):
-            side = np.where(real & (z > kx), sgn, np.where(real & (z < -kx), -sgn, 0))
+            side = np.where(real & (z > kx), sgn, np.where(real & (z < -kx), -sgn, 0)).astype(np.int8)
             sig[f"{mode}_z{kx}"] = (side != 0, side, {"taker_z": kx, "mode": mode})
     b = search_a("A5 taker burst", sig, min_n=200, start=t23, train=(ms(2023), HN.TRAIN_END))
     _, _, sname, ename, E, ex, sp = b
@@ -463,6 +472,7 @@ def part_b():
     df = load_1m()
     t = df.t.values
     o, h, l, c, v = (df[x].values.astype(float) for x in "ohlcv")
+    del df
     N = len(c)
     log(f"   1m bars: {N:,}  {pd.to_datetime(t[0], unit='s')} → {pd.to_datetime(t[-1], unit='s')}")
     O2, H2, L2, C2 = o[None], h[None], l[None], c[None]
@@ -483,8 +493,12 @@ def part_b():
         ii = thin(sig_idx, ex["max_bars"])
         ii = ii[ii + ex["max_bars"] + 1 < N]
         sd = atr60[ii] * ex["sl_atr"]
-        R = sim(O2, H2, L2, C2, np.zeros(len(ii), int), ii, side_arr[ii], sd, ex["tp_r"], ex["max_bars"], mode,
-                fill_win=3)
+        parts = [sim(O2, H2, L2, C2, np.zeros(len(ch), int), ch, side_arr[ch], sd[a:a + len(ch)], ex["tp_r"],
+                     ex["max_bars"], mode, fill_win=3)
+                 for a, ch in ((a, ii[a:a + 40_000]) for a in range(0, max(1, len(ii)), 40_000))]
+        R = {key: np.concatenate([p_[key] for p_ in parts]) for key in ("k", "i", "sg", "e", "x", "gross", "kind")}
+        R["n_sig"] = sum(p_["n_sig"] for p_ in parts)
+        R["n_fill"] = sum(p_["n_fill"] for p_ in parts)
         return R
 
     def search_b(idea, signals, min_n=300):
@@ -619,6 +633,9 @@ def part_b():
 def main():
     res_a = part_a()
     log(f"Part A done, tried so far {TRIED}")
+    import gc
+    HN._D = None          # Part B does not need the 15m arrays; the box has a ~2 GB memory limit
+    gc.collect()
     res_b = part_b()
     log(f"Part B done, tried total {TRIED}")
     results = res_a + res_b

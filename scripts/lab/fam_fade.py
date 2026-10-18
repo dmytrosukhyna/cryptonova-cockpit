@@ -203,6 +203,23 @@ def short_stats(st):
                 pos=st.get("pos_years", 0), yrs=st.get("years_n", 0), top=st.get("top_coin_share"))
 
 
+def train_top_share(trades):
+    """Share of the TRAIN profit that comes from the best coin (same formula as harness.stats, TRAIN trades only)."""
+    if not trades:
+        return None
+    from harness import TRAIN_START, TRAIN_END
+    e = np.fromiter((t["e"] for t in trades), dtype=np.int64, count=len(trades))
+    k = np.fromiter((t["k"] for t in trades), dtype=np.int64, count=len(trades))
+    r = np.fromiter((t["ret"] for t in trades), dtype=float, count=len(trades))
+    tt = D.times[e]
+    m = (tt >= TRAIN_START) & (tt < TRAIN_END)
+    if not m.any():
+        return None
+    by = np.bincount(k[m], weights=r[m], minlength=D.NS)
+    tot = by[by > 0].sum()
+    return round(float(by.max() / tot), 2) if tot > 0 else None
+
+
 def side_split(trades):
     out = {}
     tr_end = __import__("harness").TRAIN_END
@@ -230,22 +247,29 @@ def main():
                     T = run(E, ex)
                     st = stats(T, f"{idea}-{mode}-{p}-{en}")
                     tried += 1
-                    rows.append(dict(idea=idea, mode=mode, p=p, exit=en, st=st))
-            s = short_stats(rows[-1]["st"])
+                    rows.append(dict(idea=idea, mode=mode, p=p, exit=en, st=st, tr_top=train_top_share(T)))
             print(f"{idea} {p} entries={len(E)}  [{time.time() - t_start:.0f}s]", flush=True)
 
     # ---- choose the best variant per idea × direction on TRAIN only
     def key(r):
         return (r["idea"], r["mode"])
 
-    best = {}
+    # rule: the highest TRAIN avg among variants with ≥ MIN_TRAIN_N train trades AND no coin > 50 % of the TRAIN profit
+    # (the lab's coin-concentration rule, measured on TRAIN only). best_v1 = the same without the coin rule (for reference).
+    best, best_v1 = {}, {}
     for r in rows:
         tr = r["st"].get("train", {})
         if tr.get("n", 0) < MIN_TRAIN_N:
             continue
         k = key(r)
+        if k not in best_v1 or tr["avg_pct"] > best_v1[k]["st"]["train"]["avg_pct"]:
+            best_v1[k] = r
+        if r["tr_top"] is None or r["tr_top"] > 0.5:
+            continue
         if k not in best or tr["avg_pct"] > best[k]["st"]["train"]["avg_pct"]:
             best[k] = r
+    for k, r in best_v1.items():
+        best.setdefault(k, r)
 
     def find(idea, mode, p, en):
         for r in rows:
@@ -267,7 +291,11 @@ def main():
             opp = find(idea, "flip" if mode == "fade" else "fade", r["p"], r["exit"])
             so = short_stats(opp["st"])
             print(f"{idea + '-' + mode:<12}{str(r['p']):<26}{r['exit']:<10}{s['tr_n']:>7}{s['tr_avg']:>8}{s['te_n']:>6}{s['te_avg']!s:>8}"
-                  f"{s['pos']:>3}/{s['yrs']}{s['top']!s:>6} {'YES' if passes(r['st']) else 'no '}   {so['tr_avg']}/{so['te_avg']}")
+                  f"{s['pos']:>3}/{s['yrs']}{s['top']!s:>6} {'YES' if passes(r['st']) else 'no '}   {so['tr_avg']}/{so['te_avg']}  tr_top={r['tr_top']}")
+            v1 = best_v1.get((idea, mode))
+            if v1 is not None and v1 is not r:
+                s1 = short_stats(v1["st"])
+                print(f"   (without the coin rule: {v1['p']} {v1['exit']} train {s1['tr_avg']} test {s1['te_avg']} tr_top={v1['tr_top']})")
 
     # ---- exit comparison: average over ALL param combos per idea × direction (train and test)
     print("\n=== exits: mean avg_pct over the 6 param combos (train | test) ===")
@@ -356,7 +384,17 @@ def main():
                 paired_opposite={"mode": opp_mode, "train": opp["st"]["train"], "test": opp["st"]["test"], "pos_years": opp["st"]["pos_years"]},
                 beats_other_best_on_train=bool(other_best and r["st"]["train"]["avg_pct"] > other_best["st"]["train"]["avg_pct"]),
                 side_split=split,
+                train_top_coin_share=r["tr_top"],
+                selection_ru="лучшая средняя на 2021–24 среди вариантов с ≥ 300 сделок и без монеты > 50 % прибыли 2021–24",
+                neighbors=[{"params": q["p"], "train_avg": q["st"]["train"].get("avg_pct"), "test_avg": q["st"]["test"].get("avg_pct"),
+                            "pos_years": q["st"]["pos_years"]}
+                           for q in rows if q["idea"] == idea and q["mode"] == mode and q["exit"] == r["exit"]],
             )
+            v1 = best_v1.get((idea, mode))
+            if v1 is not None and v1 is not r:
+                res["pick_without_coin_rule"] = {"params": v1["p"], "exit": v1["exit"], "train": v1["st"]["train"], "test": v1["st"]["test"],
+                                                 "pos_years": v1["st"]["pos_years"], "top_coin_share": v1["st"]["top_coin_share"],
+                                                 "train_top_coin_share": v1["tr_top"]}
             results.append(res)
     for m in ("fade", "flip"):
         r = app_pair[m]
@@ -412,26 +450,44 @@ def notes(results, tried, exit_rank, exit_tab, app_pair, month_info):
         f"То есть флип теряет меньше, но в плюс за 6 лет не выходит.",
         f"Копия сигналов приложения, параметры заданы заранее: оригинал {pc(af['train']['avg_pct'])} (2021–24) и {pc(af['test']['avg_pct'])} (2025–26), "
         f"флип {pc(ag['train']['avg_pct'])} и {pc(ag['test']['avg_pct'])}. По годам — оригинал: {yrs(af)}; флип: {yrs(ag)}. "
-        f"По месяцам флип был в плюсе в {mi['flip_pos']} из {mi['n_months']} месяцев и давал +0,33 % и больше только в {mi['flip_ge_033']} месяцах — "
-        f"значит, +0,33 % за сентябрь–октябрь 2026 — удачный период, а не правило.",
+        f"По месяцам флип был в плюсе в {mi['flip_pos']} из {mi['n_months']} месяцев и "
+        + (f"ни разу не дал +0,33 % (лучший месяц {pc(mi['best_flip'][-1][0])}, {mi['best_flip'][-1][1]})"
+           if mi["flip_ge_033"] == 0 else f"давал +0,33 % и больше только в {mi['flip_ge_033']} месяцах")
+        + " — значит, +0,33 % в сигналах приложения за сентябрь–октябрь 2026 — либо удачный период, либо у сигналов приложения есть своя "
+          "(обратная) информация, которой нет в нашей простой копии; как постоянное правило по истории это не подтверждается.",
         f"Откуда разница: в лучших вариантах лонги были в плюсе на 2021–24 в {long_tr_pos} из {len(lt)} случаев, шорты — в {short_tr_pos} из {len(lt)}. "
         f"Флип помогает, потому что превращает «шорт после роста» в «лонг после роста», а лонги в эти годы просто выигрывали от роста рынка.",
     ]
     if u0 and u1:
+        nb = [q["test_avg"] for q in u1["neighbors"] if q["test_avg"] is not None]
+        nb_tr = [q["train_avg"] for q in u1["neighbors"] if q["train_avg"] is not None]
+        v1 = u1.get("pick_without_coin_rule")
         parts.append(
-            f"Самый частый тип сигнала приложения отдельно («после роста в аптренде»): шорт (как в приложении) — "
-            f"{pc(u0['stats']['train']['avg_pct'])} / {pc(u0['stats']['test'].get('avg_pct'))}, лонг (флип) — "
-            f"{pc(u1['stats']['train']['avg_pct'])} / {pc(u1['stats']['test'].get('avg_pct'))} (2021–24 / 2025–26), "
-            f"плюсовых лет у флипа {u1['stats']['pos_years']} из {u1['stats']['years_n']}, фильтры {'пройдены' if passes(u1['stats']) else 'не пройдены'}.")
+            f"Самый частый тип сигнала приложения отдельно («после сильного роста в аптренде»): шорт, как в приложении, — "
+            f"{pc(u0['stats']['train']['avg_pct'])} / {pc(u0['stats']['test'].get('avg_pct'))} (2021–24 / 2025–26), плюсовых лет "
+            f"{u0['stats']['pos_years']} из {u0['stats']['years_n']}. Флип — лонг и держать до 24 ч — "
+            f"{pc(u1['stats']['train']['avg_pct'])} / {pc(u1['stats']['test'].get('avg_pct'))}, плюсовых лет "
+            f"{u1['stats']['pos_years']} из {u1['stats']['years_n']}, фильтры {'пройдены' if passes(u1['stats']) else 'не пройдены'}; "
+            f"все 6 наборов параметров с этим выходом: 2021–24 от {pc(min(nb_tr))} до {pc(max(nb_tr))}, 2025–26 от {pc(min(nb))} до {pc(max(nb))}. "
+            + (f"Без правила «не больше 50 % прибыли с одной монеты» победил бы вариант {v1['params']} "
+               f"({pc(v1['train']['avg_pct'])} / {pc(v1['test'].get('avg_pct'))}), но он держится на DOGE в 2021 году. "
+               f"Правило по монете на 2021–24 добавлено после первого прогона, поэтому этот результат — гипотеза, которую надо проверить "
+               f"на других монетах и на новых данных, а не готовая стратегия. " if v1 else "")
+            + "С планом приложения (ранняя цель 0,8 %) этот же лонг не зарабатывает — прибыль дают редкие большие движения за сутки, "
+              "медианная сделка в минусе.")
     parts.append(
         f"Выходы: для оригинала лучше всего «{EXIT_RU[rk['fade'][0]]}», для флипа — «{EXIT_RU[rk['flip'][0]]}» (по 2021–24). "
         f"Для флипа: 5 целей приложения {pc(ex_flip['app5'][0])} / {pc(ex_flip['app5'][1])}, 3 цели {pc(ex_flip['app3'][0])} / {pc(ex_flip['app3'][1])}, "
         f"1 цель 0,8 % {pc(ex_flip['app1'][0])} / {pc(ex_flip['app1'][1])} (2021–24 / 2025–26, среднее по идеям). "
-        f"1 цель на 0,8 % — худший выход и для оригинала ({pc(ex_fade['app1'][0])}), и для флипа: цель в половину стопа требует очень высокого процента побед. "
-        f"Из трёх планов приложения 5 целей с безубытком лучше 3 целей, а 3 цели лучше 1 цели.")
+        + (f"1 цель на 0,8 % — худший выход и для оригинала ({pc(ex_fade['app1'][0])}), и для флипа: цель в половину стопа требует очень высокого процента побед. "
+           if rk["fade"][-1] == "app1" and rk["flip"][-1] == "app1" else "")
+        + ("Из трёх планов приложения 5 целей с безубытком лучше 3 целей, а 3 цели лучше 1 цели — в обе стороны и в оба периода."
+           if all(ex[a_][i_] > ex[b_][i_] for ex in (ex_fade, ex_flip) for a_, b_ in (("app5", "app3"), ("app3", "app1")) for i_ in (0, 1))
+           else "Порядок 5 / 3 / 1 цели приложения не одинаков в разных периодах."))
     parts.append(
         "Оговорки: сделки по разным монетам в один момент сильно связаны (весь рынок двигается вместе), поэтому реальная надёжность ниже, "
-        "чем кажется по числу сделок; производные метрики не использовались; сигналы приложения могут иметь свои правила, которых мы не знаем.")
+        "чем кажется по числу сделок; данные заканчиваются 09.09.2026, то есть период сигналов приложения (сентябрь–октябрь 2026) почти не попал "
+        "в проверку; наша копия сигналов приблизительная — точных правил приложения мы не знаем; производные метрики не использовались.")
     return " ".join(parts)
 
 

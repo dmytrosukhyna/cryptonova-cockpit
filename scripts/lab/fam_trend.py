@@ -13,8 +13,9 @@ Ideas (long and short unless noted), 18 coins x 15m bars, harness.py for entries
                 (f = None is the control without the "alt lags" condition).
   5. daily    — daily open-range breakout (first 4 h / 8 h of the UTC day) and previous-day high/low breakout,
                 first breakout of the day only.
-  6. regime   — idea 1 (N = 3 / 5 days, volume > 2x daily mean) only in BTC's direction (1h EMA50 vs EMA200, or BTC vs
-                its ~50-day EMA).
+  6. regime   — idea 1 (N = 3 / 5 days, volume > 2x daily mean) with a market filter: BTC's direction (1h EMA50 vs
+                EMA200, or BTC vs its ~50-day EMA) or breadth (>= 4 / 8 / 12 coins broke out in the last 24 h).
+                NB: added after the first pass showed idea 1 longs losing in 2022 (parameters still chosen on TRAIN).
 Exits: harness grid_exits(max_bars) + "wide_trail" (4 ATR stop, 30 % at 1R, then break-even + 4 ATR trail) and
 "wide_time" (8 ATR disaster stop, time exit). Controls (every coin every day at 00:00 UTC, same exits) show how much of a
 result is plain market drift; they are not strategies and not counted in "tried".
@@ -479,27 +480,35 @@ def main():
     passed = [r["name_ru"] for r in results if passes(r["stats"])]
     lt, wt = league["time"], league["wide_time"]
     tight = [league[e]["train_mean"] for e in ("1tp_1r", "1tp_2r", "3tp_be", "5tp_be", "tp1_trail")]
+    tight_pos = [league[e]["train_pos_share"] for e in ("1tp_1r", "1tp_2r", "3tp_be", "5tp_be", "tp1_trail")]
     cl, cs = ctrl["long_daily_wide_time192"], ctrl["short_daily_wide_time192"]
+    tops = "; ".join(f"«{r['name_ru']}» {r['stats']['day_concentration'].get('test', {}).get('avg_pct_without_top3_days')} %"
+                     for r in results if passes(r["stats"]))
     notes_ru = (
         f"Семейство «тренд»: 6 идей — пробой канала 1/3/5 дней (с фильтром объёма и без), откат к EMA по часовому "
         f"тренду, пробой после сжатия Боллинджера, альт догоняет BTC, пробой дневного диапазона/вчерашнего дня, "
-        f"пробой канала только по тренду BTC; лонг и шорт отдельно. Проверено {TRIED} вариантов "
-        f"(сигнал × сторона × выход + проверка длины удержания). Параметры и выход выбирались только на 2021–2024 "
-        f"(лучшее среднее на сделку при n ≥ {NMIN_TRAIN} и ≥ 3 из 4 плюсовых лет). Прошли критерий: {npass} из "
-        f"{len(results)}{(': ' + '; '.join(passed)) if passed else ''}. "
-        f"Выходы: узкий стоп 2 ATR(15м) с целями 1–3R и трейлинг после первой цели почти всегда в минусе "
-        f"(среднее на трейне от {min(tight):+.2f} до {max(tight):+.2f} % на сделку) — 15-минутный шум выбивает стоп "
-        f"раньше, чем развивается движение, а комиссия 0,14 % съедает маленькие цели. Работают только широкие выходы по "
-        f"времени: стоп 4 ATR + выход через N баров (трейн {lt['train_mean']:+.2f}, тест {lt['test_mean']:+.2f}) и "
-        f"аварийный стоп 8 ATR (трейн {wt['train_mean']:+.2f}, тест {wt['test_mean']:+.2f}); на трейне их чаще всего и "
-        f"выбирали. Важно: большая часть плюса лонгов — это просто рост рынка. Контроль «покупать каждую монету каждый "
-        f"день в 00:00 UTC, стоп 8 ATR, выход через 2 суток» даёт трейн {cl['train']:+.2f} %, тест {cl['test']:+.2f} %; "
-        f"шорт тем же способом — трейн {cs['train']:+.2f} %, тест {cs['test']:+.2f} %. Пробои вверх лучше этого контроля "
-        f"(есть импульс), но в медвежий 2022 год всё равно теряют; пробои вниз и шорты после падения BTC хуже "
-        f"случайного шорта — на 15м после резкого пробоя вниз цена чаще откатывает (идея для семейства fade). "
-        f"У «альт догоняет BTC» условие «альт отстал» ничего не добавляет: просто лонг альтов после часа роста BTC "
-        f"≥ 2 % даёт похожий или лучший результат. Сделки по одной монете могут перекрываться (харнесс считает "
-        f"каждую отдельно), так что сумма процентов — не доходность счёта.")
+        f"пробой канала с фильтром рынка (тренд BTC или «пробой всего рынка»); лонг и шорт отдельно. Проверено "
+        f"{TRIED} вариантов (сигнал × сторона × выход + проверка длины удержания). Параметры и выход выбирались только "
+        f"на 2021–2024 (лучшее среднее на сделку при n ≥ {NMIN_TRAIN} и ≥ 3 из 4 плюсовых лет). Прошли критерий: "
+        f"{npass} из {len(results)}{(': ' + '; '.join(passed)) if passed else ''}. "
+        f"НО прошедшие варианты держатся на нескольких днях, когда рвануло почти всё сразу: без 3 лучших дней теста среднее "
+        f"на сделку — {tops}. Фильтр «пробой всего рынка», посчитанный честно (по уже случившимся пробоям за сутки), "
+        f"этот эффект не ловит. Идея 6 (фильтр рынка) добавлена после того, как увидели, что простой пробой вверх "
+        f"теряет в 2022-м, — параметры выбраны на трейне, но сам выбор идеи уже не полностью «слепой». "
+        f"Выходы: узкий стоп 2 ATR(15м) с целями 1–3R и трейлинг после первой цели почти никогда не дают плюса на "
+        f"трейне (плюсовых вариантов {min(tight_pos):.0%}–{max(tight_pos):.0%}; среднее от {min(tight):+.2f} до "
+        f"{max(tight):+.2f} % на сделку) — 15-минутный шум выбивает стоп раньше, чем развивается движение, а комиссия "
+        f"0,14 % съедает маленькие цели. Лучше всего — выход по времени с широким стопом: стоп 4 ATR "
+        f"(плюсовых вариантов на трейне {lt['train_pos_share']:.0%}) и аварийный стоп 8 ATR "
+        f"({wt['train_pos_share']:.0%}, выбран лучшим в {wt['train_best_count']} сигналах из {sum(v['train_best_count'] for v in league.values())}). "
+        f"Важно: большая часть плюса лонгов — просто рост рынка. Контроль «покупать каждую монету каждый день в 00:00 "
+        f"UTC, стоп 8 ATR, выход через 2 суток» даёт трейн {cl['train']:+.2f} %, тест {cl['test']:+.2f} %; шорт тем же "
+        f"способом — трейн {cs['train']:+.2f} %, тест {cs['test']:+.2f} %. Пробои вверх лучше этого контроля (импульс "
+        f"есть), но в 2022-м всё равно теряют; пробои вниз, сжатия и шорты после падения BTC хуже случайного шорта — на "
+        f"15м после резкого пробоя вниз цена чаще откатывает (материал для семейства fade). У «альт догоняет BTC» "
+        f"условие «альт отстал» ничего не добавляет: просто лонг всех альтов после часа роста BTC ≥ 2 % даёт похожий "
+        f"результат на большем числе сделок. Сделки по одной монете могут перекрываться (харнесс считает каждую "
+        f"отдельно), так что сумма процентов — не доходность счёта.")
     os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
     report(os.path.join(HERE, "results", "trend.json"), "trend", results, TRIED, notes_ru)
 

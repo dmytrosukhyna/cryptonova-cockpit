@@ -406,7 +406,9 @@ def day_clustered(trades):
         if m.sum():
             u, inv = np.unique(day[m], return_inverse=True)
             dm = np.bincount(inv, weights=r[m]) / np.bincount(inv)
-            out[lab] = {"days": int(len(u)), "day_avg_pct": round(float(dm.mean() * 100), 3), "day_win": round(float((dm > 0).mean()), 3)}
+            ds = np.sort(np.bincount(inv, weights=r[m]))[::-1]           # profit per day, best first
+            out[lab] = {"days": int(len(u)), "day_avg_pct": round(float(dm.mean() * 100), 3), "day_win": round(float((dm > 0).mean()), 3),
+                        "sum_pct": round(float(r[m].sum() * 100), 1), "sum_without_best10_days_pct": round(float((r[m].sum() - ds[:10].sum()) * 100), 1)}
     return out
 
 
@@ -472,8 +474,8 @@ base_txt = "; ".join(f"{'лонг' if sg > 0 else 'шорт'} {ex}: train {v[0]:
 NOTES = (
     "Производные данные (фандинг, OI, ликвидации, CVD, тейкеры, лонг/шорт, базис) до 2023 г. в основном восстановлены (is_imputed_metrics=1), "
     "поэтому все правила этой семьи судятся только на реальных барах с 2023-01: TRAIN = 2023-01 → 2024-12 (выбор параметров), "
-    "TEST = 2025-01 → 2026-09 (только проверка). Лет всего 4 (2023–2026), поэтому правило лет здесь — «≥ 3 из 4 положительных»; "
-    "harness.passes() требует 4 из 6 и для этой семьи означает «все 4 года в плюсе» (поле passes), отдельно записано passes_3of4. "
+    "TEST = 2025-01 → 2026-09 (только проверка). Лет всего 4 (2023–2026), поэтому правило лет здесь — «≥ 3 из 4 положительных» "
+    "(harness.passes() с 18.10 сам ставит 3 при 4 годах; поле passes_3of4 — то же правило, посчитанное в скрипте). "
     "Открытый интерес переведён в монеты (OI в $ / цена): в долларах он двигается вместе с ценой, и «цена растёт, OI падает» было бы наполовину арифметикой. "
     "Ликвидации по альткоинам имеют постоянный «пол» (~0.2–0.5 млн $ на свечу даже в тишине) — похоже на оценочные данные; "
     "поэтому используются только всплески относительно собственной медианы и 30-дневного перцентиля. "
@@ -484,14 +486,31 @@ NOTES = (
 _ok3 = [f"{r['name_ru']} (test {r['stats']['test'].get('avg_pct'):+.3f} %, перекрытие с B/E/F/D {r['overlap_BEFD_4h'].get('any', 0) * 100:.0f} %)"
         for r in results if r["passes_3of4"]]
 _ok4 = [r["name_ru"] for r in results if passes(r["stats"])]
-NOTES += (f" Итог: по правилу «≥ 3 из 4 лет» проходят — {'; '.join(_ok3) or 'ничего'}; по строгому правилу harness (все 4 года) — "
-          f"{', '.join(_ok4) or 'ничего'}. Фандинг, тейкерские всплески, CVD-дивергенции, перекос топ-трейдеров, премия базиса и "
+_all4 = [r["name_ru"] for r in results if r["stats"].get("pos_years", 0) >= 4]
+NOTES += (f" Итог: по правилу «≥ 3 из 4 лет» проходят — {'; '.join(_ok3) or 'ничего'}; все 4 года в плюсе — "
+          f"{', '.join(_all4) or 'ни у кого'}. Но у прошедших среднее «по дням» на TEST отрицательное: прибыль держится на 5–10 днях "
+          "массовых сквизов/обвалов (поле day_clustered, sum_without_best10_days_pct), а без входов рядом с B/E/F/D их TEST ≈ 0 или минус "
+          "(поле without_BEFD_overlap) — как самостоятельные новые правила они слабые. Фандинг, тейкерские всплески, CVD-дивергенции, перекос топ-трейдеров, премия базиса и "
           "«толпа против фандинга» на TEST не лучше случайного входа (≈ минус издержки).")
+
+for r in results:
+    c = []
+    dc = (r.get("day_clustered") or {}).get("test") or {}
+    if dc and dc.get("day_avg_pct") is not None and dc["day_avg_pct"] < 0 < (r["stats"]["test"].get("avg_pct") or 0):
+        c.append(f"среднее по дням на TEST {dc['day_avg_pct']:+.2f} % (дней {dc['days']}); без 10 лучших дней сумма TEST "
+                 f"{dc.get('sum_without_best10_days_pct', 0):+.0f} % — плюс дают несколько дней, когда сигнал срабатывает сразу на многих монетах")
+    ov = r.get("overlap_BEFD_4h") or {}
+    if ov.get("any", 0) >= 0.3:
+        w = (r.get("without_BEFD_overlap") or {}).get("test") or {}
+        c.append(f"{ov['any'] * 100:.0f} % входов в ±4 ч от сигналов B/E/F/D" + (f"; без них TEST {w.get('avg_pct'):+.3f} % (n {w.get('n')})" if w else ""))
+    if (r["stats"]["test"].get("n") or 0) < 60:
+        c.append(f"на TEST мало сделок ({r['stats']['test'].get('n', 0)})")
+    r["caveat_ru"] = "; ".join(c)
 
 os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
 report(os.path.join(HERE, "results", "deriv.json"), "deriv", results, TRIED, NOTES)
 import json  # noqa: E402
-with open(os.path.join(HERE, "results", "deriv_all_variants.json"), "w", encoding="utf-8") as f:
+with open(os.path.join(HERE, "results", "_deriv_all_variants.json"), "w", encoding="utf-8") as f:
     json.dump({"tried": TRIED, "baseline": {f"{sg}_{ex}": v for (sg, ex), v in BASE.items()}, "variants": ALL}, f, ensure_ascii=False, default=float)
 
 print(f"\n{'idea':14} {'variant':22} {'exit':9} {'trN':>5} {'trAvg':>7} {'teN':>5} {'teAvg':>7} {'tePF':>5} yrs  top  pass 3/4  overlap  years")

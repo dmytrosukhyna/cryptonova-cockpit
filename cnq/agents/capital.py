@@ -154,7 +154,7 @@ def desk_values(out: str) -> dict:
         v["susde"] = float(_susde(out)["equity"])
     d = prof.get("lst") or {}
     if d.get("equity") is not None:                      # tracked always (index), given money only after the gate
-        v["listings"] = float(d["equity"])
+        v["listings"] = float(d["equity_mtm"] if d.get("equity_mtm") is not None else d["equity"])
     return v
 
 

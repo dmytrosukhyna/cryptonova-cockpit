@@ -58,6 +58,10 @@ jobs:
         continue-on-error: true
         timeout-minutes: 3
         run: python -m cnq.cli listings --out web
+      - name: «Турбо» (the listing short ×4, BTC ×2 in «рост») — demo accounts against the +70 %/month target → web/paper.json
+        continue-on-error: true
+        timeout-minutes: 2
+        run: python -m cnq.cli turbo --out web
       - name: Our own signals in Cornix format (CNPTS «Сбалансированная») → web/signals_feed.json; Telegram only if CNQ_SIGNALS_CHAT is set
         continue-on-error: true
         env:

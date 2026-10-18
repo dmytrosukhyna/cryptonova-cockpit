@@ -175,7 +175,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
         u = (t["entry"] - px) * t["qty"] + (t["funding_usd"] or 0) - t["entry"] * t["qty"] * FEE
         open_pnl += u
         out_open.append({"id": t["id"], "symbol": t["symbol"].replace("-USDT", ""), "side": "SHORT", "grade": "LST", "kind": "LISTING_SHORT",
-                         "entry": t["entry"], "stop": t["stop"], "qty": t["qty"], "qty_left": t["qty"], "opened": t["opened"],
+                         "entry": t["entry"], "stop": t["stop"], "qty": t["qty"], "qty_left": t["qty"], "opened": t["opened"], "pnl_usd": 0.0,
                          "expires": t["expires"], "price": px, "open_pnl_usd": round(u, 2), "funding_usd": round(t["funding_usd"] or 0, 2),
                          "listed": t["listed"], "reason": f"Шорт листинга: через {DELAY_H} ч после появления фьючерса; стоп +30%, выход через {HOLD_D} дней."})
     equity = equity_closed + open_pnl
@@ -193,8 +193,11 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
     wins = conn.execute("SELECT COUNT(*) FROM lst_trades WHERE closed IS NOT NULL AND pnl_usd > 0").fetchone()[0]
     avg_trade = conn.execute("SELECT AVG(pnl_usd / (qty * entry)) FROM lst_trades WHERE closed IS NOT NULL AND qty > 0 AND entry > 0").fetchone()[0]
     first = conn.execute("SELECT MIN(time) FROM lst_equity").fetchone()[0] or now
+    # 19.10: the paper-desk convention — `equity` = closed trades only, open P&L apart (the panel adds open positions at live prices;
+    # equity_mtm = both, for the history, the allocator and the turbo mirror)
     return {"asof": now, "profile": "lst", "name": NAME, "about": ABOUT, "start_equity": START, "since": first, "reset": None,
-            "equity": round(equity, 2), "pnl_usd": round(equity - START, 2), "pnl_pct": round((equity / START - 1) * 100, 2),
+            "equity": round(equity_closed, 2), "equity_mtm": round(equity, 2),
+            "pnl_usd": round(equity - START, 2), "pnl_pct": round((equity / START - 1) * 100, 2),
             "open_pnl_usd": round(open_pnl, 2), "open": out_open, "pending": [], "closed": closed,
             "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "max_dd_pct": round(dd * 100, 2),
                       "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0),

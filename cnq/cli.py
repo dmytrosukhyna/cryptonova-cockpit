@@ -43,7 +43,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -270,6 +270,11 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs("data", exist_ok=True)
         d = tokenomics.run(args.out, conn=sqlite3.connect("data/agents.sqlite"))
         print(f"tokenomics.json: {len(d['tokens'])} tokens with holders revenue; top {[t['symbol'] for t in d['top'][:8]]} error={d['error']}")
+    elif args.cmd == "turbo":
+        import sqlite3
+        from .agents import turbo_desk
+        d = turbo_desk.run(sqlite3.connect("data/agents.sqlite"), args.out)
+        print("turbo:", {k: (v["equity"], v.get("month_pct")) for k, v in d.items()})
     elif args.cmd == "listings":
         import os, sqlite3
         from .agents import listing_desk

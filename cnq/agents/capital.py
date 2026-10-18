@@ -5,14 +5,15 @@ A DEMO account of $10 000 (owner: «как будто я вложил насто
   • spot     — the CRYPTO NOVA portfolio (portfolio.json → portfolios.ideas, equity_usd);
   • futures  — CRYPTO NOVA = the desks in the mix: CNPTS «Сбалансированная» (paper.json profiles.bal) and «Импульс BTC»
                (profiles.imp), equal parts, equity incl. open P&L;
-  • funding  — the funding-carry desk (funding.json equity_mtm).
+  • funding  — the funding-carry desk (funding.json equity_mtm);
+  • yield    — stablecoin lending on Aave v3 at DefiLlama's current supply APY (yield_desk.py → yield.json).
 Arbitrage and the triangle are NOT given money: their numbers are virtual estimates from windows the server saw, and a client
 cannot run them (money on several exchanges, robots win those windows in milliseconds). They are shown as «наблюдение».
 
 Each run every sleeve moves by its desk's return since the previous run. Weights are reset once a week (Monday, Kyiv):
-base spot 50 % · futures 30 % · funding 20 %; a sleeve whose desk lost more than 5 % over the last 30 days gets half its base
+base spot 40 % · futures 25 % · funding 15 % · lending 20 %; a sleeve whose desk lost more than 5 % over the last 30 days gets half its base
 weight, one that gained more than 5 % gets ×1.25, then everything is scaled back to 100 % within the bounds
-(spot 30–60 %, futures 15–45 %, funding 0–30 %). Month summary: start of the calendar month (Kyiv) → now, and 10 % of a
+(spot 25–55 %, futures 10–40 %, funding 0–25 %, lending 10–40 %). Month summary: start of the calendar month (Kyiv) → now, and 10 % of a
 positive result as the fee («к оплате»). A demo, not a promise: the result can be a minus. Stdlib only."""
 from __future__ import annotations
 
@@ -23,10 +24,12 @@ import sqlite3
 import time
 
 START = 10_000.0
-BASE = {"spot": 0.50, "futures": 0.30, "funding": 0.20}
-BOUNDS = {"spot": (0.30, 0.60), "futures": (0.15, 0.45), "funding": (0.0, 0.30)}
+# 18.10 (owner): + a conservative lending sleeve («кредитование», yield_desk.py) → spot 40 · futures 25 · funding 15 · lending 20
+BASE = {"spot": 0.40, "futures": 0.25, "funding": 0.15, "yield": 0.20}
+BOUNDS = {"spot": (0.25, 0.55), "futures": (0.10, 0.40), "funding": (0.0, 0.25), "yield": (0.10, 0.40)}
 FEE = 0.10
-NAMES = {"spot": "Спот · CRYPTO NOVA портфель", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)"}
+NAMES = {"spot": "Спот · CRYPTO NOVA портфель", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)",
+         "yield": "Кредитование стейблкоинов (Aave)"}
 KYIV = dt.timezone(dt.timedelta(hours=3))
 
 
@@ -51,6 +54,9 @@ def desk_values(out: str) -> dict:
     fd = _load(out, "funding.json")
     if fd.get("start_equity"):
         v["funding"] = float(fd["equity_mtm"] if fd.get("equity_mtm") is not None else fd.get("equity", fd["start_equity"]))
+    yd = _load(out, "yield.json")
+    if yd.get("equity") is not None:
+        v["yield"] = float(yd["equity"])
     return v
 
 
@@ -73,6 +79,9 @@ def desk_30d(out: str, now: int) -> dict:
     fh = [x for x in _load(out, "funding.json").get("history") or [] if x[0] >= since and x[1]]
     if fh:
         r["funding"] = fh[-1][1] / fh[0][1] - 1
+    yh = [x for x in _load(out, "yield.json").get("history") or [] if x[0] >= since and x[1]]
+    if yh:
+        r["yield"] = yh[-1][1] / yh[0][1] - 1
     return r
 
 
@@ -159,9 +168,11 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
                            {"key": "tri", "name_ru": "Треугольный арбитраж", "week_virtual_usd": tri}],
             "rules_ru": [
                 f"Демо-счёт ${START:,.0f}: система сама делит сумму между нашими направлениями и ведёт её месяц.",
-                "Старт: спот 50%, фьючерсы 30%, фандинг 20%. Раз в неделю (понедельник) доли пересчитываются: направление, "
-                "которое за 30 дней потеряло больше 5%, получает половину своей доли, заработавшее больше 5% — в 1.25 раза больше; "
-                "границы: спот 30–60%, фьючерсы 15–45%, фандинг 0–30%.",
+                "Старт: спот 40%, фьючерсы 25%, фандинг 15%, кредитование стейблкоинов 20%. Раз в неделю (понедельник) доли "
+                "пересчитываются: направление, которое за 30 дней потеряло больше 5%, получает половину своей доли, заработавшее "
+                "больше 5% — в 1.25 раза больше; границы: спот 25–55%, фьючерсы 10–40%, фандинг 0–25%, кредитование 10–40%.",
+                "Кредитование — консервативная часть: USDC и USDT отданы в кредит на Aave под плавающий процент (сейчас — в файле "
+                "yield.json); без займов, поэтому нет ликвидаций, но остаются риски смарт-контракта и отвязки стейблкоина.",
                 "Арбитраж и треугольник денег не получают: их цифры — виртуальная оценка, клиент не может их исполнить.",
                 "В конце месяца — итог; 10% от прибыли — оплата (месяц без прибыли бесплатно).",
                 "Это демо, а не обещание: результат может быть и минусом."]}

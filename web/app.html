@@ -575,7 +575,7 @@ body.tab-futures #sigCard{order:-1}
 <div id="deck" hidden><div class="dtop"><span class="lvpill"><i></i>ЭФИР</span><b id="dTitle"></b><span class="muted" id="dCount"></span><span class="sp"></span><button class="ib sm" id="dNotes" title="Показать / скрыть подсказки ведущему (N)">подсказки</button><button class="ib sm" id="dLive" title="Старый режим эфира с графиком">график</button><button class="ib sm" id="dClose">✕</button></div><div class="dbody"><div class="dstage" id="dStage"></div><aside class="dnotes" id="dNotesBox"></aside></div><div class="dnav"><button class="ib" id="dPrev">← Назад</button><div class="dprog"><i id="dProg"></i></div><button class="ib" id="dNext">Далее →</button></div></div>
 <div id="welcome" hidden><div class="wbox"><div class="wsub">CRYPTO NOVA · демо-доступ</div><h3>Добро пожаловать в систему</h3><div class="wtxt" id="wTxt"></div>
 <div class="wcols"><div class="wcol ok"><b>Что можно уже сейчас</b><ul><li>смотреть, как автопилот торгует на демо-счетах по $10 000: сделки, результаты, статистику стратегий</li><li>графики монет, радар сигналов — почему автопилот входит или ждёт</li><li>рынок целиком: макро-панель, календарь событий, мем-сектор, киты</li><li>«Заработок»: арбитраж между биржами и фандинг на виртуальных счетах</li><li>спрашивать ассистента и слушать доклад голосом</li></ul></div>
-<div class="wcol no"><b>Откроется с полным доступом</b><ul><li>подключение своей биржи и торговля своими деньгами</li><li>личная статистика и свой портфель — здесь общие демо-счета системы</li><li>тесты новых стратегий</li></ul><div class="muted" style="font-size:11.5px;margin-top:6px">Полный доступ выдаёт администратор CRYPTO NOVA.</div></div></div>
+<div class="wcol no"><b>Откроется с полным доступом</b><ul><li>подключение своей биржи и торговля своими деньгами</li><li>личная статистика и свой портфель — здесь общие демо-счета системы</li><li>подключение своих стратегий и уведомлений</li></ul><div class="muted" style="font-size:11.5px;margin-top:6px">Полный доступ выдаёт администратор CRYPTO NOVA.</div></div></div>
 <div class="wa"><button class="ib" id="wTour">Начать обучение →</button><span class="sp"></span><button class="ib sm" id="wVoice">🔊 слушать</button><button class="ib sm" id="wSkip">Пропустить</button></div></div></div>
 <header class="top">
   <div class="logo">CRYPTO NOVA<small id="logoTot" title="Заработано всего: фьючерсы + спот, демо-счета"></small></div>
@@ -1914,7 +1914,7 @@ function tradesPanel(){ fsysBody(); const head=`<h2>Фьючерсы</h2>${strat
 // 18.10: Futures = three windows. CNPTS — our proven strategies; CRYPTO NOVA App — the app's signals under test;
 // «Тесты стратегий» — Ivan, Roman, memes, swing, new ideas, whales. What proves itself in tests moves into CNPTS.
 const TESTS_HASH='ROdIZ334R2yDxsFY7tmgo85pp104R5jz__T9uHqMAW4';   // sha('cnq:'+invite code); the owner shares cryptonova.vip/?tests=CODE
-let TESTS_OK=!IS_GUEST||load('cnq_tests','')==='1';
+let TESTS_OK=!IS_GUEST;   // 18.10: «Тесты стратегий» is internal — only the owner sees it
 (async()=>{ const m=location.search.match(/[?&]tests=([a-z0-9]+)/i); if(!m) return; try{ if(await sha(m[1].toLowerCase())===TESTS_HASH){ store('cnq_tests','1'); TESTS_OK=true; try{ renderBelow(); }catch(e){} } }catch(e){} })();
 let FSYS=load('cnq_fsys','cn'); if(!['cn','app','tests'].includes(FSYS)) FSYS='cn';
 let TSEL=load('cnq_tsel','ivan'); if(!['ivan','roman','memes','exp','lab','whales'].includes(TSEL)) TSEL='ivan';
@@ -2372,7 +2372,7 @@ function briefClose(){ const w=$('#briefWin'); if(!w) return; w.classList.remove
 function guestText(){ const h=new Date().getHours(); const hello=h<5?'Доброй ночи':h<12?'Доброе утро':h<18?'Добрый день':'Добрый вечер';
   const AC=load('cnq_access',null);
   const L=[`${hello}${AC&&AC.label?', '+AC.label:''}! Добро пожаловать в CRYPTO NOVA — систему, где искусственный интеллект сам ищет сделки на крипторынке и ведёт демо-счета по 10 тысяч долларов.`];
-  if(AC) L.push('Вам открыт доступ по приглашению: кроме общей панели видны тесты новых стратегий.');
+  if(AC) L.push('Вам открыт доступ по приглашению.');
   try{ const b=K.BTCUSDT&&K.BTCUSDT['15m']; const last=b?b[b.length-1].c:null; const ch=b&&b.length>97?last/b[b.length-97].c-1:0; if(last) L.push(`Коротко о рынке: биткоин сейчас ${spokenP(last)} долларов, ${ch>=0.005?'за сутки вырос на '+(ch*100).toFixed(1)+'%':ch<=-0.005?'за сутки снизился на '+(-ch*100).toFixed(1)+'%':'за сутки почти не изменился'}.`); }catch(e){}
   try{ const P=PP(); if(P){ const n=P.open.length; L.push(n?`Автопилот сейчас ведёт ${dealsW(n)}.`:'Автопилот сейчас без открытых сделок: он ждёт резкого движения, в спокойном рынке это нормально.'); } }catch(e){}
   L.push('Здесь можно смотреть сделки, графики, стратегии и их результаты. Подключение своей биржи и личная статистика откроются, когда администратор выдаст вам полный доступ. Сейчас коротко покажу, как всё устроено.'); return L.join(' '); }

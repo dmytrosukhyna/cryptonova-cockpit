@@ -1871,6 +1871,37 @@ def run(conn, now: int | None = None, fetch_json=None, klines=None, budget_s: fl
         else:
             lists[status] = items
             api[f"{kind}_n"] = len(items)
+    # 18.10: does the app's backend keep more than a month? (the owner wants the flip idea checked over ~2 years)
+    # Probe a few common paging parameters once a day; any answer longer / older than the plain list is merged in.
+    if fetch_json is _get_api and lists.get("closed") is not None:
+        try:
+            last = conn.execute("SELECT v FROM app_meta WHERE k='probe_t'").fetchone() if conn.execute(
+                "SELECT name FROM sqlite_master WHERE name='app_meta'").fetchone() else None
+        except sqlite3.Error:
+            last = None
+        if not last or now - int(last[0]) > DAY:
+            conn.execute("CREATE TABLE IF NOT EXISTS app_meta (k TEXT PRIMARY KEY, v TEXT)")
+            base_n = len(lists["closed"])
+            base_min = min((int(x.get("date") or 0) for x in lists["closed"] if isinstance(x, dict) and x.get("date")), default=0)
+            probe = {}
+            for q in ("limit=5000", "size=5000", "page=2", "offset=300", "skip=300", "days=730", f"from={now - 730 * DAY}"):
+                try:
+                    items, _ = extract_list(fetch_json(API_HISTORY + "?" + q))
+                except Exception as e:  # noqa: BLE001
+                    probe[q] = f"ошибка {type(e).__name__}"
+                    continue
+                if items is None:
+                    probe[q] = "нет списка"
+                    continue
+                mn = min((int(x.get("date") or 0) for x in items if isinstance(x, dict) and x.get("date")), default=0)
+                probe[q] = {"n": len(items), "oldest": mn}
+                if len(items) > base_n or (mn and base_min and mn < base_min):
+                    known = {x.get("signal_id") for x in lists["closed"] if isinstance(x, dict)}
+                    lists["closed"] += [x for x in items if isinstance(x, dict) and x.get("signal_id") not in known]
+            api["history_probe"] = probe
+            conn.execute("INSERT OR REPLACE INTO app_meta VALUES ('probe_t', ?)", (str(now),))
+            conn.execute("INSERT OR REPLACE INTO app_meta VALUES ('probe', ?)", (json.dumps(probe),))
+            conn.commit()
     pstats_ = upsert(conn, lists, now, active_ok=api.get("active", False))
     if pstats_["extra_keys"]:
         notes.append("Новые поля в ответе API (пока не используются): " + ", ".join(pstats_["extra_keys"][:20]))

@@ -290,7 +290,7 @@ def test_run_returns_six_portfolios(tmp_path):
     assert {p["symbol"] for p in res["portfolios"]["bal"]["positions"]} >= {"BTC", "ETH", "SOL"}
     assert res["portfolios"]["meme"]["index"] == 104.0
     ip = res["portfolios"]["ideas"]
-    assert {p["symbol"] for p in ip["positions"]} == {"BTC", "ETH"} and ip["experiment"] and ip["name"] == "AI-портфель · по рекомендациям"
+    assert {p["symbol"] for p in ip["positions"]} == {"BTC", "ETH"} and not ip["experiment"] and ip["ours"] and ip["name"] == "CRYPTO NOVA портфель"
     assert [a["symbol"] for a in ip["actions"] if a["action"] == "SKIP"] == ["GHOST"]          # no price source → skipped, said so
 
 
@@ -415,7 +415,7 @@ def test_spot_reset_archives_and_rebuilds_once(tmp_path):
         assert r and r["time"] == now and "Портфель пересобран 17.10 по решению владельца" in r["note_ru"] and "Новый старт $10 000" in r["note_ru"], k
         assert P[k]["history"][0]["time"] == now and all(a["time"] == now for a in P[k]["recent_actions"]), k
         assert "error" not in P[k], (k, P[k].get("error"))
-    assert P["cons"]["reset"]["archived_pnl_usd"] == 1250.0 and "итог +$1 250" in P["cons"]["reset"]["note_ru"]   # BTC 64k → 80k on 50 %
+    assert P["cons"]["reset"]["archived_pnl_usd"] == 1500.0 and "итог +$1 500" in P["cons"]["reset"]["note_ru"]   # BTC 64k → 80k on 60 % (18.10)
     assert P["mod"]["reset"]["archived_pnl_usd"] == round(10_000 * 0.08 * (1.1e-5 / 1e-5 - 1), 2)   # BTC flat, PEPE +10 %
     assert "в прошлом составе мем — PEPE" in P["mod"]["reset"]["note_ru"]
     assert P["high"]["reset"]["archived_pnl_usd"] == round(10_000 * (0.95 + 0.05 * 4.0 / 4.0 - 1), 2)

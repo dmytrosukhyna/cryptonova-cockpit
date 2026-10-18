@@ -9,6 +9,8 @@ No new data and no forecasts: the module only re-reads what the other department
                                    the follower «По рекомендациям» only adds coins to the universe, see below);
   • memes.json     `spot_memes` — the meme desk's checked spot memes: status small/wait/avoid, why_ru, quality score,
                                    `from_high30_pct` (distance from the 30-day high, a lower-bound estimate);
+  • tokenomics.json `tokens`    — 18.10: holders revenue from DefiLlama (buybacks / burns / payouts): a fact line in the «i» and a
+                                   score bonus (≤ +10, 2 points per 1 % of market cap a year) — never a pass / fail check;
   • markets.json   `top`        — 24 h volume (liquidity);  decision.json `coins` — support zones and the 20-day high for the
                                    18 futures coins of the terminal (used for «цена у поддержки» and the 30-day-high estimate).
 Missing files are skipped; a coin missing a value simply does not pass the check that needs it (never a guess).
@@ -158,7 +160,7 @@ def _num(x):
 def load_inputs(web_dir: str = "web") -> dict:
     out = {}
     for key, fn in (("research", "research.json"), ("portfolio", "portfolio.json"), ("memes", "memes.json"),
-                    ("markets", "markets.json"), ("decision", "decision.json")):
+                    ("markets", "markets.json"), ("decision", "decision.json"), ("tokenomics", "tokenomics.json")):
         try:
             with open(os.path.join(web_dir, fn), encoding="utf-8") as f:
                 out[key] = json.load(f)
@@ -248,6 +250,7 @@ def _gather(inp: dict, now: int) -> tuple[dict, dict]:
         btc_bull = ((decision.get("portfolio") or {}).get("btc_bull")) if dec_ok else None
     bt = (((pf.get("portfolios") or {}).get("bal") or {}).get("backtest") or {}).get("result") or {}
     ctx = {"btc_bull": btc_bull, "names": names, "core_bt": bt.get("cons_50_25_15"),
+           "tok": ((inp.get("tokenomics") or {}).get("tokens")) or {},
            "sources": {k: (v or {}).get("asof") for k, v in inp.items() if isinstance(v, dict)}}
     return coins, ctx
 
@@ -486,9 +489,23 @@ def evaluate(sym: str, s: dict, ctx: dict) -> dict:
         if status is None:
             status, (why, dkey) = "wait", reason
 
+    # ---- holders revenue (18.10, tokenomics.json): the protocol pays its token holders (buybacks / burns / payouts) ----
+    tk = (ctx.get("tok") or {}).get(sym) or {}
+    h30 = _num(tk.get("holders_rev_30d_usd"))
+    mcap = _num(card.get("mcap")) if card else None
+    hy = h30 * 12 / mcap if (h30 and mcap) else None
+    if kind != "meme":
+        if h30 and h30 >= 100_000:
+            chk("holders", f"держатели получают от протокола {_usd(h30)} за 30 дней" + (f" (≈{hy*100:.1f}% капитализации в год)" if hy else "")
+                + " — выкуп, сжигание или выплаты", None)
+        elif kind == "mid" and ctx.get("tok"):
+            chk("holders", "держатели дохода протокола не получают (по DefiLlama) — рост держится только на спросе", None)
+
     # ---- score ----
     parts = [(v, w) for v, w in ((R, 0.5), (C, 0.3), (M, 0.2)) if v is not None]
     score = round(sum(v * w for v, w in parts) / sum(w for _, w in parts)) if parts else 0
+    if hy is not None and kind != "meme":         # a real yield to holders lifts the coin in the order (≤ +10 points)
+        score = min(100, score + round(min(10.0, hy * 100 * 2)))
 
     # ---- info for the «i» popup: 2–5 short sentences, the deciding check first ----
     first = lambda xs: sorted(xs, key=lambda c: c["key"] != dkey)   # noqa: E731

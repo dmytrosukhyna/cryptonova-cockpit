@@ -199,3 +199,29 @@ def test_follower_portfolio_does_not_feed_back_and_statuses_cover_every_coin():
     st = d["statuses"]["ALTA"]
     assert st["status"] == "buy" and st["status_ru"] == "можно брать" and st["kind"] == "mid" and st["price"] == 10.0 and st["why_ru"]
     assert d["statuses"]["ONLYF"]["status"] == "wait" and "ONLYF" not in base["statuses"]
+
+
+def test_holders_revenue_is_a_fact_and_a_small_score_bonus_never_a_gate():
+    """18.10: tokens whose protocol pays holders (DefiLlama holders revenue) rank higher; no data → no bonus, status unchanged."""
+    cs = [card("ALTA", "mod", 48), card("ALTB", "mod", 48)]
+    for c in cs:
+        c["mcap"] = 1e9
+    inp = inputs(cards=cs, picks={"short": [], "mid": [pick("ALTA", 70), pick("ALTB", 70)], "long": []})
+    d0 = rows_by_sym(si.build(inp, NOW))
+    inp["tokenomics"] = {"tokens": {"ALTA": {"name": "Alta", "holders_rev_30d_usd": 5_000_000, "holders_rev_1y_usd": 60_000_000}}}
+    d1 = rows_by_sym(si.build(inp, NOW))
+    assert d1["ALTA"]["score"] == min(100, d0["ALTA"]["score"] + 10) and d1["ALTB"]["score"] == d0["ALTB"]["score"]   # 6 %/yr → capped +10
+    assert d1["ALTA"]["status"] == d0["ALTA"]["status"] and d1["ALTB"]["status"] == d0["ALTB"]["status"]
+    assert any(c["key"] == "holders" and "$5" in c["t"] for c in d1["ALTA"]["checks"])
+    assert any(c["key"] == "holders" and "не получают" in c["t"] for c in d1["ALTB"]["checks"])
+
+
+def test_tokenomics_joins_holders_revenue_to_symbols():
+    from cnq.agents import tokenomics as T
+    ov = {"protocols": [{"name": "Hyperliquid", "slug": "hyperliquid", "total30d": 7e7, "total1y": 8e8},
+                        {"name": "Ondo", "slug": "ondo-finance", "total30d": 0, "total1y": 0},
+                        {"name": "Uniswap V3", "slug": "uniswap-v3", "parentProtocol": "parent#uniswap", "total30d": 2e6, "total1y": 2e7}]}
+    pr = [{"name": "Hyperliquid", "slug": "hyperliquid", "symbol": "HYPE"}, {"name": "Ondo Finance", "slug": "ondo-finance", "symbol": "ONDO"},
+          {"name": "Uniswap", "slug": "uniswap", "symbol": "UNI", "parentProtocol": "parent#uniswap"}]
+    t = T.build(ov, pr)
+    assert t["HYPE"]["holders_rev_30d_usd"] == 70_000_000 and "ONDO" not in t and t["UNI"]["holders_rev_1y_usd"] == 20_000_000

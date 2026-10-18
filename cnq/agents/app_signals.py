@@ -79,7 +79,14 @@ FEE_PCT, SLIP_PCT = 0.05, 0.02
 COST_PCT = 2 * FEE_PCT + SLIP_PCT
 MIN_SAMPLE = 30
 LEV_CAP = 10
-SIM_VERSION = 2             # 2: market fill at the signal minute + 1m path for the first 3 h; strict path coverage
+SIM_VERSION = 3             # 2: market fill at the signal minute + 1m path for the first 3 h; strict path coverage; 3: what-if variants
+WHATIF = {   # «что если» on the same price path: the owner asked whether flipping the signal or changing the stop would work
+    "rev": "Разворот: та же сделка в обратную сторону (стоп и цели зеркально)",
+    "wide15": "Стоп в 1.5 раза дальше, цели те же",
+    "wide2": "Стоп в 2 раза дальше, цели те же",
+    "tp3": "Цели только до TP3: выход равными частями по TP1–TP3",
+}
+MAKER_SAVING_PCT = 0.08      # limit (maker) orders instead of market: 0.02 % × 2 fees and no slippage vs 0.05 % × 2 + 0.02 %
 MAX_FETCH_FAIL = 6
 
 POLICIES = [   # key, name, executable — the first one is the main policy (owner 18.10.2026), the rest are for comparison
@@ -957,7 +964,39 @@ def _sim_from_cache(conn, sig: dict, m1_final: bool, now: int, path_until: int |
                            _candles(conn, sym, "15m", t0 // M15 * M15, now + M15), m1_final, now, path_until)
     if path is None:
         return {"v": SIM_VERSION, "state": "pending", "reason": why, "policies": {}, "n_tps": len(sig["tps"]), "best_tp": 0}
-    return simulate(sig, path, now)
+    res = simulate(sig, path, now)
+    if res.get("state") in ("closed", "open"):
+        res["whatif"] = whatif(sig, path, now)
+    return res
+
+
+def _variant(sig: dict, key: str) -> dict:
+    v = dict(sig)
+    mid = (sig["entry_lo"] + sig["entry_hi"]) / 2
+    if key == "rev":
+        v["side"] = "SHORT" if sig["side"] == "LONG" else "LONG"
+        v["sl"] = 2 * mid - sig["sl"]
+        v["tps"] = [2 * mid - p for p in sig["tps"]]
+    elif key in ("wide15", "wide2"):
+        k = 1.5 if key == "wide15" else 2.0
+        v["sl"] = mid - (mid - sig["sl"]) * k
+    elif key == "tp3":
+        v["tps"] = list(sig["tps"][:3])
+    return v
+
+
+def whatif(sig: dict, path: list, now: int) -> dict:
+    """Outcome of each WHATIF variant on the same candles (compact: state, first event, best TP, net % under two exits)."""
+    out = {}
+    for key in WHATIF:
+        try:
+            r = simulate(_variant(sig, key), path, now)
+        except Exception:  # noqa: BLE001
+            continue
+        pol = r.get("policies") or {}
+        out[key] = {"state": r.get("state"), "first": r.get("first"), "best_tp": r.get("best_tp"),
+                    "be": (pol.get("ladder_be") or {}).get("net"), "last": (pol.get("last") or {}).get("net")}
+    return out
 
 
 def process(conn, now: int, klines, budget: _Budget, notes: list) -> dict:
@@ -1217,7 +1256,47 @@ def build_stats(rows) -> dict:
                       for k in ("1m", "15m")}
     st["median_entry_dist_pct"] = _median([r["sim"].get("entry_dist_pct") for r in rows])
     st["app_flags"] = app_flags_check(rows)
+    st["whatif"] = whatif_stats(res)
     return st
+
+
+def whatif_stats(res) -> dict:
+    """Per variant and exit: n, average net % per trade, share of winners, and the two halves of history (stability check)."""
+    if not res:
+        return {}
+    srt = sorted(res, key=lambda r: r["t"] or 0)
+    half = srt[len(srt) // 2]["t"] or 0
+
+    def summ(xs):
+        xs = [x for x in xs if x is not None]
+        return {"n": len(xs), "avg_pct": round(statistics.fmean(xs), 3) if xs else None,
+                "winrate": round(sum(1 for x in xs if x > 0) / len(xs), 3) if xs else None}
+
+    out = {"variants": [], "half_t": half}
+    base = {"key": "base", "name_ru": "Как есть (для сравнения)"}
+    for ex, pk in (("be", "ladder_be"), ("last", "last")):
+        vals = [(r["t"] or 0, (_pol(r, pk) or {}).get("net")) for r in res]
+        base[ex] = {**summ([v for _, v in vals]), "h1": summ([v for t, v in vals if t < half])["avg_pct"],
+                    "h2": summ([v for t, v in vals if t >= half])["avg_pct"]}
+    out["variants"].append(base)
+    mk = {"key": "maker", "name_ru": f"Лимитные ордера вместо рыночных (комиссии на {MAKER_SAVING_PCT:.2f}% меньше)"}
+    for ex in ("be", "last"):
+        b = base[ex]
+        mk[ex] = {"n": b["n"], "avg_pct": round(b["avg_pct"] + MAKER_SAVING_PCT, 3) if b["avg_pct"] is not None else None, "winrate": None,
+                  "h1": round(b["h1"] + MAKER_SAVING_PCT, 3) if b["h1"] is not None else None,
+                  "h2": round(b["h2"] + MAKER_SAVING_PCT, 3) if b["h2"] is not None else None}
+    for key, name in WHATIF.items():
+        rows_ = [r for r in res if (r["sim"].get("whatif") or {}).get(key)]
+        if not rows_:
+            continue
+        v = {"key": key, "name_ru": name}
+        for ex in ("be", "last"):
+            vals = [(r["t"] or 0, r["sim"]["whatif"][key].get(ex)) for r in rows_]
+            v[ex] = {**summ([x for _, x in vals]), "h1": summ([x for t, x in vals if t < half])["avg_pct"],
+                     "h2": summ([x for t, x in vals if t >= half])["avg_pct"]}
+        out["variants"].append(v)
+    out["variants"].insert(1, mk)
+    return out
 
 
 def app_flags_check(rows) -> dict:

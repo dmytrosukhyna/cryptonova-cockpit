@@ -458,3 +458,17 @@ def test_demo_accounts_compound_in_time_order():
     for k in ("key", "name_ru", "rules_ru", "start", "equity", "pnl_usd", "pnl_pct", "trades", "wins", "winrate", "max_dd_pct",
               "open", "last", "curve"):
         assert k in a, k
+
+
+def test_whatif_reverse_and_wider_stop_on_the_same_path():
+    sig = _sig(sl=95.0, tps=(105.0, 110.0, 115.0), lev=5)
+    # dips to 94 (original stop), then rallies only to 97 and falls to 85: the flipped trade (short, stop 105, targets 95/90/85) wins all
+    cs = _bars([(100.0, 100.2, 99.9, 100.0), (100.0, 100.0, 94.0, 96.0), (96.0, 97.0, 90.0, 91.0), (91.0, 91.0, 84.0, 85.0)])
+    base = aps.simulate(sig, cs, P0 + DAY)
+    wi = aps.whatif(sig, cs, P0 + DAY)
+    assert base["first"] == "sl" and wi["rev"]["best_tp"] == 3 and wi["rev"]["be"] > 0 and wi["rev"]["last"] > 0
+    assert wi["wide15"]["first"] == "sl"                       # stop 92.5 also hit at 90
+    assert wi["tp3"]["first"] == "sl"
+    st = aps.whatif_stats([{"t": TS, "sim": {**base, "whatif": wi}}])
+    keys = [v["key"] for v in st["variants"]]
+    assert keys[:2] == ["base", "maker"] and "rev" in keys and st["variants"][keys.index("rev")]["be"]["avg_pct"] > 0

@@ -42,7 +42,10 @@ PRE_N = 30
 TOP_N = 10                            # «топ-10 трейдеров» on the panel
 FOLLOW_N = 5                          # the copy desk follows the best 5 whose copy test is positive
 MIN_AV, MIN_ALL = 300_000.0, 500_000.0
-MAX_VLM_X, MAX_ROI_M = 1000.0, 10.0
+MAX_VLM_X, MAX_ROI_M = 400.0, 10.0
+FETCH_WINDOW = 45 * DAY               # fills fetched for 45 days so positions opened before the 30-day window are known
+FILLS_PAGES = 4                       # up to 8000 fills (big traders slice orders); more than that = high-frequency
+FILLS_V = 2
 FILLS_PAGE = 2000
 MIN_TRIPS, MIN_HOLD_H, MIN_PF = 8, 0.5, 1.2
 DELAYS_MIN = (15, 30, 60)
@@ -370,7 +373,7 @@ def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list,
          "portfolio": pf_stats, "too_active": too_active}
     why = []
     if too_active:
-        why.append("слишком частые сделки (≥ 2000 ордеров за 30 дней) — скопировать нельзя")
+        why.append("слишком частые сделки (больше 8000 исполнений за 45 дней) — скопировать нельзя")
     if n < MIN_TRIPS:
         why.append(f"мало закрытых сделок за 30 дней ({n})")
     if hold_med is not None and hold_med < MIN_HOLD_H:
@@ -450,11 +453,24 @@ def refresh_whale(conn, c: dict, now: int, budget: Budget, post=_post, notes=Non
     if fills_t is None or now - fills_t >= REFRESH_MS:
         if not budget.take():
             return False
-        start = max((fills_t or 0) + 1, now - WINDOW)
+        start = max((fills_t or 0) + 1, now - FETCH_WINDOW)
         try:
-            page = post({"type": "userFillsByTime", "user": addr, "startTime": start, "aggregateByTime": True}) or []
-            store_fills(conn, addr, page)
-            full = 1 if len(page) >= FILLS_PAGE else full if fills_t else 0
+            pages, full = 0, 0
+            while True:
+                page = post({"type": "userFillsByTime", "user": addr, "startTime": start, "aggregateByTime": True}) or []
+                store_fills(conn, addr, page)
+                pages += 1
+                if len(page) < FILLS_PAGE:
+                    break
+                last = max(int(f.get("time") or 0) for f in page)
+                if pages >= FILLS_PAGES or last <= start:
+                    full = 1 if pages >= FILLS_PAGES else 0
+                    break
+                if not budget.take():
+                    conn.commit()
+                    return False                     # the next run continues (stored fills are kept, duplicates ignored)
+                start = last + 1
+                time.sleep(0.3)
             conn.execute("UPDATE ws_whale SET fills_t=?, fills_full=? WHERE addr=?", (now, full, addr))
         except Exception as e:  # noqa: BLE001
             ok = False
@@ -805,18 +821,26 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         desk = desk_step(desk, follow, states, mids, now)
         kv_set(conn, "desk", desk)
         conn.commit()
-    # 4. study data, budgeted and resumable
-    fresh = 0
-    for c in rows:
-        if not refresh_whale(conn, c, now, budget, post, notes):
+    # 4. study data, budgeted and resumable; both sources take turns so neither waits for the other
+    if kv_get(conn, "fills_v") != FILLS_V:
+        conn.execute("UPDATE ws_whale SET fills_t=NULL WHERE addr NOT LIKE 'okx:%'")
+        kv_set(conn, "fills_v", FILLS_V)
+    fresh = ofresh = 0
+    stop_hl = stop_okx = False
+    for n in range(max(len(rows), len(orows))):
+        if n < len(rows) and not stop_hl:
+            if refresh_whale(conn, rows[n], now, budget, post, notes):
+                fresh += 1
+            else:
+                stop_hl = True
+            time.sleep(0.2)
+        if n < len(orows) and not stop_okx:
+            if refresh_okx(conn, orows[n], now, budget, okx_get, notes):
+                ofresh += 1
+            else:
+                stop_okx = True
+        if stop_hl and stop_okx:
             break
-        fresh += 1
-        time.sleep(0.2)
-    ofresh = 0
-    for c in orows:
-        if not refresh_okx(conn, c, now, budget, okx_get, notes):
-            break
-        ofresh += 1
     need = []
     for c in rows:
         for (coin,) in conn.execute("SELECT DISTINCT coin FROM ws_fills WHERE addr=? AND t>=?", (c["addr"], since)):
@@ -851,7 +875,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             pos = okx_positions(json.loads(r[3])) if r[3] else []
             pfs = {}
         else:
-            trips, total = round_trips(load_fills(conn, c["addr"], since - 30 * DAY), since)
+            trips, total = round_trips(load_fills(conn, c["addr"], now - FETCH_WINDOW), since)
             pos = norm_positions(json.loads(r[3])) if r[3] else []
             pfs = portfolio_stats(json.loads(r[2])) if r[2] else {}
         if c["addr"] in states:

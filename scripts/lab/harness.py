@@ -315,19 +315,71 @@ def stats(trades, label: str = "") -> dict:
     tot = sum(v for v in by_coin.values() if v > 0)
     top_share = max(by_coin.values()) / tot if tot > 0 else None
     span_days = max(1.0, (t.max() - t.min()) / 86_400_000)
-    return {"label": label, "all": s(np.ones(len(r), bool)), "train": s(tr), "test": s(te), "years": years,
+    # 18.10 (lab reports): a per-trade average can be carried by 5–10 days when every coin moves together.
+    # So also: the average of daily averages, the test average without its 3 best days, and a 5-slot account.
+    day = t // 86_400_000
+    te_m = t >= TRAIN_END
+    extra = {}
+    if te_m.any():
+        dte, rte = day[te_m], r[te_m]
+        ud, inv = np.unique(dte, return_inverse=True)
+        dsum = np.bincount(inv, weights=rte)
+        dcnt = np.bincount(inv)
+        extra["test_day_avg"] = round(float((dsum / dcnt).mean() * 100), 3)
+        extra["test_days"] = int(len(ud))
+        best = set(np.argsort(-dsum)[:3].tolist())
+        keep = np.array([j not in best for j in inv])
+        extra["test_ex3_avg"] = round(float(rte[keep].mean() * 100), 3) if keep.any() else None
+    extra["pf5"] = portfolio(trades, 5)
+    return {**extra, "label": label, "all": s(np.ones(len(r), bool)), "train": s(tr), "test": s(te), "years": years,
             "pos_years": sum(1 for y, v in years.items() if v.get("n", 0) >= 10 and v["avg_pct"] > 0),
             "years_n": sum(1 for y, v in years.items() if v.get("n", 0) >= 10),
             "max_dd_sum_pct": round(dd, 1), "top_coin_share": round(top_share, 2) if top_share is not None else None,
             "per_day": round(len(r) / span_days, 2), "median_hold_h": round(float(np.median([(t_["x"] - t_["e"] + 1) / 4 for t_ in trades])), 2)}
 
 
+def portfolio(trades, slots: int = 5) -> dict:
+    """A real account: at most `slots` positions at once (one per coin), each 1/slots of the start capital, no compounding.
+    Trades are taken in order of entry; a signal that finds every slot busy is skipped. → % of capital by year / train / test."""
+    d = data()
+    busy, coins_open, taken = [], set(), []
+    import heapq
+    for tr in sorted(trades, key=lambda q: (q["e"], q["k"])):
+        while busy and busy[0][0] < tr["e"]:
+            _, kk = heapq.heappop(busy)
+            coins_open.discard(kk)
+        if len(busy) >= slots or tr["k"] in coins_open:
+            continue
+        heapq.heappush(busy, (tr["x"], tr["k"]))
+        coins_open.add(tr["k"])
+        taken.append(tr)
+    if not taken:
+        return {"taken": 0}
+    r = np.array([q["ret"] for q in taken]) / slots * 100
+    tx = np.array([d.times[q["x"]] for q in taken])
+    yx = np.array([d.year[q["x"]] for q in taken])
+    o = np.argsort(tx)
+    cum = np.cumsum(r[o])
+    years = {int(y): round(float(r[yx == y].sum()), 1) for y in sorted(set(yx.tolist()))}
+    return {"slots": slots, "taken": int(len(taken)), "skipped": int(len(trades) - len(taken)),
+            "train_pct": round(float(r[(tx >= TRAIN_START) & (tx < TRAIN_END)].sum()), 1), "test_pct": round(float(r[tx >= TRAIN_END].sum()), 1),
+            "years": years, "pos_years": sum(1 for v in years.values() if v > 0),
+            "max_dd_pct": round(float((cum - np.maximum.accumulate(np.concatenate([[0.0], cum]))[1:]).min()), 1)}
+
+
 def passes(st: dict) -> bool:
     te = st.get("test") or {}
     yn = st.get("years_n", 0)
-    need = 4 if yn >= 6 else 3 if yn >= 4 else max(1, yn)          # 6 years (2021–26) → 4; 4 years (2023–26, wide set) → 3
-    return (te.get("n", 0) >= 60 and (te.get("avg_pct") or -1) > 0.05 and st.get("pos_years", 0) >= need
-            and (st.get("top_coin_share") or 1) <= 0.5)
+    if yn < 3:
+        return False
+    need = 4 if yn >= 6 else 3 if yn >= 4 else yn                   # 6 years (2021–26) → 4; 4 years (2023–26, wide set) → 3
+    ok = (te.get("n", 0) >= 60 and (te.get("avg_pct") or -1) > 0.05 and st.get("pos_years", 0) >= need
+          and (st.get("top_coin_share") or 1) <= 0.5)
+    # robustness (added 18.10; older result files without these fields are judged on the old rule until re-run)
+    if ok and "test_day_avg" in st:
+        pf = st.get("pf5") or {}
+        ok = (st["test_day_avg"] > 0 and (st.get("test_ex3_avg") or -1) > 0 and (pf.get("test_pct") or -1) > 0)
+    return ok
 
 
 # standard exit grid: everyone tries the same small set (1 target, 3 targets, 5 targets like the app, time exit)

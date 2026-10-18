@@ -105,7 +105,7 @@ def test_three_profiles_share_signals_but_differ():
     c = coin("BTC-USDT", flat, [{"id": "L1", "kind": "support", "lo": 9.96, "hi": 9.99, "center": 9.975, "touches": 3, "status": "ACTIVE"}])
     c["regime"] = {"long": "BULL"}
     out = pd.run(conn, {"coins": [c]}, now=t0 + 300 * 900_000)
-    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp", "lab", "brk"} and out["profile"] == "bal"
+    assert set(out["profiles"]) == {"cons", "bal", "aggr", "exp", "lab", "brk", "imp"} and out["profile"] == "bal"
     assert not any(out["profiles"][k]["pending"] for k in ("cons", "bal", "aggr"))
     lab = pd.PaperDesk(conn, "aggr", classes={"A", "B", "R", "C"}).step([c], True, t0 + 300 * 900_000)
     assert lab["pending"]   # the same zone would be traded only if class C were enabled
@@ -167,6 +167,27 @@ def test_lab_breakout_needs_volume_and_btc_above_its_50_day_ema():
     c2 = coin("ETH-USDT", prices, []); c2["candles_long"] = c2["candles"]          # same breakout, ordinary volume → nothing
     d = pd.PaperDesk(sqlite3.connect(":memory:"), "brk"); d._btc50 = bull
     assert not d.step([c2], True, now)["open"]
+
+
+def test_btc_impulse_buys_the_most_traded_alts_only_after_a_jump():
+    """18.10 class K («Импульс BTC»): BTC +2.5 % over the last hour → long alts, most traded first, at most 5; nothing without a jump."""
+    t0 = 1_700_000_000_000
+    n = 200
+    alts = {f"A{i}": coin(f"A{i}-USDT", [10.0] * n, []) for i in range(7)}
+    for i, c in enumerate(alts.values()):
+        for k in c["candles"]:
+            k[5] = 100.0 * (i + 1)                                  # A6 trades the most
+    flat = coin("BTC-USDT", [100.0] * n, [])
+    jump = coin("BTC-USDT", [100.0] * (n - 5) + [100.0, 101.0, 102.0, 103.0, 103.0], [])   # +3 % over 4 closed bars
+    now = t0 + n * 900_000
+    d = pd.PaperDesk(sqlite3.connect(":memory:"), "imp")
+    assert not d.step([flat] + list(alts.values()), True, now)["open"]
+    d = pd.PaperDesk(sqlite3.connect(":memory:"), "imp")
+    res = d.step([jump] + list(alts.values()), True, now)
+    syms = sorted(t["symbol"] for t in res["open"])
+    assert syms == ["A2", "A3", "A4", "A5", "A6"] and all(t["grade"] == "K" for t in res["open"])
+    t = res["open"][0]
+    assert abs(t["qty"] * t["entry"] - 2000) < 10 and t["expires"] - t["opened"] == 12 * 3_600_000
 
 
 def test_main_desks_ignore_experimental_rules():

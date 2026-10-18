@@ -54,17 +54,22 @@ PROFILES = {   # one strategy — "Автопилот" — at three risk levels.
     "brk":  {"name": "Пробой", "classes": {"T"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "t_share": 0.20, "t_open": 5, "prefix": "paper_brk_",
              "about": "Из «Лаборатории», прошла строгую проверку: лонг на пробое максимума 5 дней с объёмом ×2, только когда BTC выше своей 50-дневной средней; стоп 8 ATR (15м), выход через 2 дня. До 5 позиций по 20% счёта. История 2025–2026: +0.75% на сделку, счёт +20%, просадка до −49%."},
+    # 18.10: the rule that passed the lab's strictest check (2025 and 2026 each positive, also without the 3 best days) on the
+    # point-in-time top-50 AND on the 18 coins: 2025–26 account +34…+43 %, max drawdown −12 % (top-50, 2023+) / −67 % (18 coins incl. 2022).
+    "imp":  {"name": "Импульс BTC", "classes": {"K"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
+             "k_share": 0.20, "k_open": 5, "prefix": "paper_imp_",
+             "about": "Из «Лаборатории», прошла самую строгую проверку: когда BTC за час вырос на 2.5% и больше, покупаем самые ликвидные альткоины — они догоняют. Выход через 12 ч, широкий стоп 8 ATR, до 5 позиций по 20% счёта. История: 2025 и 2026 в плюсе, счёт +34% за 2025–2026, просадка −12% (топ-50, с 2023); в обвальном 2022 — минус."},
     "exp":  {"name": "Свинг", "classes": {"S", "G"}, "confirm": False, "risk": 0.01, "max_open": 0, "tgt_r": 2.0, "riskoff": "shorts",
              "s_share": 0.10, "s_open": 10, "g_share": 0.10, "g_open": 5, "prefix": "paper_exp_",
              "about": "Проверка новых правил на живом рынке: свинг-пробой (выше максимума 5 дней в росте, выход ниже вчерашнего минимума) и быстрый откуп резкой свечи. 10% счёта на сделку, до 15 позиций. История: +0.31% и +0.41% на сделку, но в портфеле ≈ 0 — поэтому отдельный счёт."},
 }
 RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "ретест уровня", "C": "наблюдение у уровня", "E": "откуп паники", "F": "откуп сброса позиций",
-           "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса", "T": "пробой 5 дней при росте BTC",
+           "S": "свинг-пробой", "G": "быстрый откуп", "D": "откуп дисконта фьючерса", "T": "пробой 5 дней при росте BTC", "K": "альт догоняет рывок BTC",
            "L": "покупка у низа диапазона", "N": "отскок от часовой поддержки", "Q": "шорт от часового сопротивления",
            "W": "сделка по сильной новости", "X": "откуп паники на альткоине", "Y": "откуп дисконта на альткоине", "J": "разворот после Никкей"}
 THROUGH = {"L", "N", "Q"}        # lab limits fill only when price trades through the level by ≥ 0.01 %
 HOLD_L_H, HOLD_N_H = 72, 24
-SHARE_RULES = {"E", "F", "S", "G", "D", "X", "Y", "J", "T"}   # sized as a share of equity, own position caps
+SHARE_RULES = {"E", "F", "S", "G", "D", "X", "Y", "J", "T", "K"}   # sized as a share of equity, own position caps
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
@@ -91,6 +96,9 @@ G_STOP = 0.03
 HOLD_D_H = 24          # class D (17.10): perp ≥ 0.20 % below its spot index on a 1-hour average → long 24 h, stop −12 % (docs/research/new_signals.md)
 D_BASIS = -0.0020
 D_STOP = 0.12
+HOLD_K_H = 12          # class K (18.10, lab): BTC +2.5 % in one hour → long the most traded alts, 12 h, stop 8 ATR(15m) (scripts/lab, «Альт догоняет BTC»)
+K_BTC = 0.025
+K_ATR = 8.0
 HOLD_T_H = 48          # class T (18.10, lab): close above the 5-day high on 2× volume while BTC > its 50-day EMA → long 48 h, stop 8 ATR(15m)
 T_BRK = 96 * 5
 T_ATR = 8.0
@@ -263,7 +271,7 @@ class PaperDesk:
             return []
         if coin.get("b_only"):   # extra alt coins: lab experiments only (17.10: B on extras switched off — no gain without hindsight)
             sub = self.signals({k: v for k, v in coin.items() if k != "b_only"} | {"levels": [], "candles_long": None, "oi_chg4h": None, "_alt": True}, btc_bull, now)
-            return [s for s in sub if s["grade"] in ("L", "W", "X", "Y")]
+            return [s for s in sub if s["grade"] in ("L", "W", "X", "Y", "K")]
         price = c15[-1][4]
         a = _atr(c15) or price * 0.003
         base = coin["symbol"].replace("-USDT", "").replace("USDT", "")
@@ -361,6 +369,16 @@ class PaperDesk:
                                           f"BTC выше своей 50-дневной средней. Из «Лаборатории»: на 2025–2026 +0.75% на сделку, но прибыль неровная. "
                                           f"Выход через 48 ч, широкий стоп {T_ATR:g} ATR ({(T_ATR * at / entry) * 100:.1f}%), 20% счёта."})
                     break
+        # K (lab, 18.10): BTC rose ≥ 2.5 % over the last hour (4 closed 15m bars) → long this alt; one per coin per 4 h
+        kb = getattr(self, "_btc_jump", None)
+        if "K" in self.P["classes"] and kb and base != "BTC" and len(c15) >= 30:
+            entry = c15[-1][4]
+            at = _atr(c15[-31:-1]) or entry * 0.003
+            out.append({"id": f"K-{base}-{kb['bar'] // 14_400_000}", "symbol": base, "side": "LONG", "grade": "K", "kind": "BTC_IMPULSE",
+                        "entry": entry, "stop": entry - K_ATR * at, "tps": [entry * 3] * 3, "parts": [1.0, 0.0, 0.0],
+                        "order": "MARKET", "hold_h": HOLD_K_H,
+                        "reason": f"Рывок BTC: +{kb['ret'] * 100:.1f}% за час — ликвидные альткоины обычно догоняют. Из «Лаборатории»: на 2025–2026 "
+                                  f"счёт +34%, просадка −12%. Выход через 12 ч, широкий стоп {K_ATR:g} ATR ({K_ATR * at / entry * 100:.1f}%), 20% счёта."})
         # lab rules (L/N/Q): limit orders inside the range, valid ~1 h, re-placed every run
         if self.P["classes"] & {"L", "N", "Q"}:
             h1 = agg1h(coin.get("candles_long") or c15, now)
@@ -489,6 +507,15 @@ class PaperDesk:
     def step(self, coins: list[dict], btc_bull: bool, now: int | None = None) -> dict:
         now = now or int(time.time() * 1000)
         by_sym = {c["symbol"].replace("-USDT", "").replace("USDT", ""): c for c in coins}
+        self._btc_jump = None
+        if "K" in self.P["classes"]:
+            bc = (by_sym.get("BTC") or {}).get("candles") or []
+            for j in range(len(bc) - 4, len(bc) - 1):           # the last closed bars since the previous run
+                if j >= 4 and bc[j - 4][4] and bc[j][4] / bc[j - 4][4] - 1 >= K_BTC:
+                    self._btc_jump = {"bar": bc[j][0], "ret": bc[j][4] / bc[j - 4][4] - 1}
+            # the 5 slots go to the most traded alts first (24 h turnover from the 15m candles)
+            turn = lambda c: sum(k[4] * k[5] for k in (c.get("candles") or [])[-97:-1])
+            by_sym = dict(sorted(by_sym.items(), key=lambda kv: -turn(kv[1])))
         self._stress = self.stress(coins)
         risk_off = self._stress >= 0.7
         events: list[str] = []
@@ -514,12 +541,12 @@ class PaperDesk:
                 if risk_off and s["grade"] == "R" and s["side"] == "SHORT":   # history: retest shorts inside a broad sell-off ≈ 0 (+0.013R, n=839) vs +0.155R in calm markets
                     events.append(f"пропуск шорта {base}: ретест внутри широкой распродажи на истории ≈ 0 — ждём спокойного рынка")
                     continue
-                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F", "G", "D", "J")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
+                if risk_off and ((s["side"] == "LONG" and s["grade"] not in ("B", "E", "F", "G", "D", "J", "K")) or self.P["riskoff"] == "none"):   # B = cascade fade, tested in crashes
                     events.append(f"пропуск {'лонга' if s['side'] == 'LONG' else 'шорта'} {base}: рынок падает широким фронтом (режим риска; на истории покупка дна со стопом −0.20R, шорт после падения −0.04R — не торгуем)")
                     continue
                 if s["grade"] == "F" and sum(1 for t in self._open() if t["grade"] == "F") >= self.P.get("f_open", 3):
                     continue
-                if s["grade"] in ("S", "G", "D", "X", "Y", "J", "T") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
+                if s["grade"] in ("S", "G", "D", "X", "Y", "J", "T", "K") and sum(1 for t in self._open() if t["grade"] == s["grade"]) >= self.P.get(s["grade"].lower() + "_open", 0):
                     continue
                 if s["grade"] not in SHARE_RULES and sum(1 for t in self._open() if t["grade"] not in SHARE_RULES) + len(self._pending()) >= self.P["max_open"]:
                     continue
@@ -534,12 +561,12 @@ class PaperDesk:
                     notional = eq * self.P.get("f_share", 0.15)
                     qty = notional / s["entry"]
                     risk_usd = notional * F_STOP
-                elif s["grade"] in ("S", "G", "D", "X", "Y", "J", "T"):
+                elif s["grade"] in ("S", "G", "D", "X", "Y", "J", "T", "K"):
                     if s["grade"] == "X" and any(t["grade"] == "X" and now - t["opened"] < E_BASKET_H * 3_600_000 and t["opened"] != now for t in self._open()):
                         continue   # one alt panic basket per 10 h
                     notional = eq * self.P.get(s["grade"].lower() + "_share", 0.1)
                     qty = notional / s["entry"]
-                    risk_usd = (s["entry"] - s["stop"]) * qty if s["grade"] == "T" else notional * {"S": S_STOP, "G": G_STOP, "D": D_STOP, "X": E_STOP, "Y": D_STOP, "J": 0.20}[s["grade"]]
+                    risk_usd = (s["entry"] - s["stop"]) * qty if s["grade"] in ("T", "K") else notional * {"S": S_STOP, "G": G_STOP, "D": D_STOP, "X": E_STOP, "Y": D_STOP, "J": 0.20}[s["grade"]]
                 else:
                     risk_usd = eq * self.P["risk"]
                     r = abs(s["entry"] - s["stop"])
@@ -576,7 +603,7 @@ class PaperDesk:
                     filled = c
                     break
             if filled:
-                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H, "W": 48, "X": HOLD_E_H, "Y": HOLD_D_H, "J": 24, "T": HOLD_T_H}.get(o["grade"], HOLD_C_H)
+                hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H, "W": 48, "X": HOLD_E_H, "Y": HOLD_D_H, "J": 24, "T": HOLD_T_H, "K": HOLD_K_H}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])
                 sgn = 1 if o["side"] == "LONG" else -1
@@ -687,7 +714,7 @@ class PaperDesk:
         for e in eqh:
             peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
         by_grade = {}
-        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q", "W", "X", "Y", "J", "T"):
+        for g in ("A", "B", "R", "C", "E", "F", "S", "G", "D", "L", "N", "Q", "W", "X", "Y", "J", "T", "K"):
             ts = [t for t in closed if t["grade"] == g]
             if ts:
                 by_grade[g] = {"n": len(ts), "winrate": round(len([t for t in ts if t["net_usd"] > 0]) / len(ts), 3), "avg_r": round(sum(t["pnl_r"] for t in ts) / len(ts), 3),

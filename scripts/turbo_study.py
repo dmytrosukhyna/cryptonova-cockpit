@@ -45,7 +45,7 @@ def trade(L: dict, delay_h: int = 4, hold_d: int = 14, stop: float = 0.3):
     fund = float(L["fv"][m].sum()) if len(L["fv"]) else 0.0
     m4 = c[3] / o[0] - 1 if len(c) > 4 else None
     q4 = float(L["q"][:4].sum()) if "q" in L else None
-    return ret + fund - LS.COST, int(t[e]), int(t[exit_i]), m4, q4
+    return float(ret + fund - LS.COST), int(t[e]), int(t[exit_i]), (float(m4) if m4 is not None else None), q4
 
 
 def month_key(ms: int) -> str:
@@ -99,7 +99,7 @@ def sim_listings(trs: list, share: float, max_open: int) -> dict:
         E += o[0] * o[2]
         pts.append((o[1], max(E, 0.0)))
     out = stats_from_curve(pts)
-    out["ruined"] = E <= 0.05
+    out["ruined"] = bool(E <= 0.05)
     return out
 
 
@@ -177,7 +177,8 @@ def btc_part():
 
 
 def main():
-    btc_part()
+    if "--btc" in sys.argv:
+        btc_part()
     listings_part()
 
 

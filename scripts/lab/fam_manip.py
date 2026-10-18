@@ -92,6 +92,7 @@ MB = 96                                                        # time exit / max
 LEVELS_ALL = ("pd", "pw", "r3", "asia")
 DERIV_IDEAS = ("liq", "crowd", "oisweep")                      # need real derivative data (18-coin set: 2023+)
 IDEAS = ("sweep", "eqhl", "liq", "crowd", "trap", "round", "night", "oisweep")
+SWEEP_IDEAS = ("sweep", "eqhl", "liq", "trap", "round", "oisweep")   # ideas with a sweep extreme (structural exits)
 assert np.all(np.diff(TIMES) == 900_000), "the harness data must be a contiguous 15m grid"
 
 
@@ -766,13 +767,30 @@ def side_ru(s):
     return "лонг" if s > 0 else "шорт"
 
 
-LEVEL_RU = {"pd": ("вчерашнего максимума", "вчерашнего минимума", "вчерашний максимум/минимум (UTC-сутки)"),
-            "pw": ("максимума прошлой недели", "минимума прошлой недели", "максимум/минимум прошлой недели"),
-            "r3": ("максимума последних 3 суток", "минимума последних 3 суток", "максимум/минимум последних 3 суток"),
-            "asia": ("максимума азиатской сессии", "минимума азиатской сессии",
-                     "максимум/минимум азиатской сессии 00–07 UTC (вынос во время Лондона, 07–13 UTC)"),
-            "any": ("любого очевидного уровня", "любого очевидного уровня",
-                    "любой из уровней: вчерашний день, прошлая неделя, 3 суток, азиатская сессия")}
+LEVEL_RU = {   # (above: genitive, below: genitive)
+    "pd": ("вчерашнего максимума (UTC-сутки)", "вчерашнего минимума (UTC-сутки)"),
+    "pw": ("максимума прошлой недели", "минимума прошлой недели"),
+    "r3": ("максимума последних 3 суток", "минимума последних 3 суток"),
+    "asia": ("максимума азиатской сессии 00–07 UTC (вынос во время Лондона, 07–13 UTC)",
+             "минимума азиатской сессии 00–07 UTC (вынос во время Лондона, 07–13 UTC)"),
+    "any": ("любого очевидного максимума (вчерашний день, прошлая неделя, последние 3 суток, азиатская сессия)",
+            "любого очевидного минимума (вчерашний день, прошлая неделя, последние 3 суток, азиатская сессия)")}
+LEVEL_SHORT_RU = {"pd": ("вчерашнего максимума", "вчерашнего минимума"), "pw": ("максимума недели", "минимума недели"),
+                  "r3": ("максимума 3 суток", "минимума 3 суток"), "asia": ("максимума Азии", "минимума Азии"),
+                  "any": ("очевидного уровня", "очевидного уровня")}
+
+
+def candles(n):
+    """'4 свечи' / '8 свечей' / '1 свечу' (after 'через')."""
+    if n % 10 == 1 and n % 100 != 11:
+        return f"{n} свечу"
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return f"{n} свечи"
+    return f"{n} свечей"
+
+
+def days_ru(n_bars):
+    return "сутки" if n_bars == 96 else f"{n_bars // 96} суток"
 
 
 def fnum(x):
@@ -790,13 +808,14 @@ def texts(r):
     entry = "вход на открытии следующей свечи 15м, не чаще раза в 4 ч по монете"
     if idea in ("sweep", "liq", "oisweep"):
         lv = p["level"]
-        nm_lvl = LEVEL_RU[lv][0 if s < 0 else 1]
-        base = (f"{side_ru(s).capitalize()}: цена прошла {beyond} уровня ({LEVEL_RU[lv][2]}) на {fnum(p['kmin'])}–"
-                f"{fnum(p['kmax'])} ATR — собрала стопы {stops}, — и ")
+        nm_lvl = LEVEL_SHORT_RU[lv][0 if s < 0 else 1]
+        base = (f"{side_ru(s).capitalize()}: цена прошла {beyond} {LEVEL_RU[lv][0 if s < 0 else 1]}, который до этого не трогала, "
+                f"на {fnum(p['kmin'])}–{fnum(p['kmax'])} ATR(15м) — собрала стопы {stops}, — и ")
         if p.get("R", 4) == 1:
-            base += f"та же свеча закрылась обратно {back} уровня"
+            base += f"та же 15-минутная свеча закрылась обратно {back} уровня"
         else:
-            base += f"не позже чем через {p['R']} свечи 15м (считая свечу выноса) закрылась обратно {back} уровня"
+            base += (f"не позже чем через {candles(p['R'] - 1)} 15м после свечи выноса (или в ней самой) закрылась обратно "
+                     f"{back} уровня")
         if idea == "sweep":
             name = f"Вынос {nm_lvl} и возврат ({side_ru(s)})"
             extra = {"base": "", "wick": f"; тень свечи выноса ≥ 50 % её размера",
@@ -819,10 +838,10 @@ def texts(r):
     elif idea == "eqhl":
         what = "максимума" if s < 0 else "минимума"
         name = f"Вынос равных {'максимумов' if s < 0 else 'минимумов'} ({side_ru(s)})"
-        rule = (f"{side_ru(s).capitalize()}: за последние {fnum(p['N'] / 96)} сут. есть два локальных {what} "
+        rule = (f"{side_ru(s).capitalize()}: за последние {days_ru(p['N'])} есть два локальных {what} "
                 f"(разворотные точки, 4 свечи с каждой стороны) не ближе 3 ч друг к другу и отличающиеся не больше чем на "
                 f"{fnum(p['x_pct'])} %, между ними цена их не пробивала — там копятся стопы. Цена выносит этот уровень "
-                f"(на 0,05–2 ATR) и не позже чем через 4 свечи закрывается обратно {back} него; {entry}. {ex}.")
+                f"(на 0,05–2 ATR) и не позже чем через 3 свечи после выноса (или в той же свече) закрывается обратно {back} него; {entry}. {ex}.")
     elif idea == "crowd":
         name = f"Перегруз позиций → пробой против толпы ({side_ru(s)})"
         cr = {"none": "",
@@ -839,19 +858,19 @@ def texts(r):
             days = {96: "суток", 288: "3 суток"}[int(p["kind"][5:])]
             name = f"Ложный пробой канала {days} → против ({side_ru(s)})"
             rule = (f"{side_ru(s).capitalize()}: свеча 15м закрылась {'выше максимума' if s < 0 else 'ниже минимума'} последних {days} "
-                    f"(классический пробой), но не позже чем через {p['W']} свечей цена закрылась обратно {back} этого уровня — "
+                    f"(классический пробой), но не позже чем через {candles(p['W'])} цена закрылась обратно {back} этого уровня — "
                     f"ловушка для {'покупателей' if s < 0 else 'продавцов'}; входим в обратную сторону; {entry}. {ex}.")
         else:
             name = f"Ложный пробой после сжатия Боллинджера ({side_ru(s)})"
             rule = (f"{side_ru(s).capitalize()}: после сжатия полос Боллинджера (ширина в нижних 20 % за 5 дней в последние 4 ч) свеча "
                     f"закрылась {'выше верхней' if s < 0 else 'ниже нижней'} полосы и за пределами 12-часового диапазона, но не позже "
-                    f"чем через {p['W']} свечей вернулась обратно в диапазон — входим против пробоя; {entry}. {ex}.")
+                    f"чем через {candles(p['W'])} вернулась обратно в диапазон — входим против пробоя; {entry}. {ex}.")
     elif idea == "round":
         stp = "1000 / 100 / 10 / 0,01" if p["step"] == "major" else "500 / 50 / 5 / 0,005"
         name = f"Вынос круглого уровня ({side_ru(s)})"
         rule = (f"{side_ru(s).capitalize()}: ближайший круглый уровень {beyond} цены (шаг по масштабу цены: BTC около 60 000 — {stp.split(' / ')[0]}, "
                 f"ETH около 3000 — {stp.split(' / ')[1]}, SOL около 150 — {stp.split(' / ')[2]}, DOGE около 0,15 — {stp.split(' / ')[3]}), "
-                f"который цена не трогала последние 4 ч; цена проходит его на 0,1–2 ATR и не позже чем через 4 свечи закрывается "
+                f"который цена не трогала последние 4 ч; цена проходит его на 0,1–2 ATR и не позже чем через 3 свечи после выноса закрывается "
                 f"обратно {back} — входим в разворот; {entry}. {ex}.")
     else:
         sess = "открытии Европы (07:00 UTC)" if p["session"] == "eu" else "открытии Нью-Йорка (09:30 по Нью-Йорку)"
@@ -918,35 +937,40 @@ def main():
         LEVELS.clear()
         CACHE.clear()
 
-    # ---- exit league over every signal variant
-    exit_names = list(exits(MB, True).keys()) + ["wide_time"]
+    # ---- exit league over every signal variant, separately for the sweep-type ideas (6 grid + 2 structural exits) and for
+    #      ideas 4 and 7 (6 grid exits + wide_time), so every exit is compared on the same signals
     league = {}
-    for en in exit_names:
-        rows = [r for r in REC if r["exit"] == en and (r["stats"].get("train") or {}).get("n", 0) >= 50]
-        if not rows:
-            continue
-        tr = [r["stats"]["train"]["avg_pct"] for r in rows]
-        te = [r["stats"]["test"]["avg_pct"] for r in rows if (r["stats"].get("test") or {}).get("n", 0) >= 20]
-        p5 = [(r["stats"].get("pf5") or {}).get("test_pct") for r in rows]
-        p5 = [x for x in p5 if x is not None]
-        league[en] = {"variants": len(rows), "train_mean": round(float(np.mean(tr)), 3),
-                      "test_mean": round(float(np.mean(te)), 3) if te else None,
-                      "train_pos_share": round(float(np.mean(np.array(tr) > 0)), 2),
-                      "test_pos_share": round(float(np.mean(np.array(te) > 0)), 2) if te else None,
-                      "pf5_test_pos_share": round(float(np.mean(np.array(p5) > 0)), 2) if p5 else None}
-    bestcount = {en: 0 for en in league}
-    sigs = {}
-    for r in REC:
-        sigs.setdefault(pkey(r["idea"], r["side"], r["params"]), []).append(r)
-    for rs_ in sigs.values():
-        ok = [r for r in rs_ if (r["stats"].get("train") or {}).get("n", 0) >= 50]
-        if ok:
-            bestcount[max(ok, key=lambda r: r["stats"]["train"]["avg_pct"])["exit"]] += 1
-    for en in league:
-        league[en]["train_best_count"] = bestcount.get(en, 0)
-    print("\nEXIT LEAGUE (mean avg_pct over all signal variants with train n >= 50)")
-    for en, v in league.items():
-        print(f"  {en:10s} {v}")
+    for grp, ids in (("sweep_type", SWEEP_IDEAS), ("crowd_night", ("crowd", "night"))):
+        g = {}
+        for en in list(exits(MB, grp == "sweep_type").keys()):
+            rows = [r for r in REC if r["idea"] in ids and r["exit"] == en and (r["stats"].get("train") or {}).get("n", 0) >= 50]
+            if not rows:
+                continue
+            tr = [r["stats"]["train"]["avg_pct"] for r in rows]
+            te = [r["stats"]["test"]["avg_pct"] for r in rows if (r["stats"].get("test") or {}).get("n", 0) >= 20]
+            p5 = [x for x in ((r["stats"].get("pf5") or {}).get("test_pct") for r in rows) if x is not None]
+            g[en] = {"variants": len(rows), "train_mean": round(float(np.mean(tr)), 3),
+                     "test_mean": round(float(np.mean(te)), 3) if te else None,
+                     "train_pos_share": round(float(np.mean(np.array(tr) > 0)), 2),
+                     "test_pos_share": round(float(np.mean(np.array(te) > 0)), 2) if te else None,
+                     "pf5_test_pos_share": round(float(np.mean(np.array(p5) > 0)), 2) if p5 else None, "train_best_count": 0}
+        sigs = {}
+        for r in REC:
+            if r["idea"] in ids:
+                sigs.setdefault(pkey(r["idea"], r["side"], r["params"]), []).append(r)
+        for rs_ in sigs.values():
+            ok = [r for r in rs_ if (r["stats"].get("train") or {}).get("n", 0) >= 50]
+            if ok:
+                g[max(ok, key=lambda r: r["stats"]["train"]["avg_pct"])["exit"]]["train_best_count"] += 1
+        league[grp] = g
+        print(f"\nEXIT LEAGUE {grp} (mean avg_pct over its signal variants with train n >= 50)")
+        for en, v in g.items():
+            print(f"  {en:10s} {v}")
+    # gross (before the 0.14 % costs) per-trade TEST average of the sweep-type ideas, all variants and exits
+    te_sw = [r["stats"]["test"]["avg_pct"] for r in REC if r["idea"] in SWEEP_IDEAS and (r["stats"].get("test") or {}).get("n", 0) >= 30]
+    gross_sw = round(float(np.mean(te_sw)) + HN.COST * 100, 3) if te_sw else None
+    if te_sw:
+        print(f"sweep-type ideas: mean TEST avg per trade {np.mean(te_sw):+.3f} % after costs -> {gross_sw:+.3f} % before costs")
 
     # ---- per idea: how the whole grid behaves (shown, not used to choose)
     grid = {}
@@ -1006,7 +1030,7 @@ def main():
     if only:
         log("MANIP_ONLY set (debug run) -> results not written")
         return
-    notes_ru = make_notes(results, league, grid, ctrl, npass_all)
+    notes_ru = make_notes(results, league, grid, ctrl, npass_all, gross_sw)
     os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
     report(os.path.join(HERE, "results", "manip.json"), "manip", results, TRIED, notes_ru)
     allv = [dict(idea=r["idea"], side=r["side"], params=r["params"], exit=r["exit"], train=r["stats"].get("train"),
@@ -1015,60 +1039,96 @@ def main():
                  pf5={k: (r["stats"].get("pf5") or {}).get(k) for k in ("train_pct", "test_pct", "test_ex3_pct", "years", "max_dd_pct")},
                  test_ex3_avg=r["stats"].get("test_ex3_avg"), passes=passes(r["stats"])) for r in REC]
     with open(os.path.join(HERE, "results", f"_manip_all_variants{HN.SUFFIX}.json"), "w", encoding="utf-8") as f:
-        json.dump({"tried": TRIED, "league": league, "variants": allv}, f, ensure_ascii=False, default=float)
+        json.dump({"tried": TRIED, "league": league, "gross_sweep_type_test": gross_sw, "variants": allv}, f, ensure_ascii=False, default=float)
     log(f"done, tried = {TRIED}, passes = {sum(passes(r['stats']) for r in results)}/{len(results)}, "
         f"maxrss {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024} MB")
 
 
-def make_notes(results, league, grid, ctrl, npass_all):
-    """Plain-Russian summary for the owner (numbers filled from this run)."""
-    tr_p = "2023–2024" if WIDE else "2021–2024 (идеи с ликвидациями/ОИ/фандингом — 2023–2024, раньше эти данные восстановлены)"
+def make_notes(results, league, grid, ctrl, npass_all, gross_sw):
+    """Plain-Russian summary for the owner; every number is filled from this run."""
+    tr_p = ("2023–2024" if WIDE else
+            "2021–2024 (идеи с ликвидациями, открытым интересом и фандингом — 2023–2024: раньше эти данные восстановлены, а не настоящие)")
     passed = [r for r in results if passes(r["stats"])]
-    per = []
-    for r in results:
-        st, pf = r["stats"], r["stats"].get("pf5") or {}
-        ys = pf.get("years") or {}
-        per.append(f"«{r['name_ru']}»: на сделку {pct(st['train'].get('avg_pct'))} % на обучении → {pct(st['test'].get('avg_pct'))} % "
-                   f"на 2025–26 (сделок {st['test'].get('n', 0)}); счёт на 5 позиций 2025 {pct(ys.get(2025), 1)} %, "
-                   f"2026 {pct(ys.get(2026), 1)} %, без 3 лучших дней {pct(pf.get('test_ex3_pct'), 1)} %"
-                   + (" — ПРОШЛА" if passes(st) else ""))
-    good_ex = sorted(league.items(), key=lambda kv: -(kv[1].get("train_mean") or -9))
-    ex_txt = "; ".join(f"{EXIT_SHORT_RU[en]}: обучение "
-                       f"{pct(v['train_mean'], 3)} %, 2025–26 {pct(v['test_mean'], 3)} %"
-                       for en, v in good_ex[:3])
-    te_pos = [v["test_pos_share"] for v in grid.values() if v.get("test_pos_share") is not None]
-    pf_pos = [v["pf5_test_pos_share"] for v in grid.values() if v.get("pf5_test_pos_share") is not None]
-    lc = ""
+    out = []
+    out.append(
+        "Что проверяли. Мысль владельца: классические фигуры больше не работают, потому что крупные игроки знают, где стоят стопы и "
+        "ликвидации толпы, выносят цену чуть за очевидный уровень, собирают эту ликвидность и разворачивают. 8 идей, лонг и шорт отдельно: "
+        "(1) вынос вчерашнего максимума/минимума, уровня прошлой недели, 3-дневного диапазона и азиатской сессии с возвратом за уровень "
+        "за 1–4 свечи 15м (варианты: длинная тень, всплеск объёма, глубокий вынос); (2) вынос «равных вершин/днищ», где копятся стопы; "
+        "(3) вынос уровня вместе со всплеском ликвидаций" + (" (в этом наборе ликвидаций нет — идея пропущена)" if not HAS_LIQ else "") +
+        "; (4) перегруз позиций: открытый интерес растёт, цена стоит, затем пробой против толпы — идём по пробою; (5) ложный пробой канала "
+        "1–3 суток или сжатия Боллинджера — торгуем против пробоя («фигура не сработала — переворачиваемся»); (6) вынос круглого уровня; "
+        "(7) резкое движение ночью (00–04 UTC) или в выходные — входим против него на открытии Европы или США; (8) вынос уровня с резким "
+        "падением или ростом открытого интереса (замена ликвидациям). "
+        f"Всего проверено вариантов: {TRIED}. Вход — на открытии следующей свечи после сигнала, комиссии 0,14 % за сделку. Параметры "
+        f"и выход выбирались только по {tr_p}; 2025–2026 при выборе не смотрели.")
+    out.append(f"Итог: прошли все фильтры лаборатории {len(passed)} из {len(results)} лучших вариантов"
+               + (": " + "; ".join(f"«{r['name_ru']}»" for r in passed) if passed else "")
+               + f". Если не выбирать, а просто посчитать — проходят {npass_all} из {len(REC)} вариантов.")
+    # sweep-type ideas
+    sw = [r for r in REC if r["idea"] in SWEEP_IDEAS and (r["stats"].get("test") or {}).get("n", 0) >= 30]
+    if sw and gross_sw is not None:
+        pos = np.mean([r["stats"]["test"]["avg_pct"] > 0 for r in sw])
+        pf_pos = np.mean([((r["stats"].get("pf5") or {}).get("test_pct") or -1) > 0 for r in sw])
+        out.append(
+            f"Выносы уровней (идеи 1, 2, 3, 5, 6, 8 — всего {len(sw)} вариантов с достаточным числом сделок): на 2025–26 в плюсе после "
+            f"комиссий {pos:.0%} вариантов, счёт на 5 позиций в плюсе у {pf_pos:.0%}. До комиссий такие сделки в среднем дают "
+            f"{pct(gross_sw, 2)} % — то есть после выноса и возврата цена дальше идёт в сторону разворота не чаще, чем в обратную. "
+            "Сам «вынос стопов» на графике бывает постоянно (тысячи случаев), но по нему нельзя заранее сказать, развернётся цена или "
+            "продолжит движение: когда уровень пробит по-настоящему, тот же рисунок заканчивается пробоем. А 0,14 % комиссии съедают "
+            "сделку, у которой нет перевеса.")
     if ctrl:
-        lc = " Контроль для ликвидаций (те же выносы уровней с 2023 г., но без условия на ликвидации, тот же выход): " + "; ".join(
-            f"{side_ru(s)} — 2025–26 {pct((v.get('test') or {}).get('avg_pct'))} % на сделку, счёт на 5 позиций "
-            f"{pct((v.get('pf5') or {}).get('test_pct'), 1)} %" for s, v in ctrl.items()) + "."
-    txt = (
-        "Семейство «манипуляции»: проверяли мысль владельца, что крупные игроки знают, где стоят стопы и ликвидации толпы, "
-        "выносят цену чуть за очевидный уровень, собирают эту ликвидность и разворачивают. 8 идей, лонг и шорт отдельно: "
-        "(1) вынос вчерашнего максимума/минимума, уровня прошлой недели, 3-дневного диапазона и азиатской сессии с возвратом "
-        "за уровень за 1–4 свечи (варианты: длинная тень, всплеск объёма, глубина выноса); (2) вынос «равных вершин/днищ», где "
-        "копятся стопы; (3) вынос уровня вместе со всплеском ликвидаций (только 18 монет — в широком наборе ликвидаций нет); "
-        "(4) перегруз позиций: открытый интерес растёт, цена стоит, затем пробой против толпы — идём по пробою; (5) ложный "
-        "пробой канала 1–3 суток или сжатия Боллинджера — торгуем против пробоя («фигура не сработала — переворачиваемся»); "
-        "(6) вынос круглого уровня; (7) рывок ночью (00–04 UTC) или в выходные — входим против него на открытии Европы или США; "
-        "(8) вынос уровня с резким падением или ростом открытого интереса (замена ликвидациям для широкого набора). "
-        f"Проверено вариантов (сигнал × сторона × выход + контроль): {TRIED}. Вход — на открытии следующей свечи после сигнала, "
-        f"комиссии 0,14 % за сделку. Параметры и выход выбирались только по {tr_p}; 2025–2026 при выборе не смотрели. "
-        f"Итог: прошли все фильтры лаборатории {len(passed)} из {len(results)} лучших вариантов"
-        + (": " + "; ".join(f"«{r['name_ru']}»" for r in passed) if passed else "") + ". "
-        + "Подробно по каждой идее (лучший вариант по обучению): " + " | ".join(per) + ". "
-        + f"По всей сетке: доля вариантов в плюсе на 2025–26 по идеям — от {min(te_pos):.0%} до {max(te_pos):.0%}, "
-        f"счёт на 5 позиций в плюсе — от {min(pf_pos):.0%} до {max(pf_pos):.0%}; все фильтры (без выбора, просто подсчёт) "
-        f"проходят {npass_all} из {len(REC)} вариантов. "
-        + f"Выходы (среднее по всем вариантам, лучшие три по обучению): {ex_txt}."
-        + lc
-    ) if te_pos and pf_pos else "Нет данных."
-    return txt + NOTES_TAIL
-
-
-# interpretation written after reading the runs (kept separate from the numbers above)
-NOTES_TAIL = ""
+        lr = {r["params"]["side"]: r for r in results if r["id"].startswith("manip_liq")}
+        parts = []
+        for sd_, v in ctrl.items():
+            r = lr.get(sd_)
+            if r is None:
+                continue
+            parts.append(f"{side_ru(sd_)}: со всплеском ликвидаций {pct(r['stats']['test'].get('avg_pct'))} %, без условия "
+                         f"{pct((v.get('test') or {}).get('avg_pct'))} % на сделку на 2025–26")
+        out.append("Ликвидации не помогают: " + "; ".join(parts) + " (те же выносы с 2023 г., тот же выход).")
+    # night / weekend
+    nl = [r for r in results if r["id"] == "manip_night_long"]
+    g = grid.get(("night", +1))
+    if nl and g:
+        st, pf = nl[0]["stats"], nl[0]["stats"].get("pf5") or {}
+        ys = pf.get("years") or {}
+        out.append(
+            f"Единственное, что стабильно в плюсе, — покупка после резкого ночного или выходного обвала (идея 7, лонг): в плюсе на "
+            f"2025–26 {g['test_pos_share']:.0%} вариантов этой сетки, выбранный вариант «{nl[0]['name_ru']}» — "
+            f"{pct(st['train'].get('avg_pct'))} % на сделку на обучении и {pct(st['test'].get('avg_pct'))} % на 2025–26. Но сделок мало "
+            f"({st['test'].get('n', 0)} за 2025–26), прибыль делают несколько дней общего обвала, после которых рынок отскочил (счёт на 5 "
+            f"позиций без 3 лучших дней {pct(pf.get('test_ex3_pct'), 1)} %), а 2026 год {'в минусе' if (ys.get(2026) or 0) <= 0 else 'в плюсе'} "
+            f"({pct(ys.get(2026), 1)} %). Это не «манипуляция ночью», а отскок после паники — и как правило фильтры лаборатории его "
+            "не пропускают. Продавать ночной рост на открытии (шорт) не работает.")
+    # exits
+    st_l = league.get("sweep_type") or {}
+    if st_l:
+        rank = sorted(st_l.items(), key=lambda kv: -(kv[1].get("train_mean") or -9))
+        best = rank[0]
+        sr = [(en, v) for en, v in st_l.items() if en.startswith("struct")]
+        out.append(
+            "Выходы (для выносов уровней, среднее по всем вариантам): лучше всего — «" + EXIT_SHORT_RU[best[0]] + f"» (обучение "
+            f"{pct(best[1]['train_mean'], 3)} %, 2025–26 {pct(best[1]['test_mean'], 3)} % на сделку), но и он в среднем не прибыльный; "
+            + "; ".join(f"«{EXIT_SHORT_RU[en]}» — {pct(v['train_mean'], 3)} % / {pct(v['test_mean'], 3)} %" for en, v in rank[1:])
+            + ". " + (f"Классический для «охоты за стопами» стоп сразу за тенью выноса — среди худших: плюсовых вариантов на 2025–26 "
+                      f"{max(v['test_pos_share'] or 0 for _, v in sr):.0%}. Тень обычно близко к входу, и обычный 15-минутный шум выбивает такой "
+                      "стоп раньше, чем цена успевает уйти к цели." if sr else ""))
+    cn = league.get("crowd_night") or {}
+    if cn:
+        b2 = max(cn.items(), key=lambda kv: (kv[1].get("train_mean") or -9))
+        out.append(f"Для идей 4 и 7 лучший выход — «{EXIT_SHORT_RU[b2[0]]}» ({pct(b2[1]['train_mean'], 3)} % / "
+                   f"{pct(b2[1]['test_mean'], 3)} %): там сигналы редкие, а движение после них большое — узкие цели его обрезают.")
+    out.append("Подробно по лучшему варианту каждой идеи (на сделку: обучение → 2025–26; счёт на 5 позиций: 2025 / 2026 / 2025–26 без 3 "
+               "лучших дней): " + " | ".join(
+                   f"«{r['name_ru']}» {pct(r['stats']['train'].get('avg_pct'))} → {pct(r['stats']['test'].get('avg_pct'))} % "
+                   f"(сделок {r['stats']['test'].get('n', 0)}); {pct(((r['stats'].get('pf5') or {}).get('years') or {}).get(2025), 1)} / "
+                   f"{pct(((r['stats'].get('pf5') or {}).get('years') or {}).get(2026), 1)} / "
+                   f"{pct((r['stats'].get('pf5') or {}).get('test_ex3_pct'), 1)} %" for r in results) + ".")
+    out.append("Оговорки: у идеи 4 (перегруз позиций) за 2023–2026 всего несколько десятков сигналов — вывод по ней ненадёжный; "
+               "сделки по разным монетам в один момент сильно связаны (весь рынок двигается вместе), поэтому реальная надёжность ниже, "
+               "чем кажется по числу сделок; данные 15-минутные — внутри свечи порядок «стоп или цель» неизвестен, считаем стоп первым.")
+    return " ".join(out)
 
 
 if __name__ == "__main__":

@@ -28,6 +28,7 @@
     "test_ex3_avg": -0.412,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -171.8,
      "taken": 2281,
      "skipped": 1609,
      "train_pct": -55.8,
@@ -240,6 +241,7 @@
     "test_ex3_avg": -0.152,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -176.4,
      "taken": 11536,
      "skipped": 12338,
      "train_pct": -174.0,
@@ -447,6 +449,7 @@
     "test_ex3_avg": -0.152,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -128.0,
      "taken": 7613,
      "skipped": 12138,
      "train_pct": -174.4,
@@ -676,6 +679,7 @@
     "test_ex3_avg": -0.132,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -345.3,
      "taken": 27610,
      "skipped": 52990,
      "train_pct": -403.2,
@@ -888,6 +892,7 @@
     "test_ex3_avg": -0.379,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -284.3,
      "taken": 10868,
      "skipped": 5792,
      "train_pct": -56.4,
@@ -1117,6 +1122,7 @@
     "test_ex3_avg": -0.145,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -414.2,
      "taken": 29699,
      "skipped": 69774,
      "train_pct": -522.9,
@@ -1329,6 +1335,7 @@
     "test_ex3_avg": -0.194,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -141.9,
      "taken": 5534,
      "skipped": 3367,
      "train_pct": -76.7,
@@ -1558,6 +1565,7 @@
     "test_ex3_avg": -0.135,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -352.9,
      "taken": 25400,
      "skipped": 36339,
      "train_pct": -401.5,
@@ -1770,6 +1778,7 @@
     "test_ex3_avg": -0.115,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -173.0,
      "taken": 15814,
      "skipped": 16426,
      "train_pct": -205.6,
@@ -1977,6 +1986,7 @@
     "test_ex3_avg": -0.132,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -45.2,
      "taken": 4059,
      "skipped": 6483,
      "train_pct": -73.1,
@@ -2207,6 +2217,7 @@
     "test_ex3_avg": -0.18,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -236.0,
      "taken": 14306,
      "skipped": 9252,
      "train_pct": -243.3,
@@ -2407,6 +2418,7 @@
     "test_ex3_avg": -0.151,
     "pf5": {
      "slots": 5,
+     "test_ex3_pct": -176.3,
      "taken": 13184,
      "skipped": 10374,
      "train_pct": -233.3,

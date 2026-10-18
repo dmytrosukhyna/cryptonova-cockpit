@@ -17,8 +17,11 @@ import os
 import sqlite3
 import time
 import urllib.request
+from datetime import datetime, timezone
 
 API = "https://yields.llama.fi/pools"
+DERIBIT = "https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency={c}&kind=future"
+BASIS_FEES_PCT = 0.3              # spot buy + futures short, in and out (taker fees), % of the sum
 START = 10_000.0
 YEAR_MS = 365 * 86_400_000
 BASKET = [("aave-v3", "Ethereum", "USDC", 0.4), ("aave-v3", "Ethereum", "USDT", 0.3),
@@ -49,7 +52,42 @@ def base_apy(p: dict) -> float | None:
     return None if v is None else float(v)
 
 
-def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_pools) -> dict:
+def fetch_futures(cur: str, timeout: int = 20) -> list:
+    req = urllib.request.Request(DERIBIT.format(c=cur), headers={"User-Agent": "cnq-yield/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode()).get("result") or []
+
+
+def basis_row(rows: list, cur: str, now: int) -> dict | None:
+    """Cash-and-carry, for information: buy the coin on spot and short its dated futures (Deribit) for the same sum — the price
+    no longer matters, and the gap between the futures and spot is earned by the expiry date, FIXED at entry. Takes the
+    furthest expiry 25–200 days away; annualised, minus ≈0.3 % fees. The perpetual (funding) is the funding desk's job."""
+    best = None
+    for r in rows:
+        name = str(r.get("instrument_name") or "")
+        parts = name.split("-")
+        if len(parts) != 2 or parts[1] == "PERPETUAL":
+            continue
+        try:
+            exp = datetime.strptime(parts[1].upper(), "%d%b%y").replace(hour=8, tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        days = (exp.timestamp() * 1000 - now) / 86_400_000
+        mark, idx = r.get("mark_price"), r.get("estimated_delivery_price")
+        if not (25 <= days <= 200) or not mark or not idx:
+            continue
+        gross = (float(mark) / float(idx) - 1) * 365 / days * 100
+        if best is None or days > best[0]:
+            best = (days, exp, gross)
+    if best is None:
+        return None
+    days, exp, gross = best
+    net = gross - BASIS_FEES_PCT * 365 / days
+    return {"name_ru": f"{cur} · спот + шорт фьючерса до {exp:%d.%m.%Y} (ставка фиксируется при входе)", "apy": round(net, 2),
+            "apy_base": round(gross, 2), "tvl_usd": None, "risk": 2, "project": "deribit-basis", "symbol": cur, "days": round(days)}
+
+
+def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_pools, fetch_fut=None) -> dict:
     now = now or int(time.time() * 1000)
     conn.execute("CREATE TABLE IF NOT EXISTS yield_state(k TEXT PRIMARY KEY, v TEXT)")
     st = {k: json.loads(v) for k, v in conn.execute("SELECT k, v FROM yield_state")}
@@ -85,6 +123,13 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_pools) ->
         if p:
             table.append({"name_ru": name, "apy": round(float(p.get("apy") or 0), 2), "apy_base": round(base_apy(p) or 0, 2),
                           "tvl_usd": round(p.get("tvlUsd") or 0), "risk": risk, "project": proj, "symbol": sym})
+    for cur in (("BTC", "ETH") if fetch_fut else ()):
+        try:
+            row = basis_row(fetch_fut(cur), cur, now)
+        except Exception:  # noqa: BLE001
+            row = None
+        if row:
+            table.append(row)
     eq = st["equity"]
     return {"asof": now, "name": "Доходность · кредитование стейблкоинов", "start_equity": START, "equity": round(eq, 2),
             "pnl_usd": round(eq - START, 2), "pnl_pct": round((eq / START - 1) * 100, 3), "apy_now": round(st["apy"], 2) if st.get("apy") is not None else None,
@@ -99,8 +144,8 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_pools) ->
                          "Консервативная часть: кредитование стейблкоинов на Aave и сберегательная ставка Sky. Ставка появится после первого обновления.")}
 
 
-def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, fetch=fetch_pools) -> dict:
-    doc = step(conn, now, fetch)
+def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, fetch=fetch_pools, fetch_fut=fetch_futures) -> dict:
+    doc = step(conn, now, fetch, fetch_fut)
     with open(os.path.join(out, "yield.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False)
     return doc

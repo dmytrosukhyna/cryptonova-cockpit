@@ -59,3 +59,20 @@ def test_yield_desk_accrues_at_the_current_rate_and_keeps_the_last_rate_when_off
     assert any(t["name_ru"].startswith("Lido") for t in a["table"])
     b = Y.step(conn, T0 + 365 * 86_400_000, fetch=lambda: (_ for _ in ()).throw(OSError("down")))   # a year later, API down
     assert abs(b["equity"] - 10_410) < 0.5 and b["stale"] and b["error"]
+
+
+def test_basis_row_takes_the_furthest_dated_futures_and_annualises_net_of_fees():
+    from cnq.agents import yield_desk as Y
+    from datetime import datetime, timezone
+    now = int(datetime(2026, 10, 18, 8, tzinfo=timezone.utc).timestamp() * 1000)
+    rows = [{"instrument_name": "BTC-PERPETUAL", "mark_price": 100_500, "estimated_delivery_price": 100_000},
+            {"instrument_name": "BTC-30OCT26", "mark_price": 100_200, "estimated_delivery_price": 100_000},      # 12 days: too short
+            {"instrument_name": "BTC-27NOV26", "mark_price": 100_600, "estimated_delivery_price": 100_000},
+            {"instrument_name": "BTC-25DEC26", "mark_price": 101_000, "estimated_delivery_price": 100_000},      # 68 days → used
+            {"instrument_name": "BTC-26JUN27", "mark_price": 104_000, "estimated_delivery_price": 100_000}]     # 251 days: too far
+    r = Y.basis_row(rows, "BTC", now)
+    assert r["days"] == 68 and abs(r["apy_base"] - 1 * 365 / 68) < 0.01 and abs(r["apy"] - (1 - 0.3) * 365 / 68) < 0.01
+    assert "25.12.2026" in r["name_ru"] and Y.basis_row(rows[:2], "BTC", now) is None
+    conn = sqlite3.connect(":memory:")
+    a = Y.step(conn, now, fetch=lambda: [], fetch_fut=lambda c: rows if c == "BTC" else (_ for _ in ()).throw(OSError("down")))
+    assert [t["symbol"] for t in a["table"]] == ["BTC"]

@@ -50,6 +50,8 @@ TRAIN_START = int(_dt.datetime(2021, 1, 1, tzinfo=_dt.timezone.utc).timestamp() 
 WIDE = os.environ.get("CNQ_LAB_SET", "") == "wide"           # CNQ_LAB_SET=wide → the wide universe (alt100.npz, all2023)
 WIDE_PATH = os.environ.get("CNQ_LAB_WIDE", "/tmp/claude-0/-home-claude/5491f1a8-ca5d-58c4-b6e0-e27b29449aba/scratchpad/lab/alt100_all2023.npz")
 TOPN = int(os.environ.get("CNQ_LAB_TOPN", "50"))              # point-in-time: trade a coin only while it is in the top-N by 30-day volume
+if WIDE:                                                      # wide data starts 2022-11-20 (+30 days to rank) → train 2023–2024
+    TRAIN_START = int(_dt.datetime(2023, 1, 1, tzinfo=_dt.timezone.utc).timestamp() * 1000)
 SUFFIX = f"_wide{TOPN}" if WIDE else ""                       # result files of a wide run: results/<family>_wide50.json
 UNIVERSE_RU = f"топ-{TOPN} по объёму" if WIDE else "18"
 

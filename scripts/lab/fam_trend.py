@@ -49,7 +49,9 @@ NS, NT = D.NS, D.T
 SYMS = D.syms
 FIRST = np.array([int(np.argmax(np.isfinite(C[k]))) for k in range(NS)])
 AGE = np.arange(NT)[None, :] - FIRST[:, None]          # bars since the coin's first bar (warm-up masks)
-TRAIN_YEARS = (2021, 2022, 2023, 2024)
+import harness as _HH  # noqa: E402
+TRAIN_YEARS = tuple(range(int(D.year[np.searchsorted(D.times, _HH.TRAIN_START)]), 2025))   # 2021–24; wide set: 2023–24
+NEED_TRAIN_POS = 3 if len(TRAIN_YEARS) >= 4 else len(TRAIN_YEARS)
 NMIN_TRAIN = 200
 
 
@@ -150,7 +152,7 @@ def choose(idea, side):
             and (r["stats"].get("train") or {}).get("n", 0) >= NMIN_TRAIN]
     if not cand:
         return None
-    good = [r for r in cand if train_pos_years(r["stats"]) >= 3]
+    good = [r for r in cand if train_pos_years(r["stats"]) >= NEED_TRAIN_POS]
     pool = good or cand
     return max(pool, key=lambda r: r["stats"]["train"]["avg_pct"])
 
@@ -512,6 +514,8 @@ def main():
         f"результат на большем числе сделок. Сделки по одной монете могут перекрываться (харнесс считает каждую "
         f"отдельно), так что сумма процентов — не доходность счёта.")
     os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
+    if _HH.WIDE:
+        notes_ru = notes_ru.replace("2021–2024", "2023–2024").replace("≥ 3 из 4 плюсовых лет", "оба года 2023–2024 в плюсе")
     report(os.path.join(HERE, "results", "trend.json"), "trend", results, TRIED, notes_ru)
 
     # full variant table for the analyst (outside the lab folder)

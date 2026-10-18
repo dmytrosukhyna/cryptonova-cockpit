@@ -25,6 +25,26 @@ try:
     st["spot_positions"] = c.execute("SELECT COUNT(*) FROM spot_portfolio WHERE status='OPEN'").fetchone()[0]
 except Exception as e:  # noqa: BLE001
     st["state_error"] = str(e)[:120]
+# 18.10: every file the server should refresh each run — a step that fails «continue-on-error» leaves its file old (the signals
+# feed was silently stuck for 4 h); stale or erroring files are listed and raised as GitHub warnings
+WATCH = {"capital.json": 2, "yield.json": 2, "basis.json": 2, "signals_feed.json": 2, "paper.json": 2, "portfolio.json": 2,
+         "ideas.json": 2, "markets.json": 2, "research.json": 3, "funding.json": 2, "tokenomics.json": 26, "channel_watch.json": 2,
+         "app_signals.json": 3, "decision.json": 2}
+st["stale"] = []
+for f, max_h in WATCH.items():
+    try:
+        d = json.load(open(os.path.join("web", f)))
+    except Exception as e:  # noqa: BLE001
+        st["stale"].append({"file": f, "why": f"нет файла или он битый: {str(e)[:80]}"})
+        continue
+    a_ = d.get("asof") or d.get("time") if isinstance(d, dict) else None
+    err = d.get("error") if isinstance(d, dict) else None
+    if isinstance(a_, (int, float)) and a_ > 1e12 and (now - a_) / 3.6e6 > max_h:
+        st["stale"].append({"file": f, "why": f"не обновлялся {(now - a_) / 3.6e6:.1f} ч"})
+    elif err:
+        st["stale"].append({"file": f, "why": f"ошибка: {str(err)[:100]}"})
+for x in st["stale"]:
+    print(f"::warning title=stale {x['file']}::{x['why']}")
 os.makedirs("web", exist_ok=True)
 json.dump(st, open("web/status.json", "w"), ensure_ascii=False)
 print(json.dumps({k: v for k, v in st.items() if k != "candles"}, ensure_ascii=False))

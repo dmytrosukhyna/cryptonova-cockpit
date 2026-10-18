@@ -542,25 +542,27 @@ def test_ideas_first_run_weights_cash_and_unpriceable_skips():
     by = {p["symbol"]: p for p in st["positions"]}
     big = {s for s, p in by.items() if p["role"] in ("buy", "add")}
     assert big == {"BTC", "ETH", "A1", "A2", "A3", "A4", "A5", "A6"}                 # at most 8; ADD1 has no place left
-    assert {s for s, p in by.items() if p["role"] == "small"} == {"M1", "M2", "M3", "M4"}     # at most 4
-    assert all(abs(by[s]["weight"] - 0.10) < 0.001 for s in big) and all(abs(by[f"M{i}"]["weight"] - 0.025) < 0.001 for i in range(1, 5))
+    assert {s for s, p in by.items() if p["role"] == "small"} == {"M1", "M2", "M3"}           # at most 3 (18.10)
+    # 18.10: core BTC / ETH 15 %, other «можно брать» 7.5 %, small 2.5 % (index ≈ 100 → market weight ≈ cost weight)
+    assert all(abs(by[s]["weight"] - (0.15 if s in ("BTC", "ETH") else 0.075)) < 0.001 for s in big)
+    assert all(abs(by[f"M{i}"]["weight"] - 0.025) < 0.001 for i in range(1, 4))
     assert st["cash_pct"] >= 10 and port.rp.cash() >= 0.10 * st["index"] / 100 - 1e-9 and 99.85 < st["index"] < 100   # fees 0.1 %
     skips = {a["symbol"]: a["reason"] for a in st["actions"] if a["action"] == "SKIP"}
     assert set(skips) == {"NAMESAKE", "NOPX"} and "другой токен" in skips["NAMESAKE"] and "нет живой цены" in skips["NOPX"]
     nb = {x["symbol"]: x["why_ru"] for x in st["not_bought"]}
-    assert "8 мест" in nb["ADD1"] and "4 места" in nb["M5"] and "W1" not in nb and "X1" not in nb
+    assert "8 мест" in nb["ADD1"] and "3 места" in nb["M4"] and "3 места" in nb["M5"] and "W1" not in nb and "X1" not in nb
     for k in ("key", "name", "about", "positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions"):
         assert k in st, k
-    assert st["key"] == "ideas" and st["name"] == "AI-портфель · по рекомендациям" and st["experiment"] and "не обещаем" in st["about"]
+    assert st["key"] == "ideas" and st["name"] == "CRYPTO NOVA портфель" and st["ours"] and not st["experiment"] and "не обещаем" in st["about"]
     assert by["A1"]["bucket"] == "mid" and by["BTC"]["bucket"] == "core" and by["M1"]["bucket"] == "meme"
     assert by["A1"]["role_ru"] == "из таблицы: можно брать" and by["M1"]["role_ru"] == "на небольшую сумму"
     assert by["M1"]["price_src"] == "meme" and by["A1"]["price_src"] == "cg" and by["A1"]["price_live"]
     for p in st["positions"]:
         assert p["reco"]["k"] in ("hold", "add", "trim", "sell") and p["reco"]["t"] and p["reco"]["why"]
         assert p["status"] == "OPEN" and "pnl_usd" in p and abs(p["value_usd"] - 10_000 * p["weight"] * st["index"] / 100) < 1
-    assert abs(st["sleeves"]["buy"]["now_pct"] - 80) < 0.5 and abs(st["sleeves"]["small"]["now_pct"] - 10) < 0.5
+    assert abs(st["sleeves"]["buy"]["now_pct"] - 75) < 0.5 and abs(st["sleeves"]["small"]["now_pct"] - 7.5) < 0.5
     st2 = port.step(src, _ideas(rows, T0), T0 + 1_800_000)          # nothing changed → no trades (places full → no SKIP either)
-    assert not st2["actions"] and all(a["action"] != "SKIP" for a in st2["recent_actions"]) and len(st2["recent_actions"]) == 12
+    assert not st2["actions"] and all(a["action"] != "SKIP" for a in st2["recent_actions"]) and len(st2["recent_actions"]) == 11
     src3 = copy.deepcopy(src)
     src3["cg"]["A1"] *= 1.1
     st3 = port.step(src3, _ideas(rows, T0), T0 + 3_600_000)                          # the index moves with the live price
@@ -588,10 +590,12 @@ def test_ideas_avoid_stops_body_trailing_and_cooldown():
     assert not {("A3", "SELL"), ("BTC", "SELL"), ("M3", "SELL")} & set(acts)
     by = {p["symbol"]: p for p in st["positions"]}
     assert by["M2"]["fixes"] == 1 and by["M2"]["reco"]["t"] == "Едет бесплатно" and abs(by["M2"]["cost_weight"] - 0.025 / 1.001 / 2) < 1e-6
-    assert by["BTC"]["pnl_pct"] == -40.0 and by["BTC"]["reco"]["k"] == "hold"
+    # 18.10: the core has no stop and is topped back up to 15 % when it falls under 11 % (cash permitting)
+    assert ("BTC", "ADD") in acts and "доливаем" in acts[("BTC", "ADD")]["reason"]
+    assert -40.0 < by["BTC"]["pnl_pct"] < 0 and by["BTC"]["reco"]["k"] == "hold"
     assert by["A3"]["reco"]["k"] == "sell" and by["A3"]["reco"]["t"] == "У стопа −20%"
     # freed places go to the next rows of the table; sold coins are not bought back (14 days)
-    assert ("ADD1", "BUY") in acts and ("M5", "BUY") in acts and ("A2", "BUY") not in acts and ("M1", "BUY") not in acts
+    assert ("ADD1", "BUY") in acts and ("M4", "BUY") in acts and ("A2", "BUY") not in acts and ("M1", "BUY") not in acts
     assert "снова не раньше" in {x["symbol"]: x["why_ru"] for x in st["not_bought"]}["A2"]
     # the rest of a ×2 position trails 35 % from its peak
     src2 = copy.deepcopy(src1)

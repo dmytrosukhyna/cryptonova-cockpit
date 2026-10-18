@@ -105,3 +105,17 @@ def test_lint_allows_repeated_bold_values_but_not_repeated_sections():
     assert "повторяющиеся разделы" not in ch.lint(ok, {})
     bad = ok + "\n\n<b>Что дальше:</b>\n— ещё раз"
     assert "повторяющиеся разделы" in ch.lint(bad, {})
+
+
+def test_news_post_may_not_claim_a_fall_the_market_does_not_show():
+    from cnq.agents.channel import Channel
+    C = Channel.__new__(Channel)
+    txt = "<b>Вывод CRYPTO NOVA:</b>\nСистема фиксирует падение. Страх приводит к массовой продаже, давление ощущается на биткоине."
+    assert any("нет падения" in p for p in C.lint(txt, {"btc": {"chg24": "+0.4%"}}))
+    assert not any("нет падения" in p for p in C.lint(txt, {"btc": {"chg24": "-3.2%"}}))
+    ok = "<b>Вывод CRYPTO NOVA:</b>\nНовость может добавить осторожности, но на цене это пока не видно."
+    assert not any("падения" in p for p in C.lint(ok, {"btc": {"chg24": "+0.4%"}}))
+    n = {"title": "Китайский подозреваемый в $75 млн крипто‑преступной сети арестован в Бангкоке", "strength": "3/5"}
+    assert Channel.minor_enforcement(n, {"title_en": "Chinese suspect in $75M crime network arrested"})
+    assert not Channel.minor_enforcement({"title": "ETF на биткоин одобрен", "strength": "4/5"}, {})
+    assert not Channel.minor_enforcement({"title": "Взлом биржи на $1.4 млрд", "strength": "3/5"}, {"title_en": "Exchange hacked, $1.4B stolen, suspect arrested"})

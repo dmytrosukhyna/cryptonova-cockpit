@@ -24,7 +24,8 @@ WELCOME = ("Здравствуйте! Это бот платформы <b>CRYPTO
            "Канал с обзорами: @crypto_nova_news\n"
            "Доступ к самой платформе откроем скоро — вы в списке. Если есть вопрос, просто напишите сюда: отвечаем в течение дня.")
 # 18.10 (owner): «Подключить» on the panel opens t.me/<bot>?start=connect_<strategy>. The bot explains the terms and tells the owner.
-CONNECT_NAMES = {"cryptonova": "CRYPTO NOVA (отобранные сигналы)", "portfolio": "CRYPTO NOVA портфель", "exp": "Волна", "brk": "Прорыв",
+CONNECT_NAMES = {"cryptonova": "CRYPTO NOVA (отобранные сигналы)", "portfolio": "CRYPTO NOVA портфель",
+                 "capital": "CRYPTO NOVA Капитал (система сама распределяет вашу сумму)", "exp": "Волна", "brk": "Прорыв",
                  "imp": "Импульс", "lab": "Эксперименты", "memes": "Мем-радар", "whales": "По следам китов",
                  "cons": "портфель «Консервативный»", "mod": "портфель «Умеренный»", "high": "портфель «Высокий риск»",
                  "meme": "портфель «Мемы»", "bal": "портфель «Сбалансированный»"}

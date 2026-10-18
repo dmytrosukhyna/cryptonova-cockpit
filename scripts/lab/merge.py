@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FAM_RU = {"fade": "Против движения и разворот", "trend": "Тренд и пробои", "deriv": "Деривативы: фандинг, ОИ, ликвидации",
-          "scalp": "Скальпинг и сессии"}
+          "scalp": "Скальпинг и сессии", "manip": "Манипуляции: сбор стопов и ловушки"}
 
 
 def fam_ru(fam):

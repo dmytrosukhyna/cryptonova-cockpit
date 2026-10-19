@@ -296,6 +296,71 @@ def walk_forward(series_by_param, ppy):
     return oos[start:], start, chosen
 
 
+# ------------------------------------------------------------------------------------------------------------- switch test
+def switch_test(OOS, meta, looks=(3, 7, 14, 30, 90), holds=(1, 7)):
+    """19.10, owner: «автоматически переключать на самую эффективную стратегию … не надо месяц ждать». On each market, the 12
+    rule versions (4 families × 3 directions, each already walk-forward) are the candidates. SWITCHER: every `hold` days move the
+    whole account to the version with the best result over the last `look` days (cost: 2 × the market's cost per switch).
+    Against: the plain MIX of all 12 (equal parts, never switching). Rows per market class: average yearly %, Sharpe, worst
+    drawdown, share of markets where the switcher beat the mix."""
+    out = {}
+    for cls in ("crypto", "metal", "index", "other"):
+        mk = [k for k in OOS if meta[k][2] == cls]
+        if not mk:
+            continue
+        res = {}
+        for key in mk:
+            cands = OOS[key]
+            ks = list(cands)
+            n = min(len(cands[k][1]) for k in ks)
+            M = np.array([cands[k][1][-n:] for k in ks])          # versions × days
+            ppy = 365 if cls == "crypto" else 252
+            cost = 2 * COST[cls]
+            mix = M.mean(axis=0)
+            res.setdefault("mix", []).append(mix)
+            cum = np.cumsum(M, axis=1)
+            for look in looks:
+                for hold in holds:
+                    r, cur, sw = np.zeros(n), None, 0
+                    for t in range(look, n):
+                        if (t - look) % hold == 0:
+                            past = cum[:, t - 1] - (cum[:, t - 1 - look] if t - 1 - look >= 0 else 0)
+                            best = int(np.argmax(past))
+                            if best != cur:
+                                sw += 1
+                                r[t] -= cost if cur is not None else 0
+                                cur = best
+                        r[t] += M[cur, t]
+                    res.setdefault(f"switch {look}d/{'day' if hold == 1 else 'week'}", []).append(r)
+            # SOFT: «the system adapts faster» — half the account stays in the equal mix, half goes to the versions in plus over the
+            # last `look` days in proportion to that plus; reweighted weekly; cost on the change of weights
+            for look in (7, 14, 30, 90):
+                r, w = np.zeros(n), np.full(len(ks), 1 / len(ks))
+                for t in range(look, n):
+                    if (t - look) % 7 == 0:
+                        past = cum[:, t - 1] - (cum[:, t - 1 - look] if t - 1 - look >= 0 else 0)
+                        pos = np.maximum(past, 0)
+                        tilt = pos / pos.sum() if pos.sum() > 0 else np.full(len(ks), 1 / len(ks))
+                        w_new = 0.5 / len(ks) + 0.5 * tilt
+                        r[t] -= COST[cls] * float(np.abs(w_new - w).sum())
+                        w = w_new
+                    r[t] += float(w @ M[:, t])
+                res.setdefault(f"tilt {look}d/week", []).append(r)
+        def agg(series):
+            ppy = 365 if cls == "crypto" else 252
+            S = [stats(x, ["2000-01-01"] * len(x), ppy) for x in series]
+            S = [x for x in S if x]
+            return {"cagr": round(float(np.mean([x["cagr"] for x in S])), 1), "sharpe": round(float(np.mean([x["sharpe"] for x in S])), 2),
+                    "dd": round(float(np.mean([x["dd"] for x in S])), 1)} if S else None
+        row = {k: agg(v) for k, v in res.items()}
+        for k, v in res.items():
+            if k != "mix" and row.get(k):
+                wins = sum(1 for a, b in zip(v, res["mix"]) if a.mean() / (a.std() or 1) > b.mean() / (b.std() or 1))
+                row[k]["beats_mix_share"] = round(wins / len(v), 2)
+        out[cls] = {"markets": mk, **row}
+    return out
+
+
 # ------------------------------------------------------------------------------------------------------------- live check
 def live_check(paper):
     rows = []
@@ -344,6 +409,7 @@ def main():
     note("autolab · data", json.dumps({k: (v.get("source"), v.get("from"), v.get("days")) if "source" in v else v.get("error")
                                        for k, v in cover.items()}, ensure_ascii=False))
     rows, port_parts, tried = [], {}, 0
+    OOS = {}
     for key, (dates, c) in data.items():
         cls = meta[key][2]
         ppy = 365 if cls == "crypto" else 252
@@ -355,6 +421,8 @@ def main():
                 tried += len(params)
                 ser = {p: strat_returns(c, raws[p], mode, COST[cls], ppy) for p in params}
                 oos, start, chosen = walk_forward(ser, ppy)
+                if fam != "hold":
+                    OOS.setdefault(key, {})[(fam, mode)] = (dates[start:], oos)
                 st = stats(oos, dates[start:], ppy)
                 if not st:
                     continue
@@ -416,6 +484,8 @@ def main():
             ports[name] = {"markets": keys, **st}
     for name, p in ports.items():
         note(f"autolab · portfolio · {name[:40]}", json.dumps({k: p.get(k) for k in ("cagr", "sharpe", "dd", "pos_years", "n_years", "last12", "at_dd25", "from")}, ensure_ascii=False))
+    switch = switch_test(OOS, meta)
+    note("autolab · switch test", json.dumps(switch, ensure_ascii=False))
     # previous night → changes
     try:
         prev = json.load(open(OUT, encoding="utf-8"))
@@ -441,7 +511,7 @@ def main():
            "inverted_passed": sum(r["passes"] for r in inv), "coverage": cover, "classes_ru": CLASS_RU,
            "best_by_class": {k: {x: v[x] for x in ("market_ru", "family_ru", "mode_ru", "sharpe", "cagr", "dd", "last12", "reliable")}
                              for k, v in best.items()},
-           "portfolios": ports, "live": live, "changes": changes, "rows": rows,
+           "portfolios": ports, "switch": switch, "live": live, "changes": changes, "rows": rows,
            "method_ru": [
                "Каждую ночь движок сам берёт свежие дневные свечи: крипта (Binance), металлы, фондовые индексы, нефть и облигации США (Yahoo, запасной — Stooq).",
                "5 семей правил × параметры × 3 направления: только покупки, покупки и шорты, перевёрнутое правило. Размер позиции — под 15% годовых колебаний, комиссии учтены.",

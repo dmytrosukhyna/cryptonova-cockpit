@@ -178,7 +178,7 @@ def simulate(K, fam, gate, ex, sym):
             break                                             # still open at the end of the data
         days = j - i
         net = sg * (px / e - 1) * 100 - COST - FUND_D * days
-        out.append((int(t[i + 1]), int(t[j]), sg, float(net), days, sym))
+        out.append((int(t[i + 1]), int(t[j]), sg, float(net), days, sym, float(sd / e * 100)))
         i = j                                                 # a new signal can come at this close
     return out
 
@@ -189,7 +189,7 @@ _BASE: dict = {}
 def baseline(KS, trades):
     """Random entry of the same coin, side, year and holding time (exact mean over all days of that coin-year)."""
     cache, vals = _BASE, []
-    for o_t, _c, sg, _net, days, sym in trades:
+    for o_t, _c, sg, _net, days, sym, *_ in trades:
         K = KS[sym]
         y = dt.datetime.fromtimestamp(o_t / 1000, dt.timezone.utc).year
         key = (sym, y, days)
@@ -215,14 +215,15 @@ def summary(trades, KS, n_days):
             "short": round(float(np.mean([x[3] for x in trades if x[2] == -1])), 3) if any(x[2] == -1 for x in trades) else None}
 
 
-def account(trades, share=0.10, max_open=10):
-    """Compounding demo account: `share` of equity per trade (notional, 1×), at most `max_open` at once."""
+def account(trades, share=0.10, max_open=10, risk=None):
+    """Compounding demo account: `share` of equity per trade (notional, 1×), at most `max_open` at once. With `risk` (% of
+    equity lost at the stop): notional = risk ÷ stop distance, capped at 25 % of equity."""
     ev = sorted([(o, 0, k) for k, (o, *_r) in enumerate(trades)] + [(cl, 1, k) for k, (_o, cl, *_r) in enumerate(trades)])
     E, peak, dd, size, opened, curve = 1.0, 1.0, 0.0, {}, 0, []
     for tt, kind, k in ev:
         if kind == 0:
             if opened < max_open:
-                size[k] = E * share
+                size[k] = E * (min(0.25, risk / trades[k][6]) if risk else share)
                 opened += 1
             continue
         if k in size:
@@ -304,5 +305,57 @@ def main():
     note("own signals · last 60 days", json.dumps(rec, ensure_ascii=False))
 
 
+COINS2 = ["FET", "RENDER", "1000PEPE", "WIF", "JUP", "PYTH", "ONDO", "TAO", "1000BONK", "1000FLOKI", "ORDI", "JTO", "STRK", "PENDLE",
+          "ENS", "IMX", "MANA", "EGLD", "THETA", "ALGO", "VET", "QNT", "KAVA", "ZIL", "MASK", "CHZ", "COMP", "SNX", "1INCH", "ZRO"]
+
+
+def combo():
+    """19.10, round 2. No single family is in plus every year: the pullback (P·regime) lost in 2024, the breakouts with a
+    trailing exit (B·chand·regime) lost in 2025. Together? Same rules, same costs; accounts with fixed size and with fixed risk.
+    Then the same rules on 30 OTHER coins never used to pick them (FET, RENDER, PEPE, WIF, …) — the out-of-sample check."""
+    def load(coins):
+        with ThreadPoolExecutor(12) as ex:
+            raw = dict(zip(coins, ex.map(lambda s: daily(s + "USDT"), coins)))
+        return {s: k for s, k in raw.items() if k is not None}
+    KS = load(COINS)
+    B = KS["BTC"]
+    bc = B["c"]
+    s200, s50 = sma(bc, 200), sma(bc, 50)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+        soft = np.where(np.isnan(s50), np.nan, (bc > s50).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": soft}
+    K2 = load(COINS2)
+    for D in (KS, K2):
+        for s in D:
+            prep(D[s], gate)
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    n_days = (TODAY - dt.date(2022, 1, 1)).days
+    rules = {"P": ("P", "regime", "-"), "B5c": ("B5", "regime", "chand"), "B10c": ("B10", "regime", "chand"), "B20c": ("B20", "regime", "chand")}
+    combos = {"P": ["P"], "B10c": ["B10c"], "P+B10c": ["P", "B10c"], "P+B5c": ["P", "B5c"], "P+B20c": ["P", "B20c"], "P+B5c+B20c": ["P", "B5c", "B20c"]}
+    for label, D in (("main 40 coins", KS), ("other 30 coins", K2)):
+        TRr = {r: [x for s, K in D.items() for x in simulate(K, *spec, s) if x[0] >= t0] for r, spec in rules.items()}
+        out = {}
+        for cname, parts in combos.items():
+            trs = sorted([x for r in parts for x in TRr[r]], key=lambda x: x[0])
+            sm = summary([x[:6] for x in trs], D, n_days)
+            out[cname] = {"n": sm.get("n"), "per_day": sm.get("per_day"), "avg": sm.get("avg"), "rand": sm.get("rand"),
+                          "y": {y: v[0] for y, v in (sm.get("y") or {}).items()},
+                          "fix10x15": account(trs, 0.10, 15), "risk1x20": account(trs, max_open=20, risk=1.0)}
+            for a in ("fix10x15", "risk1x20"):
+                out[cname][a].pop("last_months_pct", None)
+        note(f"own signals combo · {label}", json.dumps(out, ensure_ascii=False))
+        if label.startswith("main"):
+            recent = int((dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=90)).timestamp() * 1000)
+            trs = sorted([x for r in ("P", "B10c") for x in TRr[r]], key=lambda x: x[0])
+            mo = {}
+            for x in trs:
+                if x[0] >= recent:
+                    m = dt.datetime.fromtimestamp(x[0] / 1000, dt.timezone.utc).strftime("%Y-%m")
+                    mo.setdefault(m, []).append(x[3])
+            note("own signals combo · P+B10c last 90 days by month", json.dumps({m: [len(v), round(float(np.mean(v)), 2), round(float(np.mean(np.array(v) > 0)) * 100)]
+                                                                                for m, v in sorted(mo.items())}))
+
+
 if __name__ == "__main__":
-    main()
+    combo() if "--combo" in sys.argv else main()

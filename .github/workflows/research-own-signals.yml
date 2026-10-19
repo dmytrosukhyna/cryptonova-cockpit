@@ -2,7 +2,12 @@ name: research-own-signals
 # Manual only. Our own signals with a steady flow (scripts/own_signals_study.py): breakout / pullback / weekly trend,
 # both sides, gated by the BTC regime, on Binance USDT-M daily candles 2022 → today.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "empty = all variants, --combo = combinations + 30 other coins"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -16,4 +21,4 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -q numpy
-      - run: python scripts/own_signals_study.py
+      - run: python scripts/own_signals_study.py ${{ inputs.mode }}

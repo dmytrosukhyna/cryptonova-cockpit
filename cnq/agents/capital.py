@@ -56,7 +56,8 @@ DIRECTIONAL = ("spot", "active", "futures")
 CARRY = ("funding", "basis", "yield", "susde")
 # 18.10 backtest (scripts/lab/portfolio_rules.py): regime shares 0.5–0.7 × 0.10–0.35 — lower «off» better in 2025–26 every time
 RISK = {"spot": 4, "active": 4, "futures": 4, "funding": 3, "basis": 2, "yield": 2, "susde": 3, "listings": 4}
-LST_GATE = {"trades": 20, "avg_trade_pct": 1.0}  # the listing short gets dollars only after this live record (criteria of «Концепция»)
+LST_GATE = {"trades": 20, "avg_trade_pct": 1.0}
+OWN_GATE = {"trades": 30, "avg_trade_pct": 0.3}   # «Сигналы CRYPTO NOVA» join the futures sleeve after this live record (history: +0.76 % a trade)  # the listing short gets dollars only after this live record (criteria of «Концепция»)
 DISCOUNT = {2: 0.0, 3: 1.5}                      # percentage points taken off a source's rate for its risk
 CAP = {"funding": 0.20, "basis": 0.30, "susde": 0.15}
 YIELD_FLOOR = 0.30                               # share of the carry part that always stays in lending (liquid reserve)
@@ -115,6 +116,13 @@ def _susde(out: str) -> dict:
     return ((_load(out, "yield.json").get("accounts") or {}).get("susde")) or {}
 
 
+def own_gate(out: str) -> tuple[bool, dict]:
+    """Has the own-signals demo desk earned a place in the futures result? (≥ 30 closed trades, ≥ +0.3 % a trade on average)."""
+    s = (((_load(out, "paper.json").get("profiles") or {}).get("own") or {}).get("stats")) or {}
+    n, avg = s.get("trades") or 0, s.get("avg_trade_pct")
+    return bool(n >= OWN_GATE["trades"] and avg is not None and avg >= OWN_GATE["avg_trade_pct"]), {"trades": n, "avg_trade_pct": avg}
+
+
 def lst_gate(out: str) -> tuple[bool, dict]:
     """Has the listing-short demo desk earned real dollars? (≥ 20 closed trades, ≥ +1 % a trade on average)."""
     s = (((_load(out, "paper.json").get("profiles") or {}).get("lst") or {}).get("stats")) or {}
@@ -137,8 +145,9 @@ def desk_values(out: str) -> dict:
     d = prof.get("imps") or {}
     if d.get("equity") is not None:
         v["active"] = float(d["equity"]) + sum(float(o.get("open_pnl_usd") or 0) for o in d.get("open") or [])
+    fut_keys = ("bal", "imp", "own") if own_gate(out)[0] else ("bal", "imp")
     fut = [float(d["equity"]) + sum(float(o.get("open_pnl_usd") or 0) for o in d.get("open") or [])
-           for k in ("bal", "imp") if (d := prof.get(k)) and d.get("equity") is not None]
+           for k in fut_keys if (d := prof.get(k)) and d.get("equity") is not None]
     if fut:
         v["futures"] = sum(fut) / len(fut)
     fd = _load(out, "funding.json")

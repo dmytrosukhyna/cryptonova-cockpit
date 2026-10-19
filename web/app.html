@@ -2462,7 +2462,9 @@ function tRes(k){ const pr=(PAPER&&PAPER.profiles)||{};
   if(k==='whales'){ return WTOP&&WTOP.desk?WTOP.desk.pnl_usd:null; }
   return null; }
 function novaRes(){ const pr=(PAPER&&PAPER.profiles)||{}, C=[]; let t0=0;   // CRYPTO NOVA = bal + imp, each since its own start
-  ['bal','imp'].forEach(k=>{ const v=pr[k]; if(!v) return; const t=v.equity_history&&v.equity_history[0]&&v.equity_history[0].time; if(t>t0) t0=t; C.push({k,n:(STRATS[k]||{}).name||k,r:futEq(v)-(v.start_equity||10000),base:v.start_equity||10000,since:pSince(v),P:v}); });
+  // «Сигналы CRYPTO NOVA» (own) join once their live record passes the allocator's gate (≥ 30 closed trades, ≥ +0.3 % a trade)
+  const ownOk=(()=>{ const s=(pr.own&&pr.own.stats)||{}; return (s.trades||0)>=30&&s.avg_trade_pct!=null&&s.avg_trade_pct>=0.3; })();
+  (ownOk?['bal','imp','own']:['bal','imp']).forEach(k=>{ const v=pr[k]; if(!v) return; const t=v.equity_history&&v.equity_history[0]&&v.equity_history[0].time; if(t>t0) t0=t; C.push({k,n:(STRATS[k]||{}).name||k,r:futEq(v)-(v.start_equity||10000),base:v.start_equity||10000,since:pSince(v),P:v}); });
   // 19.10: «умный разворот» left the mix — on 3 037 golden signals over 10 months the signal's direction is a coin flip (golden_history.py)
   // 19.10 (owner: «30 000 на фьючах почему-то, не соответствует разделу»): the mix is shown as ONE $10 000 account — the average
   // result of its accounts — like every other demo account; each component keeps its own result

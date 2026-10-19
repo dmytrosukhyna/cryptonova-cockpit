@@ -20,13 +20,27 @@ Round 5 (19.10, the live knobs, risk 0.5 % a trade): longs only and at most 4 NE
     30 other coins: +2.8 % a month, −18 %, +16 / +60 / +1 / +29 %. In a market that is not «рост» the desk waits in cash
     (2022: no trades). The shorts of the rules stay computed but are not traded.
 
+Rounds 6–8 (19.10, owner: «что это за правило не больше 4 сделок в день? … главное качество, а не количество, но не упускать
+    возможности»), on a DAILY mark-to-market account (open trades count in the drawdown), every signal day a candidate:
+    • the cap of 4 took the first 4 coins of the list — no selection; at the same drawdown (−25 %) it earned no more than taking
+      every signal or a random 4 (40 coins: +1.3 / +1.4 / +1.4 % a month) — a cap is only a smaller risk;
+    • the quality mark is the VOLUME of the signal day: in dollars ≥ 1.5× its 30-day average. Taking every such signal, no
+      daily cap: 40 coins +3.2 % a month, drawdown −20 %, average trade +4.5 % (was +1.6 %, −29 %, +1.4 %); 30 other coins
+      +2.4 %, −16 %; all 70 +5.3 %, −28 %, 0.7 trades a day; at the same drawdown −25 %: +4.3 / +3.9 / +4.8 % a month
+      (now: +1.3 / +2.4 / +1.3 %). Plus every year 2023–2026 on 40 and 70 coins. Ranking by the volume beat a random pick at
+      every cap 2…6 on 40 and on 30 coins, with 20 / 30 / 50-day windows and base or quote volume alike.
+    • the pullback without the volume mark is the weak part (70 coins: drawdown −45 %); the breakout with volume carries it.
+    Live since 19.10 evening: 70 coins, the volume mark, no daily cap, ≤ 40 open, gross ≤ 2× the account, risk 0.5 %.
+
 Rules (checked once a day after the daily close, 00:00 UTC; entries and rule exits at the new day's open):
   P — long: close above a RISING 50-day average (vs 5 days ago) and RSI(2) < 10, BTC regime «рост» (BTC above its 200-day average
       and up over 60 days); out when the close is back above the 5-day average or after 10 days. Short: the mirror, regime not «рост».
   C — long: close above the high of the previous 20 days and above the 20-day average, regime «рост»; out when the close falls
       3 ATR(14) below the best close since entry, or after 14 days. Short: the mirror, regime not «рост».
   Stop for both: 2.5 ATR(14) from the entry, at least 3 % and at most 15 % — checked every run (≈ 30 min) against the live price.
-  Size: 0.5 % of the account is lost at the stop (notional at most 25 % of the account), at most 20 open, one position per coin and
+  Volume: the signal day's volume in dollars (base volume × close) ≥ 1.5× its 30-day average, else no trade; when the room is
+  short (40 open, gross 2× the account), the higher volume first.
+  Size: 0.5 % of the account is lost at the stop (notional at most 25 % of the account), at most 40 open, one position per coin and
   rule. Fees 0.05 % + slippage 0.02 % per side. Writes profiles["own"] into web/paper.json. Stdlib only; fetchers injectable."""
 from __future__ import annotations
 
@@ -36,22 +50,27 @@ import sqlite3
 import time
 import urllib.request
 
-COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT", "LTC", "BCH", "TRX", "NEAR", "ATOM", "ETC", "FIL",
-         "APT", "ARB", "OP", "INJ", "SUI", "UNI", "AAVE", "XLM", "HBAR", "ICP", "RUNE", "STX", "GRT", "LDO", "SAND", "AXS", "CRV",
-         "DYDX", "GALA", "TIA", "SEI", "WLD", "ENA"]
+COINS40 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT", "LTC", "BCH", "TRX", "NEAR", "ATOM", "ETC", "FIL",
+           "APT", "ARB", "OP", "INJ", "SUI", "UNI", "AAVE", "XLM", "HBAR", "ICP", "RUNE", "STX", "GRT", "LDO", "SAND", "AXS", "CRV",
+           "DYDX", "GALA", "TIA", "SEI", "WLD", "ENA"]
+COINS30 = ["FET", "RENDER", "1000PEPE", "WIF", "JUP", "PYTH", "ONDO", "TAO", "1000BONK", "FLOKI", "ORDI", "JTO", "STRK", "PENDLE",
+           "ENS", "IMX", "MANA", "EGLD", "THETA", "ALGO", "VET", "QNT", "KAVA", "ZIL", "MASK", "CHZ", "COMP", "SNX", "1INCH", "ZRO"]
+COINS = COINS40 + COINS30          # BingX perp names (1000PEPE, 1000BONK, FLOKI)
 START = 10_000.0
-RISK, NOTIONAL_CAP, MAX_OPEN = 0.005, 0.25, 20
-LONG_ONLY, PER_DAY = True, 4       # 19.10 round 5: shorts ≈ 0 a trade; ≤ 4 new trades a day cuts the drawdown (see the docstring)
+RISK, NOTIONAL_CAP, MAX_OPEN, GROSS_CAP = 0.005, 0.25, 40, 2.0
+LONG_ONLY = True                   # 19.10 round 5: the shorts of the rules ≈ 0 a trade
+VOL_MIN, VOL_DAYS = 1.5, 30        # 19.10 rounds 6–8: the signal day's dollar volume ≥ 1.5× its 30-day average (see the docstring)
 FEE = 0.0007                      # 0.05 % taker + 0.02 % slippage, per side
 HOLD = {"P": 10, "C": 14}
 DAY = 86_400_000
 NAME = "Сигналы CRYPTO NOVA"
 RULE_RU = {"P": "откат в тренде", "C": "пробой 20 дней"}
-ABOUT = ("Наши собственные сигналы раз в день на 40 монетах: покупаем, только когда рынок растёт, в остальное время ждём в долларах. "
+ABOUT = ("Наши собственные сигналы раз в день на 70 монетах: покупаем, только когда рынок растёт, в остальное время ждём в долларах. "
          "Два правила: «откат в тренде» (монета в росте сделала короткий откат) и «пробой 20 дней» (цена вышла из 20-дневного "
-         "диапазона, держим, пока тренд не сломается). Стоп 3–15% от входа, риск 0.5% счёта на сделку, не больше 4 новых сделок "
-         "в день и 20 открытых. История 2023–2026: в среднем около +2.9% в месяц, худшая просадка −24%, каждый год в плюсе — "
-         "и на 40 монетах, и на 30 других. Демо $10 000.")
+         "диапазона, держим, пока тренд не сломается). Входим, только если в день сигнала объём торгов был в 1.5 раза выше "
+         "обычного: за таким движением стоят деньги. Лимита сделок в день нет, до 40 открытых. Стоп 3–15% от входа, риск 0.5% "
+         "счёта на сделку. История 2023–2026 с учётом открытых сделок: в среднем около +5% в месяц, худшая просадка −28%, "
+         "каждый год в плюсе. Демо $10 000.")
 
 
 def _get(url: str, timeout: int = 15):
@@ -61,16 +80,19 @@ def _get(url: str, timeout: int = 15):
 
 
 def fetch_daily(sym: str) -> list:
-    """[[open ms, o, h, l, c], …] ascending, the last row is today's forming candle. BingX perp first, Binance spot mirror next."""
+    """[[open ms, o, h, l, c, base volume], …] ascending, the last row is today's forming candle. BingX perp first, Binance spot
+    mirror next (not for the 1000-unit perps — the spot price is on another scale)."""
     try:
         from ..bingx.rest import BingXRest
-        rows = [[c.open_time, c.open, c.high, c.low, c.close] for c in BingXRest().klines(f"{sym}-USDT", "1d", limit=300)]
+        rows = [[c.open_time, c.open, c.high, c.low, c.close, c.volume] for c in BingXRest().klines(f"{sym}-USDT", "1d", limit=300)]
         if len(rows) >= 120:
             return rows
     except Exception:  # noqa: BLE001
         pass
+    if sym.startswith("1000"):
+        return []
     d = _get(f"https://data-api.binance.vision/api/v3/klines?symbol={sym}USDT&interval=1d&limit=300")
-    return [[int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4])] for r in d]
+    return [[int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])] for r in d]
 
 
 def fetch_prices() -> dict:
@@ -113,6 +135,16 @@ def regime(btc: list) -> bool | None:
     if s200 is None or e < 60:
         return None
     return c[e] > s200 and c[e] > c[e - 60]
+
+
+def vol_surge(K: list) -> float | None:
+    """The last closed day's volume in dollars (base volume × close) ÷ its average over the last VOL_DAYS days (that day
+    included). None without volume data."""
+    if len(K) < VOL_DAYS or any(len(k) < 6 for k in K[-VOL_DAYS:]):
+        return None
+    dv = [k[5] * k[4] for k in K[-VOL_DAYS:]]
+    avg = sum(dv) / VOL_DAYS
+    return dv[-1] / avg if avg > 0 else None
 
 
 def signals(K: list, bull: bool) -> list[tuple[str, int]]:
@@ -161,6 +193,10 @@ def ensure(conn: sqlite3.Connection) -> None:
     conn.execute("""CREATE TABLE IF NOT EXISTS own_trades(id TEXT PRIMARY KEY, symbol TEXT, rule TEXT, side TEXT, opened INTEGER,
                     opened_day INTEGER, entry REAL, stop REAL, qty REAL, best REAL, closed INTEGER, exit REAL, exit_kind TEXT,
                     pnl_usd REAL)""")
+    try:
+        conn.execute("ALTER TABLE own_trades ADD COLUMN vol REAL")      # 19.10: the signal day's volume ÷ its 30-day average
+    except sqlite3.OperationalError:
+        pass
     conn.execute("CREATE TABLE IF NOT EXISTS own_equity(time INTEGER PRIMARY KEY, equity REAL)")
     conn.execute("CREATE TABLE IF NOT EXISTS own_closes(symbol TEXT, day INTEGER, close REAL, PRIMARY KEY(symbol, day))")
     conn.commit()
@@ -183,7 +219,7 @@ def _close(conn, t: dict, px: float, kind: str, now: int) -> float:
 
 
 def _open_rows(conn) -> list[dict]:
-    keys = ("id", "symbol", "rule", "side", "opened", "opened_day", "entry", "stop", "qty", "best")
+    keys = ("id", "symbol", "rule", "side", "opened", "opened_day", "entry", "stop", "qty", "best", "vol")
     return [dict(zip(keys, r)) for r in conn.execute(f"SELECT {', '.join(keys)} FROM own_trades WHERE closed IS NULL ORDER BY opened")]
 
 
@@ -243,26 +279,38 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                 open_now = _open_rows(conn)
                 have = {(t["symbol"], t["rule"]) for t in open_now}
                 n_open = len(open_now)
-                n_new = 0
+                gross = sum(t["qty"] * t["entry"] for t in open_now)
+                cands = []
                 for s, k in K.items():
                     closed = k[:-1]
                     for rule, sg in signals(closed, bull):
-                        if (LONG_ONLY and sg != 1) or n_open >= MAX_OPEN or n_new >= PER_DAY or (s, rule) in have:
+                        if (LONG_ONLY and sg != 1) or (s, rule) in have:
                             continue
-                        e = _px(k, s)
-                        a = _atr(closed, len(closed) - 1)
-                        if not a or e <= 0:
+                        v = vol_surge(closed)
+                        if v is None or v < VOL_MIN:            # no volume behind the signal → no trade (rounds 6–8)
                             continue
-                        dist = min(max(2.5 * a, 0.03 * e), 0.15 * e)
-                        qty = min(eq * RISK / dist, eq * NOTIONAL_CAP / e)
-                        tid = f"OWN-{rule}-{s}-{day // DAY}"
-                        conn.execute("INSERT OR IGNORE INTO own_trades(id, symbol, rule, side, opened, opened_day, entry, stop, qty, best) "
-                                     "VALUES(?,?,?,?,?,?,?,?,?,?)",
-                                     (tid, s, rule, "LONG" if sg == 1 else "SHORT", now, day, e, e - sg * dist, qty, closed[-1][4]))
-                        have.add((s, rule))
-                        n_open += 1
-                        n_new += 1
-                        events.append(f"{s} {RULE_RU[rule]}: {'покупка' if sg == 1 else 'шорт'} по {e:g}")
+                        cands.append((v, s, rule, sg))
+                for v, s, rule, sg in sorted(cands, key=lambda x: -x[0]):   # the room is short → the higher volume first
+                    if n_open >= MAX_OPEN:
+                        break
+                    k = K[s]
+                    closed = k[:-1]
+                    e = _px(k, s)
+                    a = _atr(closed, len(closed) - 1)
+                    if not a or e <= 0:
+                        continue
+                    dist = min(max(2.5 * a, 0.03 * e), 0.15 * e)
+                    qty = min(eq * RISK / dist, eq * NOTIONAL_CAP / e)
+                    if gross + qty * e > GROSS_CAP * eq:
+                        continue
+                    tid = f"OWN-{rule}-{s}-{day // DAY}"
+                    conn.execute("INSERT OR IGNORE INTO own_trades(id, symbol, rule, side, opened, opened_day, entry, stop, qty, best, vol) "
+                                 "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                                 (tid, s, rule, "LONG" if sg == 1 else "SHORT", now, day, e, e - sg * dist, qty, closed[-1][4], round(v, 2)))
+                    have.add((s, rule))
+                    n_open += 1
+                    gross += qty * e
+                    events.append(f"{s} {RULE_RU[rule]}: {'покупка' if sg == 1 else 'шорт'} по {e:g}, объём ×{v:.1f}")
             _set(conn, "regime", bull)
             _set(conn, "day", day)
             _set(conn, "coins_seen", len(K))
@@ -281,7 +329,8 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
         out_open.append({"id": t["id"], "symbol": t["symbol"], "side": t["side"], "grade": t["rule"], "kind": "OWN_" + t["rule"],
                          "entry": t["entry"], "stop": t["stop"], "qty": t["qty"], "qty_left": t["qty"], "opened": t["opened"], "pnl_usd": 0.0,
                          "price": p, "open_pnl_usd": round(u, 2),
-                         "reason": f"{RULE_RU[t['rule']]}: стоп {abs(t['stop'] / t['entry'] - 1) * 100:.1f}%, выход по правилу или через {HOLD[t['rule']]} дней"})
+                         "reason": f"{RULE_RU[t['rule']]}" + (f", объём ×{t['vol']:.1f} к среднему" if t.get("vol") else "")
+                                   + f": стоп {abs(t['stop'] / t['entry'] - 1) * 100:.1f}%, выход по правилу или через {HOLD[t['rule']]} дней"})
     eq = eqc + open_pnl
     conn.execute("INSERT OR REPLACE INTO own_equity VALUES(?, ?)", (now, round(eq, 2)))
     conn.commit()
@@ -306,7 +355,7 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
                       "max_dd_pct": round(dd * 100, 2), "best": 0, "worst": 0},
             "equity_history": eqh, "events": events[:20], "error": None,
             "regime_ru": None if bull is None else ("рост: покупаем" if bull else "не рост: ждём в долларах"),
-            "rules": "откат в тренде и пробой 20 дней, только покупки в режиме «рост»; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 4 новых сделок в день и 20 открытых"}
+            "rules": "откат в тренде и пробой 20 дней на 70 монетах, только покупки в режиме «рост» и только при объёме дня от 1.5× к среднему за 30 дней; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 40 открытых"}
 
 
 def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, daily=fetch_daily, prices=fetch_prices) -> dict:

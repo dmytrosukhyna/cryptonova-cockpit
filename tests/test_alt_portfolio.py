@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 
 from cnq.agents import alt_portfolio as ap
+from cnq.agents.own_desk import COINS40, COINS30
 
 DAY = ap.DAY
 D0 = 1_780_000_000_000 // DAY * DAY
@@ -17,7 +18,7 @@ def _closes(conn, btc_growth, alt_growth, n=260, alts=12):
         rows.append(("BTC", d, 100 * btc_growth ** i))
         rows.append(("ETH", d, 10 * btc_growth ** i))
         for a in range(alts):
-            rows.append((f"A{a}", d, (1 + a) * alt_growth ** i))
+            rows.append((COINS40[2 + a], d, (1 + a) * alt_growth ** i))
     conn.executemany("INSERT INTO own_closes VALUES(?,?,?)", rows)
 
 
@@ -52,3 +53,12 @@ def test_posts_first_status_then_only_changes():
     ap.run(c, tmp, now=now + 3_600_000, send=lambda m: sent.append(m) or 1, daily=False)
     assert len(sent) == 1 or "понедельник" in sent[-1].lower()
     assert json.load(open(tmp + "/altseason.json"))["gauge"]["on"] is True
+
+
+def test_gauge_stays_on_the_40_coins_it_was_checked_on():
+    """The desk trades 70 coins since 19.10; the 30 added ones must not change the altseason gauge."""
+    c = sqlite3.connect(":memory:")
+    _closes(c, 1.002, 1.004)
+    before = ap.gauge(c)
+    c.executemany("INSERT INTO own_closes VALUES(?,?,?)", [(s, D0 + i * DAY, 50 * 0.99 ** i) for s in COINS30[:20] for i in range(260)])
+    assert ap.gauge(c) == before

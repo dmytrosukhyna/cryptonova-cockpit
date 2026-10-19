@@ -50,7 +50,8 @@ def gauge(conn: sqlite3.Connection) -> dict | None:
     days = sorted(btc)
     if len(days) < 2 * WIN + 1:
         return None
-    alts = [s for s in by if s not in ("BTC", "ETH")]
+    from .own_desk import COINS40                     # the gauge stays on the 40 coins it was checked on (the desk trades 70)
+    alts = [s for s in by if s not in ("BTC", "ETH") and s in COINS40]
     # equal-weight alt index (rebalanced daily) divided by BTC
     idx, ratio = 1.0, []
     for i, d in enumerate(days):

@@ -7,10 +7,10 @@ up to ~30 minutes after its 15-minute candle closed. Here the desks act within a
 Layout on the server (deploy/engine/install.sh):
   /opt/cnq/repo — a clean git checkout: pull and push only;
   /opt/cnq/run  — where the engine works: data/ (its own agents.sqlite and candle store), web/ (outputs), links to the repo code.
-Every minute (cycle): new 15-minute candles of the 18 core coins (only the missing bars) → the CNPTS desks (paper), listing
-shorts, our own signals, the neutral basket, turbo, the signal feed (Telegram; the app bridge on the same server can read
-run/web/signals_feed.json directly). Every 5 cycles: the 36 lab coins too. Every 15: the full candle check (gaps, funding).
-Every 30: the quality card and «ядро + альтсезон» (each does its daily work once a day).
+Every minute (cycle): new 15-minute candles of the 18 core coins (only the missing bars) and a fifth of the 36 lab coins → the
+CNPTS desks (paper), listing shorts, our own signals, the neutral basket, turbo, the signal feed (Telegram; the app bridge on
+the same server reads run/web/signals_feed.json directly). Every 60 cycles: funding. Every 30: the quality card and «ядро +
+альтсезон» (each does its daily work once a day). The 11-minute full candle check runs only once, in start.sh.
 Every SYNC_S: sync with GitHub — pull what the GitHub pipeline makes (news, research, macro …) into run/web and run/data, push
 what the engine owns (OWNED + engine.json). The GitHub pipeline skips the engine's steps while the repository variable
 CNQ_ENGINE = server, so there is only one writer of each file.
@@ -118,11 +118,12 @@ def sync(push: bool = True) -> dict:
 def cycle(n: int, env: dict) -> dict:
     steps = {}
     py = sys.executable
-    if n % 15 == 0 and n > 0:                          # the full check (gaps, funding, lab coins); start.sh did it before cycle 0
-        steps["candles_full"] = sh([py, "scripts/ci_refresh.py"], RUN, 900, {**env, "CNQ_REFRESH": "full"})
-    else:
-        steps["candles"] = sh([py, "scripts/ci_refresh.py"], RUN, 120,
-                              {**env, "CNQ_REFRESH": "quick", "CNQ_REFRESH_EXTRA": "1" if n % 5 == 0 else "0"})
+    # new bars of the 18 core coins every cycle + a fifth of the 36 lab coins (each lab coin every 5 minutes); funding once an hour.
+    # Never the 11-minute full check here — it would stop the minute loop (start.sh runs it once before the service starts).
+    steps["candles"] = sh([py, "scripts/ci_refresh.py"], RUN, 120,
+                          {**env, "CNQ_REFRESH": "quick", "CNQ_REFRESH_EXTRA": f"{n % 5}/5"})
+    if n % 60 == 30:
+        steps["funding"] = sh([py, "scripts/ci_refresh.py"], RUN, 120, {**env, "CNQ_REFRESH": "funding"})
     for cmd in FAST:
         steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
     if n % 30 == 0:

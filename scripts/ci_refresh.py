@@ -22,7 +22,7 @@ from cnq.store.db import Store  # noqa: E402
 
 def mode() -> str:
     m = os.environ.get("CNQ_REFRESH", "").strip().lower()
-    if m in ("quick", "full"):
+    if m in ("quick", "full", "funding"):
         return m
     now = dt.datetime.now(dt.timezone.utc)
     return "full" if now.hour % 6 == 0 and now.minute < 20 else "quick"
@@ -51,11 +51,25 @@ def main() -> int:
     m = mode()
     t0 = time.time()
     core = [bx for bx, _ in cfg.universe]
+    if m == "funding":                       # the server engine, once an hour: the last 2 days of funding for the core coins
+        rest, now, n = BingXRest(cfg.bingx), int(time.time() * 1000), 0
+        for bx in core:
+            try:
+                store.upsert_funding(bx, rest.funding_history(bx, start_ms=now - 2 * 86_400_000, end_ms=now))
+                n += 1
+            except Exception as e:  # noqa: BLE001
+                print("funding failed", bx, repr(e))
+        print(f"funding {n}/{len(core)} in {time.time() - t0:.0f}s")
+        return 0
     if m == "quick":
         rest = BingXRest(cfg.bingx)          # the documented limit is 1 request a second per IP — kept (18 coins ≈ 20 s)
         ok = quick(store, core, rest)
-        if os.environ.get("CNQ_REFRESH_EXTRA", "1") == "1":
+        extra = os.environ.get("CNQ_REFRESH_EXTRA", "1")
+        if extra == "1":
             quick(store, list(cfg.b_extra), rest)
+        elif "/" in extra:                   # "k/n": the k-th of n slices of the lab coins (the engine spreads them over cycles)
+            k, n_ = (int(x) for x in extra.split("/"))
+            quick(store, list(cfg.b_extra)[k::n_], rest)
         print(f"quick refresh {ok}/{len(core)} symbols in {time.time() - t0:.0f}s")
         return 0 if ok else 1
     ok = 0

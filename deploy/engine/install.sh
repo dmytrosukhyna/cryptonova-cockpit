@@ -5,7 +5,7 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq git python3 python3-venv python3-pip >/dev/null
+apt-get install -y -qq sudo git python3 python3-venv python3-pip >/dev/null
 id cnq >/dev/null 2>&1 || useradd --system --home-dir /opt/cnq --shell /usr/sbin/nologin cnq
 mkdir -p /opt/cnq
 chown cnq:cnq /opt/cnq

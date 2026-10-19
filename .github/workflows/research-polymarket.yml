@@ -1,0 +1,22 @@
+name: research-polymarket
+# Manual only. Polymarket research (scripts/polymarket_study.py): public read APIs, no keys, no trading.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "probe | bonds | arb"
+        required: false
+        default: "probe"
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/polymarket_study.py ${{ inputs.mode }}

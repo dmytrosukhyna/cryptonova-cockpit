@@ -548,5 +548,118 @@ def tune():
         note(f"own signals tune · {label} avg_month dd worst years", json.dumps(out, ensure_ascii=False))
 
 
+def altport():
+    """19.10 — the live «ядро + альтсезон» model exactly as cnq/agents/alt_portfolio.py runs it, on DAILY closes:
+    gauge = equal-weight alt index / BTC above its 91-day average AND ≥ 60 % of alts beat BTC over 91 days AND BTC «рост»;
+    shares of the whole: futures 15 % (the own-signals long account, risk 0.5 %, ≤ 4 new a day, ≤ 20 open), dollars 10 % at 4 %,
+    core BTC 15.8 / ETH 6.3 / SOL 4.7 / LINK 2.4 / NEAR 2.4, alt part 43.4 % in 10 alts while the gauge is on (else BTC);
+    not «рост» → coins at 35 % of their size. Rebalanced daily when the state changes, else weekly; 0.2 % of the turnover."""
+    basket = ["SOL", "LINK", "NEAR", "AVAX", "SUI", "ONDO", "AAVE", "HBAR", "PENDLE", "INJ"]
+    coins = sorted(set(COINS) | set(basket))
+    with ThreadPoolExecutor(12) as ex:
+        raw = dict(zip(coins, ex.map(lambda s: daily(s + "USDT"), coins)))
+    KS = {s: k for s, k in raw.items() if k is not None}
+    B = KS["BTC"]
+    days = [int(t) for t in B["t"]]
+    cl = {s: {int(t): float(c) for t, c in zip(K["t"], K["c"])} for s, K in KS.items()}
+    bc = B["c"]
+    s200 = sma(bc, 200)
+    with np.errstate(invalid="ignore"):
+        bullv = ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]]))
+    alts = [s for s in COINS if s not in ("BTC", "ETH") and s in cl]
+    idx, ratio = 1.0, []
+    for i, d in enumerate(days):
+        if i:
+            rs = [cl[s][d] / cl[s][days[i - 1]] - 1 for s in alts if d in cl[s] and days[i - 1] in cl[s]]
+            idx *= 1 + (sum(rs) / len(rs) if rs else 0.0)
+        ratio.append(idx / bc[i])
+    ratio = np.array(ratio)
+    # the futures part: the own-signals long account (risk 0.5 %, cap 4 a day, ≤ 20 open) as a daily curve
+    prep_gate = {"t": B["t"], "bull": bullv.astype(float), "soft": bullv.astype(float)}
+    for s in KS:
+        prep(KS[s], prep_gate)
+    trs = sorted([x for s, K in KS.items() if s in COINS for spec in (("P", "regime", "-"), ("B20", "regime", "chand"))
+                  for x in simulate(K, *spec, s) if x[2] == 1], key=lambda x: x[0])
+    ev = sorted([(o, 0, k) for k, (o, *_r) in enumerate(trs)] + [(c2, 1, k) for k, (_o, c2, *_r) in enumerate(trs)])
+    E, size, opened, curve, day_n = 1.0, {}, 0, {}, {}
+    for tt, kind, k in ev:
+        if kind == 0:
+            dk = tt // 86_400_000
+            if day_n.get(dk, 0) >= 4 or opened >= 20:
+                continue
+            day_n[dk] = day_n.get(dk, 0) + 1
+            size[k] = E * min(0.25, 0.5 / trs[k][6])
+            opened += 1
+        elif k in size:
+            E += size.pop(k) * trs[k][3] / 100
+            opened -= 1
+            curve[tt // 86_400_000 * 86_400_000] = E
+    fut, last = [], 1.0
+    for d in days:
+        last = curve.get(d, last)
+        fut.append(last)
+    core = {"BTC": 15.8, "ETH": 6.3, "SOL": 4.7, "LINK": 2.4, "NEAR": 2.4}
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    start = next(i for i, d in enumerate(days) if d >= t0)
+    out = {}
+    for name, use_gauge in (("model", True), ("always alts", False), ("never alts", None)):
+        V, hold, prev_state, curve2 = 1.0, None, None, []
+        peak, dd, on_days = 1.0, 0.0, 0
+        for i in range(start, len(days) - 1):
+            d = days[i]
+            bull = bool(bullv[i])
+            if use_gauge is None:
+                on = False
+            elif use_gauge is False:
+                on = True
+            else:
+                d0 = days[i - 91]
+                b_ret = cl["BTC"][d] / cl["BTC"][d0] - 1
+                beat = [cl[s][d] / cl[s][d0] - 1 > b_ret for s in alts if d0 in cl[s] and d in cl[s]]
+                br = sum(beat) / len(beat) if len(beat) >= 10 else 0
+                on = bool(bull and br >= 0.60 and ratio[i] > ratio[i - 90:i + 1].mean())
+            on_days += on
+            state = (bull, on)
+            if hold is None or state != prev_state or (d // 86_400_000) % 7 == 0:
+                t = dict(core)
+                if on:
+                    av = [s for s in basket if s in cl and d in cl[s]]
+                    for s in av:
+                        t[s] = t.get(s, 0) + 43.4 / len(av)
+                else:
+                    t["BTC"] += 43.4
+                if not bull:
+                    t = {s: w * 0.35 for s, w in t.items()}
+                coins_w = sum(t.values())
+                new = {s: w / 100 * V for s, w in t.items()}
+                new["_fut"] = 0.15 * V
+                new["_cash"] = V - sum(new.values())
+                if hold is not None:
+                    turn = sum(abs(new.get(s, 0) - hold.get(s, 0)) for s in set(new) | set(hold)) / 2
+                    V -= turn * 0.002
+                    new = {s: v * (V / sum(new.values())) for s, v in new.items()}
+                hold, prev_state = new, state
+            d1 = days[i + 1]
+            for s in list(hold):
+                if s == "_cash":
+                    hold[s] *= 1 + 0.04 / 365
+                elif s == "_fut":
+                    hold[s] *= fut[i + 1] / fut[i] if fut[i] else 1
+                elif d in cl[s] and d1 in cl[s]:
+                    hold[s] *= cl[s][d1] / cl[s][d]
+            V = sum(hold.values())
+            peak = max(peak, V)
+            dd = max(dd, 1 - V / peak)
+            curve2.append((d1, V))
+        yrs, pv = {}, 1.0
+        for y in ("2022", "2023", "2024", "2025", "2026"):
+            pts = [v for t, v in curve2 if dt.datetime.fromtimestamp(t / 1000, dt.timezone.utc).strftime("%Y") == y]
+            if pts:
+                yrs[y] = round((pts[-1] / pv - 1) * 100)
+                pv = pts[-1]
+        out[name] = {"x": round(V, 2), "dd": round(-dd * 100), "years": yrs, "alt_days": on_days}
+    note("altport · the live model on daily closes since 2022", json.dumps(out, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    (tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

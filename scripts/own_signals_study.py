@@ -28,6 +28,7 @@ import json
 import os
 import re
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -1439,5 +1440,212 @@ def spot_probe():
         out[k] = [st, len(txt), sample[:420]]
     note("spot probe · free fundamental sources", json.dumps(out, ensure_ascii=False)[:3900])
 
+
+# ------------------------------------------------------------------------------------------------ round 13: spot fundamentals
+LL = "https://api.llama.fi"
+
+
+def _jget(url, tries=3):
+    st, b = http(url, tries=tries)
+    if st != 200:
+        return None
+    try:
+        return json.loads(b)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _llama_series(slug, dtype):
+    j = _jget(f"{LL}/summary/fees/{slug}?dataType={dtype}")
+    out = {}
+    for row in (j or {}).get("totalDataChart") or []:
+        try:
+            t, v = int(row[0]), float(row[1] or 0)
+        except (TypeError, ValueError, IndexError):
+            continue
+        out[t * 1000 // DAY * DAY] = v
+    return out
+
+
+def factors():
+    """19.10, round 13 — owner: «по споту можно проанализировать максимально всё … спот мы можем сделать идеальный, подойди
+    профессионально». Which fundamentals actually predicted the next month of a token, honestly (every Binance perp, delisted
+    included; monthly rebalance 2022–2026; terciles; equal weight):
+      revenue universe (DefiLlama: protocol / chain revenue mapped to its token): revenue yield = revenue 30 d × 12 ÷ FDV, revenue
+      growth 90 d vs the 90 d before, holders revenue (buybacks / burns / payouts) yield and «pays holders at all», fees yield;
+      price universe (the point-in-time top 100 alts by 30-day dollar volume, ≥ 1 year of history): 12- and 3-month strength vs
+      BTC, distance from the 1-year high, volume trend, age.
+    FDV(t) = price(t) × today's total supply (CoinGecko top 1000) — an approximation; DefiLlama may revise old data. Rows:
+    [top − bottom tercile a month %, t-stat, months top > bottom %, top − universe %, n months, coins a month, 2022…2026 spread]."""
+    t_start = dt.datetime.now()
+    syms = all_um_symbols()
+    with ThreadPoolExecutor(48) as ex:
+        raw = dict(zip(syms, ex.map(daily_wide, syms)))
+    D = {s[:-4]: k for s, k in raw.items() if k is not None}
+    cl = {s: {int(t): float(c) for t, c in zip(K["t"], K["c"])} for s, K in D.items()}
+    B = D["BTC"]
+    days = [int(t) for t in B["t"]]
+    # token supply (CoinGecko top 1000, by symbol; the largest market cap wins a symbol clash)
+    supply = {}
+    for page in (1, 2, 3, 4):
+        for c in _jget(f"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page={page}") or []:
+            sym = str(c.get("symbol") or "").upper()
+            ts = c.get("total_supply") or c.get("max_supply") or c.get("circulating_supply")
+            if sym and ts and sym not in supply:
+                supply[sym] = float(ts)
+        time.sleep(6)
+    alias = {"1000PEPE": ("PEPE", 1000), "1000SHIB": ("SHIB", 1000), "1000BONK": ("BONK", 1000), "1000FLOKI": ("FLOKI", 1000),
+             "1000SATS": ("SATS", 1000), "1000RATS": ("RATS", 1000), "1000LUNC": ("LUNC", 1000), "1000XEC": ("XEC", 1000)}
+    # DefiLlama: protocols and chains → token symbol → slugs with revenue
+    prot = _jget(f"{LL}/protocols") or []
+    ov = _jget(f"{LL}/overview/fees?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true&dataType=dailyRevenue") or {}
+    chains = _jget(f"{LL}/v2/chains") or []
+    by_id = {str(p.get("defillamaId") or p.get("id")): p for p in prot}
+    parent_sym = {}
+    for p in prot:
+        if p.get("parentProtocol") and p.get("symbol") and p["symbol"] != "-":
+            parent_sym.setdefault(p["parentProtocol"], p["symbol"].upper())
+    chain_sym = {str(c.get("name") or "").lower(): str(c.get("tokenSymbol") or "").upper() for c in chains if c.get("tokenSymbol")}
+    tok_slugs = {}
+    ov_rows = ov.get("protocols") or []
+    for e in ov_rows:
+        slug = e.get("slug") or e.get("module")
+        if not slug or not (e.get("total30d") or e.get("total1y")):
+            continue
+        sym = None
+        p = by_id.get(str(e.get("defillamaId") or e.get("id")))
+        if p and p.get("symbol") and p["symbol"] != "-":
+            sym = p["symbol"].upper()
+        elif e.get("parentProtocol") and e["parentProtocol"] in parent_sym:
+            sym = parent_sym[e["parentProtocol"]]
+        elif str(e.get("protocolType") or e.get("category") or "").lower() in ("chain",):
+            sym = chain_sym.get(str(e.get("name") or "").lower())
+        if sym:
+            tok_slugs.setdefault(sym, set()).add(slug)
+    perp_for = {}
+    for s in D:
+        base, _m = alias.get(s, (s, 1))
+        perp_for[base] = s
+    want = {sym: sl for sym, sl in tok_slugs.items() if sym in perp_for}
+    note("factors · data", json.dumps({"perps": len(D), "supply": len(supply), "llama_protocols": len(prot), "fees_rows": len(ov_rows),
+                                       "ov_keys": sorted(ov_rows[0].keys())[:40] if ov_rows else [], "tokens_with_revenue": len(tok_slugs),
+                                       "with_perp": len(want), "sample": {k: sorted(v)[:3] for k, v in list(want.items())[:8]},
+                                       "minutes": round((dt.datetime.now() - t_start).seconds / 60, 1)}, ensure_ascii=False))
+    jobs = [(sym, slug, dtp) for sym, sl in want.items() for slug in sl for dtp in ("dailyRevenue", "dailyFees", "dailyHoldersRevenue")]
+    with ThreadPoolExecutor(8) as ex:
+        series = list(ex.map(lambda j: (j, _llama_series(j[1], j[2])), jobs))
+    rev, fees, hold = {}, {}, {}
+    for (sym, _slug, dtp), ser in series:
+        tgt = {"dailyRevenue": rev, "dailyFees": fees, "dailyHoldersRevenue": hold}[dtp].setdefault(sym, {})
+        for d, v in ser.items():
+            tgt[d] = tgt.get(d, 0.0) + v
+
+    def ssum(ser, d, n):
+        return sum(ser.get(d - k * DAY, 0.0) for k in range(n)) if ser else 0.0
+
+    def has_data(ser, d, n):
+        return bool(ser) and any((d - k * DAY) in ser for k in range(n))
+    # month ends
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    months = []
+    for d in days:
+        x = dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc)
+        if d >= t0 and x.day == 1:
+            months.append(d)
+    first = {s: int(K["t"][0]) for s, K in D.items()}
+    v30 = {}
+    for s, K in D.items():
+        v = sma(K["bv"] * K["c"], 30)
+        v30[s] = {int(t): float(x) for t, x in zip(K["t"], v) if not np.isnan(x)}
+
+    def ret(s, a, b):
+        if a not in cl[s] or cl[s][a] <= 0:
+            return None
+        if b in cl[s]:
+            return cl[s][b] / cl[s][a] - 1
+        last = max((t for t in cl[s] if a <= t <= b), default=a)      # delisted inside the month: its last close
+        return cl[s][last] / cl[s][a] - 1
+    fac_rows = {}
+
+    def add(name, d, d1, scored):
+        """scored: [(score, sym)] for month start d → terciles → next-month returns."""
+        sc = [(v, s) for v, s in scored if v is not None and not (isinstance(v, float) and np.isnan(v))]
+        rs = {s: ret(s, d, d1) for _v, s in sc}
+        sc = [(v, s) for v, s in sc if rs.get(s) is not None]
+        if len(sc) < 9:
+            return
+        sc.sort()
+        n3 = len(sc) // 3
+        lo = float(np.mean([rs[s] for _v, s in sc[:n3]]))
+        hi = float(np.mean([rs[s] for _v, s in sc[-n3:]]))
+        allm = float(np.mean([rs[s] for _v, s in sc]))
+        fac_rows.setdefault(name, []).append((d, hi - lo, hi - allm, len(sc)))
+    for i, d in enumerate(months[:-1]):
+        d1 = months[i + 1]
+        # revenue universe
+        R = []
+        for sym, perp in perp_for.items():
+            if sym not in want or d not in cl[perp] or d - first[perp] < 120 * DAY:
+                continue
+            base, mul = sym, alias.get(perp, (perp, 1))[1]
+            ts = supply.get(base)
+            r30, r90, r90p = ssum(rev.get(sym), d, 30), ssum(rev.get(sym), d, 90), ssum(rev.get(sym), d - 90 * DAY, 90)
+            f30, h30 = ssum(fees.get(sym), d, 30), ssum(hold.get(sym), d, 30)
+            if not has_data(rev.get(sym), d, 30):
+                continue
+            fdv = cl[perp][d] / mul * ts if ts else None
+            R.append({"s": perp, "ry": r30 * 12 / fdv if fdv else None, "fy": f30 * 12 / fdv if fdv else None,
+                      "hy": h30 * 12 / fdv if fdv else None, "hb": 1.0 if h30 > 0 else 0.0,
+                      "rg": (r90 / r90p - 1) if r90p > 0 and r90 > 0 else None})
+        for key, name in (("ry", "revenue yield"), ("fy", "fees yield"), ("hy", "holders yield"), ("rg", "revenue growth 90d")):
+            add(name, d, d1, [(x[key], x["s"]) for x in R])
+        # pays holders vs not: two groups
+        g1 = [x["s"] for x in R if x["hb"] == 1.0]
+        g0 = [x["s"] for x in R if x["hb"] == 0.0]
+        r1 = [ret(s, d, d1) for s in g1]
+        r0 = [ret(s, d, d1) for s in g0]
+        r1 = [x for x in r1 if x is not None]
+        r0 = [x for x in r0 if x is not None]
+        if len(r1) >= 3 and len(r0) >= 3:
+            fac_rows.setdefault("pays holders vs not", []).append((d, float(np.mean(r1)) - float(np.mean(r0)), 0.0, len(r1) + len(r0)))
+        # revenue tokens vs the other alts of the top 100 (by volume)
+        top = sorted((v30[s][d], s) for s in D if d in v30[s] and s not in ("BTC", "ETH") and d - first[s] >= 365 * DAY)[-100:]
+        uni = [s for _v, s in top]
+        rev_set = {x["s"] for x in R}
+        a1 = [ret(s, d, d1) for s in uni if s in rev_set]
+        a0 = [ret(s, d, d1) for s in uni if s not in rev_set]
+        a1 = [x for x in a1 if x is not None]
+        a0 = [x for x in a0 if x is not None]
+        if len(a1) >= 3 and len(a0) >= 3:
+            fac_rows.setdefault("revenue tokens vs other alts", []).append((d, float(np.mean(a1)) - float(np.mean(a0)), 0.0, len(a1) + len(a0)))
+        # price universe
+        P = []
+        for s in uni:
+            def back(n):
+                t = d - n * DAY
+                return cl[s].get(t), cl["BTC"].get(t)
+            c0, b0 = cl[s][d], cl["BTC"][d]
+            c12, b12 = back(365)
+            c1, b1 = back(30)
+            c3, b3 = back(91)
+            hi = max((cl[s][t] for t in cl[s] if d - 365 * DAY <= t <= d), default=None)
+            v180 = np.mean([v30[s][t] for t in v30[s] if d - 180 * DAY <= t <= d]) if v30[s] else None
+            P.append({"s": s, "m12": (c1 / c12) / (b1 / b12) - 1 if c12 and c1 and b12 and b1 else None,
+                      "m3": (c0 / c3) / (b0 / b3) - 1 if c3 and b3 else None, "dd": c0 / hi - 1 if hi else None,
+                      "vt": v30[s].get(d) / v180 if v180 else None, "age": (d - first[s]) / DAY})
+        for key, name in (("m12", "strength vs BTC 12 m (skip 1 m)"), ("m3", "strength vs BTC 3 m"), ("dd", "distance from 1-year high"),
+                          ("vt", "volume trend 30 d / 180 d"), ("age", "age")):
+            add(name, d, d1, [(x[key], x["s"]) for x in P])
+    out = {}
+    for name, rows in fac_rows.items():
+        sp = np.array([r[1] for r in rows])
+        yr = {}
+        for d, v, _w, _n in rows:
+            yr.setdefault(dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).strftime("%Y"), []).append(v)
+        out[name] = [round(float(sp.mean()) * 100, 2), round(float(sp.mean() / (sp.std() + 1e-12) * np.sqrt(len(sp))), 2),
+                     round(float((sp > 0).mean()) * 100), round(float(np.mean([r[2] for r in rows])) * 100, 2), len(rows),
+                     round(float(np.mean([r[3] for r in rows]))), [round(float(np.mean(yr[y])) * 100, 1) if y in yr else None for y in YEARS]]
+    note("factors · [top−bottom %/month, t, months+ %, top−all %, months, coins, 2022…2026]", json.dumps(out, ensure_ascii=False))
+
 if __name__ == "__main__":
-    (spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

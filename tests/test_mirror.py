@@ -15,8 +15,8 @@ class FakeBX:
     def set_stop(self, symbol, stop): self.orders.append(("stop", symbol, stop))
 
 
-def test_mirror_open_close():
-    os.chdir(tempfile.mkdtemp())
+def test_mirror_open_close(monkeypatch):
+    monkeypatch.chdir(tempfile.mkdtemp())
     now = 1_800_000_000_000
     st = {"started": now - 60_000, "trades": {}}
     t_new = {"id": "F-SOL-1", "symbol": "SOL", "side": "LONG", "entry": 100.0, "qty": 15.0, "qty_left": 15.0, "stop": 88.0, "stop_now": 88.0, "tps": [150.0], "opened": now - 120_000}
@@ -29,10 +29,10 @@ def test_mirror_open_close():
     assert r["closed"] == 1 and bx.orders[-1][0] == "close" and not st["trades"]
 
 
-def test_mirror_is_neutral_to_a_desk_reset():
+def test_mirror_is_neutral_to_a_desk_reset(monkeypatch):
     """17.10 reset of the autopilot desks: the mirror keys only on `open` trade ids (and equity for sizing) — a reset with no
     open positions changes nothing on Bybit; a position the reset closed would be closed on Bybit too (same as any autopilot exit)."""
-    os.chdir(tempfile.mkdtemp())
+    monkeypatch.chdir(tempfile.mkdtemp())
     now = 1_800_000_000_000
     bx = FakeBX()
     st = {"started": now - 3600_000, "trades": {}}

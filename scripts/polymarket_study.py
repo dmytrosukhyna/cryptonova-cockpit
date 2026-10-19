@@ -366,6 +366,25 @@ def probe2():
                                                 ensure_ascii=False, default=str)[:3900])
 
 
+def probe3():
+    now = int(time.time()) // 900 * 900
+    out = {}
+    for ts in (now - 86400, now - 3 * 86400, now + 900):
+        sl = f"btc-updown-15m-{ts}"
+        for path in (f"/markets?slug={sl}", f"/markets?slug={sl}&closed=true", f"/events?slug={sl}", f"/events/slug/{sl}",
+                     f"/events?slug={sl}&closed=true"):
+            st, r = get(f"{GAMMA}{path}")
+            if isinstance(r, list):
+                r0 = r[0] if r else None
+            else:
+                r0 = r
+            mk = (r0 or {}).get("markets") if isinstance(r0, dict) and "markets" in (r0 or {}) else None
+            m = (mk[0] if mk else r0) if isinstance(r0, dict) else None
+            out[f"{ts - now:+d}s {path.split('?')[0]}{'?closed' if 'closed' in path else ''}"] = [st, bool(m), (m or {}).get("slug"),
+                                                                                                    (m or {}).get("outcomePrices"), (m or {}).get("closed")]
+    note("probe3 · finding a past up/down market", json.dumps(out, ensure_ascii=False)[:3900])
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
-    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2}[mode]()
+    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3}[mode]()

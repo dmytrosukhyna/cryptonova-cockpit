@@ -2012,7 +2012,7 @@ function renderStrats(){ const el=$('#stratsCard'); if(!el) return; const rows=[
   const tot=rows.reduce((a,r)=>a+r.p,0);
   // 18.10: three approaches head to head (Ivan's platform · CRYPTO NOVA app signals · our own) — the base for one ideal strategy later
   const VS=[], dms=t=>t<1e12?t*1000:t, day=t=>new Date(dms(t)).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});
-  { const fut=['cons','bal','aggr'].map(k=>PR[k]).filter(Boolean); if(fut.length){ const s0=fut.reduce((a,v)=>a+(v.start_equity||10000),0), e=fut.reduce((a,v)=>a+v.equity+(v.open_pnl_usd||0),0); VS.push({name:'Наша стратегия',sub:'фьючерсы · 3 стола',usd:e-s0,pct:(e/s0-1)*100,from:since(fut[0].equity_history),n:fut.reduce((a,v)=>a+((v.stats||{}).trades||0),0)}); } }
+  { const fut=['cons','bal','aggr'].map(k=>PR[k]).filter(Boolean); if(fut.length){ const s0=fut.reduce((a,v)=>a+(v.start_equity||10000),0), e=fut.reduce((a,v)=>a+v.equity+(v.open_pnl_usd||0),0); VS.push({name:'Наша стратегия',sub:'фьючерсы · среднее 3 столов на $10 000',usd:(e-s0)/fut.length,pct:(e/s0-1)*100,from:since(fut[0].equity_history),n:fut.reduce((a,v)=>a+((v.stats||{}).trades||0),0)}); } }
   if(IVAN&&IVAN.equity_hist&&IVAN.equity_hist.length){ const s0=IVAN.equity_hist[0][1]; VS.push({name:'Платформа Ивана',sub:'Bybit демо',usd:IVAN.equity-s0,pct:(IVAN.equity/s0-1)*100,from:day(IVAN.equity_hist[0][0]),n:(IVAN.stats||{}).trades}); }
   else VS.push({name:'Платформа Ивана',sub:'Bybit демо',usd:null,hint:'откроется после пароля в карточке «Иван тест»'});
   { const SA=SIGS&&SIGS.accounts&&SIGS.accounts.since_live; if(SA) [SA.as_is,SA.improved].filter(Boolean).forEach(a=>VS.push({name:'CRYPTO NOVA · '+(a.key==='improved'?'улучшенные':'как приходят'),sub:'сигналы приложения',usd:(a.equity_with_open??a.equity)-10000,pct:((a.equity_with_open??a.equity)/10000-1)*100,from:SA.start_t?day(SA.start_t):'18.10',n:a.trades})); }
@@ -2471,11 +2471,11 @@ const TESTS_HASH='ROdIZ334R2yDxsFY7tmgo85pp104R5jz__T9uHqMAW4';   // sha('cnq:'+
 let TESTS_OK=!IS_GUEST;   // 18.10 (owner): users (code holders and guests) see ONE futures window — CRYPTO NOVA; CNPTS and the tests are the owner's
 (async()=>{ const m=location.search.match(/[?&]tests=([a-z0-9]+)/i); if(!m) return; try{ if(await sha(m[1].toLowerCase())===TESTS_HASH){ store('cnq_tests','1'); if(IS_GUEST&&!GUEST_FORCE&&!load('cnq_access',null)) store('cnq_access',{label:'',level:'tests',t:Date.now()}); TESTS_OK=true; FULL_ACCESS=true; try{ renderBelow(); }catch(e){} try{ renderMyPort(true); }catch(e){} } }catch(e){} })();   // the invite link = the same code as in the entry window
 let FSYS=load('cnq_fsys','nova'); if(FSYS==='app') FSYS='nova'; if(!['nova','cn','tests'].includes(FSYS)||IS_GUEST) FSYS='nova';
-let TSEL=load('cnq_tsel','research'); if(!['research','ivan','roman','memes','exp','lab','brk','imp','imps','lst','chan','whales'].includes(TSEL)) TSEL='research';
+let TSEL=load('cnq_tsel','research'); if(!['research','ivan','roman','memes','exp','lab','brk','imp','imps','lst','lstx','btcx','own','lsn','chan','whales'].includes(TSEL)) TSEL='research';
 let CNPROF=load('cnq_cnprof',''); if(!['cons','bal','aggr'].includes(CNPROF)) CNPROF=['cons','bal','aggr'].includes(PROF)?PROF:'bal';
 // 18.10 (owner): Тесты → CNPTS → CRYPTO NOVA. CRYPTO NOVA = the finished product (selected signals); CNPTS = the self-learning engine; tests = everything under test
 const FSYS_META={nova:['CRYPTO NOVA','отобранные сигналы · готовый результат','our'],cn:['CNPTS','самообучающийся движок · ищет идеальную систему','engine'],tests:['Тесты стратегий','все стратегии на проверке','test']};
-const TESTS=[['research','Лаборатория'],['own','Сигналы CRYPTO NOVA'],['ivan','Иван'],['roman','Роман'],['memes','Мемкоины'],['exp','Свинг'],['brk','Пробой'],['imp','Импульс BTC'],['imps','Активный спот'],['lst','Шорт листингов'],['lstx','Турбо · листинги'],['btcx','Турбо · BTC ×2'],['chan','Каналы трейдеров'],['lab','Новые идеи'],['whales','Киты · копирование']];
+const TESTS=[['research','Лаборатория'],['own','Сигналы CRYPTO NOVA'],['lsn','Нейтральная корзина'],['ivan','Иван'],['roman','Роман'],['memes','Мемкоины'],['exp','Свинг'],['brk','Пробой'],['imp','Импульс BTC'],['imps','Активный спот'],['lst','Шорт листингов'],['lstx','Турбо · листинги'],['btcx','Турбо · BTC ×2'],['chan','Каналы трейдеров'],['lab','Новые идеи'],['whales','Киты · копирование']];
 // 18.10: public names — the owner (!IS_GUEST) keeps the internal names above, everyone else sees these; null = hidden from non-owners
 const PUBLIC_NAMES={exp:'Волна',brk:'Прорыв',imp:'Импульс',lab:'Эксперименты',memes:'Мем-радар',whales:'По следам китов',ivan:'Наставник A',roman:'Наставник B',research:null};
 const PUBLIC_ABOUT={exp:'Ловит движение на несколько дней: покупает, когда монета выходит из затишья, и быстро откупает резкие откаты. По 10% счёта на сделку, до 15 сделок сразу',brk:'Покупает монету, когда она пробивает максимум 5 дней на двойном объёме, и только если биткоин растёт. Держит 2 дня. На истории 2025–2026 счёт +20%, но просадки доходили до −49% — стратегия резкая',imp:'Когда биткоин за час вырос на 2.5% и больше, покупает самые ликвидные альткоины — они обычно догоняют. Держит до 12 часов, до 5 сделок по 20% счёта. На истории 2025–2026 счёт +34% при просадке до −12%, но в обвальном 2022 был минус',lab:'Свежие идеи проверяем вживую: покупка у низа диапазона, сделки по сильным новостям, откуп паники на альткоинах. На истории ещё не доказаны, поэтому не больше 10% счёта на сделку',memes:'Торгует мемами: покупает только после резкого обвала (−25% от максимума суток) и сначала забирает вложенное. Риск высокий',whales:'Повторяет сделки лучших трейдеров Hyperliquid и OKX с опозданием и честно считает, выгодно ли это'};
@@ -2486,7 +2486,7 @@ function setProf(k){ if(!STRATS[k]||PROF===k) return; PROF=k; store('cnq_profile
 function tRes(k){ const pr=(PAPER&&PAPER.profiles)||{};
   if(k==='ivan'){ return IVAN&&IVAN.equity_hist&&IVAN.equity_hist.length?IVAN.equity-IVAN.equity_hist[0][1]:null; }
   if(k==='memes'){ const A=MEMES&&MEMES.account; return A?A.equity-(A.start_equity||10000):null; }
-  if(['exp','lab','brk','imp','imps','lst','lstx','btcx','own'].includes(k)){ const v=pr[k]; return v?(v.equity+(v.open_pnl_usd||0))-(v.start_equity||10000):null; }
+  if(['exp','lab','brk','imp','imps','lst','lstx','btcx','own','lsn'].includes(k)){ const v=pr[k]; return v?(v.equity+(v.open_pnl_usd||0))-(v.start_equity||10000):null; }
   if(k==='whales'){ return WTOP&&WTOP.desk?WTOP.desk.pnl_usd:null; }
   return null; }
 function novaRes(){ const pr=(PAPER&&PAPER.profiles)||{}, C=[]; let t0=0;   // CRYPTO NOVA = bal + imp, each since its own start
@@ -2504,10 +2504,13 @@ function tResF(k){ const pr=(PAPER&&PAPER.profiles)||{}, u=tRes(k); if(u==null) 
   if(k==='whales'){ const D=WTOP.desk; return {usd:u,base:D.start||10000,since:ddmm(D.started)}; }
   const v=pr[k]; return {usd:u,base:(v&&v.start_equity)||10000,since:pSince(v)}; }
 function fsysResF(k){ if(k==='nova'){ const N=novaRes(); return N?{usd:N.usd,base:N.base,since:N.since}:null; } const u=fsysRes(k); if(u==null) return null; const pr=(PAPER&&PAPER.profiles)||{};
-  if(k==='cn'){ const L=['cons','bal','aggr'].map(x=>pr[x]).filter(Boolean); return {usd:u,base:L.reduce((a,v)=>a+(v.start_equity||10000),0),since:L.map(pSince).filter(Boolean)[0]||''}; }
+  if(k==='cn'){ const L=['cons','bal','aggr'].map(x=>pr[x]).filter(Boolean); return {usd:u,base:10000,since:L.map(pSince).filter(Boolean)[0]||''}; }
   return {usd:u,base:10000,since:''}; }
 function fsysRes(k){ const pr=(PAPER&&PAPER.profiles)||{};
-  if(k==='cn'){ const L=['cons','bal','aggr'].map(x=>pr[x]).filter(Boolean); return L.length?L.reduce((a,v)=>a+(v.equity+(v.open_pnl_usd||0))-(v.start_equity||10000),0):null; }
+  // 19.10 (owner: «на фьючерсах общая сумма 600 с чем-то, а внутри каждый портфель отдельно»): the three CNPTS accounts trade the SAME
+  // signals at three sizes, so their sum counted one trade three times. CNPTS is shown as ONE $10 000 account — the average of the three
+  // (≈ «Сбалансированная»), like CRYPTO NOVA.
+  if(k==='cn'){ const L=['cons','bal','aggr'].map(x=>pr[x]).filter(Boolean); return L.length?L.reduce((a,v)=>a+(futEq(v)-(v.start_equity||10000))/((v.start_equity||10000)/10000),0)/L.length:null; }
   if(k==='nova'){ const N=novaRes(); return N?N.usd:null; }
   return null; }
 function testsShown(){ return IS_GUEST?PUBLIC_TESTS.map(k=>[k,PUBLIC_NAMES[k]]):TESTS; }
@@ -2528,18 +2531,18 @@ function stratSwitch(){ if(IS_GUEST){ FSYS='nova'; return `<div class="muted fab
   if(FSYS==='tests'&&!TESTS_OK) FSYS='cn';
   const sys=`<div class="fsys ${TESTS_OK?'':'two'}">${Object.entries(FSYS_META).filter(([k])=>k!=='tests'||TESTS_OK).map(([k,[a,b,t]])=>{ const R=fsysResF(k); return `<button data-sys="${k}" aria-pressed="${FSYS===k}"><b>${a} ${otag(t)}</b><small>${b}</small>${R?resFmt(R.usd,R.base,R.since):''}</button>`; }).join('')}</div>`;
   if(FSYS==='cn') return sys+pipeHtml()+`<div class="strat fsw eqg" ${eqAttr(3,3,2)}>${['cons','bal','aggr'].map(k=>`<button data-pf="${k}" aria-pressed="${k===PROF}" title="${(STRATS[k].about||'').replace(/"/g,'')}">${STRATS[k].name}${pr[k]?resFmt(res(k),pr[k].start_equity||10000,pSince(pr[k])):''}</button>`).join('')}</div>`;
-  if(FSYS==='tests'){ if(!testsShown().some(([k])=>k===TSEL)){ TSEL=testsShown()[0][0]; if(['exp','lab','brk','imp','imps','lst','lstx','btcx','own'].includes(TSEL)) setProf(TSEL); }
+  if(FSYS==='tests'){ if(!testsShown().some(([k])=>k===TSEL)){ TSEL=testsShown()[0][0]; if(['exp','lab','brk','imp','imps','lst','lstx','btcx','own','lsn'].includes(TSEL)) setProf(TSEL); }
     return sys+goalHtml()+rankHtml()+`<div class="strat fsw tst eqg" ${eqAttr(testsShown().length,5,2)}>${testsShown().map(([k,n])=>{ const R=tResF(k); return `<button data-t="${k}" aria-pressed="${k===TSEL}">${n}${R?resFmt(R.usd,R.base,R.since):''}</button>`; }).join('')}</div><div class="muted fabout">${otag('test')} ${IS_GUEST?`${PUBLIC_ABOUT[TSEL]?`<b>${tName(TSEL)}</b> — ${PUBLIC_ABOUT[TSEL].charAt(0).toLowerCase()+PUBLIC_ABOUT[TSEL].slice(1)}. `:''}Каждая стратегия торгует на своём демо-счёте $10&nbsp;000. Что докажет себя на живом рынке, переносим в основную систему CNPTS.`:'Каждый тест — свой демо-счёт. Что докажет себя на живом рынке, переносим в CNPTS.'}</div>`; }
   return sys; }
 function bindFsw(el){
-  el.querySelectorAll('.fsys button').forEach(b=>b.addEventListener('click',()=>{ FSYS=b.dataset.sys; store('cnq_fsys',FSYS); if(FSYS==='cn') setProf(CNPROF); if(FSYS==='tests'){ if(['exp','lab','brk','imp','imps','lst','lstx','btcx','own'].includes(TSEL)) setProf(TSEL); if(TSEL==='ivan'){ try{ loadIvan(true); }catch(e){} } } fsysBody(); renderBelow(); try{ applyLayout(); }catch(e){} }));
+  el.querySelectorAll('.fsys button').forEach(b=>b.addEventListener('click',()=>{ FSYS=b.dataset.sys; store('cnq_fsys',FSYS); if(FSYS==='cn') setProf(CNPROF); if(FSYS==='tests'){ if(['exp','lab','brk','imp','imps','lst','lstx','btcx','own','lsn'].includes(TSEL)) setProf(TSEL); if(TSEL==='ivan'){ try{ loadIvan(true); }catch(e){} } } fsysBody(); renderBelow(); try{ applyLayout(); }catch(e){} }));
   el.querySelectorAll('.fsw button[data-pf]').forEach(b=>b.addEventListener('click',()=>{ HDR_MAN.f=true; CNPROF=b.dataset.pf; store('cnq_cnprof',CNPROF); setProf(CNPROF); fsysBody(); renderBelow(); }));
-  el.querySelectorAll('.fsw button[data-t],.rank button[data-t]').forEach(b=>b.addEventListener('click',()=>{ TSEL=b.dataset.t; store('cnq_tsel',TSEL); if(['exp','lab','brk','imp','imps','lst','lstx','btcx','own'].includes(TSEL)) setProf(TSEL); if(TSEL==='ivan'){ try{ loadIvan(true); }catch(e){} } fsysBody(); renderBelow(); })); }
+  el.querySelectorAll('.fsw button[data-t],.rank button[data-t]').forEach(b=>b.addEventListener('click',()=>{ TSEL=b.dataset.t; store('cnq_tsel',TSEL); if(['exp','lab','brk','imp','imps','lst','lstx','btcx','own','lsn'].includes(TSEL)) setProf(TSEL); if(TSEL==='ivan'){ try{ loadIvan(true); }catch(e){} } fsysBody(); renderBelow(); })); }
 function fsysBody(){ const b=document.body; ['nova','cn','tests'].forEach(k=>b.classList.toggle('fsys-'+k,FSYS===k)); b.classList.toggle('fsys-ivan',FSYS==='tests'&&TSEL==='ivan'); b.classList.toggle('fsys-whales',FSYS==='tests'&&TSEL==='whales'); b.classList.toggle('fsys-chan',FSYS==='tests'&&TSEL==='chan'); }
 // the right profile behind the desk on first load
 if(!testsShown().some(([k])=>k===TSEL)) TSEL=testsShown()[0][0];   // a non-owner never lands on a hidden test (Лаборатория, Иван, Роман)
 if(FSYS==='tests'&&!TESTS_OK) FSYS='cn';
-if(FSYS==='cn'&&!['cons','bal','aggr'].includes(PROF)) PROF=CNPROF; if(FSYS==='tests'&&['exp','lab','brk','imp','imps','lst','lstx','btcx','own'].includes(TSEL)) PROF=TSEL;
+if(FSYS==='cn'&&!['cons','bal','aggr'].includes(PROF)) PROF=CNPROF; if(FSYS==='tests'&&['exp','lab','brk','imp','imps','lst','lstx','btcx','own','lsn'].includes(TSEL)) PROF=TSEL;
 // ---------------------------------------------------------------- «Лаборатория» (18.10): many strategy ideas tested the same honest way on 2020–2026 history (web/lab.json, scripts/lab)
 let LABR=null, LAB_F=load('cnq_lab_f','all');
 function exRu(ex){ if(!ex) return ''; const t=ex.tps||[]; const p=[]; p.push(ex.sl_pct!=null?`стоп ${(ex.sl_pct*100).toFixed(1)}%`:`стоп ${ex.sl_atr} ATR`); p.push(!t.length?'без цели — выход по времени':t.length===1?`1 цель (${t[0][0]}R)`:`${t.length} цели (${t.map(x=>x[0]+'R').join(', ')})`); if(ex.be_after_tp1) p.push('после первой цели стоп в безубыток'); if(ex.trail_atr) p.push('дальше трейлинг'); if(ex.max_bars) p.push(`до ${ex.max_bars>=8?Math.round(ex.max_bars/4)+' ч':ex.max_bars*15+' мин'}`); return p.join(' · '); }

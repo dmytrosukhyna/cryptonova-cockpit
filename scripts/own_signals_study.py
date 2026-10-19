@@ -702,6 +702,7 @@ def flow_cands(D, order, t0):
                             "i": i, "j": j, "e": float(K["o"][i + 1]), "rank": order.get(s, 999),
                             "rs_hi": f("rs60"), "atr_hi": f("atrp"), "surge": f("surge"), "liq": f("vol30"), "ext_hi": f("ext"),
                             "surge_b30": f("surge_b30"), "surge_q20": f("surge_q20"), "surge_q50": f("surge_q50"),
+                            "surge_vc30": f("surge_vc30"),
                             "rsi_lo": -f("rsi2") if fam == "P" else -100.0})
     return out
 
@@ -718,14 +719,15 @@ def flow_feats(D, btc):
         K["vol30"] = sma(K["qv"], 30)
         with np.errstate(invalid="ignore", divide="ignore"):
             K["surge"] = K["qv"] / np.where(K["vol30"] > 0, K["vol30"], np.nan)
-            for nm, ser, n in (("surge_b30", K["bv"], 30), ("surge_q20", K["qv"], 20), ("surge_q50", K["qv"], 50)):
+            for nm, ser, n in (("surge_b30", K["bv"], 30), ("surge_q20", K["qv"], 20), ("surge_q50", K["qv"], 50),
+                               ("surge_vc30", K["bv"] * c, 30)):
                 av = sma(ser, n)
                 K[nm] = ser / np.where(av > 0, av, np.nan)
             K["ext"] = (c - K["sma50"]) / K["atr"]
 
 
 def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, heat=None, max_open=20, gross=2.0, seed=None,
-                 fam_cap=None, mult=1.0, min_surge=None):
+                 fam_cap=None, mult=1.0, min_surge=None, surge_key="surge", fam_only=None):
     """Daily mark-to-market account. Each day: today's entries (signals of yesterday's close) → skip a coin+rule already open →
     rank by `score` → take up to `cap` (None = all) within max_open, the gross notional cap (× equity) and the open-risk cap
     `heat` (% of equity); size = risk % of the (realised) equity lost at the stop, notional ≤ 25 %. With `budget` the day's
@@ -737,10 +739,10 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
         by_o.setdefault(x["o"], []).append(k)
     idx = {s: {int(t): q for q, t in enumerate(K["t"])} for s, K in D.items()}
     E, opn, keys, curve, taken, skipped_good = 1.0, {}, set(), [], [], []
-    n_c, n_t = 0, 0
+    n_c, n_t, max_o = 0, 0, 0
     for d in days:
         cand = [k for k in by_o.get(d, []) if (C[k]["sym"], C[k]["fam"]) not in keys
-                and (min_surge is None or C[k]["surge"] >= min_surge)]
+                and (min_surge is None or C[k][surge_key] >= min_surge) and (fam_only is None or C[k]["fam"] == fam_only)]
         if cand:
             n_c += len(cand)
             if score == "random":
@@ -790,6 +792,7 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
             if q is not None:
                 mtm += size * (D[C[k]["sym"]]["c"][q] / e - 1)
         curve.append((d, E + mtm))
+        max_o = max(max_o, len(opn))
     eq = np.array([v for _, v in curve])
     dd = float((eq / np.maximum.accumulate(eq) - 1).min())
     last = {}
@@ -805,7 +808,9 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
     v = np.array(mo)
     return {"m": round(float(v.mean()) * 100, 2), "dd": round(dd * 100, 1), "wm": round(float(v.min()) * 100, 1),
             "tpd": round(n_t / len(days), 2), "x": round(float(eq[-1]), 2), "avg": round(float(np.mean(taken)), 2) if taken else None,
-            "y": [round((float(np.prod([1 + r for r in yrs.get(y, [])])) - 1) * 100) for y in YEARS], "cand_pd": round(n_c / len(days), 2)}
+            "y": [round((float(np.prod([1 + r for r in yrs.get(y, [])])) - 1) * 100) for y in YEARS], "cand_pd": round(n_c / len(days), 2),
+            "max_open": max_o, "plus_m": round(float((v > 0).mean()) * 100), "last12": [round(r * 100, 1) for r in mo[-12:]],
+            "n": n_t}
 
 
 def _row(a):
@@ -968,5 +973,59 @@ def flow2():
         {lab: {f"c{c}": [round(r[f"{sc} c{c}"][0] - r[f"random c{c}"][0], 2) for sc in ("surge", "surge_b30", "surge_q20", "surge_q50", "order")]
                for c in (2, 3, 4, 5, 6)} for lab, r in allres.items()}))
 
+
+def flow3():
+    """19.10, round 8 — the live version of round 7's winner: take EVERY signal whose day's volume is ≥ 1.5× its 30-day average
+    (no daily cap), ≤ 40 open, gross ≤ 2× equity. Live uses BingX candles (base volume) → the volume in dollars = base volume ×
+    close; thresholds 1.3 / 1.5 / 1.7; the pullback and the breakout apart; caps 4 / 6 as a safety; risk 0.5 / 0.75 %; months
+    in plus; the last 12 months; which of the 70 coins BingX lists."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(urllib.request.Request("https://open-api.bingx.com/openApi/swap/v2/quote/contracts",
+                                                           headers={"User-Agent": "Mozilla/5.0"}), timeout=20) as r:
+            bx = {x["symbol"].split("-")[0] for x in json.loads(r.read().decode()).get("data") or []}
+        note("own flow3 · BingX", json.dumps({"missing": [s for s in COINS + COINS2 if s not in bx],
+                                              "alt_names": {s: [b for b in bx if b.endswith(s.replace("1000", "")) and b != s][:3]
+                                                            for s in COINS + COINS2 if s not in bx}}))
+    except Exception as e:  # noqa: BLE001
+        note("own flow3 · BingX", str(e)[:200])
+    KS, K2 = _load(COINS), _load(COINS2)
+    B = KS["BTC"]
+    bc = B["c"]
+    s200 = sma(bc, 200)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": bull}
+    for D in (KS, K2):
+        for s in D:
+            prep(D[s], gate)
+        flow_feats(D, B)
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    days = [int(t) for t in B["t"] if t >= t0]
+    order = {s: k for k, s in enumerate(COINS + COINS2)}
+    for label, D in (("40", KS), ("30", K2), ("70", dict(KS, **K2))):
+        C = flow_cands(D, order, t0)
+        res = {}
+
+        def row(name, **kw):
+            a = flow_account(C, D, days, **kw)
+            res[name] = [a["m"], a["dd"], a["wm"], a["plus_m"], a["avg"], a["tpd"], a["max_open"]] + a["y"][1:]
+            return a
+        row("live now (order c4)", cap=4)
+        for th in (1.3, 1.5, 1.7):
+            row(f"vc>{th} all", min_surge=th, surge_key="surge_vc30", max_open=40, score="surge_vc30")
+        best = row("vc>1.5 all r0.75", min_surge=1.5, surge_key="surge_vc30", max_open=40, score="surge_vc30", risk=0.75)
+        a = row("vc>1.5 all", min_surge=1.5, surge_key="surge_vc30", max_open=40, score="surge_vc30")
+        for cap in (4, 6):
+            row(f"vc>1.5 c{cap}", min_surge=1.5, surge_key="surge_vc30", max_open=40, score="surge_vc30", cap=cap)
+        for fam in ("P", "C"):
+            row(f"vc>1.5 {fam} only", min_surge=1.5, surge_key="surge_vc30", max_open=40, score="surge_vc30", fam_only=fam)
+            row(f"{fam} only, no filter", max_open=40, fam_only=fam)
+        res["vc>1.5 all · last 12 months"] = a["last12"]
+        res["vc>1.5 all · trades"] = a["n"]
+        res["at dd −25 %"] = _at25(C, D, days, min_surge=1.5, surge_key="surge_vc30", max_open=40, score="surge_vc30")
+        note(f"own flow3 · {label} coins · [m, dd, worst m, months+ %, avg trade, a day, max open, 2023…2026]",
+             json.dumps(res, ensure_ascii=False))
+
 if __name__ == "__main__":
-    (flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

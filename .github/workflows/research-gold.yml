@@ -26,3 +26,12 @@ jobs:
       - name: probe
         if: inputs.mode == 'probe'
         run: python scripts/gold_study.py probe
+      - name: fetch
+        if: inputs.mode == 'all'
+        run: python scripts/gold_study.py fetch
+      - name: PAXG spot (Binance)
+        if: inputs.mode == 'all'
+        run: python scripts/gold_study.py run paxg
+      - name: XAUUSD (Dukascopy)
+        if: inputs.mode == 'all'
+        run: python scripts/gold_study.py run xau

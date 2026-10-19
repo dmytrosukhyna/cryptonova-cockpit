@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "probe | all"
+        description: "probe | probe2 | all"
         required: false
         default: "probe"
 
@@ -24,5 +24,5 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -q numpy
       - name: probe
-        if: inputs.mode == 'probe'
-        run: python scripts/funding_farm_study.py probe
+        if: inputs.mode == 'probe' || inputs.mode == 'probe2'
+        run: python scripts/funding_farm_study.py ${{ inputs.mode }}

@@ -255,7 +255,95 @@ def probe():
         note(f"farm probe · {v} intervals and caps", json.dumps({"intervals_h": dist, "caps_pct": caps[:30]}))
 
 
+def probe2():
+    """History depth of the hedge venues + the named tokens in the Binance archive."""
+    now = int(time.time())
+    res = {}
+    tests = [
+        ("gate fr BTC no range", "https://api.gateio.ws/api/v4/futures/usdt/funding_rate?contract=BTC_USDT&limit=1000"),
+        ("gate fr SIREN no range", "https://api.gateio.ws/api/v4/futures/usdt/funding_rate?contract=SIREN_USDT&limit=1000"),
+        ("gate fr BTC from", f"https://api.gateio.ws/api/v4/futures/usdt/funding_rate?contract=BTC_USDT&from={now - 400 * 86400}&to={now - 300 * 86400}"),
+        ("gate candles BTC 400d", f"https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=BTC_USDT&interval=1h&from={now - 400 * 86400}&to={now - 330 * 86400}"),
+        ("gate candles BTC 1000d", f"https://api.gateio.ws/api/v4/futures/usdt/candlesticks?contract=BTC_USDT&interval=1h&from={now - 1000 * 86400}&to={now - 950 * 86400}"),
+        ("gatedata candles 2024-01", "https://download.gatedata.org/futures_usdt/candlesticks_1h/202401/BTC_USDT-202401.csv.gz"),
+        ("gatedata funding_applies", "https://download.gatedata.org/futures_usdt/funding_applies/202401/BTC_USDT-202401.csv.gz"),
+        ("gatedata funding_rate", "https://download.gatedata.org/futures_usdt/funding_rate/202401/BTC_USDT-202401.csv.gz"),
+        ("gatedata funding_rates", "https://download.gatedata.org/futures_usdt/funding_rates/202401/BTC_USDT-202401.csv.gz"),
+        ("okx static swaprate monthly", "https://static.okx.com/cdn/okex/traderecords/swaprate/monthly/202401/allswaprate-swaprate-2024-01.zip"),
+        ("okx static swaprate daily", "https://static.okx.com/cdn/okex/traderecords/swaprate/daily/20240101/allswaprate-swaprate-2024-01-01.zip"),
+        ("mexc fr SIREN p1", "https://contract.mexc.com/api/v1/contract/funding_rate/history?symbol=SIREN_USDT&page_num=1&page_size=1000"),
+        ("mexc fr BTW p1", "https://contract.mexc.com/api/v1/contract/funding_rate/history?symbol=BTW_USDT&page_num=1&page_size=1000"),
+        ("bitget fr BTC p10", "https://api.bitget.com/api/v2/mix/market/history-fund-rate?symbol=BTCUSDT&productType=usdt-futures&pageSize=100&pageNo=10"),
+        ("bitget fr BTC p5", "https://api.bitget.com/api/v2/mix/market/history-fund-rate?symbol=BTCUSDT&productType=usdt-futures&pageSize=100&pageNo=5"),
+        ("bingx fr BTC 60d", f"https://open-api.bingx.com/openApi/swap/v2/quote/fundingRate?symbol=BTC-USDT&startTime={(now - 60 * 86400) * 1000}&endTime={(now - 50 * 86400) * 1000}&limit=1000"),
+        ("bingx fr BTC 300d", f"https://open-api.bingx.com/openApi/swap/v2/quote/fundingRate?symbol=BTC-USDT&startTime={(now - 300 * 86400) * 1000}&endTime={(now - 290 * 86400) * 1000}&limit=1000"),
+        ("bingx kline BTC 300d", f"https://open-api.bingx.com/openApi/swap/v3/quote/klines?symbol=BTC-USDT&interval=1h&startTime={(now - 300 * 86400) * 1000}&endTime={(now - 290 * 86400) * 1000}&limit=1000"),
+        ("okx fr BTC latest", "https://www.okx.com/api/v5/public/funding-rate-history?instId=BTC-USDT-SWAP&limit=400"),
+    ]
+    for name, url in tests:
+        s, d = get(url, tries=2, raw=True)
+        if s == 200:
+            b = d
+            if url.endswith(".gz"):
+                import gzip
+                b = gzip.decompress(d)
+                txt = b.decode()[:200]
+                res[name] = f"200 {len(b)} bytes :: {txt}"
+                continue
+            if url.endswith(".zip"):
+                res[name] = f"200 zip {len(d)} bytes"
+                continue
+            try:
+                j = json.loads(b.decode())
+            except Exception:  # noqa: BLE001
+                res[name] = f"200 non-json {b[:120]}"
+                continue
+            if isinstance(j, list):
+                tt = [x.get("t") if isinstance(x, dict) else None for x in j]
+                tt = [x for x in tt if x]
+                res[name] = f"200 list {len(j)} " + (f"{ts(min(tt) * 1000)} → {ts(max(tt) * 1000)}" if tt else str(j[:1])[:150])
+            else:
+                dd = j.get("data")
+                if isinstance(dd, dict) and "resultList" in dd:
+                    rl = dd["resultList"]
+                    res[name] = f"200 total {dd.get('totalCount')} pages {dd.get('totalPage')} " + (f"{ts(rl[-1]['settleTime'])} → {ts(rl[0]['settleTime'])}" if rl else "")
+                elif isinstance(dd, list) and dd and isinstance(dd[0], dict) and "fundingTime" in dd[0]:
+                    tt = [int(x["fundingTime"]) for x in dd]
+                    res[name] = f"200 rows {len(dd)} {ts(min(tt))} → {ts(max(tt))}"
+                elif isinstance(dd, list):
+                    res[name] = f"200 rows {len(dd)} {str(dd[:1])[:150]}"
+                else:
+                    res[name] = f"200 {str(j)[:150]}"
+        else:
+            res[name] = f"HTTP {s}"
+    items = list(res.items())
+    note("farm probe2 · depth 1", json.dumps(dict(items[:10]), ensure_ascii=False))
+    note("farm probe2 · depth 2", json.dumps(dict(items[10:]), ensure_ascii=False))
+    syms = vision_list("fundingRate")
+    hits = sorted(s for s in syms if any(s.startswith(n) or s.startswith("1000" + n) for n in
+                                         ("SIREN", "ESPORT", "AKE", "ANSEM", "BTR", "BTW", "LOB", "SPORT", "EAT", "AKI", "BTV", "CLAW")))
+    note("farm probe2 · binance archive", json.dumps({"fundingRate symbols": len(syms), "named": hits}, ensure_ascii=False))
+    s, d = get("https://api.hyperliquid.xyz/info", {"type": "meta"})
+    hl = [u["name"] for u in (d or {}).get("universe") or []]
+    note("farm probe2 · hyperliquid named", json.dumps([x for x in hl if any(n in x.upper() for n in ("SIREN", "ESPORT", "AKE", "ANSEM", "BTR", "BTW", "LOB", "SPORT"))]))
+
+
+def vision_list(kind="fundingRate"):
+    """All USDT-M symbols in the Binance archive for `kind` (S3 listing, paged)."""
+    syms, marker = [], ""
+    for _ in range(20):
+        s, b = get(f"{S3}?delimiter=/&prefix=data/futures/um/monthly/{kind}/" + (f"&marker={marker}" if marker else ""), raw=True)
+        if s != 200:
+            break
+        p = re.findall(rf"<Prefix>data/futures/um/monthly/{kind}/([A-Z0-9]+)/</Prefix>", b.decode())
+        syms += p
+        if "<IsTruncated>true</IsTruncated>" not in b.decode() or not p:
+            break
+        marker = f"data/futures/um/monthly/{kind}/{p[-1]}/"
+    return sorted(set(syms))
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
     os.makedirs(OUT, exist_ok=True)
-    {"probe": probe}[mode]()
+    {"probe": probe, "probe2": probe2}[mode]()

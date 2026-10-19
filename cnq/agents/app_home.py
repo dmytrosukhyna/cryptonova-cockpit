@@ -150,6 +150,16 @@ def _market(mk: dict) -> dict:
             "regime": None if mk.get("btc_bull") is None else ("рост" if mk.get("btc_bull") else "спад")}
 
 
+def _engine_facts(out: str) -> dict:
+    """Real numbers for the welcome screen (never invented): the nightly lab and the signals checked by price."""
+    al, sig, ac = _load(out, "autolab.json"), _load(out, "app_signals.json"), _load(out, "academy.json")
+    return {"lab_tried": al.get("tried"), "lab_tested": al.get("tested"), "lab_passed": al.get("passed"),
+            "lab_reliable": al.get("reliable"), "lab_markets": len(al.get("coverage") or {}) or None,
+            "signals_checked": (sig.get("counts") or {}).get("resolved"),
+            "lessons": sum(len(lv.get("lessons") or []) for lv in ac.get("levels") or []) or None,
+            "cycle_sec": 60}
+
+
 def btc_daily(conn: sqlite3.Connection | None, out: str) -> dict:
     from . import outlook
     closes = outlook.merge(outlook.seed_closes(), outlook.local_closes(), outlook.db_closes(conn),
@@ -172,7 +182,7 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
            "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]},
            "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                        {"key": "piggy", "usd": None}, {"key": "soon", "label": "арбитраж, рынки прогнозов"}],
-           "market": _market(mk), "futures": fut, "spot": spot,
+           "market": _market(mk), "futures": fut, "spot": spot, "engine": _engine_facts(out),
            "note_ru": "Демо-счета CRYPTO NOVA. Прошлые результаты не гарантируют будущих. Не финансовый совет."}
     with open(os.path.join(out, "app_home.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))

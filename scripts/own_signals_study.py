@@ -357,5 +357,49 @@ def combo():
                                                                                 for m, v in sorted(mo.items())}))
 
 
+def sizing():
+    """19.10, round 3: the pullback + 20-day trailing breakout (P+B20c) has a plus per trade in every year on both coin sets,
+    but 10–15 positions of 10 % each fall together (drawdown −73…−77 %). How big can the account go and keep the drawdown sane?"""
+    def load(coins):
+        with ThreadPoolExecutor(12) as ex:
+            raw = dict(zip(coins, ex.map(lambda s: daily(s + "USDT"), coins)))
+        return {s: k for s, k in raw.items() if k is not None}
+    KS = load(COINS)
+    B = KS["BTC"]
+    bc = B["c"]
+    s200, s50 = sma(bc, 200), sma(bc, 50)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+        soft = np.where(np.isnan(s50), np.nan, (bc > s50).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": soft}
+    K2 = load(COINS2)
+    for D in (KS, K2):
+        for s in D:
+            prep(D[s], gate)
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    for label, D in (("main 40", KS), ("other 30", K2)):
+        trs = sorted([x for s, K in D.items() for spec in (("P", "regime", "-"), ("B20", "regime", "chand")) for x in simulate(K, *spec, s)
+                      if x[0] >= t0], key=lambda x: x[0])
+        out = {}
+        for name, kw in (("5pct x10", dict(share=0.05, max_open=10)), ("5pct x20", dict(share=0.05, max_open=20)),
+                         ("10pct x5", dict(share=0.10, max_open=5)), ("10pct x10", dict(share=0.10, max_open=10)),
+                         ("risk0.5 x10", dict(max_open=10, risk=0.5)), ("risk0.5 x20", dict(max_open=20, risk=0.5)),
+                         ("risk0.25 x20", dict(max_open=20, risk=0.25))):
+            a = account(trs, **kw)
+            a.pop("last_months_pct", None)
+            out[name] = a
+        note(f"own signals sizing · P+B20c {label}", json.dumps(out, ensure_ascii=False))
+        lo = [x for x in trs if x[2] == 1]
+        sh = [x for x in trs if x[2] == -1]
+        note(f"own signals sizing · sides {label}", json.dumps({
+            "long": {"n": len(lo), "avg": round(float(np.mean([x[3] for x in lo])), 2) if lo else None,
+                     "stop_pct_median": round(float(np.median([x[6] for x in lo])), 1) if lo else None,
+                     "days_median": float(np.median([x[4] for x in lo])) if lo else None},
+            "short": {"n": len(sh), "avg": round(float(np.mean([x[3] for x in sh])), 2) if sh else None,
+                      "stop_pct_median": round(float(np.median([x[6] for x in sh])), 1) if sh else None,
+                      "days_median": float(np.median([x[4] for x in sh])) if sh else None},
+            "win_pct": round(float(np.mean([x[3] > 0 for x in trs])) * 100), "per_day": round(len(trs) / ((TODAY - dt.date(2022, 1, 1)).days), 2)}))
+
+
 if __name__ == "__main__":
-    combo() if "--combo" in sys.argv else main()
+    combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else main()

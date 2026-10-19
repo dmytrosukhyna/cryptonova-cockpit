@@ -215,14 +215,19 @@ def summary(trades, KS, n_days):
             "short": round(float(np.mean([x[3] for x in trades if x[2] == -1])), 3) if any(x[2] == -1 for x in trades) else None}
 
 
-def account(trades, share=0.10, max_open=10, risk=None):
+def account(trades, share=0.10, max_open=10, risk=None, per_day=None):
     """Compounding demo account: `share` of equity per trade (notional, 1×), at most `max_open` at once. With `risk` (% of
     equity lost at the stop): notional = risk ÷ stop distance, capped at 25 % of equity."""
     ev = sorted([(o, 0, k) for k, (o, *_r) in enumerate(trades)] + [(cl, 1, k) for k, (_o, cl, *_r) in enumerate(trades)])
     E, peak, dd, size, opened, curve = 1.0, 1.0, 0.0, {}, 0, []
+    day_n = {}
     for tt, kind, k in ev:
         if kind == 0:
+            dk = tt // 86_400_000
+            if per_day is not None and day_n.get(dk, 0) >= per_day:
+                continue
             if opened < max_open:
+                day_n[dk] = day_n.get(dk, 0) + 1
                 size[k] = E * (min(0.25, risk / trades[k][6]) if risk else share)
                 opened += 1
             continue
@@ -511,5 +516,37 @@ def export():
         note(f"export · r{i}", blob[i * 4000:(i + 1) * 4000])
 
 
+def tune():
+    """19.10, round 5 — the live desk's knobs: both sides vs longs only, a cap on new trades a day (the drawdown comes from
+    many trades opened together), at most 10 / 20 open; risk 0.5 % a trade. 40 coins and 30 other coins."""
+    def load(coins):
+        with ThreadPoolExecutor(12) as ex:
+            raw = dict(zip(coins, ex.map(lambda s: daily(s + "USDT"), coins)))
+        return {s: k for s, k in raw.items() if k is not None}
+    KS = load(COINS)
+    B = KS["BTC"]
+    bc = B["c"]
+    s200 = sma(bc, 200)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": bull}
+    K2 = load(COINS2)
+    for D in (KS, K2):
+        for s in D:
+            prep(D[s], gate)
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    for label, D in (("main 40", KS), ("other 30", K2)):
+        allt = sorted([x for s, K in D.items() for spec in (("P", "regime", "-"), ("B20", "regime", "chand")) for x in simulate(K, *spec, s)
+                       if x[0] >= t0], key=lambda x: x[0])
+        out = {}
+        for side in ("both", "long"):
+            trs = allt if side == "both" else [x for x in allt if x[2] == 1]
+            for cap in (None, 2, 4):
+                for mo in (10, 20):
+                    a = account(trs, max_open=mo, risk=0.5, per_day=cap)
+                    out[f"{side} cap{cap or '∞'} x{mo}"] = [a["avg_month_pct"], a["max_dd_pct"], a["worst_month_pct"], list(a["years_pct"].values())]
+        note(f"own signals tune · {label} avg_month dd worst years", json.dumps(out, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    (export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

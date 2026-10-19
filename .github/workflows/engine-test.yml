@@ -1,0 +1,49 @@
+name: engine-test
+# Manual only. Runs the server engine (cnq/engine.py) for a few cycles on a GitHub runner — no git, no Telegram — to check it
+# end to end before it goes to the server.
+on:
+  workflow_dispatch:
+    inputs:
+      cycles:
+        description: "cycles to run"
+        required: false
+        default: "3"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy pillow
+      - name: Candle store from the site cache (read-only)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/cnq.sqlite
+            data/agents.sqlite
+          key: cnq-state-none
+          restore-keys: |
+            cnq-state-
+      - name: Engine — a few cycles
+        env:
+          CNQ_REPO_DIR: ${{ github.workspace }}
+          CNQ_RUN_DIR: /tmp/cnq-run
+          CNQ_ENGINE_INTERVAL: "30"
+        run: python -m cnq.engine --cycles ${{ inputs.cycles }} --no-sync
+      - name: Report
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          d = json.load(open("/tmp/cnq-run/web/engine.json"))
+          steps = {k: (v["ok"], v["sec"], v.get("err", "")[-200:]) for k, v in d["steps"].items()}
+          print(f"::notice title=engine · cycle {d['cycle']} {d['cycle_sec']}s::" + json.dumps(steps, ensure_ascii=False)[:3900])
+          p = json.load(open("/tmp/cnq-run/web/paper.json"))
+          print("::notice title=engine · paper::" + json.dumps({k: [v.get("equity"), len(v.get("open") or [])] for k, v in (p.get("profiles") or {}).items()}))
+          PY

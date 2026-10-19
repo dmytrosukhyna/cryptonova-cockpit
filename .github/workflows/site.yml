@@ -52,25 +52,31 @@ jobs:
           CNQ_X_BEARER: ${{ secrets.CNQ_X_BEARER }}
         run: python -m cnq.cli agents --out web
       - name: Paper desk ($10k demo futures account) → web/paper.json
+        if: ${{ vars.CNQ_ENGINE != 'server' }}      # 19.10: the server engine (cnq/engine.py) runs this every minute
         continue-on-error: true
         run: python -m cnq.cli paper --out web
       - name: Шорт листингов (new BingX perps, short 4 h after listing; demo) → web/paper.json profiles.lst
+        if: ${{ vars.CNQ_ENGINE != 'server' }}      # 19.10: the server engine (cnq/engine.py) runs this every minute
         continue-on-error: true
         timeout-minutes: 3
         run: python -m cnq.cli listings --out web
       - name: Сигналы CRYPTO NOVA (own daily signals — pullback + 20-day breakout with the BTC regime; demo) → web/paper.json profiles.own
+        if: ${{ vars.CNQ_ENGINE != 'server' }}      # 19.10: the server engine (cnq/engine.py) runs this every minute
         continue-on-error: true
         timeout-minutes: 4
         run: python -m cnq.cli own --out web
       - name: Спот — анкета качества (revenue, age, calm volume; the alt basket of «ядро + альтсезон») → web/quality.json
+        if: ${{ vars.CNQ_ENGINE != 'server' }}      # 19.10: the server engine (cnq/engine.py) runs this every minute
         continue-on-error: true
         timeout-minutes: 4
         run: python -m cnq.cli quality --out web
       - name: Нейтральная корзина (long the 10 best / short the 10 worst alts by the quality card, monthly; demo) → web/paper.json profiles.lsn
+        if: ${{ vars.CNQ_ENGINE != 'server' }}      # 19.10: the server engine (cnq/engine.py) runs this every minute
         continue-on-error: true
         timeout-minutes: 3
         run: python -m cnq.cli lsn --out web
       - name: Портфель «ядро + альтсезон» (altseason gauge, model shares; posts to the signals channel) → web/altseason.json
+        if: ${{ vars.CNQ_ENGINE != 'server' }}      # 19.10: the server engine (cnq/engine.py) runs this every minute
         continue-on-error: true
         timeout-minutes: 3
         env:
@@ -78,10 +84,12 @@ jobs:
           CNQ_SIGNALS_CHAT: ${{ secrets.CNQ_SIGNALS_CHAT }}
         run: python -m cnq.cli altport --out web
       - name: «Турбо» (the listing short ×4, BTC ×2 in «рост») — demo accounts against the +70 %/month target → web/paper.json
+        if: ${{ vars.CNQ_ENGINE != 'server' }}      # 19.10: the server engine (cnq/engine.py) runs this every minute
         continue-on-error: true
         timeout-minutes: 2
         run: python -m cnq.cli turbo --out web
       - name: Our own signals in Cornix format (CNPTS «Сбалансированная») → web/signals_feed.json; Telegram only if CNQ_SIGNALS_CHAT is set
+        if: ${{ vars.CNQ_ENGINE != 'server' }}      # 19.10: the server engine (cnq/engine.py) runs this every minute
         continue-on-error: true
         env:
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}

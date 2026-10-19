@@ -1,0 +1,23 @@
+[Unit]
+Description=CRYPTO NOVA fast engine (demo desks every minute; no exchange orders)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=cnq
+Group=cnq
+WorkingDirectory=/opt/cnq/run
+EnvironmentFile=/etc/cnq.env
+Environment=PYTHONPATH=/opt/cnq/run
+Environment=CNQ_REPO_DIR=/opt/cnq/repo
+Environment=CNQ_RUN_DIR=/opt/cnq/run
+ExecStart=/opt/cnq/venv/bin/python -m cnq.engine
+Restart=always
+RestartSec=10
+# the app backend lives on the same server: the engine yields to it
+Nice=10
+CPUQuota=60%
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

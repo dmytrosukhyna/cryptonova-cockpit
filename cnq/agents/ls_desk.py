@@ -8,8 +8,10 @@ point-in-time top 100 alts by 30-day dollar volume with ≥ 1 year of history; m
   long the top 10 / short the bottom 10 of the quality composite (spot_quality.py), weights ∝ 1 ÷ 30-day volatility (no coin above
   2.5× an equal share): ×3.36 at gross 1 (half long, half short), worst drawdown −27 %, +2.55 % a month, every year 2022–2026 in
   plus (+10 / +15 / +39 / +55 / +23 %), first half ×1.28, second ×2.62; funding cost −0.6 % a month is inside.
-  At gross 0.75 (the drawdown-25 % setting): ×2.57, +1.9 % a month. Equal weights instead: drawdown −47 % — the short leg's
-  squeezes; that is why the weights are by volatility. Honest: the composite's signs were chosen on the same history (round 13).
+  At gross 0.75 (the drawdown-25 % setting): ×2.57, +1.9 % a month. Rebalanced on the 15th instead (robustness): ×1.84 at gross
+  0.75, +1.25 % a month, 2023 −11 % at gross 1 — so the honest range is +1.3…+1.9 % a month. Equal weights instead: drawdown −47 %
+  (the short leg's squeezes); that is why the weights are by volatility. The composite's signs were chosen on the same history
+  (round 13).
 
 Live: the ranking = web/quality.json (spot_quality.py, daily); rebalance on the first run of each UTC month (and on the first run
 ever); marks every run from the BingX ticker; funding accrues every run from BingX premiumIndex (rate per 8 h × hours ÷ 8; longs
@@ -34,7 +36,8 @@ NAME = "Нейтральная корзина"
 ABOUT = ("Зарабатывает на разнице между сильными и слабыми альтами, а не на росте или падении рынка. Раз в месяц покупаем 10 "
          "лучших альтов по анкете качества (есть выручка, старше, без хайпа) и шортим 10 худших. Доли — по спокойствию монеты: "
          "чем сильнее её качает, тем меньше доля. Честная история 2022–2026 (все монеты Binance, включая снятые с торгов, "
-         "фандинг и комиссии учтены): в среднем около +1.9% в месяц, худшая просадка −25%, каждый год в плюсе. Демо $10 000.")
+         "фандинг и комиссии учтены): в среднем от +1.3% до +1.9% в месяц в зависимости от дня ребаланса, худшая просадка до −25%; "
+         "при ребалансе 1-го числа каждый год в плюсе, при ребалансе 15-го 2023 год в минусе. Демо $10 000.")
 RULES = ("раз в месяц: лонг 10 лучших и шорт 10 худших альтов по анкете качества (топ-100 по объёму, от года торгов); доли обратно "
          "колебаниям за 30 дней, не больше 2.5 равных долей; общий объём 75% счёта (по 37.5% в каждую сторону); без стопов")
 
@@ -247,7 +250,7 @@ def doc(conn, now: int, px: dict, events: list) -> dict:
                                         "max_dd_pct": round(dd * 100, 2), "best": 0, "worst": 0},
             "equity_history": eqh, "events": events[:20], "error": None, "regime_ru": "рыночно-нейтрально: половина лонг, половина шорт",
             "rules": RULES, "last_rebalance": _st(conn, "last_rebalance"),
-            "evidence": {"x_gross_075": 2.57, "month_pct": 1.9, "max_dd_pct": 25, "years_pct_gross1": [10, 15, 39, 55, 23],
+            "evidence": {"x_gross_075": [2.57, 1.84], "month_pct": [1.9, 1.25], "rebalance_day": [1, 15], "max_dd_pct": 25, "years_pct_gross1": [10, 15, 39, 55, 23],
                          "halves_x_gross1": [1.28, 2.62], "funding_month_pct": -0.58}}
 
 

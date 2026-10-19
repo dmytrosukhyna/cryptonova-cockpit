@@ -1400,5 +1400,44 @@ def altport2():
     res["basket by 180-day volume now"] = basket(today, "pit180")
     note("altport2 · honest [x, dd %, 2022…2026 %]", json.dumps(res, ensure_ascii=False))
 
+
+def spot_probe():
+    """19.10 — which free data sources for a fundamental coin card answer from GitHub Actions (status, size, a sample)."""
+    urls = {
+        "llama protocols": "https://api.llama.fi/protocols",
+        "llama fees overview": "https://api.llama.fi/overview/fees?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true&dataType=dailyRevenue",
+        "llama fees hist (aave)": "https://api.llama.fi/summary/fees/aave?dataType=dailyRevenue",
+        "llama raises": "https://api.llama.fi/raises",
+        "llama hacks": "https://api.llama.fi/hacks",
+        "llama emissions": "https://api.llama.fi/emissions",
+        "llama chains": "https://api.llama.fi/v2/chains",
+        "llama coins chart": "https://coins.llama.fi/chart/coingecko:solana?start=1640995200&span=10&period=30d",
+        "gecko markets": "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1",
+        "gecko coin": "https://api.coingecko.com/api/v3/coins/solana?localization=false&tickers=true&market_data=true&community_data=true&developer_data=true",
+        "gecko categories": "https://api.coingecko.com/api/v3/coins/categories",
+        "github repo": "https://api.github.com/repos/solana-foundation/solana-web3.js",
+        "cryptorank": "https://api.cryptorank.io/v1/currencies?limit=5",
+        "tokenomist": "https://api.tokenomist.ai/v1/list",
+        "defillama yields": "https://yields.llama.fi/pools",
+    }
+    out = {}
+    for k, u in urls.items():
+        st, b = http(u, tries=2)
+        txt = b if isinstance(b, str) else ""
+        sample = ""
+        try:
+            j = json.loads(txt)
+            if isinstance(j, list):
+                sample = f"list[{len(j)}] keys={sorted(j[0].keys())[:25] if j and isinstance(j[0], dict) else ''}"
+            elif isinstance(j, dict):
+                sample = f"dict keys={sorted(j.keys())[:25]}"
+                for kk in ("protocols", "raises", "data"):
+                    if isinstance(j.get(kk), list) and j[kk]:
+                        sample += f" | {kk}[{len(j[kk])}] keys={sorted(j[kk][0].keys())[:30] if isinstance(j[kk][0], dict) else ''}"
+        except Exception:  # noqa: BLE001
+            sample = txt[:120]
+        out[k] = [st, len(txt), sample[:420]]
+    note("spot probe · free fundamental sources", json.dumps(out, ensure_ascii=False)[:3900])
+
 if __name__ == "__main__":
-    (altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

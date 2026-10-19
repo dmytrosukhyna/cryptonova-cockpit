@@ -1,8 +1,14 @@
 name: research-copytraders
 # Manual only. Copy traders and trading bots across exchanges: which public leaderboards answer (copytraders_probe.py),
-# then OKX's official public copy-trading API in depth (copytraders_study.py).
+# OKX's official public copy-trading API in depth (copytraders_study.py), Binance / MEXC copy trading and Binance grid bots
+# (copytraders_markets.py).
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "all | markets | okx | probe"
+        required: false
+        default: "all"
 
 permissions:
   contents: read
@@ -10,14 +16,20 @@ permissions:
 jobs:
   study:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: probe
+        if: ${{ inputs.step == 'all' || inputs.step == 'probe' }}
         continue-on-error: true
         run: python scripts/copytraders_probe.py
       - name: okx
+        if: ${{ inputs.step == 'all' || inputs.step == 'okx' }}
         continue-on-error: true
         run: python scripts/copytraders_study.py
+      - name: markets
+        if: ${{ inputs.step == 'all' || inputs.step == 'markets' }}
+        continue-on-error: true
+        run: python scripts/copytraders_markets.py

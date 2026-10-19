@@ -69,11 +69,11 @@ def klines(sym: str, iv: str, d0: dt.date, d1: dt.date) -> dict | None:
     return {"t": a[:, 0].astype(np.int64), "o": a[:, 1], "h": a[:, 2], "l": a[:, 3], "c": a[:, 4]}
 
 
-def simulate(K: dict, sig: dict, side: str) -> dict | None:
+def simulate(K: dict, sig: dict, side: str, iv: int = M5) -> dict | None:
     """One trade on 5-minute candles → {fill_t, close_t, last, ladder_be} (net % of price, no leverage)."""
     t, o, h, l, c = K["t"], K["o"], K["h"], K["l"], K["c"]
     i0 = int(np.searchsorted(t, sig["t"], side="right")) - 1
-    if i0 < 0 or i0 + 2 >= len(t) or sig["t"] - t[i0] > 2 * M5:
+    if i0 < 0 or i0 + 2 >= len(t) or sig["t"] - t[i0] > 2 * iv:
         return None
     lo, hi = sig["lo"], sig["hi"]
     E = (lo + hi) / 2 if lo and hi else (lo or hi)
@@ -84,7 +84,7 @@ def simulate(K: dict, sig: dict, side: str) -> dict | None:
     if abs(ref - E) / E <= MARKET_TOL:
         fill_i = i0
     else:
-        for j in range(i0 + 1, min(len(t), i0 + 1 + FILL_WIN)):
+        for j in range(i0 + 1, min(len(t), i0 + 1 + FILL_WIN * M5 // iv)):
             if l[j] <= max(lo, hi) and h[j] >= min(lo, hi):
                 fill_i = j
                 break
@@ -96,7 +96,7 @@ def simulate(K: dict, sig: dict, side: str) -> dict | None:
     tps = [E * (1 + sg * k * step) for k in range(1, 6)]
     last = lad = None
     lad_parts, lad_stop, lad_done, close_last, close_lad = 0.0, stop0, 0, None, None
-    end = min(len(t) - 1, fill_i + HOLD)
+    end = min(len(t) - 1, fill_i + HOLD * M5 // iv)
     for j in range(fill_i + 1, end + 1):
         hit = lambda px: (l[j] <= px) if sg == 1 else (h[j] >= px)          # noqa: E731 — the price went down to / up to
         reach = lambda px: (h[j] >= px) if sg == 1 else (l[j] <= px)        # noqa: E731
@@ -219,5 +219,49 @@ def main():
         note("golden history · check vs 1-minute sim", f"skipped: {e}")
 
 
+def check():
+    """Why the 5-minute replay and our 1-minute one disagree on the overlapping signals: the same signals on Binance 1-minute
+    candles, side by side with Binance 5-minute and our 1-minute (BingX) results, plus the trades that disagree most."""
+    D = json.load(open(os.path.join(os.path.dirname(__file__), "lab", "data", "golden_signals.json"), encoding="utf-8"))
+    conn = sqlite3.connect(os.path.join(os.path.dirname(__file__), "..", "data", "agents.sqlite"))
+    db = {}
+    for sym, side, t, sim in conn.execute("SELECT symbol, side, t_signal, sim FROM app_signals"):
+        j = json.loads(sim or "{}")
+        p = (j.get("policies") or {}).get("last") or {}
+        if p.get("net") is not None:
+            db[(sym.replace("-", ""), side, t)] = (p["net"], j.get("ended"), j.get("fill"), j.get("fill_t"), j.get("end_t"), j.get("sl_t"),
+                                                   ((j.get("whatif") or {}).get("rev") or {}).get("last"))
+    S = []
+    for s in D["signals"]:
+        m = [k for k in db if k[0] == s["sym"] and k[1] == s["side"] and abs(k[2] - s["t"]) < 15 * 60_000]
+        if m:
+            S.append((s, db[m[0]]))
+    syms = sorted({s["sym"] for s, _ in S})
+    d0 = dt.datetime.fromtimestamp(min(s["t"] for s, _ in S) / 1000, dt.timezone.utc).date() - dt.timedelta(days=1)
+    with ThreadPoolExecutor(10) as ex:
+        K1 = dict(zip(syms, ex.map(lambda x: klines(x, "1m", d0, TODAY), syms)))
+        K5 = dict(zip(syms, ex.map(lambda x: klines(x, "5m", d0, TODAY), syms)))
+    rows = []
+    for s, (net, ended, fill, fill_t, end_t, sl_t, rev) in S:
+        if K1.get(s["sym"]) is None or K5.get(s["sym"]) is None:
+            continue
+        a1 = simulate(K1[s["sym"]], s, s["side"], 60_000)
+        a5 = simulate(K5[s["sym"]], s, s["side"])
+        r1 = simulate(K1[s["sym"]], s, "SHORT" if s["side"] == "LONG" else "LONG", 60_000)
+        if not a1 or not a5 or a1.get("fill_t") is None or a5.get("fill_t") is None:
+            continue
+        rows.append({"sym": s["sym"], "side": s["side"], "t": s["t"], "lev": s["lev"], "db": net, "b1": round(a1["last"], 3),
+                     "b5": round(a5["last"], 3), "db_rev": rev, "b1_rev": round(r1["last"], 3) if r1 and r1.get("last") is not None else None,
+                     "db_end": ended, "db_fill": fill, "E": (s["lo"] + s["hi"]) / 2, "db_close_h": round((end_t - s["t"]) / 3.6e6, 1) if end_t else None,
+                     "b1_close_h": round((a1["last_t"] - s["t"]) / 3.6e6, 1), "b5_close_h": round((a5["last_t"] - s["t"]) / 3.6e6, 1)})
+    A = lambda k: round(float(np.mean([r[k] for r in rows if r[k] is not None])), 3)            # noqa: E731
+    sg = lambda a, b: round(float(np.mean([np.sign(r[a]) == np.sign(r[b]) for r in rows if r[a] is not None and r[b] is not None])) * 100)  # noqa: E731
+    note("golden check · averages", json.dumps({"n": len(rows), "db_1m_bingx": A("db"), "binance_1m": A("b1"), "binance_5m": A("b5"),
+                                                "db_rev": A("db_rev"), "binance_1m_rev": A("b1_rev"), "same_sign_db_b1": sg("db", "b1"),
+                                                "same_sign_b1_b5": sg("b1", "b5")}))
+    bad = sorted(rows, key=lambda r: -abs(r["db"] - r["b1"]))[:25]
+    note("golden check · biggest gaps db vs binance 1m", json.dumps(bad, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    main()
+    check() if "--check" in sys.argv else main()

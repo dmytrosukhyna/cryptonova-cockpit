@@ -16,4 +16,5 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -q numpy
+      - run: python scripts/golden_history.py --check
       - run: python scripts/golden_history.py

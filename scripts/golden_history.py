@@ -70,7 +70,8 @@ def klines(sym: str, iv: str, d0: dt.date, d1: dt.date) -> dict | None:
 
 
 def simulate(K: dict, sig: dict, side: str, iv: int = M5) -> dict | None:
-    """One trade on 5-minute candles → {fill_t, close_t, last, ladder_be} (net % of price, no leverage)."""
+    """One trade on candles of `iv` ms → {fill_t, x: {k: (net %, close ms)} for «everything out at target k or the stop»,
+    last / last_t (= k 5), ladder_be / lad_t} — net % of price after costs, no leverage."""
     t, o, h, l, c = K["t"], K["o"], K["h"], K["l"], K["c"]
     i0 = int(np.searchsorted(t, sig["t"], side="right")) - 1
     if i0 < 0 or i0 + 2 >= len(t) or sig["t"] - t[i0] > 2 * iv:
@@ -79,9 +80,8 @@ def simulate(K: dict, sig: dict, side: str, iv: int = M5) -> dict | None:
     E = (lo + hi) / 2 if lo and hi else (lo or hi)
     if not E:
         return None
-    ref = c[i0]
     fill_i = None
-    if abs(ref - E) / E <= MARKET_TOL:
+    if l[i0] * (1 - MARKET_TOL) <= E <= h[i0] * (1 + MARKET_TOL):       # the entry traded in the signal candle → market (no look-ahead)
         fill_i = i0
     else:
         for j in range(i0 + 1, min(len(t), i0 + 1 + FILL_WIN * M5 // iv)):
@@ -94,17 +94,23 @@ def simulate(K: dict, sig: dict, side: str, iv: int = M5) -> dict | None:
     sld, step = 0.30 / sig["lev"], 0.15 / sig["lev"]
     stop0 = E * (1 - sg * sld)
     tps = [E * (1 + sg * k * step) for k in range(1, 6)]
-    last = lad = None
-    lad_parts, lad_stop, lad_done, close_last, close_lad = 0.0, stop0, 0, None, None
+    best, stop_t, tp_t = 0, None, [None] * 5
+    lad = None
+    lad_parts, lad_stop, lad_done, close_lad = 0.0, stop0, 0, None
     end = min(len(t) - 1, fill_i + HOLD * M5 // iv)
     for j in range(fill_i + 1, end + 1):
-        hit = lambda px: (l[j] <= px) if sg == 1 else (h[j] >= px)          # noqa: E731 — the price went down to / up to
-        reach = lambda px: (h[j] >= px) if sg == 1 else (l[j] <= px)        # noqa: E731
-        if last is None:
+        def hit(px):                                     # the price went against us down/up to px
+            return (l[j] <= px) if sg == 1 else (h[j] >= px)
+
+        def reach(px):
+            return (h[j] >= px) if sg == 1 else (l[j] <= px)
+        if stop_t is None and best < 5:
             if hit(stop0):
-                last, close_last = -sld * 100, t[j]
-            elif reach(tps[-1]):
-                last, close_last = 5 * step * 100, t[j]
+                stop_t = t[j]
+            else:
+                while best < 5 and reach(tps[best]):
+                    tp_t[best] = t[j]
+                    best += 1
         if lad is None:
             if hit(lad_stop):
                 lad = lad_parts + (5 - lad_done) / 5 * ((lad_stop / E - 1) * sg * 100)
@@ -116,13 +122,20 @@ def simulate(K: dict, sig: dict, side: str, iv: int = M5) -> dict | None:
                     lad_stop = E                                          # stop to the entry after TP1
                 if lad_done == 5:
                     lad, close_lad = lad_parts, t[j]
-        if last is not None and lad is not None:
+        if (stop_t is not None or best == 5) and lad is not None:
             break
-    if last is None:
-        last, close_last = (c[end] / E - 1) * sg * 100, t[end]
+    mtm = (c[end] / E - 1) * sg * 100
     if lad is None:
-        lad, close_lad = lad_parts + (5 - lad_done) / 5 * ((c[end] / E - 1) * sg * 100), t[end]
-    return {"fill_t": int(t[fill_i]) if fill_i != i0 else sig["t"], "last": last - COST, "last_t": int(close_last),
+        lad, close_lad = lad_parts + (5 - lad_done) / 5 * mtm, t[end]
+    x = {}
+    for k in range(1, 6):
+        if best >= k:
+            x[k] = (k * step * 100 - COST, int(tp_t[k - 1]))
+        elif stop_t is not None:
+            x[k] = (-sld * 100 - COST, int(stop_t))
+        else:
+            x[k] = (mtm - COST, int(t[end]))
+    return {"fill_t": int(t[fill_i]) if fill_i != i0 else sig["t"], "x": x, "last": x[5][0], "last_t": x[5][1],
             "ladder_be": lad - COST, "lad_t": int(close_lad)}
 
 
@@ -179,24 +192,53 @@ def main():
         res.append({**s, "as": a, "rev": b, "with_btc": (bdir > 0) == (s["side"] == "LONG") if bdir else None})
     note("golden history · data", json.dumps({"signals": len(S), "simulated": len(res), "skipped": skipped, "coins": len(syms),
                                               "missing_on_binance": missing}, ensure_ascii=False))
-    V = {
-        "как приходят · лесенка": [(r["as"]["fill_t"], r["as"]["lad_t"], r["as"]["ladder_be"], r["lev"], 1.0) for r in res],
-        "как приходят · до последней": [(r["as"]["fill_t"], r["as"]["last_t"], r["as"]["last"], r["lev"], 1.0) for r in res],
-        "наоборот": [(r["rev"]["fill_t"], r["rev"]["last_t"], r["rev"]["last"], r["lev"], 1.0) for r in res],
-        "умный разворот": [((r["as"] if r["with_btc"] else r["rev"])["fill_t"], (r["as"] if r["with_btc"] else r["rev"])["last_t"],
-                            (r["as"] if r["with_btc"] else r["rev"])["last"], r["lev"], 1.0) for r in res if r["with_btc"] is not None],
-        "вилка": [x for r in res for x in ((r["as"]["fill_t"], r["as"]["last_t"], r["as"]["last"], r["lev"], 0.5),
-                                            (r["rev"]["fill_t"], r["rev"]["last_t"], r["rev"]["last"], r["lev"], 0.5))],
-    }
+    def leg(r, who, k):
+        x = r[who]["x"][k]
+        return (r[who]["fill_t"], x[1], x[0], r["lev"], 1.0)
+
+    V = {"как приходят · лесенка": [(r["as"]["fill_t"], r["as"]["lad_t"], r["as"]["ladder_be"], r["lev"], 1.0) for r in res]}
+    for k in (1, 2, 3, 5):
+        V[f"как приходят · до TP{k}"] = [leg(r, "as", k) for r in res]
+        V[f"наоборот · до TP{k}"] = [leg(r, "rev", k) for r in res]
+    V["наоборот · лесенка"] = [(r["rev"]["fill_t"], r["rev"]["lad_t"], r["rev"]["ladder_be"], r["lev"], 1.0) for r in res]
+    V["умный разворот"] = [leg(r, "as" if r["with_btc"] else "rev", 5) for r in res if r["with_btc"] is not None]
+    V["вилка"] = [(*leg(r, w, 5)[:4], 0.5) for r in res for w in ("as", "rev")]
     per_trade = {}
     for k, T in V.items():
         by = {}
         for o, cl, net, lev, w in T:
             by.setdefault(dt.datetime.fromtimestamp(o / 1000, dt.timezone.utc).strftime("%Y-%m"), []).append(net)
-        per_trade[k] = {"avg_pct": round(float(np.mean([x[2] for x in T])), 3), "n": len(T),
-                        "by_month": {m: round(float(np.mean(v)), 2) for m, v in sorted(by.items())}}
+        per_trade[k] = {"avg": round(float(np.mean([x[2] for x in T])), 3), "n": len(T),
+                        "m": [round(float(np.mean(v)), 2) for _, v in sorted(by.items())]}
     note("golden history · per trade pct no leverage after costs", json.dumps(per_trade, ensure_ascii=False))
-    note("golden history · demo account 10k at 5 pct margin", json.dumps({k: account(T) for k, T in V.items()}, ensure_ascii=False))
+    acc = {k: account(T) for k, T in V.items()}
+    note("golden history · demo account 10k at 5 pct margin", json.dumps(
+        {k: {"total": v["total_pct"], "dd": v["max_dd_pct"], "plus": f"{v['months_plus']}/{v['n_months']}", "m": list(v["months"].values())}
+         for k, v in acc.items()}, ensure_ascii=False))
+    # is there a part of the signals that works — found on Dec–May, checked on Jun–Oct (the walk-forward test)
+    split = int(dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    seg = {
+        "long": lambda r: r["side"] == "LONG", "short": lambda r: r["side"] == "SHORT",
+        "lev<=10": lambda r: r["lev"] <= 10, "lev11-20": lambda r: 10 < r["lev"] <= 20, "lev>20": lambda r: r["lev"] > 20,
+        "with_btc4h": lambda r: r["with_btc"] is True, "against_btc4h": lambda r: r["with_btc"] is False,
+        "utc0-8": lambda r: dt.datetime.fromtimestamp(r["t"] / 1000, dt.timezone.utc).hour < 8,
+        "utc8-16": lambda r: 8 <= dt.datetime.fromtimestamp(r["t"] / 1000, dt.timezone.utc).hour < 16,
+        "utc16-24": lambda r: dt.datetime.fromtimestamp(r["t"] / 1000, dt.timezone.utc).hour >= 16,
+        "btc_eth_sol": lambda r: r["sym"] in ("BTCUSDT", "ETHUSDT", "SOLUSDT"),
+    }
+    out = {}
+    for name, f in seg.items():
+        row = {}
+        for who, k in (("as", 1), ("as", 5), ("rev", 1), ("rev", 5)):
+            tr = [r[who]["x"][k][0] for r in res if f(r) and r["t"] < split]
+            te = [r[who]["x"][k][0] for r in res if f(r) and r["t"] >= split]
+            row[f"{who}{k}"] = [round(float(np.mean(tr)), 2) if tr else None, len(tr), round(float(np.mean(te)), 2) if te else None, len(te)]
+        out[name] = row
+    note("golden history · segments train Dec-May vs test Jun-Oct", json.dumps(out, ensure_ascii=False))
+    # hit rates: how often each target is reached before the stop (as they come)
+    hr = {f"TP{k}": round(float(np.mean([r["as"]["x"][k][0] > 0 for r in res])) * 100, 1) for k in range(1, 6)}
+    hr.update({f"rev TP{k}": round(float(np.mean([r["rev"]["x"][k][0] > 0 for r in res])) * 100, 1) for k in range(1, 6)})
+    note("golden history · how often targets are reached before the stop pct", json.dumps(hr))
     # the 5-minute simulation against our 1-minute one on the signals both have
     try:
         conn = sqlite3.connect(os.path.join(os.path.dirname(__file__), "..", "data", "agents.sqlite"))

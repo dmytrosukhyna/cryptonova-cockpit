@@ -472,3 +472,23 @@ def test_whatif_reverse_and_wider_stop_on_the_same_path():
     st = aps.whatif_stats([{"t": TS, "sim": {**base, "whatif": wi}}])
     keys = [v["key"] for v in st["variants"]]
     assert keys[:2] == ["base", "maker"] and "rev" in keys and st["variants"][keys.index("rev")]["be"]["avg_pct"] > 0
+
+
+def test_source_that_keeps_only_the_newest_1000_candles_leaves_no_hole_in_the_path():
+    """19.10.2026: BingX answers at most 1000 candles and keeps the NEWEST ones. With 1440-candle windows the first 110 h of every
+    15m path were missing — a stop at hour 40 was skipped and the trade «jumped» to the targets at hour 120."""
+    conn = sqlite3.connect(":memory:")
+    bars = [r[:5] for r in _flat(100.0, 160, T0)]                                     # 40 h flat at the entry
+    bars += _q([(100.0, 100.2, 94.0, 94.5)], start=bars[-1][0] + M15)                 # hour 40: through the stop (95)
+    bars += [r[:5] for r in _flat(96.0, 320, bars[-1][0] + M15)]                      # 80 h more
+    bars += _q([(96.0, 116.0, 95.9, 115.5)], start=bars[-1][0] + M15)                 # hour 120: all targets
+    base = _market({"BTC-USDT": bars})
+
+    def capped(symbol, iv, start, end):
+        return base(symbol, iv, start, end)[-1000:]
+    capped.used = {"fake": 1}
+    api = {aps.API_ACTIVE: {"code": 1, "body": []}, aps.API_HISTORY: {"code": 1, "body": [_api_item(1)]}}
+    aps.run(conn, now=P0 + 20 * DAY, fetch_json=lambda u: api[u], klines=capped, budget_s=30, max_requests=200)
+    sim = json.loads(conn.execute("SELECT sim FROM app_signals").fetchone()[0])
+    assert sim["ended"] == "sl" and sim["best_tp"] == 0
+    assert 39 * H1 < sim["sl_t"] - TS < 42 * H1

@@ -19,7 +19,9 @@ class BingXConfig:
     timeout_s: float = 10.0
     # Documented: market endpoints are limited to 1 request/s per IP.
     min_request_interval_s: float = 1.05
-    kline_max_limit: int = 1440
+    # BingX returns at most 1000 candles per request and keeps the NEWEST ones: asking for 1440 silently leaves a hole of 440
+    # candles at the start of every window (found 19.10.2026 — it cut 110 h out of every app-signal price path).
+    kline_max_limit: int = 1000
 
 
 @dataclass(frozen=True)

@@ -79,7 +79,10 @@ FEE_PCT, SLIP_PCT = 0.05, 0.02
 COST_PCT = 2 * FEE_PCT + SLIP_PCT
 MIN_SAMPLE = 30
 LEV_CAP = 10
-SIM_VERSION = 4             # 2: market fill at the signal minute + 1m path for the first 3 h; strict path coverage; 3: what-if variants; 4: what-if close times (reverse account)
+SIM_VERSION = 5             # 2: market fill at the signal minute + 1m path for the first 3 h; strict path coverage; 3: what-if variants; 4: what-if close times (reverse account); 5: paths without the 110 h hole (KLINE_WINDOW)
+KLINE_WINDOW = 500          # candles per request. BingX caps a request at 1000 and keeps the NEWEST candles: the old 1440 windows lost the
+                            # first 440 × 15m = 110 h of every path (19.10.2026: a third of the trades «jumped» from 3 h to ~110 h, which made
+                            # both the signal and its mirror look profitable). 500 stays well under any source's cap.
 WHATIF = {   # «что если» on the same price path: the owner asked whether flipping the signal or changing the stop would work
     "rev": "Разворот: та же сделка в обратную сторону (стоп и цели зеркально)",
     "wide15": "Стоп в 1.5 раза дальше, цели те же",
@@ -416,7 +419,7 @@ class KlineSource:
         if self._bx is None:
             from ..bingx.rest import BingXRest
             self._bx = BingXRest()
-        return [[c.open_time, c.open, c.high, c.low, c.close] for c in self._bx.klines(symbol, iv, start_ms=start, end_ms=end, limit=1440)]
+        return [[c.open_time, c.open, c.high, c.low, c.close] for c in self._bx.klines(symbol, iv, start_ms=start, end_ms=end, limit=KLINE_WINDOW)]
 
     @staticmethod
     def _base_scale(symbol):
@@ -627,11 +630,11 @@ def build_path(t0: int, m1: list, c15: list, m1_final: bool, now: int, path_unti
 
 
 def _fetch_range(conn, klines, budget, symbol, iv, start, end, now: int | None = None) -> tuple[bool, int | None]:
-    """Fetch [start, end] in 1440-candle windows; only CLOSED candles are stored (a forming one would be cached as final).
+    """Fetch [start, end] in KLINE_WINDOW-candle windows; only CLOSED candles are stored (a forming one would be cached as final).
     → (complete, open time of the last candle stored)."""
     ms = IV_MS[iv]
     now = now if now is not None else int(time.time() * 1000)
-    step = ms * 1440
+    step = ms * KLINE_WINDOW
     t, last = start, None
     while t <= end:
         if not budget.take():
@@ -1083,7 +1086,7 @@ def process(conn, now: int, klines, budget: _Budget, notes: list) -> dict:
             end = last_closed if stop_at is None else min(last_closed, stop_at + M15)
             if start > end:
                 break
-            w_end = min(end, start + 1439 * M15)
+            w_end = min(end, start + (KLINE_WINDOW - 1) * M15)
             miss = _first_missing(conn, sym, "15m", start, w_end)
             if miss is not None:
                 try:

@@ -201,6 +201,10 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
             pnl = _close(conn, t, fill, "стоп", now)
             events.append(f"{t['symbol']} {RULE_RU[t['rule']]}: стоп, {pnl:+.0f}$")
     # 2. once a day after the daily close: rule exits, then new signals at the new day's open
+    def _px(k, sym):
+        """The day's open right after the close; later in the day (a missed run, a late deploy) the live price instead —
+        a fill at an open hours old would be a free look-back."""
+        return px[sym] if now - day > 3_600_000 and px.get(sym) else k[-1][1]
     if _state(conn, "day") != day and now - day >= 5 * 60_000:
         K = {}
         for s in COINS:
@@ -222,7 +226,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                 conn.execute("UPDATE own_trades SET best=? WHERE id=?", (best, t["id"]))
                 t["best"] = best
                 if rule_exit(t, closed):
-                    pnl = _close(conn, t, k[-1][1], "правило", now)
+                    pnl = _close(conn, t, _px(k, t["symbol"]), "правило", now)
                     events.append(f"{t['symbol']} {RULE_RU[t['rule']]}: выход по правилу, {pnl:+.0f}$")
             if bull is not None:
                 eq = equity_closed(conn)
@@ -234,7 +238,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                     for rule, sg in signals(closed, bull):
                         if n_open >= MAX_OPEN or (s, rule) in have:
                             continue
-                        e = k[-1][1]
+                        e = _px(k, s)
                         a = _atr(closed, len(closed) - 1)
                         if not a or e <= 0:
                             continue

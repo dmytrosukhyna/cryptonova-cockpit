@@ -138,3 +138,19 @@ def test_the_trading_set_is_the_daily_top_by_dollar_volume(monkeypatch):
     syms = sorted(r[0] for r in conn.execute("SELECT symbol FROM own_trades"))
     assert syms == ["ETH", "NEW"]                                      # BTC's dollar volume is below ETH's and NEW's here
     assert od._state(conn, "universe") == ["NEW", "ETH"]
+
+
+def test_the_desk_picks_the_alt_basket_by_180_day_dollar_volume():
+    conn = sqlite3.connect(":memory:")
+    flat = [100.0] * 400
+    coins = od.COINS[:14]                                    # BTC, ETH + 12 alts with rising volume
+
+    def daily(sym):
+        if sym not in coins:
+            raise RuntimeError("no data")
+        v = 1000.0 * (1 + coins.index(sym))
+        rows = [[r[0], r[1], r[2], r[3], r[4], v] for r in _series(flat)]
+        rows.append([D0 + 400 * DAY, 100.0, 100.0, 100.0, 100.0, 1.0])
+        return rows
+    od.run(conn, out=tempfile.mkdtemp(), now=D0 + 400 * DAY + 10 * 60_000, daily=daily, prices=lambda: {})
+    assert od._state(conn, "alt_basket") == list(reversed(coins[4:14]))      # the 10 largest alts, BTC and ETH never

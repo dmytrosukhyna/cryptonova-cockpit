@@ -94,14 +94,14 @@ def fetch_daily(sym: str) -> list:
     mirror next (not for the 1000-unit perps — the spot price is on another scale)."""
     try:
         from ..bingx.rest import BingXRest
-        rows = [[c.open_time, c.open, c.high, c.low, c.close, c.volume] for c in BingXRest().klines(f"{sym}-USDT", "1d", limit=300)]
+        rows = [[c.open_time, c.open, c.high, c.low, c.close, c.volume] for c in BingXRest().klines(f"{sym}-USDT", "1d", limit=400)]
         if len(rows) >= 120:
             return rows
     except Exception:  # noqa: BLE001
         pass
     if sym.startswith("1000"):
         return []
-    d = _get(f"https://data-api.binance.vision/api/v3/klines?symbol={sym}USDT&interval=1d&limit=300")
+    d = _get(f"https://data-api.binance.vision/api/v3/klines?symbol={sym}USDT&interval=1d&limit=400")
     return [[int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])] for r in d]
 
 
@@ -264,6 +264,34 @@ def equity_closed(conn) -> float:
     return START + (conn.execute("SELECT COALESCE(SUM(pnl_usd), 0) FROM own_trades WHERE closed IS NOT NULL").fetchone()[0] or 0.0)
 
 
+def _pool_candles(conn, day: int, daily, volumes) -> dict:
+    """Daily candles (today's forming one last) of the core coins + the POOL_N largest BingX perps by 24-hour volume + the open
+    trades' coins; only series that reach today and have ≥ 120 days."""
+    try:
+        vols = volumes() if volumes else {}
+    except Exception:  # noqa: BLE001
+        vols = {}
+    ranked = [x for x, _v in sorted(vols.items(), key=lambda kv: -kv[1]) if tradable(x)][:POOL_N]
+    pool = list(dict.fromkeys(COINS + ranked + [t["symbol"] for t in _open_rows(conn)]))
+    K = {}
+    for s in pool:
+        try:
+            rows = daily(s)
+        except Exception:  # noqa: BLE001
+            continue
+        if rows and rows[-1][0] == day and len(rows) >= 120:
+            K[s] = rows
+    return K
+
+
+def pick_basket(K: dict) -> list:
+    """19.10 round 12: the alt basket of the «ядро + альтсезон» model — the 10 alts with the largest 180-day dollar volume among
+    coins with ≥ 1 year of candles (alt_portfolio.py reads it; the honest test picked it this way, not by hand)."""
+    dv180 = {s: sum(r[5] * r[4] for r in k[:-1][-180:]) / 180 for s, k in K.items()
+             if tradable(s) and s not in ("BTC", "ETH") and len(k) > 366 and all(len(r) >= 6 for r in k[-181:-1])}
+    return sorted((s for s in dv180 if dv180[s] > 0), key=lambda s: -dv180[s])[:10]
+
+
 def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, prices=fetch_prices, volumes=None) -> dict:
     now = now or int(time.time() * 1000)
     ensure(conn)
@@ -285,21 +313,16 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
         """The day's open right after the close; later in the day (a missed run, a late deploy) the live price instead —
         a fill at an open hours old would be a free look-back."""
         return px[sym] if now - day > 3_600_000 and px.get(sym) else k[-1][1]
-    if _state(conn, "day") != day and now - day >= 5 * 60_000:
-        try:
-            vols = volumes() if volumes else {}
-        except Exception:  # noqa: BLE001
-            vols = {}
-        ranked = [x for x, _v in sorted(vols.items(), key=lambda kv: -kv[1]) if tradable(x)][:POOL_N]
-        pool = list(dict.fromkeys(COINS + ranked + [t["symbol"] for t in _open_rows(conn)]))
-        K = {}
-        for s in pool:
-            try:
-                rows = daily(s)
-            except Exception:  # noqa: BLE001
-                continue
-            if rows and rows[-1][0] == day and len(rows) >= 120:
-                K[s] = rows
+    daily_due = _state(conn, "day") != day and now - day >= 5 * 60_000
+    first_basket = _state(conn, "alt_basket") is None and volumes and _state(conn, "basket_try") != day
+    if daily_due or first_basket:                     # the first basket must not wait for tomorrow (one try a day)
+        _set(conn, "basket_try", day)
+        K = _pool_candles(conn, day, daily, volumes)
+        basket = pick_basket(K)
+        if len(basket) == 10:
+            _set(conn, "alt_basket", basket)
+            conn.commit()
+    if daily_due:
         # the day's trading set: the TOP_N by 30-day dollar volume among the fetched (closed candles; no volume → not ranked)
         dv = {s: dollar_vol30(k[:-1]) for s, k in K.items() if tradable(s)}
         universe = set(sorted((s for s in dv if dv[s]), key=lambda s: -dv[s])[:TOP_N])

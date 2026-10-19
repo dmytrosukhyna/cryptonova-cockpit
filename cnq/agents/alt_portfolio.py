@@ -12,8 +12,9 @@ Altseason gauge (daily closes of the 40 coins of the own desk, BTC and ETH exclu
   ON = the equal-weight alt index against BTC is above its 91-day average AND ≥ 60 % of the alts beat BTC over 91 days
   AND the BTC regime is «рост» (BTC above its 200-day average and up over 60 days).
 Model (of the whole portfolio; the owner's real one is about $19 000 — amounts are never posted, only shares):
-  futures 15 % (our signals) · dollars 10 % (Earn) · core BTC 15.8 / ETH 6.3 / SOL 4.7 / LINK 2.4 / NEAR 2.4 %
-  · alt part 43.4 %: SOL, LINK, NEAR, AVAX, SUI, ONDO, AAVE, HBAR, PENDLE, INJ equally while the gauge is on, BTC when off;
+  futures 15 % (our signals) · dollars 10 % (Earn) · core BTC 39.2 / ETH 6.3 / SOL 4.7 / LINK 2.4 / NEAR 2.4 %
+  · alt part 20 % (was 43.4 % until the honest re-check of 19.10): the 10 alts with the largest 180-day dollar volume (≥ 1 year
+    of candles; own_desk.py picks them daily) equally while the gauge is on, BTC when off;
   regime not «рост» → the coins shrink to 35 % of their size, the rest waits in dollars.
 Posts to the signals channel (signal_feed.signals_chat): when the gauge or the regime changes, and a Monday status.
 Writes web/altseason.json (a generic market gauge + the model's shares). Stdlib only."""
@@ -28,15 +29,20 @@ import time
 DAY = 86_400_000
 WIN = 91
 BREADTH_MIN = 0.60
-ALT_BASKET = ["SOL", "LINK", "NEAR", "AVAX", "SUI", "ONDO", "AAVE", "HBAR", "PENDLE", "INJ"]
-CORE = {"BTC": 15.8, "ETH": 6.3, "SOL": 4.7, "LINK": 2.4, "NEAR": 2.4}
-ALT_PART, FUTURES, CASH = 43.4, 15.0, 10.0
+ALT_BASKET = ["SOL", "LINK", "NEAR", "AVAX", "SUI", "ONDO", "AAVE", "HBAR", "PENDLE", "INJ"]   # fallback only (picked by hand)
+# 19.10 round 12 (honest: every Binance perp, delisted included, the basket picked by volume on each date): the bigger the alt
+# part, the worse — alts 43.4 %: ×2.7, drawdown −30 %; alts 20 % + BTC 23.4 %: ×3.0, −26 %; alts 10 %: ×3.1, −25 %; no alts
+# (all in BTC): ×3.2, −24 %. The hand-picked basket looked like ×3.35 only because its coins are today's survivors.
+# The model keeps 20 % for an altseason (the owner's view) and moves 23.4 % into BTC.
+CORE = {"BTC": 39.2, "ETH": 6.3, "SOL": 4.7, "LINK": 2.4, "NEAR": 2.4}
+ALT_PART, FUTURES, CASH = 20.0, 15.0, 10.0
 BEAR_KEEP = 0.35
 # How the alt part leaves the alts (19.10 daily re-check of this exact model, since 2022, with the futures part and costs):
 #   "gauge"  — out of alts when the gauge turns off:          ×2.88, drawdown −26 %, 2023 +101 %, 2025 +1 %, 2026 +9 %
 #   "regime" — alts whenever the market is «рост» (gauge = info): ×3.54, drawdown −36 %, 2023 +162 %, 2025 −17 %, 2026 +29 %
 #   (for reference, the alt part always in BTC: ×3.08, −25 %). Today both hold the alts; the owner picks the exit rule.
 EXIT = "gauge"
+MODEL_V = 2                        # 19.10: alt part 20 %, the basket by 180-day volume — a change posts once to the channel
 NAME = "Портфель CRYPTO NOVA · ядро + альтсезон"
 
 
@@ -73,12 +79,13 @@ def gauge(conn: sqlite3.Connection) -> dict | None:
             "alts": len(beat), "day": d1}
 
 
-def targets(bull: bool | None, alt_on: bool) -> dict[str, float]:
+def targets(bull: bool | None, alt_on: bool, basket: list | None = None) -> dict[str, float]:
     """Shares of the whole portfolio, %."""
     t: dict[str, float] = dict(CORE)
+    bk = basket or ALT_BASKET
     if alt_on:
-        for s in ALT_BASKET:
-            t[s] = t.get(s, 0.0) + ALT_PART / len(ALT_BASKET)
+        for s in bk:
+            t[s] = t.get(s, 0.0) + ALT_PART / len(bk)
     else:
         t["BTC"] += ALT_PART
     if bull is False:
@@ -126,14 +133,18 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, send
     if not g:
         return {"error": "not enough history"}
     alt_hold = g["on"] if EXIT == "gauge" else bool(g["bull"])
-    t = targets(g["bull"], alt_hold)
+    r = conn.execute("SELECT v FROM own_state WHERE k='alt_basket'").fetchone() if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='own_state'").fetchone() else None
+    basket = json.loads(r[0]) if r else None
+    t = targets(g["bull"], alt_hold, basket)
     doc = {"asof": now, "name": NAME, "gauge": g, "targets_pct": t, "rules_ru": (
         "Датчик альтсезона включён, когда альты в среднем сильнее биткоина своей 3-месячной средней, биткоин обгоняют от 60% "
-        "монет и рынок в режиме «рост». Пока включён — альт-часть (43% портфеля) поровну в 10 альтах, иначе в BTC.")}
+        "монет и рынок в режиме «рост». Пока включён — альт-часть (20% портфеля) поровну в 10 альтах с наибольшим объёмом торгов "
+        "за полгода, иначе в BTC."), "basket": basket or ALT_BASKET}
     with open(os.path.join(out, "altseason.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False)
     prev = st.get("state")
-    cur = {"bull": g["bull"], "on": alt_hold}
+    cur = {"bull": g["bull"], "on": alt_hold, "basket": sorted(basket or ALT_BASKET), "v": MODEL_V}
     monday = dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc).weekday() == 0
     week = dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc).strftime("%G-%V")
     why = None
@@ -143,6 +154,11 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, send
         if prev.get("on") != cur["on"]:
             why = ("Датчик альтсезона включился: переложить альт-часть из BTC в 10 альтов поровну." if cur["on"]
                    else "Датчик альтсезона выключился: альт-часть продать и переложить в BTC.")
+        elif prev.get("v") != cur["v"]:
+            why = ("Модель обновлена после честной проверки на всех монетах, включая снятые с торгов: альт-часть 20% вместо 43%, "
+                   "остальное в BTC; альты — 10 монет с наибольшим объёмом торгов за полгода. Сейчас так:")
+        elif prev.get("basket") != cur["basket"]:
+            why = "Состав альт-части обновлён (10 альтов с наибольшим объёмом за полгода):" if cur["on"] else None
         else:
             why = ("Рынок снова в режиме «рост»: вернуть монеты к полным долям." if cur["bull"]
                    else "Рынок перешёл в «осторожно»: монеты сократить до 35% их доли, остальное в доллары под процент.")

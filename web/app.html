@@ -2433,13 +2433,13 @@ function tRes(k){ const pr=(PAPER&&PAPER.profiles)||{};
   if(['exp','lab','brk','imp','imps','lst','lstx','btcx'].includes(k)){ const v=pr[k]; return v?(v.equity+(v.open_pnl_usd||0))-(v.start_equity||10000):null; }
   if(k==='whales'){ return WTOP&&WTOP.desk?WTOP.desk.pnl_usd:null; }
   return null; }
-function novaRes(){ const pr=(PAPER&&PAPER.profiles)||{}, C=[]; let t0=0;   // CRYPTO NOVA = bal + imp + the app signals «умный разворот», each since its own start
+function novaRes(){ const pr=(PAPER&&PAPER.profiles)||{}, C=[]; let t0=0;   // CRYPTO NOVA = bal + imp, each since its own start
   ['bal','imp'].forEach(k=>{ const v=pr[k]; if(!v) return; const t=v.equity_history&&v.equity_history[0]&&v.equity_history[0].time; if(t>t0) t0=t; C.push({k,n:(STRATS[k]||{}).name||k,r:futEq(v)-(v.start_equity||10000),base:v.start_equity||10000,since:pSince(v),P:v}); });
-  const sm=SIGS&&SIGS.accounts&&SIGS.accounts.since_live&&SIGS.accounts.since_live.smart; if(sm){ if(sm.start_t>t0) t0=sm.start_t; C.push({k:'smart',n:'Сигналы приложения · умный разворот',r:sm.equity-(sm.start||10000),base:sm.start||10000,since:ddmm(sm.start_t)}); }
+  // 19.10: «умный разворот» left the mix — on 3 037 golden signals over 10 months the signal's direction is a coin flip (golden_history.py)
   // 19.10 (owner: «30 000 на фьючах почему-то, не соответствует разделу»): the mix is shown as ONE $10 000 account — the average
   // result of its accounts — like every other demo account; each component keeps its own result
   const sb=C.reduce((a,c)=>a+c.base,0); return C.length?{usd:C.reduce((a,c)=>a+c.r,0)/(sb||1)*10000,base:10000,since:ddmm(t0),comps:C}:null; }
-const novaMix=()=>{ const M=NOVAF&&Array.isArray(NOVAF.mix)?NOVAF.mix:null; return M?M.filter(m=>m.in_mix!==false).map(m=>m.key||m.id||m.profile).filter(Boolean):['bal','imp','smart']; };
+const novaMix=()=>{ const M=NOVAF&&Array.isArray(NOVAF.mix)?NOVAF.mix:null; return M?M.filter(m=>m.in_mix!==false).map(m=>m.key||m.id||m.profile).filter(Boolean):['bal','imp']; };
 function tResF(k){ const pr=(PAPER&&PAPER.profiles)||{}, u=tRes(k); if(u==null) return null;   // result + base + start date of a test account
   if(k==='ivan') return {usd:u,base:IVAN.equity_hist[0][1],since:ddmm(IVAN.equity_hist[0][0])};
   if(k==='memes'){ const A=MEMES.account, h=A.history||[]; return {usd:u,base:A.start_equity||10000,since:h[0]?ddmm(h[0].time||h[0].t||h[0][0]):''}; }

@@ -181,8 +181,12 @@ def public(conn: sqlite3.Connection, now: int | None = None) -> dict:
     for k, n, why in SOURCES:
         ok, st = live_ok(conn, k, now)
         mix.append({"key": k, "name_ru": n, "why_ru": why, "in_mix": ok, "live_30d": st})
-    mix.append({"key": "app_smart", "name_ru": "сигналы приложения через «умный разворот»", "in_mix": True,
-                "why_ru": "их сигнал по ходу последней 4-часовой свечи BTC — как есть, против неё — наоборот; публикует мост на сервере приложения",
+    # 19.10.2026: out of the mix. 3 037 golden signals (Dec 2025 – Oct 2026, Binance prices, scripts/golden_history.py): the price
+    # reaches each target as often against the signal as with it, and every way of trading them lost (smart −99 % on a demo account).
+    # The +89 % on the app's 30 days came from a 110-hour hole in our candle download (fixed in app_signals.py, SIM_VERSION 5).
+    mix.append({"key": "app_smart", "name_ru": "сигналы приложения через «умный разворот»", "in_mix": False,
+                "why_ru": "выключено 19.10: на 3 037 сигналах за 10 месяцев цена доходит до цели против сигнала так же часто, как по "
+                          "сигналу; все способы торговли ими в минусе (умный разворот −99% на демо-счёте)",
                 "live_30d": None})
     return {"asof": now, "name": "CRYPTO NOVA", "profile": PROFILE, "mix": mix, "channel_on": bool(os.environ.get("CNQ_SIGNALS_CHAT")),
             "stats": {"signals": sum(1 for r in rows if r["seeded"] == 0), "closed": len(done), "wins": wins,

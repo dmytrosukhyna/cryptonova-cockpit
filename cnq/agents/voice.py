@@ -75,14 +75,11 @@ def compose(out: str = "web") -> str:
         eq = prof.get("equity")
         if eq:
             fut_res = eq + sum(o.get("open_pnl_usd") or 0 for o in opened) - 10_000
-            # 18.10: our futures result = CRYPTO NOVA = the desks in the mix (CNPTS «Сбалансированная» + «Импульс BTC») + the app's
-            # selected signals («умный разворот», live part)
+            # 18.10: our futures result = CRYPTO NOVA = the desks in the mix (CNPTS «Сбалансированная» + «Импульс BTC»); 19.10: the app
+            # signals' «умный разворот» left the mix (no edge on 3 037 golden signals over 10 months — scripts/golden_history.py)
             imp = (paper.get("profiles") or {}).get("imp") or {}
             if imp.get("equity") is not None:
                 fut_res += imp["equity"] + sum(o.get("open_pnl_usd") or 0 for o in imp.get("open") or []) - 10_000
-            sm = (((_load(out, "app_signals.json") or {}).get("accounts") or {}).get("since_live") or {}).get("smart") or {}
-            if sm.get("equity") is not None:
-                fut_res += sm.get("equity_with_open", sm["equity"]) - 10_000
         L.append("По фьючерсам, CRYPTO NOVA: " + "; ".join(parts) + "."
                  + (f" Итог {result(fut_res)}." if fut_res is not None else ""))
     spot_res = None

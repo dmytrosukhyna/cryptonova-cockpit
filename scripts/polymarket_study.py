@@ -84,20 +84,39 @@ def probe():
     note("polymarket probe", json.dumps(out, ensure_ascii=False, default=str)[:3900])
 
 
-def closed_markets(n_max=4000, vol_min=50_000):
-    out, off = [], 0
-    while len(out) < n_max and off < 30_000:
-        st, page = get(f"{GAMMA}/markets?closed=true&limit=500&offset={off}&order=volumeNum&ascending=false&volume_num_min={vol_min}")
-        if st != 200 or not page:
-            break
-        for m in page:
-            prices = [float(x) for x in (_js(m.get("outcomePrices")) or [])]
-            toks = _js(m.get("clobTokenIds")) or []
-            if len(prices) == 2 and len(toks) == 2 and sorted(prices) == [0.0, 1.0]:
-                out.append({"q": m.get("question"), "end": m.get("closedTime") or m.get("endDate"), "tok": toks[0],
-                            "yes_won": prices[0] == 1.0, "vol": float(m.get("volumeNum") or 0), "neg": bool(m.get("negRisk")),
-                            "cat": m.get("category") or ""})
-        off += 500
+def closed_markets(n_max=8000, vol_min=20_000):
+    """Resolved binary markets, month by month 2024-01 → now (the API pages poorly past ~500 rows of one query)."""
+    out, seen, diag = [], set(), []
+    y, mo = 2024, 1
+    now = dt.datetime.now(dt.timezone.utc)
+    while (y, mo) <= (now.year, now.month) and len(out) < n_max:
+        a = dt.datetime(y, mo, 1, tzinfo=dt.timezone.utc)
+        y2, mo2 = (y + 1, 1) if mo == 12 else (y, mo + 1)
+        b = dt.datetime(y2, mo2, 1, tzinfo=dt.timezone.utc)
+        got = 0
+        for off in range(0, 2000, 500):
+            q = urllib.parse.urlencode({"closed": "true", "limit": 500, "offset": off, "order": "volumeNum", "ascending": "false",
+                                        "volume_num_min": vol_min, "end_date_min": a.strftime("%Y-%m-%dT00:00:00Z"),
+                                        "end_date_max": b.strftime("%Y-%m-%dT00:00:00Z")})
+            st, page = get(f"{GAMMA}/markets?{q}")
+            if st != 200 or not page:
+                break
+            for m in page:
+                if m.get("id") in seen:
+                    continue
+                seen.add(m.get("id"))
+                prices = [float(x) for x in (_js(m.get("outcomePrices")) or [])]
+                toks = _js(m.get("clobTokenIds")) or []
+                if len(prices) == 2 and len(toks) == 2 and sorted(prices) == [0.0, 1.0]:
+                    out.append({"q": m.get("question"), "end": m.get("closedTime") or m.get("endDate"), "tok": toks[0],
+                                "yes_won": prices[0] == 1.0, "vol": float(m.get("volumeNum") or 0), "neg": bool(m.get("negRisk")),
+                                "updown": "Up or Down" in str(m.get("question"))})
+                    got += 1
+            if len(page) < 500:
+                break
+        diag.append(got)
+        y, mo = y2, mo2
+    note("bonds · markets by month 2024→", json.dumps(diag))
     return out
 
 
@@ -120,7 +139,7 @@ def history(tok, end_ts):
 
 
 def bonds():
-    ms = closed_markets()
+    ms = [m for m in closed_markets() if not m["updown"]]
     note("bonds · markets", json.dumps({"binary resolved, volume ≥ $50k": len(ms), "negRisk": sum(m["neg"] for m in ms)}))
 
     def one(m):
@@ -194,6 +213,144 @@ def arb():
         ensure_ascii=False))
 
 
+def _norm_cdf(x):
+    import math
+    return 0.5 * (1 + math.erf(x / math.sqrt(2)))
+
+
+def binance_1m(start_ms, end_ms):
+    """BTCUSDT spot 1-minute closes {minute ms: (open, close)} from data.binance.vision (monthly + daily zips)."""
+    import csv
+    import io
+    import zipfile
+    base = "https://data.binance.vision/data/spot"
+    out = {}
+    d = dt.datetime.fromtimestamp(start_ms / 1000, dt.timezone.utc).date().replace(day=1)
+    end = dt.datetime.fromtimestamp(end_ms / 1000, dt.timezone.utc).date()
+    today = dt.datetime.now(dt.timezone.utc).date()
+    urls = []
+    while d <= end:
+        if (d.year, d.month) < (today.year, today.month):
+            urls.append(f"{base}/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-{d:%Y-%m}.zip")
+        else:
+            x = d
+            while x < today:
+                urls.append(f"{base}/daily/klines/BTCUSDT/1m/BTCUSDT-1m-{x:%Y-%m-%d}.zip")
+                x += dt.timedelta(days=1)
+        d = (d.replace(day=28) + dt.timedelta(days=4)).replace(day=1)
+
+    def load(u):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=60) as r:
+                z = zipfile.ZipFile(io.BytesIO(r.read()))
+            rows = list(csv.reader(io.StringIO(z.read(z.namelist()[0]).decode())))
+            return [(int(x[0]) // 1000 if int(x[0]) > 10 ** 14 else int(x[0]), float(x[1]), float(x[4])) for x in rows if x and x[0].isdigit()]
+        except Exception:  # noqa: BLE001
+            return []
+    with ThreadPoolExecutor(8) as ex:
+        for rows in ex.map(load, urls):
+            for t, o, c in rows:
+                out[t] = (o, c)
+    return out
+
+
+def updown():
+    """Crypto «Up or Down» 15-minute markets: does Polymarket's price lag Bitcoin's own move inside the window?
+    Model price = Φ(r ÷ (σ1m·√minutes left)) from Binance (σ from the previous 60 minutes — known at the time). Trade when the model
+    differs from Polymarket's price by ≥ 5 / 10 / 15 cents; pay the price + 1 cent (+ the market's taker fee if any), hold to
+    the end. Resolution uses Chainlink, our check uses Binance — close calls can differ."""
+    import re
+    rx = re.compile(r"^Bitcoin Up or Down - .*?(\d{1,2}):(\d{2})(AM|PM)-(\d{1,2}):(\d{2})(AM|PM) ET")
+    ms, off = [], 0
+    while off < 20000 and len(ms) < 3000:
+        st, page = get(f"{GAMMA}/markets?closed=true&limit=500&offset={off}&order=endDate&ascending=false")
+        if st != 200 or not page:
+            break
+        for m in page:
+            q = str(m.get("question") or "")
+            mm = rx.match(q)
+            if not mm:
+                continue
+            h1, m1, a1, h2, m2, a2 = mm.groups()
+            t1 = (int(h1) % 12 + (12 if a1 == "PM" else 0)) * 60 + int(m1)
+            t2 = (int(h2) % 12 + (12 if a2 == "PM" else 0)) * 60 + int(m2)
+            if (t2 - t1) % 1440 != 15:
+                continue
+            prices = [float(x) for x in (_js(m.get("outcomePrices")) or [])]
+            toks = _js(m.get("clobTokenIds")) or []
+            outs = _js(m.get("outcomes")) or []
+            if len(prices) != 2 or sorted(prices) != [0.0, 1.0] or len(toks) != 2:
+                continue
+            up_i = 0 if str(outs[0]).lower().startswith("up") else 1
+            end = _ts(m.get("endDate"))
+            if not end:
+                continue
+            ms.append({"end": end, "start": end - 900, "tok_up": toks[up_i], "up_won": prices[up_i] == 1.0,
+                       "fee": m.get("takerBaseFee"), "fees": m.get("feesEnabled"), "q": q})
+        off += 500
+    note("updown · markets", json.dumps({"btc 15m resolved": len(ms), "fee sample": [(x["fees"], x["fee"]) for x in ms[:3]],
+                                         "span": [ms[-1]["q"] if ms else None, ms[0]["q"] if ms else None]}, ensure_ascii=False))
+    if not ms:
+        return
+    K = binance_1m((min(x["start"] for x in ms) - 7200) * 1000, max(x["end"] for x in ms) * 1000)
+
+    def one(m):
+        st, h = get(f"{CLOB}/prices-history?market={m['tok_up']}&startTs={m['start'] - 300}&endTs={m['end']}&fidelity=1")
+        pts = [(int(p["t"]), float(p["p"])) for p in ((h or {}).get("history") or [])] if isinstance(h, dict) else []
+        return m, pts
+    with ThreadPoolExecutor(8) as ex:
+        got = list(ex.map(one, ms))
+    import math
+    rows = []
+    for m, pts in got:
+        if len(pts) < 5:
+            continue
+        t0 = m["start"] // 60 * 60 * 1000
+        o = K.get(t0)
+        prev = [K.get(t0 - k * 60000) for k in range(1, 61)]
+        prev = [x for x in prev if x]
+        if not o or len(prev) < 40:
+            continue
+        rets = [math.log(c / op) for op, c in prev if op > 0]
+        sig = (sum(r * r for r in rets) / len(rets)) ** 0.5
+        for k in (3, 6, 9, 12, 14):
+            bar = K.get(t0 + (k - 1) * 60000)
+            if not bar or sig <= 0:
+                continue
+            r = math.log(bar[1] / o[0])
+            left = 15 - k
+            model = _norm_cdf(r / (sig * math.sqrt(left))) if left > 0 else (1.0 if r > 0 else 0.0)
+            tk = m["start"] + k * 60
+            before = [p for t, p in pts if t <= tk]
+            if not before:
+                continue
+            rows.append((k, before[-1], model, m["up_won"]))
+    out = {"rows": len(rows)}
+    for k in (3, 6, 9, 12, 14):
+        rk = [x for x in rows if x[0] == k]
+        if not rk:
+            continue
+        cal = {}
+        for lo in (0.0, 0.1, 0.3, 0.5, 0.7, 0.9):
+            xs = [x for x in rk if lo <= x[1] < lo + (0.1 if lo in (0.0, 0.9) else 0.2)]
+            if len(xs) >= 20:
+                cal[f"poly {lo:.1f}"] = [len(xs), round(sum(x[3] for x in xs) / len(xs), 3)]
+        tr = {}
+        for th in (0.05, 0.10, 0.15):
+            pl = []
+            for _k, p, mdl, won in rk:
+                if mdl - p >= th and p < 0.98:
+                    cost = p + 0.01
+                    pl.append((1.0 if won else 0.0) / cost - 1)
+                elif p - mdl >= th and p > 0.02:
+                    cost = (1 - p) + 0.01
+                    pl.append((0.0 if won else 1.0) / cost - 1)
+            if pl:
+                tr[f"edge≥{th:.2f}"] = [len(pl), round(sum(pl) / len(pl) * 100, 2), round(sum(1 for x in pl if x > 0) / len(pl) * 100)]
+        out[f"min {k}"] = {"calibration (price bucket → up share)": cal, "trades [n, avg %, wins %]": tr}
+    note("updown · Polymarket price vs Bitcoin's move inside the window", json.dumps(out, ensure_ascii=False))
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
-    {"probe": probe, "bonds": bonds, "arb": arb}[mode]()
+    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown}[mode]()

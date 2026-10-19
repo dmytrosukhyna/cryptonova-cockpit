@@ -1205,5 +1205,28 @@ def wide():
         res[f"top150 vol≥{thr} open60"] = [_at25(C, D, days, **kw), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"]] + a["y"][1:]
     note("own wide · thresholds on top150", json.dumps({k: v for k, v in res.items() if k.startswith("top150 vol≥1.3") or k.startswith("top150 vol≥2")}))
 
+
+def pool_probe():
+    """19.10 — the live desk's daily trading set, computed now from BingX exactly as cnq/agents/own_desk.py does it."""
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from cnq.agents import own_desk as od
+    vols = od.fetch_volumes()
+    ranked = [x for x, _v in sorted(vols.items(), key=lambda kv: -kv[1]) if od.tradable(x)][:od.POOL_N]
+    pool = list(dict.fromkeys(od.COINS + ranked))
+    with ThreadPoolExecutor(6) as ex:
+        rows = dict(zip(pool, ex.map(lambda s: _safe_call(od.fetch_daily, s), pool)))
+    dv = {s: od.dollar_vol30(k[:-1]) for s, k in rows.items() if k and len(k) >= 120 and od.tradable(s)}
+    top = sorted((s for s in dv if dv[s]), key=lambda s: -dv[s])[:od.TOP_N]
+    note("own pool probe", json.dumps({"tickers": len(vols), "pool": len(pool), "with_candles": sum(1 for k in rows.values() if k),
+                                       "no_volume": [s for s in rows if rows[s] and s not in dv][:10],
+                                       "top40": [[s, round(dv[s] / 1e6)] for s in top], "core_out": [s for s in od.COINS if s not in top]}))
+
+
+def _safe_call(fn, *a):
+    try:
+        return fn(*a)
+    except Exception:  # noqa: BLE001
+        return None
+
 if __name__ == "__main__":
-    (wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

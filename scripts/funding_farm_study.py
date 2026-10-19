@@ -16,9 +16,12 @@ Rules fixed before the run (no tuning; two thresholds and three leverages are re
   signal  a settled print with |funding| ≥ THR per 8 h (rate × 8 / interval h); entry at the open of the hour of that print
           (after it: that print is not received); funding received only for prints while held. No entry in the first 24 h
           of a leg's trading, nor when the two legs' prices differ by > 3 % (rule v2).
-  exit    (v2, main) when the funding received since entry over the last ≤ 24 h averages < 0.02 % per 8 h, checked from
-          the 8th hour. (v1, the first run: exit on the latest prints alone — it churned, average hold 7–19 h; kept for
-          comparison; v2 was written after seeing v1, so it is not an out-of-sample result.)
+  exit    (v2 / v3) when the funding received since entry over the last ≤ 24 h averages < 0.02 % per 8 h, checked from
+          the 8th hour. (v1, the first run: exit on the latest prints alone — it churned, average hold 7–19 h.)
+  v3      (main) = v2 + every leg trades ≥ $1 M a day (7-day average before entry) + liquidation judged on the Binance
+          MARK price 1-hour high / low (exchanges liquidate on the mark price; v1 / v2 used last-price wicks, which
+          liquidated hedged pairs on spikes the hedge leg never saw). v2 and v3 were written after seeing v1 / v2: they
+          make the test kinder to the strategy, so they are not out-of-sample results; v1 and v2 stay in the grid.
   (a)     cross-venue: Binance perp vs Gate perp of the same coin. Entry when the gap of the two latest prints ≥ THR per 8 h:
           short where funding is higher, long where lower. Exit when the received gap < 0.02 % per 8 h, after 14 days, or
           when one venue's data ends (delisting: that leg 2 % worse). Margin N / L on each venue (capital = 2N / L).
@@ -587,13 +590,15 @@ def signals(BF, GF):
 
 # ---------------------------------------------------------------------------------------------- prices
 def bin_klines(kind, sym, mos):
+    """kind = um | spot | mark (USDT-M mark price; its volume columns are empty)."""
     base = "https://data.binance.vision/data/spot" if kind == "spot" else VISION
-    have = set(s3_months(f"data/{'spot' if kind == 'spot' else 'futures/um'}/monthly/klines/{sym}/1h/"))
+    folder = "markPriceKlines" if kind == "mark" else "klines"
+    have = set(s3_months(f"data/{'spot' if kind == 'spot' else 'futures/um'}/monthly/{folder}/{sym}/1h/"))
     rows = []
     for m in mos:
         if m not in have:
             continue
-        s, b = get(f"{base}/monthly/klines/{sym}/1h/{sym}-1h-{m}.zip", raw=True)
+        s, b = get(f"{base}/monthly/{folder}/{sym}/1h/{sym}-1h-{m}.zip", raw=True)
         if s == 200:
             rows += zrows(b)
     if not rows:
@@ -601,7 +606,7 @@ def bin_klines(kind, sym, mos):
     ms_ = lambda v: int(v) // 1000 if int(v) > 10 ** 14 else int(v)    # noqa: E731
     d = {}
     for r in rows:
-        d[ms_(r[0])] = (float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[7]))
+        d[ms_(r[0])] = (float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[7]) if len(r) > 7 and r[7] else 0.0)
     t = np.array(sorted(d), dtype=np.int64)
     v = np.array([d[k] for k in t])
     return {"t": t, "o": v[:, 0], "h": v[:, 1], "l": v[:, 2], "c": v[:, 3], "q": v[:, 4]}
@@ -640,7 +645,22 @@ def prices():
         P["bin"] = dict(zip(need["bin"], ex.map(lambda s: bin_klines("um", s, sorted(m for m in need["bin"][s] if m <= M1)), need["bin"])))
         P["spot"] = dict(zip(need["spot"], ex.map(lambda s: bin_klines("spot", s, sorted(m for m in need["spot"][s] if m <= M1)), need["spot"])))
         P["gate"] = dict(zip(need["gate"], ex.map(lambda s: gate_klines(s, sorted(m for m in need["gate"][s] if m <= M1), mult.get(gate_name(s)[0])), need["gate"])))
+        P["mark"] = dict(zip(need["bin"], ex.map(lambda s: bin_klines("mark", s, sorted(m for m in need["bin"][s] if m <= M1)), need["bin"])))
     pickle.dump(P, open(f"{OUT}/prices.pkl", "wb"))
+    # alignment: correlation of hourly returns Binance vs Gate at lags -1 / 0 / +1 (Gate shifted), liquid coins
+    lag = {-1: [], 0: [], 1: []}
+    for s, g in sorted(P["gate"].items(), key=lambda kv: -float(np.mean(P["bin"][kv[0]]["q"])) if P["bin"].get(kv[0]) else 0)[:40]:
+        b = P["bin"].get(s)
+        if g is None or b is None:
+            continue
+        rb = dict(zip(b["t"][1:], np.diff(np.log(b["c"]))))
+        rg = dict(zip(g["t"][1:], np.diff(np.log(g["c"]))))
+        for L_ in lag:
+            ks = [t for t in rb if t + L_ * H in rg]
+            if len(ks) > 200:
+                lag[L_].append(float(np.corrcoef([rb[t] for t in ks], [rg[t + L_ * H] for t in ks])[0, 1]))
+    note("farm prices · gate vs binance timing", dumps({f"gate shifted {k:+d} h": round(float(np.median(v)), 3) if v else None for k, v in lag.items()} |
+                                                     {"mark files": sum(1 for v in P["mark"].values() if v is not None)}))
     # sanity: gate vs binance closes on common hours
     ratio_ok, ratio_bad = 0, []
     for s, g in P["gate"].items():
@@ -656,7 +676,7 @@ def prices():
             ratio_ok += 1
         else:
             ratio_bad.append((s, round(float(rr), 4)))
-    note("farm prices · data", dumps({k: {"asked": len(need[k]), "got": sum(1 for v in P[k].values() if v is not None)} for k in P} |
+    note("farm prices · data", dumps({k: {"asked": len(need[k]), "got": sum(1 for v in P[k].values() if v is not None)} for k in need} |
                                          {"gate scale ok": ratio_ok, "gate different token (skipped)": ratio_bad[:30],
                                           "gate volume known": sum(1 for v in P["gate"].values() if v and v["q_known"])}, ensure_ascii=False))
 
@@ -683,7 +703,7 @@ def norm_gap(r):
     return abs(r / k - 1)
 
 
-def trade(legs, hr0, L, mode, rule="v2"):
+def trade(legs, hr0, L, mode, rule="v3"):
     """legs: [{K, F (prints or None), side, fee, spot}] → result dict or None. Fills at the open of hr0; see module doc.
     rule v1: exit when the LATEST prints give < 0.02 % per 8 h (first run — churned, avg hold 7–19 h);
     rule v2: exit when the funding received since entry over the last ≤ 24 h averages < 0.02 % per 8 h, checked from the
@@ -694,11 +714,24 @@ def trade(legs, hr0, L, mode, rule="v2"):
     p0 = [g["K"]["o"][i] for g, i in zip(legs, idx0)]
     if min(p0) <= 0:
         return None
-    if rule == "v2":
+    if rule in ("v2", "v3"):
         if min(idx0) < 24 or any(g["K"]["t"][i] - g["K"]["t"][max(0, i - 24)] > 30 * H for g, i in zip(legs, idx0)):
             return None
         if len(legs) == 2 and norm_gap(p0[0] / p0[1]) > 0.03:
             return None
+    if rule == "v3":                                                  # tradable books only: ≥ $1 M a day on every leg
+        qs = [liq_stats(g["K"], i)[1] for g, i in zip(legs, idx0)]
+        for k in range(1, len(qs)):
+            if qs[k] <= 0 and qs[0] > 0:
+                qs[k] = 0.3 * qs[0]
+        if min(qs) < 1e6:
+            return None
+    m0 = [None] * len(legs)
+    if rule == "v3":
+        for k, g in enumerate(legs):
+            if g.get("M") is not None:
+                j = bar_index(g["M"], hr0)
+                m0[k] = g["M"]["o"][j] if j >= 0 and g["M"]["o"][j] > 0 else None
     fund, path, last_c = 0.0, [], list(p0)
     recv_hist = []                                                   # (hour index, received funding of that hour)
     gap_entry = (p0[0] / p0[1]) if len(legs) == 2 else 1.0
@@ -723,7 +756,7 @@ def trade(legs, hr0, L, mode, rule="v2"):
                     recv += -g["side"] * F[j1 - 1, 1] * 8 / max(F[j1 - 1, 2], 1)
             fund += got
             recv_hist.append(got)
-            if rule == "v2":
+            if rule in ("v2", "v3"):
                 w = recv_hist[-24:]
                 avg8 = sum(w) / len(w) * 8
                 faded = n >= 8 and avg8 < EXIT_THR
@@ -749,7 +782,15 @@ def trade(legs, hr0, L, mode, rule="v2"):
             i = cur[k]
             if g["spot"] or i is None:
                 continue
-            adverse = (g["K"]["h"][i] / p0[k] - 1) if g["side"] == -1 else (1 - g["K"]["l"][i] / p0[k])
+            if m0[k] is not None:                                    # v3: on the mark price (its 1-hour high / low)
+                j = bar_index(g["M"], T)
+                if j >= 0:
+                    hi_, lo_ = g["M"]["h"][j] / m0[k], g["M"]["l"][j] / m0[k]
+                else:
+                    hi_ = lo_ = g["K"]["c"][i] / p0[k]
+                adverse = (hi_ - 1) if g["side"] == -1 else (1 - lo_)
+            else:
+                adverse = (g["K"]["h"][i] / p0[k] - 1) if g["side"] == -1 else (1 - g["K"]["l"][i] / p0[k])
             if adverse >= 1 / L - MM:
                 liq = k
                 break
@@ -796,25 +837,28 @@ def cap_ratio(mode, L):
 
 
 def build_legs(mode, s, side_bin, BF, GF, P):
+    """Every perp leg carries M = the Binance mark-price candles of the coin (liquidation is judged on the mark price,
+    which follows the multi-venue index on both venues; v1 / v2 used each leg's last-price wicks)."""
     b = P["bin"].get(s)
     if b is None:
         return None
+    M = (P.get("mark") or {}).get(s)
     if mode == "c":
-        return [{"K": b, "F": BF[s], "side": side_bin, "fee": FEE["bin"], "spot": False}]
+        return [{"K": b, "F": BF[s], "side": side_bin, "fee": FEE["bin"], "spot": False, "M": M}]
     if mode == "b":
         sp = P["spot"].get(spot_name(s))
         if sp is None:
             return None
-        return [{"K": b, "F": BF[s], "side": -1, "fee": FEE["bin"], "spot": False},
-                {"K": sp, "F": None, "side": 1, "fee": FEE["spot"], "spot": True}]
+        return [{"K": b, "F": BF[s], "side": -1, "fee": FEE["bin"], "spot": False, "M": M},
+                {"K": sp, "F": None, "side": 1, "fee": FEE["spot"], "spot": True, "M": None}]
     g = P["gate"].get(s)
     if g is None or s not in GF:
         return None
-    return [{"K": b, "F": BF[s], "side": side_bin, "fee": FEE["bin"], "spot": False},
-            {"K": g, "F": GF[s], "side": -side_bin, "fee": FEE["gate"], "spot": False}]
+    return [{"K": b, "F": BF[s], "side": side_bin, "fee": FEE["bin"], "spot": False, "M": M},
+            {"K": g, "F": GF[s], "side": -side_bin, "fee": FEE["gate"], "spot": False, "M": M}]
 
 
-def portfolio(mode, thr, L, sig, BF, GF, P, capital=10_000.0, cache=None, rule="v2"):
+def portfolio(mode, thr, L, sig, BF, GF, P, capital=10_000.0, cache=None, rule="v3"):
     """Fixed slot size = capital / 5; returns trades taken (each with pnl at that size) and the hourly equity curve."""
     cache = {} if cache is None else cache
     slot = capital / SLOTS
@@ -907,6 +951,10 @@ def sim(which):
     s1, _ = summarize(tk1)
     grid[f"v1 (first run) 0.1% {Lmain}x"] = {k: s1[k] for k in ("pct_per_year", "max_dd_pct", "years_pct", "trades", "liquidated", "win_pct")} | {
         "avg_hold_h": s1.get("avg_hold_h")}
+    tk2 = portfolio(mode, 0.001, Lmain, SIG[f"{mode}@0.001"], BF, GF, P, cache=cache, rule="v2")
+    s2, _ = summarize(tk2)
+    grid[f"v2 (second run) 0.1% {Lmain}x"] = {k: s2[k] for k in ("pct_per_year", "max_dd_pct", "years_pct", "trades", "liquidated", "win_pct")} | {
+        "avg_hold_h": s2.get("avg_hold_h")}
     for thr in THRS:
         for L in (LEVS if mode != "c" else (1,)):
             tk = portfolio(mode, thr, L, SIG[f"{mode}@{thr}"], BF, GF, P, cache=cache)
@@ -938,10 +986,10 @@ def sim(which):
             for hr, sym, st_, side in SIG[f"{mode}@{thr}"]:
                 if seen_until.get(sym, 0) > hr:
                     continue
-                key = (mode, sym, hr, side, L, "v2")
+                key = (mode, sym, hr, side, L, "v3")
                 if key not in cache:
                     legs = build_legs(mode, sym, side, BF, GF, P)
-                    tr = trade(legs, hr, L, mode, "v2") if legs else None
+                    tr = trade(legs, hr, L, mode, "v3") if legs else None
                     if tr and mode == "a":
                         k = 10 ** (3 * round(np.log10(tr["gap_entry"]) / 3))
                         if abs(tr["gap_entry"] / k - 1) >= 0.1:
@@ -973,6 +1021,8 @@ def sim(which):
                     "avg_gross_pct": round(100 * float(np.mean([x[1]["gross"] for x in per])), 3),
                     "gross_by_year_pct": {int(y): round(100 * float(np.mean([x[1]["gross"] for x, yy in zip(per, yrs_) if yy == y])), 3) for y in sorted(set(yrs_))},
                     "avg_price_pct": round(100 * float(np.mean([x[1]["price"] for x in per])), 3),
+                    "avg_price_pct_not_liquidated": round(100 * float(np.mean([x[1]["price"] for x in per if not x[1]["liq"]] or [0])), 3),
+                    "price_outliers_30pct": sum(1 for x in per if abs(x[1]["price"]) > 0.3 and not x[1]["liq"]),
                     "avg_hours": round(float(np.mean([x[1]["hours"] for x in per])), 0),
                     "named (n, fund, price, net, liq) pct of notional": {k: [v[0]] + [round(x, 1) for x in v[1:4]] + [v[4]] for k, v in named.items()}},
                     ensure_ascii=False))

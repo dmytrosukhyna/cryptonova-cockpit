@@ -15,7 +15,7 @@ point-in-time top 100 alts by 30-day dollar volume with ≥ 1 year of history, m
 
 Composite (the signs from that study; equal weights, no fitting): mean of the percentile ranks inside the universe of
   age ↑ · 3-month strength vs BTC ↓ · volume trend 30 d / 180 d ↓ · revenue growth ↑ (no data = middle)  + 0.5 if the project has
-  revenue. The top 10 → own_state.alt_basket (alt_portfolio.py, the alt part of «ядро + альтсезон»), all scores → web/quality.json.
+  revenue. The top 10 (a held coin stays while it ranks in the top 20) → own_state.alt_basket (alt_portfolio.py, the alt part of «ядро + альтсезон»), all scores → web/quality.json.
 
 Inputs: own_desk.py `pool_features` (own_state.pool_feats: 30/180-day dollar volume, 3-month change vs BTC, candles we have),
 age = the first daily candle on Binance spot (cached; else the BingX candles we have, ≤ 400 days), DefiLlama revenue. Once a day.
@@ -33,6 +33,7 @@ LL = "https://api.llama.fi"
 OVERVIEW = f"{LL}/overview/fees?excludeTotalDataChart=true&excludeTotalDataChartBreakdown=true&dataType=dailyRevenue"
 DAY = 86_400_000
 TOP_N, BASKET_N, MIN_AGE_D = 100, 10, 365
+KEEP_RANK = 20          # a basket coin stays while it ranks in the top 20 — the study rebalanced monthly; no daily churn of 2 % lots
 REV_BONUS = 0.5
 
 
@@ -165,10 +166,14 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, fetc
                    "rg": round(r90 / r90p - 1, 3) if r90p > 0 and r90 > 0 else None, "rev": r30 > 0, "rev30": round(r30)}
     sc = composite(rows) if rows else {}
     order = sorted(sc, key=lambda s: -sc[s])
-    basket = order[:BASKET_N]
+    prev = conn.execute("SELECT v FROM sq_state WHERE k='basket'").fetchone()
+    prev = json.loads(prev[0]) if prev else []
+    keep = [s for s in prev if s in order[:KEEP_RANK]]
+    basket = (keep + [s for s in order if s not in keep])[:BASKET_N]
     if len(basket) == BASKET_N and not err:
         conn.execute("CREATE TABLE IF NOT EXISTS own_state(k TEXT PRIMARY KEY, v TEXT)")
         conn.execute("INSERT OR REPLACE INTO own_state VALUES('alt_basket', ?)", (json.dumps(basket),))
+        conn.execute("INSERT OR REPLACE INTO sq_state VALUES('basket', ?)", (json.dumps(basket),))
     conn.execute("INSERT OR REPLACE INTO sq_state VALUES('day', ?)", (str(day),))
     conn.commit()
     doc = {"asof": now, "error": err, "universe": len(uni), "basket": basket,

@@ -54,3 +54,17 @@ def test_run_writes_the_basket_and_quality_json():
     assert json.loads(conn.execute("SELECT v FROM own_state WHERE k='alt_basket'").fetchone()[0]) == d["basket"]
     assert json.load(open(tmp + "/quality.json"))["basket"] == d["basket"]
     assert sq.run(conn, tmp, now=NOW + 3_600_000, fetch=fetch)["skipped"]                        # once a day
+
+
+def test_a_basket_coin_stays_while_it_ranks_in_the_top_20():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE own_state(k TEXT PRIMARY KEY, v TEXT)")
+    feats = {f"C{k}": {"dv30": 1e8 * (40 - k), "dv180": 1e8 * (40 - k), "m3": k / 40, "n": 400} for k in range(30)}
+    conn.execute("INSERT INTO own_state VALUES('pool_feats', ?)", (json.dumps(feats),))
+    conn.execute("CREATE TABLE sq_state(k TEXT PRIMARY KEY, v TEXT)")
+    conn.execute("INSERT INTO sq_state VALUES('basket', ?)", (json.dumps(["C15", "C29"]),))   # C15 ranks ~16th, C29 last
+
+    def fetch(url):
+        return {"protocols": []} if "overview" in url else []
+    d = sq.run(conn, tempfile.mkdtemp(), now=NOW, fetch=fetch, first_day=lambda s: NOW - 800 * DAY)
+    assert d["basket"][0] == "C15" and "C29" not in d["basket"] and len(d["basket"]) == 10

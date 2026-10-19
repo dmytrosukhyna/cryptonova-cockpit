@@ -53,6 +53,13 @@ def _get(url: str, timeout: int = 15):
         return json.loads(r.read().decode())
 
 
+def not_crypto(symbol: str) -> bool:
+    """19.10: BingX lists synthetic pairs like NCCOXAU2TRY-USDT, NCFXEUR2NZD-USDT, NCSKCCI2USD-USDT (commodities, FX, stocks).
+    The listing-short edge is about new TOKENS — those are skipped."""
+    base = symbol.split("-")[0]
+    return base.startswith("NC") and "2" in base and len(base) >= 7
+
+
 def fetch_market() -> dict:
     """{symbol: {"launch": ms|None, "price": float|None, "high24": float|None, "funding": float|None}} for every BingX USDT perp."""
     ts = int(time.time() * 1000)
@@ -96,6 +103,8 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
     for s, m in mk.items():
         if s not in known:
             seeded = 1 if first_run else 0
+            if not seeded and not_crypto(s):
+                seeded = 4                                    # BingX's synthetic FX / commodity / stock pairs — not a token listing
             listed = m["launch"] if (m["launch"] and not seeded) else (None if seeded else now)
             if not seeded and m["launch"] and m["launch"] < now - 3 * 86_400_000:
                 seeded = 1                                    # BingX says it launched long ago — not a fresh listing
@@ -136,6 +145,9 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
              conn.execute("SELECT id, symbol, listed, opened, entry, stop, qty, expires, funding_usd FROM lst_trades WHERE closed IS NULL")]
     equity_closed = START + realized
     # open new shorts
+    for (s,) in conn.execute("SELECT symbol FROM lst_known WHERE seeded = 0").fetchall():
+        if not_crypto(s):
+            conn.execute("UPDATE lst_known SET seeded = 4 WHERE symbol = ?", (s,))
     traded = {r[0] for r in conn.execute("SELECT symbol FROM lst_trades")}
     for s, listed, first_seen, seeded, first_px in conn.execute(
             "SELECT symbol, listed, first_seen, seeded, first_px FROM lst_known WHERE seeded = 0").fetchall():

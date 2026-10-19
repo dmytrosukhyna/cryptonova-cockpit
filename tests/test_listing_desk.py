@@ -64,3 +64,9 @@ def test_pumped_and_thin_listings_are_skipped():
     L.step(conn2, T0 + H, mk(qvol=5e5, **{"BTC-USDT": (1.0, 0.0), "THIN-USDT": (1.0, 0.0)}))
     y = L.step(conn2, T0 + 6 * H, mk(qvol=5e5, **{"BTC-USDT": (1.0, 0.0), "THIN-USDT": (1.0, 0.0)}))
     assert y["open"] == [] and any("THIN: не шортим — оборот $0.5M" in e for e in y["events"])
+
+
+def test_synthetic_fx_commodity_stock_pairs_are_not_listings():
+    from cnq.agents.listing_desk import not_crypto
+    assert not_crypto("NCCOXAU2TRY-USDT") and not_crypto("NCFXEUR2NZD-USDT") and not_crypto("NCSKCCI2USD-USDT")
+    assert not not_crypto("NCT-USDT") and not not_crypto("PUMP-USDT")

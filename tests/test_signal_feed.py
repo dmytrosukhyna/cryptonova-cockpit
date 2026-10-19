@@ -75,3 +75,10 @@ def test_run_on_a_fresh_db_and_on_an_old_table_without_source():
                    open_text TEXT, msg_id INTEGER, seeded INTEGER, closed INTEGER, exit_kind TEXT, pnl_pct REAL, close_text TEXT, close_msg_id INTEGER)""")
     doc = F.run(old, d, 1_792_000_000_000)
     assert "error" not in doc and "source" in {r[1] for r in old.execute("PRAGMA table_info(signal_feed)")}
+
+
+def test_own_signal_post_shows_the_size_and_the_volume_mark():
+    t = {"symbol": "SOL", "side": "LONG", "grade": "C", "entry": 100.0, "stop": 90.0, "vol": 2.34}
+    txt = SF.open_text(t)
+    assert "Размер: 5.0% счёта" in txt and "Объём дня сигнала: ×2.3 к обычному" in txt
+    assert "Объём" not in SF.open_text(dict(t, vol=None))

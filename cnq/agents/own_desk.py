@@ -377,7 +377,7 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
         open_pnl += u
         out_open.append({"id": t["id"], "symbol": t["symbol"], "side": t["side"], "grade": t["rule"], "kind": "OWN_" + t["rule"],
                          "entry": t["entry"], "stop": t["stop"], "qty": t["qty"], "qty_left": t["qty"], "opened": t["opened"], "pnl_usd": 0.0,
-                         "price": p, "open_pnl_usd": round(u, 2),
+                         "price": p, "open_pnl_usd": round(u, 2), "vol": t.get("vol"),
                          "reason": f"{RULE_RU[t['rule']]}" + (f", объём ×{t['vol']:.1f} к среднему" if t.get("vol") else "")
                                    + f": стоп {abs(t['stop'] / t['entry'] - 1) * 100:.1f}%, выход по правилу или через {HOLD[t['rule']]} дней"})
     eq = eqc + open_pnl

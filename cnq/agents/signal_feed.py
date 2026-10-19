@@ -82,6 +82,8 @@ def open_text(t: dict) -> str:
         stop_pct = abs(float(t["stop"]) / float(t["entry"]) - 1) * 100
         if stop_pct > 0:
             lines.append(f"Размер: {min(25.0, 0.5 / stop_pct * 100):.1f}% счёта (при стопе −0.5% счёта)")
+        if t.get("vol"):               # 19.10: the quality mark — the signal day's dollar volume vs its 30-day average
+            lines.append(f"Объём дня сигнала: ×{float(t['vol']):.1f} к обычному")
     elif g == "LST":
         lines.append("Размер: 5% счёта")
     if g == "LST":

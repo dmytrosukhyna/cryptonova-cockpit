@@ -210,7 +210,7 @@ def fetch_paxg():
 
 def fetch_xau():
     """Dukascopy XAUUSD 1 h, newest month first, gently (it throttles), within a time budget."""
-    t_start, budget = time.time(), 40 * 60
+    t_start, budget = time.time(), 110 * 60
     jobs = []
     y, mo = TODAY.year, TODAY.month - 2                                  # the last full month (0-based month)
     if mo < 0:
@@ -220,16 +220,25 @@ def fetch_xau():
         mo -= 1
         if mo < 0:
             y, mo = y - 1, 11
-    rows, ok, fail = [], 0, 0
-    for k in range(0, len(jobs), 2):
-        if time.time() - t_start > budget:
+    rows, ok, todo = [], 0, list(jobs)
+    for _pass in range(4):                                           # one at a time; failed months are retried later
+        left = []
+        for a in todo:
+            if time.time() - t_start > budget:
+                left.append(a)
+                continue
+            s_, rr = duka_hours("XAUUSD", *a)
+            if s_ == 200 and rr:
+                ok += 1
+                rows += rr
+            else:
+                left.append(a)
+            time.sleep(0.7)
+        todo = left
+        if not todo or time.time() - t_start > budget:
             break
-        with ThreadPoolExecutor(2) as ex:
-            got = list(ex.map(lambda a: duka_hours("XAUUSD", *a), jobs[k:k + 2]))
-        for s_, rr in got:
-            ok += s_ == 200
-            fail += s_ != 200
-            rows += rr
+        time.sleep(60)
+    fail = len(todo)
     d = TODAY.replace(day=1)
     while d < TODAY and time.time() - t_start < budget + 600:          # the current month: minutes → hours
         mins = duka_minutes_day("XAUUSD", d)
@@ -243,7 +252,8 @@ def fetch_xau():
                 x[2], x[3], x[4], x[5] = max(x[2], h), min(x[3], l), c, x[5] + v
         rows += [tuple(x) for x in hrs.values()]
         d += dt.timedelta(days=1)
-    info = {"months ok": ok, "months failed": fail, "minutes": round((time.time() - t_start) / 60, 1)}
+    info = {"months ok": ok, "months failed": fail, "missing": sorted(f"{y}-{m + 1:02d}" for y, m in todo)[:40],
+            "minutes": round((time.time() - t_start) / 60, 1)}
     xa = np.array(sorted(set(rows)))
     if len(xa):
         flat = (xa[:, 5] <= 0) & (xa[:, 2] == xa[:, 3])

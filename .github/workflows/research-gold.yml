@@ -15,7 +15,7 @@ permissions:
 jobs:
   study:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 200
     env:
       GOLD_DIR: /tmp/gold
     steps:

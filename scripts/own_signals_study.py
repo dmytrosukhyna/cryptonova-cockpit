@@ -1467,7 +1467,7 @@ def _llama_series(slug, dtype):
     return out
 
 
-def factors():
+def _spot_data():
     """19.10, round 13 — owner: «по споту можно проанализировать максимально всё … спот мы можем сделать идеальный, подойди
     профессионально». Which fundamentals actually predicted the next month of a token, honestly (every Binance perp, delisted
     included; monthly rebalance 2022–2026; terciles; equal weight):
@@ -1539,24 +1539,28 @@ def factors():
         tgt = {"dailyRevenue": rev, "dailyFees": fees, "dailyHoldersRevenue": hold}[dtp].setdefault(sym, {})
         for d, v in ser.items():
             tgt[d] = tgt.get(d, 0.0) + v
+    first = {s: int(K["t"][0]) for s, K in D.items()}
+    v30 = {}
+    for s, K in D.items():
+        v = sma(K["bv"] * K["c"], 30)
+        v30[s] = {int(t): float(x) for t, x in zip(K["t"], v) if not np.isnan(x)}
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    months = [d for d in days if d >= t0 and dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).day == 1]
+    return dict(D=D, cl=cl, days=days, months=months, perp_for=perp_for, want=want, rev=rev, fees=fees, hold=hold, supply=supply,
+                alias=alias, v30=v30, first=first)
+
+
+def factors():
+    """19.10, round 13 — see _spot_data(). Which fundamentals predicted the next month (terciles, equal weight)."""
+    X = _spot_data()
+    D, cl, days, months, perp_for, want = X["D"], X["cl"], X["days"], X["months"], X["perp_for"], X["want"]
+    rev, fees, hold, supply, alias, v30, first = X["rev"], X["fees"], X["hold"], X["supply"], X["alias"], X["v30"], X["first"]
 
     def ssum(ser, d, n):
         return sum(ser.get(d - k * DAY, 0.0) for k in range(n)) if ser else 0.0
 
     def has_data(ser, d, n):
         return bool(ser) and any((d - k * DAY) in ser for k in range(n))
-    # month ends
-    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
-    months = []
-    for d in days:
-        x = dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc)
-        if d >= t0 and x.day == 1:
-            months.append(d)
-    first = {s: int(K["t"][0]) for s, K in D.items()}
-    v30 = {}
-    for s, K in D.items():
-        v = sma(K["bv"] * K["c"], 30)
-        v30[s] = {int(t): float(x) for t, x in zip(K["t"], v) if not np.isnan(x)}
 
     def ret(s, a, b):
         if a not in cl[s] or cl[s][a] <= 0:
@@ -1647,5 +1651,97 @@ def factors():
                      round(float(np.mean([r[3] for r in rows]))), [round(float(np.mean(yr[y])) * 100, 1) if y in yr else None for y in YEARS]]
     note("factors · [top−bottom %/month, t, months+ %, top−all %, months, coins, 2022…2026]", json.dumps(out, ensure_ascii=False))
 
+
+def _mret(cl, s, a, b):
+    if a not in cl[s] or cl[s][a] <= 0:
+        return None
+    if b in cl[s]:
+        return cl[s][b] / cl[s][a] - 1
+    last = max((t for t in cl[s] if a <= t <= b), default=a)          # delisted inside the month: its last close
+    return cl[s][last] / cl[s][a] - 1
+
+
+def quality():
+    """19.10, round 14 — round 13 found, on every Binance perp (delisted included), 2022–2026, monthly:
+      tokens of projects WITH REVENUE (DefiLlama) beat the other alts of the top 100 by +2.0 % a month (t 3.1, 69 % of months,
+      plus 2023–2026); OLDER coins beat younger (+3.0 %, t 1.9, plus every year); a RISING volume trend lost (−2.9 %, t −2.0) and
+      the 3-month winners vs BTC lost (−2.4 %, minus every year); revenue growth slightly positive; «cheap» revenue yield,
+      buybacks and the distance from the high — nothing.
+    Here the monthly portfolios built from that, against BTC and against the model's current basket (top 10 by 180-day volume):
+      Q10 = top 10 of the top-100 alts by the composite (age ↑, 3-month strength ↓, volume trend ↓, revenue growth ↑, + revenue);
+      Q10 rev = the same among revenue tokens only; REV = all revenue tokens of the top 100; OLD10 = the 10 oldest; VOL10; ALL; BTC.
+    The signs come from round 13 on the same data — in-sample; halves are shown. Cost 0.2 % of the replaced part a month.
+    Rows: [×, max dd % (monthly), avg month %, months beating BTC %, 2022…2026 %, 1st half ×, 2nd half ×]."""
+    X = _spot_data()
+    D, cl, months, perp_for, want = X["D"], X["cl"], X["months"], X["perp_for"], X["want"]
+    rev, v30, first = X["rev"], X["v30"], X["first"]
+    sym_of = {perp: sym for sym, perp in perp_for.items()}
+
+    def ssum(ser, d, n):
+        return sum(ser.get(d - k * DAY, 0.0) for k in range(n)) if ser else 0.0
+    v180 = {}
+    for s, K in D.items():
+        v = sma(K["bv"] * K["c"], 180)
+        v180[s] = {int(t): float(x) for t, x in zip(K["t"], v) if not np.isnan(x)}
+    books = {k: {"V": 1.0, "hold": set(), "curve": [], "rets": []} for k in ("Q10", "Q10 rev", "REV", "OLD10", "VOL10", "ALL", "BTC")}
+    for i, d in enumerate(months[:-1]):
+        d1 = months[i + 1]
+        top = sorted((v30[s][d], s) for s in D if d in v30[s] and s not in ("BTC", "ETH") and d - first[s] >= 365 * DAY)[-100:]
+        uni = [s for _v, s in top]
+        F = {}
+        for s in uni:
+            c0, b0 = cl[s][d], cl["BTC"][d]
+            c3, b3 = cl[s].get(d - 91 * DAY), cl["BTC"].get(d - 91 * DAY)
+            vv = [v30[s][t] for t in v30[s] if d - 180 * DAY <= t <= d]
+            sym = sym_of.get(s)
+            r30 = ssum(rev.get(sym), d, 30) if sym in want else 0.0
+            r90, r90p = (ssum(rev.get(sym), d, 90), ssum(rev.get(sym), d - 90 * DAY, 90)) if sym in want else (0.0, 0.0)
+            F[s] = {"age": (d - first[s]) / DAY, "m3": (c0 / c3) / (b0 / b3) - 1 if c3 and b3 else 0.0,
+                    "vt": v30[s][d] / np.mean(vv) if vv else 1.0, "rev": 1.0 if r30 > 0 else 0.0,
+                    "rg": (r90 / r90p - 1) if r90p > 0 and r90 > 0 else None}
+
+        def prank(key, rev_=False):
+            xs = sorted((F[s][key], s) for s in uni if F[s][key] is not None)
+            n = max(1, len(xs) - 1)
+            out = {s: k / n for k, (_v, s) in enumerate(xs)}
+            return {s: out.get(s, 0.5) for s in uni}
+        ra, rm, rv, rg = prank("age"), prank("m3"), prank("vt"), prank("rg")
+        comp = {s: (ra[s] + (1 - rm[s]) + (1 - rv[s]) + rg[s]) / 4 + 0.5 * F[s]["rev"] for s in uni}
+        picks = {
+            "Q10": sorted(uni, key=lambda s: -comp[s])[:10],
+            "Q10 rev": sorted([s for s in uni if F[s]["rev"]], key=lambda s: -comp[s])[:10],
+            "REV": [s for s in uni if F[s]["rev"]],
+            "OLD10": sorted(uni, key=lambda s: -F[s]["age"])[:10],
+            "VOL10": [s for _v, s in sorted(((v180[s].get(d, 0), s) for s in uni), reverse=True)[:10]],
+            "ALL": uni, "BTC": ["BTC"]}
+        for k, ps in picks.items():
+            bk = books[k]
+            rs = [_mret(cl, s, d, d1) for s in ps]
+            rs = [x for x in rs if x is not None]
+            r = float(np.mean(rs)) if rs else 0.0
+            new = set(ps)
+            if bk["hold"] and k != "BTC":
+                r -= 0.002 * (1 - len(new & bk["hold"]) / max(1, len(new)))
+            bk["hold"] = new
+            bk["V"] *= 1 + r
+            bk["curve"].append((d1, bk["V"]))
+            bk["rets"].append(r)
+    btc = np.array(books["BTC"]["rets"])
+    half = len(btc) // 2
+    out = {}
+    for k, bk in books.items():
+        eq = np.array([v for _, v in bk["curve"]])
+        rr = np.array(bk["rets"])
+        yrs, pv = [], 1.0
+        for y in YEARS:
+            pts = [v for t, v in bk["curve"] if dt.datetime.fromtimestamp(t / 1000, dt.timezone.utc).strftime("%Y") == y]
+            if pts:
+                yrs.append(round((pts[-1] / pv - 1) * 100))
+                pv = pts[-1]
+        out[k] = [round(float(eq[-1]), 2), round(float((eq / np.maximum.accumulate(np.r_[1.0, eq])[1:] - 1).min()) * 100),
+                  round(float(rr.mean()) * 100, 2), round(float((rr > btc).mean()) * 100), yrs,
+                  round(float(np.prod(1 + rr[:half])), 2), round(float(np.prod(1 + rr[half:])), 2)]
+    note("quality · monthly alt baskets vs BTC [x, dd %, month %, months > BTC %, 2022…2026, halves]", json.dumps(out, ensure_ascii=False))
+
 if __name__ == "__main__":
-    (factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

@@ -30,15 +30,19 @@ SOURCES = [   # desk key, name for people, why it is in
     ("bal", "откуп падений (CNPTS)", "основная стратегия CNPTS: откуп каскадов, паники, сброса позиций и дисконта фьючерса"),
     ("imp", "Импульс BTC", "прошла самую строгую проверку «Лаборатории»: 2025 и 2026 в плюсе, без 3 лучших дней тоже"),
     # 19.10 (owner: «нам нужны собственные сигналы … сигналы должны быть»): 729 listings on history, +2.6 % a trade, plus every year
+    # 19.10: our own daily signals (own_desk.py): plus per trade in every year 2022–2026 on 40 coins and on 30 other coins
+    ("own", "сигналы CRYPTO NOVA: откат в тренде и пробой 20 дней", "раз в день на 40 монетах по направлению рынка; история "
+                                                                    "2022–2026: плюс на сделку в каждом году, около 4 сигналов в день"),
     ("lst", "шорт новых листингов", "через 4 ч после появления фьючерса новой монеты — шорт на 14 дней; на истории 729 листингов: "
                                     "+2.6% на сделку, плюс в каждом году"),
 ]
 LIVE_MIN_N = 10
 LIVE_DAYS = 30
-LEV = {"B": 5, "E": 3, "F": 3, "D": 3, "K": 3, "LST": 2}          # isolated leverage per rule: wide catastrophe stops (−6…−12 %) → 3×, cascade (tight stop) → 5×
+LEV = {"B": 5, "E": 3, "F": 3, "D": 3, "K": 3, "LST": 2, "P": 2, "C": 2}          # isolated leverage per rule: wide catastrophe stops (−6…−12 %) → 3×, cascade (tight stop) → 5×
 RULE_RU = {"B": "откуп каскада ликвидаций", "E": "откуп паники", "F": "откуп сброса позиций", "D": "откуп дисконта фьючерса",
-           "A": "откуп гэпа", "K": "альт догоняет рывок BTC", "LST": "шорт нового листинга"}
-TIME_EXIT = {"E", "F", "D", "K", "LST"}
+           "A": "откуп гэпа", "K": "альт догоняет рывок BTC", "LST": "шорт нового листинга",
+           "P": "откат в тренде", "C": "пробой 20 дней"}
+TIME_EXIT = {"E", "F", "D", "K", "LST", "P", "C"}
 HOLD_H = {"E": 24, "F": 24, "D": 24, "K": 12, "LST": 14 * 24}
 
 
@@ -73,6 +77,8 @@ def open_text(t: dict) -> str:
     lines += ["Stop Targets:", f"1) {_fmt(float(t['stop']))}"]
     if g == "LST":
         lines.append("Выход по времени через 14 дней — пришлём «Close».")
+    elif g in ("P", "C"):
+        lines.append(f"Выход по правилу (откат закончился / тренд сломался) или через {10 if g == 'P' else 14} дней — пришлём «Close».")
     elif g in TIME_EXIT:
         lines.append(f"Выход по времени через {HOLD_H.get(g, 24)} ч — пришлём «Close».")
     return "\n".join(lines)
@@ -82,7 +88,7 @@ def close_text(t: dict) -> str:
     sym = t["symbol"].replace("-USDT", "").replace("USDT", "")
     pct = t.get("pnl_pct")
     why = {"STOP": "стоп", "TARGET": "цель", "TIME": "время вышло", "BREAKEVEN": "безубыток", "TRAIL": "трейлинг",
-           "время": "время вышло"}.get(t.get("exit_kind") or "", t.get("exit_kind") or "")
+           "время": "время вышло", "правило": "сработало правило выхода"}.get(t.get("exit_kind") or "", t.get("exit_kind") or "")
     return f"Close #{sym}/USDT" + (f" — {why}" if why else "") + (f", {pct:+.2f}%" if pct is not None else "")
 
 

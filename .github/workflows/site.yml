@@ -58,6 +58,10 @@ jobs:
         continue-on-error: true
         timeout-minutes: 3
         run: python -m cnq.cli listings --out web
+      - name: Сигналы CRYPTO NOVA (own daily signals — pullback + 20-day breakout with the BTC regime; demo) → web/paper.json profiles.own
+        continue-on-error: true
+        timeout-minutes: 4
+        run: python -m cnq.cli own --out web
       - name: «Турбо» (the listing short ×4, BTC ×2 in «рост») — demo accounts against the +70 %/month target → web/paper.json
         continue-on-error: true
         timeout-minutes: 2

@@ -377,7 +377,7 @@ def live_check(paper):
         if exp and dd > exp[1]:
             status, why = "alarm", f"просадка {dd:.1f}% глубже худшей исторической {exp[1]}%"
         elif days < 30 or n < 20:
-            status, why = "early", f"рано судить: {days:.0f} дн., {n} сделок (нужно от 30 дней и 20 сделок)"
+            status, why = "early", f"{days:.0f} дн., {n} сделок, результат {pnl:+.2f}% (судить можно от 30 дней и 20 сделок)"
         elif exp and pace is not None and pace < 0 and days >= 60:
             status, why = "below", f"темп {pace:+.1f}% в месяц при ожидании {exp[0]:+.1f}%"
         elif exp and pace is not None and pace < exp[0] / 2:

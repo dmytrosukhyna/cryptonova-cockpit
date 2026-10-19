@@ -164,7 +164,10 @@ def main(argv: list[str] | None = None) -> int:
         n += 1
         if a.cycles and n >= a.cycles:
             return 0
-        time.sleep(max(1.0, INTERVAL_S - (time.time() - t0)))
+        # start every cycle 3 s after a minute boundary: a 15-minute candle closes at :00 / :15 / :30 / :45, so the desks see it
+        # within seconds (history 2020–26: the cascade buy entered 15 minutes late lost 40 % of its edge, and all of it in 2025–26)
+        nxt = (int((time.time() - 3) // INTERVAL_S) + 1) * INTERVAL_S + 3
+        time.sleep(max(1.0, nxt - time.time()))
 
 
 if __name__ == "__main__":

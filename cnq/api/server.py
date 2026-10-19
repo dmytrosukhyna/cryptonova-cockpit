@@ -56,6 +56,14 @@ class Api:
         except Exception:  # noqa: BLE001
             return None
 
+    def _llm_ready(self) -> bool:
+        """cnq.agents.llm.LLM has `available` as a property; test fakes may have it as a method"""
+        a = getattr(self.llm, "available", False) if self.llm is not None else False
+        try:
+            return bool(a() if callable(a) else a)
+        except Exception:  # noqa: BLE001
+            return False
+
     def _uid(self, headers: dict) -> dict:
         h = headers.get("authorization") or ""
         if not h.lower().startswith("bearer "):
@@ -79,7 +87,7 @@ class Api:
         if method == "GET" and path == "/v2/health":
             home = self._feed("app_home") or {}
             age = None if not home.get("asof") else round(time.time() - home["asof"] / 1000)
-            ready = {"llm": bool(self.llm is not None and getattr(self.llm, "available", lambda: False)()),
+            ready = {"llm": self._llm_ready(),
                      "firebase_admin": bool(getattr(self.admin, "ready", False)),
                      "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready}
@@ -158,7 +166,7 @@ class Api:
         ctx["futures"] = {k: fut.get(k) for k in ("usd", "pct", "today_usd", "trades", "wins", "worst_dd_pct", "open")}
         ctx["spot"] = {k: (home.get("spot") or {}).get(k) for k in ("usd", "pct", "alloc", "last_action")}
         answer = None
-        if self.llm is not None and getattr(self.llm, "available", lambda: False)():
+        if self._llm_ready():
             try:
                 answer = self.llm.complete(AGENT_SYSTEM, "КОНТЕКСТ (демо-счета CRYPTO NOVA):\n"
                                            + json.dumps(ctx, ensure_ascii=False) + "\n\nВОПРОС:\n" + q, temperature=0.3).strip()

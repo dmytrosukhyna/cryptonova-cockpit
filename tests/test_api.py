@@ -175,3 +175,22 @@ def test_firebase_admin_delete():
     assert sent[-1][0].endswith("/projects/crypto-nova/accounts:delete") and json.loads(sent[-1][1]) == {"localId": "u1"}
     assert a.delete_user("gone") == "gone"
     assert sum(1 for u, _ in sent if "oauth2" in u) == 1
+
+
+def test_real_llm_property_and_health(tmp_path):
+    """the production LLM exposes `available` as a property — health and the agent must not crash on it"""
+    from cnq.agents.llm import LLM
+    api, _ = make(tmp_path)
+    api.llm = LLM(api_key="")
+    c, d = call(api, "GET", "/v2/health")
+    assert c == 200 and d["ready"] == {"llm": False, "firebase_admin": False, "bingx_partner": False}
+    c, d = call(api, "POST", "/v2/agent", {"q": "что такое биткоин?"}, token("p1"))
+    assert c == 503 and d["error"] == "agent_unavailable"
+
+    class Ok(LLM):
+        def complete(self, system, user, temperature=0.2):
+            return "Ответ."
+    api.llm = Ok(api_key="k")
+    assert call(api, "GET", "/v2/health")[1]["ready"]["llm"] is True
+    c, d = call(api, "POST", "/v2/agent", {"q": "что такое биткоин?"}, token("p1"))
+    assert c == 200 and d["answer"] == "Ответ." and d["agent"]["left"] == 4

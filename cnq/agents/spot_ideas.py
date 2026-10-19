@@ -165,7 +165,8 @@ def _num(x):
 def load_inputs(web_dir: str = "web") -> dict:
     out = {}
     for key, fn in (("research", "research.json"), ("portfolio", "portfolio.json"), ("memes", "memes.json"),
-                    ("markets", "markets.json"), ("decision", "decision.json"), ("tokenomics", "tokenomics.json")):
+                    ("markets", "markets.json"), ("decision", "decision.json"), ("tokenomics", "tokenomics.json"),
+                    ("quality", "quality.json")):
         try:
             with open(os.path.join(web_dir, fn), encoding="utf-8") as f:
                 out[key] = json.load(f)
@@ -257,6 +258,9 @@ def _gather(inp: dict, now: int) -> tuple[dict, dict]:
     ctx = {"btc_bull": btc_bull, "names": names, "core_bt": bt.get("cons_50_25_15"),
            "tok": ((inp.get("tokenomics") or {}).get("tokens")) or {},
            "unl": ((inp.get("tokenomics") or {}).get("unlocks_next")) or {},
+           # 19.10: the spot quality card (spot_quality.py): rank among the top-100 alts by revenue, age, calm volume, no 3-month spike
+           "qual": {str(r.get("symbol") or "").upper(): r for r in ((inp.get("quality") or {}).get("rows") or [])},
+           "qual_basket": set((inp.get("quality") or {}).get("basket") or []),
            "sources": {k: (v or {}).get("asof") for k, v in inp.items() if isinstance(v, dict)}}
     return coins, ctx
 
@@ -523,6 +527,17 @@ def evaluate(sym: str, s: dict, ctx: dict) -> dict:
         chk("supply", f"за 30 дней монет в обращении стало больше на {sg:.1f}% — идут разлоки; по исследованию Keyrock около 90% "
                       "крупных разлоков давили на цену", None)
 
+    # ---- quality card (19.10, spot_quality.py; study: revenue +2 %/month vs other alts, older coins +3 %, hype lost) ----
+    q = (ctx.get("qual") or {}).get(sym) or (ctx.get("qual") or {}).get("1000" + sym)
+    q_adj = 0
+    if q and kind not in ("core", "meme"):
+        n_q = max(1, len(ctx.get("qual") or {}))
+        tags = ["есть выручка" if q.get("rev") else "без выручки", f"{int(q['age'] // 365)} г. торгов" if q.get("age") else None,
+                ("объём раздут" if (q.get("vt") or 0) > 1.3 else "объём спокойный") if q.get("vt") is not None else None]
+        chk("quality", f"анкета качества: место {q.get('rank')} из {n_q} ({', '.join(t for t in tags if t)})"
+            + (" — в альт-части модели «ядро + альтсезон»" if sym in (ctx.get("qual_basket") or set()) else ""), None)
+        q_adj = 8 if q.get("rank", n_q) <= n_q / 3 else -8 if q.get("rank", 0) > 2 * n_q / 3 else 0
+
     # ---- score ----
     parts = [(v, w) for v, w in ((R, 0.5), (C, 0.3), (M, 0.2)) if v is not None]
     score = round(sum(v * w for v, w in parts) / sum(w for _, w in parts)) if parts else 0
@@ -530,6 +545,7 @@ def evaluate(sym: str, s: dict, ctx: dict) -> dict:
         score = min(100, score + round(min(10.0, hy * 100 * 2)))
     if sg is not None and sg >= 2 and kind != "core":   # realised dilution (unlocks) pushes it down (≤ −10 points)
         score = max(0, score - round(min(10.0, sg * 2)))
+    score = max(0, min(100, score + q_adj))             # quality card: top third +8, bottom third −8 (never a pass / fail check)
 
     # ---- info for the «i» popup: 2–5 short sentences, the deciding check first ----
     first = lambda xs: sorted(xs, key=lambda c: c["key"] != dkey)   # noqa: E731
@@ -624,7 +640,8 @@ def build(inp: dict, now: int | None = None) -> dict:
                           else "режим BTC неизвестен — считаем медвежьим, можно брать только ядро"),
             "summary_ru": summary, "rules_ru": RULES_RU,
             "score_formula_ru": "балл 0–100 = анкета × 0.5 + консультант (max тренд/фундамент) × 0.3 + качество мема × 0.2; "
-                                "веса делятся заново, если какой-то оценки нет. Балл — для порядка, не прогноз роста.",
+                                "веса делятся заново, если какой-то оценки нет; анкета качества альтов: верхняя треть +8, нижняя −8. "
+                                "Балл — для порядка, не прогноз роста.",
             "counts": counts, "counts_all": counts_all, "evaluated": len(allrows), "shown": len(rows),
             "portfolio_names": ctx["names"], "sources": ctx["sources"],
             "disclaimer_ru": "Правила отбора по данным панели, а не прогноз цены и не инвестиционный совет.",

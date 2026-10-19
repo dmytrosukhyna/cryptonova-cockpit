@@ -291,3 +291,17 @@ def test_unlock_calendar_window_and_forward_watch(tmp_path):
               now=t0, calendar=str(p))
     assert d["unlocks_next"]["MONX"]["days"] == 23 and d["calendar_built"] == "2026-10-18" and d["unlock_watch"]["open"]
     assert json.load(open(tmp_path / "tokenomics.json"))["unlocks_next"]["MONX"]["pct_circ"] == 40.0
+
+
+def test_quality_card_is_a_fact_and_moves_the_score_never_a_gate():
+    """19.10: the spot quality card (revenue, age, calm volume, no 3-month spike) — top third +8, bottom third −8."""
+    cs = [card("ALTA", "mod", 48), card("ALTB", "mod", 48), card("ALTC", "mod", 48)]
+    inp = inputs(cards=cs, picks={"short": [], "mid": [pick("ALTA", 70), pick("ALTB", 70), pick("ALTC", 70)], "long": []})
+    d0 = rows_by_sym(si.build(inp, NOW))
+    inp["quality"] = {"basket": ["ALTA"], "rows": [{"symbol": "ALTA", "rank": 1, "rev": True, "age": 1500, "vt": 0.9},
+                                                   {"symbol": "ALTB", "rank": 2, "rev": False, "age": 800, "vt": 1.0},
+                                                   {"symbol": "ALTC", "rank": 3, "rev": False, "age": 400, "vt": 2.0}]}
+    d1 = rows_by_sym(si.build(inp, NOW))
+    assert d1["ALTA"]["score"] == min(100, d0["ALTA"]["score"] + 8) and d1["ALTC"]["score"] == max(0, d0["ALTC"]["score"] - 8)
+    assert d1["ALTB"]["score"] == d0["ALTB"]["score"] and d1["ALTA"]["status"] == d0["ALTA"]["status"]
+    assert any(c["key"] == "quality" and "место 1 из 3" in c["t"] and "ядро + альтсезон" in c["t"] for c in d1["ALTA"]["checks"])

@@ -26,3 +26,21 @@ jobs:
       - name: probe
         if: inputs.mode == 'probe' || inputs.mode == 'probe2'
         run: python scripts/funding_farm_study.py ${{ inputs.mode }}
+      - name: scan (Binance + Gate funding archives)
+        if: inputs.mode == 'all'
+        run: python scripts/funding_farm_study.py scan
+      - name: prices (1-hour candles around the signals)
+        if: inputs.mode == 'all'
+        run: python scripts/funding_farm_study.py prices
+      - name: (a) cross-venue Binance vs Gate
+        if: ${{ !cancelled() && inputs.mode == 'all' }}
+        run: python scripts/funding_farm_study.py sim a
+      - name: (b) spot long + perp short
+        if: ${{ !cancelled() && inputs.mode == 'all' }}
+        run: python scripts/funding_farm_study.py sim b
+      - name: (c) naked one leg
+        if: ${{ !cancelled() && inputs.mode == 'all' }}
+        run: python scripts/funding_farm_study.py sim c
+      - name: now (cross-venue gaps today)
+        if: ${{ !cancelled() && inputs.mode == 'all' }}
+        run: python scripts/funding_farm_study.py now

@@ -79,3 +79,24 @@ def test_bundle_and_cap(tmp_path):
         (web / "paper.json").write_text(json.dumps(paper([f"N{i}"])))
         app_push.run(conn, api, str(web), ms(11, i), f)
     assert len(f.sent) == app_push.TRADE_CAP
+
+
+def test_big_move_news_once_a_day_and_brief_dedupe(tmp_path):
+    web, api, conn = setup(tmp_path)
+    (web / "paper.json").write_text(json.dumps(paper()))
+    f = FakeFcm()
+    app_push.run(conn, api, str(web), ms(12), f)                      # first run: silent
+    (web / "markets.json").write_text(json.dumps({"top": [{"symbol": "BTC", "price": 76000, "chg24": -6.4}]}))
+    app_push.run(conn, api, str(web), ms(9, 30), f)                   # before 10:00 → nothing
+    assert f.sent == []
+    app_push.run(conn, api, str(web), ms(12, 1), f)
+    app_push.run(conn, api, str(web), ms(15, 0), f)                   # same day → still one
+    assert len(f.sent) == 1 and "упал на 6%" in f.sent[0][1] and "76 000" in f.sent[0][2]
+    (web / "markets.json").write_text(json.dumps({"top": [{"symbol": "BTC", "price": 80000, "chg24": 2.0}]}))
+    app_push.run(conn, api, str(web), ms(12, 0, day=20), f)           # small move → nothing
+    assert len(f.sent) == 1
+    # news switched off → nothing even on a big move
+    Store(api).set_prefs("u1", {"news": False})
+    (web / "markets.json").write_text(json.dumps({"top": [{"symbol": "BTC", "price": 90000, "chg24": 9.0}]}))
+    app_push.run(conn, api, str(web), ms(12, 0, day=21), f)
+    assert len(f.sent) == 1

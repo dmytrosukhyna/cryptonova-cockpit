@@ -4,8 +4,11 @@ Rules:
 - only what the user switched on (Кабинет → Уведомления); default: trades on, news on, piggy off, weekly summary on;
 - quiet hours 22:00–09:00 Kyiv time: nothing is sent (trade news is not queued — it would be stale);
 - trades: a CRYPTO NOVA demo trade opened or closed, at most 6 messages a day per person, several at once are bundled;
-- piggy: one reminder on the buy day at 10:00 Kyiv; weekly summary: Friday 18:00 Kyiv.
-Every message says «демо». Runs every engine cycle; reads data/api.sqlite (users, prefs, push tokens) and web/paper.json."""
+- piggy: one reminder on the buy day at 10:00 Kyiv; weekly summary: Friday 18:00 Kyiv;
+- «важное на рынке» (news switch): bitcoin moved ≥ 5% in 24 h — at most once a day, 10:00–21:00 Kyiv.
+Every trade message says «демо». Runs every engine cycle; reads data/api.sqlite (users, prefs, push tokens), web/paper.json
+and web/markets.json. Timed messages have a 10-minute window and are deduplicated per person and day (a slow cycle never
+skips or doubles them)."""
 from __future__ import annotations
 
 import datetime as dt
@@ -17,6 +20,7 @@ import time
 KYIV = dt.timezone(dt.timedelta(hours=3))
 QUIET = (22, 9)
 TRADE_CAP = 6
+BIG_MOVE = 5.0          # % in 24 h that counts as «важное на рынке»
 
 
 def _now_kyiv(now_ms: int) -> dt.datetime:
@@ -61,6 +65,24 @@ def trade_events(paper: dict) -> list[dict]:
     return ev
 
 
+def _big_move(out: str) -> tuple[str, str] | None:
+    """bitcoin moved ≥ BIG_MOVE % in 24 h → (title, body) in calm words; None otherwise"""
+    try:
+        with open(os.path.join(out, "markets.json"), encoding="utf-8") as f:
+            mk = json.load(f)
+    except Exception:  # noqa: BLE001
+        return None
+    btc = next((r for r in mk.get("top") or [] if str(r.get("symbol") or "").upper() == "BTC"), None)
+    if not btc or btc.get("chg24") is None:
+        return None
+    ch = float(btc["chg24"])
+    if abs(ch) < BIG_MOVE:
+        return None
+    word = "вырос" if ch > 0 else "упал"
+    return (f"Важное на рынке: биткоин {word} на {abs(ch):.0f}% за сутки",
+            f"Сейчас {_fmt_price(btc.get('price'))} $. Такие движения бывают — что это значит, простыми словами объяснит NOVA.")
+
+
 def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | None = None, fcm=None) -> dict:
     now_ms = now_ms or int(time.time() * 1000)
     _db(conn)
@@ -98,7 +120,7 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
             msgs.append(("trades", f"CRYPTO NOVA · {len(fresh)} события по сделкам · демо",
                          "; ".join(e["body"] for e in fresh[:3]) + (" …" if len(fresh) > 3 else ""), {"open": "futures"}))
     k = _now_kyiv(now_ms)
-    if k.weekday() == 4 and k.hour == 18 and k.minute < 2:
+    if k.weekday() == 4 and k.hour == 18 and k.minute < 10:
         prof = (paper.get("profiles") or {}).get("bal") or {}
         hist = prof.get("equity_history") or []
         week_ago = now_ms - 7 * 86_400_000
@@ -106,12 +128,17 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
         if base and hist:
             msgs.append(("brief", "Итоги недели · CRYPTO NOVA", f"Система за неделю: {_fmt_usd(hist[-1]['equity'] - base)} на демо-счёте $10 000. Подробности — в приложении.",
                          {"open": "home"}))
+    move = _big_move(out)
+    if move and 10 <= k.hour < 21:
+        msgs.append(("news", move[0], move[1], {"open": "home"}))
     for pref, title, body, data in msgs:
         for uid, tok in st.push_tokens(pref=pref):
             if pref == "trades":
                 n = conn.execute("SELECT COUNT(*) FROM push_log WHERE uid=? AND kind='trades' AND day=?", (uid, day)).fetchone()[0]
                 if n >= TRADE_CAP:
                     continue
+            elif conn.execute("SELECT 1 FROM push_log WHERE uid=? AND kind=? AND day=?", (uid, pref, day)).fetchone():
+                continue          # brief and news: once a day per person
             r = fcm.send(tok, title, body, data)
             results[r] = results.get(r, 0) + 1
             if r == "gone":
@@ -121,7 +148,7 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
                 conn.execute("INSERT INTO push_log VALUES(?,?,?,?)", (uid, pref, day, now_ms))
                 sent += 1
     # piggy reminders: once on the buy day at 10:00 Kyiv
-    if k.hour == 10 and k.minute < 2:
+    if k.hour == 10 and k.minute < 10:
         today = int(now_ms // 86_400_000)
         for uid, tok in st.push_tokens(pref="piggy"):
             p = st.piggy(uid) or {}

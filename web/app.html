@@ -418,6 +418,13 @@ body.tab-futures #topCard{order:-5}body.tab-futures #apRadar{order:-4}body.tab-f
 #analystBtn .atom b{position:absolute;inset:32%;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#7cc4ff 45%,rgba(124,196,255,.25));box-shadow:0 0 22px rgba(124,196,255,.95),0 0 44px rgba(124,196,255,.5);animation:bcore 1.6s ease-in-out infinite}
 #analystBtn.talking .atom b{animation:bcore .45s ease-in-out infinite}
 #analystBtn .albl{display:block!important;position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);font:700 8px/1 var(--mono);letter-spacing:.14em;color:#cfe6ff;text-shadow:0 0 6px rgba(124,196,255,.8);white-space:nowrap;pointer-events:none}
+/* 19.10: brighter orb — the owner found it dim */
+#analystBtn.analyst{background:radial-gradient(circle,rgba(150,205,255,.48),rgba(108,92,255,.2) 46%,rgba(6,11,22,0) 72%)!important;animation:orbHalo 3s ease-in-out infinite!important}
+@keyframes orbHalo{0%,100%{filter:drop-shadow(0 0 8px rgba(124,196,255,.6))}50%{filter:drop-shadow(0 0 18px rgba(124,196,255,1)) drop-shadow(0 0 32px rgba(140,124,255,.55))}}
+#analystBtn .atom i{border-width:2px;border-color:rgba(170,220,255,1);box-shadow:0 0 14px rgba(124,196,255,.7) inset,0 0 16px rgba(124,196,255,.75)}
+#analystBtn .atom i::after{width:8px;height:8px;top:-4px;left:calc(50% - 4px);box-shadow:0 0 12px #9ed3ff,0 0 4px #fff}
+#analystBtn .atom b{inset:27%;background:radial-gradient(circle at 35% 30%,#fff,#cfe9ff 28%,#7cc4ff 55%,#6c5cff 88%);box-shadow:0 0 30px rgba(124,196,255,1),0 0 64px rgba(124,196,255,.7),0 0 96px rgba(140,124,255,.4)}
+#analystBtn .albl{font-size:9px;color:#fff;text-shadow:0 0 8px rgba(124,196,255,1),0 0 2px #fff}
 @media (max-width:760px){#analystBtn.analyst{width:62px!important;height:62px!important;right:6px!important}}
 .ideas .irow{display:grid;grid-template-columns:28px 78px minmax(0,1fr) auto 26px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}.ideas .irow .n{color:var(--muted);font:600 11px var(--mono)}.ideas .irow b{font-family:var(--mono)}.ideas .irow small{display:block;font-size:10.5px;color:var(--muted)}
 .ideas .ibtn{width:22px;height:22px;border-radius:50%;border:1px solid var(--line2);background:transparent;color:#7cc4ff;font:700 12px/1 Georgia,serif;cursor:pointer}

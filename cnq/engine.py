@@ -118,7 +118,7 @@ def sync(push: bool = True) -> dict:
 def cycle(n: int, env: dict) -> dict:
     steps = {}
     py = sys.executable
-    if n % 15 == 0:
+    if n % 15 == 0 and n > 0:                          # the full check (gaps, funding, lab coins); start.sh did it before cycle 0
         steps["candles_full"] = sh([py, "scripts/ci_refresh.py"], RUN, 900, {**env, "CNQ_REFRESH": "full"})
     else:
         steps["candles"] = sh([py, "scripts/ci_refresh.py"], RUN, 120,

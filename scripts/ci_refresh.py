@@ -52,7 +52,7 @@ def main() -> int:
     t0 = time.time()
     core = [bx for bx, _ in cfg.universe]
     if m == "quick":
-        rest = BingXRest(cfg.bingx)
+        rest = BingXRest(cfg.bingx)          # the documented limit is 1 request a second per IP — kept (18 coins ≈ 20 s)
         ok = quick(store, core, rest)
         if os.environ.get("CNQ_REFRESH_EXTRA", "1") == "1":
             quick(store, list(cfg.b_extra), rest)

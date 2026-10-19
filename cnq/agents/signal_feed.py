@@ -103,8 +103,22 @@ def _pct(t: dict) -> float | None:
         return None
 
 
-def _send(text: str, reply_to: int | None = None) -> int | None:
-    chat, token = os.environ.get("CNQ_SIGNALS_CHAT"), os.environ.get("CNQ_TG_TOKEN")
+def signals_chat(conn: sqlite3.Connection | None = None) -> str | None:
+    """The signals channel: the CNQ_SIGNALS_CHAT secret, else the channel the owner connected by adding the bot as an admin to a
+    channel with «signal» / «сигнал» in its title (botmail.channel_event → bot_meta.signals_chat)."""
+    if os.environ.get("CNQ_SIGNALS_CHAT"):
+        return os.environ["CNQ_SIGNALS_CHAT"]
+    if conn is None:
+        return None
+    try:
+        r = conn.execute("SELECT v FROM bot_meta WHERE k='signals_chat'").fetchone()
+    except sqlite3.Error:
+        return None
+    return r[0] if r and r[0] else None
+
+
+def _send(text: str, reply_to: int | None = None, chat: str | None = None) -> int | None:
+    chat, token = chat or os.environ.get("CNQ_SIGNALS_CHAT"), os.environ.get("CNQ_TG_TOKEN")
     if not chat or not token:
         return None
     import urllib.request
@@ -204,7 +218,7 @@ def public(conn: sqlite3.Connection, now: int | None = None) -> dict:
                 "why_ru": "выключено 19.10: на 3 037 сигналах за 10 месяцев цена доходит до цели против сигнала так же часто, как по "
                           "сигналу; все способы торговли ими в минусе (умный разворот −99% на демо-счёте)",
                 "live_30d": None})
-    return {"asof": now, "name": "CRYPTO NOVA", "profile": PROFILE, "mix": mix, "channel_on": bool(os.environ.get("CNQ_SIGNALS_CHAT")),
+    return {"asof": now, "name": "CRYPTO NOVA", "profile": PROFILE, "mix": mix, "channel_on": bool(signals_chat(conn)),
             "stats": {"signals": sum(1 for r in rows if r["seeded"] == 0), "closed": len(done), "wins": wins,
                       "avg_pct": round(sum(r["pnl_pct"] for r in done) / len(done), 2) if done else None},
             "items": rows,
@@ -221,10 +235,14 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> d
         return {"error": f"paper.json: {e}"}
     ensure(conn)
     res = {}
+    chat = signals_chat(conn)
+
+    def send(text, reply_to=None):
+        return _send(text, reply_to, chat)
     for k, _, _ in SOURCES:
         desk = (paper.get("profiles") or {}).get(k) or {}
         ok, _ = live_ok(conn, k, now or int(time.time() * 1000))
-        res[k] = step(conn, desk, now, source=k, active=ok)
+        res[k] = step(conn, desk, now, send=send, source=k, active=ok)
     doc = public(conn, now)
     doc["this_run"] = res
     with open(os.path.join(out, "signals_feed.json"), "w", encoding="utf-8") as f:

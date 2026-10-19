@@ -52,3 +52,19 @@ def test_connect_name_reads_the_users_model_and_options():
     assert botmail.connect_name("capital_bold_r_d") == "CRYPTO NOVA Портфолио · модель «Смелая» + рискованные монеты, больше DeFi-кредитования"
     assert botmail.connect_name("capital_calm") == "CRYPTO NOVA Портфолио · модель «Спокойная»"
     assert botmail.connect_name("cryptonova").startswith("CRYPTO NOVA") and botmail.connect_name("zzz") == "стратегия CRYPTO NOVA"
+
+
+def test_owner_connects_a_signals_channel_by_adding_the_bot():
+    import sqlite3
+    from cnq.agents import botmail, signal_feed
+    conn = sqlite3.connect(":memory:")
+    mb = botmail.Mailbox(conn)
+    conn.execute("INSERT INTO bot_chats VALUES(?,?,?,?,?,1)", (111, "owner_x", "D", 0, 0))
+    ev = lambda title, uid, un, status="administrator", cid=-1001: {"chat": {"id": cid, "type": "channel", "title": title},  # noqa: E731
+                                                                    "from": {"id": uid, "username": un}, "new_chat_member": {"status": status}}
+    assert mb.channel_event(ev("CRYPTO NOVA Signals", 999, "stranger"), "owner_x") is None          # not the owner
+    assert mb.channel_event(ev("Новости", 111, "owner_x"), "owner_x") is None                        # not a signals channel
+    assert mb.channel_event(ev("CRYPTO NOVA Signals", 111, "owner_x"), "owner_x").startswith("Канал «CRYPTO NOVA Signals» подключён")
+    assert signal_feed.signals_chat(conn) == "-1001"
+    assert "убран" in mb.channel_event(ev("CRYPTO NOVA Signals", 111, "owner_x", "left"), "owner_x")
+    assert signal_feed.signals_chat(conn) is None

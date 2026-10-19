@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import time
 import urllib.parse
@@ -70,6 +71,7 @@ def _api(token: str, method: str, data: dict | None = None, timeout: int = 20) -
 class Mailbox:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
+        self.notes: list[str] = []
         conn.executescript("""CREATE TABLE IF NOT EXISTS bot_chats(chat_id INTEGER PRIMARY KEY, username TEXT, first_name TEXT, first_seen INTEGER, last_seen INTEGER, n_msgs INTEGER);
             CREATE TABLE IF NOT EXISTS bot_meta(k TEXT PRIMARY KEY, v TEXT);""")
         conn.commit()
@@ -94,6 +96,31 @@ class Mailbox:
         if ok:
             self.set_meta("profile", PROFILE_VERSION)
         return ok
+
+    def channel_event(self, mcm: dict, owner_username: str | None) -> str | None:
+        """19.10: the owner adds the bot as an admin to a private channel with «signal» / «сигнал» in its title → that channel
+        becomes the CRYPTO NOVA signals channel (signal_feed.py posts there). Only when the OWNER added it (his user id or
+        username), never the news channel (CNQ_TG_CHAT / @crypto_nova_news). Removing the bot switches it off. → a note for the owner."""
+        chat = mcm.get("chat") or {}
+        new = (mcm.get("new_chat_member") or {}).get("status")
+        frm = mcm.get("from") or {}
+        cid, title = chat.get("id"), chat.get("title") or ""
+        if cid is None or chat.get("type") not in ("channel", "supergroup", "group"):
+            return None
+        if new in ("left", "kicked") and str(cid) == self.meta("signals_chat"):
+            self.set_meta("signals_chat", "")
+            return f"Бот убран из канала «{title}» — сигналы туда больше не идут."
+        if new != "administrator":
+            return None
+        own = self.owner_chat(owner_username)
+        by_owner = (own is not None and frm.get("id") == own) or (
+            owner_username and (frm.get("username") or "").lower() == owner_username.lstrip("@").lower())
+        news = str(cid) == str(os.environ.get("CNQ_TG_CHAT") or "") or (chat.get("username") or "").lower() == "crypto_nova_news"
+        if not by_owner or news or not re.search(r"(?i)signal|сигнал", title):
+            return None
+        self.set_meta("signals_chat", str(cid))
+        self.set_meta("signals_chat_title", title)
+        return f"Канал «{title}» подключён: новые сигналы CRYPTO NOVA (вход, стоп, цели и «Close» при выходе) будут приходить туда."
 
     def owner_chat(self, owner_username: str | None) -> int | None:
         if owner_username:
@@ -129,17 +156,22 @@ class Mailbox:
         self.conn.commit()
         return n
 
-    def poll(self, token: str, answer_fn=None, now: int | None = None) -> dict:
+    def poll(self, token: str, answer_fn=None, now: int | None = None, owner_username: str | None = None) -> dict:
         """Read new updates, welcome newcomers, answer messages (answer_fn(text, chat) -> reply or None), remember chats."""
         now = now or int(time.time() * 1000)
         offset = int(self.meta("offset", "0") or 0)
         try:
-            res = _api(token, "getUpdates", {"offset": offset, "timeout": 0, "allowed_updates": ["message"]})
+            res = _api(token, "getUpdates", {"offset": offset, "timeout": 0, "allowed_updates": ["message", "my_chat_member"]})
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "error": str(e)[:200]}
         n_new = n_reply = 0
         for u in res.get("result", []):
             offset = max(offset, u["update_id"] + 1)
+            if u.get("my_chat_member"):
+                msg = self.channel_event(u["my_chat_member"], owner_username)
+                if msg:
+                    self.notes.append(msg)
+                continue
             m = u.get("message") or {}
             chat = m.get("chat") or {}
             if chat.get("type") != "private":
@@ -194,8 +226,16 @@ def run(conn: sqlite3.Connection, llm=None, token: str | None = None, owner: str
         except Exception:  # noqa: BLE001
             return None
 
-    res = mb.poll(token, answer)
+    owner_un = owner or os.environ.get("CNQ_TG_OWNER") or "dmytrosukhyna"
+    res = mb.poll(token, answer, owner_username=owner_un)
     res["profile_set"] = prof
-    res["owner_chat"] = mb.owner_chat(owner or os.environ.get("CNQ_TG_OWNER") or "dmytrosukhyna")
+    res["owner_chat"] = mb.owner_chat(owner_un)
+    for msg in mb.notes:
+        if res["owner_chat"]:
+            try:
+                _api(token, "sendMessage", {"chat_id": res["owner_chat"], "text": msg})
+            except Exception:  # noqa: BLE001
+                pass
+    res["signals_chat"] = bool(mb.meta("signals_chat"))
     res["leads_sent"] = mb.notify_leads(token, res["owner_chat"])
     return res

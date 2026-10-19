@@ -401,5 +401,46 @@ def sizing():
             "win_pct": round(float(np.mean([x[3] > 0 for x in trs])) * 100), "per_day": round(len(trs) / ((TODAY - dt.date(2022, 1, 1)).days), 2)}))
 
 
+def spot():
+    """19.10, round 4 — the owner's own spot account: the same two rules, LONGS ONLY (spot cannot short), no leverage, spot
+    costs (0.1 % fee per side + 0.02 % slippage → 0.24 % a trade, no funding). Bought only while the BTC regime says «рост»;
+    otherwise the money waits in stablecoins at 4 % a year. 40 coins and 30 other coins; account sizes."""
+    global COST, FUND_D
+    COST, FUND_D = 0.24, 0.0
+
+    def load(coins):
+        with ThreadPoolExecutor(12) as ex:
+            raw = dict(zip(coins, ex.map(lambda s: daily(s + "USDT"), coins)))
+        return {s: k for s, k in raw.items() if k is not None}
+    KS = load(COINS)
+    B = KS["BTC"]
+    bc = B["c"]
+    s200, s50 = sma(bc, 200), sma(bc, 50)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+        soft = np.where(np.isnan(s50), np.nan, (bc > s50).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": soft}
+    K2 = load(COINS2)
+    for D in (KS, K2):
+        for s in D:
+            prep(D[s], gate)
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    for label, D in (("main 40", KS), ("other 30", K2)):
+        trs = sorted([x for s, K in D.items() for spec in (("P", "regime", "-"), ("B20", "regime", "chand")) for x in simulate(K, *spec, s)
+                      if x[0] >= t0 and x[2] == 1], key=lambda x: x[0])
+        yr = {}
+        for x in trs:
+            yr.setdefault(dt.datetime.fromtimestamp(x[0] / 1000, dt.timezone.utc).strftime("%Y"), []).append(x[3])
+        out = {"trades": len(trs), "per_day": round(len(trs) / ((TODAY - dt.date(2022, 1, 1)).days), 2),
+               "avg": round(float(np.mean([x[3] for x in trs])), 2), "win_pct": round(float(np.mean([x[3] > 0 for x in trs])) * 100),
+               "y": {y: [round(float(np.mean(v)), 2), len(v)] for y, v in sorted(yr.items())}}
+        for name, kw in (("10pct x10", dict(share=0.10, max_open=10)), ("15pct x6", dict(share=0.15, max_open=6)),
+                         ("20pct x5", dict(share=0.20, max_open=5)), ("risk1 x10", dict(max_open=10, risk=1.0))):
+            a = account(trs, **kw)
+            a.pop("last_months_pct", None)
+            out[name] = a
+        note(f"own signals spot · longs only {label}", json.dumps(out, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else main()
+    (combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

@@ -344,6 +344,122 @@ def updown(minutes=15, days=30):
     note(f"updown {minutes}m · Polymarket price vs Bitcoin's move inside the window", json.dumps(out, ensure_ascii=False))
 
 
+def binance_1s(day_list):
+    """BTCUSDT spot 1-second closes {second: close} for the given UTC dates (daily zips)."""
+    import csv
+    import io
+    import zipfile
+    out = {}
+
+    def load(d):
+        u = f"https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1s/BTCUSDT-1s-{d:%Y-%m-%d}.zip"
+        try:
+            with urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=120) as r:
+                z = zipfile.ZipFile(io.BytesIO(r.read()))
+            res = {}
+            for x in csv.reader(io.StringIO(z.read(z.namelist()[0]).decode())):
+                if x and x[0].isdigit():
+                    t = int(x[0])
+                    t = t // 1_000_000 if t > 10 ** 14 else t // 1000
+                    res[t] = (float(x[1]), float(x[4]))
+            return res
+        except Exception:  # noqa: BLE001
+            return {}
+    with ThreadPoolExecutor(4) as ex:
+        for r in ex.map(load, day_list):
+            out.update(r)
+    return out
+
+
+def updown_trades(days=5):
+    """The executable check: real TRADES in BTC 15-minute up/down markets (Data API, second timestamps) against Bitcoin's own
+    move at that second (Binance 1-second closes). Model = Φ(r ÷ (σ1s·√seconds left)), σ from the 15 minutes before the window.
+    Takers who bought far below the model (≥ 5 / 10 / 15 cents) — how did those trades end? If such trades exist and win,
+    the lag is real money; if they are rare or lose, the price already knows. Fee crypto_fees_v2 is noted, not applied."""
+    import math
+    step = 900
+    now = int(time.time()) // step * step
+    starts = list(range(now - days * 86400, now - 3600, step))
+
+    def fetch(ts):
+        st, page = get(f"{GAMMA}/markets?slug=btc-updown-15m-{ts}&closed=true")
+        if st != 200 or not isinstance(page, list) or not page:
+            return None
+        m = page[0]
+        prices = [float(x) for x in (_js(m.get("outcomePrices")) or [])]
+        toks = _js(m.get("clobTokenIds")) or []
+        outs = _js(m.get("outcomes")) or []
+        if len(prices) != 2 or sorted(prices) != [0.0, 1.0] or len(toks) != 2:
+            return None
+        up_i = 0 if str(outs[0]).lower().startswith("up") else 1
+        return {"start": ts, "end": ts + step, "cond": m.get("conditionId"), "tok_up": toks[up_i], "tok_dn": toks[1 - up_i],
+                "up_won": prices[up_i] == 1.0}
+    with ThreadPoolExecutor(12) as ex:
+        ms = [m for m in ex.map(fetch, starts) if m]
+
+    def trades(m):
+        out, off = [], 0
+        while off < 5000:
+            st, page = get(f"{DATA}/trades?market={m['cond']}&limit=500&offset={off}&takerOnly=true")
+            if st != 200 or not isinstance(page, list) or not page:
+                break
+            out += page
+            if len(page) < 500:
+                break
+            off += 500
+        return m, out
+    with ThreadPoolExecutor(8) as ex:
+        got = list(ex.map(trades, ms))
+    days_needed = sorted({dt.datetime.fromtimestamp(t, dt.timezone.utc).date() for m in ms for t in (m["start"] - 900, m["end"])})
+    S = binance_1s(days_needed)
+    rows, n_tr = [], 0
+    for m, trs in got:
+        o = S.get(m["start"])
+        pre = [S.get(t) for t in range(m["start"] - 900, m["start"])]
+        pre = [x for x in pre if x]
+        if not o or len(pre) < 600:
+            continue
+        rets = [math.log(c / op) for op, c in pre if op > 0 and c > 0]
+        sig = (sum(r * r for r in rets) / len(rets)) ** 0.5 if rets else 0
+        if sig <= 0:
+            continue
+        for t in trs:
+            n_tr += 1
+            ts = int(t.get("timestamp") or 0)
+            if not (m["start"] + 10 <= ts <= m["end"] - 5) or str(t.get("side")).upper() != "BUY":
+                continue
+            px = S.get(ts)
+            if not px:
+                continue
+            r = math.log(px[1] / o[0])
+            left = m["end"] - ts
+            p_up = _norm_cdf(r / (sig * math.sqrt(left)))
+            is_up = str(t.get("asset")) == str(m["tok_up"])
+            model = p_up if is_up else 1 - p_up
+            price = float(t.get("price") or 0)
+            won = m["up_won"] if is_up else not m["up_won"]
+            if 0.02 < price < 0.98:
+                rows.append((model - price, price, won, float(t.get("size") or 0), (m["end"] - ts) // 60))
+    out = {"markets": len(ms), "trades seen": n_tr, "taker buys checked": len(rows)}
+    for th in (0.0, 0.05, 0.10, 0.15, 0.25):
+        xs = [x for x in rows if x[0] >= th]
+        if len(xs) < 10:
+            continue
+        ret = [(1.0 if w else 0.0) / p - 1 for _e, p, w, _s, _l in xs]
+        usd = sum(sz * p for _e, p, _w, sz, _l in xs)
+        pnl = sum(sz * ((1.0 if w else 0.0) - p) for _e, p, w, sz, _l in xs)
+        out[f"model − price ≥ {th:.2f}"] = {"trades": len(xs), "share %": round(len(xs) / len(rows) * 100, 1),
+                                            "avg return per trade %": round(sum(ret) / len(ret) * 100, 1),
+                                            "wins %": round(sum(1 for x in xs if x[2]) / len(xs) * 100),
+                                            "dollars bought": round(usd), "their pnl $": round(pnl),
+                                            "minutes left median": sorted(x[4] for x in xs)[len(xs) // 2]}
+    lo = [x for x in rows if x[0] <= -0.10]
+    if lo:
+        out["model − price ≤ −0.10 (overpaid)"] = {"trades": len(lo), "wins %": round(sum(1 for x in lo if x[2]) / len(lo) * 100),
+                                                   "their pnl $": round(sum(sz * ((1.0 if w else 0.0) - p) for _e, p, w, sz, _l in lo))}
+    note("updown trades · real taker buys vs Bitcoin at that second", json.dumps(out, ensure_ascii=False))
+
+
 def probe2():
     """What do the short crypto «Up or Down» markets look like (question, slug, dates, fees)?"""
     found, n, samples = {}, 0, []
@@ -387,4 +503,4 @@ def probe3():
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
-    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3}[mode]()
+    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3, "trades": updown_trades}[mode]()

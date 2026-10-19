@@ -1,0 +1,19 @@
+name: research-levels
+# Manual only. Trades from strong volume levels (volume profile of the last 30 days) on Binance 1-hour candles
+# (scripts/levels_study.py).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: python scripts/levels_study.py

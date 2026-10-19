@@ -102,7 +102,7 @@ def main():
                                                  "roi_overview_median_pct": round(st.median(roi) * 100, 1) if roi else None,
                                                  "roi_over_100pct": sum(1 for x in roi if x >= 1.0), "roi_negative": sum(1 for x in roi if x < 0)}))
     long_ = [x for x in r1 if float(x.get("leadDays") or 0) >= 180]
-    prof, months_all, pairs = [], [], []
+    prof, months_all, pairs, series = [], [], [], []
     sample_shown = False
     for x in long_[:400]:
         code = x.get("uniqueCode")
@@ -128,6 +128,7 @@ def main():
             eq *= 1 + r
             peak = max(peak, eq)
             dd = max(dd, 1 - eq / peak)
+        series.append(v)
         prof.append({"code": code, "months": len(v), "median_m": st.median(v), "plus_share": sum(1 for r in v if r > 0) / len(v),
                      "max_dd": dd, "year_x": eq, "m70": sum(1 for r in v if r >= 0.7), "aum": float(x.get("aum") or 0),
                      "followers": int(x.get("copyTraderNum") or 0)})
@@ -153,6 +154,33 @@ def main():
                               "next_median_pct": round(st.median(neg) * 100, 1) if neg else None},
         "drawdown_median_pct": round(st.median(p["max_dd"] for p in prof) * 100),
         "drawdown_over_50pct": sum(1 for p in prof if p["max_dd"] > 0.5)}))
+    # out of sample: pick on the first 6 full months, judge on the months after (does stability carry on?)
+    sel, rest = [], []
+    for v in series:
+        if len(v) < 9:
+            continue
+        a, b = v[:6], v[6:]
+        eq, pk, dd = 1.0, 1.0, 0.0
+        for r in a:
+            eq *= 1 + r
+            pk = max(pk, eq)
+            dd = max(dd, 1 - eq / pk)
+        (sel if sum(1 for r in a if r > 0) >= 5 and dd <= 0.3 and st.median(a) > 0 else rest).append(b)
+
+    def judge(group):
+        xs = [r for b in group for r in b]
+        if not xs:
+            return {"traders": len(group)}
+        tot = []
+        for b in group:
+            e = 1.0
+            for r in b:
+                e *= 1 + r
+            tot.append(e - 1)
+        return {"traders": len(group), "months": len(xs), "median_month_pct": round(st.median(xs) * 100, 1),
+                "months_plus_pct": round(sum(1 for r in xs if r > 0) / len(xs) * 100), "later_total_median_pct": round(st.median(tot) * 100, 1),
+                "later_total_negative": sum(1 for x in tot if x < 0)}
+    note("copytraders · picked on 6 months, judged after", json.dumps({"picked_steady": judge(sel), "the_rest": judge(rest)}))
     steady = sorted([p for p in prof if p["plus_share"] >= 0.75 and p["max_dd"] <= 0.30 and p["months"] >= 6],
                     key=lambda p: -p["median_m"])
     note("copytraders · steady (6+ months, 75 %+ months in plus, drawdown ≤ 30 %)", json.dumps({

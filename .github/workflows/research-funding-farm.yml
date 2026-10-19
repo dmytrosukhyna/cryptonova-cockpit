@@ -1,0 +1,28 @@
+name: research-funding-farm
+# Manual only. Funding farming on small / new perps — history check (scripts/funding_farm_study.py). Public read APIs only:
+# no keys, no secrets, no orders.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "probe | all"
+        required: false
+        default: "probe"
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      FARM_DIR: /tmp/farm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - name: probe
+        if: inputs.mode == 'probe'
+        run: python scripts/funding_farm_study.py probe

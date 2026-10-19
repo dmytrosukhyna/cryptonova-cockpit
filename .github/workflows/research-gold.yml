@@ -1,0 +1,28 @@
+name: research-gold
+# Manual only. Gold on crypto venues (PAXG / XAUT / XAU perps) — the engine's simple rule families vs buy-and-hold
+# (scripts/gold_study.py). Public data only: no keys, no secrets, no orders.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "probe | all"
+        required: false
+        default: "probe"
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GOLD_DIR: /tmp/gold
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - name: probe
+        if: inputs.mode == 'probe'
+        run: python scripts/gold_study.py probe

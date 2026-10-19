@@ -1328,8 +1328,9 @@ def altport2():
             return [s for s in day_top.get(d, []) if alt_ok(s) and d - first[s] >= 180 * DAY][:5]
         return [s for s in day_top.get(d, []) if alt_ok(s) and d - first[s] >= 180 * DAY][:10]
 
-    def sim(mode, how="pit", core=None, alt_part=43.4):
-        core = core or {"BTC": 15.8, "ETH": 6.3, "SOL": 4.7, "LINK": 2.4, "NEAR": 2.4}
+    def sim(mode, how="pit", core=None, alt_part=43.4, extra_btc=0.0):
+        core = dict(core or {"BTC": 15.8, "ETH": 6.3, "SOL": 4.7, "LINK": 2.4, "NEAR": 2.4})
+        core["BTC"] = core.get("BTC", 0) + extra_btc
         start = next(i for i, d in enumerate(days) if d >= t0)
         V, hold, prev, curve = 1.0, None, None, []
         for i in range(start, len(days) - 1):
@@ -1386,7 +1387,11 @@ def altport2():
            "gauge · basket by 180-day volume, ≥1 year": sim("gauge", how="pit180"),
            "alts whenever «рост» · by 180-day volume": sim("regime", how="pit180"),
            "gauge · top 5 alts by volume": sim("gauge", how="pit5"),
-           "gauge · alt part 20 % · by 180-day volume": sim("gauge", how="pit180", alt_part=20.0)}
+           "gauge · alt part 20 % · by 180-day volume": sim("gauge", how="pit180", alt_part=20.0),
+           "gauge · alts 20 % + BTC 23.4 % · 180-day volume": sim("gauge", how="pit180", alt_part=20.0, extra_btc=23.4),
+           "gauge · alts 20 % + BTC 23.4 % · 30-day volume": sim("gauge", how="pit", alt_part=20.0, extra_btc=23.4),
+           "gauge · alts 10 % + BTC 33.4 % · 180-day volume": sim("gauge", how="pit180", alt_part=10.0, extra_btc=33.4),
+           "alts 20 % whenever «рост» + BTC 23.4 % · 180-day": sim("regime", how="pit180", alt_part=20.0, extra_btc=23.4)}
     on_days = sum(1 for d, v in gauge.items() if v and d >= t0)
     today = days[-1]
     res["gauge days on since 2022"] = on_days

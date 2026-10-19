@@ -284,6 +284,25 @@ def _pool_candles(conn, day: int, daily, volumes) -> dict:
     return K
 
 
+def pool_features(K: dict) -> dict:
+    """19.10 round 14: per pool coin (closed candles) — 30- and 180-day dollar volume, the 3-month change against BTC and the
+    number of daily candles we have (≤ 400). spot_quality.py ranks the alts with it."""
+    b = K.get("BTC")
+    if not b or len(b) < 93:
+        return {}
+    bc = [r[4] for r in b[:-1]]
+    out = {}
+    for s, k in K.items():
+        c = k[:-1]
+        if not tradable(s) or len(c) < 181 or any(len(r) < 6 for r in c[-180:]):
+            continue
+        dv = [r[5] * r[4] for r in c]
+        m3 = (c[-1][4] / c[-92][4]) / (bc[-1] / bc[-92]) - 1 if c[-92][4] > 0 and bc[-92] > 0 else None
+        out[s] = {"dv30": round(sum(dv[-30:]) / 30), "dv180": round(sum(dv[-180:]) / 180), "m3": None if m3 is None else round(m3, 4),
+                  "n": len(c)}
+    return out
+
+
 def pick_basket(K: dict) -> list:
     """19.10 round 12: the alt basket of the «ядро + альтсезон» model — the 10 alts with the largest 180-day dollar volume among
     coins with ≥ 1 year of candles (alt_portfolio.py reads it; the honest test picked it this way, not by hand)."""
@@ -314,14 +333,17 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
         a fill at an open hours old would be a free look-back."""
         return px[sym] if now - day > 3_600_000 and px.get(sym) else k[-1][1]
     daily_due = _state(conn, "day") != day and now - day >= 5 * 60_000
-    first_basket = _state(conn, "alt_basket") is None and volumes and _state(conn, "basket_try") != day
-    if daily_due or first_basket:                     # the first basket must not wait for tomorrow (one try a day)
+    first_pool = (_state(conn, "alt_basket") is None or _state(conn, "pool_feats") is None) and volumes and _state(conn, "basket_try") != day
+    if daily_due or first_pool:                       # the first basket / features must not wait for tomorrow (one try a day)
         _set(conn, "basket_try", day)
         K = _pool_candles(conn, day, daily, volumes)
         basket = pick_basket(K)
         if len(basket) == 10:
-            _set(conn, "alt_basket", basket)
-            conn.commit()
+            _set(conn, "alt_basket", basket)          # the fallback basket; spot_quality.py replaces it with the quality pick
+        feats = pool_features(K)
+        if feats:
+            _set(conn, "pool_feats", feats)
+        conn.commit()
     if daily_due:
         # the day's trading set: the TOP_N by 30-day dollar volume among the fetched (closed candles; no volume → not ranked)
         dv = {s: dollar_vol30(k[:-1]) for s, k in K.items() if tradable(s)}

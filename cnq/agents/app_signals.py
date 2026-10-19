@@ -118,6 +118,13 @@ ACCOUNTS = [   # key, name, rules, policy, coin filter
     # (+0.64 / +0.56 / +0.27 / +0.24 % per trade), while «flip everything» fell to −0.02 % in the last quarter.
     ("smart", "Умный разворот", "по ходу последней 4-часовой свечи BTC — как есть, против неё — наоборот; всё до последней цели или стопа", "smart:last", False),
     ("reverse_long", "Разворот только их лонгов", "только их лонги — в шорт, стоп и цели зеркально, равными частями по целям + стоп в безубыток после TP1; их шорты пропускаем", "rev_long:ladder_be", False),
+    # 19.10 (owner: «голден сигналс — с ними нужно хорошо поработать»). On the 322 signals of 18.09–18.10 the EXIT decides more
+    # than the direction: held to the last target or the stop, the signals as they come are +0.20 % a trade (positive in 4 of 5
+    # weeks) while the ladder exits lose; and the mirrored trade is +0.53 %. Both sides win because the stop is tight (≈ 1.1 %)
+    # and the last target far (≈ 2.8 %), and a big move often follows a signal — the edge is in the volatility after the signal
+    # more than in its direction. Two forward tests:
+    ("as_last", "Как приходят · до последней цели", "сигнал как есть, всё держим до последней цели или стопа", "last", False),
+    ("both", "Вилка: обе стороны", "сигнал как есть и зеркальная сделка одновременно, по половине маржи; обе до последней цели или стопа (на истории +0.37% на сигнал, 4 недели из 5 в плюсе)", "both:last", False),
 ]
 WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 
@@ -1651,6 +1658,17 @@ def run_account(rows, key: str, name_ru: str, rules_ru: str, policy: str, use_fi
             trades.append({"r": rr, "open_t": wi["fill_t"], "close_t": closed_, "net": wi.get("last") if closed_ else None,
                            "lev": min(float(r["leverage"] or 1.0), ACCOUNT_LEV_CAP)})
             continue
+        if policy.startswith("both:"):                            # as is AND mirrored, half the margin each
+            p = _pol(r, "last")
+            wi = (sim.get("whatif") or {}).get("rev")
+            lev = min(float(r["leverage"] or 1.0), ACCOUNT_LEV_CAP)
+            if p:
+                trades.append({"r": r, "open_t": sim["fill_t"], "close_t": p["t"], "net": p["net"], "lev": lev, "w": 0.5})
+            if wi and wi.get("fill_t") is not None:
+                closed_ = wi.get("t_last") if wi.get("state") == "closed" else None
+                rr = {**r, "side": "SHORT" if r["side"] == "LONG" else "LONG", "sim": {**sim, "first": wi.get("first"), "risk_pct": wi.get("risk_pct")}}
+                trades.append({"r": rr, "open_t": wi["fill_t"], "close_t": closed_, "net": wi.get("last") if closed_ else None, "lev": lev, "w": 0.5})
+            continue
         if policy.startswith("rev_long:") and r["side"] != "LONG":
             skipped += 1
             continue
@@ -1672,7 +1690,7 @@ def run_account(rows, key: str, name_ru: str, rules_ru: str, policy: str, use_fi
     for t, kind, i in sorted(events, key=lambda e: (e[0], e[1])):
         tr = trades[i]
         if kind == 0:
-            tr["margin"] = equity * ACCOUNT_MARGIN_SHARE
+            tr["margin"] = equity * ACCOUNT_MARGIN_SHARE * tr.get("w", 1.0)
             continue
         m = _margin_return(tr["r"], tr["net"], tr["lev"])
         pnl = tr["margin"] * m / 100.0

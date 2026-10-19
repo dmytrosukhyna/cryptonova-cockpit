@@ -32,6 +32,11 @@ ALT_BASKET = ["SOL", "LINK", "NEAR", "AVAX", "SUI", "ONDO", "AAVE", "HBAR", "PEN
 CORE = {"BTC": 15.8, "ETH": 6.3, "SOL": 4.7, "LINK": 2.4, "NEAR": 2.4}
 ALT_PART, FUTURES, CASH = 43.4, 15.0, 10.0
 BEAR_KEEP = 0.35
+# How the alt part leaves the alts (19.10 daily re-check of this exact model, since 2022, with the futures part and costs):
+#   "gauge"  — out of alts when the gauge turns off:          ×2.88, drawdown −26 %, 2023 +101 %, 2025 +1 %, 2026 +9 %
+#   "regime" — alts whenever the market is «рост» (gauge = info): ×3.54, drawdown −36 %, 2023 +162 %, 2025 −17 %, 2026 +29 %
+#   (for reference, the alt part always in BTC: ×3.08, −25 %). Today both hold the alts; the owner picks the exit rule.
+EXIT = "gauge"
 NAME = "Портфель CRYPTO NOVA · ядро + альтсезон"
 
 
@@ -117,14 +122,15 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, send
     g = gauge(conn)
     if not g:
         return {"error": "not enough history"}
-    t = targets(g["bull"], g["on"])
+    alt_hold = g["on"] if EXIT == "gauge" else bool(g["bull"])
+    t = targets(g["bull"], alt_hold)
     doc = {"asof": now, "name": NAME, "gauge": g, "targets_pct": t, "rules_ru": (
         "Датчик альтсезона включён, когда альты в среднем сильнее биткоина своей 3-месячной средней, биткоин обгоняют от 60% "
         "монет и рынок в режиме «рост». Пока включён — альт-часть (43% портфеля) поровну в 10 альтах, иначе в BTC.")}
     with open(os.path.join(out, "altseason.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False)
     prev = st.get("state")
-    cur = {"bull": g["bull"], "on": g["on"]}
+    cur = {"bull": g["bull"], "on": alt_hold}
     monday = dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc).weekday() == 0
     week = dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc).strftime("%G-%V")
     why = None

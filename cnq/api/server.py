@@ -79,7 +79,10 @@ class Api:
         if method == "GET" and path == "/v2/health":
             home = self._feed("app_home") or {}
             age = None if not home.get("asof") else round(time.time() - home["asof"] / 1000)
-            return 200, {"ok": True, "version": VERSION, "home_age_sec": age}
+            ready = {"llm": bool(self.llm is not None and getattr(self.llm, "available", lambda: False)()),
+                     "firebase_admin": bool(getattr(self.admin, "ready", False)),
+                     "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
+            return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready}
         if method == "GET" and path == "/v2/home":
             d = self._feed("app_home")
             return (200, d) if d else (503, {"error": "feed_unavailable"})

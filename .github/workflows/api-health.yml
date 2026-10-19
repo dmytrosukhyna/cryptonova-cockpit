@@ -1,0 +1,24 @@
+name: api-health
+# 19.10.2026: one click (or `gh workflow run api-health.yml`) → is the 2.0 API up, is the home feed fresh, and which keys the
+# server has (only yes/no: AI agent, Firebase admin for pushes + account deletion, BingX partner for the VIP check).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: GET /v2/health
+        run: |
+          set -u
+          body=$(curl -sS -m 20 https://app.crypto-capital.app/v2/health || echo '{"ok":false,"error":"unreachable"}')
+          echo "$body"
+          echo "::notice title=health::$body"
+          home=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' https://app.crypto-capital.app/v2/home || echo 000)
+          echo "::notice title=home::HTTP $home"
+          noauth=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' -X POST https://app.crypto-capital.app/v2/me || echo 000)
+          echo "::notice title=auth::POST /v2/me without a token → HTTP $noauth (401 expected)"

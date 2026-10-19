@@ -448,5 +448,34 @@ def main():
         note("autolab · changes", json.dumps(changes, ensure_ascii=False))
 
 
+def probe():
+    """Which free daily sources answer from GitHub Actions (Yahoo is often refused there)."""
+    urls = {
+        "yahoo1": "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?range=5d&interval=1d",
+        "yahoo2": "https://query2.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=5d&interval=1d",
+        "stooq": "https://stooq.com/q/d/l/?s=xauusd&i=d",
+        "lbma_gold": "https://prices.lbma.org.uk/json/gold_pm.json",
+        "lbma_silver": "https://prices.lbma.org.uk/json/silver.json",
+        "lbma_plat": "https://prices.lbma.org.uk/json/platinum_pm.json",
+        "fred_sp500": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500",
+        "fred_ndx": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=NASDAQ100",
+        "fred_oil": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DCOILWTICO",
+        "fred_copper": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=PCOPPUSDM",
+        "binance_xau": "https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=3",
+        "binance_um_xau": "https://data.binance.vision/?prefix=data/futures/um/monthly/klines/XAUUSDT/1d/",
+    }
+    out = {}
+    for k, u in urls.items():
+        try:
+            with urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=30) as r:
+                b = r.read()
+            out[k] = [r.status, len(b), b[:160].decode("utf-8", "replace")]
+        except urllib.error.HTTPError as e:
+            out[k] = [e.code, (e.read() or b"")[:160].decode("utf-8", "replace")]
+        except Exception as e:  # noqa: BLE001
+            out[k] = ["ERR", str(e)[:160]]
+    note("autolab · probe", json.dumps(out, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    main()
+    probe() if "--probe" in sys.argv else main()

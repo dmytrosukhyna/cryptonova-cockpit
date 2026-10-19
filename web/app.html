@@ -1805,14 +1805,23 @@ function psBudgetHtml(C,amt){ const S=(C.sleeves||[]).filter(x=>(x.weight||x.sha
   const r=x=>`<div class="bud-r"><i style="background:${x.c}"></i><span>${mypEsc(x.n)}</span><b>${usd(x.v)}</b>${x.h?`<small>${mypEsc(x.h)}</small>`:''}</div>`;
   const sp=spotRows.reduce((a,x)=>a+x.v,0);
   return `${spotRows.length?`<h4>Монеты · ${usd(sp)}</h4>${spotRows.map(r).join('')}`:''}${rows.length?`<h4>Сделки и доход · ${usd(amt-sp)}</h4>${rows.map(r).join('')}`:''}`; }
+// the «ядро + альтсезон» model (alt_portfolio.py): its shares of the whole sum, coins by name
+function altBudgetHtml(amt){ const T=(ALTS&&ALTS.targets_pct)||null; if(!T) return '<div class="muted">Модель появится после ближайшего обновления сервера.</div>';
+  const usd=v=>'$'+Math.round(v).toLocaleString('ru-RU'), g=ALTS.gauge||{}, coins=[], other=[];
+  Object.entries(T).forEach(([k,w])=>{ const row={n:k,v:amt*w/100,c:/USDT/.test(k)?'#b8a7ff':/Фьючерс/.test(k)?'#5b8cff':'#7cc4ff',h:/USDT/.test(k)?'под ~4% в Earn':/Фьючерс/.test(k)?'сигналы CRYPTO NOVA, плечо 2, риск 0.5% на сделку':''}; (/USDT|Фьючерс/.test(k)?other:coins).push(row); });
+  const r=x=>`<div class="bud-r"><i style="background:${x.c}"></i><span>${mypEsc(x.n)}</span><b>${usd(x.v)}</b>${x.h?`<small>${mypEsc(x.h)}</small>`:''}</div>`, sc=coins.reduce((a,x)=>a+x.v,0);
+  return `<div class="muted" style="font-size:12.5px;margin-bottom:4px">Датчик альтсезона ${g.on?'<b class="pos">включён</b> — альт-часть в 10 альтах':'<b>выключен</b> — альт-часть в BTC'} · рынок ${g.bull?'«рост»':'«осторожно»'}</div><h4>Монеты · ${usd(sc)}</h4>${coins.map(r).join('')}<h4>Сделки и доллары · ${usd(amt-sc)}</h4>${other.map(r).join('')}`; }
 function renderPortBudget(){ const box=$('#portBudget'), C=CAP; if(!box) return; if(!C||!C.sleeves){ box.innerHTML=''; return; }
+  const model=()=>load('cnq_budget_model','cap'), calc=a=>a>0?(model()==='alt'?altBudgetHtml(a):psBudgetHtml(CAP,a)):'';
   if(!$('#psBudIn')){ const v0=+(load('cnq_budget','1000'))||1000;
     box.innerHTML=`<div class="ps-card"><h3>Ваш бюджет</h3><p class="sub">Впишите свою сумму — покажем, как система разложила бы её сегодня: какие монеты купить, сколько на сделки и сколько под процент.</p>
+     <div class="sview" id="psBudModel" style="margin:0 0 10px"><button data-m="cap" aria-pressed="${model()!=='alt'}">CRYPTO NOVA Портфолио</button><button data-m="alt" aria-pressed="${model()==='alt'}">Ядро + альтсезон</button></div>
      <div class="ps-bud"><span>$</span><input id="psBudIn" type="number" inputmode="decimal" min="50" step="50" value="${v0}" aria-label="Ваш бюджет в долларах"><div class="q">${[500,1000,5000,20000].map(x=>`<button data-b="${x}">$${x.toLocaleString('ru-RU')}</button>`).join('')}</div></div>
      <div class="bud-g" id="psBudOut"></div><div class="muted" style="font-size:12px;margin-top:10px;line-height:1.45">Раскладка меняется вместе с рынком: при «осторожно» больше денег уходит в доллары под процент. Это расчёт по демо-портфелю, а не обещание дохода.</div></div>`;
-    const inp=$('#psBudIn'), upd=()=>{ const a=Math.max(0,+inp.value||0); store('cnq_budget',String(a)); const o=$('#psBudOut'); if(o) o.innerHTML=a>0?psBudgetHtml(CAP,a):''; };
-    inp.addEventListener('input',upd); box.querySelectorAll('.q button').forEach(b=>b.addEventListener('click',()=>{ inp.value=b.dataset.b; upd(); })); }
-  const inp=$('#psBudIn'), a=Math.max(0,+inp.value||0), o=$('#psBudOut'); if(o&&document.activeElement!==inp){ const h=a>0?psBudgetHtml(C,a):''; if(o.__h!==h){ o.__h=h; o.innerHTML=h; } } }
+    const inp=$('#psBudIn'), upd=()=>{ const a=Math.max(0,+inp.value||0); store('cnq_budget',String(a)); const o=$('#psBudOut'); if(o){ o.innerHTML=calc(a); o.__h=o.innerHTML; } };
+    inp.addEventListener('input',upd); box.querySelectorAll('.q button').forEach(b=>b.addEventListener('click',()=>{ inp.value=b.dataset.b; upd(); }));
+    box.querySelectorAll('#psBudModel button').forEach(b=>b.addEventListener('click',()=>{ store('cnq_budget_model',b.dataset.m); box.querySelectorAll('#psBudModel button').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); upd(); })); }
+  const inp=$('#psBudIn'), a=Math.max(0,+inp.value||0), o=$('#psBudOut'); if(o&&document.activeElement!==inp){ const h=calc(a); if(o.__h!==h){ o.__h=h; o.innerHTML=h; } } }
 function ovOpen(id){ const o=$('#'+id); if(!o||!o.hidden) return; o.hidden=false; o.scrollTop=0; try{ history.pushState({ov:id},''); }catch(e){} }
 function ovClose(id){ const o=$('#'+id); if(!o||o.hidden) return; if(history.state&&history.state.ov===id){ try{ history.back(); return; }catch(e){} } o.hidden=true; }
 // the phone's «back» closes an open screen instead of leaving the panel

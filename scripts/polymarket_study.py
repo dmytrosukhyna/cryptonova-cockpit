@@ -213,6 +213,74 @@ def arb():
         ensure_ascii=False))
 
 
+def rewards():
+    """Where the money for MAKERS is: liquidity rewards. Active markets with a reward pool (Gamma clobRewards / rewardsDailyRate,
+    rewardsMaxSpread v in cents, rewardsMinSize). Polymarket scores each resting order S = ((v − s) ÷ v)² × size (s = cents from
+    the mid), two-sided, sampled every minute; the day's pool is split by score. Estimate for a NEW maker: quote $1,000 a side
+    (YES bid and NO bid) 1 cent from the mid → our score vs the scores already in the book within v → our share of the daily pool
+    → yearly % on the capital. An upper bound (others requote; inventory risk on news is not priced)."""
+    ms, seen = [], set()
+    for off in range(0, 3000, 100):
+        st, page = get(f"{GAMMA}/markets?closed=false&limit=100&offset={off}&order=volume24hr&ascending=false")
+        if st != 200 or not isinstance(page, list) or not page:
+            break
+        for m in page:
+            if m.get("id") not in seen:
+                seen.add(m.get("id"))
+                ms.append(m)
+    keys = sorted({k for m in ms[:50] for k in m if "reward" in k.lower() or "holding" in k.lower() or "fee" in k.lower()})
+
+    def pool(m):
+        rs = _js(m.get("clobRewards")) or []
+        rate = sum(float(r.get("rewardsDailyRate") or 0) for r in rs if isinstance(r, dict))
+        return rate
+    rw = [m for m in ms if pool(m) > 0 and float(m.get("rewardsMaxSpread") or 0) > 0]
+
+    def score(m):
+        toks = _js(m.get("clobTokenIds")) or []
+        if len(toks) != 2:
+            return None
+        st, b = get(f"{CLOB}/book?token_id={toks[0]}")
+        if st != 200 or not isinstance(b, dict):
+            return None
+        bids = [(float(x["price"]), float(x["size"])) for x in b.get("bids") or []]
+        asks = [(float(x["price"]), float(x["size"])) for x in b.get("asks") or []]
+        if not bids or not asks:
+            return None
+        bb, ba = max(p for p, _ in bids), min(p for p, _ in asks)
+        mid = (bb + ba) / 2
+        v = float(m.get("rewardsMaxSpread") or 0)
+        mn = float(m.get("rewardsMinSize") or 0)
+
+        def sc(levels):
+            return sum(sz * ((v - abs(mid - p) * 100) / v) ** 2 for p, sz in levels if abs(mid - p) * 100 < v)
+        qb, qa = sc(bids), sc(asks)          # YES asks = NO bids
+        cap = 1000.0
+        n_yes = cap / max(0.01, mid - 0.01)
+        n_no = cap / max(0.01, 1 - mid - 0.01)
+        if min(n_yes, n_no) < mn:
+            return None
+        ours = ((v - 1) / v) ** 2 if v > 1 else 0.0
+        share = min(n_yes * ours / (qb + n_yes * ours), n_no * ours / (qa + n_no * ours))
+        day = pool(m) * share
+        end = m.get("endDate") or ""
+        return {"q": (m.get("question") or "")[:70], "pool $/day": round(pool(m), 1), "max spread c": v, "min size": mn,
+                "mid": round(mid, 3), "spread c": round((ba - bb) * 100, 1), "book score bid/ask": [round(qb), round(qa)],
+                "our $/day on $2k": round(day, 2), "yearly %": round(day * 365 / (2 * cap) * 100, 1),
+                "vol24h": round(float(m.get("volume24hr") or 0)), "ends": end[:10]}
+    with ThreadPoolExecutor(8) as ex:
+        res = [r for r in ex.map(score, rw[:400]) if r]
+    res.sort(key=lambda r: -r["yearly %"])
+    tot = sum(pool(m) for m in rw)
+    note("rewards · pools", json.dumps({"active markets scanned": len(ms), "with a reward pool": len(rw),
+                                        "pools $/day total": round(tot), "fields": keys,
+                                        "yearly % quantiles (our $2k, 1c from mid)":
+                                            [r["yearly %"] for r in res[::max(1, len(res) // 10)]][:12]}, ensure_ascii=False))
+    note("rewards · best 12 for a new maker", json.dumps(res[:12], ensure_ascii=False)[:4000])
+    mid_ = [r for r in res if 0.15 <= r["mid"] <= 0.85 and r["vol24h"] < 50_000]
+    note("rewards · calm markets (mid 0.15–0.85, volume < $50k a day)", json.dumps(mid_[:10], ensure_ascii=False)[:4000])
+
+
 def _norm_cdf(x):
     import math
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
@@ -517,4 +585,4 @@ def probe3():
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
-    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3, "trades": updown_trades, "trades5": lambda: updown_trades(3, 5)}[mode]()
+    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3, "trades": updown_trades, "trades5": lambda: updown_trades(3, 5), "rewards": rewards}[mode]()

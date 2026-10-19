@@ -1842,9 +1842,19 @@ def ls_neutral():
         FR = dict(zip(need, ex.map(lambda k: _funding_month(*k), need)))
     have_f = sum(1 for v in FR.values() if v is not None)
 
+    IV = "--iv" in sys.argv                    # inverse-volatility weights (30-day daily σ) instead of equal — the standard risk fix
+
+    def vol30(s, d):
+        xs = [cl[s].get(d - k * DAY) for k in range(31)]
+        xs = [x for x in xs if x]
+        if len(xs) < 15:
+            return None
+        r = np.diff(np.log(np.array(xs[::-1])))
+        return float(r.std()) or None
+
     def leg(ps, d, d1):
         ts = [t for t in days if d < t <= d1]
-        out = []
+        out, w = [], []
         for s in ps:
             c0 = cl[s].get(d)
             if not c0:
@@ -1856,7 +1866,17 @@ def ls_neutral():
                     last = c
                 path.append(last / c0)
             out.append(path)
-        return np.mean(np.array(out), axis=0) if out else np.ones(len(ts))
+            sv = vol30(s, d) if IV else None
+            w.append(1.0 / sv if sv else None)
+        if not out:
+            return np.ones(len(ts))
+        if IV and len(out) > 1:
+            med = float(np.median([x for x in w if x])) if any(w) else 1.0
+            w = np.array([x if x else med for x in w])
+            w = np.minimum(w / w.sum(), 2.5 / len(w))     # no coin above 2.5× an equal share
+            w = w / w.sum()
+            return (np.array(out) * w[:, None]).sum(axis=0)
+        return np.mean(np.array(out), axis=0)
     names = list(plan[0][2])
     comp_ = {k: [] for k in names}        # per month: (Lpath, Spath, turnover L, turnover S, funding L, funding S, d)
     prev = {k: (set(), set()) for k in names}
@@ -1909,7 +1929,7 @@ def ls_neutral():
                   round(float(np.prod(1 + rr[:half])), 2), round(float(np.prod(1 + rr[half:])), 2),
                   round(fm * 100, 2), round(cm * 100, 2), g25, round(best[0], 2) if best else None,
                   round(best[1] * 100, 2) if best else None]
-    note("ls neutral · [x g1, dd %, month %, t, months+ %, 2022…2026 %, halves, funding %/m, cost %/m, g@dd25, x, month %]",
+    note(("ls neutral IV" if IV else "ls neutral") + " · [x g1, dd %, month %, t, months+ %, 2022…2026 %, halves, funding %/m, cost %/m, g@dd25, x, month %]",
          json.dumps({"funding files": f"{have_f}/{len(need)}", "months": len(plan), **out}, ensure_ascii=False))
 
 

@@ -30,7 +30,14 @@ Rounds 6–8 (19.10, owner: «что это за правило не больш�
       (now: +1.3 / +2.4 / +1.3 %). Plus every year 2023–2026 on 40 and 70 coins. Ranking by the volume beat a random pick at
       every cap 2…6 on 40 and on 30 coins, with 20 / 30 / 50-day windows and base or quote volume alike.
     • the pullback without the volume mark is the weak part (70 coins: drawdown −45 %); the breakout with volume carries it.
-    Live since 19.10 evening: 70 coins, the volume mark, no daily cap, ≤ 40 open, gross ≤ 2× the account, risk 0.5 %.
+    Rounds 9–10 (the honest test): EVERY Binance USDT-M perp, delisted ones included, and each day the coin set = the top N by
+    30-day dollar volume ON THAT DAY. More coins is WORSE: top 40 → +2.1 % a month, drawdown −23 %; top 60 → −39 %; top 100 →
+    −57 %; all → −72 %. Today's 70 (and today's 40) were flattered by survivors — about ×2…4 at the same drawdown. The honest
+    winner: the top 40 by volume, the mark 1.5×, ≤ 40 open: +2.1 % a month, −23 %, average trade +3.1 %, 0.6 trades a day,
+    2023–2026 +44 / +54 / +10 / +13 %; at the same drawdown −25 % +2.3 % a month vs +0.7 % for 4 random signals a day (≈ the
+    old rule) and +0.8 % for every signal without the mark.
+    Live since 19.10: each day the 40 BingX perps with the largest 30-day dollar volume (from a pool of the 90 largest by 24-hour
+    volume + the 40 core coins), the volume mark, no daily cap, ≤ 40 open, gross ≤ 2× the account, risk 0.5 %.
 
 Rules (checked once a day after the daily close, 00:00 UTC; entries and rule exits at the new day's open):
   P — long: close above a RISING 50-day average (vs 5 days ago) and RSI(2) < 10, BTC regime «рост» (BTC above its 200-day average
@@ -55,7 +62,9 @@ COINS40 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DO
            "DYDX", "GALA", "TIA", "SEI", "WLD", "ENA"]
 COINS30 = ["FET", "RENDER", "1000PEPE", "WIF", "JUP", "PYTH", "ONDO", "TAO", "1000BONK", "FLOKI", "ORDI", "JTO", "STRK", "PENDLE",
            "ENS", "IMX", "MANA", "EGLD", "THETA", "ALGO", "VET", "QNT", "KAVA", "ZIL", "MASK", "CHZ", "COMP", "SNX", "1INCH", "ZRO"]
-COINS = COINS40 + COINS30          # BingX perp names (1000PEPE, 1000BONK, FLOKI)
+COINS = COINS40                    # the core list: always fetched (the altseason gauge reads their closes); trading = TOP_N below
+TOP_N, POOL_N = 40, 90             # 19.10 rounds 9–10: trade the 40 perps with the largest 30-day dollar volume (pool: 90 by 24 h)
+NOT_TRADED = {"USDC", "FDUSD", "TUSD", "USDE", "DAI", "USDP", "PYUSD", "USD1", "BUSD", "XAUT", "PAXG"}
 START = 10_000.0
 RISK, NOTIONAL_CAP, MAX_OPEN, GROSS_CAP = 0.005, 0.25, 40, 2.0
 LONG_ONLY = True                   # 19.10 round 5: the shorts of the rules ≈ 0 a trade
@@ -65,12 +74,13 @@ HOLD = {"P": 10, "C": 14}
 DAY = 86_400_000
 NAME = "Сигналы CRYPTO NOVA"
 RULE_RU = {"P": "откат в тренде", "C": "пробой 20 дней"}
-ABOUT = ("Наши собственные сигналы раз в день на 70 монетах: покупаем, только когда рынок растёт, в остальное время ждём в долларах. "
+ABOUT = ("Наши собственные сигналы раз в день на 40 самых торгуемых монетах (список обновляется каждый день по объёму за 30 дней): "
+         "покупаем, только когда рынок растёт, в остальное время ждём в долларах. "
          "Два правила: «откат в тренде» (монета в росте сделала короткий откат) и «пробой 20 дней» (цена вышла из 20-дневного "
          "диапазона, держим, пока тренд не сломается). Входим, только если в день сигнала объём торгов был в 1.5 раза выше "
          "обычного: за таким движением стоят деньги. Лимита сделок в день нет, до 40 открытых. Стоп 3–15% от входа, риск 0.5% "
-         "счёта на сделку. История 2023–2026 с учётом открытых сделок: в среднем около +5% в месяц, худшая просадка −28%, "
-         "каждый год в плюсе. Демо $10 000.")
+         "счёта на сделку. Честная история 2023–2026 (все монеты Binance, включая снятые с торгов): в среднем около +2% в месяц, "
+         "худшая просадка −23%, каждый год в плюсе. Демо $10 000.")
 
 
 def _get(url: str, timeout: int = 15):
@@ -93,6 +103,33 @@ def fetch_daily(sym: str) -> list:
         return []
     d = _get(f"https://data-api.binance.vision/api/v3/klines?symbol={sym}USDT&interval=1d&limit=300")
     return [[int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5])] for r in d]
+
+
+def fetch_volumes() -> dict:
+    """{SYM: 24-hour volume in dollars} for the BingX USDT perps (one request) — the pool for the daily top 40."""
+    d = _get(f"https://open-api.bingx.com/openApi/swap/v2/quote/ticker?timestamp={int(time.time() * 1000)}")
+    out = {}
+    for x in d.get("data") or []:
+        s = str(x.get("symbol") or "")
+        try:
+            qv = float(x.get("quoteVolume") or 0) or float(x.get("volume") or 0) * float(x.get("lastPrice") or 0)
+        except (TypeError, ValueError):
+            continue
+        if s.endswith("-USDT") and qv > 0:
+            out[s[:-5]] = qv
+    return out
+
+
+def tradable(sym: str) -> bool:
+    from .listing_desk import not_crypto
+    return sym not in NOT_TRADED and not not_crypto(f"{sym}-USDT")
+
+
+def dollar_vol30(K: list) -> float | None:
+    """The 30-day average dollar volume (base volume × close) of the closed candles K."""
+    if len(K) < VOL_DAYS or any(len(k) < 6 for k in K[-VOL_DAYS:]):
+        return None
+    return sum(k[5] * k[4] for k in K[-VOL_DAYS:]) / VOL_DAYS
 
 
 def fetch_prices() -> dict:
@@ -227,7 +264,7 @@ def equity_closed(conn) -> float:
     return START + (conn.execute("SELECT COALESCE(SUM(pnl_usd), 0) FROM own_trades WHERE closed IS NOT NULL").fetchone()[0] or 0.0)
 
 
-def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, prices=fetch_prices) -> dict:
+def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, prices=fetch_prices, volumes=None) -> dict:
     now = now or int(time.time() * 1000)
     ensure(conn)
     events = []
@@ -249,14 +286,23 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
         a fill at an open hours old would be a free look-back."""
         return px[sym] if now - day > 3_600_000 and px.get(sym) else k[-1][1]
     if _state(conn, "day") != day and now - day >= 5 * 60_000:
+        try:
+            vols = volumes() if volumes else {}
+        except Exception:  # noqa: BLE001
+            vols = {}
+        ranked = [x for x, _v in sorted(vols.items(), key=lambda kv: -kv[1]) if tradable(x)][:POOL_N]
+        pool = list(dict.fromkeys(COINS + ranked + [t["symbol"] for t in _open_rows(conn)]))
         K = {}
-        for s in COINS:
+        for s in pool:
             try:
                 rows = daily(s)
             except Exception:  # noqa: BLE001
                 continue
             if rows and rows[-1][0] == day and len(rows) >= 120:
                 K[s] = rows
+        # the day's trading set: the TOP_N by 30-day dollar volume among the fetched (closed candles; no volume → not ranked)
+        dv = {s: dollar_vol30(k[:-1]) for s, k in K.items() if tradable(s)}
+        universe = set(sorted((s for s in dv if dv[s]), key=lambda s: -dv[s])[:TOP_N])
         # closed daily closes for the altseason gauge (alt_portfolio.py) — kept ~220 days per coin
         conn.executemany("INSERT OR REPLACE INTO own_closes VALUES(?,?,?)", [(s, int(r[0]), float(r[4])) for s, k in K.items() for r in k[:-1][-220:]])
         conn.execute("DELETE FROM own_closes WHERE day < ?", (day - 240 * DAY,))
@@ -282,6 +328,8 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                 gross = sum(t["qty"] * t["entry"] for t in open_now)
                 cands = []
                 for s, k in K.items():
+                    if s not in universe:
+                        continue
                     closed = k[:-1]
                     for rule, sg in signals(closed, bull):
                         if (LONG_ONLY and sg != 1) or (s, rule) in have:
@@ -314,6 +362,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
             _set(conn, "regime", bull)
             _set(conn, "day", day)
             _set(conn, "coins_seen", len(K))
+            _set(conn, "universe", sorted(universe, key=lambda s: -(dv.get(s) or 0)))
     conn.commit()
     return {"events": events, "prices": px}
 
@@ -355,12 +404,14 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
                       "max_dd_pct": round(dd * 100, 2), "best": 0, "worst": 0},
             "equity_history": eqh, "events": events[:20], "error": None,
             "regime_ru": None if bull is None else ("рост: покупаем" if bull else "не рост: ждём в долларах"),
-            "rules": "откат в тренде и пробой 20 дней на 70 монетах, только покупки в режиме «рост» и только при объёме дня от 1.5× к среднему за 30 дней; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 40 открытых"}
+            "rules": "откат в тренде и пробой 20 дней на 40 самых торгуемых монетах, только покупки в режиме «рост» и только при объёме дня от 1.5× к среднему за 30 дней; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 40 открытых"}
 
 
-def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, daily=fetch_daily, prices=fetch_prices) -> dict:
+def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, daily=fetch_daily, prices=fetch_prices, volumes=None) -> dict:
     now = now or int(time.time() * 1000)
-    r = step(conn, now, daily, prices)
+    if volumes is None and daily is fetch_daily:      # live: the BingX 24-hour volumes; tests inject candles → the core list only
+        volumes = fetch_volumes
+    r = step(conn, now, daily, prices, volumes)
     d = doc(conn, now, r["prices"], r["events"])
     p = os.path.join(out, "paper.json")
     try:

@@ -112,3 +112,29 @@ def test_vol_surge_is_the_last_days_dollar_volume_over_its_30_day_average():
     rows = [[0, 1, 1, 1, 10.0, 100.0]] * 29 + [[0, 1, 1, 1, 20.0, 200.0]]        # $1 000 a day, then $4 000
     assert abs(od.vol_surge(rows) - 4000 / ((29 * 1000 + 4000) / 30)) < 1e-9
     assert od.vol_surge([r[:5] for r in rows]) is None                           # no volume data → no trade
+
+
+def test_the_trading_set_is_the_daily_top_by_dollar_volume(monkeypatch):
+    """19.10 rounds 9–10: trade the TOP_N perps by 30-day dollar volume — a big new coin from the BingX volume pool gets in, a quiet
+    core coin drops out, synthetic non-crypto pairs never count."""
+    conn = sqlite3.connect(":memory:")
+    up = [100 * 1.004 ** i for i in range(260)]
+    brk = up[:199] + [up[198] * 1.06]
+    base_vol = {"NEW": 50_000.0, "ETH": 20_000.0, "SOL": 1_000.0}     # base volume a day; the breakout day ×3
+
+    def daily(sym):
+        if sym == "BTC":
+            src, v = up[:200], 100.0
+        elif sym in base_vol:
+            src, v = brk, base_vol[sym]
+        else:
+            raise RuntimeError("no data")
+        rows = [[r[0], r[1], r[2], r[3], r[4], v * (3 if i == len(src) - 1 else 1)] for i, r in enumerate(_series(src))]
+        rows.append([D0 + 200 * DAY, rows[-1][4], rows[-1][4], rows[-1][4], rows[-1][4], 1.0])
+        return rows
+    monkeypatch.setattr(od, "TOP_N", 2)
+    od.run(conn, out=tempfile.mkdtemp(), now=D0 + 200 * DAY + 10 * 60_000, daily=daily, prices=lambda: {},
+           volumes=lambda: {"NEW": 9e9, "NCSKXYZ2USD": 9e12, "SOL": 1.0})
+    syms = sorted(r[0] for r in conn.execute("SELECT symbol FROM own_trades"))
+    assert syms == ["ETH", "NEW"]                                      # BTC's dollar volume is below ETH's and NEW's here
+    assert od._state(conn, "universe") == ["NEW", "ETH"]

@@ -19,4 +19,5 @@ systemctl enable -q cnq-engine
 systemctl restart cnq-engine
 sleep 90
 journalctl -u cnq-engine -n 5 --no-pager
-echo "Движок работает. Статус: systemctl status cnq-engine · журнал: journalctl -u cnq-engine -f"
+echo "Движок работает. GitHub сам увидит его (web/engine.json) и перестанет запускать эти столы у себя."
+echo "Статус: systemctl status cnq-engine · журнал: journalctl -u cnq-engine -f"

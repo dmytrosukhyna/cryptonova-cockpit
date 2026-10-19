@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CRYPTO NOVA fast engine — one-time install on the Ubuntu server (as root):
 #   curl -fsSL https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/deploy/engine/install.sh | bash
-# Then: nano /etc/cnq.env (2 values), set the GitHub variable CNQ_ENGINE=server, and run start.sh (see README.md).
+# Then: nano /etc/cnq.env (2 values) and run start.sh (see README.md).
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
@@ -23,5 +23,4 @@ systemctl daemon-reload
 echo
 echo "Готово. Дальше:"
 echo "  1) nano /etc/cnq.env   — вписать CNQ_GH_TOKEN и CNQ_TG_TOKEN"
-echo "  2) GitHub → cryptonova-cockpit → Settings → Secrets and variables → Actions → Variables → New: CNQ_ENGINE = server"
-echo "  3) bash /opt/cnq/repo/deploy/engine/start.sh"
+echo "  2) bash /opt/cnq/repo/deploy/engine/start.sh"

@@ -142,6 +142,10 @@ jobs:
           CNQ_LLM_PROVIDER: ${{ vars.CNQ_LLM_PROVIDER }}
           CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
         run: python -m cnq.cli portfolio --out web
+      - name: CRYPTO NOVA портфель for the mobile app (shares, prices, the index curve) → web/app_portfolio.json
+        continue-on-error: true
+        timeout-minutes: 2
+        run: python -m cnq.cli appportfolio --out web
       - name: Доход держателям (DefiLlama holders revenue → token symbols) → web/tokenomics.json
         continue-on-error: true
         timeout-minutes: 3
@@ -225,7 +229,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/tokenomics.json web/channel_watch.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/tokenomics.json web/channel_watch.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase -X theirs origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done

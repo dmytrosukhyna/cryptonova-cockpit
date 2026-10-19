@@ -109,3 +109,25 @@ def test_poll_connects_the_channel_from_the_owners_forward(monkeypatch):
     mb.poll("t", owner_username="owner_x")
     assert signal_feed.signals_chat(conn) == "-1003"
     assert "подключён" in sent[0]["text"]
+
+
+def test_owner_dm_without_a_channel_gets_the_forward_instruction_and_the_poll_is_recorded(monkeypatch):
+    import json as _json
+    import sqlite3
+    from cnq.agents import botmail
+    conn = sqlite3.connect(":memory:")
+    mb = botmail.Mailbox(conn)
+    conn.execute("INSERT INTO bot_chats VALUES(?,?,?,?,?,1)", (111, "owner_x", "D", 0, 0))
+    sent = []
+
+    def api(token, method, data=None, timeout=20):
+        if method == "getUpdates":
+            return {"ok": True, "result": [{"update_id": 9, "message": {"chat": {"id": 111, "type": "private"},
+                                                                         "from": {"id": 111, "username": "owner_x"}, "text": "Старт"}}]}
+        sent.append(data)
+        return {"ok": True}
+    monkeypatch.setattr(botmail, "_api", api)
+    mb.poll("t", owner_username="owner_x")
+    assert "Перешлите мне" in sent[0]["text"]
+    lp = _json.loads(mb.meta("last_poll"))
+    assert lp["ok"] and lp["n"] == 1 and lp["types"] == ["message"]

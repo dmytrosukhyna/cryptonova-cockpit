@@ -196,7 +196,17 @@ class Mailbox:
             res = _api(token, "getUpdates", {"offset": offset, "timeout": 0,
                                              "allowed_updates": ["message", "my_chat_member", "channel_post"]})
         except Exception as e:  # noqa: BLE001
-            return {"ok": False, "error": str(e)[:200]}
+            err = str(e)[:200]
+            if "409" in err:                 # a webhook is set somewhere → getUpdates gets nothing; say where it points (no token)
+                try:
+                    w = _api(token, "getWebhookInfo").get("result") or {}
+                    err += f" · webhook: {(w.get('url') or '')[:60]}"
+                except Exception:  # noqa: BLE001
+                    pass
+            self.set_meta("last_poll", json.dumps({"t": now, "ok": False, "err": err}))
+            return {"ok": False, "error": err}
+        self.set_meta("last_poll", json.dumps({"t": now, "ok": True, "n": len(res.get("result") or []),
+                                               "types": sorted({k for u in res.get("result") or [] for k in u if k != "update_id"})}))
         n_new = n_reply = 0
         for u in res.get("result", []):
             offset = max(offset, u["update_id"] + 1)
@@ -244,7 +254,13 @@ class Mailbox:
                 self.conn.execute("INSERT INTO bot_chats VALUES(?,?,?,?,?,1)", (cid, frm.get("username"), frm.get("first_name"), now, now)); n_new += 1
             text = (m.get("text") or "").strip()
             reply = None
-            if text.startswith("/start connect_"):
+            own = self.owner_chat(owner_username)
+            is_owner = (own is not None and frm.get("id") == own) or (
+                owner_username and (frm.get("username") or "").lower() == owner_username.lstrip("@").lower())
+            if is_owner and not self.meta("signals_chat") and not text.startswith("/start connect_"):
+                reply = ("Канал сигналов ещё не подключён. Перешлите мне сюда любой пост из вашего канала (стрелка справа от поста → "
+                         "этот бот) — я проверю, что вы его администратор, и подключу. Бот должен быть администратором канала.")
+            elif text.startswith("/start connect_"):
                 what = text.split("connect_", 1)[1].strip().split()[0][:40]
                 reply = CONNECT.format(name=connect_name(what))
                 self.lead(cid, frm.get("username"), frm.get("first_name"), what, now)

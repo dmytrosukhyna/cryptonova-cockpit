@@ -29,9 +29,9 @@ REPO = os.environ.get("CNQ_REPO_DIR", "/opt/cnq/repo")
 RUN = os.environ.get("CNQ_RUN_DIR", "/opt/cnq/run")
 INTERVAL_S = int(os.environ.get("CNQ_ENGINE_INTERVAL", "60"))
 SYNC_S = int(os.environ.get("CNQ_ENGINE_SYNC", "120"))
-FAST = ["paper", "listings", "own", "lsn", "turbo", "signalfeed"]          # order matters: paper rewrites paper.json, the rest add
+FAST = ["paper", "listings", "own", "lsn", "turbo", "signalfeed", "apphome"]          # order matters: paper rewrites paper.json, the rest add
 SLOW = ["quality", "altport"]
-OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "altseason.json", "engine.json"]
+OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "altseason.json", "engine.json", "app_home.json", "app_btc.json"]
 DB_OWNED = {"agents.sqlite", "cnq.sqlite"}                                 # the engine's own state — never overwritten by a pull
 STEP_TIMEOUT = {"paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90}
 
@@ -148,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     env = {**os.environ, "PYTHONPATH": RUN, "PYTHONUNBUFFERED": "1"}
     prepare()
+    code_mtime = os.path.getmtime(os.path.realpath(__file__))        # a git pull that changes the engine → restart (systemd)
     started, n, last_sync, t_sync = _now_ms(), 0, None, 0.0
     while True:
         t0 = time.time()
@@ -164,6 +165,12 @@ def main(argv: list[str] | None = None) -> int:
         n += 1
         if a.cycles and n >= a.cycles:
             return 0
+        try:
+            if not a.cycles and os.path.getmtime(os.path.realpath(__file__)) != code_mtime:
+                print("engine code updated by git pull — exiting so systemd restarts the new version", flush=True)
+                return 0
+        except OSError:
+            pass
         # start every cycle 3 s after a minute boundary: a 15-minute candle closes at :00 / :15 / :30 / :45, so the desks see it
         # within seconds (history 2020–26: the cascade buy entered 15 minutes late lost 40 % of its edge, and all of it in 2025–26)
         nxt = (int((time.time() - 3) // INTERVAL_S) + 1) * INTERVAL_S + 3

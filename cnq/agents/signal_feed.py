@@ -29,14 +29,17 @@ PROFILE = "bal"
 SOURCES = [   # desk key, name for people, why it is in
     ("bal", "откуп падений (CNPTS)", "основная стратегия CNPTS: откуп каскадов, паники, сброса позиций и дисконта фьючерса"),
     ("imp", "Импульс BTC", "прошла самую строгую проверку «Лаборатории»: 2025 и 2026 в плюсе, без 3 лучших дней тоже"),
+    # 19.10 (owner: «нам нужны собственные сигналы … сигналы должны быть»): 729 listings on history, +2.6 % a trade, plus every year
+    ("lst", "шорт новых листингов", "через 4 ч после появления фьючерса новой монеты — шорт на 14 дней; на истории 729 листингов: "
+                                    "+2.6% на сделку, плюс в каждом году"),
 ]
 LIVE_MIN_N = 10
 LIVE_DAYS = 30
-LEV = {"B": 5, "E": 3, "F": 3, "D": 3, "K": 3}          # isolated leverage per rule: wide catastrophe stops (−6…−12 %) → 3×, cascade (tight stop) → 5×
+LEV = {"B": 5, "E": 3, "F": 3, "D": 3, "K": 3, "LST": 2}          # isolated leverage per rule: wide catastrophe stops (−6…−12 %) → 3×, cascade (tight stop) → 5×
 RULE_RU = {"B": "откуп каскада ликвидаций", "E": "откуп паники", "F": "откуп сброса позиций", "D": "откуп дисконта фьючерса",
-           "A": "откуп гэпа", "K": "альт догоняет рывок BTC"}
-TIME_EXIT = {"E", "F", "D", "K"}
-HOLD_H = {"E": 24, "F": 24, "D": 24, "K": 12}
+           "A": "откуп гэпа", "K": "альт догоняет рывок BTC", "LST": "шорт нового листинга"}
+TIME_EXIT = {"E", "F", "D", "K", "LST"}
+HOLD_H = {"E": 24, "F": 24, "D": 24, "K": 12, "LST": 14 * 24}
 
 
 def _fmt(p: float) -> str:
@@ -53,6 +56,8 @@ def targets(t: dict) -> list[float]:
     e, s = float(t["entry"]), float(t["stop"])
     r = abs(e - s)
     sg = 1 if t["side"] == "LONG" else -1
+    if t.get("grade") == "LST":                   # the desk exits by time (14 days); targets only lock in a deep fall on the way
+        return [e * (1 - k) for k in (0.25, 0.4, 0.55)]
     if t.get("grade") in TIME_EXIT or not t.get("tps"):
         return [e + sg * k * r for k in (1, 2, 3)]
     tps = sorted({float(x) for x in json.loads(t["tps"]) if x} if isinstance(t["tps"], str) else {float(x) for x in t["tps"] if x})
@@ -66,7 +71,9 @@ def open_text(t: dict) -> str:
              f"Leverage: Isolated {LEV.get(g, 3)}x", "Entry Targets:", f"1) {_fmt(float(t['entry']))}", "Take-Profit Targets:"]
     lines += [f"{i}) {_fmt(p)}" for i, p in enumerate(targets(t), 1)]
     lines += ["Stop Targets:", f"1) {_fmt(float(t['stop']))}"]
-    if g in TIME_EXIT:
+    if g == "LST":
+        lines.append("Выход по времени через 14 дней — пришлём «Close».")
+    elif g in TIME_EXIT:
         lines.append(f"Выход по времени через {HOLD_H.get(g, 24)} ч — пришлём «Close».")
     return "\n".join(lines)
 
@@ -74,7 +81,8 @@ def open_text(t: dict) -> str:
 def close_text(t: dict) -> str:
     sym = t["symbol"].replace("-USDT", "").replace("USDT", "")
     pct = t.get("pnl_pct")
-    why = {"STOP": "стоп", "TARGET": "цель", "TIME": "время вышло", "BREAKEVEN": "безубыток", "TRAIL": "трейлинг"}.get(t.get("exit_kind") or "", t.get("exit_kind") or "")
+    why = {"STOP": "стоп", "TARGET": "цель", "TIME": "время вышло", "BREAKEVEN": "безубыток", "TRAIL": "трейлинг",
+           "время": "время вышло"}.get(t.get("exit_kind") or "", t.get("exit_kind") or "")
     return f"Close #{sym}/USDT" + (f" — {why}" if why else "") + (f", {pct:+.2f}%" if pct is not None else "")
 
 
@@ -82,6 +90,8 @@ def _pct(t: dict) -> float | None:
     """Price move of the trade in % (side-adjusted), from the desk's realised P&L and size."""
     try:
         q, e = float(t.get("qty") or 0), float(t["entry"])
+        if not q and t.get("exit") and e:          # desks without qty in closed rows (listing shorts): from the exit price
+            return round((float(t["exit"]) / e - 1) * (1 if t.get("side") == "LONG" else -1) * 100, 2)
         return round(float(t.get("pnl_usd") or 0) / (q * e) * 100, 2) if q and e else None
     except (TypeError, ValueError, ZeroDivisionError):
         return None

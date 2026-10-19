@@ -62,13 +62,13 @@ def note(title, msg, level="notice"):
     print(f"::{level} title={title}::{m}", flush=True)
 
 
-def get(url, body=None, tries=4, raw=False):
+def get(url, body=None, tries=4, raw=False, timeout=40):
     err = None
     for a in range(tries):
         try:
             req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None,
                                          headers={**UA, "Content-Type": "application/json"}, method="POST" if body is not None else "GET")
-            with urllib.request.urlopen(req, timeout=40) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 b = r.read()
                 return r.status, (b if raw else json.loads(b.decode()))
         except urllib.error.HTTPError as e:
@@ -99,7 +99,7 @@ def duka_decode(raw, base, scale):
 
 def duka_hours(sym, year, month0, scale=1000):
     """Dukascopy hour candles of one month → [(ms, o, h, l, c, vol)] (BID side). Big-endian 24-byte records."""
-    s, b = get(f"https://datafeed.dukascopy.com/datafeed/{sym}/{year}/{month0:02d}/BID_candles_hour_1.bi5", raw=True)
+    s, b = get(f"https://datafeed.dukascopy.com/datafeed/{sym}/{year}/{month0:02d}/BID_candles_hour_1.bi5", raw=True, tries=3, timeout=20)
     if s != 200 or not b:
         return s, []
     base = int(dt.datetime(year, month0 + 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
@@ -107,7 +107,7 @@ def duka_hours(sym, year, month0, scale=1000):
 
 
 def duka_minutes_day(sym, d, scale=1000):
-    s, b = get(f"https://datafeed.dukascopy.com/datafeed/{sym}/{d.year}/{d.month - 1:02d}/{d.day:02d}/BID_candles_min_1.bi5", raw=True)
+    s, b = get(f"https://datafeed.dukascopy.com/datafeed/{sym}/{d.year}/{d.month - 1:02d}/{d.day:02d}/BID_candles_min_1.bi5", raw=True, tries=2, timeout=20)
     if s != 200 or not b:
         return []
     base = int(dt.datetime(d.year, d.month, d.day, tzinfo=dt.timezone.utc).timestamp() * 1000)
@@ -186,11 +186,11 @@ def vision_funding(sym):
     return out, months
 
 
-def fetch():
+def fetch_paxg():
     info = {}
     paxg, months = vision_series("spot", "PAXGUSDT")
     np.save(f"{OUT}/paxg_1h.npy", paxg)
-    info["paxg spot 1h"] = f"{len(paxg)} bars {months[0]}…{months[-1]}"
+    info["paxg spot 1h"] = f"{len(paxg)} bars {months[0]}…{months[-1]} + days of this month"
     for sym in ("PAXGUSDT", "XAUUSDT", "XAUTUSDT"):
         f, m = vision_funding(sym)
         info[f"funding {sym}"] = f"{len(f)} prints {m[:1]}…{m[-1:]}, avg per 8h {np.mean([r * 8 / h for _, r, h in f]) * 100:.4f}%" if f else "none"
@@ -200,43 +200,65 @@ def fetch():
         if k is not None:
             np.save(f"{OUT}/perp_{sym}_1h.npy", k)
             info[f"perp {sym} 1h"] = f"{len(k)} bars {m2[:1]}…{m2[-1:]}, avg quote vol/h ${np.mean(k[-720:, 5]) / 1e6:.2f}M (last 30 d)"
-    # Dukascopy XAUUSD
+            # perp vs spot gap (same hours)
+            m_ = dict(zip(paxg[:, 0].astype(np.int64), paxg[:, 4]))
+            g = np.array([c / m_[int(t)] - 1 for t, c in zip(k[:, 0], k[:, 4]) if int(t) in m_])
+            if len(g):
+                info[f"perp {sym} vs PAXG spot"] = f"median {np.median(g) * 100:.2f}%, 5-95% {np.percentile(g, 5) * 100:.2f}…{np.percentile(g, 95) * 100:.2f}%"
+    note("gold data · binance", json.dumps(info, ensure_ascii=False))
+
+
+def fetch_xau():
+    """Dukascopy XAUUSD 1 h, newest month first, gently (it throttles), within a time budget."""
+    t_start, budget = time.time(), 40 * 60
     jobs = []
-    y, mo = 2015, 0
-    while dt.date(y, mo + 1, 1) < TODAY.replace(day=1):
+    y, mo = TODAY.year, TODAY.month - 2                                  # the last full month (0-based month)
+    if mo < 0:
+        y, mo = y - 1, 11
+    while (y, mo) >= (2015, 0):
         jobs.append((y, mo))
-        mo += 1
-        if mo == 12:
-            y, mo = y + 1, 0
-    with ThreadPoolExecutor(6) as ex:
-        got = list(ex.map(lambda a: duka_hours("XAUUSD", *a), jobs))
-    rows = [r for s, rr in got for r in rr]
+        mo -= 1
+        if mo < 0:
+            y, mo = y - 1, 11
+    rows, ok, fail = [], 0, 0
+    for k in range(0, len(jobs), 2):
+        if time.time() - t_start > budget:
+            break
+        with ThreadPoolExecutor(2) as ex:
+            got = list(ex.map(lambda a: duka_hours("XAUUSD", *a), jobs[k:k + 2]))
+        for s_, rr in got:
+            ok += s_ == 200
+            fail += s_ != 200
+            rows += rr
     d = TODAY.replace(day=1)
-    while d < TODAY:                                                     # the current month: minutes → hours
+    while d < TODAY and time.time() - t_start < budget + 600:          # the current month: minutes → hours
         mins = duka_minutes_day("XAUUSD", d)
         hrs = {}
         for t, o, h, l, c, v in mins:
-            k = t - t % H
-            if k not in hrs:
-                hrs[k] = [k, o, h, l, c, v]
+            kk = t - t % H
+            if kk not in hrs:
+                hrs[kk] = [kk, o, h, l, c, v]
             else:
-                x = hrs[k]
+                x = hrs[kk]
                 x[2], x[3], x[4], x[5] = max(x[2], h), min(x[3], l), c, x[5] + v
         rows += [tuple(x) for x in hrs.values()]
         d += dt.timedelta(days=1)
+    info = {"months ok": ok, "months failed": fail, "minutes": round((time.time() - t_start) / 60, 1)}
     xa = np.array(sorted(set(rows)))
     if len(xa):
         flat = (xa[:, 5] <= 0) & (xa[:, 2] == xa[:, 3])
         xa = xa[~flat]
         np.save(f"{OUT}/xau_1h.npy", xa)
-        info["dukascopy XAUUSD 1h"] = f"{len(xa)} bars {dt.datetime.utcfromtimestamp(xa[0, 0] / 1000):%Y-%m-%d} → {dt.datetime.utcfromtimestamp(xa[-1, 0] / 1000):%Y-%m-%d}, months ok {sum(1 for s, _ in got if s == 200)}/{len(jobs)}"
-        # PAXG vs XAUUSD sanity: premium at common hours
-        m = dict(zip(xa[:, 0].astype(np.int64), xa[:, 4]))
-        pr = np.array([p / m[int(t)] - 1 for t, p in zip(paxg[:, 0], paxg[:, 4]) if int(t) in m])
-        if len(pr):
-            info["paxg vs xauusd"] = (f"common hours {len(pr)}, median premium {np.median(pr) * 100:.2f}%, |gap|>1% in "
-                                      f"{(np.abs(pr - np.median(pr)) > 0.01).mean() * 100:.1f}% of hours, >3% in {(np.abs(pr - np.median(pr)) > 0.03).mean() * 100:.2f}%")
-    note("gold data", json.dumps(info, ensure_ascii=False))
+        info["XAUUSD 1h"] = f"{len(xa)} bars {dt.datetime.fromtimestamp(xa[0, 0] / 1000, dt.timezone.utc):%Y-%m-%d} → {dt.datetime.fromtimestamp(xa[-1, 0] / 1000, dt.timezone.utc):%Y-%m-%d}"
+        if os.path.exists(f"{OUT}/paxg_1h.npy"):
+            paxg = np.load(f"{OUT}/paxg_1h.npy")
+            m = dict(zip(xa[:, 0].astype(np.int64), xa[:, 4]))
+            pr = np.array([p / m[int(t)] - 1 for t, p in zip(paxg[:, 0], paxg[:, 4]) if int(t) in m])
+            if len(pr):
+                med = np.median(pr)
+                info["paxg vs xauusd"] = (f"common hours {len(pr)}, median premium {med * 100:.2f}%, gap>1% from median in "
+                                          f"{(np.abs(pr - med) > 0.01).mean() * 100:.1f}% of hours, >3% in {(np.abs(pr - med) > 0.03).mean() * 100:.2f}%")
+    note("gold data · dukascopy", json.dumps(info, ensure_ascii=False))
 
 
 # ================================================================================================== engine
@@ -714,7 +736,11 @@ FAMS = [("trend", fam_trend), ("channel", fam_channel), ("levels", fam_levels), 
 
 
 def run(which):
-    a = np.load(f"{OUT}/{'paxg' if which == 'paxg' else 'xau'}_1h.npy")
+    f = f"{OUT}/{'paxg' if which == 'paxg' else 'xau'}_1h.npy"
+    if not os.path.exists(f):
+        note(f"gold {which}", "no data file — the fetch step failed", "warning")
+        return
+    a = np.load(f)
     S = Series(a, which)
     if os.path.exists(f"{OUT}/funding_PAXGUSDT.npy"):
         S.set_funding([tuple(x) for x in np.load(f"{OUT}/funding_PAXGUSDT.npy")])
@@ -727,4 +753,4 @@ if __name__ == "__main__":
     if mode == "run":
         run(sys.argv[2])
     else:
-        {"probe": probe, "fetch": fetch}[mode]()
+        {"probe": probe, "fetch_paxg": fetch_paxg, "fetch_xau": fetch_xau}[mode]()

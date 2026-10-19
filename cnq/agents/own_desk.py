@@ -333,9 +333,11 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
         a fill at an open hours old would be a free look-back."""
         return px[sym] if now - day > 3_600_000 and px.get(sym) else k[-1][1]
     daily_due = _state(conn, "day") != day and now - day >= 5 * 60_000
-    first_pool = (_state(conn, "alt_basket") is None or _state(conn, "pool_feats") is None) and volumes and _state(conn, "basket_try") != day
+    first_pool = volumes and ((_state(conn, "alt_basket") is None and _state(conn, "basket_try") != day)
+                              or (_state(conn, "pool_feats") is None and _state(conn, "feats_try") != day))
     if daily_due or first_pool:                       # the first basket / features must not wait for tomorrow (one try a day)
         _set(conn, "basket_try", day)
+        _set(conn, "feats_try", day)
         K = _pool_candles(conn, day, daily, volumes)
         basket = pick_basket(K)
         if len(basket) == 10:

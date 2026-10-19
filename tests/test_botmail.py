@@ -68,3 +68,43 @@ def test_owner_connects_a_signals_channel_by_adding_the_bot():
     assert signal_feed.signals_chat(conn) == "-1001"
     assert "убран" in mb.channel_event(ev("CRYPTO NOVA Signals", 111, "owner_x", "left"), "owner_x")
     assert signal_feed.signals_chat(conn) is None
+
+
+def test_channel_connects_by_a_post_or_a_forward_only_when_the_owner_is_its_admin():
+    import sqlite3
+    from cnq.agents import botmail, signal_feed
+    conn = sqlite3.connect(":memory:")
+    mb = botmail.Mailbox(conn)
+    conn.execute("INSERT INTO bot_chats VALUES(?,?,?,?,?,1)", (111, "owner_x", "D", 0, 0))
+    admins = {-1002: [{"user": {"id": 999, "username": "stranger"}, "status": "creator"}],
+              -1003: [{"user": {"id": 111, "username": "owner_x"}, "status": "creator"}, {"user": {"id": 5, "is_bot": True}}]}
+    api = lambda token, method, data: {"ok": True, "result": admins.get(data["chat_id"], [])}  # noqa: E731
+    ch = lambda cid, title: {"id": cid, "type": "channel", "title": title}  # noqa: E731
+    assert mb.connect_checked("t", ch(-1002, "Best Signals"), "owner_x", api) is None            # a stranger's channel
+    assert mb.connect_checked("t", ch(-1003, "Новости"), "owner_x", api) is None                 # not a signals channel
+    assert "подключён" in mb.connect_checked("t", ch(-1003, "CRYPTO NOVA Signals"), "owner_x", api)
+    assert signal_feed.signals_chat(conn) == "-1003"
+    assert mb.connect_checked("t", ch(-1003, "CRYPTO NOVA Signals"), "owner_x", api) is None     # already connected → no repeat note
+
+
+def test_poll_connects_the_channel_from_the_owners_forward(monkeypatch):
+    import sqlite3
+    from cnq.agents import botmail, signal_feed
+    conn = sqlite3.connect(":memory:")
+    mb = botmail.Mailbox(conn)
+    conn.execute("INSERT INTO bot_chats VALUES(?,?,?,?,?,1)", (111, "owner_x", "D", 0, 0))
+    sent = []
+    src = {"id": -1003, "type": "channel", "title": "CRYPTO NOVA Signals"}
+
+    def api(token, method, data=None, timeout=20):
+        if method == "getUpdates":
+            return {"ok": True, "result": [{"update_id": 7, "message": {"chat": {"id": 111, "type": "private"}, "from": {"id": 111, "username": "owner_x"},
+                                                                         "forward_origin": {"type": "channel", "chat": src}, "text": "x"}}]}
+        if method == "getChatAdministrators":
+            return {"ok": True, "result": [{"user": {"id": 111}, "status": "creator"}]}
+        sent.append(data)
+        return {"ok": True}
+    monkeypatch.setattr(botmail, "_api", api)
+    mb.poll("t", owner_username="owner_x")
+    assert signal_feed.signals_chat(conn) == "-1003"
+    assert "подключён" in sent[0]["text"]

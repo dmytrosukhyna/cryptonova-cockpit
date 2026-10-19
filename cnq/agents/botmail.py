@@ -123,6 +123,32 @@ class Mailbox:
         self.set_meta("signals_chat_title", title)
         return f"Канал «{title}» подключён: новые сигналы CRYPTO NOVA (вход, стоп, цели и «Close» при выходе) будут приходить туда."
 
+    def connect_checked(self, token: str, chat: dict, owner_username: str | None, api=None) -> str | None:
+        """19.10 fallback when the «bot added» event was missed: a post in the channel (channel_post) or a post the owner forwards
+        to the bot from it. The channel is connected only when its title says «signal» / «сигнал», it is not the news channel, and
+        Telegram's admin list of the channel (getChatAdministrators — works only where the bot itself is an admin) has the OWNER."""
+        api = api or _api
+        cid, title = chat.get("id"), chat.get("title") or ""
+        if cid is None or chat.get("type") not in ("channel", "supergroup"):
+            return None
+        if str(cid) == self.meta("signals_chat"):
+            return None
+        news = str(cid) == str(os.environ.get("CNQ_TG_CHAT") or "") or (chat.get("username") or "").lower() == "crypto_nova_news"
+        if news or not re.search(r"(?i)signal|сигнал", title):
+            return None
+        own = self.owner_chat(owner_username)
+        try:
+            admins = api(token, "getChatAdministrators", {"chat_id": cid}).get("result") or []
+        except Exception:  # noqa: BLE001
+            return None
+        un = (owner_username or "").lstrip("@").lower()
+        if not any((own is not None and (a.get("user") or {}).get("id") == own) or (un and ((a.get("user") or {}).get("username") or "").lower() == un)
+                   for a in admins):
+            return None
+        self.set_meta("signals_chat", str(cid))
+        self.set_meta("signals_chat_title", title)
+        return f"Канал «{title}» подключён: новые сигналы CRYPTO NOVA (вход, стоп, цели и «Close» при выходе) и портфель будут приходить туда."
+
     def owner_chat(self, owner_username: str | None) -> int | None:
         if owner_username:
             r = self.conn.execute("SELECT chat_id FROM bot_chats WHERE lower(username)=?", (owner_username.lstrip("@").lower(),)).fetchone()
@@ -162,7 +188,8 @@ class Mailbox:
         now = now or int(time.time() * 1000)
         offset = int(self.meta("offset", "0") or 0)
         try:
-            res = _api(token, "getUpdates", {"offset": offset, "timeout": 0, "allowed_updates": ["message", "my_chat_member"]})
+            res = _api(token, "getUpdates", {"offset": offset, "timeout": 0,
+                                             "allowed_updates": ["message", "my_chat_member", "channel_post"]})
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "error": str(e)[:200]}
         n_new = n_reply = 0
@@ -173,11 +200,30 @@ class Mailbox:
                 if msg:
                     self.notes.append(msg)
                 continue
+            if u.get("channel_post"):
+                msg = self.connect_checked(token, (u["channel_post"].get("chat") or {}), owner_username)
+                if msg:
+                    self.notes.append(msg)
+                continue
             m = u.get("message") or {}
             chat = m.get("chat") or {}
             if chat.get("type") != "private":
                 continue
             cid = chat["id"]; frm = m.get("from") or {}
+            src = (m.get("forward_origin") or {}).get("chat") or m.get("forward_from_chat")
+            if src and src.get("type") == "channel":       # the owner forwards a post from his signals channel to the bot
+                own = self.owner_chat(owner_username)
+                is_owner = (own is not None and frm.get("id") == own) or (
+                    owner_username and (frm.get("username") or "").lower() == owner_username.lstrip("@").lower())
+                if is_owner:
+                    msg = self.connect_checked(token, src, owner_username) or (
+                        f"Канал «{src.get('title') or ''}» уже подключён." if str(src.get("id")) == self.meta("signals_chat") else
+                        "Не получилось подключить канал: в названии должно быть «Signals» или «Сигналы», а бот — администратором канала.")
+                    try:
+                        _api(token, "sendMessage", {"chat_id": cid, "text": msg})
+                    except Exception:  # noqa: BLE001
+                        pass
+                    continue
             row = self.conn.execute("SELECT n_msgs FROM bot_chats WHERE chat_id=?", (cid,)).fetchone()
             if row:
                 self.conn.execute("UPDATE bot_chats SET last_seen=?, n_msgs=n_msgs+1, username=COALESCE(?,username) WHERE chat_id=?", (now, frm.get("username"), cid))

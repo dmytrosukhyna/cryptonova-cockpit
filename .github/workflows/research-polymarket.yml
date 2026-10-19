@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "probe | bonds | arb"
+        description: "probe | bonds | arb | updown | trades | trades5 | rewards | lp"
         required: false
         default: "probe"
 
@@ -14,7 +14,7 @@ permissions:
 jobs:
   study:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

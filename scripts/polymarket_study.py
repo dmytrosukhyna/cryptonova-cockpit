@@ -281,6 +281,175 @@ def rewards():
     note("rewards · calm markets (mid 0.15–0.85, volume < $50k a day)", json.dumps(mid_[:10], ensure_ascii=False)[:4000])
 
 
+def lp_paper(hours=5.6, n_markets=30, cap=1000.0):
+    """A PAPER liquidity-provider desk, minute by minute, on live markets (no orders sent). Each minute, for each of the chosen
+    reward markets: our quotes = YES bid at mid − 1 c and NO bid at (1 − mid) − 1 c, $1,000 a side; the reward = the market's
+    daily pool ÷ 1440 × our share of the two-sided score (our score vs the book's within the max spread). Fills = the REAL taker
+    trades of the next minute that reach our price (YES sell ≤ our bid or NO buy ≥ 1 − our bid fills the YES bid; the mirror for
+    NO); a YES + NO pair is merged into $1. Net position per market capped at $2,000. At the end: inventory at the mid (or the
+    result if resolved). Answers the one question the snapshot cannot: do the rewards beat being picked off?"""
+    t_end = time.time() + hours * 3600
+    ms, seen = [], set()
+    for off in range(0, 2500, 100):
+        st, page = get(f"{GAMMA}/markets?closed=false&limit=100&offset={off}&order=volume24hr&ascending=false")
+        if st != 200 or not isinstance(page, list) or not page:
+            break
+        for m in page:
+            if m.get("id") not in seen:
+                seen.add(m.get("id"))
+                ms.append(m)
+
+    def pool(m):
+        return sum(float(r.get("rewardsDailyRate") or 0) for r in (_js(m.get("clobRewards")) or []) if isinstance(r, dict))
+    now_iso = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=hours + 2)
+    cand = []
+    for m in ms:
+        toks = _js(m.get("clobTokenIds")) or []
+        outs = _js(m.get("outcomes")) or []
+        try:
+            end = dt.datetime.fromisoformat(str(m.get("endDate")).replace("Z", "+00:00"))
+        except Exception:  # noqa: BLE001
+            continue
+        bb, ba = float(m.get("bestBid") or 0), float(m.get("bestAsk") or 0)
+        if (pool(m) > 0 and len(toks) == 2 and float(m.get("rewardsMaxSpread") or 0) > 1 and end > now_iso and 0.12 <= (bb + ba) / 2 <= 0.88
+                and float(m.get("volume24hr") or 0) >= 2000 and m.get("conditionId")):
+            cand.append({"q": (m.get("question") or "")[:60], "cond": m["conditionId"], "yes": toks[0], "no": toks[1],
+                         "v": float(m["rewardsMaxSpread"]), "mn": float(m.get("rewardsMinSize") or 0), "pool": pool(m),
+                         "vol": float(m.get("volume24hr") or 0), "o0": str(outs[0]) if outs else "Yes"})
+    # a mix: the 30 largest pools per $ of 24 h volume would be the «easy» ones; take the largest pools with real trading
+    cand.sort(key=lambda c: -c["pool"])
+    book = cand[:n_markets]
+    for c in book:
+        c.update({"yes_sh": 0.0, "no_sh": 0.0, "cash": 0.0, "rew": 0.0, "fills": 0, "fill_usd": 0.0, "quote": None,
+                  "last_ts": int(time.time()), "mins": 0, "share_sum": 0.0, "seen": set()})
+
+    def snap(c):
+        st, b = get(f"{CLOB}/book?token_id={c['yes']}")
+        if st != 200 or not isinstance(b, dict):
+            return None
+        bids = [(float(x["price"]), float(x["size"])) for x in b.get("bids") or []]
+        asks = [(float(x["price"]), float(x["size"])) for x in b.get("asks") or []]
+        if not bids or not asks:
+            return None
+        return bids, asks
+
+    def trades_since(c, ts):
+        st, page = get(f"{DATA}/trades?market={c['cond']}&limit=500&takerOnly=true")
+        if st != 200 or not isinstance(page, list):
+            return []
+        return [t for t in page if int(t.get("timestamp") or 0) > ts]
+
+    def step(c):
+        now = int(time.time())
+        q = c["quote"]
+        if q:                                                     # fills against last minute's quotes
+            for t in sorted(trades_since(c, c["last_ts"]), key=lambda t: int(t.get("timestamp") or 0)):
+                key = (t.get("transactionHash"), t.get("asset"), t.get("price"), t.get("size"))
+                if key in c["seen"]:
+                    continue
+                c["seen"].add(key)
+                px, sz = float(t.get("price") or 0), float(t.get("size") or 0)
+                is_yes = str(t.get("asset")) == str(c["yes"])
+                side = str(t.get("side")).upper()
+                yb, nb = q
+                # our YES bid yb is hit by: YES SELL at ≤ yb, or NO BUY at ≥ 1 − yb
+                if (is_yes and side == "SELL" and px <= yb + 1e-9) or (not is_yes and side == "BUY" and px >= 1 - yb - 1e-9):
+                    room = max(0.0, 2 * cap - (c["yes_sh"] - c["no_sh"]) * yb)
+                    n = min(sz, cap / yb, room / yb)
+                    if n > 0:
+                        c["yes_sh"] += n
+                        c["cash"] -= n * yb
+                        c["fills"] += 1
+                        c["fill_usd"] += n * yb
+                if (not is_yes and side == "SELL" and px <= nb + 1e-9) or (is_yes and side == "BUY" and px >= 1 - nb - 1e-9):
+                    room = max(0.0, 2 * cap - (c["no_sh"] - c["yes_sh"]) * nb)
+                    n = min(sz, cap / nb, room / nb)
+                    if n > 0:
+                        c["no_sh"] += n
+                        c["cash"] -= n * nb
+                        c["fills"] += 1
+                        c["fill_usd"] += n * nb
+                pair = min(c["yes_sh"], c["no_sh"])
+                if pair > 0:                                      # merge YES + NO → $1
+                    c["yes_sh"] -= pair
+                    c["no_sh"] -= pair
+                    c["cash"] += pair
+        c["last_ts"] = now
+        sn = snap(c)
+        if not sn:
+            c["quote"] = None
+            return
+        bids, asks = sn
+        bb, ba = max(p for p, _ in bids), min(p for p, _ in asks)
+        mid = (bb + ba) / 2
+        c["mid"] = mid
+        yb = max(0.01, round(mid - 0.01, 2))
+        nb = max(0.01, round((1 - mid) - 0.01, 2))
+        if yb >= ba or 1 - nb <= bb:                             # would cross the book: stay out this minute
+            yb, nb = min(yb, round(bb, 2)), min(nb, round(1 - ba, 2))
+        c["quote"] = (yb, nb)
+        v = c["v"]
+
+        def sc(levels):
+            return sum(sz * ((v - abs(mid - p) * 100) / v) ** 2 for p, sz in levels if abs(mid - p) * 100 < v)
+        qb, qa = sc(bids), sc(asks)
+        ny, nn = cap / yb, cap / nb
+        if min(ny, nn) < c["mn"]:
+            return
+        wy = ((v - abs(mid - yb) * 100) / v) ** 2 if abs(mid - yb) * 100 < v else 0.0
+        wn = ((v - abs((1 - mid) - nb) * 100) / v) ** 2 if abs((1 - mid) - nb) * 100 < v else 0.0
+        share = min(ny * wy / (qb + ny * wy) if wy else 0.0, nn * wn / (qa + nn * wn) if wn else 0.0)
+        el = min(180.0, now - c.get("t_rew", now - 60))          # seconds since the last sample (a slow minute is not over-paid)
+        c["t_rew"] = now
+        c["rew"] += c["pool"] * share * el / 86400
+        c["mins"] += 1
+        c["share_sum"] += share
+
+    def report(final=False):
+        rows, tot = [], {"rewards": 0.0, "trading": 0.0}
+        for c in book:
+            mid = c.get("mid")
+            if mid is None:
+                continue
+            inv = c["yes_sh"] * mid + c["no_sh"] * (1 - mid)
+            trading = c["cash"] + inv
+            tot["rewards"] += c["rew"]
+            tot["trading"] += trading
+            rows.append({"q": c["q"], "pool": c["pool"], "minutes": c["mins"], "avg share %": round(c["share_sum"] / max(1, c["mins"]) * 100, 1),
+                         "rewards $": round(c["rew"], 2), "fills": c["fills"], "filled $": round(c["fill_usd"]),
+                         "trading pnl $": round(trading, 2), "open yes/no": [round(c["yes_sh"]), round(c["no_sh"])], "mid": round(mid, 3)})
+        rows.sort(key=lambda r: -(r["rewards $"] + r["trading pnl $"]))
+        hrs = (time.time() - t0) / 3600
+        capital = 2 * cap * len(rows)
+        summ = {"hours": round(hrs, 2), "markets": len(rows), "capital $": round(capital), "rewards $": round(tot["rewards"], 2),
+                "trading pnl $": round(tot["trading"], 2), "net $": round(tot["rewards"] + tot["trading"], 2),
+                "net % a day on capital": round((tot["rewards"] + tot["trading"]) / max(1, capital) / max(0.01, hrs) * 24 * 100, 3)}
+        note(f"lp paper · {'final' if final else 'hour ' + str(int(hrs))}", json.dumps(summ, ensure_ascii=False))
+        if final:
+            note("lp paper · markets (best first)", json.dumps(rows[:14], ensure_ascii=False)[:4000])
+            note("lp paper · markets (worst)", json.dumps(rows[-8:], ensure_ascii=False)[:4000])
+    t0 = time.time()
+    note("lp paper · chosen", json.dumps({"candidates": len(cand), "chosen": [(c["q"], c["pool"], round(c["vol"])) for c in book]},
+                                         ensure_ascii=False)[:4000])
+    next_rep = t0 + 3600
+    while time.time() < t_end:
+        t_loop = time.time()
+        with ThreadPoolExecutor(10) as ex:
+            list(ex.map(step, book))
+        if time.time() >= next_rep and (time.time() - t0) < hours * 3600 - 1800:
+            report()
+            next_rep += 3600 * 2
+        time.sleep(max(1.0, 60 - (time.time() - t_loop)))
+    # final: resolved markets at their result
+    for c in book:
+        st, page = get(f"{GAMMA}/markets?condition_ids={c['cond']}&closed=true")
+        if st == 200 and isinstance(page, list) and page:
+            pr = [float(x) for x in (_js(page[0].get("outcomePrices")) or [])]
+            if len(pr) == 2 and sorted(pr) == [0.0, 1.0]:
+                c["mid"] = pr[0]
+    report(final=True)
+
+
 def _norm_cdf(x):
     import math
     return 0.5 * (1 + math.erf(x / math.sqrt(2)))
@@ -585,4 +754,4 @@ def probe3():
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
-    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3, "trades": updown_trades, "trades5": lambda: updown_trades(3, 5), "rewards": rewards}[mode]()
+    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3, "trades": updown_trades, "trades5": lambda: updown_trades(3, 5), "rewards": rewards, "lp": lp_paper}[mode]()

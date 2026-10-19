@@ -1545,7 +1545,8 @@ def _spot_data():
         v = sma(K["bv"] * K["c"], 30)
         v30[s] = {int(t): float(x) for t, x in zip(K["t"], v) if not np.isnan(x)}
     t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
-    months = [d for d in days if d >= t0 and dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).day == 1]
+    reb_day = 15 if "--mid" in sys.argv else 1      # robustness: rebalance on the 15th instead of the 1st
+    months = [d for d in days if d >= t0 and dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).day == reb_day]
     return dict(D=D, cl=cl, days=days, months=months, perp_for=perp_for, want=want, rev=rev, fees=fees, hold=hold, supply=supply,
                 alias=alias, v30=v30, first=first)
 
@@ -1929,7 +1930,7 @@ def ls_neutral():
                   round(float(np.prod(1 + rr[:half])), 2), round(float(np.prod(1 + rr[half:])), 2),
                   round(fm * 100, 2), round(cm * 100, 2), g25, round(best[0], 2) if best else None,
                   round(best[1] * 100, 2) if best else None]
-    note(("ls neutral IV" if IV else "ls neutral") + " · [x g1, dd %, month %, t, months+ %, 2022…2026 %, halves, funding %/m, cost %/m, g@dd25, x, month %]",
+    note(("ls neutral IV" if IV else "ls neutral") + (" mid-month" if "--mid" in sys.argv else "") + " · [x g1, dd %, month %, t, months+ %, 2022…2026 %, halves, funding %/m, cost %/m, g@dd25, x, month %]",
          json.dumps({"funding files": f"{have_f}/{len(need)}", "months": len(plan), **out}, ensure_ascii=False))
 
 

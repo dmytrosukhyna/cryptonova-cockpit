@@ -442,5 +442,63 @@ def spot():
         note(f"own signals spot · longs only {label}", json.dumps(out, ensure_ascii=False))
 
 
+EXPORT = ["BTC", "ETH", "SOL", "LINK", "HBAR", "BNB", "XRP", "SUI", "AVAX", "ADA", "DOGE", "ONDO", "NEAR", "GRASS", "RENDER", "ALGO",
+          "VIRTUAL", "WLD", "PENDLE", "INJ", "XLM", "POL", "FET", "PYTH", "TRUMP", "STRK", "TIA", "ZK", "EIGEN", "ARKM", "IMX", "JTO",
+          "WIF", "SAND", "SNX", "AR", "AAVE", "TRX", "TON", "JUP", "1000BONK", "1000SHIB", "NOT"]
+
+
+def export():
+    """19.10 — weekly closes (Monday 00:00 UTC) of ~40 coins, the BTC regime by week and the weekly equity of the spot long-only
+    sleeve (risk 1 %, ≤ 10 open), so portfolio mixes can be compared offline. Generic coin list, no account data."""
+    global COST, FUND_D
+    with ThreadPoolExecutor(12) as ex:
+        raw = dict(zip(EXPORT, ex.map(lambda s: daily(s + "USDT"), EXPORT)))
+    KS = {s: k for s, k in raw.items() if k is not None}
+    B = KS["BTC"]
+    bc = B["c"]
+    s200 = sma(bc, 200)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+    mondays = [i for i, t in enumerate(B["t"]) if dt.datetime.fromtimestamp(t / 1000, dt.timezone.utc).weekday() == 0
+               and t >= int(dt.datetime(2022, 1, 3, tzinfo=dt.timezone.utc).timestamp() * 1000)]
+    wt = [int(B["t"][i]) for i in mondays]
+    out = {"t0": wt[0], "weeks": len(wt), "bull": [None if np.isnan(bull[i - 1]) else int(bull[i - 1]) for i in mondays]}
+    closes = {}
+    for s, K in KS.items():
+        idx = {int(t): k for k, t in enumerate(K["t"])}
+        closes[s] = [round(float(K["o"][idx[t]]), 8) if t in idx else None for t in wt]     # the Monday OPEN = the price we trade at
+    # the sleeve: spot longs only (pullback + 20-day breakout in «рост»), risk 1 %, ≤ 10 open
+    COST, FUND_D = 0.24, 0.0
+    KA = {s: KS[s] for s in KS}
+    gate = {"t": B["t"], "bull": bull, "soft": bull}
+    for s in KA:
+        prep(KA[s], gate)
+    trs = sorted([x for s, K in KA.items() if s in COINS for spec in (("P", "regime", "-"), ("B20", "regime", "chand"))
+                  for x in simulate(K, *spec, s) if x[2] == 1 and x[0] >= wt[0]], key=lambda x: x[0])
+    ev = sorted([(o, 0, k) for k, (o, *_r) in enumerate(trs)] + [(cl, 1, k) for k, (_o, cl, *_r) in enumerate(trs)])
+    E, size, opened, curve = 1.0, {}, 0, []
+    for tt, kind, k in ev:
+        if kind == 0:
+            if opened < 10:
+                size[k] = E * min(0.25, 1.0 / trs[k][6])
+                opened += 1
+            continue
+        if k in size:
+            E += size.pop(k) * trs[k][3] / 100
+            opened -= 1
+            curve.append((tt, E))
+    sleeve, j, e = [], 0, 1.0
+    for t in wt:
+        while j < len(curve) and curve[j][0] <= t:
+            e = curve[j][1]
+            j += 1
+        sleeve.append(round(e, 5))
+    out["sleeve"] = sleeve
+    note("export · meta", json.dumps(out))
+    items = list(closes.items())
+    for i in range(0, len(items), 6):
+        note(f"export · closes {i // 6 + 1}", json.dumps(dict(items[i:i + 6])))
+
+
 if __name__ == "__main__":
-    (combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

@@ -1769,5 +1769,149 @@ def quality():
                   round(float(np.prod(1 + rr[:half])), 2), round(float(np.prod(1 + rr[half:])), 2)]
     note("quality · monthly alt baskets vs BTC [x, dd %, month %, months > BTC %, 2022…2026, halves]", json.dumps(out, ensure_ascii=False))
 
+def _funding_month(sym, ym):
+    """Sum of the funding rates of one USDT-M perp over one month (Binance monthly archive; missing = 0)."""
+    st, z = http(f"{UM}/monthly/fundingRate/{sym}USDT/{sym}USDT-fundingRate-{ym}.zip", binary=True)
+    if st != 200 or not z:
+        return None
+    tot = 0.0
+    for r in read_zip_csv(z):
+        try:
+            tot += float(r[-1])
+        except (ValueError, IndexError):
+            continue
+    return tot
+
+
+def ls_neutral():
+    """19.10, round 15 — owner: «продолжай выполнять тесты, искать лучшие возможности … усовершенствовать систему».
+    Round 13–14 found which alts do well and badly a month ahead (revenue, age ↑; 3-month spike and swelling volume ↓) and that
+    alts as a class lost to BTC. Perps can SHORT, so: is there a market-neutral book that earns in any market?
+      LS10      long the top 10 by the quality composite, short the bottom 10 (top-100 alts by 30-day $ volume, ≥ 1 year);
+      LS33      long the top third, short the bottom third;
+      BTC/B10   long BTC, short the bottom 10;          BTC/ALL  long BTC, short all top-100 alts (equal weight);
+      BTC/YNG   long BTC, short the 20 most traded young coins (60–365 days since listing);
+      Q10/BTC   long the top 10, short BTC.
+    Equal weights fixed at the month start (no intra-month rebalance) → DAILY marks; half the gross long, half short.
+    Costs 0.2 % of the replaced notional (in + out, taker + slippage); REAL funding from the Binance monthly archives
+    (longs pay the month's sum of rates, shorts receive it). Delisted coins: their last close. In-sample signs — halves shown.
+    Rows: [× gross 1, max dd % daily, month %, t, months + %, 2022…2026 %, halves ×, funding %/month, cost %/month,
+    gross at dd 25 %, × there, month % there]."""
+    X = _spot_data()
+    D, cl, days, months, perp_for, want = X["D"], X["cl"], X["days"], X["months"], X["perp_for"], X["want"]
+    rev, v30, first = X["rev"], X["v30"], X["first"]
+    sym_of = {perp: sym for sym, perp in perp_for.items()}
+
+    def ssum(ser, d, n):
+        return sum(ser.get(d - k * DAY, 0.0) for k in range(n)) if ser else 0.0
+    plan = []
+    for i, d in enumerate(months[:-1]):
+        d1 = months[i + 1]
+        top = sorted((v30[s][d], s) for s in D if d in v30[s] and s not in ("BTC", "ETH") and d - first[s] >= 365 * DAY)[-100:]
+        uni = [s for _v, s in top]
+        young = [s for _v, s in sorted((v30[s][d], s) for s in D if d in v30[s] and s not in ("BTC", "ETH")
+                                       and 60 * DAY <= d - first[s] < 365 * DAY)[-20:]]
+        F = {}
+        for s in uni:
+            c0, b0 = cl[s][d], cl["BTC"][d]
+            c3, b3 = cl[s].get(d - 91 * DAY), cl["BTC"].get(d - 91 * DAY)
+            vv = [v30[s][t] for t in v30[s] if d - 180 * DAY <= t <= d]
+            sym = sym_of.get(s)
+            r30 = ssum(rev.get(sym), d, 30) if sym in want else 0.0
+            r90, r90p = (ssum(rev.get(sym), d, 90), ssum(rev.get(sym), d - 90 * DAY, 90)) if sym in want else (0.0, 0.0)
+            F[s] = {"age": (d - first[s]) / DAY, "m3": (c0 / c3) / (b0 / b3) - 1 if c3 and b3 else 0.0,
+                    "vt": v30[s][d] / np.mean(vv) if vv else 1.0, "rev": 1.0 if r30 > 0 else 0.0,
+                    "rg": (r90 / r90p - 1) if r90p > 0 and r90 > 0 else None}
+
+        def prank(key):
+            xs = sorted((F[s][key], s) for s in uni if F[s][key] is not None)
+            n = max(1, len(xs) - 1)
+            o = {s: k / n for k, (_v, s) in enumerate(xs)}
+            return {s: o.get(s, 0.5) for s in uni}
+        ra, rm, rv, rg = prank("age"), prank("m3"), prank("vt"), prank("rg")
+        comp = {s: (ra[s] + (1 - rm[s]) + (1 - rv[s]) + rg[s]) / 4 + 0.5 * F[s]["rev"] for s in uni}
+        order = sorted(uni, key=lambda s: -comp[s])
+        n3 = len(order) // 3
+        plan.append((d, d1, {"LS10": (order[:10], order[-10:]), "LS33": (order[:n3], order[-n3:]),
+                             "BTC/B10": (["BTC"], order[-10:]), "BTC/ALL": (["BTC"], uni), "BTC/YNG": (["BTC"], young),
+                             "Q10/BTC": (order[:10], ["BTC"])}))
+    # real funding for every (coin, month) held
+    need = sorted({(s, dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).strftime("%Y-%m"))
+                   for d, _d1, bk in plan for lg, sh in bk.values() for s in lg + sh})
+    with ThreadPoolExecutor(48) as ex:
+        FR = dict(zip(need, ex.map(lambda k: _funding_month(*k), need)))
+    have_f = sum(1 for v in FR.values() if v is not None)
+
+    def leg(ps, d, d1):
+        ts = [t for t in days if d < t <= d1]
+        out = []
+        for s in ps:
+            c0 = cl[s].get(d)
+            if not c0:
+                continue
+            last, path = c0, []
+            for t in ts:
+                c = cl[s].get(t)
+                if c:
+                    last = c
+                path.append(last / c0)
+            out.append(path)
+        return np.mean(np.array(out), axis=0) if out else np.ones(len(ts))
+    names = list(plan[0][2])
+    comp_ = {k: [] for k in names}        # per month: (Lpath, Spath, turnover L, turnover S, funding L, funding S, d)
+    prev = {k: (set(), set()) for k in names}
+    for d, d1, bk in plan:
+        ym = dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).strftime("%Y-%m")
+        for k in names:
+            lg, sh = bk[k]
+            pl, ps_ = prev[k]
+            tl = 1 - len(set(lg) & pl) / max(1, len(lg))
+            tsh = 1 - len(set(sh) & ps_) / max(1, len(sh))
+            fl = float(np.mean([FR.get((s, ym)) or 0.0 for s in lg])) if lg else 0.0
+            fs = float(np.mean([FR.get((s, ym)) or 0.0 for s in sh])) if sh else 0.0
+            comp_[k].append((leg(lg, d, d1), leg(sh, d, d1), tl, tsh, fl, fs, d1))
+            prev[k] = (set(lg), set(sh))
+
+    def sim(k, g):
+        V, curve, rets, fsum, csum = 1.0, [], [], 0.0, 0.0
+        for Lp, Sp, tl, tsh, fl, fs, d1 in comp_[k]:
+            cost = 0.002 * g * 0.5 * (tl + tsh)
+            fund = g * 0.5 * (-fl + fs)
+            path = 1 + g * 0.5 * ((Lp - 1) - (Sp - 1)) - cost
+            path = np.maximum(path, 0.0)
+            V0 = V
+            curve += list(V0 * path)
+            V = V0 * (path[-1] + fund)
+            curve[-1] = V
+            rets.append((d1, V / V0 - 1))
+            fsum += fund
+            csum += cost
+        eq = np.array(curve)
+        dd = float((eq / np.maximum.accumulate(np.r_[1.0, eq])[1:] - 1).min()) if len(eq) else 0.0
+        return V, dd, rets, fsum / max(1, len(rets)), csum / max(1, len(rets))
+    out = {}
+    for k in names:
+        V, dd, rets, fm, cm = sim(k, 1.0)
+        rr = np.array([r for _d, r in rets])
+        yrs = {}
+        for d1, r in rets:
+            y = dt.datetime.fromtimestamp((d1 - DAY) / 1000, dt.timezone.utc).strftime("%Y")
+            yrs[y] = yrs.get(y, 1.0) * (1 + r)
+        half = len(rr) // 2
+        g25, best = None, None
+        for g in (0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0):
+            Vg, ddg, rg_, _f, _c = sim(k, g)
+            if ddg >= -0.25:
+                g25, best = g, (Vg, float(np.mean([r for _d, r in rg_])))
+        out[k] = [round(V, 2), round(dd * 100), round(float(rr.mean()) * 100, 2),
+                  round(float(rr.mean() / (rr.std() + 1e-12) * np.sqrt(len(rr))), 2), round(float((rr > 0).mean()) * 100),
+                  [round((yrs[y] - 1) * 100) if y in yrs else None for y in YEARS],
+                  round(float(np.prod(1 + rr[:half])), 2), round(float(np.prod(1 + rr[half:])), 2),
+                  round(fm * 100, 2), round(cm * 100, 2), g25, round(best[0], 2) if best else None,
+                  round(best[1] * 100, 2) if best else None]
+    note("ls neutral · [x g1, dd %, month %, t, months+ %, 2022…2026 %, halves, funding %/m, cost %/m, g@dd25, x, month %]",
+         json.dumps({"funding files": f"{have_f}/{len(need)}", "months": len(plan), **out}, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    (quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (ls_neutral() if "--ls" in sys.argv else quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

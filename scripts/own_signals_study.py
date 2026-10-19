@@ -1078,6 +1078,68 @@ def daily_wide(sym):
     return {"t": np.array(ts, dtype=np.int64), "o": a[:, 0], "h": a[:, 1], "l": a[:, 2], "c": a[:, 3], "qv": a[:, 4], "bv": a[:, 5]}
 
 
+def _wide_data():
+    syms = all_um_symbols()
+    with ThreadPoolExecutor(48) as ex:
+        raw = dict(zip(syms, ex.map(daily_wide, syms)))
+    D = {s[:-4]: k for s, k in raw.items() if k is not None}
+    B = D["BTC"]
+    bc = B["c"]
+    s200 = sma(bc, 200)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": bull}
+    for s in D:
+        prep(D[s], gate)
+    flow_feats(D, B)
+    by_day = {}
+    for s, K in D.items():
+        v = sma(K["bv"] * K["c"], 30)          # 30-day dollar volume (base × close), as live computes it
+        for q in range(119, len(K["t"])):
+            if not np.isnan(v[q]):
+                by_day.setdefault(int(K["t"][q]), []).append((float(v[q]), s))
+    rank = {}
+    for d, lst in by_day.items():
+        lst.sort(reverse=True)
+        for r_, (_v, s) in enumerate(lst):
+            rank[(s, d)] = r_
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    days = [int(t) for t in B["t"] if t >= t0]
+    C = flow_cands(D, {}, t0)
+    for x in C:
+        x["vrank"] = rank.get((x["sym"], int(D[x["sym"]]["t"][x["i"]])), 10 ** 6)
+    return D, C, days
+
+
+def wide2():
+    """19.10, round 10 — round 9 (every Binance perp, delisted included, point-in-time top N by volume): more coins = WORSE
+    (top 40 → dd −24 %, top 100 → −57 %, all → −72 %), and today's 70 were flattered by survivors (×4 at the same drawdown).
+    Here the knobs around the honest winner, the point-in-time top 40: N 20…60, the volume mark 1.3…2.0 or none, 20 / 40
+    open, a random pick of 4 as the baseline. Rows: [m @dd −25 %, m, dd, worst m, avg trade, a day, 2023…2026]."""
+    D, C, days = _wide_data()
+    res = {}
+
+    def row(name, seeds=None, **kw):
+        if seeds:
+            rs = [flow_account(C, D, days, seed=sd, **kw) for sd in range(seeds)]
+            a = {k: round(float(np.mean([r[k] for r in rs])), 2) for k in ("m", "dd", "wm", "avg", "tpd")}
+            a["y"] = [round(float(np.mean([r["y"][q] for r in rs]))) for q in range(len(YEARS))]
+        else:
+            a = flow_account(C, D, days, **kw)
+        res[name] = [_at25(C, D, days, seeds=seeds, **kw), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"]] + a["y"][1:]
+    for top in (20, 30, 40, 50, 60):
+        row(f"top{top} vol≥1.5", min_surge=1.5, surge_key="surge_vc30", score="surge_vc30", max_open=40, top=top)
+    for thr in (1.3, 1.7, 2.0):
+        row(f"top40 vol≥{thr}", min_surge=thr, surge_key="surge_vc30", score="surge_vc30", max_open=40, top=40)
+    row("top40 vol≥1.5 open20", min_surge=1.5, surge_key="surge_vc30", score="surge_vc30", max_open=20, top=40)
+    row("top40 no mark, all", max_open=40, top=40)
+    row("top40 random 4", seeds=6, cap=4, score="random", max_open=40, top=40)
+    row("top30 vol≥1.3", min_surge=1.3, surge_key="surge_vc30", score="surge_vc30", max_open=40, top=30)
+    row("top50 vol≥1.3", min_surge=1.3, surge_key="surge_vc30", score="surge_vc30", max_open=40, top=50)
+    row("top40 vol≥1.5 C only", min_surge=1.5, surge_key="surge_vc30", score="surge_vc30", max_open=40, top=40, fam_only="C")
+    note("own wide2 · point-in-time top N, knobs", json.dumps(res, ensure_ascii=False))
+
+
 def wide():
     """19.10, round 9 — owner: «раз статистика улучшается с количеством монет … хотя бы до 100, либо топ 1000». The honest test:
     EVERY Binance USDT-M perp in the archive, delisted ones included (no survivor bias), and each day the coin set is the top N
@@ -1144,4 +1206,4 @@ def wide():
     note("own wide · thresholds on top150", json.dumps({k: v for k, v in res.items() if k.startswith("top150 vol≥1.3") or k.startswith("top150 vol≥2")}))
 
 if __name__ == "__main__":
-    (wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

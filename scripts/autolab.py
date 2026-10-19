@@ -361,6 +361,40 @@ def switch_test(OOS, meta, looks=(3, 7, 14, 30, 90), holds=(1, 7)):
     return out
 
 
+def scale_test(OOS, meta, looks=(7, 14, 30, 90)):
+    """19.10, owner: «когда система видит, что сигналы идут чётко по направлению … задействовать свободный кэш, рычаги». Each rule
+    version that PASSED (or every version, as a control): exposure ×1.5 while its own last N days are in plus, ×0.5 while in
+    minus (on average about the same money in the market) — against the constant ×1. Also the reverse (more after losses)."""
+    out = {}
+    for cls in ("crypto", "metal", "index"):
+        series = [(k, fm, v[1]) for k in OOS if meta[k][2] == cls for fm, v in OOS[k].items()]
+        if not series:
+            continue
+        ppy = 365 if cls == "crypto" else 252
+        acc = {}
+        for _k, _fm, r in series:
+            cum = np.cumsum(r)
+            acc.setdefault("const ×1", []).append(r)
+            for look in looks:
+                past = np.r_[np.zeros(look + 1), cum[look:-1] - cum[:-look - 1]][:len(r)]
+                for name, up, dn in (("больше после плюса", 1.5, 0.5), ("больше после минуса", 0.5, 1.5)):
+                    m = np.where(past > 0, up, dn)
+                    m[: look + 1] = 1.0
+                    turn = np.abs(np.diff(np.r_[1.0, m])) * COST[meta[_k][2]] * 0.5
+                    acc.setdefault(f"{name} {look}d", []).append(r * m - turn)
+        row = {}
+        for k, v in acc.items():
+            S = [stats(x, ["2000-01-01"] * len(x), ppy) for x in v]
+            S = [x for x in S if x]
+            row[k] = {"cagr": round(float(np.mean([x["cagr"] for x in S])), 2), "sharpe": round(float(np.mean([x["sharpe"] for x in S])), 3),
+                      "dd": round(float(np.mean([x["dd"] for x in S])), 1)}
+            if k != "const ×1":
+                row[k]["better_sharpe_share"] = round(sum(1 for a, b in zip(v, acc["const ×1"])
+                                                          if a.mean() / (a.std() or 1) > b.mean() / (b.std() or 1)) / len(v), 2)
+        out[cls] = {"versions": len(series), **row}
+    return out
+
+
 # ------------------------------------------------------------------------------------------------------------- live check
 def live_check(paper):
     rows = []
@@ -485,6 +519,8 @@ def main():
     for name, p in ports.items():
         note(f"autolab · portfolio · {name[:40]}", json.dumps({k: p.get(k) for k in ("cagr", "sharpe", "dd", "pos_years", "n_years", "last12", "at_dd25", "from")}, ensure_ascii=False))
     switch = switch_test(OOS, meta)
+    scale = scale_test(OOS, meta)
+    note("autolab · scale test", json.dumps(scale, ensure_ascii=False)[:3900])
     note("autolab · switch test", json.dumps(switch, ensure_ascii=False))
     # previous night → changes
     try:
@@ -511,7 +547,7 @@ def main():
            "inverted_passed": sum(r["passes"] for r in inv), "coverage": cover, "classes_ru": CLASS_RU,
            "best_by_class": {k: {x: v[x] for x in ("market_ru", "family_ru", "mode_ru", "sharpe", "cagr", "dd", "last12", "reliable")}
                              for k, v in best.items()},
-           "portfolios": ports, "switch": switch, "live": live, "changes": changes, "rows": rows,
+           "portfolios": ports, "switch": switch, "scale": scale, "live": live, "changes": changes, "rows": rows,
            "method_ru": [
                "Каждую ночь движок сам берёт свежие дневные свечи: крипта (Binance), металлы, фондовые индексы, нефть и облигации США (Yahoo, запасной — Stooq).",
                "5 семей правил × параметры × 3 направления: только покупки, покупки и шорты, перевёрнутое правило. Размер позиции — под 15% годовых колебаний, комиссии учтены.",

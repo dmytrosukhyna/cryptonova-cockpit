@@ -62,10 +62,11 @@ def daily(sym: str):
     seen = {}
     for r in rows:
         t = int(r[0]); t = t // 1000 if t > 10 ** 14 else t
-        seen[t] = (float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[7]) if len(r) > 7 and r[7] else 0.0)
+        seen[t] = (float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[7]) if len(r) > 7 and r[7] else 0.0,
+                   float(r[5]) if len(r) > 5 and r[5] else 0.0)
     ts = sorted(seen)
     a = np.array([seen[t] for t in ts])
-    return {"t": np.array(ts, dtype=np.int64), "o": a[:, 0], "h": a[:, 1], "l": a[:, 2], "c": a[:, 3], "qv": a[:, 4]}
+    return {"t": np.array(ts, dtype=np.int64), "o": a[:, 0], "h": a[:, 1], "l": a[:, 2], "c": a[:, 3], "qv": a[:, 4], "bv": a[:, 5]}
 
 
 def sma(x, n):
@@ -700,6 +701,7 @@ def flow_cands(D, order, t0):
                 out.append({"o": tr[0], "c": tr[1], "net": tr[3], "stop": tr[6], "sym": s, "fam": "P" if fam == "P" else "C",
                             "i": i, "j": j, "e": float(K["o"][i + 1]), "rank": order.get(s, 999),
                             "rs_hi": f("rs60"), "atr_hi": f("atrp"), "surge": f("surge"), "liq": f("vol30"), "ext_hi": f("ext"),
+                            "surge_b30": f("surge_b30"), "surge_q20": f("surge_q20"), "surge_q50": f("surge_q50"),
                             "rsi_lo": -f("rsi2") if fam == "P" else -100.0})
     return out
 
@@ -716,11 +718,14 @@ def flow_feats(D, btc):
         K["vol30"] = sma(K["qv"], 30)
         with np.errstate(invalid="ignore", divide="ignore"):
             K["surge"] = K["qv"] / np.where(K["vol30"] > 0, K["vol30"], np.nan)
+            for nm, ser, n in (("surge_b30", K["bv"], 30), ("surge_q20", K["qv"], 20), ("surge_q50", K["qv"], 50)):
+                av = sma(ser, n)
+                K[nm] = ser / np.where(av > 0, av, np.nan)
             K["ext"] = (c - K["sma50"]) / K["atr"]
 
 
 def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, heat=None, max_open=20, gross=2.0, seed=None,
-                 fam_cap=None, mult=1.0):
+                 fam_cap=None, mult=1.0, min_surge=None):
     """Daily mark-to-market account. Each day: today's entries (signals of yesterday's close) → skip a coin+rule already open →
     rank by `score` → take up to `cap` (None = all) within max_open, the gross notional cap (× equity) and the open-risk cap
     `heat` (% of equity); size = risk % of the (realised) equity lost at the stop, notional ≤ 25 %. With `budget` the day's
@@ -734,7 +739,8 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
     E, opn, keys, curve, taken, skipped_good = 1.0, {}, set(), [], [], []
     n_c, n_t = 0, 0
     for d in days:
-        cand = [k for k in by_o.get(d, []) if (C[k]["sym"], C[k]["fam"]) not in keys]
+        cand = [k for k in by_o.get(d, []) if (C[k]["sym"], C[k]["fam"]) not in keys
+                and (min_surge is None or C[k]["surge"] >= min_surge)]
         if cand:
             n_c += len(cand)
             if score == "random":
@@ -891,5 +897,76 @@ def flow():
         note(f"own flow · {label} coins · budget heat open, same dd", json.dumps(res2, ensure_ascii=False))
     note("own flow · monthly % at the same drawdown −25 %", json.dumps(summary_best, ensure_ascii=False))
 
+
+def _at25(C, D, days, seeds=None, **kw):
+    """The monthly return of a policy at the drawdown −25 % (its risk scaled ¼…3×), with its points."""
+    pts = []
+    for m_ in (0.25, 0.5, 1.0, 1.5, 2.0, 3.0):
+        if seeds:
+            rs = [flow_account(C, D, days, mult=m_, seed=sd, **kw) for sd in range(seeds)]
+            pts.append((float(np.mean([r["dd"] for r in rs])), float(np.mean([r["m"] for r in rs]))))
+        else:
+            a = flow_account(C, D, days, mult=m_, **kw)
+            pts.append((a["dd"], a["m"]))
+    pts.sort(key=lambda z: -z[0])
+    seg = next(((p1, p2) for p1, p2 in zip(pts, pts[1:]) if p1[0] >= -25 >= p2[0]), None)
+    if seg is None:
+        seg = (pts[-2], pts[-1]) if pts[-1][0] > -25 else (pts[0], pts[1])
+    (d1, m1), (d2, m2) = seg
+    return round(m1 + (m2 - m1) * (-25 - d1) / (d2 - d1), 2) if d2 != d1 else round(m1, 2)
+
+
+def flow2():
+    """19.10, round 7 — the check of round 6's finding: ranking the day's signals by the VOLUME SURGE (the signal day's
+    volume ÷ its 30-day average) was at or near the top on 40 coins, on 30 other coins and on all 70, at caps 2, 4 and 6.
+    Picked from 10 scores, so it may be luck. Here: the same at caps 2…6 against a random pick at the SAME drawdown (−25 %,
+    8 seeds), with other volume windows (20 / 50 days) and base volume instead of quote volume (BingX gives base volume),
+    a volume filter instead of a cap (take every signal with volume above its average), and ranking + a daily risk budget.
+    Rows: [monthly % at dd −25 %, monthly % at risk 0.5 %, dd %, avg trade %, trades a day, 2023…2026 % at risk 0.5 %]."""
+    KS, K2 = _load(COINS), _load(COINS2)
+    B = KS["BTC"]
+    bc = B["c"]
+    s200 = sma(bc, 200)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": bull}
+    for D in (KS, K2):
+        for s in D:
+            prep(D[s], gate)
+        flow_feats(D, B)
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    days = [int(t) for t in B["t"] if t >= t0]
+    order = {s: k for k, s in enumerate(COINS + COINS2)}
+    allres = {}
+    for label, D in (("40", KS), ("30", K2), ("70", dict(KS, **K2))):
+        C = flow_cands(D, order, t0)
+        res = {}
+
+        def row(name, seeds=None, **kw):
+            if seeds:
+                rs = [flow_account(C, D, days, seed=sd, **kw) for sd in range(seeds)]
+                a = {k: round(float(np.mean([r[k] for r in rs])), 2) for k in ("m", "dd", "avg", "tpd")}
+                a["y"] = [round(float(np.mean([r["y"][q] for r in rs]))) for q in range(len(YEARS))]
+            else:
+                a = flow_account(C, D, days, **kw)
+            res[name] = [_at25(C, D, days, seeds=seeds, **kw), a["m"], a["dd"], a["avg"], a["tpd"]] + a["y"][1:]
+        for cap in (2, 3, 4, 5, 6):
+            row(f"random c{cap}", seeds=8, cap=cap, score="random")
+            row(f"order c{cap}", cap=cap)
+            for sc in ("surge", "surge_b30", "surge_q20", "surge_q50"):
+                row(f"{sc} c{cap}", cap=cap, score=sc)
+        row("order all", cap=None)
+        for ms in (1.0, 1.5, 2.0):
+            row(f"vol>{ms} all", min_surge=ms, max_open=40, score="surge")
+            row(f"vol>{ms} c4", min_surge=ms, cap=4, score="surge")
+        for b in (1.5, 2.0):
+            row(f"surge top6 budget{b}", cap=6, score="surge", budget=b)
+        allres[label] = res
+        note(f"own flow2 · {label} coins", json.dumps(res, ensure_ascii=False))
+    # the verdict: surge vs random at the same drawdown, every cap, every coin set
+    note("own flow2 · surge minus random, monthly % at dd −25 %", json.dumps(
+        {lab: {f"c{c}": [round(r[f"{sc} c{c}"][0] - r[f"random c{c}"][0], 2) for sc in ("surge", "surge_b30", "surge_q20", "surge_q50", "order")]
+               for c in (2, 3, 4, 5, 6)} for lab, r in allres.items()}))
+
 if __name__ == "__main__":
-    (flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

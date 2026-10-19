@@ -1,0 +1,18 @@
+name: research-listings-more
+# Manual only. Short of new listings on MEXC and Hyperliquid perps (scripts/listings_more_study.py).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: python scripts/listings_more_study.py

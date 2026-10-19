@@ -1,0 +1,19 @@
+name: research-golden-history
+# Manual only. Golden signals on 10 months of history (scripts/golden_history.py): the signals as recorded by Cornix
+# (time, coin, side, leverage, entry zone — no account data) replayed on Binance 5-minute candles, five ways.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: python scripts/golden_history.py

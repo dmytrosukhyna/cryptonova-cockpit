@@ -66,6 +66,10 @@ jobs:
         continue-on-error: true
         timeout-minutes: 4
         run: python -m cnq.cli quality --out web
+      - name: Нейтральная корзина (long the 10 best / short the 10 worst alts by the quality card, monthly; demo) → web/paper.json profiles.lsn
+        continue-on-error: true
+        timeout-minutes: 3
+        run: python -m cnq.cli lsn --out web
       - name: Портфель «ядро + альтсезон» (altseason gauge, model shares; posts to the signals channel) → web/altseason.json
         continue-on-error: true
         timeout-minutes: 3

@@ -43,7 +43,7 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn"])
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -282,6 +282,12 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs("data", exist_ok=True)
         d = alt_portfolio.run(sqlite3.connect("data/agents.sqlite"), args.out)
         print("altseason portfolio:", {k: d.get(k) for k in ("gauge", "posted", "error")})
+    elif args.cmd == "lsn":
+        import os, sqlite3
+        from .agents import ls_desk
+        os.makedirs("data", exist_ok=True)
+        d = ls_desk.run(sqlite3.connect("data/agents.sqlite"), args.out)
+        print("neutral basket:", {"equity": d["equity_mtm"], "open": [(o["symbol"], o["side"]) for o in d["open"]], "events": d["events"][:6]})
     elif args.cmd == "quality":
         import os, sqlite3
         from .agents import spot_quality

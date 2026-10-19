@@ -117,11 +117,16 @@ class Mailbox:
         by_owner = (own is not None and frm.get("id") == own) or (
             owner_username and (frm.get("username") or "").lower() == owner_username.lstrip("@").lower())
         news = str(cid) == str(os.environ.get("CNQ_TG_CHAT") or "") or (chat.get("username") or "").lower() == "crypto_nova_news"
-        if not by_owner or news or not re.search(r"(?i)signal|сигнал", title):
+        if not by_owner or news or not self.title_ok(title):
             return None
         self.set_meta("signals_chat", str(cid))
         self.set_meta("signals_chat_title", title)
         return f"Канал «{title}» подключён: новые сигналы CRYPTO NOVA (вход, стоп, цели и «Close» при выходе) будут приходить туда."
+
+    def title_ok(self, title: str) -> bool:
+        """19.10: the owner's channel is «CRYPTO NOVA FUTURES» — a title with signals / futures (any language), or ANY channel of
+        the owner while no signals channel is connected yet (the owner is always checked; the news channel never qualifies)."""
+        return bool(re.search(r"(?i)signal|сигнал|futures|фьючерс", title)) or not self.meta("signals_chat")
 
     def connect_checked(self, token: str, chat: dict, owner_username: str | None, api=None) -> str | None:
         """19.10 fallback when the «bot added» event was missed: a post in the channel (channel_post) or a post the owner forwards
@@ -129,12 +134,12 @@ class Mailbox:
         Telegram's admin list of the channel (getChatAdministrators — works only where the bot itself is an admin) has the OWNER."""
         api = api or _api
         cid, title = chat.get("id"), chat.get("title") or ""
-        if cid is None or chat.get("type") not in ("channel", "supergroup"):
+        if cid is None or chat.get("type") not in ("channel", "supergroup", "group"):
             return None
         if str(cid) == self.meta("signals_chat"):
             return None
         news = str(cid) == str(os.environ.get("CNQ_TG_CHAT") or "") or (chat.get("username") or "").lower() == "crypto_nova_news"
-        if news or not re.search(r"(?i)signal|сигнал", title):
+        if news or not self.title_ok(title):
             return None
         own = self.owner_chat(owner_username)
         try:
@@ -207,6 +212,14 @@ class Mailbox:
                 continue
             m = u.get("message") or {}
             chat = m.get("chat") or {}
+            if chat.get("type") in ("group", "supergroup"):
+                if m.get("migrate_to_chat_id") and str(chat.get("id")) == self.meta("signals_chat"):
+                    self.set_meta("signals_chat", str(m["migrate_to_chat_id"]))      # a group became a supergroup: new id
+                else:
+                    msg = self.connect_checked(token, chat, owner_username)
+                    if msg:
+                        self.notes.append(msg)
+                continue
             if chat.get("type") != "private":
                 continue
             cid = chat["id"]; frm = m.get("from") or {}
@@ -218,7 +231,7 @@ class Mailbox:
                 if is_owner:
                     msg = self.connect_checked(token, src, owner_username) or (
                         f"Канал «{src.get('title') or ''}» уже подключён." if str(src.get("id")) == self.meta("signals_chat") else
-                        "Не получилось подключить канал: в названии должно быть «Signals» или «Сигналы», а бот — администратором канала.")
+                        "Не получилось подключить канал: бот должен быть администратором канала, а вы — его владельцем или администратором.")
                     try:
                         _api(token, "sendMessage", {"chat_id": cid, "text": msg})
                     except Exception:  # noqa: BLE001

@@ -1,4 +1,4 @@
-"""Портфель «Ядро + альтсезон» — a model spot portfolio with an altseason switch, and its signals to the CRYPTO NOVA Signals
+"""Портфель «Ядро + альтсезон» — a model spot portfolio with an altseason switch, and its signals to the owner's signals channel (CRYPTO NOVA FUTURES)
 channel (19.10.2026, owner: «все рассказывают про альтсезон … с альтами есть перспектива на X5, X7 … предложи правильный,
 самый лучший вариант»; «туда же и портфель надо законнектить наш»).
 

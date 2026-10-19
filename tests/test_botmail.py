@@ -63,8 +63,9 @@ def test_owner_connects_a_signals_channel_by_adding_the_bot():
     ev = lambda title, uid, un, status="administrator", cid=-1001: {"chat": {"id": cid, "type": "channel", "title": title},  # noqa: E731
                                                                     "from": {"id": uid, "username": un}, "new_chat_member": {"status": status}}
     assert mb.channel_event(ev("CRYPTO NOVA Signals", 999, "stranger"), "owner_x") is None          # not the owner
-    assert mb.channel_event(ev("Новости", 111, "owner_x"), "owner_x") is None                        # not a signals channel
     assert mb.channel_event(ev("CRYPTO NOVA Signals", 111, "owner_x"), "owner_x").startswith("Канал «CRYPTO NOVA Signals» подключён")
+    assert signal_feed.signals_chat(conn) == "-1001"
+    assert mb.channel_event(ev("Новости", 111, "owner_x", cid=-1009), "owner_x") is None             # another channel while one is on
     assert signal_feed.signals_chat(conn) == "-1001"
     assert "убран" in mb.channel_event(ev("CRYPTO NOVA Signals", 111, "owner_x", "left"), "owner_x")
     assert signal_feed.signals_chat(conn) is None
@@ -81,10 +82,10 @@ def test_channel_connects_by_a_post_or_a_forward_only_when_the_owner_is_its_admi
     api = lambda token, method, data: {"ok": True, "result": admins.get(data["chat_id"], [])}  # noqa: E731
     ch = lambda cid, title: {"id": cid, "type": "channel", "title": title}  # noqa: E731
     assert mb.connect_checked("t", ch(-1002, "Best Signals"), "owner_x", api) is None            # a stranger's channel
-    assert mb.connect_checked("t", ch(-1003, "Новости"), "owner_x", api) is None                 # not a signals channel
-    assert "подключён" in mb.connect_checked("t", ch(-1003, "CRYPTO NOVA Signals"), "owner_x", api)
+    assert "подключён" in mb.connect_checked("t", ch(-1003, "CRYPTO NOVA FUTURES"), "owner_x", api)   # the owner's real channel
     assert signal_feed.signals_chat(conn) == "-1003"
-    assert mb.connect_checked("t", ch(-1003, "CRYPTO NOVA Signals"), "owner_x", api) is None     # already connected → no repeat note
+    assert mb.connect_checked("t", ch(-1004, "Новости"), "owner_x", api) is None                 # not a signals channel, one is on
+    assert mb.connect_checked("t", ch(-1003, "CRYPTO NOVA FUTURES"), "owner_x", api) is None     # already connected → no repeat note
 
 
 def test_poll_connects_the_channel_from_the_owners_forward(monkeypatch):

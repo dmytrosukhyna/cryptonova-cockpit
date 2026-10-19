@@ -62,10 +62,10 @@ def daily(sym: str):
     seen = {}
     for r in rows:
         t = int(r[0]); t = t // 1000 if t > 10 ** 14 else t
-        seen[t] = (float(r[1]), float(r[2]), float(r[3]), float(r[4]))
+        seen[t] = (float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[7]) if len(r) > 7 and r[7] else 0.0)
     ts = sorted(seen)
     a = np.array([seen[t] for t in ts])
-    return {"t": np.array(ts, dtype=np.int64), "o": a[:, 0], "h": a[:, 1], "l": a[:, 2], "c": a[:, 3]}
+    return {"t": np.array(ts, dtype=np.int64), "o": a[:, 0], "h": a[:, 1], "l": a[:, 2], "c": a[:, 3], "qv": a[:, 4]}
 
 
 def sma(x, n):
@@ -131,55 +131,64 @@ def signals(K, fam, gate):
     return np.nan_to_num(L).astype(bool), np.nan_to_num(S).astype(bool)
 
 
-def simulate(K, fam, gate, ex, sym):
-    """One position per coin at a time. → list of (open ms, close ms, side, net %, days held, sym)."""
-    L, S = signals(K, fam, gate)
+def _trade(K, fam, ex, i, sg, sym):
+    """One trade from the signal at the close of day i (entry at the next open). → (trade tuple, exit index j) or None when the
+    trade is still open at the end of the data. Tuple: (open ms, close ms, side, net %, days held, sym, stop %, i, fam)."""
     t, o, h, l, c, A = K["t"], K["o"], K["h"], K["l"], K["c"], K["atr"]
-    n, out, i = len(t), [], 0
+    n = len(t)
     hold_max = 7 if fam == "M" else (10 if fam == "P" else 14)
+    e = o[i + 1]
+    a = A[i]
+    if ex == "rr2":
+        sd, td = 1.5 * a, 3.0 * a
+    else:
+        sd, td = min(max(2.5 * a, 0.03 * e), 0.15 * e), None
+    stop = e - sg * sd
+    tgt = e + sg * td if td else None
+    best = e
+    j, px, done = i + 1, None, False
+    while j < n:
+        if (sg == 1 and l[j] <= stop) or (sg == -1 and h[j] >= stop):
+            px, done = stop, True
+        elif tgt is not None and ((sg == 1 and h[j] >= tgt) or (sg == -1 and l[j] <= tgt)):
+            px, done = tgt, True
+        else:
+            best = max(best, c[j]) if sg == 1 else min(best, c[j])
+            if fam == "M":
+                done = j - i >= hold_max
+            elif fam == "P":
+                done = (c[j] > K["sma5"][j]) if sg == 1 else (c[j] < K["sma5"][j])
+            elif ex == "pde" and j > i + 1:
+                done = (c[j] < l[j - 1]) if sg == 1 else (c[j] > h[j - 1])
+            elif ex == "chand":
+                done = (c[j] < best - 3 * A[j]) if sg == 1 else (c[j] > best + 3 * A[j])
+            if not done and j - i >= hold_max:
+                done = True
+            if done:
+                px = c[j]
+        if done:
+            break
+        j += 1
+    if not done:
+        return None
+    days = j - i
+    net = sg * (px / e - 1) * 100 - COST - FUND_D * days
+    return (int(t[i + 1]), int(t[j]), sg, float(net), days, sym, float(sd / e * 100), int(i), fam), j
+
+
+def simulate(K, fam, gate, ex, sym):
+    """One position per coin at a time. → list of (open ms, close ms, side, net %, days held, sym, stop %, i, fam)."""
+    L, S = signals(K, fam, gate)
+    n, out, i = len(K["t"]), [], 0
     while i < n - 2:
-        if not (L[i] or S[i]) or (L[i] and S[i]) or np.isnan(A[i]):
+        if not (L[i] or S[i]) or (L[i] and S[i]) or np.isnan(K["atr"][i]):
             i += 1
             continue
-        sg = 1 if L[i] else -1
-        e = o[i + 1]
-        a = A[i]
-        if ex == "rr2":
-            sd, td = 1.5 * a, 3.0 * a
-        else:
-            sd, td = min(max(2.5 * a, 0.03 * e), 0.15 * e), None
-        stop = e - sg * sd
-        tgt = e + sg * td if td else None
-        best = e
-        j, px, done = i + 1, None, False
-        while j < n:
-            if (sg == 1 and l[j] <= stop) or (sg == -1 and h[j] >= stop):
-                px, done = stop, True
-            elif tgt is not None and ((sg == 1 and h[j] >= tgt) or (sg == -1 and l[j] <= tgt)):
-                px, done = tgt, True
-            else:
-                best = max(best, c[j]) if sg == 1 else min(best, c[j])
-                if fam == "M":
-                    done = j - i >= hold_max
-                elif fam == "P":
-                    done = (c[j] > K["sma5"][j]) if sg == 1 else (c[j] < K["sma5"][j])
-                elif ex == "pde" and j > i + 1:
-                    done = (c[j] < l[j - 1]) if sg == 1 else (c[j] > h[j - 1])
-                elif ex == "chand":
-                    done = (c[j] < best - 3 * A[j]) if sg == 1 else (c[j] > best + 3 * A[j])
-                if not done and j - i >= hold_max:
-                    done = True
-                if done:
-                    px = c[j]
-            if done:
-                break
-            j += 1
-        if not done:
+        r = _trade(K, fam, ex, i, 1 if L[i] else -1, sym)
+        if r is None:
             break                                             # still open at the end of the data
-        days = j - i
-        net = sg * (px / e - 1) * 100 - COST - FUND_D * days
-        out.append((int(t[i + 1]), int(t[j]), sg, float(net), days, sym, float(sd / e * 100)))
-        i = j                                                 # a new signal can come at this close
+        out.append(r[0])
+        i = r[1]                                              # a new signal can come at this close
     return out
 
 
@@ -661,5 +670,226 @@ def altport():
     note("altport · the live model on daily closes since 2022", json.dumps(out, ensure_ascii=False))
 
 
+
+# ------------------------------------------------------------------------------------------------ round 6: how many a day, which
+FLOW_SCORES = ("order", "rs_hi", "rs_lo", "atr_lo", "atr_hi", "surge", "liq", "ext_hi", "rsi_lo", "P_first", "C_first")
+
+
+def _load(coins):
+    with ThreadPoolExecutor(12) as ex:
+        raw = dict(zip(coins, ex.map(lambda s: daily(s + "USDT"), coins)))
+    return {s: k for s, k in raw.items() if k is not None}
+
+
+def flow_cands(D, order, t0):
+    """EVERY long signal day of P and C (not one trade after another): the account decides which to take, like the live desk,
+    which sees the same coin signal again the next day when it skipped it. Features are known at the signal day's close."""
+    out = []
+    for s, K in D.items():
+        for fam, ex in (("P", "-"), ("B20", "chand")):
+            L, S = signals(K, fam, "regime")
+            for i in np.where(L & ~S)[0]:
+                i = int(i)
+                if i >= len(K["t"]) - 2 or np.isnan(K["atr"][i]):
+                    continue
+                r = _trade(K, fam, ex, i, 1, s)
+                if r is None or r[0][0] < t0:
+                    continue
+                tr, j = r
+                f = lambda k: float(K[k][i]) if not np.isnan(K[k][i]) else 0.0  # noqa: E731
+                out.append({"o": tr[0], "c": tr[1], "net": tr[3], "stop": tr[6], "sym": s, "fam": "P" if fam == "P" else "C",
+                            "i": i, "j": j, "e": float(K["o"][i + 1]), "rank": order.get(s, 999),
+                            "rs_hi": f("rs60"), "atr_hi": f("atrp"), "surge": f("surge"), "liq": f("vol30"), "ext_hi": f("ext"),
+                            "rsi_lo": -f("rsi2") if fam == "P" else -100.0})
+    return out
+
+
+def flow_feats(D, btc):
+    bidx = {int(t): k for k, t in enumerate(btc["t"])}
+    bc = btc["c"]
+    br60 = bc / np.r_[np.full(60, np.nan), bc[:-60]] - 1
+    for K in D.values():
+        c = K["c"]
+        r60 = c / np.r_[np.full(60, np.nan), c[:-60]] - 1
+        K["rs60"] = r60 - np.array([br60[bidx[int(t)]] if int(t) in bidx else np.nan for t in K["t"]])
+        K["atrp"] = K["atr"] / c
+        K["vol30"] = sma(K["qv"], 30)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            K["surge"] = K["qv"] / np.where(K["vol30"] > 0, K["vol30"], np.nan)
+            K["ext"] = (c - K["sma50"]) / K["atr"]
+
+
+def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, heat=None, max_open=20, gross=2.0, seed=None,
+                 fam_cap=None, mult=1.0):
+    """Daily mark-to-market account. Each day: today's entries (signals of yesterday's close) → skip a coin+rule already open →
+    rank by `score` → take up to `cap` (None = all) within max_open, the gross notional cap (× equity) and the open-risk cap
+    `heat` (% of equity); size = risk % of the (realised) equity lost at the stop, notional ≤ 25 %. With `budget` the day's
+    new risk is split equally among the trades taken (each ≤ risk). Then today's exits; equity = realised + open at the close."""
+    risk, budget, heat = risk * mult, (budget * mult if budget else None), (heat * mult if heat else None)
+    rng = np.random.default_rng(seed) if score == "random" else None
+    by_o, by_c = {}, {}
+    for k, x in enumerate(C):
+        by_o.setdefault(x["o"], []).append(k)
+    idx = {s: {int(t): q for q, t in enumerate(K["t"])} for s, K in D.items()}
+    E, opn, keys, curve, taken, skipped_good = 1.0, {}, set(), [], [], []
+    n_c, n_t = 0, 0
+    for d in days:
+        cand = [k for k in by_o.get(d, []) if (C[k]["sym"], C[k]["fam"]) not in keys]
+        if cand:
+            n_c += len(cand)
+            if score == "random":
+                rng.shuffle(cand)
+            elif score == "order":
+                cand.sort(key=lambda k: (C[k]["rank"], C[k]["fam"]))
+            elif score == "P_first":
+                cand.sort(key=lambda k: (C[k]["fam"] != "P", C[k]["rank"]))
+            elif score == "C_first":
+                cand.sort(key=lambda k: (C[k]["fam"] != "C", C[k]["rank"]))
+            elif score in ("rs_lo", "atr_lo"):
+                cand.sort(key=lambda k: C[k]["rs_hi" if score == "rs_lo" else "atr_hi"])
+            else:
+                cand.sort(key=lambda k: -C[k][score])
+            room = max_open - len(opn)
+            n_take = min(len(cand), room, cap if cap is not None else 10 ** 6)
+            r_each = min(risk, budget / max(1, n_take)) if budget else risk
+            got, per_fam = 0, {}
+            g_now = sum(v[0] for v in opn.values())
+            h_now = sum(v[2] for v in opn.values())
+            for k in cand:
+                x = C[k]
+                if got >= n_take:
+                    break
+                if fam_cap and per_fam.get(x["fam"], 0) >= fam_cap:
+                    continue
+                if heat is not None and h_now + r_each > heat + 1e-9:
+                    break
+                size = E * min(0.25, r_each / x["stop"])
+                if g_now + size > gross * E:
+                    continue
+                opn[k] = (size, x["e"], r_each)
+                keys.add((x["sym"], x["fam"]))
+                by_c.setdefault(x["c"], []).append(k)
+                g_now += size; h_now += r_each; got += 1
+                per_fam[x["fam"]] = per_fam.get(x["fam"], 0) + 1
+                taken.append(x["net"])
+            n_t += got
+        for k in by_c.pop(d, []):
+            if k in opn:
+                size = opn.pop(k)[0]
+                E += size * C[k]["net"] / 100
+                keys.discard((C[k]["sym"], C[k]["fam"]))
+        mtm = 0.0
+        for k, (size, e, _r) in opn.items():
+            q = idx[C[k]["sym"]].get(d)
+            if q is not None:
+                mtm += size * (D[C[k]["sym"]]["c"][q] / e - 1)
+        curve.append((d, E + mtm))
+    eq = np.array([v for _, v in curve])
+    dd = float((eq / np.maximum.accumulate(eq) - 1).min())
+    last = {}
+    for d, v in curve:
+        last[dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).strftime("%Y-%m")] = v
+    mo, prev = [], 1.0
+    yrs = {}
+    for m in sorted(last):
+        r = last[m] / prev - 1
+        mo.append(r)
+        yrs.setdefault(m[:4], []).append(r)
+        prev = last[m]
+    v = np.array(mo)
+    return {"m": round(float(v.mean()) * 100, 2), "dd": round(dd * 100, 1), "wm": round(float(v.min()) * 100, 1),
+            "tpd": round(n_t / len(days), 2), "x": round(float(eq[-1]), 2), "avg": round(float(np.mean(taken)), 2) if taken else None,
+            "y": [round((float(np.prod([1 + r for r in yrs.get(y, [])])) - 1) * 100) for y in YEARS], "cand_pd": round(n_c / len(days), 2)}
+
+
+def _row(a):
+    return [a["m"], a["dd"], a["wm"], a["tpd"], a["avg"]] + a["y"]
+
+
+def flow():
+    """19.10, round 6 — owner: «что это за правило не больше 4 сделок в день? … главное качество, а не количество, но хочется и
+    не упускать возможности». The live desk takes at most 4 new trades a day — the FIRST 4 in the coin list (largest coins),
+    which is no selection at all. Here, on a daily mark-to-market account (the drawdown counts open trades), longs only, P + C
+    in «рост», risk 0.5 %, ≤ 20 open, gross ≤ 2× equity: (1) caps 1…8 and none; (2) which ones to take when there are more
+    signals than the cap — by strength vs BTC, volatility, volume surge, liquidity, trend extension, pullback depth, rule —
+    against a RANDOM pick (20 seeds); (3) take all but split a daily risk budget; (4) a cap on the total open risk; (5) more
+    open positions; (6) 70 coins instead of 40. Fair comparison: the same policies at ½…2× risk → the monthly return at the
+    SAME drawdown (−25 %). Rows: [avg month %, max dd %, worst month %, trades a day, avg trade %, 2022…2026 %]."""
+    KS, K2 = _load(COINS), _load(COINS2)
+    B = KS["BTC"]
+    bc = B["c"]
+    s200 = sma(bc, 200)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": bull}
+    for D in (KS, K2):
+        for s in D:
+            prep(D[s], gate)
+        flow_feats(D, B)
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    days = [int(t) for t in B["t"] if t >= t0]
+    order = {s: k for k, s in enumerate(COINS + COINS2)}
+    K70 = dict(KS, **K2)
+    summary_best = {}
+    for label, D in (("40", KS), ("30", K2), ("70", K70)):
+        C = flow_cands(D, order, t0)
+        # candidates per «рост» day and what the cap of 4 (in list order) leaves out
+        pd = {}
+        for x in C:
+            pd[x["o"]] = pd.get(x["o"], 0) + 1
+        cnt = np.array(list(pd.values()))
+        res = {}
+        for cap in (1, 2, 3, 4, 6, 8, None):
+            res[f"order c{cap or 'all'}"] = _row(flow_account(C, D, days, cap=cap))
+        for cap in (2, 4, 6):
+            rs = [flow_account(C, D, days, cap=cap, score="random", seed=sd) for sd in range(20)]
+            ms_ = np.array([r["m"] for r in rs]); dds = np.array([r["dd"] for r in rs])
+            res[f"random c{cap}"] = [round(float(ms_.mean()), 2), round(float(dds.mean()), 1), round(float(ms_.min()), 2), round(float(ms_.max()), 2),
+                                     round(float(dds.min()), 1)]
+            for sc in FLOW_SCORES[1:]:
+                res[f"{sc} c{cap}"] = _row(flow_account(C, D, days, cap=cap, score=sc))
+        note(f"own flow · {label} coins · caps & picks", json.dumps({"cand_days": len(cnt), "cand_per_day": [round(float(cnt.mean()), 1), int(np.median(cnt)),
+                                                                     int(np.quantile(cnt, 0.9)), int(cnt.max())],
+                                                                     "days_over4_pct": round(float((cnt > 4).mean()) * 100), "res": res}, ensure_ascii=False))
+        res2 = {}
+        for b in (1.0, 1.5, 2.0, 3.0):
+            res2[f"budget{b}"] = _row(flow_account(C, D, days, budget=b, max_open=40))
+        for h in (3.0, 5.0, 7.5, 10.0):
+            res2[f"heat{h}"] = _row(flow_account(C, D, days, heat=h, max_open=40))
+        for mo_ in (10, 30, 40):
+            res2[f"open{mo_}"] = _row(flow_account(C, D, days, max_open=mo_))
+        res2["P2+C2"] = _row(flow_account(C, D, days, cap=4, fam_cap=2))
+        # the same drawdown: each policy at ½…2.5× its risk → the monthly return where the drawdown crosses −25 %
+        best_rank = sorted([k for k in res if not k.startswith("random") and not k.startswith("order")],
+                           key=lambda k: -(res[k][0] / max(1.0, -res[k][1])))[:4]
+        pols = {"order c4": dict(cap=4), "order call": dict(cap=None), "budget2": dict(budget=2.0, max_open=40), "heat5": dict(heat=5.0, max_open=40),
+                "open40": dict(max_open=40)}
+        for k in best_rank:
+            sc, cp = k.rsplit(" c", 1)
+            pols[k] = dict(cap=int(cp), score=sc)
+        at25 = {}
+        pols["random c4"] = dict(cap=4, score="random")
+        for name, kw in pols.items():
+            pts = []
+            for m_ in (0.25, 0.5, 1.0, 1.5, 2.0, 3.0):
+                if kw.get("score") == "random":
+                    rs = [flow_account(C, D, days, mult=m_, seed=sd, **kw) for sd in range(8)]
+                    pts.append((round(float(np.mean([r["dd"] for r in rs])), 1), round(float(np.mean([r["m"] for r in rs])), 2)))
+                else:
+                    a = flow_account(C, D, days, mult=m_, **kw)
+                    pts.append((a["dd"], a["m"]))
+            pts.sort(key=lambda z: -z[0])            # drawdown from small to large
+            val = None
+            seg = next(((p1, p2) for p1, p2 in zip(pts, pts[1:]) if p1[0] >= -25 >= p2[0]), None)
+            if seg is None:                          # not crossed: extrapolate from the nearest two points
+                seg = (pts[-2], pts[-1]) if pts[-1][0] > -25 else (pts[0], pts[1])
+            (d1, m1), (d2, m2) = seg
+            val = round(m1 + (m2 - m1) * (-25 - d1) / (d2 - d1), 2) if d2 != d1 else m1
+            at25[name] = {"m@dd25": val, "pts": [list(p_) for p_ in pts]}
+        res2["at_dd25"] = at25
+        summary_best[label] = {k: v["m@dd25"] for k, v in at25.items()}
+        note(f"own flow · {label} coins · budget heat open, same dd", json.dumps(res2, ensure_ascii=False))
+    note("own flow · monthly % at the same drawdown −25 %", json.dumps(summary_best, ensure_ascii=False))
+
 if __name__ == "__main__":
-    (altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

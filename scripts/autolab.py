@@ -477,5 +477,29 @@ def probe():
     note("autolab · probe", json.dumps(out, ensure_ascii=False))
 
 
+def probe2():
+    out = {}
+    try:
+        import yfinance as yf
+        for sym in ("GC=F", "^GSPC", "ALI=F", "PA=F"):
+            try:
+                df = yf.Ticker(sym).history(period="max", interval="1d", auto_adjust=False)
+                out["yf " + sym] = [len(df), str(df.index[0])[:10] if len(df) else None, str(df.index[-1])[:10] if len(df) else None]
+            except Exception as e:  # noqa: BLE001
+                out["yf " + sym] = ["ERR", str(e)[:160]]
+    except Exception as e:  # noqa: BLE001
+        out["yfinance import"] = str(e)[:160]
+    for k, u in {"fred_sp500": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500",
+                 "cboe_spx": "https://cdn.cboe.com/api/global/us_indices/daily_prices/SPX_History.csv",
+                 "cboe_vix": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"}.items():
+        try:
+            with urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=90) as r:
+                b = r.read()
+            out[k] = [r.status, len(b), b[:120].decode("utf-8", "replace")]
+        except Exception as e:  # noqa: BLE001
+            out[k] = ["ERR", str(e)[:160]]
+    note("autolab · probe2", json.dumps(out, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    probe() if "--probe" in sys.argv else main()
+    probe() if "--probe" in sys.argv else probe2() if "--probe2" in sys.argv else main()

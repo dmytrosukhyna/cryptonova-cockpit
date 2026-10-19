@@ -492,12 +492,23 @@ def export():
         while j < len(curve) and curve[j][0] <= t:
             e = curve[j][1]
             j += 1
-        sleeve.append(round(e, 5))
+        sleeve.append(round(e, 4))
     out["sleeve"] = sleeve
+    # annotations are cut at 4 096 characters: weekly log returns in 0.01 % as int16 (−32768 = no price), base64, in chunks
+    import base64
+    syms = list(closes)
+    arr = []
+    for s in syms:
+        c = closes[s]
+        for k in range(1, len(c)):
+            a, b = c[k - 1], c[k]
+            arr.append(-32768 if not a or not b else int(max(-32767, min(32767, round(np.log(b / a) * 10000)))))
+    blob = base64.b64encode(np.array(arr, dtype="<i2").tobytes()).decode()
+    out["syms"] = syms
+    out["chunks"] = (len(blob) + 3999) // 4000
     note("export · meta", json.dumps(out))
-    items = list(closes.items())
-    for i in range(0, len(items), 6):
-        note(f"export · closes {i // 6 + 1}", json.dumps(dict(items[i:i + 6])))
+    for i in range(out["chunks"]):
+        note(f"export · r{i}", blob[i * 4000:(i + 1) * 4000])
 
 
 if __name__ == "__main__":

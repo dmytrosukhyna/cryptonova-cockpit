@@ -77,9 +77,9 @@ FDV считается по сегодняшнему предложению мо
 
 ## Профили проектов (`web/coin_profiles.json`)
 
-44 монеты из топа: BTC, ETH, BNB, XRP, SOL, TRX, ZEC, HYPE, DOGE, LINK, ADA, NEAR, XLM, BCH, LTC, UNI, AVAX, SUI, TON (GRAM),
+50 монет из топа: BTC, ETH, BNB, XRP, SOL, TRX, ZEC, HYPE, DOGE, LINK, ADA, NEAR, XLM, BCH, LTC, UNI, AVAX, SUI, TON (GRAM),
 HBAR, TAO, SHIB, QNT, CRO, ENA, AAVE, ONDO, PUMP, ASTER, WLD, DOT, WLFI, MNT, MORPHO, ALGO, KAS, JUP, POL, ATOM, RENDER, FIL,
-INJ, AERO, ZRO.
+INJ, AERO, ZRO, ARB, ETC, ICP, PEPE, SKY, XMR.
 
 В каждом профиле:
 - что это за проект;
@@ -92,7 +92,6 @@ INJ, AERO, ZRO.
 
 Источники — открытые: сайты проектов, документация, отчёты, крупные СМИ, на 19.10.2026.
 
-Ждут свежего исследования: ARB, ETC, ICP, PEPE, SKY, XMR. На них закончился лимит поиска; без двух и более источников профиль
-не публикуется.
+Профиль публикуется только при двух и более открытых источниках.
 
 Это история, а не обещание, и не финансовый совет.

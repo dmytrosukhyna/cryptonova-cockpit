@@ -1683,7 +1683,13 @@ def quality():
     for s, K in D.items():
         v = sma(K["bv"] * K["c"], 180)
         v180[s] = {int(t): float(x) for t, x in zip(K["t"], v) if not np.isnan(x)}
-    books = {k: {"V": 1.0, "hold": set(), "curve": [], "rets": []} for k in ("Q10", "Q10 rev", "REV", "OLD10", "VOL10", "ALL", "BTC")}
+    names = ("Q10", "Q10 rev", "REV", "OLD10", "VOL10", "ALL", "BTC")
+    books = {k: {"V": 1.0, "hold": set(), "curve": [], "rets": []} for k in names + tuple(f"{k} +regime" for k in ("Q10", "VOL10", "BTC"))
+             + ("BTC80+Q10 20 +regime", "BTC80+VOL10 20 +regime")}
+    bt = sorted(cl["BTC"])
+    bc_ = np.array([cl["BTC"][t] for t in bt])
+    s200_ = sma(bc_, 200)
+    bull_at = {t: bool(not np.isnan(s200_[k]) and bc_[k] > s200_[k] and k >= 60 and bc_[k] > bc_[k - 60]) for k, t in enumerate(bt)}
     for i, d in enumerate(months[:-1]):
         d1 = months[i + 1]
         top = sorted((v30[s][d], s) for s in D if d in v30[s] and s not in ("BTC", "ETH") and d - first[s] >= 365 * DAY)[-100:]
@@ -1714,7 +1720,20 @@ def quality():
             "OLD10": sorted(uni, key=lambda s: -F[s]["age"])[:10],
             "VOL10": [s for _v, s in sorted(((v180[s].get(d, 0), s) for s in uni), reverse=True)[:10]],
             "ALL": uni, "BTC": ["BTC"]}
+        bull = bull_at.get(d, False)
+        for k in ("Q10", "VOL10", "BTC"):
+            picks[f"{k} +regime"] = picks[k] if bull else []
+        mixr = {}
         for k, ps in picks.items():
+            if not ps:                               # not «рост»: dollars at 4 % a year
+                bk = books[k]
+                r = 0.04 / 12
+                bk["hold"] = set()
+                bk["V"] *= 1 + r
+                bk["curve"].append((d1, bk["V"]))
+                bk["rets"].append(r)
+                mixr[k] = r
+                continue
             bk = books[k]
             rs = [_mret(cl, s, d, d1) for s in ps]
             rs = [x for x in rs if x is not None]
@@ -1723,6 +1742,13 @@ def quality():
             if bk["hold"] and k != "BTC":
                 r -= 0.002 * (1 - len(new & bk["hold"]) / max(1, len(new)))
             bk["hold"] = new
+            bk["V"] *= 1 + r
+            bk["curve"].append((d1, bk["V"]))
+            bk["rets"].append(r)
+            mixr[k] = r
+        for mk, ak in (("BTC80+Q10 20 +regime", "Q10 +regime"), ("BTC80+VOL10 20 +regime", "VOL10 +regime")):
+            r = 0.8 * mixr["BTC +regime"] + 0.2 * mixr[ak]
+            bk = books[mk]
             bk["V"] *= 1 + r
             bk["curve"].append((d1, bk["V"]))
             bk["rets"].append(r)

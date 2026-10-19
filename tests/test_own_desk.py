@@ -71,3 +71,34 @@ def test_paper_json_gets_the_profile():
     od.run(conn, out=tmp, now=D0 + 3 * 60_000, daily=lambda s: (_ for _ in ()).throw(RuntimeError("x")), prices=lambda: {})
     p = json.load(open(os.path.join(tmp, "paper.json")))
     assert p["profiles"]["own"]["name"] == od.NAME and any(x["key"] == "own" for x in p["profile_list"])
+
+
+def test_longs_only_and_at_most_four_new_trades_a_day():
+    conn = sqlite3.connect(":memory:")
+    up = [100 * 1.004 ** i for i in range(260)]
+    brk = up[:199] + [up[198] * 1.06]
+    coins = od.COINS[1:7]                                     # six coins break out on the same day
+
+    def daily(sym):
+        src = up[:200] if sym == "BTC" else brk if sym in coins else None
+        if src is None:
+            raise RuntimeError("no data")
+        rows = _series(src)
+        rows.append([D0 + 200 * DAY, rows[-1][4], rows[-1][4], rows[-1][4], rows[-1][4]])
+        return rows
+    od.run(conn, out=tempfile.mkdtemp(), now=D0 + 200 * DAY + 10 * 60_000, daily=daily, prices=lambda: {})
+    rows = conn.execute("SELECT symbol, side FROM own_trades").fetchall()
+    assert len(rows) == od.PER_DAY == 4 and all(sd == "LONG" for _, sd in rows)
+    # a falling market: the short signals of the rules are not traded
+    conn2 = sqlite3.connect(":memory:")
+    down = list(reversed(up))
+
+    def daily2(sym):
+        src = down[:200] if sym == "BTC" else (down[:199] + [down[198] * 0.94]) if sym in coins else None
+        if src is None:
+            raise RuntimeError("no data")
+        rows = _series(src)
+        rows.append([D0 + 200 * DAY, rows[-1][4], rows[-1][4], rows[-1][4], rows[-1][4]])
+        return rows
+    od.run(conn2, out=tempfile.mkdtemp(), now=D0 + 200 * DAY + 10 * 60_000, daily=daily2, prices=lambda: {})
+    assert conn2.execute("SELECT COUNT(*) FROM own_trades").fetchone()[0] == 0

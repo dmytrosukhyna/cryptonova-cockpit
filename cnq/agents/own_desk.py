@@ -15,6 +15,11 @@ Evidence (scripts/own_signals_study.py, Binance USDT-M daily candles 2022-01 →
     Risk 0.25 % → every year in plus on both sets, drawdown −26 %, about +1 % a month. Trades fall together in sharp market turns
     — that is where the drawdown comes from.
 
+Round 5 (19.10, the live knobs, risk 0.5 % a trade): longs only and at most 4 NEW trades a day beat both sides with no cap —
+    40 coins: +2.9 % a month on average, drawdown −24 % (both sides, no cap: +2.2 %, −46 %), 2023–2026 +34 / +59 / +4 / +10 %;
+    30 other coins: +2.8 % a month, −18 %, +16 / +60 / +1 / +29 %. In a market that is not «рост» the desk waits in cash
+    (2022: no trades). The shorts of the rules stay computed but are not traded.
+
 Rules (checked once a day after the daily close, 00:00 UTC; entries and rule exits at the new day's open):
   P — long: close above a RISING 50-day average (vs 5 days ago) and RSI(2) < 10, BTC regime «рост» (BTC above its 200-day average
       and up over 60 days); out when the close is back above the 5-day average or after 10 days. Short: the mirror, regime not «рост».
@@ -36,16 +41,17 @@ COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT"
          "DYDX", "GALA", "TIA", "SEI", "WLD", "ENA"]
 START = 10_000.0
 RISK, NOTIONAL_CAP, MAX_OPEN = 0.005, 0.25, 20
+LONG_ONLY, PER_DAY = True, 4       # 19.10 round 5: shorts ≈ 0 a trade; ≤ 4 new trades a day cuts the drawdown (see the docstring)
 FEE = 0.0007                      # 0.05 % taker + 0.02 % slippage, per side
 HOLD = {"P": 10, "C": 14}
 DAY = 86_400_000
 NAME = "Сигналы CRYPTO NOVA"
 RULE_RU = {"P": "откат в тренде", "C": "пробой 20 дней"}
-ABOUT = ("Наши собственные сигналы раз в день на 40 монетах, только по направлению рынка: в росте — покупки, в падении — шорты. "
+ABOUT = ("Наши собственные сигналы раз в день на 40 монетах: покупаем, только когда рынок растёт, в остальное время ждём в долларах. "
          "Два правила: «откат в тренде» (монета в росте сделала короткий откат) и «пробой 20 дней» (цена вышла из 20-дневного "
-         "диапазона, держим, пока тренд не сломается). Стоп 3–15% от входа, риск 0.5% счёта на сделку, до 20 сделок. История "
-         "2022–2026: плюс на сделку в каждом году и на 40 монетах, и на 30 других; в среднем около +2% в месяц, худшая просадка −46%. "
-         "Сильнее покупки, шорты около нуля. Демо $10 000.")
+         "диапазона, держим, пока тренд не сломается). Стоп 3–15% от входа, риск 0.5% счёта на сделку, не больше 4 новых сделок "
+         "в день и 20 открытых. История 2023–2026: в среднем около +2.9% в месяц, худшая просадка −24%, каждый год в плюсе — "
+         "и на 40 монетах, и на 30 других. Демо $10 000.")
 
 
 def _get(url: str, timeout: int = 15):
@@ -233,10 +239,11 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                 open_now = _open_rows(conn)
                 have = {(t["symbol"], t["rule"]) for t in open_now}
                 n_open = len(open_now)
+                n_new = 0
                 for s, k in K.items():
                     closed = k[:-1]
                     for rule, sg in signals(closed, bull):
-                        if n_open >= MAX_OPEN or (s, rule) in have:
+                        if (LONG_ONLY and sg != 1) or n_open >= MAX_OPEN or n_new >= PER_DAY or (s, rule) in have:
                             continue
                         e = _px(k, s)
                         a = _atr(closed, len(closed) - 1)
@@ -250,6 +257,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                                      (tid, s, rule, "LONG" if sg == 1 else "SHORT", now, day, e, e - sg * dist, qty, closed[-1][4]))
                         have.add((s, rule))
                         n_open += 1
+                        n_new += 1
                         events.append(f"{s} {RULE_RU[rule]}: {'покупка' if sg == 1 else 'шорт'} по {e:g}")
             _set(conn, "regime", bull)
             _set(conn, "day", day)
@@ -293,8 +301,8 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
             "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "avg_trade_pct": round(avg * 100, 2) if avg is not None else None,
                       "max_dd_pct": round(dd * 100, 2), "best": 0, "worst": 0},
             "equity_history": eqh, "events": events[:20], "error": None,
-            "regime_ru": None if bull is None else ("рост: только покупки" if bull else "не рост: только шорты"),
-            "rules": "откат в тренде и пробой 20 дней, по направлению режима BTC; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 20 сделок"}
+            "regime_ru": None if bull is None else ("рост: покупаем" if bull else "не рост: ждём в долларах"),
+            "rules": "откат в тренде и пробой 20 дней, только покупки в режиме «рост»; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 4 новых сделок в день и 20 открытых"}
 
 
 def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, daily=fetch_daily, prices=fetch_prices) -> dict:

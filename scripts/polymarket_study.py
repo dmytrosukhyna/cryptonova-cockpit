@@ -351,6 +351,28 @@ def updown():
     note("updown · Polymarket price vs Bitcoin's move inside the window", json.dumps(out, ensure_ascii=False))
 
 
+def probe2():
+    """What do the short crypto «Up or Down» markets look like (question, slug, dates, fees)?"""
+    found, n, samples = {}, 0, []
+    for off in range(0, 3000, 100):
+        st, page = get(f"{GAMMA}/markets?closed=true&limit=100&offset={off}&order=endDate&ascending=false")
+        if st != 200 or not page:
+            break
+        for m in page:
+            n += 1
+            q = str(m.get("question") or "")
+            if "Up or Down" in q or "up-or-down" in str(m.get("slug")) or "updown" in str(m.get("slug")):
+                key = q.split(" - ")[0]
+                found[key] = found.get(key, 0) + 1
+                if len(samples) < 6:
+                    samples.append({k: m.get(k) for k in ("question", "slug", "startDate", "endDate", "eventStartTime", "feesEnabled",
+                                                           "takerBaseFee", "makerBaseFee", "feeType", "outcomes", "outcomePrices", "volumeNum")})
+    st, ev = get(f"{GAMMA}/events?closed=false&limit=100&order=startDate&ascending=false&tag_slug=crypto")
+    evs = [(e.get("title"), e.get("seriesSlug"), e.get("slug")) for e in (ev or [])][:12] if isinstance(ev, list) else str(ev)[:200]
+    note("probe2 · up/down markets", json.dumps({"scanned": n, "kinds": found, "samples": samples, "open crypto events": evs},
+                                                ensure_ascii=False, default=str)[:3900])
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
-    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown}[mode]()
+    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "probe2": probe2}[mode]()

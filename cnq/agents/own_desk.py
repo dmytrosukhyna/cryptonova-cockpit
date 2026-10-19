@@ -162,6 +162,7 @@ def ensure(conn: sqlite3.Connection) -> None:
                     opened_day INTEGER, entry REAL, stop REAL, qty REAL, best REAL, closed INTEGER, exit REAL, exit_kind TEXT,
                     pnl_usd REAL)""")
     conn.execute("CREATE TABLE IF NOT EXISTS own_equity(time INTEGER PRIMARY KEY, equity REAL)")
+    conn.execute("CREATE TABLE IF NOT EXISTS own_closes(symbol TEXT, day INTEGER, close REAL, PRIMARY KEY(symbol, day))")
     conn.commit()
 
 
@@ -220,6 +221,9 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                 continue
             if rows and rows[-1][0] == day and len(rows) >= 120:
                 K[s] = rows
+        # closed daily closes for the altseason gauge (alt_portfolio.py) — kept ~220 days per coin
+        conn.executemany("INSERT OR REPLACE INTO own_closes VALUES(?,?,?)", [(s, int(r[0]), float(r[4])) for s, k in K.items() for r in k[:-1][-220:]])
+        conn.execute("DELETE FROM own_closes WHERE day < ?", (day - 240 * DAY,))
         if "BTC" in K:
             bull = regime(K["BTC"][:-1])
             for t in _open_rows(conn):

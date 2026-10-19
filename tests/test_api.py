@@ -109,3 +109,69 @@ def test_http_roundtrip(tmp_path):
             assert json.loads(r.read())["user"]["uid"] == "h"
     finally:
         srv.shutdown()
+
+
+class FakeAdmin:
+    def __init__(self):
+        self.deleted = []
+
+    def delete_user(self, uid):
+        self.deleted.append(uid)
+        return "ok"
+
+
+def test_delete_account(tmp_path):
+    api, _ = make(tmp_path)
+    api.admin = FakeAdmin()
+    t = token("del1")
+    assert call(api, "DELETE", "/v2/me", None)[0] == 401
+    call(api, "POST", "/v2/me", {}, t)
+    call(api, "PUT", "/v2/piggy", {"amount": 50, "freq": "week"}, t)
+    call(api, "PUT", "/v2/progress", {"lessons": {"g1": {"done": True, "score": 3}}, "xp": 10}, t)
+    call(api, "POST", "/v2/push", {"token": "x" * 40, "platform": "ios"}, t)
+    call(api, "POST", "/v2/agent", {"q": "что такое биткоин?"}, t)
+    keep = token("other")
+    call(api, "POST", "/v2/me", {}, keep)
+    c, d = call(api, "DELETE", "/v2/me", None, t)
+    assert c == 200 and d == {"deleted": True, "firebase": "ok"} and api.admin.deleted == ["del1"]
+    s = api.store
+    for table in ("users", "prefs", "piggy", "push", "usage", "vip_checks", "progress"):
+        assert s._q(f"SELECT COUNT(*) FROM {table} WHERE uid='del1'")[0][0] == 0, table
+    assert s.user("other")["uid"] == "other"
+    # signing in again later starts from zero
+    c, d = call(api, "POST", "/v2/me", {}, t)
+    assert c == 200 and d["piggy"] is None and d["progress"] == {} and d["agent"]["left"] == 5
+
+
+def test_firebase_admin_delete():
+    import io
+    import urllib.error
+    from cnq.api.firebase_admin import FirebaseAdmin
+    a = FirebaseAdmin(sa_path="/nonexistent")
+    assert not a.ready and a.delete_user("x") == "dry"
+    sent = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def opener(req, timeout=15):
+        sent.append((req.full_url, req.data))
+        if "oauth2" in req.full_url:
+            return Resp(json.dumps({"access_token": "AT", "expires_in": 3600}).encode())
+        if b"gone" in req.data:
+            raise urllib.error.HTTPError(req.full_url, 400, "USER_NOT_FOUND", {}, None)
+        assert req.headers["Authorization"] == "Bearer AT" and req.get_method() == "POST"
+        return Resp(b"{}")
+
+    from cryptography.hazmat.primitives import serialization
+    pem = KEY.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
+    a = FirebaseAdmin(sa_path="/nonexistent", project="crypto-nova", opener=opener)
+    a.sa = {"client_email": "x@crypto-nova.iam.gserviceaccount.com", "private_key": pem}
+    assert a.ready and a.delete_user("u1") == "ok"
+    assert sent[-1][0].endswith("/projects/crypto-nova/accounts:delete") and json.loads(sent[-1][1]) == {"localId": "u1"}
+    assert a.delete_user("gone") == "gone"
+    assert sum(1 for u, _ in sent if "oauth2" in u) == 1

@@ -11,6 +11,7 @@ With the Firebase ID token («Authorization: Bearer …»):
   POST /v2/push      the phone's FCM token
   POST /v2/agent     a question to NOVA (free: 5 a day, VIP: 100)
   POST /v2/vip/check BingX UID → invited by our link and deposited → VIP
+  DELETE /v2/me      delete the account: every row on our server + the Firebase login (Apple 5.1.1(v))
 Demo only until 2.1; nothing here places orders or holds money."""
 from __future__ import annotations
 
@@ -43,8 +44,9 @@ def _day() -> str:
 
 
 class Api:
-    def __init__(self, store: Store, verifier: FirebaseVerifier, web_dir: str, llm=None, bingx_fetch=None):
+    def __init__(self, store: Store, verifier: FirebaseVerifier, web_dir: str, llm=None, bingx_fetch=None, admin=None):
         self.store, self.verifier, self.web, self.llm, self.bingx_fetch = store, verifier, web_dir, llm, bingx_fetch
+        self.admin = admin
 
     # ---------------------------------------------------------------- helpers
     def _feed(self, name: str) -> dict | None:
@@ -93,6 +95,11 @@ class Api:
         except AuthError as e:
             return 401, {"error": "unauthorized", "detail": str(e)[:120]}
         uid = who["uid"]
+        if method == "DELETE" and path == "/v2/me":
+            rows = self.store.delete_user(uid)
+            auth = self.admin.delete_user(uid) if self.admin is not None else "dry"
+            print(f"account deleted: rows={rows} firebase={auth}", flush=True)
+            return 200, {"deleted": True, "firebase": auth}
         try:
             data = json.loads(body.decode() or "{}") if body else {}
             if not isinstance(data, dict):
@@ -206,6 +213,9 @@ def make_handler(api: Api):
         def do_PUT(self):  # noqa: N802
             self._go("PUT")
 
+        def do_DELETE(self):  # noqa: N802
+            self._go("DELETE")
+
         def log_message(self, fmt, *args):  # quiet: nginx keeps the access log
             pass
     return H
@@ -215,8 +225,9 @@ def main() -> int:
     run = os.environ.get("CNQ_RUN_DIR", ".")
     os.makedirs(os.path.join(run, "data"), exist_ok=True)
     from cnq.agents.llm import LLM
+    from .firebase_admin import FirebaseAdmin
     api = Api(Store(os.path.join(run, "data", "api.sqlite")), FirebaseVerifier(os.environ.get("CNQ_FIREBASE_PROJECT", "crypto-nova")),
-              os.path.join(run, "web"), LLM(max_tokens=600))
+              os.path.join(run, "web"), LLM(max_tokens=600), admin=FirebaseAdmin())
     port = int(os.environ.get("CNQ_API_PORT", "8090"))
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))
     print(f"cnq-api {VERSION} on 127.0.0.1:{port}", flush=True)

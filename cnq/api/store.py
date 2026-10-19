@@ -110,6 +110,15 @@ class Store:
     def drop_push(self, token: str) -> None:
         self._q("DELETE FROM push WHERE token=?", (token,))
 
+    def delete_user(self, uid: str) -> int:
+        """Account deletion from the app: every row of this user goes, nothing is kept (GDPR erasure, Apple 5.1.1(v))."""
+        n = 0
+        for table in ("users", "prefs", "piggy", "push", "usage", "vip_checks", "progress"):
+            with self.lock:
+                n += self.conn.execute(f"DELETE FROM {table} WHERE uid=?", (uid,)).rowcount
+                self.conn.commit()
+        return n
+
     def used_today(self, uid: str, day: str) -> int:
         r = self._q("SELECT n FROM usage WHERE uid=? AND day=?", (uid, day))
         return int(r[0][0]) if r else 0

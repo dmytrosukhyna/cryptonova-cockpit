@@ -1,0 +1,23 @@
+name: research-copytraders
+# Manual only. Copy traders and trading bots across exchanges: which public leaderboards answer (copytraders_probe.py),
+# then OKX's official public copy-trading API in depth (copytraders_study.py).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: probe
+        continue-on-error: true
+        run: python scripts/copytraders_probe.py
+      - name: okx
+        continue-on-error: true
+        run: python scripts/copytraders_study.py

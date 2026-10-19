@@ -1042,6 +1042,8 @@ def flow3():
 
 
 S3 = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
+TRADFI = {"XAU", "XAG", "XPT", "XPD", "CL", "BZ", "NG", "HG", "TSLA", "NVDA", "AAPL", "AMZN", "GOOGL", "META", "MSFT", "MSTR", "COIN",
+          "HOOD", "CRCL", "QQQ", "SPY", "INTC", "AMD", "PLTR", "NFLX", "BABA", "ORCL", "SPX", "NDX"}     # 2025–26 TradFi perps
 NOT_COINS = re.compile(r"^(BTCDOM|DEFI|USDC|BUSD|TUSD|FDUSD|USDP|DAI|EUR|GBP|XAU|XAG|PAXG|BLUEBIRD|FOOTBALL)")
 
 
@@ -1056,7 +1058,7 @@ def all_um_symbols():
         if "<IsTruncated>true</IsTruncated>" not in b or not p:
             break
         marker = f"data/futures/um/monthly/klines/{p[-1]}/"
-    return sorted(x for x in syms if re.fullmatch(r"[A-Z0-9]+USDT", x) and not NOT_COINS.match(x))
+    return sorted(x for x in syms if re.fullmatch(r"[A-Z0-9]+USDT", x) and not NOT_COINS.match(x) and x[:-4] not in TRADFI)
 
 
 def daily_wide(sym):
@@ -1311,9 +1313,19 @@ def altport2():
             gauge[d] = bool(bullv.get(d) and br >= 0.60 and rlist[-1] > float(np.mean(rlist[-91:])))
     fixed_basket = ["SOL", "LINK", "NEAR", "AVAX", "SUI", "ONDO", "AAVE", "HBAR", "PENDLE", "INJ"]
 
+    vol180 = {}
+    for s_, K in D.items():
+        v = sma(K["bv"] * K["c"], 180)
+        vol180[s_] = {int(t): float(x) for t, x in zip(K["t"], v) if not np.isnan(x)}
+
     def basket(d, how):
         if how == "fixed":
             return [s for s in fixed_basket if d in cl.get(s, {})]
+        if how == "pit180":                      # steadier: the 180-day volume, coins with ≥ 365 days of history
+            c_ = [(vol180[s][d], s) for s in vol180 if d in vol180[s] and alt_ok(s) and d - first[s] >= 365 * DAY]
+            return [s for _v, s in sorted(c_, reverse=True)[:10]]
+        if how == "pit5":
+            return [s for s in day_top.get(d, []) if alt_ok(s) and d - first[s] >= 180 * DAY][:5]
         return [s for s in day_top.get(d, []) if alt_ok(s) and d - first[s] >= 180 * DAY][:10]
 
     def sim(mode, how="pit", core=None, alt_part=43.4):
@@ -1370,12 +1382,17 @@ def altport2():
            "gauge · the live fixed basket (survivors)": sim("gauge", how="fixed"),
            "alts whenever «рост» · fixed basket": sim("regime", how="fixed"),
            "gauge · core BTC+ETH · by volume": sim("gauge", core=be), "never alts · core BTC+ETH": sim("never", core=be),
-           "gauge · alt part 20 % · by volume": sim("gauge", alt_part=20.0)}
+           "gauge · alt part 20 % · by volume": sim("gauge", alt_part=20.0),
+           "gauge · basket by 180-day volume, ≥1 year": sim("gauge", how="pit180"),
+           "alts whenever «рост» · by 180-day volume": sim("regime", how="pit180"),
+           "gauge · top 5 alts by volume": sim("gauge", how="pit5"),
+           "gauge · alt part 20 % · by 180-day volume": sim("gauge", how="pit180", alt_part=20.0)}
     on_days = sum(1 for d, v in gauge.items() if v and d >= t0)
     today = days[-1]
     res["gauge days on since 2022"] = on_days
     res["gauge now"] = gauge.get(today)
     res["basket by volume now"] = basket(today, "pit")
+    res["basket by 180-day volume now"] = basket(today, "pit180")
     note("altport2 · honest [x, dd %, 2022…2026 %]", json.dumps(res, ensure_ascii=False))
 
 if __name__ == "__main__":

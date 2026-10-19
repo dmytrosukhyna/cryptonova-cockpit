@@ -1,0 +1,20 @@
+[Unit]
+Description=CRYPTO NOVA API v2 for the 2.0 app (profile, piggy, AI agent, VIP check; no orders, no money)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=cnq
+Group=cnq
+WorkingDirectory=/opt/cnq/run
+EnvironmentFile=/etc/cnq.env
+Environment=PYTHONPATH=/opt/cnq/run
+Environment=CNQ_RUN_DIR=/opt/cnq/run
+ExecStart=/opt/cnq/venv/bin/python -m cnq.api.server
+Restart=always
+RestartSec=5
+Nice=5
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

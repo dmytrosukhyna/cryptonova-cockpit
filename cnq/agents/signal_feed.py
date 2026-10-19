@@ -75,6 +75,12 @@ def open_text(t: dict) -> str:
              f"Leverage: Isolated {LEV.get(g, 3)}x", "Entry Targets:", f"1) {_fmt(float(t['entry']))}", "Take-Profit Targets:"]
     lines += [f"{i}) {_fmt(p)}" for i, p in enumerate(targets(t), 1)]
     lines += ["Stop Targets:", f"1) {_fmt(float(t['stop']))}"]
+    if g in ("P", "C"):                # 19.10: the size, so a reader can copy the desk — 0.5 % of the account lost at the stop
+        stop_pct = abs(float(t["stop"]) / float(t["entry"]) - 1) * 100
+        if stop_pct > 0:
+            lines.append(f"Размер: {min(25.0, 0.5 / stop_pct * 100):.1f}% счёта (при стопе −0.5% счёта)")
+    elif g == "LST":
+        lines.append("Размер: 5% счёта")
     if g == "LST":
         lines.append("Выход по времени через 14 дней — пришлём «Close».")
     elif g in ("P", "C"):

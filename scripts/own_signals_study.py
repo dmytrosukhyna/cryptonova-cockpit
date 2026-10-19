@@ -683,23 +683,23 @@ def _load(coins):
     return {s: k for s, k in raw.items() if k is not None}
 
 
-def flow_cands(D, order, t0):
+def flow_cands(D, order, t0, side=1, gate="regime"):
     """EVERY long signal day of P and C (not one trade after another): the account decides which to take, like the live desk,
     which sees the same coin signal again the next day when it skipped it. Features are known at the signal day's close."""
     out = []
     for s, K in D.items():
         for fam, ex in (("P", "-"), ("B20", "chand")):
-            L, S = signals(K, fam, "regime")
-            for i in np.where(L & ~S)[0]:
+            L, S = signals(K, fam, gate)
+            for i in np.where((L & ~S) if side == 1 else (S & ~L))[0]:
                 i = int(i)
                 if i >= len(K["t"]) - 2 or np.isnan(K["atr"][i]):
                     continue
-                r = _trade(K, fam, ex, i, 1, s)
+                r = _trade(K, fam, ex, i, side, s)
                 if r is None or r[0][0] < t0:
                     continue
                 tr, j = r
                 f = lambda k: float(K[k][i]) if not np.isnan(K[k][i]) else 0.0  # noqa: E731
-                out.append({"o": tr[0], "c": tr[1], "net": tr[3], "stop": tr[6], "sym": s, "fam": "P" if fam == "P" else "C",
+                out.append({"o": tr[0], "c": tr[1], "net": tr[3], "stop": tr[6], "sym": s, "fam": "P" if fam == "P" else "C", "sg": side,
                             "i": i, "j": j, "e": float(K["o"][i + 1]), "rank": order.get(s, 999),
                             "rs_hi": f("rs60"), "atr_hi": f("atrp"), "surge": f("surge"), "liq": f("vol30"), "ext_hi": f("ext"),
                             "surge_b30": f("surge_b30"), "surge_q20": f("surge_q20"), "surge_q50": f("surge_q50"),
@@ -731,7 +731,7 @@ _IDX: dict = {}
 
 
 def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, heat=None, max_open=20, gross=2.0, seed=None,
-                 fam_cap=None, mult=1.0, min_surge=None, surge_key="surge", fam_only=None, top=None):
+                 fam_cap=None, mult=1.0, min_surge=None, surge_key="surge", fam_only=None, top=None, curve_out=None):
     """Daily mark-to-market account. Each day: today's entries (signals of yesterday's close) → skip a coin+rule already open →
     rank by `score` → take up to `cap` (None = all) within max_open, the gross notional cap (× equity) and the open-risk cap
     `heat` (% of equity); size = risk % of the (realised) equity lost at the stop, notional ≤ 25 %. With `budget` the day's
@@ -747,7 +747,7 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
         _IDX[key] = {s: {int(t): q for q, t in enumerate(K["t"])} for s, K in D.items()}
     idx = _IDX[key]
     E, opn, keys, curve, taken, skipped_good = 1.0, {}, set(), [], [], []
-    n_c, n_t, max_o = 0, 0, 0
+    n_c, n_t, max_o, opened_m = 0, 0, 0, {}
     for d in days:
         cand = [k for k in by_o.get(d, []) if (C[k]["sym"], C[k]["fam"]) not in keys
                 and (min_surge is None or C[k][surge_key] >= min_surge) and (fam_only is None or C[k]["fam"] == fam_only)
@@ -789,6 +789,8 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
                 g_now += size; h_now += r_each; got += 1
                 per_fam[x["fam"]] = per_fam.get(x["fam"], 0) + 1
                 taken.append(x["net"])
+                mk = dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).strftime("%Y-%m")
+                opened_m[mk] = opened_m.get(mk, 0) + 1
             n_t += got
         for k in by_c.pop(d, []):
             if k in opn:
@@ -799,9 +801,11 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
         for k, (size, e, _r) in opn.items():
             q = idx[C[k]["sym"]].get(d)
             if q is not None:
-                mtm += size * (D[C[k]["sym"]]["c"][q] / e - 1)
+                mtm += size * C[k].get("sg", 1) * (D[C[k]["sym"]]["c"][q] / e - 1)
         curve.append((d, E + mtm))
         max_o = max(max_o, len(opn))
+    if curve_out is not None:
+        curve_out.extend(curve)
     eq = np.array([v for _, v in curve])
     dd = float((eq / np.maximum.accumulate(eq) - 1).min())
     last = {}
@@ -819,7 +823,7 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
             "tpd": round(n_t / len(days), 2), "x": round(float(eq[-1]), 2), "avg": round(float(np.mean(taken)), 2) if taken else None,
             "y": [round((float(np.prod([1 + r for r in yrs.get(y, [])])) - 1) * 100) for y in YEARS], "cand_pd": round(n_c / len(days), 2),
             "max_open": max_o, "plus_m": round(float((v > 0).mean()) * 100), "last12": [round(r * 100, 1) for r in mo[-12:]],
-            "n": n_t}
+            "n": n_t, "active_m": round(len(opened_m) / max(1, len(last)) * 100)}
 
 
 def _row(a):
@@ -1085,10 +1089,11 @@ def _wide_data():
     D = {s[:-4]: k for s, k in raw.items() if k is not None}
     B = D["BTC"]
     bc = B["c"]
-    s200 = sma(bc, 200)
+    s200, s50 = sma(bc, 200), sma(bc, 50)
     with np.errstate(invalid="ignore"):
         bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
-    gate = {"t": B["t"], "bull": bull, "soft": bull}
+        soft = np.where(np.isnan(s50), np.nan, (bc > s50).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": soft}
     for s in D:
         prep(D[s], gate)
     flow_feats(D, B)
@@ -1098,9 +1103,10 @@ def _wide_data():
         for q in range(119, len(K["t"])):
             if not np.isnan(v[q]):
                 by_day.setdefault(int(K["t"][q]), []).append((float(v[q]), s))
-    rank = {}
+    rank, day_top = {}, {}
     for d, lst in by_day.items():
         lst.sort(reverse=True)
+        day_top[d] = [s for _v, s in lst]
         for r_, (_v, s) in enumerate(lst):
             rank[(s, d)] = r_
     t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
@@ -1108,7 +1114,17 @@ def _wide_data():
     C = flow_cands(D, {}, t0)
     for x in C:
         x["vrank"] = rank.get((x["sym"], int(D[x["sym"]]["t"][x["i"]])), 10 ** 6)
+    _WIDE.update(rank=rank, day_top=day_top, bull=bull, t0=t0)
     return D, C, days
+
+
+_WIDE: dict = {}
+
+
+def with_rank(C, D):
+    for x in C:
+        x["vrank"] = _WIDE["rank"].get((x["sym"], int(D[x["sym"]]["t"][x["i"]])), 10 ** 6)
+    return C
 
 
 def wide2():
@@ -1228,5 +1244,139 @@ def _safe_call(fn, *a):
     except Exception:  # noqa: BLE001
         return None
 
+
+def own_bear():
+    """19.10, round 11 — the desk waits in dollars whenever the market is not «рост» (most of the last 12 months). On the honest
+    universe (every Binance perp, delisted included, the point-in-time top 40 by volume): (1) the SHORTS of the same rules with
+    the volume mark in a market that is not «рост»; (2) a softer gate — BTC above / below its 50-day average. Rows:
+    [m @dd −25 %, m, dd, worst m, avg trade, a day, months with trades %, 2022…2026]."""
+    D, CL, days = _wide_data()
+    t0 = _WIDE["t0"]
+    CS = with_rank(flow_cands(D, {}, t0, side=-1, gate="regime"), D)
+    CLs = with_rank(flow_cands(D, {}, t0, side=1, gate="soft"), D)
+    CSs = with_rank(flow_cands(D, {}, t0, side=-1, gate="soft"), D)
+    res = {}
+
+    def row(name, C, **kw):
+        kw = dict(dict(surge_key="surge_vc30", score="surge_vc30", max_open=40, top=40), **kw)
+        a = flow_account(C, D, days, **kw)
+        res[name] = [_at25(C, D, days, **kw), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"], a["active_m"]] + a["y"]
+    row("longs «рост» vol≥1.5 (live)", CL, min_surge=1.5)
+    row("shorts «не рост» vol≥1.5", CS, min_surge=1.5)
+    row("shorts «не рост» vol≥2.0", CS, min_surge=2.0)
+    row("shorts «не рост» no mark", CS)
+    row("longs + shorts vol≥1.5", CL + CS, min_surge=1.5)
+    row("longs 1.5 + shorts 2.0", CL + [x for x in CS if x["surge_vc30"] >= 2.0], min_surge=1.5)
+    row("soft gate longs vol≥1.5", CLs, min_surge=1.5)
+    row("soft gate shorts vol≥1.5", CSs, min_surge=1.5)
+    row("soft gate both vol≥1.5", CLs + CSs, min_surge=1.5)
+    row("shorts «не рост» vol≥1.5 C only", CS, min_surge=1.5, fam_only="C")
+    note("own bear · shorts and a softer gate, top 40 (delisted included)", json.dumps(res, ensure_ascii=False))
+
+
+def altport2():
+    """19.10, round 12 — the honest re-check of «ядро + альтсезон» before the owner's rebalance: the alt basket was picked TODAY
+    (SOL, LINK, NEAR, AVAX, SUI, ONDO, AAVE, HBAR, PENDLE, INJ) — survivors. Here, on every Binance perp (delisted included):
+    the gauge on the point-in-time top 40 alts by volume, the basket at each rebalance = the 10 largest alts by 30-day volume
+    (≥ 180 days of history), the futures part = the honest own-signals curve (top 40, volume mark). Variants: the gauge, alts
+    whenever «рост», never alts, all coins in BTC, the live fixed basket, a core of BTC + ETH only."""
+    D, CL, days_all = _wide_data()
+    rank, day_top, bull_arr, t0 = _WIDE["rank"], _WIDE["day_top"], _WIDE["bull"], _WIDE["t0"]
+    B = D["BTC"]
+    days = [int(t) for t in B["t"]]
+    bullv = {int(t): (b == 1) for t, b in zip(B["t"], bull_arr)}
+    cl = {s: {int(t): float(c) for t, c in zip(K["t"], K["c"])} for s, K in D.items()}
+    first = {s: int(K["t"][0]) for s, K in D.items()}
+    alt_ok = lambda s: s not in ("BTC", "ETH")  # noqa: E731
+    # the honest futures part
+    fc = []
+    flow_account(CL, D, days_all, min_surge=1.5, surge_key="surge_vc30", score="surge_vc30", max_open=40, top=40, curve_out=fc)
+    fut = dict(fc)
+    # gauge on the point-in-time top 40 alts
+    idx, ratio, gauge = 1.0, {}, {}
+    rlist = []
+    for i, d in enumerate(days):
+        top = [s for s in day_top.get(d, []) if alt_ok(s)][:40]
+        if i and top:
+            p = days[i - 1]
+            rs = [cl[s][d] / cl[s][p] - 1 for s in top if p in cl[s] and d in cl[s] and cl[s][p] > 0]
+            idx *= 1 + (float(np.mean(rs)) if rs else 0.0)
+        ratio[d] = idx / cl["BTC"][d]
+        rlist.append(ratio[d])
+        if i >= 91 and top:
+            d0 = days[i - 91]
+            b_ret = cl["BTC"][d] / cl["BTC"][d0] - 1
+            beat = [cl[s][d] / cl[s][d0] - 1 > b_ret for s in top if d0 in cl[s] and d in cl[s]]
+            br = sum(beat) / len(beat) if len(beat) >= 10 else 0
+            gauge[d] = bool(bullv.get(d) and br >= 0.60 and rlist[-1] > float(np.mean(rlist[-91:])))
+    fixed_basket = ["SOL", "LINK", "NEAR", "AVAX", "SUI", "ONDO", "AAVE", "HBAR", "PENDLE", "INJ"]
+
+    def basket(d, how):
+        if how == "fixed":
+            return [s for s in fixed_basket if d in cl.get(s, {})]
+        return [s for s in day_top.get(d, []) if alt_ok(s) and d - first[s] >= 180 * DAY][:10]
+
+    def sim(mode, how="pit", core=None, alt_part=43.4):
+        core = core or {"BTC": 15.8, "ETH": 6.3, "SOL": 4.7, "LINK": 2.4, "NEAR": 2.4}
+        start = next(i for i, d in enumerate(days) if d >= t0)
+        V, hold, prev, curve = 1.0, None, None, []
+        for i in range(start, len(days) - 1):
+            d, d1 = days[i], days[i + 1]
+            bull = bool(bullv.get(d))
+            on = {"gauge": gauge.get(d, False), "regime": bull, "never": False, "btc": False}[mode]
+            state = (bull, on)
+            if hold is None or state != prev or (d // DAY) % 7 == 0:
+                t = {s: w for s, w in core.items() if d in cl.get(s, {})}
+                if mode == "btc":
+                    t = {"BTC": sum(core.values())}
+                if on:
+                    bk = basket(d, how)
+                    for s in bk:
+                        t[s] = t.get(s, 0) + alt_part / len(bk)
+                else:
+                    t["BTC"] = t.get("BTC", 0) + alt_part
+                if not bull:
+                    t = {s: w * 0.35 for s, w in t.items()}
+                new = {s: w / 100 * V for s, w in t.items()}
+                new["_fut"] = 0.15 * V
+                new["_cash"] = V - sum(new.values())
+                if hold is not None:
+                    turn = sum(abs(new.get(s, 0) - hold.get(s, 0)) for s in set(new) | set(hold)) / 2
+                    V -= turn * 0.002
+                    k = V / sum(new.values())
+                    new = {s: v * k for s, v in new.items()}
+                hold, prev = new, state
+            for s in list(hold):
+                if s == "_cash":
+                    hold[s] *= 1 + 0.04 / 365
+                elif s == "_fut":
+                    hold[s] *= (fut.get(d1) / fut.get(d)) if fut.get(d) and fut.get(d1) else 1
+                elif d in cl.get(s, {}) and d1 in cl.get(s, {}):
+                    hold[s] *= cl[s][d1] / cl[s][d]
+            V = sum(hold.values())
+            curve.append((d1, V))
+        eq = np.array([v for _, v in curve])
+        dd = float((eq / np.maximum.accumulate(eq) - 1).min())
+        yrs, pv = [], 1.0
+        for y in YEARS:
+            pts = [v for t, v in curve if dt.datetime.fromtimestamp(t / 1000, dt.timezone.utc).strftime("%Y") == y]
+            if pts:
+                yrs.append(round((pts[-1] / pv - 1) * 100))
+                pv = pts[-1]
+        return [round(float(eq[-1]), 2), round(dd * 100), *yrs]
+    be = {"BTC": 22.1, "ETH": 9.5}
+    res = {"gauge · basket by volume (honest)": sim("gauge"), "alts whenever «рост» · by volume": sim("regime"),
+           "never alts (alt part in BTC)": sim("never"), "all coins in BTC (+ regime)": sim("btc"),
+           "gauge · the live fixed basket (survivors)": sim("gauge", how="fixed"),
+           "alts whenever «рост» · fixed basket": sim("regime", how="fixed"),
+           "gauge · core BTC+ETH · by volume": sim("gauge", core=be), "never alts · core BTC+ETH": sim("never", core=be),
+           "gauge · alt part 20 % · by volume": sim("gauge", alt_part=20.0)}
+    on_days = sum(1 for d, v in gauge.items() if v and d >= t0)
+    today = days[-1]
+    res["gauge days on since 2022"] = on_days
+    res["gauge now"] = gauge.get(today)
+    res["basket by volume now"] = basket(today, "pit")
+    note("altport2 · honest [x, dd %, 2022…2026 %]", json.dumps(res, ensure_ascii=False))
+
 if __name__ == "__main__":
-    (pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

@@ -254,42 +254,35 @@ def binance_1m(start_ms, end_ms):
     return out
 
 
-def updown():
-    """Crypto «Up or Down» 15-minute markets: does Polymarket's price lag Bitcoin's own move inside the window?
+def updown(minutes=15, days=30):
+    """Crypto «Up or Down» markets (BTC, 15 or 5 minutes): does Polymarket's price lag Bitcoin's own move inside the window?
     Model price = Φ(r ÷ (σ1m·√minutes left)) from Binance (σ from the previous 60 minutes — known at the time). Trade when the model
-    differs from Polymarket's price by ≥ 5 / 10 / 15 cents; pay the price + 1 cent (+ the market's taker fee if any), hold to
-    the end. Resolution uses Chainlink, our check uses Binance — close calls can differ."""
-    import re
-    rx = re.compile(r"^Bitcoin Up or Down - .*?(\d{1,2}):(\d{2})(AM|PM)-(\d{1,2}):(\d{2})(AM|PM) ET")
-    ms, off = [], 0
-    while off < 20000 and len(ms) < 3000:
-        st, page = get(f"{GAMMA}/markets?closed=true&limit=500&offset={off}&order=endDate&ascending=false")
-        if st != 200 or not page:
-            break
-        for m in page:
-            q = str(m.get("question") or "")
-            mm = rx.match(q)
-            if not mm:
-                continue
-            h1, m1, a1, h2, m2, a2 = mm.groups()
-            t1 = (int(h1) % 12 + (12 if a1 == "PM" else 0)) * 60 + int(m1)
-            t2 = (int(h2) % 12 + (12 if a2 == "PM" else 0)) * 60 + int(m2)
-            if (t2 - t1) % 1440 != 15:
-                continue
-            prices = [float(x) for x in (_js(m.get("outcomePrices")) or [])]
-            toks = _js(m.get("clobTokenIds")) or []
-            outs = _js(m.get("outcomes")) or []
-            if len(prices) != 2 or sorted(prices) != [0.0, 1.0] or len(toks) != 2:
-                continue
-            up_i = 0 if str(outs[0]).lower().startswith("up") else 1
-            end = _ts(m.get("endDate"))
-            if not end:
-                continue
-            ms.append({"end": end, "start": end - 900, "tok_up": toks[up_i], "up_won": prices[up_i] == 1.0,
-                       "fee": m.get("takerBaseFee"), "fees": m.get("feesEnabled"), "q": q})
-        off += 500
-    note("updown · markets", json.dumps({"btc 15m resolved": len(ms), "fee sample": [(x["fees"], x["fee"]) for x in ms[:3]],
-                                         "span": [ms[-1]["q"] if ms else None, ms[0]["q"] if ms else None]}, ensure_ascii=False))
+    differs from Polymarket's price by ≥ 5 / 10 / 15 cents; pay the price + 1 cent (+ the taker fee), hold to the end.
+    Markets are found by their slug btc-updown-{15m|5m}-{window start, unix s}. Resolution uses Chainlink, our check Binance."""
+    step = minutes * 60
+    now = int(time.time()) // step * step
+    starts = list(range(now - days * 86400, now - 3600, step))
+
+    def fetch(ts):
+        st, page = get(f"{GAMMA}/markets?slug=btc-updown-{minutes}m-{ts}")
+        if st != 200 or not isinstance(page, list) or not page:
+            return None
+        m = page[0]
+        prices = [float(x) for x in (_js(m.get("outcomePrices")) or [])]
+        toks = _js(m.get("clobTokenIds")) or []
+        outs = _js(m.get("outcomes")) or []
+        if len(prices) != 2 or sorted(prices) != [0.0, 1.0] or len(toks) != 2 or not outs:
+            return None
+        up_i = 0 if str(outs[0]).lower().startswith("up") else 1
+        return {"end": ts + step, "start": ts, "tok_up": toks[up_i], "up_won": prices[up_i] == 1.0, "fee": m.get("takerBaseFee"),
+                "fees": m.get("feesEnabled"), "feeType": m.get("feeType"), "q": m.get("question"), "vol": m.get("volumeNum")}
+    with ThreadPoolExecutor(12) as ex:
+        ms = [m for m in ex.map(fetch, starts) if m]
+    vols = sorted(float(m["vol"] or 0) for m in ms)
+    note(f"updown {minutes}m · markets", json.dumps({"resolved": len(ms), "asked": len(starts), "up share": round(sum(m["up_won"] for m in ms) / max(1, len(ms)), 3),
+                                                  "fees": sorted({(m["fees"], m["fee"], m["feeType"]) for m in ms}, key=str)[:4],
+                                                  "volume median $": round(vols[len(vols) // 2]) if vols else None,
+                                                  "span": [ms[0]["q"] if ms else None, ms[-1]["q"] if ms else None]}, ensure_ascii=False))
     if not ms:
         return
     K = binance_1m((min(x["start"] for x in ms) - 7200) * 1000, max(x["end"] for x in ms) * 1000)
@@ -313,12 +306,12 @@ def updown():
             continue
         rets = [math.log(c / op) for op, c in prev if op > 0]
         sig = (sum(r * r for r in rets) / len(rets)) ** 0.5
-        for k in (3, 6, 9, 12, 14):
+        for k in ((1, 2, 3, 4) if minutes == 5 else (3, 6, 9, 12, 14)):
             bar = K.get(t0 + (k - 1) * 60000)
             if not bar or sig <= 0:
                 continue
             r = math.log(bar[1] / o[0])
-            left = 15 - k
+            left = minutes - k
             model = _norm_cdf(r / (sig * math.sqrt(left))) if left > 0 else (1.0 if r > 0 else 0.0)
             tk = m["start"] + k * 60
             before = [p for t, p in pts if t <= tk]
@@ -326,7 +319,7 @@ def updown():
                 continue
             rows.append((k, before[-1], model, m["up_won"]))
     out = {"rows": len(rows)}
-    for k in (3, 6, 9, 12, 14):
+    for k in ((1, 2, 3, 4) if minutes == 5 else (3, 6, 9, 12, 14)):
         rk = [x for x in rows if x[0] == k]
         if not rk:
             continue
@@ -348,7 +341,7 @@ def updown():
             if pl:
                 tr[f"edge≥{th:.2f}"] = [len(pl), round(sum(pl) / len(pl) * 100, 2), round(sum(1 for x in pl if x > 0) / len(pl) * 100)]
         out[f"min {k}"] = {"calibration (price bucket → up share)": cal, "trades [n, avg %, wins %]": tr}
-    note("updown · Polymarket price vs Bitcoin's move inside the window", json.dumps(out, ensure_ascii=False))
+    note(f"updown {minutes}m · Polymarket price vs Bitcoin's move inside the window", json.dumps(out, ensure_ascii=False))
 
 
 def probe2():
@@ -375,4 +368,4 @@ def probe2():
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
-    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "probe2": probe2}[mode]()
+    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2}[mode]()

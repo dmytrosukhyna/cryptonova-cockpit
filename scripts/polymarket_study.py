@@ -264,7 +264,7 @@ def updown(minutes=15, days=30):
     starts = list(range(now - days * 86400, now - 3600, step))
 
     def fetch(ts):
-        st, page = get(f"{GAMMA}/markets?slug=btc-updown-{minutes}m-{ts}")
+        st, page = get(f"{GAMMA}/markets?slug=btc-updown-{minutes}m-{ts}&closed=true")
         if st != 200 or not isinstance(page, list) or not page:
             return None
         m = page[0]

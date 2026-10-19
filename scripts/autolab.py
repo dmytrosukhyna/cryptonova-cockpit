@@ -261,6 +261,7 @@ def strat_returns(c, raw, mode, cost, ppy):
 def stats(r, dates, ppy):
     if len(r) < 60:
         return None
+    r = np.maximum(r, -0.99)                 # a day worse than −99 % = the account is gone (keeps the maths real)
     eq = np.cumprod(1 + r)
     dd = float((eq / np.maximum.accumulate(eq) - 1).min())
     yrs = {}

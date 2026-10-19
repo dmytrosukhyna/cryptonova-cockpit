@@ -371,18 +371,18 @@ def binance_1s(day_list):
     return out
 
 
-def updown_trades(days=5):
+def updown_trades(days=5, minutes=15):
     """The executable check: real TRADES in BTC 15-minute up/down markets (Data API, second timestamps) against Bitcoin's own
     move at that second (Binance 1-second closes). Model = Φ(r ÷ (σ1s·√seconds left)), σ from the 15 minutes before the window.
     Takers who bought far below the model (≥ 5 / 10 / 15 cents) — how did those trades end? If such trades exist and win,
     the lag is real money; if they are rare or lose, the price already knows. Fee crypto_fees_v2 is noted, not applied."""
     import math
-    step = 900
+    step = minutes * 60
     now = int(time.time()) // step * step
     starts = list(range(now - days * 86400, now - 3600, step))
 
     def fetch(ts):
-        st, page = get(f"{GAMMA}/markets?slug=btc-updown-15m-{ts}&closed=true")
+        st, page = get(f"{GAMMA}/markets?slug=btc-updown-{minutes}m-{ts}&closed=true")
         if st != 200 or not isinstance(page, list) or not page:
             return None
         m = page[0]
@@ -457,7 +457,21 @@ def updown_trades(days=5):
     if lo:
         out["model − price ≤ −0.10 (overpaid)"] = {"trades": len(lo), "wins %": round(sum(1 for x in lo if x[2]) / len(lo) * 100),
                                                    "their pnl $": round(sum(sz * ((1.0 if w else 0.0) - p) for _e, p, w, sz, _l in lo))}
-    note("updown trades · real taker buys vs Bitcoin at that second", json.dumps(out, ensure_ascii=False))
+    note(f"updown{minutes} trades · real taker buys vs Bitcoin at that second", json.dumps(out, ensure_ascii=False))
+    # the whole crowd of takers, dollar-weighted (= what the makers on the other side earned before fees and rebates)
+    def agg(xs):
+        usd = sum(sz * p for _e, p, _w, sz, _l in xs)
+        pnl = sum(sz * ((1.0 if w else 0.0) - p) for _e, p, w, sz, _l in xs)
+        return {"n": len(xs), "usd": round(usd), "taker return % (dollar-weighted)": round(pnl / usd * 100, 2) if usd else None,
+                "wins %": round(sum(1 for x in xs if x[2]) / len(xs) * 100, 1) if xs else None,
+                "avg price": round(sum(x[1] for x in xs) / len(xs), 3) if xs else None}
+    by = {"all": agg(rows)}
+    for lo_, hi_ in ((0.02, 0.1), (0.1, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 0.98)):
+        by[f"price {lo_}–{hi_}"] = agg([x for x in rows if lo_ <= x[1] < hi_])
+    for lo_, hi_ in ((0, 1), (1, 3), (3, 7), (7, 16)):
+        by[f"minutes left {lo_}–{hi_}"] = agg([x for x in rows if lo_ <= x[4] < hi_])
+    by["favourite ≥0.9 & ≤1 min left"] = agg([x for x in rows if x[1] >= 0.9 and x[4] < 1])
+    note(f"updown{minutes} trades · all takers by price and time", json.dumps(by, ensure_ascii=False))
 
 
 def probe2():
@@ -503,4 +517,4 @@ def probe3():
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "probe"
-    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3, "trades": updown_trades}[mode]()
+    {"probe": probe, "bonds": bonds, "arb": arb, "updown": updown, "updown5": lambda: updown(5, 10), "probe2": probe2, "probe3": probe3, "trades": updown_trades, "trades5": lambda: updown_trades(3, 5)}[mode]()

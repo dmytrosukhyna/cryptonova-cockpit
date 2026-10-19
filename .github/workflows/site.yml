@@ -2,7 +2,9 @@ name: refresh-and-deploy
 on:
   push:
     branches: [main]
-    paths-ignore: ["web/bybit.json", "web/ivan.enc.json", "web/owner.enc.json"]      # the Bybit mirror on the owner's Mac updates these files every few minutes
+    # the Bybit mirror on the owner's Mac and the server engine (cnq/engine.py) push these every few minutes — publish.yml shows them
+    paths-ignore: ["web/bybit.json", "web/ivan.enc.json", "web/owner.enc.json", "web/paper.json", "web/signals_feed.json", "web/engine.json",
+                   "web/calendar.json", "web/quality.json", "web/altseason.json"]
   schedule:
     - cron: "*/30 * * * *"      # данные + отдел новостей каждые 30 минут (UTC)
     - cron: "13,43 * * * *"     # второе расписание со сдвигом: GitHub часто задерживает/пропускает запуски, два шанса в полчаса

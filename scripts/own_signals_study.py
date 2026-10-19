@@ -26,6 +26,7 @@ Pass: plus in 2025 AND in 2026 separately, plus over 2022–2024, better than th
 import datetime as dt
 import json
 import os
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
@@ -726,8 +727,11 @@ def flow_feats(D, btc):
             K["ext"] = (c - K["sma50"]) / K["atr"]
 
 
+_IDX: dict = {}
+
+
 def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, heat=None, max_open=20, gross=2.0, seed=None,
-                 fam_cap=None, mult=1.0, min_surge=None, surge_key="surge", fam_only=None):
+                 fam_cap=None, mult=1.0, min_surge=None, surge_key="surge", fam_only=None, top=None):
     """Daily mark-to-market account. Each day: today's entries (signals of yesterday's close) → skip a coin+rule already open →
     rank by `score` → take up to `cap` (None = all) within max_open, the gross notional cap (× equity) and the open-risk cap
     `heat` (% of equity); size = risk % of the (realised) equity lost at the stop, notional ≤ 25 %. With `budget` the day's
@@ -737,12 +741,17 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
     by_o, by_c = {}, {}
     for k, x in enumerate(C):
         by_o.setdefault(x["o"], []).append(k)
-    idx = {s: {int(t): q for q, t in enumerate(K["t"])} for s, K in D.items()}
+    key = id(D)
+    if key not in _IDX:
+        _IDX.clear()
+        _IDX[key] = {s: {int(t): q for q, t in enumerate(K["t"])} for s, K in D.items()}
+    idx = _IDX[key]
     E, opn, keys, curve, taken, skipped_good = 1.0, {}, set(), [], [], []
     n_c, n_t, max_o = 0, 0, 0
     for d in days:
         cand = [k for k in by_o.get(d, []) if (C[k]["sym"], C[k]["fam"]) not in keys
-                and (min_surge is None or C[k][surge_key] >= min_surge) and (fam_only is None or C[k]["fam"] == fam_only)]
+                and (min_surge is None or C[k][surge_key] >= min_surge) and (fam_only is None or C[k]["fam"] == fam_only)
+                and (top is None or C[k].get("vrank", 0) < top)]
         if cand:
             n_c += len(cand)
             if score == "random":
@@ -1027,5 +1036,112 @@ def flow3():
         note(f"own flow3 · {label} coins · [m, dd, worst m, months+ %, avg trade, a day, max open, 2023…2026]",
              json.dumps(res, ensure_ascii=False))
 
+
+S3 = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
+NOT_COINS = re.compile(r"^(BTCDOM|DEFI|USDC|BUSD|TUSD|FDUSD|USDP|DAI|EUR|GBP|XAU|XAG|PAXG|BLUEBIRD|FOOTBALL)")
+
+
+def all_um_symbols():
+    syms, marker = set(), ""
+    for _ in range(20):
+        s, b = http(f"{S3}?delimiter=/&prefix=data/futures/um/monthly/klines/" + (f"&marker={marker}" if marker else ""))
+        if s != 200:
+            break
+        p = re.findall(r"<Prefix>data/futures/um/monthly/klines/([A-Z0-9]+)/</Prefix>", b)
+        syms |= set(p)
+        if "<IsTruncated>true</IsTruncated>" not in b or not p:
+            break
+        marker = f"data/futures/um/monthly/klines/{p[-1]}/"
+    return sorted(x for x in syms if re.fullmatch(r"[A-Z0-9]+USDT", x) and not NOT_COINS.match(x))
+
+
+def daily_wide(sym):
+    """Daily candles of one USDT-M perp from its monthly archives (listed months only — delisted coins included)."""
+    s, b = http(f"{S3}?prefix=data/futures/um/monthly/klines/{sym}/1d/")
+    if s != 200:
+        return None
+    months = sorted(m for m in re.findall(rf"{sym}-1d-(\d{{4}}-\d{{2}})\.zip</Key>", b) if m >= "2021-06")
+    rows = []
+    for mo in months:
+        st, z = http(f"{UM}/monthly/klines/{sym}/1d/{sym}-1d-{mo}.zip", binary=True)
+        if st == 200:
+            rows += read_zip_csv(z)
+    if len(rows) < 120:
+        return None
+    seen = {}
+    for r in rows:
+        t = int(r[0]); t = t // 1000 if t > 10 ** 14 else t
+        seen[t] = (float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[7]) if len(r) > 7 and r[7] else 0.0,
+                   float(r[5]) if len(r) > 5 and r[5] else 0.0)
+    ts = sorted(seen)
+    a = np.array([seen[t] for t in ts])
+    return {"t": np.array(ts, dtype=np.int64), "o": a[:, 0], "h": a[:, 1], "l": a[:, 2], "c": a[:, 3], "qv": a[:, 4], "bv": a[:, 5]}
+
+
+def wide():
+    """19.10, round 9 — owner: «раз статистика улучшается с количеством монет … хотя бы до 100, либо топ 1000». The honest test:
+    EVERY Binance USDT-M perp in the archive, delisted ones included (no survivor bias), and each day the coin set is the top N
+    by its 30-day dollar volume ON THAT DAY (a coin needs 120 days of history). N = 40 / 70 / 100 / 150 / 200 / 300 / all.
+    Rule = the live one: P + C longs in «рост», the signal day's dollar volume ≥ 1.5× its 30-day average, no daily cap,
+    ≤ 40 (or 60) open, gross ≤ 2× equity, risk 0.5 %, the higher volume first; also without the volume mark. Rows:
+    [monthly % at dd −25 %, monthly % at risk 0.5 %, dd %, worst month %, avg trade %, trades a day, 2023…2026 %]."""
+    t_start = dt.datetime.now()
+    syms = all_um_symbols()
+    with ThreadPoolExecutor(48) as ex:
+        raw = dict(zip(syms, ex.map(daily_wide, syms)))
+    D = {s[:-4]: k for s, k in raw.items() if k is not None}
+    note("own wide · data", json.dumps({"symbols": len(syms), "with_120_days": len(D), "minutes": round((dt.datetime.now() - t_start).seconds / 60, 1),
+                                        "delisted_like": sum(1 for k in D.values() if k["t"][-1] < int((dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=40)).timestamp() * 1000))}))
+    B = D["BTC"]
+    bc = B["c"]
+    s200 = sma(bc, 200)
+    with np.errstate(invalid="ignore"):
+        bull = np.where(np.isnan(s200), np.nan, ((bc > s200) & (bc > np.r_[np.full(60, np.nan), bc[:-60]])).astype(float))
+    gate = {"t": B["t"], "bull": bull, "soft": bull}
+    for s in D:
+        prep(D[s], gate)
+    flow_feats(D, B)
+    # the point-in-time volume rank: each day, coins with ≥ 120 days of history ranked by their 30-day dollar volume
+    by_day = {}
+    for s, K in D.items():
+        v = K["vol30"]
+        for q in range(119, len(K["t"])):
+            if not np.isnan(v[q]):
+                by_day.setdefault(int(K["t"][q]), []).append((float(v[q]), s))
+    rank = {}
+    for d, lst in by_day.items():
+        lst.sort(reverse=True)
+        for r_, (_v, s) in enumerate(lst):
+            rank[(s, d)] = r_
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    days = [int(t) for t in B["t"] if t >= t0]
+    C = flow_cands(D, {}, t0)
+    for x in C:
+        x["vrank"] = rank.get((x["sym"], int(D[x["sym"]]["t"][x["i"]])), 10 ** 6)
+    note("own wide · candidates", json.dumps({"n": len(C), "in_top100": sum(1 for x in C if x["vrank"] < 100),
+                                              "coins_ever_top100": len({x["sym"] for x in C if x["vrank"] < 100})}))
+    res = {}
+    for top in (40, 70, 100, 150, 200, 300, None):
+        for mo_ in (40, 60):
+            if mo_ == 60 and (top or 999) < 100:
+                continue
+            kw = dict(min_surge=1.5, surge_key="surge_vc30", score="surge_vc30", max_open=mo_, top=top)
+            a = flow_account(C, D, days, **kw)
+            res[f"top{top or 'all'} vol≥1.5 open{mo_}"] = [_at25(C, D, days, **kw), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"]] + a["y"][1:]
+        a = flow_account(C, D, days, max_open=40, top=top, cap=4)
+        res[f"top{top or 'all'} no mark, 4 a day"] = [_at25(C, D, days, max_open=40, top=top, cap=4), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"]] + a["y"][1:]
+    note("own wide · point-in-time top N by volume (delisted coins included)", json.dumps(res, ensure_ascii=False))
+    # the fixed 70 of today (survivors) vs the same rule on the point-in-time top 70
+    fixed = set(COINS) | set(COINS2)
+    Cf = [x for x in C if x["sym"] in fixed]
+    kw = dict(min_surge=1.5, surge_key="surge_vc30", score="surge_vc30", max_open=40)
+    a = flow_account(Cf, D, days, **kw)
+    note("own wide · today's 70 (survivors)", json.dumps([_at25(Cf, D, days, **kw), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"]] + a["y"][1:]))
+    for thr in (1.3, 2.0):
+        kw = dict(min_surge=thr, surge_key="surge_vc30", score="surge_vc30", max_open=60, top=150)
+        a = flow_account(C, D, days, **kw)
+        res[f"top150 vol≥{thr} open60"] = [_at25(C, D, days, **kw), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"]] + a["y"][1:]
+    note("own wide · thresholds on top150", json.dumps({k: v for k, v in res.items() if k.startswith("top150 vol≥1.3") or k.startswith("top150 vol≥2")}))
+
 if __name__ == "__main__":
-    (flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

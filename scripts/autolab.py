@@ -108,6 +108,21 @@ def yahoo(sym):
     return out
 
 
+def yfin(sym):
+    """yfinance (browser-like TLS) — the plain Yahoo URL is refused from GitHub Actions with 429."""
+    import yfinance as yf
+    df = yf.Ticker(sym).history(period="max", interval="1d", auto_adjust=False)
+    out = {}
+    for ts, row in df.iterrows():
+        c = float(row["Close"])
+        if c > 0 and not math.isnan(c):
+            o, h, lo = float(row["Open"]), float(row["High"]), float(row["Low"])
+            out[ts.date().isoformat()] = (o if o > 0 else c, h if h > 0 else c, lo if lo > 0 else c, c)
+    today = dt.datetime.now(dt.timezone.utc).date().isoformat()
+    out.pop(today, None)
+    return out
+
+
 def stooq(sym):
     b = http(f"https://stooq.com/q/d/l/?s={urllib.parse.quote(sym)}&i=d").decode()
     out = {}
@@ -139,7 +154,7 @@ def binance(sym):
 def load(m):
     key, _n, cls, y, s, b = m
     errs = []
-    for src, fn, arg in (("Binance", binance, b), ("Yahoo", yahoo, y), ("Stooq", stooq, s)):
+    for src, fn, arg in (("Binance", binance, b), ("Yahoo", yfin, y), ("Yahoo URL", yahoo, y), ("Stooq", stooq, s)):
         if not arg:
             continue
         try:
@@ -313,8 +328,9 @@ def live_check(paper):
 # ------------------------------------------------------------------------------------------------------------------ main
 def main():
     t0 = time.time()
-    with ThreadPoolExecutor(8) as ex:
-        got = list(ex.map(load, MARKETS))
+    with ThreadPoolExecutor(5) as ex:
+        got = list(ex.map(load, [m for m in MARKETS if m[5]]))
+    got += [load(m) for m in MARKETS if not m[5]]
     meta = {m[0]: m for m in MARKETS}
     data, cover = {}, {}
     for key, d, src, err in got:

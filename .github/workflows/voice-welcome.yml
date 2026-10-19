@@ -1,0 +1,24 @@
+name: voice-welcome
+# 19.10.2026: the app's spoken greeting (web/welcome.mp3 → https://cryptonova.vip/welcome.mp3). Run once, or after editing
+# scripts/welcome_voice.py. edge-tts = free Microsoft neural voices.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  voice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q edge-tts
+      - run: python scripts/welcome_voice.py web/welcome.mp3
+      - name: Commit
+        run: |
+          git config user.name "cnq-bot"
+          git config user.email "cnq-bot@users.noreply.github.com"
+          git add web/welcome.mp3
+          git commit -q -m "app: spoken greeting web/welcome.mp3" || exit 0
+          for i in 1 2 3; do git pull -q --rebase && git push -q && break; sleep 5; done

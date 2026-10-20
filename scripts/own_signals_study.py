@@ -1784,7 +1784,7 @@ def _funding_month(sym, ym):
     return tot
 
 
-def ls_neutral():
+def ls_neutral(iv=None, ret_out=None):
     """19.10, round 15 — owner: «продолжай выполнять тесты, искать лучшие возможности … усовершенствовать систему».
     Round 13–14 found which alts do well and badly a month ahead (revenue, age ↑; 3-month spike and swelling volume ↓) and that
     alts as a class lost to BTC. Perps can SHORT, so: is there a market-neutral book that earns in any market?
@@ -1843,7 +1843,7 @@ def ls_neutral():
         FR = dict(zip(need, ex.map(lambda k: _funding_month(*k), need)))
     have_f = sum(1 for v in FR.values() if v is not None)
 
-    IV = "--iv" in sys.argv                    # inverse-volatility weights (30-day daily σ) instead of equal — the standard risk fix
+    IV = iv if iv is not None else "--iv" in sys.argv   # inverse-volatility weights (30-day daily σ) instead of equal — the standard risk fix
 
     def vol30(s, d):
         xs = [cl[s].get(d - k * DAY) for k in range(31)]
@@ -1910,6 +1910,9 @@ def ls_neutral():
         eq = np.array(curve)
         dd = float((eq / np.maximum.accumulate(np.r_[1.0, eq])[1:] - 1).min()) if len(eq) else 0.0
         return V, dd, rets, fsum / max(1, len(rets)), csum / max(1, len(rets))
+    if ret_out is not None:                    # blend_study: the live book (LS10, gross 0.75) as monthly returns, no note
+        ret_out.update({g: sim("LS10", g)[2] for g in (0.75, 1.0)})
+        return
     out = {}
     for k in names:
         V, dd, rets, fm, cm = sim(k, 1.0)

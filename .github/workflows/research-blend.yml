@@ -1,0 +1,19 @@
+name: research-blend
+# Manual only. Backlog #2: our four futures desks month by month — correlations and the best mix at a drawdown ≤ 25 %
+# (scripts/blend_study.py; chosen on the first half of the months, shown on the second).
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: python scripts/blend_study.py

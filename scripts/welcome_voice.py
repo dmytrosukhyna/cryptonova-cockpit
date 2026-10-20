@@ -1,29 +1,63 @@
-"""The spoken greeting of the 2.0 app (first launch, «Послушать»): web/welcome.mp3, ~30 seconds, voice of NOVA.
-Run by .github/workflows/voice-welcome.yml (edge-tts needs the internet). Change TEXT and run the workflow again."""
+"""The spoken greeting of the 2.0 app (first launch, «Послушать»), ~30 seconds, voice of NOVA, in the app's five languages:
+web/welcome.mp3 (Russian) and web/welcome.<lang>.mp3 (en, uk, el, es). Run by .github/workflows/voice-welcome.yml (edge-tts needs the
+internet). Change a text and run the workflow again.  usage: welcome_voice.py [all | <lang> <out.mp3>]"""
 import asyncio
 import os
 import sys
 
-VOICE = os.environ.get("CNQ_WELCOME_VOICE", "ru-RU-SvetlanaNeural")
-# 20.10 (owner: «плохо выговаривает слово "Нова", как-то калечит»): the name is written in Cyrillic with the stress mark on the
-# first syllable (Но́ва), and «CRYPTO NOVA» as «Крипто Но́ва», so the Russian voice does not read it as the adjective «нова́».
-STRESS = "\u0301"
+# 20.10 (owner: «плохо выговаривает слово "Нова"»): in Russian / Ukrainian the name is written in Cyrillic with the stress on the first
+# syllable (Но́ва), «CRYPTO NOVA» as «Крипто Но́ва», so the voice does not read it as the adjective «нова́».
+STRESS = "́"
 NOVA = f"Но{STRESS}ва"
-TEXT = (
-    f"Привет! Я {NOVA} — помощник Крипто {NOVA}. "
-    "Наша система каждую минуту следит за рынком криптовалют и проверяет каждую идею на истории цен. "
-    "Здесь всё бесплатно: демо-счёт на десять тысяч долларов, копилка в биткоин и тридцать восемь уроков простыми словами. "
-    "Деньги в демо учебные, так что можно спокойно смотреть и учиться. "
-    "А если что-то непонятно — нажмите на светящийся шар внизу экрана и спросите меня. Поехали!"
-)
+
+VOICES = {"ru": "ru-RU-SvetlanaNeural", "en": "en-US-AvaNeural", "uk": "uk-UA-PolinaNeural", "el": "el-GR-AthinaNeural",
+          "es": "es-ES-ElviraNeural"}
+TEXTS = {
+    "ru": (f"Привет! Я {NOVA} — помощник Крипто {NOVA}. "
+           "Наша система каждую минуту следит за рынком криптовалют и проверяет каждую идею на истории цен. "
+           "Здесь всё бесплатно: демо-счёт на десять тысяч долларов, копилка в биткоин и тридцать восемь уроков простыми словами. "
+           "Деньги в демо учебные, так что можно спокойно смотреть и учиться. "
+           "А если что-то непонятно — нажмите на светящийся шар внизу экрана и спросите меня. Поехали!"),
+    "en": ("Hi! I'm Nova, the assistant of Crypto Nova. "
+           "Our system watches the crypto market every minute and tests every idea on the history of prices. "
+           "Everything here is free: a ten-thousand-dollar demo account, a bitcoin piggy bank, and thirty-eight lessons in plain words. "
+           "The money in the demo is virtual, so you can calmly watch and learn. "
+           "And if something isn't clear, tap the glowing sphere at the bottom of the screen and ask me. Let's go!"),
+    "uk": (f"Привіт! Я {NOVA} — помічниця Крипто {NOVA}. "
+           "Наша система щохвилини стежить за ринком криптовалют і перевіряє кожну ідею на історії цін. "
+           "Тут усе безкоштовно: демо-рахунок на десять тисяч доларів, скарбничка в біткоїні та тридцять вісім уроків простими словами. "
+           "Гроші в демо навчальні, тож можна спокійно дивитися й навчатися. "
+           "А якщо щось незрозуміло — натисніть на сяючу кулю внизу екрана й запитайте мене. Поїхали!"),
+    "el": ("Γεια σου! Είμαι η Νόβα, η βοηθός του Crypto Nova. "
+           "Το σύστημά μας παρακολουθεί κάθε λεπτό την αγορά κρυπτονομισμάτων και ελέγχει κάθε ιδέα στο ιστορικό των τιμών. "
+           "Εδώ όλα είναι δωρεάν: ένας λογαριασμός demo δέκα χιλιάδων δολαρίων, ένας κουμπαράς σε bitcoin και τριάντα οκτώ μαθήματα με απλά λόγια. "
+           "Τα χρήματα στο demo είναι εικονικά, οπότε μπορείς να παρακολουθείς και να μαθαίνεις με ηρεμία. "
+           "Κι αν κάτι δεν είναι ξεκάθαρο, πάτησε τη φωτεινή σφαίρα στο κάτω μέρος της οθόνης και ρώτα με. Πάμε!"),
+    "es": ("¡Hola! Soy Nova, la asistente de Crypto Nova. "
+           "Nuestro sistema vigila el mercado cripto cada minuto y pone a prueba cada idea con el historial de precios. "
+           "Aquí todo es gratis: una cuenta demo de diez mil dólares, una hucha en bitcoin y treinta y ocho lecciones con palabras sencillas. "
+           "El dinero de la demo es virtual, así que puedes mirar y aprender con calma. "
+           "Y si algo no está claro, toca la esfera brillante en la parte de abajo de la pantalla y pregúntame. ¡Vamos!"),
+}
 
 
-async def main(out: str) -> None:
+def out_path(lang: str) -> str:
+    return "web/welcome.mp3" if lang == "ru" else f"web/welcome.{lang}.mp3"
+
+
+async def make(lang: str, out: str) -> None:
     import edge_tts
-    await edge_tts.Communicate(TEXT, VOICE, rate="-4%").save(out)
+    voice = os.environ.get("CNQ_WELCOME_VOICE_" + lang.upper(), VOICES[lang])
+    await edge_tts.Communicate(TEXTS[lang], voice, rate="-4%").save(out)
+    print(out, os.path.getsize(out), "bytes")
 
 
 if __name__ == "__main__":
-    path = sys.argv[1] if len(sys.argv) > 1 else "web/welcome.mp3"
-    asyncio.run(main(path))
-    print(path, os.path.getsize(path), "bytes")
+    a = sys.argv[1:] or ["all"]
+    if a[0] == "all":
+        for lg in TEXTS:
+            asyncio.run(make(lg, out_path(lg)))
+    elif a[0] in TEXTS:
+        asyncio.run(make(a[0], a[1] if len(a) > 1 else out_path(a[0])))
+    else:                                   # old call: welcome_voice.py web/welcome.mp3 → Russian
+        asyncio.run(make("ru", a[0]))

@@ -14,11 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install -q edge-tts
-      - run: python scripts/welcome_voice.py web/welcome.mp3
+      - run: python scripts/welcome_voice.py all
       - name: Commit
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          git add web/welcome.mp3
-          git commit -q -m "app: spoken greeting web/welcome.mp3" || exit 0
+          git add web/welcome*.mp3
+          git commit -q -m "app: spoken greeting in 5 languages (web/welcome*.mp3)" || exit 0
           for i in 1 2 3; do git pull -q --rebase && git push -q && break; sleep 5; done

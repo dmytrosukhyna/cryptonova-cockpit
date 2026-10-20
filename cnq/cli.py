@@ -396,8 +396,13 @@ def main(argv: list[str] | None = None) -> int:
         from .terminal import notify
         # Universe = BingX symbols with ≥60 days of 15m candles in the store (run `backfill` per symbol first)
         universe = {}
+        # 20.10: «paper» runs every minute on the server; loading every 15m candle ever stored (as objects) pushed the step past the
+        # service's 2 GB from 08:45 UTC and systemd restarted the engine in a loop. The desk and its report look back ≤ 1 year
+        # (daily candles d1[-365:], 90-day ranks, the 50-day BTC EMA) → load 400 days for it; the other commands keep everything.
+        import time as _t
+        since = int(_t.time() * 1000) - 400 * 86_400_000 if args.cmd == "paper" else None
         for bx, _ in cfg.universe:
-            cs = store.candles(bx, "15m")
+            cs = store.candles(bx, "15m", start=since)
             if len(cs) >= 96 * 60:
                 universe[bx] = cs
         if not universe:
@@ -425,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as e:  # noqa: BLE001
                 print("btc ema50d:", e)
             for bx in cfg.b_extra:   # lab-only alt coins (docs/research/alt100.md): candles only, excluded from breadth and the main accounts
-                cs = store.candles(bx, "15m")
+                cs = store.candles(bx, "15m", start=int(_t.time() * 1000) - 33 * 86_400_000)
                 if len(cs) >= 96 * 31:
                     rows = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 31:]]
                     rep["coins"].append({"symbol": bx, "candles": rows, "levels": [], "regime": {}, "b_only": True})

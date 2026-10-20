@@ -50,7 +50,8 @@ def sh(args: list[str], cwd: str, timeout: int = 120, env: dict | None = None) -
     t0 = time.time()
     _now_step(args, timeout)
     try:
-        p = subprocess.Popen(args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        p = subprocess.Popen(args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
+                             preexec_fn=_cap_memory if "cnq.cli" in args else None)
     except Exception as e:  # noqa: BLE001
         return False, round(time.time() - t0, 1), repr(e)[:300]
     try:
@@ -70,6 +71,30 @@ def sh(args: list[str], cwd: str, timeout: int = 120, env: dict | None = None) -
         return False, round(time.time() - t0, 1), repr(e)[:300]
     tail = (out or "")[-300:] if p.returncode == 0 else ((err or "") + (out or ""))[-600:]
     return p.returncode == 0, round(time.time() - t0, 1), tail.strip()
+
+
+# 20.10: from 08:45 UTC the service restarted every ~80 s, always while «paper» ran — the step's memory went over the service's
+# MemoryMax=2G, the kernel's OOM killer fired and systemd stopped the whole unit (no status, no commits). A step now has its own
+# address-space cap: past it the step fails with MemoryError (its error shows in engine.json / /v2/diag), the engine lives on.
+STEP_MEM_MB = int(os.environ.get("CNQ_STEP_MEM_MB", "1800"))
+
+
+def _cap_memory() -> None:
+    try:
+        import resource
+        lim = STEP_MEM_MB * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (lim, lim))
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _peak_mb() -> int:
+    """the largest resident size any finished step has had so far (MB) — grows when a step sets a new record"""
+    try:
+        import resource
+        return round(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024)
+    except Exception:  # noqa: BLE001
+        return 0
 
 
 _STARTED = int(time.time() * 1000)
@@ -164,7 +189,9 @@ def cycle(n: int, env: dict) -> dict:
     if n % 30 == 0:
         for cmd in SLOW:
             steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
-    return {k: {"ok": v[0], "sec": v[1], **({} if v[0] else {"err": v[2][-300:]})} for k, v in steps.items()}
+    out = {k: {"ok": v[0], "sec": v[1], **({} if v[0] else {"err": v[2][-300:]})} for k, v in steps.items()}
+    out["_peak_mb"] = {"ok": True, "sec": 0, "mb": _peak_mb()}
+    return out
 
 
 def write_status(n: int, steps: dict, t_cycle: float, last_sync: dict | None, started: int) -> None:

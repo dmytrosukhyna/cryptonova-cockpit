@@ -1,0 +1,486 @@
+{
+ "name": "Фьючерсы Binance (набор лаборатории)",
+ "period": [
+  "2023-06-08",
+  "2026-10-17"
+ ],
+ "coins_in_data": 155,
+ "coins_ever_in_universe": 149,
+ "bull_share_pct": 53.7,
+ "results": {
+  "A": {
+   "final_usd": 20097.32,
+   "total_pct": 101.0,
+   "max_dd_pct": -41.3,
+   "years": {
+    "2023": 30.9,
+    "2024": 50.3,
+    "2025": -3.0,
+    "2026": 5.3
+   },
+   "train_pct": 96.7,
+   "test_pct": 2.2,
+   "test_dd_pct": -37.5,
+   "n_top": 0,
+   "trades": 492,
+   "costs_usd": 1054.62,
+   "top_pnl_usd": 0,
+   "top_win_pct": null,
+   "best2": [],
+   "best2_usd": 0,
+   "worst2": [],
+   "blocked_days": 0,
+   "dip_stat": {
+    "mid_closed": 113,
+    "touched_minus10": 92,
+    "then_stopped_pct": 91.0,
+    "then_ended_above_entry_pct": 7.0,
+    "median_end_pct": -17.3
+   }
+  },
+  "B": {
+   "final_usd": 20330.61,
+   "total_pct": 103.3,
+   "max_dd_pct": -41.1,
+   "years": {
+    "2023": 33.7,
+    "2024": 47.9,
+    "2025": -0.5,
+    "2026": 3.3
+   },
+   "train_pct": 97.8,
+   "test_pct": 2.8,
+   "test_dd_pct": -37.5,
+   "n_top": 0,
+   "trades": 550,
+   "costs_usd": 1130.73,
+   "top_pnl_usd": 0,
+   "top_win_pct": null,
+   "best2": [],
+   "best2_usd": 0,
+   "worst2": [],
+   "blocked_days": 0,
+   "dip_stat": {
+    "mid_closed": 110,
+    "touched_minus10": 89,
+    "then_stopped_pct": 92.0,
+    "then_ended_above_entry_pct": 6.0,
+    "median_end_pct": -17.5
+   }
+  },
+  "C10": {
+   "final_usd": 14965.05,
+   "total_pct": 49.7,
+   "max_dd_pct": -52.0,
+   "years": {
+    "2023": 29.8,
+    "2024": 42.8,
+    "2025": -23.4,
+    "2026": 5.4
+   },
+   "train_pct": 85.4,
+   "test_pct": -19.3,
+   "test_dd_pct": -49.1,
+   "n_top": 96,
+   "trades": 509,
+   "costs_usd": 938.44,
+   "top_pnl_usd": 472.22,
+   "top_win_pct": 25.0,
+   "best2": [
+    {
+     "sym": "ETH",
+     "day": "2023-09-13",
+     "usd": 270.52,
+     "pnl": 289.08
+    },
+    {
+     "sym": "BTC",
+     "day": "2026-07-05",
+     "usd": 986.39,
+     "pnl": 274.97
+    }
+   ],
+   "best2_usd": 564.05,
+   "worst2": [
+    {
+     "sym": "RSR",
+     "day": "2024-04-10",
+     "usd": 490.8,
+     "pnl": -129.17
+    },
+    {
+     "sym": "RSR",
+     "day": "2024-04-11",
+     "usd": 426.08,
+     "pnl": -98.54
+    }
+   ],
+   "blocked_days": 216,
+   "dip_stat": {
+    "mid_closed": 97,
+    "touched_minus10": 81,
+    "then_stopped_pct": 86.0,
+    "then_ended_above_entry_pct": 7.0,
+    "median_end_pct": -16.6
+   }
+  },
+  "C20": {
+   "final_usd": 20357.47,
+   "total_pct": 103.6,
+   "max_dd_pct": -41.3,
+   "years": {
+    "2023": 30.9,
+    "2024": 50.3,
+    "2025": -3.0,
+    "2026": 6.7
+   },
+   "train_pct": 96.7,
+   "test_pct": 3.5,
+   "test_dd_pct": -37.5,
+   "n_top": 2,
+   "trades": 496,
+   "costs_usd": 1061.13,
+   "top_pnl_usd": 323.77,
+   "top_win_pct": 100.0,
+   "best2": [
+    {
+     "sym": "ETH",
+     "day": "2026-07-04",
+     "usd": 534.69,
+     "pnl": 189.34
+    },
+    {
+     "sym": "ETH",
+     "day": "2026-07-05",
+     "usd": 383.86,
+     "pnl": 134.43
+    }
+   ],
+   "best2_usd": 323.77,
+   "worst2": [],
+   "blocked_days": 123,
+   "dip_stat": {
+    "mid_closed": 113,
+    "touched_minus10": 92,
+    "then_stopped_pct": 91.0,
+    "then_ended_above_entry_pct": 7.0,
+    "median_end_pct": -17.3
+   }
+  },
+  "D10": {
+   "final_usd": 21578.88,
+   "total_pct": 115.8,
+   "max_dd_pct": -41.3,
+   "years": {
+    "2023": 31.7,
+    "2024": 50.7,
+    "2025": -3.0,
+    "2026": 12.0
+   },
+   "train_pct": 98.6,
+   "test_pct": 8.7,
+   "test_dd_pct": -37.5,
+   "n_top": 12,
+   "trades": 509,
+   "costs_usd": 1086.03,
+   "top_pnl_usd": 2239.75,
+   "top_win_pct": 100.0,
+   "best2": [
+    {
+     "sym": "BTC",
+     "day": "2026-07-05",
+     "usd": 1401.19,
+     "pnl": 390.61
+    },
+    {
+     "sym": "ETH",
+     "day": "2023-09-13",
+     "usd": 304.96,
+     "pnl": 315.18
+    }
+   ],
+   "best2_usd": 705.79,
+   "worst2": [
+    {
+     "sym": "ETH",
+     "day": "2026-03-12",
+     "usd": 87.95,
+     "pnl": 13.24
+    },
+    {
+     "sym": "ETH",
+     "day": "2023-06-14",
+     "usd": 142.75,
+     "pnl": 36.1
+    }
+   ],
+   "blocked_days": 221,
+   "dip_stat": {
+    "mid_closed": 113,
+    "touched_minus10": 92,
+    "then_stopped_pct": 91.0,
+    "then_ended_above_entry_pct": 7.0,
+    "median_end_pct": -17.3
+   }
+  },
+  "D20": {
+   "final_usd": 20357.47,
+   "total_pct": 103.6,
+   "max_dd_pct": -41.3,
+   "years": {
+    "2023": 30.9,
+    "2024": 50.3,
+    "2025": -3.0,
+    "2026": 6.7
+   },
+   "train_pct": 96.7,
+   "test_pct": 3.5,
+   "test_dd_pct": -37.5,
+   "n_top": 2,
+   "trades": 496,
+   "costs_usd": 1061.13,
+   "top_pnl_usd": 323.77,
+   "top_win_pct": 100.0,
+   "best2": [
+    {
+     "sym": "ETH",
+     "day": "2026-07-04",
+     "usd": 534.69,
+     "pnl": 189.34
+    },
+    {
+     "sym": "ETH",
+     "day": "2026-07-05",
+     "usd": 383.86,
+     "pnl": 134.43
+    }
+   ],
+   "best2_usd": 323.77,
+   "worst2": [],
+   "blocked_days": 123,
+   "dip_stat": {
+    "mid_closed": 113,
+    "touched_minus10": 92,
+    "then_stopped_pct": 91.0,
+    "then_ended_above_entry_pct": 7.0,
+    "median_end_pct": -17.3
+   }
+  },
+  "E10": {
+   "final_usd": 20045.9,
+   "total_pct": 100.5,
+   "max_dd_pct": -48.3,
+   "years": {
+    "2023": 29.1,
+    "2024": 56.9,
+    "2025": -17.6,
+    "2026": 20.2
+   },
+   "train_pct": 102.5,
+   "test_pct": -1.0,
+   "test_dd_pct": -47.3,
+   "n_top": 116,
+   "trades": 531,
+   "costs_usd": 1044.66,
+   "top_pnl_usd": 4789.62,
+   "top_win_pct": 39.0,
+   "best2": [
+    {
+     "sym": "STG",
+     "day": "2026-05-28",
+     "usd": 389.43,
+     "pnl": 481.09
+    },
+    {
+     "sym": "ETH",
+     "day": "2025-05-06",
+     "usd": 736.54,
+     "pnl": 441.4
+    }
+   ],
+   "best2_usd": 922.49,
+   "worst2": [
+    {
+     "sym": "ZEC",
+     "day": "2025-11-28",
+     "usd": 456.75,
+     "pnl": -110.89
+    },
+    {
+     "sym": "RSR",
+     "day": "2024-04-10",
+     "usd": 361.07,
+     "pnl": -95.03
+    }
+   ],
+   "blocked_days": 0,
+   "dip_stat": {
+    "mid_closed": 94,
+    "touched_minus10": 79,
+    "then_stopped_pct": 82.0,
+    "then_ended_above_entry_pct": 11.0,
+    "median_end_pct": -16.6
+   }
+  },
+  "E20": {
+   "final_usd": 21393.51,
+   "total_pct": 113.9,
+   "max_dd_pct": -42.7,
+   "years": {
+    "2023": 30.9,
+    "2024": 50.3,
+    "2025": -1.0,
+    "2026": 9.9
+   },
+   "train_pct": 96.7,
+   "test_pct": 8.8,
+   "test_dd_pct": -38.9,
+   "n_top": 9,
+   "trades": 501,
+   "costs_usd": 1077.18,
+   "top_pnl_usd": 2235.88,
+   "top_win_pct": 100.0,
+   "best2": [
+    {
+     "sym": "ETH",
+     "day": "2025-05-06",
+     "usd": 823.38,
+     "pnl": 504.3
+    },
+    {
+     "sym": "BTC",
+     "day": "2026-06-05",
+     "usd": 1264.72,
+     "pnl": 421.4
+    }
+   ],
+   "best2_usd": 925.7,
+   "worst2": [
+    {
+     "sym": "ETH",
+     "day": "2025-03-31",
+     "usd": 200.65,
+     "pnl": 121.94
+    },
+    {
+     "sym": "ETH",
+     "day": "2026-02-05",
+     "usd": 542.0,
+     "pnl": 166.17
+    }
+   ],
+   "blocked_days": 0,
+   "dip_stat": {
+    "mid_closed": 113,
+    "touched_minus10": 92,
+    "then_stopped_pct": 91.0,
+    "then_ended_above_entry_pct": 7.0,
+    "median_end_pct": -17.3
+   }
+  },
+  "BTC_hold": {
+   "total_pct": 207.5,
+   "max_dd_pct": -53.0
+  }
+ },
+ "picked": {
+  "C": "C20",
+  "D": "D10",
+  "E": "E10"
+ },
+ "verdict": {
+  "B": {
+   "1_total": true,
+   "2_dd": true,
+   "3_years": false,
+   "years_better": "2 из 4",
+   "4_test": true,
+   "5_not_2_trades": null,
+   "extra_usd": 233.29,
+   "pass": false
+  },
+  "C20": {
+   "1_total": true,
+   "2_dd": true,
+   "3_years": false,
+   "years_better": "1 из 4",
+   "4_test": true,
+   "5_not_2_trades": false,
+   "extra_usd": 260.15,
+   "pass": false
+  },
+  "D10": {
+   "1_total": true,
+   "2_dd": true,
+   "3_years": true,
+   "years_better": "3 из 4",
+   "4_test": true,
+   "5_not_2_trades": true,
+   "extra_usd": 1481.56,
+   "pass": true
+  },
+  "E10": {
+   "1_total": false,
+   "2_dd": false,
+   "3_years": false,
+   "years_better": "2 из 4",
+   "4_test": false,
+   "5_not_2_trades": false,
+   "extra_usd": -51.42,
+   "pass": false
+  }
+ },
+ "weekday_noise": {
+  "A": [
+   101.0,
+   128.4,
+   165.3,
+   162.1,
+   73.3,
+   49.5,
+   144.9
+  ],
+  "B": [
+   103.3,
+   89.8,
+   173.6,
+   148.8,
+   109.0,
+   90.4,
+   104.9
+  ],
+  "C20": [
+   103.6,
+   132.1,
+   167.2,
+   166.2,
+   73.3,
+   55.9,
+   149.4
+  ],
+  "D10": [
+   115.8,
+   142.6,
+   152.6,
+   183.3,
+   72.4,
+   88.7,
+   152.2
+  ],
+  "E10": [
+   100.5,
+   114.0,
+   171.4,
+   154.0,
+   67.1,
+   204.1,
+   170.8
+  ]
+ },
+ "weekday_beats_A": {
+  "B": 4,
+  "C20": 6,
+  "D10": 5,
+  "E10": 3
+ }
+}

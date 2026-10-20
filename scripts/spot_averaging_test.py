@@ -134,7 +134,10 @@ def features(D: dict) -> dict:
     r90 = np.full(nd, np.nan)
     r90[90:] = b[90:] / b[:-90] - 1
     bull = (b > sma200[bi]) & (r90 > 0)
-    excl = np.array([s in STABLE or s in WRAPPED for s in syms])
+    # Binance's tokenised stocks / ETFs (AAPLB, NVDAB, SPYB …): «…B», first trade 2026-05 or later — not crypto
+    stock_t0 = int(dt.datetime(2026, 5, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    excl = np.array([s in STABLE or s in WRAPPED or (s.endswith("B") and first[k] < nd and days[first[k]] >= stock_t0)
+                     for k, s in enumerate(syms)])
     return {"syms": syms, "days": days, "C": C, "Cf": Cf, "valid": valid, "first": first, "last": last, "vol30": vol30,
             "sma200": sma200, "chg7": chg(7), "chg30": chg(30), "chg200": chg(200), "ath": ath, "bull": bull, "excl": excl,
             "meme": np.array([is_meme(s) for s in syms])}
@@ -183,6 +186,7 @@ class Book:
         self.lots: list[dict] = []
         self.trades = 0
         self.costs = 0.0
+        self.closed: list[dict] = []          # finished satellites: did they touch −10 % from entry, how did they end
 
     def slip(self, i: int) -> float:
         return SLIP_MAJOR if self.F["syms"][i] in MAJORS else SLIP_ALT
@@ -234,6 +238,9 @@ class Book:
             lot["u"] -= lu
         self.trades += 1
         if frac >= 1 - 1e-9:
+            if p["bucket"] != "core":
+                self.closed.append({"bucket": p["bucket"], "dip": p.get("dip", False), "ret": px / self.entry(i) - 1,
+                                    "stop": px / self.entry(i) - 1 <= -0.15})
             del self.pos[i]
         else:
             p["u"] -= u
@@ -251,7 +258,8 @@ class Book:
             self.sell(i, 1 - T / cur, j)
 
 
-def simulate(F: dict, j0: int, j1: int, variant: str, cache: dict) -> dict:
+def simulate(F: dict, j0: int, j1: int, variant: str, cache: dict, wd: int = 0) -> dict:
+    """`wd` — the weekly review day (0 = Monday, as live); other days only for the path-noise check."""
     fam = variant[0]
     X = int(variant[1:]) / 100 if len(variant) > 1 else None
     syms, days = F["syms"], F["days"]
@@ -266,7 +274,7 @@ def simulate(F: dict, j0: int, j1: int, variant: str, cache: dict) -> dict:
             cache[j] = day_scores(F, j)
         S = cache[j]
         bull = bool(F["bull"][j])
-        monday = dt.datetime.fromtimestamp(days[j] / 1000, dt.timezone.utc).weekday() == 0
+        monday = dt.datetime.fromtimestamp(days[j] / 1000, dt.timezone.utc).weekday() == wd
         # 0. delisted / halted for good → sold at the last close
         for i in [i for i in bk.pos if F["last"][i] < j]:
             bk.sell(i, 1.0, F["last"][i] if F["last"][i] >= 0 else j)
@@ -299,6 +307,8 @@ def simulate(F: dict, j0: int, j1: int, variant: str, cache: dict) -> dict:
             px = bk.px(i, j)
             p["high"] = max(p["high"], px)
             ret = px / bk.entry(i) - 1
+            if ret <= -0.10:
+                p["dip"] = True
             sc = (S["mid"] if p["bucket"] == "mid" else S["short"]).get(i, 0)
             V = bk.value(j)
             if ret <= -0.15:
@@ -374,7 +384,12 @@ def simulate(F: dict, j0: int, j1: int, variant: str, cache: dict) -> dict:
             lot["pnl"] += lot["u"] * (bk.px(i, j1) - lot["px"])
             lot["u"] = 0.0
     tops = sorted([l for l in bk.lots if l["tag"] == "topup"], key=lambda l: -l["pnl"])
-    return {"eq": np.array(eq), "n_top": n_top, "blocked_days": blocked, "trades": bk.trades, "costs": bk.costs,
+    dips = [c for c in bk.closed if c["bucket"] == "mid" and c["dip"]]
+    dip_stat = {"mid_closed": sum(1 for c in bk.closed if c["bucket"] == "mid"), "touched_minus10": len(dips),
+                "then_stopped_pct": round(100 * np.mean([c["stop"] for c in dips]), 0) if dips else None,
+                "then_ended_above_entry_pct": round(100 * np.mean([c["ret"] > 0 for c in dips]), 0) if dips else None,
+                "median_end_pct": round(100 * float(np.median([c["ret"] for c in dips])), 1) if dips else None}
+    return {"dip_stat": dip_stat, "lots_all": bk.lots, "eq": np.array(eq), "n_top": n_top, "blocked_days": blocked, "trades": bk.trades, "costs": bk.costs,
             "tops": [{"sym": l["sym"], "day": ymd(int(days[l["day"]])), "usd": round(l["usd"], 2), "pnl": round(l["pnl"], 2)} for l in tops]}
 
 
@@ -388,7 +403,7 @@ def stats(r: dict, days: np.ndarray, j0: int) -> dict:
     prev = START_CAP
     for y in sorted(set(yrs)):
         m = np.where(yrs == y)[0]
-        out["years"][int(y)] = round((v[m[-1]] / prev - 1) * 100, 1)
+        out["years"][int(y)] = round(float(v[m[-1]] / prev - 1) * 100, 1)
         prev = v[m[-1]]
     te = np.where(d > int(dt.datetime.strptime(TRAIN_END, "%Y-%m-%d").replace(tzinfo=dt.timezone.utc).timestamp() * 1000))[0]
     base = v[te[0] - 1] if len(te) and te[0] > 0 else START_CAP
@@ -423,6 +438,7 @@ def run(path: str, from15m: bool, name: str) -> dict:
         r = simulate(F, j0, j1, v, cache)
         res[v] = stats(r, days, j0)
         res[v]["blocked_days"] = r["blocked_days"]
+        res[v]["dip_stat"] = r["dip_stat"]
         print(f"[{name}] {v}: total {res[v]['total_pct']}% dd {res[v]['max_dd_pct']}% years {res[v]['years']} top-ups {res[v]['n_top']}", flush=True)
     b = F["Cf"][bi, j0: j1 + 1]
     res["BTC_hold"] = {"total_pct": round((b[-1] / b[0] - 1) * 100, 1), "max_dd_pct": round(float((b / np.maximum.accumulate(b) - 1).min()) * 100, 1)}
@@ -439,15 +455,22 @@ def run(path: str, from15m: bool, name: str) -> dict:
         better = sum(1 for y in ys if r["years"][y] > A["years"][y])
         extra = r["final_usd"] - A["final_usd"]
         c5 = (extra - r["best2_usd"] > 0) if v != "B" else None
-        crit = {"1_total": r["total_pct"] > A["total_pct"], "2_dd": r["max_dd_pct"] >= A["max_dd_pct"] - 2.0,
-                "3_years": better >= 3, "years_better": f"{better} из {len(ys)}", "4_test": r["test_pct"] > A["test_pct"],
-                "5_not_2_trades": c5, "extra_usd": round(extra, 2)}
+        crit = {"1_total": bool(r["total_pct"] > A["total_pct"]), "2_dd": bool(r["max_dd_pct"] >= A["max_dd_pct"] - 2.0),
+                "3_years": better >= 3, "years_better": f"{better} из {len(ys)}", "4_test": bool(r["test_pct"] > A["test_pct"]),
+                "5_not_2_trades": None if c5 is None else bool(c5), "extra_usd": round(float(extra), 2)}
         crit["pass"] = all(x for k, x in crit.items() if k[0].isdigit() and x is not None)
         verdict[v] = crit
+    # path noise (added after the first run, NOT a pass criterion): the same rules with the weekly review on each weekday —
+    # a portfolio that picks coins drifts onto a different path after any small change, so a gain smaller than this spread is noise
+    noise = {}
+    for v in ["A", "B"] + [pick[f] for f in "CDE"]:
+        noise[v] = [round((simulate(F, j0, j1, v, cache, wd)["eq"][-1] / START_CAP - 1) * 100, 1) for wd in range(7)]
+    noise_beats = {v: sum(1 for x, y in zip(noise[v], noise["A"]) if x > y) for v in noise if v != "A"}
     days_used = [ymd(int(days[j0])), ymd(int(days[j1]))]
     univ = sorted({F["syms"][i] for j in range(j0, j1 + 1, 7) for i in cache[j]["U"].tolist()})
     return {"name": name, "period": days_used, "coins_in_data": len(F["syms"]), "coins_ever_in_universe": len(univ),
-            "bull_share_pct": round(float(F["bull"][j0: j1 + 1].mean()) * 100, 1), "results": res, "picked": pick, "verdict": verdict}
+            "bull_share_pct": round(float(F["bull"][j0: j1 + 1].mean()) * 100, 1), "results": res, "picked": pick, "verdict": verdict,
+            "weekday_noise": noise, "weekday_beats_A": noise_beats}
 
 
 def md(R: dict) -> str:
@@ -468,6 +491,16 @@ def md(R: dict) -> str:
     for v, c in R["verdict"].items():
         L.append(f"| {v} | {yn[c['1_total']]} | {yn[c['2_dd']]} | {yn[c['3_years']]} ({c['years_better']}) | {yn[c['4_test']]} | "
                  f"{yn[c['5_not_2_trades']]} | ${c['extra_usd']:+,.0f} | {'прошёл' if c['pass'] else 'не прошёл'} |")
+    ds = res["A"]["dip_stat"]
+    if ds["touched_minus10"]:
+        L += ["", f"В варианте A закрыто {ds['mid_closed']} среднесрочных альтов; {ds['touched_minus10']} из них были −10% от входа и ниже. "
+              f"Дальше {ds['then_stopped_pct']:.0f}% из них закрылись по стопу −15%, {ds['then_ended_above_entry_pct']:.0f}% закрылись выше входа, "
+              f"середина итога {ds['median_end_pct']:+.1f}%."]
+    L += ["", "Шум пути (не условие прохождения): тот же вариант с недельным пересмотром в разные дни недели, итог за период, пн → вс:", "",
+          "| Вариант | пн | вт | ср | чт | пт | сб | вс | разброс | лучше A в днях |", "|---|---|---|---|---|---|---|---|---|---|"]
+    for v, xs in R["weekday_noise"].items():
+        L.append(f"| {v} | " + " | ".join(f"{x:+.0f}%" for x in xs) + f" | {min(xs):+.0f}…{max(xs):+.0f}% | "
+                 + (f"{R['weekday_beats_A'][v]} из 7" if v != "A" else "—") + " |")
     L.append("")
     for v in VARIANTS[2:]:
         r = res[v]

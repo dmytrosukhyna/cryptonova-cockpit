@@ -127,6 +127,12 @@ class Api:
         out["last_sync"] = {k: ls.get(k) for k in ("t", "pulled", "pushed", "committed")}
         if ls.get("t"):
             out["last_sync_age_sec"] = round(time.time() - ls["t"] / 1000)
+        now = self._read(os.path.join(self.web, "engine_now.json")) or {}
+        if now.get("since"):
+            out["engine_step"] = now.get("step")
+            out["engine_step_sec"] = round(time.time() - now["since"] / 1000)
+            out["engine_step_timeout"] = now.get("timeout")
+            out["engine_started_age_sec"] = round(time.time() - (now.get("started") or 0) / 1000)
         for name in ("app_home.json", "paper.json"):
             try:
                 out[name + "_age_sec"] = round(time.time() - os.path.getmtime(os.path.join(self.web, name)))

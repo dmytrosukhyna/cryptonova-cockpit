@@ -21,6 +21,7 @@ import argparse
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -43,15 +44,47 @@ def _now_ms() -> int:
 
 
 def sh(args: list[str], cwd: str, timeout: int = 120, env: dict | None = None) -> tuple[bool, float, str]:
+    """run one step with a hard time limit. 20.10: the engine went silent mid-cycle at 08:45 UTC — subprocess.run(timeout=…) can
+    wait forever after the kill when a grandchild still holds the output pipes, so the step gets its own process group and the
+    whole group is killed, and reading its output after the kill is bounded too."""
     t0 = time.time()
+    _now_step(args, timeout)
     try:
-        p = subprocess.run(args, cwd=cwd, timeout=timeout, capture_output=True, text=True, env=env)
-        tail = (p.stdout or "")[-300:] if p.returncode == 0 else ((p.stderr or "") + (p.stdout or ""))[-600:]
-        return p.returncode == 0, round(time.time() - t0, 1), tail.strip()
-    except subprocess.TimeoutExpired:
-        return False, round(time.time() - t0, 1), f"timeout {timeout}s"
+        p = subprocess.Popen(args, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
     except Exception as e:  # noqa: BLE001
         return False, round(time.time() - t0, 1), repr(e)[:300]
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(p.pid, signal.SIGKILL)
+        except OSError:
+            p.kill()
+        try:
+            p.communicate(timeout=10)
+        except Exception:  # noqa: BLE001
+            pass
+        return False, round(time.time() - t0, 1), f"timeout {timeout}s"
+    except Exception as e:  # noqa: BLE001
+        p.kill()
+        return False, round(time.time() - t0, 1), repr(e)[:300]
+    tail = (out or "")[-300:] if p.returncode == 0 else ((err or "") + (out or ""))[-600:]
+    return p.returncode == 0, round(time.time() - t0, 1), tail.strip()
+
+
+_STARTED = int(time.time() * 1000)
+
+
+def _now_step(args: list[str], timeout: int) -> None:
+    """web/engine_now.json: which step the engine is in right now (the API's /v2/diag shows it) — a hang or a restart loop is
+    visible from outside without logging in to the server"""
+    try:
+        name = next((a for a in args if not a.startswith("-") and a not in ("-m", "cnq.cli") and not a.endswith("python") and
+                     not a.endswith("python3") and "/" not in a), " ".join(args)[-60:])
+        with open(os.path.join(RUN, "web", "engine_now.json"), "w", encoding="utf-8") as f:
+            json.dump({"step": name, "since": int(time.time() * 1000), "timeout": timeout, "pid": os.getpid(), "started": _STARTED}, f)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def prepare() -> None:

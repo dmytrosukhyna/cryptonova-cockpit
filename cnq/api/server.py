@@ -25,7 +25,7 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from cnq.agents.llm import LLM
+from cnq.agents.llm import LLM, PROVIDERS
 
 from . import bingx, nova
 from .auth import AuthError, FirebaseVerifier
@@ -38,8 +38,19 @@ MAX_BODY = 16 * 1024
 # NOVA's model call (20.10: «Сколько я заработал?» failed — the reasoning model spent 506 of max_tokens=600 on hidden thinking,
 # the answer came back cut or empty → 503 → the app said «проверьте интернет»). Low reasoning effort + room for the answer, and a
 # time budget that fits the app (60 s) and nginx (proxy_read_timeout 60 s): ≤ 20 s per call, ≤ 6 s pause before one 429 retry.
-AGENT_LLM = {"max_tokens": 1200, "timeout": 20.0, "max_wait_429": 6.0, "reasoning_effort": "low"}
-AGENT_TEMPERATURE = 0.5
+AGENT_LLM = {"max_tokens": 800, "timeout": 20.0, "max_wait_429": 6.0, "reasoning_effort": "low"}
+AGENT_TEMPERATURE = 0.6
+
+
+def agent_llm() -> LLM:
+    """NOVA's model. CNQ_NOVA_LLM_KEY (+ optional CNQ_NOVA_LLM_PROVIDER, CNQ_NOVA_LLM_MODEL) gives NOVA its own key and quota, e.g.
+    a paid plan; without it NOVA shares the engine's CNQ_LLM_* key (the free groq plan limits tokens per minute)."""
+    key = os.environ.get("CNQ_NOVA_LLM_KEY")
+    if not key:
+        return LLM(**AGENT_LLM)
+    prov = (os.environ.get("CNQ_NOVA_LLM_PROVIDER") or os.environ.get("CNQ_LLM_PROVIDER") or "groq").lower()
+    prov = prov if prov in PROVIDERS else "groq"
+    return LLM(api_key=key, provider=prov, model=os.environ.get("CNQ_NOVA_LLM_MODEL") or PROVIDERS[prov]["model"], **AGENT_LLM)
 
 
 def _day() -> str:
@@ -272,7 +283,7 @@ def main() -> int:
     os.makedirs(os.path.join(run, "data"), exist_ok=True)
     from .firebase_admin import FirebaseAdmin
     api = Api(Store(os.path.join(run, "data", "api.sqlite")), FirebaseVerifier(os.environ.get("CNQ_FIREBASE_PROJECT", "crypto-nova")),
-              os.path.join(run, "web"), LLM(**AGENT_LLM), admin=FirebaseAdmin())
+              os.path.join(run, "web"), agent_llm(), admin=FirebaseAdmin())
     port = int(os.environ.get("CNQ_API_PORT", "8090"))
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))
     print(f"cnq-api {VERSION} on 127.0.0.1:{port}", flush=True)

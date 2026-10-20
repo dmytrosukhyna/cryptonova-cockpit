@@ -14,7 +14,7 @@ import pytest
 from cnq.agents import llm as llm_mod
 from cnq.agents.llm import LLM
 from cnq.api import nova
-from cnq.api.server import AGENT_LLM, make_handler
+from cnq.api.server import AGENT_LLM, agent_llm, make_handler
 from tests.test_api import call, make, token
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -87,7 +87,7 @@ def test_earned_question_regression(tmp_path, monkeypatch):
     api.llm = LLM(api_key="k", provider="groq", model="openai/gpt-oss-120b", **AGENT_LLM)
     c, d = call(api, "POST", "/v2/agent", {"q": EARNED}, t)
     sent = fake.bodies[-1]
-    assert sent["reasoning_effort"] == "low" and sent["max_tokens"] >= 1000 and sent["_timeout"] <= 25
+    assert sent["reasoning_effort"] == "low" and sent["max_tokens"] >= 700 and sent["_timeout"] <= 25
     assert c == 200 and "error" not in d and "source" not in d and d["answer"] == GroqGptOss.ANSWER
     assert d["agent"]["left"] == left - 1 and api.agent_last["finish"] == "stop" and api.agent_last["result"] == "ok"
     assert api.agent_last["reasoning_tokens"] == 90 and api.agent_last["prompt_tokens"] == 2500
@@ -165,6 +165,11 @@ def test_demo_block_from_app_home():
     assert "демо-счёт $10 000" in b and "«Спот»" in b and "Рынок: биткоин $" in b and "ниже рекорда $126 210" in b
     assert "Почему вошли" in b and len(b) < 4000
     assert "сейчас недоступны" in k.demo_block({})
+    # the open trades go to the model only when the question is about them (tokens per minute on the free model plan)
+    sym = home["futures"]["open"][0]["sym"]
+    assert f"– {sym} " in k.user_message(f"Почему система вошла в {sym}?", home, "")
+    assert f"– {sym} " in k.user_message("Какие сделки сейчас открыты?", home, "")
+    assert f"– {sym} " not in k.user_message("Что такое плечо?", home, "") and "открыто сейчас" in k.user_message("Что такое плечо?", home, "")
     assert "ДАННЫЕ CRYPTO NOVA" in k.user_message("q?", {"futures": {"open": "broken"}, "market": {"btc": {"price": "x"}}}, "")
 
 
@@ -250,3 +255,17 @@ def test_tidy_plain_text_for_voice():
     assert nova.tidy("Первое предложение. Второе обрывается на сере", cut=True) == "Первое предложение."
     assert nova.tidy("Обрыв без единой точки и на сере", cut=True) == ""
     assert len(nova.tidy("Слово. " * 400)) <= nova.ANSWER_MAX
+
+
+def test_nova_can_have_its_own_key(monkeypatch):
+    for k in ("CNQ_NOVA_LLM_KEY", "CNQ_NOVA_LLM_PROVIDER", "CNQ_NOVA_LLM_MODEL"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("CNQ_LLM_KEY", "engine-key")
+    monkeypatch.setenv("CNQ_LLM_PROVIDER", "groq")
+    monkeypatch.setenv("CNQ_LLM_MODEL", "openai/gpt-oss-120b")
+    a = agent_llm()
+    assert (a.key, a.provider, a.model, a.reasoning_effort, a.max_tokens) == ("engine-key", "groq", "openai/gpt-oss-120b", "low", AGENT_LLM["max_tokens"])
+    monkeypatch.setenv("CNQ_NOVA_LLM_KEY", "nova-key")
+    monkeypatch.setenv("CNQ_NOVA_LLM_PROVIDER", "anthropic")
+    a = agent_llm()
+    assert (a.key, a.provider, a.timeout) == ("nova-key", "anthropic", AGENT_LLM["timeout"]) and "gpt-oss" not in a.model

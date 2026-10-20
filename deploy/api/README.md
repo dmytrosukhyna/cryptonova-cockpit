@@ -8,6 +8,11 @@ API restarts itself within a minute when its code changes.
 
 Settings in `/etc/cnq.env`:
 - `CNQ_LLM_KEY` (+ optional `CNQ_LLM_PROVIDER`, `CNQ_LLM_MODEL`) — the AI agent NOVA (free providers: groq / gemini / openrouter).
+- Optional `CNQ_NOVA_LLM_KEY` (+ `CNQ_NOVA_LLM_PROVIDER`, `CNQ_NOVA_LLM_MODEL`) — a separate key only for NOVA, e.g. a paid plan:
+  one NOVA question is ≈ 2 000–2 500 tokens, and the free groq plan limits tokens per minute for the whole key.
+- NOVA's knowledge: `data/nova_facts.json` (checked facts with dates and sources), `data/nova_faq.json` (Q&A), `web/nova.json`
+  (greeting, starter questions, topics → `GET /v2/feed/nova`). Edit and push — no restart needed. Test the real model with the
+  manual workflow `nova-probe` (notices show the time, tokens and each answer).
 - `CNQ_BINGX_AGENT_KEY`, `CNQ_BINGX_AGENT_SECRET` — BingX partner cabinet, read-only (VIP check). Without them VIP check answers 503.
 - `CNQ_FIREBASE_PROJECT` — default `crypto-nova`.
 - `CNQ_FCM_SA=/etc/cnq-fcm.json` — the Firebase service-account JSON (Firebase console → Project settings → Service accounts →

@@ -79,13 +79,13 @@ def old() -> None:
 
 def new() -> None:
     import tempfile
-    from cnq.api.server import AGENT_LLM, Api
+    from cnq.api.server import AGENT_LLM, Api, agent_llm
     from cnq.api.store import Store
 
     class V:
         def verify(self, t):
             return {"uid": t}
-    api = Api(Store(os.path.join(tempfile.mkdtemp(), "api.sqlite")), V(), os.path.abspath("web"), LLM(**AGENT_LLM))
+    api = Api(Store(os.path.join(tempfile.mkdtemp(), "api.sqlite")), V(), os.path.abspath("web"), agent_llm())
     note("model", f"{api.llm.provider} · {api.llm.model} · {AGENT_LLM} · key set: {bool(api.llm.key)}")
     extra = os.environ.get("NOVA_PROBE_QS", "")
     qs = [(q, None) for q in QUESTIONS] + [
@@ -102,7 +102,7 @@ def new() -> None:
              json.dumps({"http": code, "sec": round(time.time() - t0, 1), "error": d.get("error"), "source": d.get("source"),
                          **{k: last.get(k) for k in ("result", "finish", "prompt_tokens", "reasoning_tokens")},
                          "words": len(a.split()), "answer": a}, ensure_ascii=False))
-        time.sleep(4)
+        time.sleep(float(os.environ.get("NOVA_PROBE_PAUSE", "15")))   # the free groq plan counts tokens per minute
 
 if __name__ == "__main__":
     (old if (sys.argv[1:] or ["new"])[0] == "old" else new)()

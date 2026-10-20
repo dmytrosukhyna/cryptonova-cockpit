@@ -6,7 +6,7 @@
     {
       "id": "etf_approval",
       "topic": "funds",
-      "fact": "10 января 2024 года Комиссия по ценным бумагам США (SEC) одобрила сразу 11 спотовых биткоин-ETF. С тех пор в США биткоин можно купить через обычный брокерский счёт — как акцию фонда.",
+      "fact": "10 января 2024 года SEC (регулятор США) одобрила 11 спотовых биткоин-ETF: биткоин можно купить через обычный брокерский счёт, как акцию фонда.",
       "date": "2024-01-10",
       "source": "https://www.reedsmith.com/our-insights/blogs/viewpoints/102iwu3/one-small-step-for-the-sec-one-giant-leap-for-crypto/",
       "source_date": "2024-01"
@@ -14,7 +14,7 @@
     {
       "id": "etf_holdings",
       "topic": "funds",
-      "fact": "На 8 октября 2026 года спотовые биткоин-ETF в США держали около 1 293 000 BTC — примерно $107 млрд. Больше всего у фонда BlackRock (IBIT): около 806 000 BTC.",
+      "fact": "На 8 октября 2026 года биткоин-ETF в США держали около 1 293 000 BTC (≈ $107 млрд), из них фонд BlackRock — около 806 000 BTC.",
       "date": "2026-10-08",
       "source": "https://pluang.com/en/news-feed/blackrocks-ibit-kuasai-62-persen-bitcoin-spot-etf",
       "source_date": "2026-10-08"
@@ -22,7 +22,7 @@
     {
       "id": "vanguard",
       "topic": "funds",
-      "fact": "2 декабря 2025 года Vanguard — одна из крупнейших инвестиционных компаний мира, у неё больше 50 млн клиентов — разрешила клиентам покупать крипто-ETF, хотя годами была против.",
+      "fact": "2 декабря 2025 года Vanguard (больше 50 млн клиентов) разрешила клиентам покупать крипто-ETF, хотя годами была против.",
       "date": "2025-12-02",
       "source": "https://www.etf.com/sections/features/vanguard-allow-trading-crypto-etfs-its-platform",
       "source_date": "2025-12-01"
@@ -30,7 +30,7 @@
     {
       "id": "nasdaq_tokenized",
       "topic": "tokenization",
-      "fact": "18 марта 2026 года SEC одобрила пилот Nasdaq: токенизированные версии акций из индекса Russell 1000 и ETF на S&P 500 и Nasdaq-100 смогут торговаться рядом с обычными — в том же стакане, по той же цене и с теми же правами. Фондовый рынок и блокчейн сходятся.",
+      "fact": "18 марта 2026 года SEC одобрила пилот Nasdaq: токенизированные акции из Russell 1000 и ETF на S&P 500 и Nasdaq-100 смогут торговаться рядом с обычными, по той же цене и с теми же правами.",
       "date": "2026-03-18",
       "source": "https://cointelegraph.com/news/sec-approves-nasdaq-tokenized-trading-pilot",
       "source_date": "2026-03-19"
@@ -38,7 +38,7 @@
     {
       "id": "robinhood_tokens",
       "topic": "tokenization",
-      "fact": "30 июня 2025 года Robinhood запустил для пользователей из ЕС токены американских акций и ETF — больше 200 бумаг на блокчейне Arbitrum, с торговлей круглосуточно в будни.",
+      "fact": "30 июня 2025 года Robinhood запустил для ЕС токены больше 200 американских акций и ETF на блокчейне Arbitrum.",
       "date": "2025-06-30",
       "source": "https://coindesk.com/business/2025/06/30/robinhood-pushes-deeper-into-crypto-with-own-blockchain-tokenized-stock-launch",
       "source_date": "2025-06-30"
@@ -46,7 +46,7 @@
     {
       "id": "genius_act",
       "topic": "stablecoins",
-      "fact": "18 июля 2025 года в США подписан закон GENIUS — первые федеральные правила для стейблкоинов, цифровых долларов на блокчейне.",
+      "fact": "18 июля 2025 года в США подписан закон GENIUS — первые федеральные правила для стейблкоинов.",
       "date": "2025-07-18",
       "source": "https://www.ktvu.com/news/genius-stablecoin-act-trump-signs-law",
       "source_date": "2025-07-19"
@@ -54,7 +54,7 @@
     {
       "id": "shopify_usdc",
       "topic": "payments",
-      "fact": "12 июня 2025 года Shopify вместе с Coinbase и Stripe открыла магазинам приём оплаты в стейблкоине USDC (сначала в раннем доступе). Покупатель платит цифровыми долларами, а магазин может получить обычные деньги в своей валюте.",
+      "fact": "12 июня 2025 года Shopify с Coinbase и Stripe открыла магазинам приём оплаты в стейблкоине USDC (сначала ранний доступ).",
       "date": "2025-06-12",
       "source": "https://www.shopify.com/news/stablecoins-on-shopify",
       "source_date": "2025-06-12"
@@ -62,7 +62,7 @@
     {
       "id": "samsung_usdc",
       "topic": "payments",
-      "fact": "7 октября 2026 года Samsung объявила: с последней недели октября 2026 года пользователи Galaxy в США смогут хранить цифровые доллары USDC прямо в Samsung Wallet и отправлять их на криптокошельки и на банковские счета в 60+ странах. Samsung Wallet работает примерно на 82 млн устройств Galaxy в США. Оплату стейблкоинами в магазинах Samsung называет возможным следующим шагом.",
+      "fact": "7 октября 2026 года Samsung объявила: с конца октября 2026 года пользователи Galaxy в США смогут хранить цифровые доллары USDC в Samsung Wallet и отправлять их на криптокошельки и в банки 60+ стран; Samsung Wallet работает примерно на 82 млн устройств Galaxy в США, оплата стейблкоинами в магазинах — возможный следующий шаг.",
       "date": "2026-10-07",
       "source": "https://news.samsung.com/us/samsung-wallet-to-bring-stablecoin-access-to-eligible-galaxy-users-in-the-us",
       "source_date": "2026-10-07"
@@ -70,7 +70,7 @@
     {
       "id": "btc_pizza",
       "topic": "bitcoin_history",
-      "fact": "22 мая 2010 года программист Ласло Ханеч заплатил 10 000 BTC за 2 пиццы — первая известная покупка за биткоины.",
+      "fact": "22 мая 2010 года Ласло Ханеч заплатил 10 000 BTC за 2 пиццы — первая известная покупка за биткоины.",
       "date": "2010-05-22",
       "source": "https://en.bitcoin.it/wiki/Pizza",
       "source_date": "2010-05-22"
@@ -78,7 +78,7 @@
     {
       "id": "btc_2013",
       "topic": "bitcoin_history",
-      "fact": "В начале 2013 года биткоин стоил около $13, а в ноябре 2013 года впервые дороже $1 000.",
+      "fact": "В начале 2013 года биткоин стоил около $13, в ноябре 2013 года впервые превысил $1 000.",
       "date": "2013-11",
       "source": "https://www.nasdaq.com/articles/bitcoin-price-history-2009-to-2022",
       "source_date": "2022"
@@ -86,7 +86,7 @@
     {
       "id": "btc_ath",
       "topic": "bitcoin_history",
-      "fact": "Рекорд цены биткоина — $126 210, 6 октября 2025 года.",
+      "fact": "Рекорд биткоина — $126 210, 6 октября 2025 года.",
       "value_usd": 126210,
       "date": "2025-10-06",
       "source": "https://www.kucoin.com/news/flash/bitcoin-s-126-210-all-time-high-turns-one-year-old",
@@ -95,7 +95,7 @@
     {
       "id": "btc_drawdowns",
       "topic": "bitcoin_history",
-      "fact": "После вершин 2011, 2013, 2017 и 2021 годов биткоин падал на 75–93% — и каждый раз потом обновлял рекорд. Прошлое не гарантирует, что так будет снова.",
+      "fact": "После вершин 2011, 2013, 2017 и 2021 годов биткоин падал на 75–93% и каждый раз потом обновлял рекорд; прошлое этого не гарантирует.",
       "date": "2011–2024",
       "source": "https://newhedge.io/bitcoin/price-drawdown",
       "source_date": "2026-10"
@@ -103,7 +103,7 @@
     {
       "id": "btc_supply",
       "topic": "bitcoin_history",
-      "fact": "Биткоинов никогда не будет больше 21 млн — это заложено в его программу с 2009 года.",
+      "fact": "Биткоинов никогда не будет больше 21 млн — так заложено в его программе.",
       "date": "2009-01-03",
       "source": "https://blog.lopp.net/how-is-the-21-million-bitcoin-cap-defined-and-enforced/",
       "source_date": "2022-01-12"

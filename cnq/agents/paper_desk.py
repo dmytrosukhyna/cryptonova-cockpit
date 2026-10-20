@@ -23,6 +23,8 @@ import math
 import sqlite3
 import time
 
+from .history import thin
+
 START_EQUITY = 10_000.0
 RISK = 0.01
 
@@ -737,7 +739,7 @@ class PaperDesk:
                 "stats": {"trades": n, "winrate": round(len(wins) / n, 3) if n else None, "avg_r": round(sum(t["pnl_r"] for t in closed) / n, 3) if n else None,
                           "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0), "max_dd_pct": round(dd * 100, 2),
                           "by_grade": by_grade},
-                "equity_history": eqh[-500:], "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, правила: {', '.join(RULE_RU[g] for g in sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02%, стоп первым внутри свечи, без заглядывания вперёд"}
+                "equity_history": thin(eqh, now), "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, правила: {', '.join(RULE_RU[g] for g in sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02%, стоп первым внутри свечи, без заглядывания вперёд"}
 
 
 def scan(coins: list[dict]) -> dict:
@@ -943,7 +945,7 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
             snaps[k]["events"].insert(0, just_reset[k]["note_ru"])
     out_scan = scan(report["coins"])
     out = dict(snaps[DEFAULT_PROFILE])
-    out["profiles"] = {k: {kk: vv for kk, vv in v.items() if kk != "equity_history"} | {"equity_history": v["equity_history"][-300:]} for k, v in snaps.items()}
+    out["profiles"] = {k: {kk: vv for kk, vv in v.items() if kk != "equity_history"} | {"equity_history": v["equity_history"]} for k, v in snaps.items()}
     out["scan"] = out_scan
     out["profile_list"] = [{"key": k, "name": p["name"], "about": p["about"], "risk": p["risk"], "classes": sorted(p["classes"]), "max_open": p["max_open"]} for k, p in PROFILES.items()]
     return out

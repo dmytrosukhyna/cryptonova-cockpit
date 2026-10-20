@@ -29,6 +29,8 @@ import json
 import os
 import sqlite3
 import time
+
+from .history import thin
 import urllib.request
 
 BASE = "https://open-api.bingx.com/openApi/swap/v2/quote"
@@ -193,7 +195,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
     equity = equity_closed + open_pnl
     conn.execute("INSERT OR REPLACE INTO lst_equity VALUES(?, ?)", (now, round(equity, 2)))
     conn.commit()
-    eqh = [{"time": a, "equity": b} for a, b in conn.execute("SELECT time, equity FROM lst_equity ORDER BY time")][-500:]
+    eqh = [{"time": a, "equity": b} for a, b in conn.execute("SELECT time, equity FROM lst_equity ORDER BY time")]
     peak, dd = START, 0.0
     for e in eqh:
         peak = max(peak, e["equity"]); dd = max(dd, (peak - e["equity"]) / peak)
@@ -214,7 +216,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
             "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "max_dd_pct": round(dd * 100, 2),
                       "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0),
                       "avg_trade_pct": round(avg_trade * 100, 2) if avg_trade is not None else None},
-            "equity_history": eqh, "events": events, "error": err, "watching": len(mk),
+            "equity_history": thin(eqh), "events": events, "error": err, "watching": len(mk),
             "rules": f"шорт через {DELAY_H} ч после листинга, {int(SHARE * 100)}% счёта, стоп +{int(STOP * 100)}%, выход через {HOLD_D} дней, "
                      f"до {MAX_OPEN} позиций, комиссия 0.05%/сторона, фандинг учитывается"}
 

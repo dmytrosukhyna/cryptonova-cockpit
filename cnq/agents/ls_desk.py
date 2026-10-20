@@ -24,6 +24,8 @@ import os
 import sqlite3
 import time
 
+from .history import thin
+
 from .own_desk import _get, fetch_daily, fetch_prices
 
 START = 10_000.0
@@ -218,7 +220,7 @@ def doc(conn, now: int, px: dict, events: list) -> dict:
     eq = equity(conn, px)
     conn.execute("INSERT OR REPLACE INTO lsn_equity VALUES(?, ?)", (now, round(eq, 2)))
     conn.commit()
-    eqh = [{"time": a, "equity": b} for a, b in conn.execute("SELECT time, equity FROM lsn_equity ORDER BY time")][-500:]
+    eqh = [{"time": a, "equity": b} for a, b in conn.execute("SELECT time, equity FROM lsn_equity ORDER BY time")]
     peak, dd = START, 0.0
     for e in eqh:
         peak = max(peak, e["equity"])
@@ -248,7 +250,7 @@ def doc(conn, now: int, px: dict, events: list) -> dict:
             "pnl_pct": round((eq / START - 1) * 100, 2), "open_pnl_usd": round(open_pnl, 2), "open": out_open, "pending": [],
             "closed": closed, "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "avg_trade_pct": None,
                                         "max_dd_pct": round(dd * 100, 2), "best": 0, "worst": 0},
-            "equity_history": eqh, "events": events[:20], "error": None, "regime_ru": "рыночно-нейтрально: половина лонг, половина шорт",
+            "equity_history": thin(eqh), "events": events[:20], "error": None, "regime_ru": "рыночно-нейтрально: половина лонг, половина шорт",
             "rules": RULES, "last_rebalance": _st(conn, "last_rebalance"),
             "evidence": {"x_gross_075": [2.57, 1.84], "month_pct": [1.9, 1.25], "rebalance_day": [1, 15], "max_dd_pct": 25, "years_pct_gross1": [10, 15, 39, 55, 23],
                          "halves_x_gross1": [1.28, 2.62], "funding_month_pct": -0.58}}

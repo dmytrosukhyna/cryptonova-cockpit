@@ -55,6 +55,8 @@ import json
 import os
 import sqlite3
 import time
+
+from .history import thin
 import urllib.request
 
 COINS40 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT", "LTC", "BCH", "TRX", "NEAR", "ATOM", "ETC", "FIL",
@@ -430,7 +432,7 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
     eq = eqc + open_pnl
     conn.execute("INSERT OR REPLACE INTO own_equity VALUES(?, ?)", (now, round(eq, 2)))
     conn.commit()
-    eqh = [{"time": a, "equity": b} for a, b in conn.execute("SELECT time, equity FROM own_equity ORDER BY time")][-500:]
+    eqh = [{"time": a, "equity": b} for a, b in conn.execute("SELECT time, equity FROM own_equity ORDER BY time")]
     peak, dd = START, 0.0
     for e in eqh:
         peak = max(peak, e["equity"])
@@ -449,7 +451,7 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
             "open_pnl_usd": round(open_pnl, 2), "open": out_open, "pending": [], "closed": closed,
             "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "avg_trade_pct": round(avg * 100, 2) if avg is not None else None,
                       "max_dd_pct": round(dd * 100, 2), "best": 0, "worst": 0},
-            "equity_history": eqh, "events": events[:20], "error": None,
+            "equity_history": thin(eqh), "events": events[:20], "error": None,
             "regime_ru": None if bull is None else ("рост: покупаем" if bull else "не рост: ждём в долларах"),
             "rules": "откат в тренде и пробой 20 дней на 40 самых торгуемых монетах, только покупки в режиме «рост» и только при объёме дня от 1.5× к среднему за 30 дней; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 40 открытых"}
 

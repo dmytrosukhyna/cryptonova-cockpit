@@ -164,7 +164,7 @@
       "id": "passwords",
       "topic": "money",
       "q": "¿Necesitan mis contraseñas o claves?",
-      "a": "¡No! Nunca compartas tus contraseñas, códigos SMS ni la frase semilla de tu billetera: CRYPTO NOVA nunca los pide. Si alguien escribe en nuestro nombre y te los pide, es un estafador. Cuando llegue la copia automática de operaciones, la conexión será con una clave API solo con permiso para operar, sin permiso de retiro.",
+      "a": "¡No! Nunca compartas tus contraseñas, códigos SMS ni la frase semilla de tu billetera: CRYPTO NOVA nunca los pide. Si alguien escribe en nuestro nombre y te los pide, es un estafador. La app no necesita ninguna clave de tu exchange.",
       "tags": [
         "contraseña",
         "contraseñas",
@@ -231,7 +231,7 @@
       "id": "vip",
       "topic": "how",
       "q": "¿Qué es la cuenta real?",
-      "a": "La «Cuenta real» es para quien está listo para usar dinero de verdad. Los pasos: abrir una cuenta en el exchange BingX con nuestro enlace de socio, depositar fondos e introducir en la app tu UID, el número de tu cuenta en el exchange. La app lo comprueba y conecta gratis el sistema a tu cuenta. Las operaciones del sistema las repites tú, y la copia automática llega pronto. Solo para mayores de 18 años.",
+      "a": "La «Cuenta real» es para quien está listo para usar dinero de verdad. Los pasos: abrir una cuenta en el exchange BingX con nuestro enlace de socio, depositar fondos e introducir en la app tu UID, el número de tu cuenta en el exchange. La app lo comprueba y conecta gratis el sistema a tu cuenta. Las operaciones del sistema las repites tú. Solo para mayores de 18 años.",
       "tags": [
         "cuenta real",
         "real",
@@ -262,7 +262,7 @@
       "id": "copy",
       "topic": "how",
       "q": "¿Habrá copia automática de operaciones?",
-      "a": "Sí, es el siguiente paso, y llega pronto. Por ahora ves las operaciones del sistema y las repites tú en tu cuenta. Cuando llegue la copia automática, el dinero seguirá en tu cuenta del exchange, y la clave será solo para operar, sin permiso de retiro.",
+      "a": "En la app no hay copia automática. Ves cada operación del sistema (entrada, stop, objetivo y por qué) y decides tú si repetirla en tu cuenta. Tu dinero siempre se queda en tu cuenta del exchange.",
       "tags": [
         "automático",
         "automática",

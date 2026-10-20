@@ -166,7 +166,7 @@
       "id": "passwords",
       "topic": "money",
       "q": "Do you need my passwords or keys?",
-      "a": "No! Never share your passwords, SMS codes or your wallet's seed phrase — CRYPTO NOVA never asks for them. If someone writes in our name and asks for that, it's a scammer. When automatic trade copying arrives, connecting will use an API key with trading rights only — no withdrawal rights.",
+      "a": "No! Never share your passwords, SMS codes or your wallet's seed phrase — CRYPTO NOVA never asks for them. If someone writes in our name and asks for that, it's a scammer. The app doesn't need any keys to your exchange.",
       "tags": [
         "password",
         "passwords",
@@ -235,7 +235,7 @@
       "id": "vip",
       "topic": "how",
       "q": "What is a real account?",
-      "a": "A “Real account” is for those ready to use real money. The steps: open an account on the BingX exchange through our partner link, fund it and enter your UID — your account number on the exchange — in the app. The app checks it and connects the system to your account for free. You repeat the system's trades yourself, and automatic copying is coming soon. 18+ only.",
+      "a": "A “Real account” is for those ready to use real money. The steps: open an account on the BingX exchange through our partner link, fund it and enter your UID — your account number on the exchange — in the app. The app checks it and connects the system to your account for free. You repeat the system's trades yourself. 18+ only.",
       "tags": [
         "real account",
         "real",
@@ -267,7 +267,7 @@
       "id": "copy",
       "topic": "how",
       "q": "Will there be automatic trade copying?",
-      "a": "Yes, that's the next step — coming soon. For now you see the system's trades and repeat them yourself in your account. When auto-copying arrives, your money will still stay in your exchange account, and the key will be for trading only — no withdrawal rights.",
+      "a": "There's no automatic copying in the app. You see every system trade — entry, stop, target and why — and decide yourself whether to repeat it in your account. Your money always stays in your exchange account.",
       "tags": [
         "automatic",
         "auto",

@@ -11,6 +11,7 @@ Every minute (cycle): new 15-minute candles of the 18 core coins (only the missi
 CNPTS desks (paper), listing shorts, our own signals, the neutral basket, turbo, the signal feed (Telegram; the app bridge on
 the same server reads run/web/signals_feed.json directly). Every 60 cycles: funding. Every 30: the quality card and «ядро +
 альтсезон» (each does its daily work once a day). The 11-minute full candle check runs only once, in start.sh.
+Every 60 (and on cycle 1 after a start): the strategy conveyor (stages LAB → PAPER → READY → RETIRED, demo only).
 Every SYNC_S: sync with GitHub — pull what the GitHub pipeline makes (news, research, macro …) into run/web and run/data, push
 what the engine owns (OWNED + engine.json). The GitHub pipeline skips the engine's steps while the repository variable
 CNQ_ENGINE = server, so there is only one writer of each file.
@@ -32,11 +33,16 @@ INTERVAL_S = int(os.environ.get("CNQ_ENGINE_INTERVAL", "60"))
 SYNC_S = int(os.environ.get("CNQ_ENGINE_SYNC", "120"))
 FAST = ["paper", "listings", "own", "lsn", "turbo", "signalfeed", "apphome", "apppush"]          # order matters: paper rewrites paper.json, the rest add
 SLOW = ["quality", "altport"]
+# 20.10: strategy conveyor LAB → PAPER → READY → RETIRED (cnq/agents/conveyor.py): once an hour (cycle 1 = soon after a restart, then
+# every 60 cycles), after the desks; it writes data/conveyor_state.json (read by the risk gate) and web/conveyor.json
+HOURLY = ["conveyor"]
 OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "altseason.json", "engine.json", "app_home.json", "app_btc.json",
          # 20.10: the app home in the other languages of the app (cnq/agents/i18n.py LANGS), written in the same step as app_home.json
-         "app_home.en.json", "app_home.uk.json", "app_home.el.json", "app_home.es.json"]
-DB_OWNED = {"agents.sqlite", "cnq.sqlite"}                                 # the engine's own state — never overwritten by a pull
-STEP_TIMEOUT = {"paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90}
+         "app_home.en.json", "app_home.uk.json", "app_home.el.json", "app_home.es.json",
+         "conveyor.json"]
+DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json"}          # the engine's own state — never overwritten by a pull
+STEP_TIMEOUT = {"paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90,
+                "conveyor": 120}
 
 
 def _now_ms() -> int:
@@ -246,6 +252,9 @@ def cycle(n: int, env: dict) -> dict:
         steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
     if n % 30 == 0:
         for cmd in SLOW:
+            steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
+    if n % 60 == 1:
+        for cmd in HOURLY:
             steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
     out = {k: {"ok": v[0], "sec": v[1], **({} if v[0] else {"err": v[2][-300:]})} for k, v in steps.items()}
     out["_peak_mb"] = {"ok": True, "sec": 0, "mb": _peak_mb()}

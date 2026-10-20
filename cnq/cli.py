@@ -25,6 +25,8 @@
                                               calendar/macro/autopilot drivers → web/outlook.json
   python -m cnq.cli broadcast [--out web] [--force]   Friday live-show deck (slides: what to say / what to show in the panel);
                                               rebuilt on Fridays (Kyiv) or when missing/older than 7 days, else only `live` → web/broadcast.json
+  python -m cnq.cli conveyor [run|status] [--force]   strategy conveyor LAB → PAPER → READY → RETIRED → data/conveyor_state.json + web/conveyor.json
+  python -m cnq.cli conveyor reinstate <desk> --reason «…»   the owner brings a retired desk back to PAPER (demo only)
   python -m cnq.cli appsignals [--out web]    CRYPTO NOVΛ app signals (public /api/signals/active + /history) → agents.sqlite history,
                                               outcomes checked on 15m candles under 5 exit policies, strategy profile, rules → web/app_signals.json
 """
@@ -43,7 +45,10 @@ from .store.db import Store
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor"])
+    ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
+    ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
+    ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
     ap.add_argument("--symbol")
     ap.add_argument("--db")
     ap.add_argument("--days", type=int)
@@ -300,6 +305,36 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs("data", exist_ok=True)
         d = app_push.run(sqlite3.connect("data/agents.sqlite"), os.path.join("data", "api.sqlite"), args.out)
         print("app push:", d)
+    elif args.cmd == "conveyor":
+        # 20.10: strategy conveyor LAB → PAPER → READY → RETIRED (cnq/agents/conveyor.py) — the engine runs it hourly; demo only
+        import os, sqlite3
+        from .agents import conveyor
+        os.makedirs("data", exist_ok=True)
+        conn = sqlite3.connect("data/agents.sqlite", timeout=30)
+        sub = args.sub or "run"
+        try:
+            if sub == "reinstate":
+                if not args.target:
+                    print("usage: python -m cnq.cli conveyor reinstate <desk> --reason «…»"); return 2
+                d = conveyor.reinstate(conn, args.target, args.reason or "", args.out)
+                print(f"conveyor: {args.target} reinstated → paper; counts={d.get('counts')}")
+            elif sub == "status":
+                for line in conveyor.status_table(conn):
+                    print(line)
+            elif sub == "run":
+                d = conveyor.run(conn, args.out, force=args.force)
+                if d.get("skipped"):
+                    print(f"conveyor: skipped — last run {d['minutes_since_last']} min ago (hourly at most; --force to run now)")
+                else:
+                    print(f"conveyor: counts={d['counts']} recommend_paper={d['recommend_paper']} errors={d['status']['errors']} | "
+                          + " ".join(f"{r['key']}={r['stage']}" for r in d["desks"]))
+            else:
+                print("usage: python -m cnq.cli conveyor [run|status|reinstate <desk> --reason …] [--force]"); return 2
+        except ValueError as e:
+            print("conveyor:", e); return 1
+        except Exception as e:  # noqa: BLE001 — never a silent failure: the public feed shows it, the engine sees rc 1
+            conveyor.write_error(args.out, f"{type(e).__name__}: {e}")
+            print("conveyor failed:", repr(e)[:300]); return 1
     elif args.cmd == "lsn":
         import os, sqlite3
         from .agents import ls_desk

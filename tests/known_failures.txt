@@ -1,0 +1,6 @@
+# Tests that fail on main today for known reasons (Telegram poll and Bybit mirror need live accounts). The test gate
+# (.github/workflows/tests.yml) fails only on a failure NOT listed here. Remove a line once its test is fixed.
+test_owner_dm_without_a_channel_gets_the_forward_instruction_and_the_poll_is_recorded
+test_poll_connects_the_channel_from_the_owners_forward
+test_mirror_is_neutral_to_a_desk_reset
+test_mirror_open_close

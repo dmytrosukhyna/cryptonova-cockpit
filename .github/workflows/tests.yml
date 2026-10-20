@@ -1,0 +1,37 @@
+name: tests
+# The test gate for changes made where pytest/pip can't be installed (scheduled research sessions):
+# push the change to a branch research/<anything> → this runs tests/run.py → merge into main only if it is green.
+# Green = no failure outside tests/known_failures.txt. The result is also an annotation (readable via the check-runs API).
+on:
+  push:
+    branches: ["research/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy pillow pytest
+      - name: tests/run.py against the known failures
+        run: |
+          python tests/run.py > tests.log 2>&1 || true
+          tail -3 tests.log
+          python - <<'PY'
+          import re, sys
+          log = open("tests.log", encoding="utf-8", errors="replace").read()
+          failed = set(re.findall(r"^FAIL\s+(\S+)", log, re.M))
+          known = {l.strip() for l in open("tests/known_failures.txt") if l.strip() and not l.startswith("#")}
+          summary = (re.findall(r"^\d+ passed, \d+ failed.*$", log, re.M) or ["no summary line"])[-1]
+          new = sorted(failed - known)
+          if new:
+              print(f"::error title=tests: NEW failures::{summary}; new: {', '.join(new)}")
+              sys.exit(1)
+          print(f"::notice title=tests: green::{summary}; only known failures ({len(failed & known)})")
+          PY

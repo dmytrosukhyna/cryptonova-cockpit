@@ -133,7 +133,8 @@ class Api:
                 return 400, {"error": "bad_piggy"}
             p = {"amount": amount, "freq": data["freq"], "goal": data.get("goal") if data.get("goal") in ("pension", "kids", "dream") else "dream",
                  "mode": "active" if data.get("mode") == "active" else "save",
-                 "start_day": int(data.get("start_day") or time.time() // 86400), "on": bool(data.get("on", True))}
+                 "start_day": int(data.get("start_day") or time.time() // 86400), "on": bool(data.get("on", True)),
+                 "years": max(0, min(40, int(data.get("years") or 0)))}
             return 200, {"piggy": self.store.set_piggy(uid, p)}
         if method == "PUT" and path == "/v2/progress":
             lessons = data.get("lessons") if isinstance(data.get("lessons"), dict) else {}

@@ -58,7 +58,9 @@ def test_state_machine_buys_core_then_stops_and_trims():
     # bear regime: core shrinks on the next Monday, short ideas are not opened
     st3 = port.step(rows, pk, False, now=monday + 7 * 86_400_000)
     btc = next(p for p in st3["positions"] if p["symbol"] == "BTC")
-    assert abs(btc["weight"] - 0.25) < 1e-9
+    # 20.10: the Monday core check works on the MARKET share — 25 % of the portfolio's value at that moment (satellites sold later in
+    # the same run move the final share a little, well inside the 2 p.p. band), not 25 % of the start
+    assert abs(btc["weight"] * btc["price"] / btc["entry"] / (st3["index"] / 100) - 0.25) < 0.01 and abs(btc["weight"] - 0.25) > 1e-6
     assert not [p for p in st3["positions"] if p["bucket"] == "short"]
     note = pf.market_note(False, rows[0], pk, st3)
     assert "медвежьем" in note and "Портфель" in note
@@ -723,3 +725,180 @@ def test_ideas_alt_above_plan_is_trimmed_on_monday_and_the_cash_tops_up_btc():
     by = {p["symbol"]: p for p in st["positions"]}
     v = by["A1"]["value_usd"] / (st["index"] * 100)
     assert abs(v - 0.075) < 0.003 and ("BTC", "ADD") in acts
+
+
+# ── 20.10 D10 «умное усреднение» ядра (docs/research/spot_averaging.md): BTC / ETH / SOL only, alts never ────────────────────
+NOPK = {"short": [], "mid": [], "long": []}
+
+
+def _mod_world(core_mid=70):
+    rows = pf.score_universe(fake_markets(), {"perps": {}, "spot": {}}, True)
+    for r in rows:
+        if r["symbol"] in ("BTC", "ETH"):
+            r["score"]["mid"] = core_mid
+    return rows
+
+
+def _scale(rows, sym, k, base=None):
+    for r in rows:
+        if r["symbol"] == sym:
+            r["price"] = (base or r["price"]) * k
+            return r["price"]
+
+
+def _share(st, sym):
+    p = next(p for p in st["positions"] if p["symbol"] == sym)
+    return p["weight"] * p["price"] / p["entry"] / (st["index"] / 100)
+
+
+def _topups(st):
+    return [a for a in st["actions"] if a["action"] == "ADD" and a["reason"].startswith("Докупаем")]
+
+
+def test_d10_tops_up_btc_on_a_10pct_dip_when_prospects_hold():
+    conn = sqlite3.connect(":memory:")
+    port = pf.SpotPortfolio(conn)
+    rows = _mod_world(70)
+    port.step(rows, NOPK, True, now=T0)                                         # Wednesday: core BTC 35 % / ETH 15 %
+    _scale(rows, "BTC", 0.88)
+    st = port.step(rows, NOPK, True, now=T0 + DAY)                              # −12 %, mid score 70 → top-up
+    a = _topups(st)
+    assert [x["symbol"] for x in a] == ["BTC"]
+    assert a[0]["reason"].startswith("Докупаем BTC на просадке: цена на 12% ниже средней покупки, перспективы в порядке (оценка 70/100)")
+    assert "Не больше 2 раз за 30 дней" in a[0]["reason"] and "альты на просадке не докупаем" in a[0]["reason"]
+    assert 0.43 < _share(st, "BTC") < 0.45                                      # 30.8 % + 1/3 × 35 % of the value
+    st = port.step(rows, NOPK, True, now=T0 + DAY + 3_600_000)                  # the same day again → checked once a day
+    assert not _topups(st)
+    # the 200-day average alone is enough: score 40, but the price is above its 200-day average
+    conn2 = sqlite3.connect(":memory:")
+    port2 = pf.SpotPortfolio(conn2)
+    rows2 = _mod_world(40)
+    port2.step(rows2, NOPK, True, now=T0)
+    px = _scale(rows2, "BTC", 0.88)
+    st = port2.step(rows2, NOPK, True, now=T0 + DAY, sma200={"BTC": px * 0.9})
+    assert [x["symbol"] for x in _topups(st)] == ["BTC"] and "выше 200-дневной средней" in _topups(st)[0]["reason"]
+
+
+def test_d10_no_topup_without_prospects_or_on_a_small_dip():
+    conn = sqlite3.connect(":memory:")
+    port = pf.SpotPortfolio(conn)
+    rows = _mod_world(40)                                                       # score below 60
+    port.step(rows, NOPK, True, now=T0)
+    px = _scale(rows, "BTC", 0.88)
+    st = port.step(rows, NOPK, True, now=T0 + DAY, sma200={"BTC": px * 1.2})     # and below its 200-day average
+    assert not _topups(st)
+    st = port.step(rows, NOPK, True, now=T0 + 2 * DAY)                           # no 200-day average at all
+    assert not _topups(st)
+    conn2 = sqlite3.connect(":memory:")
+    port2 = pf.SpotPortfolio(conn2)
+    rows2 = _mod_world(90)
+    port2.step(rows2, NOPK, True, now=T0)
+    _scale(rows2, "BTC", 0.92)                                                  # −8 %: under the 10 % threshold (NEAR −4.2 % → nothing)
+    assert not _topups(port2.step(rows2, NOPK, True, now=T0 + DAY))
+    d = pf.topup_decision("BTC", 88.0, 100.0, 0.35, 0.30, 1.0, 0.5, 0, 59, 95.0)
+    assert d["add"] == 0 and "перспективы не подтверждены" in d["why"]
+
+
+def test_d10_at_most_two_topups_in_30_days_and_never_above_1_5x():
+    conn = sqlite3.connect(":memory:")
+    port = pf.SpotPortfolio(conn)
+    rows = _mod_world(70)
+    base = next(r["price"] for r in rows if r["symbol"] == "BTC")
+    port.step(rows, NOPK, True, now=T0)                                         # Wed
+    n = 0
+    for day, k in ((1, 0.88), (2, 0.80), (3, 0.65)):                            # Thu, Fri, Sat — each ≥ 10 % below the new average
+        _scale(rows, "BTC", k, base)
+        st = port.step(rows, NOPK, True, now=T0 + day * DAY)
+        n += len(_topups(st))
+        assert _share(st, "BTC") <= 1.5 * 0.35 + 1e-3          # (the index is rounded to 0.01)
+        if day == 2:
+            assert len(_topups(st)) == 1 and _share(st, "BTC") > 0.52            # the 1.5 × plan cap decided the size
+    assert n == 2                                                               # the third dip (Saturday) is not bought
+    conn.execute("UPDATE spot_actions SET time = time - 31 * 86400000 WHERE action='ADD'")   # 30 days later the count is free again
+    st = port.step(rows, NOPK, True, now=T0 + 4 * DAY)
+    assert len(_topups(st)) == 1 and _share(st, "BTC") <= 1.5 * 0.35 + 1e-6
+    # the pure rule: cap and count
+    assert abs(pf.topup_decision("BTC", 88.0, 100.0, 0.35, 0.50, 1.0, 0.5, 0, 70)["add"] - 0.025) < 1e-9
+    assert pf.topup_decision("BTC", 88.0, 100.0, 0.35, 0.522, 1.0, 0.5, 0, 70)["add"] == 0
+    assert pf.topup_decision("BTC", 88.0, 100.0, 0.35, 0.30, 1.0, 0.5, 2, 70)["add"] == 0
+    assert pf.topup_decision("BTC", 88.0, 100.0, 0.35, 0.30, 1.0, 0.5, 1, 70)["add"] > 0
+
+
+def test_d10_keeps_cash_at_10pct():
+    assert abs(pf.topup_decision("BTC", 88.0, 100.0, 0.35, 0.30, 1.0, 0.13, 0, 70)["add"] - 0.03) < 1e-9
+    assert pf.topup_decision("BTC", 88.0, 100.0, 0.35, 0.30, 1.0, 0.104, 0, 70)["add"] == 0
+    conn = sqlite3.connect(":memory:")
+    port = pf.SpotPortfolio(conn)
+    rows = _mod_world(70)
+    mids = [r for r in rows if r["symbol"].startswith("T")][:5]
+    pk = {"short": [], "long": [], "mid": [{"symbol": r["symbol"], "price": r["price"], "score": 80, "why": "тест", "chg7": 0, "chg30": 0} for r in mids]}
+    st = port.step(rows, pk, True, now=T0)                                      # 35 + 15 + 5 × 8 = 90 % invested, cash 10 %
+    assert len(st["positions"]) == 7 and st["cash_pct"] == 10
+    _scale(rows, "BTC", 0.88)
+    st = port.step(rows, NOPK, True, now=T0 + DAY)
+    assert not _topups(st)
+
+
+def test_d10_never_averages_alts_but_sol_held_as_mid_is_core_like():
+    d = pf.topup_decision("NEAR", 4.0, 5.0, 0.08, 0.06, 1.0, 0.5, 0, 95, 3.0)
+    assert d["add"] == 0 and "альты" in d["why"]
+    conn = sqlite3.connect(":memory:")
+    port = pf.SpotPortfolio(conn)
+    rows = _mod_world(70)
+    rows.append({**rows[3], "symbol": "SOL", "name": "Solana", "price": 100.0, "score": {"short": 50, "mid": 75, "long": 70}})
+    alt = next(r for r in rows if r["symbol"] == "T01")
+    alt["score"] = {"short": 50, "mid": 95, "long": 70}
+    pk = {"short": [], "long": [], "mid": [{"symbol": s, "price": next(r["price"] for r in rows if r["symbol"] == s), "score": 80,
+                                            "why": "тест", "chg7": 0, "chg30": 0} for s in ("SOL", "T01")]}
+    port.step(rows, pk, True, now=T0)
+    _scale(rows, "T01", 0.88)                                                   # an alt −12 % (stop is −15 %) with score 95
+    _scale(rows, "SOL", 0.88)
+    st = port.step(rows, NOPK, True, now=T0 + DAY)
+    assert [x["symbol"] for x in _topups(st)] == ["SOL"]                        # SOL: + 1/3 of its 8 % plan; the alt — nothing
+    assert 0.09 < _share(st, "SOL") < 0.105
+
+
+def test_d10_raised_target_holds_on_monday_and_ends_after_recovery():
+    conn = sqlite3.connect(":memory:")
+    port = pf.SpotPortfolio(conn)
+    rows = _mod_world(70)
+    base = next(r["price"] for r in rows if r["symbol"] == "BTC")
+    port.step(rows, NOPK, True, now=T0)                                         # Wed
+    _scale(rows, "BTC", 0.88, base)
+    port.step(rows, NOPK, True, now=T0 + DAY)                                   # Thu: top-up
+    assert (port._meta("topup_extra:BTC") or 0) > 0.11
+    st = port.step(rows, NOPK, True, now=T0 + 5 * DAY)                          # Monday: the raised plan is kept — no trim back to 35 %
+    btc = [a for a in st["actions"] if a["symbol"] == "BTC"]
+    assert all(a["action"] != "TRIM" for a in btc) and _share(st, "BTC") > 0.43
+    _scale(rows, "BTC", 1.0, base)                                              # Tue: back above the average entry → raised plan ends
+    port.step(rows, NOPK, True, now=T0 + 6 * DAY)
+    assert port._meta("topup_extra:BTC") is None
+    st = port.step(rows, NOPK, True, now=T0 + 12 * DAY)                         # next Monday: back to the 35 % plan
+    trim = next(a for a in st["actions"] if a["symbol"] == "BTC")
+    assert trim["action"] == "TRIM" and "возвращаем к 35%" in trim["reason"] and abs(_share(st, "BTC") - 0.35) < 0.005
+    # a BTC regime flip also ends a raised plan
+    _scale(rows, "BTC", 0.85, base)
+    port.step(rows, NOPK, True, now=T0 + 13 * DAY)
+    assert (port._meta("topup_extra:BTC") or 0) > 0
+    port.step(rows, NOPK, False, now=T0 + 14 * DAY)
+    assert port._meta("topup_extra:BTC") is None
+
+
+def test_ideas_d10_tops_up_core_only():
+    def row(sym, status, price, kind, mid):
+        return {**_irow(sym, status, price, kind), "consultant": {"short": 50, "mid": mid, "long": 70}}
+    rows = [row("BTC", "buy", 80000, "core", 70), row("ETH", "buy", 2400, "core", 40), row("A1", "buy", 11.0, "mid", 95)]
+    src = {"cg": {"BTC": 80000.0, "ETH": 2400.0, "A1": 11.0}, "meme": {}, "hl": {}}
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows, T0), T0)
+    rows1, src1 = copy.deepcopy(rows), copy.deepcopy(src)
+    for s in ("BTC", "ETH", "A1"):                                              # all −12 %: A1 is above its −20 % stop
+        src1["cg"][s] *= 0.88
+        _set(rows1, s, price=src1["cg"][s])
+    st = port.step(src1, _ideas(rows1, T0 + DAY), T0 + DAY, sma200={"ETH": 2400 * 1.1})
+    a = [x for x in st["actions"] if x["action"] == "ADD" and x["reason"].startswith("Докупаем")]
+    assert [x["symbol"] for x in a] == ["BTC"] and "перспективы в порядке" in a[0]["reason"]   # ETH: score 40, below its average
+    by = {p["symbol"]: p for p in st["positions"]}
+    assert 0.35 < by["BTC"]["value_usd"] / (st["index"] * 100) <= 1.5 * 0.30 + 1e-3              # 26.4 % + 1/3 × 30 % of the value
+    assert port.rp.cash() >= 0.10 * st["index"] / 100 - 1e-9 and any("Докупка ядра на просадке" in r for r in st["rules_ru"])

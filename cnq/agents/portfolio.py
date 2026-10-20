@@ -16,6 +16,8 @@ Model portfolio (state in data/agents.sqlite, table spot_portfolio)
   cash   the rest (never below 10 %)
 Actions: buy / add / trim (+40 % → sell half) / sell (−15 % from entry or score lost) / hold / wait,
 rebalance once a week (Monday) or when a rule fires. Everything is explained in Russian for the panel.
+20.10: the Monday core check uses the MARKET share; once a day BTC / ETH (and SOL when held as a mid pick) are topped up on a
+10 % dip from the average entry when the «prospects» hold (TOPUP, variant D10 of docs/research/spot_averaging.md); alts — never.
 
 Six demo accounts of $10 000 go to the panel under `portfolios` (order in `portfolio_order`; 6th `ideas` «По рекомендациям» —
 spot_profiles.IdeasPortfolio, buys what web/ideas.json says, see the spot_profiles docstring):
@@ -51,6 +53,81 @@ def overheated(chg7: float | None, chg30: float | None) -> bool:
     thresholds as the spot ideas table, spot_ideas.OVERHEAT_7D / OVERHEAT_30D)."""
     from .spot_ideas import OVERHEAT_7D, OVERHEAT_30D
     return (chg7 is not None and chg7 >= OVERHEAT_7D) or (chg30 is not None and chg30 >= OVERHEAT_30D)
+
+
+# ----------------------------------------------------------------------------- 20.10 «умное усреднение» ядра (variant D10)
+# Owner: «если NEAR −4.2%, разумно ли боту докупить, если перспективы есть?» — docs/research/spot_averaging.md, scripts/spot_averaging_test.py.
+# Tested on Binance spot 2023-01 → 2026-10 (651 USDT pairs incl. delisted, costs 0.1 % + slippage) and on the lab's perps set:
+#   core only (BTC/ETH/SOL) at −10 % from the average entry, prospects OK → +51.7 % vs +38.8 % without it, worst drawdown −54.6 % vs
+#   −57.8 %, 2025–26 −36.4 % vs −39.9 %; perps +115.8 % vs +101.0 %. Only 8–12 top-ups in 3.5–4 years — demo only, checked forward.
+# ALTS ARE NEVER AVERAGED DOWN: the same top-up on alts gave +17.2 % vs +38.8 % and a drawdown of −68.0 % vs −57.8 % (only 19 % of
+#   alt top-ups ended in profit); 90 % of our alts that fell 10 % below entry went on to the −15 % stop. NEAR −4.2 % → nothing to do.
+TOPUP = {
+    "coins": ("BTC", "ETH", "SOL"),   # SOL only where the portfolio already holds it; short ideas and every other alt — never
+    "dip": 0.10,                      # price ≤ 90 % of the position's average entry
+    "score": 60,                      # «prospects»: mid score ≥ 60 OR price above the coin's own 200-day average
+    "part": 1 / 3,                    # + 1/3 of the coin's target weight (share of the portfolio's current value)
+    "cap": 1.5,                       # never above 1.5 × target
+    "max_n": 2, "window_d": 30,       # at most 2 top-ups per coin in any 30 days
+    "min_cash": 0.10,                 # cash stays ≥ 10 % of the portfolio
+    "min_add": 0.005,                 # less than 0.5 % of the portfolio → not worth a trade
+    "prefix": "Докупаем",             # every top-up reason starts with this word (the 30-day count looks for it)
+}
+DAY_MS = 86_400_000
+
+
+def _pct_ru(x: float) -> str:
+    return f"{x * 100:.0f}%".replace("-", "−")
+
+
+def topup_decision(sym: str, px: float | None, entry: float | None, target: float, mv: float, value: float, cash: float,
+                   n_recent: int, score_mid: float | None = None, sma200: float | None = None, fee: float = 0.0) -> dict:
+    """D10 for ONE held core coin. All amounts in the portfolio's own units (value = portfolio value, mv = the coin's market value,
+    cash = free cash). → {"add": amount to buy (0 = nothing), "reason": Russian text for the actions list, "why": why not (debug)}."""
+    if sym not in TOPUP["coins"]:
+        return {"add": 0.0, "why": "альты на просадке не докупаем"}
+    if not px or not entry or value <= 0 or target <= 0:
+        return {"add": 0.0, "why": "нет цены"}
+    ret = px / entry - 1
+    if ret > -TOPUP["dip"]:
+        return {"add": 0.0, "why": f"просадка {_pct_ru(ret)} — меньше 10%"}
+    if n_recent >= TOPUP["max_n"]:
+        return {"add": 0.0, "why": "уже 2 докупки за 30 дней"}
+    above = bool(sma200) and px > sma200
+    good = score_mid is not None and score_mid >= TOPUP["score"]
+    if not (above or good):
+        return {"add": 0.0, "why": "перспективы не подтверждены: ниже 200-дневной средней и оценка ниже 60"}
+    add = min(TOPUP["part"] * target * value, TOPUP["cap"] * target * value - mv, (cash - TOPUP["min_cash"] * value) / (1 + fee))
+    if add < TOPUP["min_add"] * value:
+        return {"add": 0.0, "why": "нет места: доля у потолка 1.5 плана или кэш у 10%"}
+    why_ok = " и ".join(x for x in ("выше 200-дневной средней" if above else "", f"оценка {score_mid:.0f}/100" if good else "") if x)
+    reason = (f"{TOPUP['prefix']} {sym} на просадке: цена на {abs(ret) * 100:.0f}% ниже средней покупки, перспективы в порядке "
+              f"({why_ok}). +{add / value * 100:.1f}% счёта, доля {(mv + add) / value * 100:.0f}% (не выше {TOPUP['cap'] * target * 100:.0f}%). "
+              "Не больше 2 раз за 30 дней; альты на просадке не докупаем.")
+    return {"add": add, "reason": reason, "ret": ret}
+
+
+def sma200_map(now: int, live: dict | None = None, path: str = "web/decision.json") -> dict[str, float]:
+    """{SYM: 200-day average of daily closes} for the core coins from the terminal's figures (decision.json coins → regime.sma200,
+    the same numbers the BTC regime uses). Only if the file is at most 36 h old and its price is within 10 % of the live one."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception:  # noqa: BLE001
+        return {}
+    if not d.get("asof") or now - int(d["asof"]) > 36 * 3_600_000:
+        return {}
+    out = {}
+    for c in d.get("coins") or []:
+        s = str(c.get("symbol") or "").upper().replace("-USDT", "").replace("USDT", "")
+        sma, px = (c.get("regime") or {}).get("sma200"), c.get("price")
+        if s not in TOPUP["coins"] or not sma or not px:
+            continue
+        lp = (live or {}).get(s)
+        if lp and abs(lp / px - 1) > 0.10:
+            continue
+        out[s] = float(sma)
+    return out
 
 
 def _get(url: str, data: dict | None = None, timeout: float = 25):
@@ -253,8 +330,63 @@ class SpotPortfolio:
             self.conn.execute("INSERT OR REPLACE INTO spot_mod_meta VALUES('realized', ?)", (self.realized() + gain,))
         return {"time": now, "symbol": sym, "action": action, "weight": round(weight, 3), "price": price, "reason": reason}
 
-    def step(self, rows: list[dict], pk: dict, btc_bull: bool, now: int | None = None, memes: set[str] | None = None) -> dict:
-        """`memes` (17.10): meme tickers — never bought here and sold if held (memes live in «Высокий риск» / «Мем-портфель»)."""
+    def _meta(self, k: str):
+        r = self.conn.execute("SELECT v FROM spot_mod_meta WHERE k=?", (k,)).fetchone()
+        return r[0] if r else None
+
+    def _set_meta(self, k: str, v: float):
+        self.conn.execute("INSERT OR REPLACE INTO spot_mod_meta VALUES(?,?)", (k, float(v)))
+
+    def _value(self, price: dict) -> tuple[float, float]:
+        """(portfolio value, free cash) in units of the start: value = 1 + realized + open P&L; cash = 1 + realized − Σ cost weights."""
+        pos = [p for p in self.positions() if p["entry"]]
+        mv = sum(p["weight"] * (price.get(p["symbol"]) or p["entry"]) / p["entry"] for p in pos)
+        cost = sum(p["weight"] for p in pos)
+        v = 1 + self.realized() + mv - cost
+        return v, v - mv
+
+    def _topup_housekeeping(self, price: dict, btc_bull: bool) -> None:
+        """A top-up raises a core coin's Monday target (meta topup_extra:SYM, share of the portfolio) until the price is back at the
+        average entry or the BTC regime flips — otherwise the next Monday would sell the top-up straight back."""
+        b = 1.0 if btc_bull else 0.0
+        flip = self._meta("topup_bull") not in (None, b)
+        self._set_meta("topup_bull", b)
+        held = {p["symbol"]: p for p in self.positions()}
+        for (k,) in self.conn.execute("SELECT k FROM spot_mod_meta WHERE k LIKE 'topup_extra:%'").fetchall():
+            p = held.get(k.split(":", 1)[1])
+            if flip or not p or not p["entry"] or (price.get(p["symbol"]) or 0) >= p["entry"]:
+                self.conn.execute("DELETE FROM spot_mod_meta WHERE k=?", (k,))
+
+    def _topups(self, now: int, price: dict, score: dict, core: dict, sma200: dict) -> list[dict]:
+        """D10 (TOPUP): once a UTC day, BTC / ETH (core) and SOL (only when held as a mid pick) — never short ideas, never other alts."""
+        day = float(now // DAY_MS)
+        if self._meta("topup_day") == day:
+            return []
+        self._set_meta("topup_day", day)
+        out = []
+        for p in self.positions():
+            s = p["symbol"]
+            if s not in TOPUP["coins"] or s not in price or not p["entry"]:
+                continue
+            target = core.get(s) if p["bucket"] == "core" else 0.08 if p["bucket"] == "mid" else None
+            if not target:
+                continue
+            value, cash = self._value(price)
+            n = self.conn.execute("SELECT COUNT(*) FROM spot_actions WHERE symbol=? AND action='ADD' AND reason LIKE ? AND time>=?",
+                                  (s, TOPUP["prefix"] + "%", now - TOPUP["window_d"] * DAY_MS)).fetchone()[0]
+            dec = topup_decision(s, price[s], p["entry"], target, p["weight"] * price[s] / p["entry"], value, cash, n,
+                                 (score.get(s) or {}).get("mid"), sma200.get(s))
+            if dec["add"] <= 0:
+                continue
+            out.append(self._act(now, s, "ADD", p["weight"] + dec["add"], price[s], dec["reason"]))
+            if p["bucket"] == "core":
+                self._set_meta(f"topup_extra:{s}", (self._meta(f"topup_extra:{s}") or 0.0) + dec["add"] / value)
+        return out
+
+    def step(self, rows: list[dict], pk: dict, btc_bull: bool, now: int | None = None, memes: set[str] | None = None,
+             sma200: dict | None = None) -> dict:
+        """`memes` (17.10): meme tickers — never bought here and sold if held (memes live in «Высокий риск» / «Мем-портфель»).
+        `sma200` (20.10): {BTC/ETH/SOL: 200-day average} for the D10 top-up's «prospects» check (sma200_map)."""
         now = now or int(time.time() * 1000)
         memes = {m.upper() for m in memes or ()}
         # 17.10: no memes, and no coin after a spike (+40 % in 7 days / +120 % in 30 days) is bought here
@@ -276,15 +408,28 @@ class SpotPortfolio:
                                                                           f"по статусу безопасности и «Мем-портфель»). Выходим ({ret*100:+.0f}%)."))
                 pos.pop(sym)
         # --- core
+        # 20.10: the Monday check compares the MARKET share (value of the coin ÷ value of the portfolio) with the target — it compared
+        # the cost weight before, which only moved when the BTC regime flipped (the research tested the market share, spot_averaging.md);
+        # a D10 top-up raises the coin's target until its price is back at the average entry or the regime flips
+        self._topup_housekeeping(price, btc_bull)
+        value, _ = self._value(price)
         for sym, w in core.items():
             if sym not in price:
                 continue
             p = pos.get(sym)
             if not p:
-                actions.append(self._act(now, sym, "BUY", w, price[sym], f"Ядро портфеля: {sym} {w*100:.0f}% — держим всегда, доля зависит от режима BTC.", "core"))
-            elif abs(p["weight"] - w) > 0.02 and rebalance:
-                actions.append(self._act(now, sym, "ADD" if w > p["weight"] else "TRIM", w, price[sym],
-                                         f"Ребаланс ядра под режим BTC ({'бычий' if btc_bull else 'медвежий'}): {sym} → {w*100:.0f}%.", "core"))
+                actions.append(self._act(now, sym, "BUY", round(w * value, 6), price[sym], f"Ядро портфеля: {sym} {w*100:.0f}% — держим всегда, доля зависит от режима BTC.", "core"))
+            elif rebalance and p["entry"]:
+                extra = self._meta(f"topup_extra:{sym}") or 0.0
+                te = min(TOPUP["cap"] * w, w + extra)
+                mv = p["weight"] * price[sym] / p["entry"]
+                mw = mv / value if value > 0 else 0.0
+                if abs(mw - te) > 0.02:
+                    neww = p["weight"] + (te * value - mv) if te > mw else te * value * p["entry"] / price[sym]
+                    actions.append(self._act(now, sym, "ADD" if te > mw else "TRIM", round(neww, 6), price[sym],
+                                             f"Ребаланс ядра ({'бычий' if btc_bull else 'медвежий'} режим BTC): {sym} {mw*100:.0f}% стоимости портфеля "
+                                             f"при плане {te*100:.0f}%" + (" — план поднят докупкой на просадке, пока цена ниже средней покупки" if extra else "")
+                                             + f" → возвращаем к {te*100:.0f}%.", "core"))
         # --- update highs, stops, trims for satellites
         for sym, p in list(pos.items()):
             if p["bucket"] == "core" or sym not in price:
@@ -304,6 +449,9 @@ class SpotPortfolio:
                 actions.append(self._act(now, sym, "SELL", 0, px, f"Среднесрочная оценка упала до {sc}/100 — тренд сломан, освобождаем место ({ret*100:+.0f}%)."))
             elif px < high * 0.75 and ret > 0.2:
                 actions.append(self._act(now, sym, "SELL", 0, px, f"Откат 25% от максимума позиции при прибыли {ret*100:+.0f}% — забираем, перезайдём по новому сигналу."))
+        # --- 20.10 D10: top-up of BTC / ETH (and SOL if held as a mid pick) on a 10 % dip — after the exits, before new picks.
+        #     Other alts are never averaged down (see TOPUP: +17 % vs +39 %, drawdown −68 % vs −58 % on 2023–2026)
+        actions += self._topups(now, price, score, core, sma200 or {})
         pos = {p["symbol"]: p for p in self.positions()}
         # --- owner's trust list: on rebalance a preferred mid idea (score ≥ 60) replaces the weakest non-preferred satellite
         #     when it beats it by ≥ 10 points — the rules (stop −15 %, caps) stay the same, the owner only sets priorities
@@ -1123,8 +1271,9 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
         reset_spot(conn, now, px_all, memes)
     except Exception as e:  # noqa: BLE001
         print("spot reset failed (will retry next run):", e)
+    sma = sma200_map(now, price)          # 20.10: 200-day averages of BTC / ETH / SOL for the D10 top-up («prospects»)
     state = SpotPortfolio(conn).step(rows, picks([r for r in rows if r["symbol"] not in memes and not overheated(r.get("chg7"), r.get("chg30"))]),
-                                 btc_bull, now, memes=memes)
+                                 btc_bull, now, memes=memes, sma200=sma)
     state["reset"] = spot_reset_info(conn, "mod")
     note = market_note(btc_bull, btc, pk, state)
     llm_note = ""
@@ -1147,7 +1296,7 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
     # the other two risk profiles (conservative / high risk) run on the same prices; research cards come from web/research.json
     from .spot_profiles import RiskPortfolio, PROFILES as RP
     hl_movers = [{"symbol": k, **v} for k, v in hl_spot_list]
-    profiles = {"mod": {"key": "mod", "name": "Умеренный", "about": "Ядро BTC/ETH + до 5 среднесрочных идей по 8 % и до 3 коротких по 5 %; стоп −15 %, фиксация половины на +40 %, кэш ≥ 10 %. Без мемов и без монет после рывка (+40 % за 7 дней или +120 % за 30).",
+    profiles = {"mod": {"key": "mod", "name": "Умеренный", "about": "Ядро BTC/ETH + до 5 среднесрочных идей по 8 % и до 3 коротких по 5 %; стоп −15 %, фиксация половины на +40 %, кэш ≥ 10 %. Без мемов и без монет после рывка (+40 % за 7 дней или +120 % за 30). С 20.10: BTC и ETH (и SOL, если он в портфеле) докупаем на просадке — цена на 10 % ниже средней покупки и перспективы в порядке — +1/3 плановой доли, не больше 2 раз за 30 дней; альты на просадке не докупаем.",
                         **{k: state[k] for k in ("positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions", "reset")}}}
     for key in RP:
         try:
@@ -1167,7 +1316,7 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
     from .spot_profiles import IDEAS, IDEAS_ABOUT, IdeasPortfolio, load_ideas
     try:      # 6th: «По рекомендациям» — buys what the spot ideas table says (web/ideas.json of the PREVIOUS run: the ideas step runs
               # after this one); prices: the same live sources as the other profiles, the source a coin was bought with is kept
-        profiles["ideas"] = IdeasPortfolio(conn).step({"cg": price, "meme": meme_px, "hl": hl_px}, load_ideas(), now)
+        profiles["ideas"] = IdeasPortfolio(conn).step({"cg": price, "meme": meme_px, "hl": hl_px}, load_ideas(), now, sma200=sma)
     except Exception as e:  # noqa: BLE001
         profiles["ideas"] = {"key": "ideas", "name": IDEAS["name"], "about": IDEAS_ABOUT, "experiment": True, "error": str(e), **empty}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),

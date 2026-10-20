@@ -338,6 +338,10 @@ IDEAS_RULES = [
     "«можно добрать» — по 7.5%; всего не больше 8 монет вместе с ядром; «можно на небольшую сумму» — по 2.5%, не больше 3. Порядок — "
     "как в таблице. Одна покупка на монету: не доливаем и не усредняем, кроме ядра — его доливаем до плана, если доля упала ниже ¾ "
     "плана, а по понедельникам продаём лишнее, если доля выросла больше чем в 1.5 раза от плана.",
+    "Докупка ядра на просадке (с 20.10): раз в сутки, если BTC, ETH или SOL на 10% ниже средней цены покупки, в таблице «можно брать» "
+    "или «можно добрать» и перспективы в порядке (оценка консультанта от 60 или цена выше 200-дневной средней) — докупаем треть "
+    "плановой доли. Не больше 2 раз за 30 дней, доля не выше 1.5 плана, кэш не меньше 10%. Альты на просадке не докупаем: на "
+    "истории 2023–2026 это дало +17% против +39% без докупок и просадку −68% против −58%.",
     "Кэш не меньше 10%: покупку, после которой кэша стало бы меньше, пропускаем. Комиссия 0.1% с каждой покупки и продажи "
     "вычитается из счёта (10% и 2.5% — вместе с комиссией).",
     "Цена: живая цена сервера (CoinGecko, список мемов, спот Hyperliquid), и она отличается от цены в таблице не больше чем на 25% — "
@@ -559,9 +563,10 @@ class IdeasPortfolio:
         actions.append(self.rp._act(now, s, "TRIM", half, px, reason, fixes=(p["fixes"] or 0) + 1, last_fix=px))
         self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
 
-    def step(self, sources: dict, ideas: dict | None, now: int | None = None) -> dict:
+    def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None) -> dict:
         """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
-        "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas())."""
+        "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas()); `sma200` (20.10) —
+        {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map)."""
         now = now or int(time.time() * 1000)
         P, rp = IDEAS, self.rp
         src = {k: {str(s).upper(): float(v) for s, v in ((sources or {}).get(k) or {}).items() if _posnum(v)} for k in IDEAS_SRC}
@@ -678,7 +683,9 @@ class IdeasPortfolio:
                                                f"План: {s} {mw*100:.1f}% счёта — больше плановых {P['buy_w']*100:.1f}%; лишнее продаём, "
                                                "деньги идут в ядро — BTC главная монета портфеля.", None))
                         rp._set_cash(rp.cash() - (p["weight"] - neww) * price[s] / p["entry"] * P["fee"])
-            # core: trimmed back to plan at the Monday review when it grew past 1.5× the plan; topped up when under ¾ of it
+            # core: trimmed back to plan at the Monday review when it grew past 1.5× the plan; topped up when under ¾ of it.
+            # 20.10: while a D10 top-up is active (topup_extra:SYM) the plan is raised by it, so the trim goes back to the raised plan
+            self._topup_housekeeping(price, (ideas or {}).get("btc_bull"))
             V = self.value(price)
             for p in rp.positions():
                 s = p["symbol"]
@@ -688,7 +695,8 @@ class IdeasPortfolio:
                 T = core_target(s)
                 mw = p["weight"] * price[s] / p["entry"] / V
                 if weekly and mw > T * P["core_trim"]:
-                    neww = T * V * p["entry"] / price[s]
+                    te = min(1.5 * T, T + (rp._meta(f"topup_extra:{s}") or 0.0))
+                    neww = te * V * p["entry"] / price[s]
                     actions.append(rp._act(now, s, "TRIM", neww, price[s],
                                            f"Ядро: {s} {mw*100:.0f}% счёта — больше плана {T*100:.0f}% в {mw / T:.1f} раза; лишнее продаём "
                                            "(недельный пересмотр).", None))
@@ -704,8 +712,55 @@ class IdeasPortfolio:
                                        f"Ядро: {s} {mw*100:.0f}% счёта — доливаем до {T*100:.0f}% (ядро держим крупным, BTC — больше всех: "
                                        "в 2025–2026 он падал меньше ETH и SOL; на 2023–2026 BTC+ETH+SOL +239%, широкая корзина альтов −57%).", p["bucket"]))
                 rp._set_cash(rp.cash() - add * P["fee"])
+            # 20.10 D10 — «умное усреднение» ядра (portfolio.TOPUP, docs/research/spot_averaging.md): once a UTC day a core coin
+            # (BTC / ETH / SOL) 10 % below its average entry, table «можно брать / добрать», prospects OK (consultant mid ≥ 60 or price
+            # above its 200-day average) gets + 1/3 of its plan; ≤ 2 per 30 days, ≤ 1.5 × plan, cash ≥ 10 %. Alts are NEVER averaged
+            # down here («одна покупка на монету»): on 2023–2026 averaging alts gave +17 % vs +39 %, drawdown −68 % vs −58 %.
+            actions += self._topups(now, price, smap, sma200 or {}, live)
         self.conn.commit()
         return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
+
+    def _topup_housekeeping(self, price: dict, btc_bull) -> None:
+        """The raised plan of a topped-up core coin ends when its price is back at the average entry or the BTC regime flips."""
+        rp = self.rp
+        flip = False
+        if btc_bull is not None:
+            b = 1.0 if btc_bull else 0.0
+            flip = rp._meta("topup_bull") not in (None, b)
+            rp._set_meta("topup_bull", b)
+        held = {p["symbol"]: p for p in rp.positions()}
+        for (k,) in self.conn.execute(f"SELECT k FROM {rp.T_META} WHERE k LIKE 'topup_extra:%'").fetchall():
+            p = held.get(k.split(":", 1)[1])
+            if flip or not p or not p["entry"] or (price.get(p["symbol"]) or 0) >= p["entry"]:
+                self.conn.execute(f"DELETE FROM {rp.T_META} WHERE k=?", (k,))
+
+    def _topups(self, now: int, price: dict, smap: dict, sma200: dict, live: set) -> list[dict]:
+        """D10 for the core (BTC / ETH / SOL) — only on a live price of this run, never on a last-seen one."""
+        from .portfolio import DAY_MS, TOPUP, topup_decision
+        rp, P = self.rp, IDEAS
+        day = float(now // DAY_MS)
+        if rp._meta("topup_day") == day:
+            return []
+        rp._set_meta("topup_day", day)
+        out = []
+        for p in rp.positions():
+            s = p["symbol"]
+            kind, _ = self._split(p["bucket"])
+            row = smap.get(s) or {}
+            if (kind != "core" or s not in TOPUP["coins"] or s not in price or s not in live or not p["entry"]
+                    or row.get("status") not in ("buy", "add")):
+                continue
+            V = self.value(price)
+            n = self.conn.execute(f"SELECT COUNT(*) FROM {rp.T_ACT} WHERE symbol=? AND action='ADD' AND reason LIKE ? AND time>=?",
+                                  (s, TOPUP["prefix"] + "%", now - TOPUP["window_d"] * DAY_MS)).fetchone()[0]
+            dec = topup_decision(s, price[s], p["entry"], core_target(s), self._mv(p, price[s]), V, rp.cash(), n,
+                                 (row.get("consultant") or {}).get("mid"), sma200.get(s), fee=P["fee"])
+            if dec["add"] <= 0:
+                continue
+            out.append(rp._act(now, s, "ADD", p["weight"] + dec["add"], price[s], dec["reason"], p["bucket"]))
+            rp._set_cash(rp.cash() - dec["add"] * P["fee"])
+            rp._set_meta(f"topup_extra:{s}", (rp._meta(f"topup_extra:{s}") or 0.0) + dec["add"] / V)
+        return out
 
     def snapshot(self, price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas) -> dict:
         rp, P = self.rp, IDEAS

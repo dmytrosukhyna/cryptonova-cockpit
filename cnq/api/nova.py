@@ -201,7 +201,7 @@ def tidy(txt: str, cut: bool = False) -> str:
     t = re.sub(r"`([^`]*)`", r"\1", t)
     t = re.sub(r"^\s*[-*–]\s+", "• ", t, flags=re.M)                           # list markers → «•»
     t = re.sub(r"\[([^\]]+)\]\((?:https?://)?[^)]+\)", r"\1", t)                 # markdown links → their text
-    t = re.sub("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F\u200D]", "", t)    # emoji
+    t = re.sub("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F\u200B-\u200D\u2060]", "", t)    # emoji, zero-width
     t = re.sub(r"[ \t]+\n", "\n", re.sub(r"\n{3,}", "\n\n", t)).strip()
     if cut:                                   # stopped by max_tokens: keep the full sentences, or nothing (→ FAQ / «busy»)
         ends = _ends(t[:ANSWER_MAX])

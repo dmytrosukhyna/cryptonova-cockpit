@@ -262,6 +262,7 @@ def test_tidy_plain_text_for_voice():
     assert nova.tidy("Первое предложение. Второе обрывается на сере", cut=True) == "Первое предложение."
     assert nova.tidy("Обрыв без единой точки и на сере", cut=True) == ""
     assert len(nova.tidy("Слово. " * 400)) <= nova.ANSWER_MAX
+    assert nova.tidy("Futures +\u200b$186, Spot \u2212\u200b$90.") == "Futures +$186, Spot \u2212$90."     # zero-width (seen 20.10)
 
 
 def test_nova_can_have_its_own_key(monkeypatch):

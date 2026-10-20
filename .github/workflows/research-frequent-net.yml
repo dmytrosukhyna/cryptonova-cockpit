@@ -44,6 +44,9 @@ jobs:
       - name: D (3-sigma 15m drop) + E (5-day breakout on volume)
         if: ${{ !cancelled() }}
         run: python scripts/research/frequent_net.py analyze fnet D,E
+      - name: A3 neighbours (volume mark 1.3 / 1.7 / 2.0, maker entry)
+        if: ${{ !cancelled() }}
+        run: python scripts/research/frequent_net.py analyze fnet A3X
       - name: REF (the own desk today, same data and costs)
         if: ${{ !cancelled() }}
         run: python scripts/research/frequent_net.py analyze fnet REF

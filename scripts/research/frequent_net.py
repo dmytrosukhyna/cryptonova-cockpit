@@ -394,8 +394,11 @@ def spec_list(only):
     def add(setup, name, **kw):
         if not only or setup in only:
             S.append(dict(setup=setup, name=name, **kw))
-    for nm, mode, vol in (("A1", "mkt", False), ("A2", "lim", False), ("A3", "mkt", True)):
+    for nm, mode, vol in (("A1", "mkt", 0), ("A2", "lim", 0), ("A3", "mkt", 1.5)):
         add("A", nm, rule="A", g=16, side=1, mode=mode, vol=vol, life=16)
+    # round 2 — the neighbours of A3, the only near-pass of round 1: other volume marks and a maker entry
+    for nm, mode, vol in (("A3v13", "mkt", 1.3), ("A3v17", "mkt", 1.7), ("A3v20", "mkt", 2.0), ("A4", "lim", 1.5)):
+        add("A3X", nm, rule="A", g=16, side=1, mode=mode, vol=vol, life=16)
     for nm, mode, k in (("B1", "mkt", 1.5), ("B2", "lim", 1.5), ("B3", "mkt", 2.5)):
         add("B", nm, rule="B", g=4, side=1, mode=mode, k=k, life=4)
     for nm, mode, ex, side in (("C1t", "mkt", "trail", 1), ("C1b", "mkt", "bracket", 1), ("C2b", "lim", "bracket", 1),
@@ -423,7 +426,7 @@ def build(cd, sp, nb):
         if rule == "A":
             sig = (c > X["s50"]) & (X["s50"] > shift(X["s50"], 5)) & (X["rsi2"] < 10)
             if sp["vol"]:
-                sig &= v >= 1.5 * roll_mean(v, 180)
+                sig &= v >= sp["vol"] * roll_mean(v, 180)
             stop = np.clip(2.5 * atrp, 1.5, 10)
             mx = 10 * 16
             ex = np.flatnonzero(c > X["s5"])
@@ -521,6 +524,10 @@ class Ctx:
         self.rank[:, okp] = Z["rank"][:, pos[okp]]
         self.jtest = (TEST - START) // BAR
         self.days_test = (self.nend - self.jtest) / 96
+        self.year_days = {}
+        for d in range(self.jtest // 96, self.nend // 96):
+            y = dt.datetime.fromtimestamp((START + d * DAY) / 1000, dt.timezone.utc).strftime("%Y")
+            self.year_days[y] = self.year_days.get(y, 0) + 1
         self.bull_days = float(np.sum(self.bull[np.arange(self.jtest // 96, self.nend // 96) - 1] == 1))
         self.mon = np.array([int(dt.datetime.fromtimestamp(x / 1000, dt.timezone.utc).strftime("%Y%m")) for x in gd])
 
@@ -652,6 +659,8 @@ def stats(ctx, name, trades, rnd, nofill, ncand, coins_c):
         "tpd_bull": round(len(taken) / max(1.0, ctx.bull_days if sp_side(taken) == 1 else ctx.days_test - ctx.bull_days), 2),
         "best_m_share": round(float(m_usd.max()) / total * 100, 1) if total > 0 else None,
         "best_m": months[int(np.argmax(m_usd))] if len(months) else None, "months_plus": round(float((m_usd > 0).mean()) * 100),
+        "m_usd": {m: round(float(x)) for m, x in zip(months, m_usd)} if name.startswith(("A3", "A4")) else None,
+        "tpd_y": {y: round(int((yr == y).sum()) / max(1.0, ctx.year_days.get(y, 1)), 2) for y in YEARS},
         "kinds": kinds, "t_stat": round(float(net.mean() / (net.std() + 1e-12) * np.sqrt(len(net))), 2),
     }
     res["pass"] = {"avg>=0.25": res["avg"] >= 0.25, "years+": all(res["y_pct"][y] > 0 for y in YEARS),
@@ -690,7 +699,7 @@ def analyze(path, only):
         json.dump(out, f, ensure_ascii=False)
     short = {k: [v.get("tpd"), v.get("win"), v.get("avg"), v.get("rand"), v.get("dd"), [v.get("y_pct", {}).get(y) for y in YEARS],
                  v.get("best_m_share"), v.get("user_usd"), v.get("ref20"), v.get("ref50"), v.get("PASS")] for k, v in out.items()}
-    publish(f"fnet · summary {only or 'all'} [a day, win %, avg %, random %, dd %, 2023…2026 %, best month share %, user $, ref 20 %, ref 50 %, pass]", short)
+    publish(f"fnet · summary {(only or 'all').replace(',', '+')} [a day / win % / avg % / random % / dd % / 2023…2026 % / best month share % / user $ / ref 20 % / ref 50 % / pass]", short)
 
 
 def costs(path):
@@ -711,11 +720,12 @@ def costs(path):
             y = dt.datetime.fromtimestamp((START + int(d) * DAY) / 1000, dt.timezone.utc).strftime("%Y")
             reg = "bull" if ctx.bull[d - 1] == 1 else "other"
             acc.setdefault((y, reg), []).append(day_sum)
-    out = {f"{y} {reg}": [round(float(np.mean(v)) / 3 * 100, 4), len(v)] for (y, reg), v in sorted(acc.items())}
+    out = {f"{y} {reg}": [round(float(np.mean(v)) / 3 * 100, 4), round(float(np.median(v)) / 3 * 100, 4), len(v)]
+           for (y, reg), v in sorted(acc.items())}
     allb = [x for (y, reg), v in acc.items() if reg == "bull" for x in v]
     allo = [x for (y, reg), v in acc.items() if reg == "other" for x in v]
-    out["all bull"] = [round(float(np.mean(allb)) / 3 * 100, 4), len(allb)] if allb else None
-    out["all other"] = [round(float(np.mean(allo)) / 3 * 100, 4), len(allo)] if allo else None
+    out["all bull"] = [round(float(np.mean(allb)) / 3 * 100, 4), round(float(np.median(allb)) / 3 * 100, 4), len(allb)] if allb else None
+    out["all other"] = [round(float(np.mean(allo)) / 3 * 100, 4), round(float(np.median(allo)) / 3 * 100, 4), len(allo)] if allo else None
     bd = ctx.bull[ctx.jtest // 96: ctx.nend // 96]
     out["bull_share_days_%"] = round(float(np.nanmean(bd == 1)) * 100, 1)
     yrs = {}
@@ -724,7 +734,7 @@ def costs(path):
         yrs.setdefault(y, []).append(ctx.bull[d - 1] == 1)
     out["bull_days_by_year_%"] = {y: round(float(np.mean(v)) * 100) for y, v in yrs.items()}
     out["test_days"] = round(ctx.days_test, 1)
-    publish("fnet · funding % per 8 h for a long, top 40 [mean, coin-days]", out)
+    publish("fnet · funding % per 8 h for a long in the top 40 [mean / median / coin-days]", out)
 
 
 if __name__ == "__main__":

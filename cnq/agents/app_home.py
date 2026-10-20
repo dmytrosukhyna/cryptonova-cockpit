@@ -520,12 +520,35 @@ def btc_daily(conn: sqlite3.Connection | None, out: str) -> dict:
             "about_ru": "Дневные закрытия биткоина (UTC). day = номер дня от 1970-01-01; closes[i] — закрытие дня start_day + i."}
 
 
+def _public_portfolio(out: str) -> dict | None:
+    """The public portfolio of the app (owner 20.10: «нашу лучшую версию… полностью распределить $10 000, как на практике»):
+    «CRYPTO NOVA Портфолио», its main «balanced» model (web/capital.json) — one $10 000 demo account spread over 7 sources
+    by the regime allocator. curve = $ earned since the start. None while capital.json is missing → the app falls back to
+    the two $10 000 demo accounts (futures + spot)."""
+    c = _load(out, "capital.json")
+    start, value, started = c.get("start_usd"), c.get("value_usd"), c.get("started")
+    if not isinstance(start, (int, float)) or not isinstance(value, (int, float)) or not started or start <= 0:
+        return None
+    hist = [h for h in c.get("history") or [] if isinstance(h, list) and len(h) >= 2 and isinstance(h[1], (int, float))]
+    step = max(1, len(hist) // 240)
+    pts = hist[::step]
+    if hist and pts[-1] is not hist[-1]:
+        pts.append(hist[-1])                                   # always end on the latest value
+    curve = [[int(h[0]), round(float(h[1]) - start, 2)] for h in pts]
+    sleeves = [{"key": x.get("key"), "share": _r(x.get("share_now") if x.get("share_now") is not None else x.get("weight"), 4),
+                "usd": _r(x.get("value_usd"), 2)} for x in c.get("sleeves") or [] if isinstance(x, dict) and x.get("key")]
+    return {"model": "balanced", "start_usd": round(float(start), 2), "since": int(started), "value_usd": round(float(value), 2),
+            "pnl_usd": round(float(value) - start, 2), "pnl_pct": _r(c.get("pnl_pct"), 2), "curve": curve, "sleeves": sleeves,
+            "regime": (c.get("regime") or {}).get("key")}
+
+
 def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT) -> dict:
     """app_home in one language — the same numbers in every language, only the words differ"""
     fut, spot = _futures(paper, now, lang), _spot(pf, lang)
-    total = round((fut["usd"] or 0) + (spot["usd"] or 0), 2)
+    pub = _public_portfolio(out)
+    total = pub["pnl_usd"] if pub else round((fut["usd"] or 0) + (spot["usd"] or 0), 2)
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
-            "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]},
+            "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub,
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
             "market": _market(mk), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),

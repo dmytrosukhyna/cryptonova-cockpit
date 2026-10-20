@@ -114,6 +114,14 @@ def _open_row(o: dict, src: str) -> dict:
             "expires": o.get("expires"), "why": why, "src": src, "src_ru": rule or SRC_RU.get(src, "CRYPTO NOVA")}
 
 
+def _kyiv():
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("Europe/Kyiv")
+    except Exception:  # noqa: BLE001
+        return dt.timezone(dt.timedelta(hours=3))
+
+
 def _status(bal_open: int, closed: list, opened: list) -> str | None:
     """what the main strategy is doing, in one calm line (shown when it has nothing open)"""
     if bal_open:
@@ -121,7 +129,7 @@ def _status(bal_open: int, closed: list, opened: list) -> str | None:
     last = closed[0] if closed else None
     tail = ""
     if last and last.get("pnl_usd") is not None:
-        d = dt.datetime.fromtimestamp((last.get("closed") or 0) / 1000, dt.timezone(dt.timedelta(hours=3)))
+        d = dt.datetime.fromtimestamp((last.get("closed") or 0) / 1000, _kyiv())
         tail = f" Последняя сделка: {last['sym']}, {'+' if last['pnl_usd'] >= 0 else '−'}${abs(last['pnl_usd']):.0f}, {d:%d.%m}."
     other = len(opened)
     word = "сделка" if other % 10 == 1 and other % 100 != 11 else \

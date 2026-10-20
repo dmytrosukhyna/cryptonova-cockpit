@@ -39,7 +39,7 @@ def test_channel_templates_slots_and_guard():
     assert r2["sent"] and "Приток в ETF" in sent[-1]
     r3 = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=15))
     assert not r3["sent"] and r3["why"] == "nothing worth posting"                    # the only strong news is used up
-    ev = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=20))
+    ev = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=21, minute=40))   # 20.10: the evening slot opens at 21:30
     assert ev["sent"] and "Итоги дня" in sent[-1] and "Утром ставили сценарий A (78%)" in sent[-1]
     # number guard: an invented figure is rejected, faithful text passes
     facts = ch.facts(ch.ctx(), now)
@@ -119,3 +119,12 @@ def test_news_post_may_not_claim_a_fall_the_market_does_not_show():
     assert Channel.minor_enforcement(n, {"title_en": "Chinese suspect in $75M crime network arrested"})
     assert not Channel.minor_enforcement({"title": "ETF на биткоин одобрен", "strength": "4/5"}, {})
     assert not Channel.minor_enforcement({"title": "Взлом биржи на $1.4 млрд", "strength": "3/5"}, {"title_en": "Exchange hacked, $1.4B stolen, suspect arrested"})
+
+
+def test_evening_slot_opens_at_2130_kyiv():
+    import datetime as dt
+    from cnq.agents.channel import KYIV, slot_for
+    at = lambda h, m: dt.datetime(2026, 10, 20, h, m, tzinfo=KYIV)
+    assert slot_for(at(20, 30)) is None and slot_for(at(21, 29)) is None
+    assert slot_for(at(21, 30)) == "evening" and slot_for(at(22, 59)) == "evening" and slot_for(at(23, 0)) is None
+    assert slot_for(at(8, 0)) == "morning" and slot_for(at(11, 0)) == "news1"

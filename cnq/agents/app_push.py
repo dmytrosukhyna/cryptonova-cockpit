@@ -17,7 +17,11 @@ import os
 import sqlite3
 import time
 
-KYIV = dt.timezone(dt.timedelta(hours=3))
+try:                                  # Kyiv time with summer / winter time (UTC+3 / UTC+2)
+    from zoneinfo import ZoneInfo
+    KYIV = ZoneInfo("Europe/Kyiv")
+except Exception:  # noqa: BLE001
+    KYIV = dt.timezone(dt.timedelta(hours=3))
 QUIET = (22, 9)
 TRADE_CAP = 6
 BIG_MOVE = 5.0          # % in 24 h that counts as «важное на рынке»

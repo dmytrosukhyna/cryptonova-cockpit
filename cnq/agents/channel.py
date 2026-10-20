@@ -22,7 +22,10 @@ try:
 except Exception:  # noqa: BLE001
     KYIV = dt.timezone(dt.timedelta(hours=3))
 
-SLOTS = {"morning": (8, 10), "news1": (11, 13), "news2": (15, 17), "evening": (20, 22)}
+# 20.10 (owner: «итоги дня приходят очень рано, в 8 вечера ещё ничего не понятно … хотя бы в 9:30 по Киеву»): the evening slot
+# opens at 21:30 Kyiv; values are (start hour, end hour) and SLOT_START_MIN holds a start minute when it is not :00.
+SLOTS = {"morning": (8, 10), "news1": (11, 13), "news2": (15, 17), "evening": (21, 23)}
+SLOT_START_MIN = {"evening": 30}
 SIGN = ""
 
 CAT_MECH = {
@@ -112,7 +115,7 @@ def kyiv_now(now_ms: int | None = None) -> dt.datetime:
 
 def slot_for(now: dt.datetime) -> str | None:
     for k, (a, b) in SLOTS.items():
-        if a <= now.hour < b:
+        if (a, SLOT_START_MIN.get(k, 0)) <= (now.hour, now.minute) and now.hour < b:
             return k
     return None
 

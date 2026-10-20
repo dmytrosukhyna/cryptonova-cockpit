@@ -496,9 +496,15 @@ def _config(out: str) -> dict:
     """web/app_config.json (in git): what the app may change without a new App Store version — the exchange partner link"""
     c = _load(out, "app_config.json")
     ref = c.get("exchange_ref")
+    # the public portfolio's caption per language {"ru": {"title", "sub", "note"}, …}; empty = the app's own honest default
+    # (fill it only when it is true — e.g. the day the owner's real money is connected, with that day's date)
+    pf = c.get("portfolio") if isinstance(c.get("portfolio"), dict) else {}
+    pf = {lang: {k: str(v) for k, v in t.items() if k in ("title", "sub", "note") and v}
+          for lang, t in pf.items() if isinstance(lang, str) and isinstance(t, dict)}
     return {"exchange_name": c.get("exchange_name") or "BingX",
             "exchange_ref": ref if isinstance(ref, str) and ref.startswith("https://") else None,
-            "exchange_trade_url": c.get("exchange_trade_url")}
+            "exchange_trade_url": c.get("exchange_trade_url"),
+            "portfolio": {k: v for k, v in pf.items() if v}}
 
 
 def btc_daily(conn: sqlite3.Connection | None, out: str) -> dict:

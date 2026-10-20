@@ -1,6 +1,7 @@
 {
-  "about_ru": "Настройки приложения 2.0, которые можно менять без новой версии в App Store: ссылка на биржу. Пустая ссылка — приложение открывает обычный сайт биржи.",
+  "about_ru": "Настройки приложения 2.0, которые можно менять без новой версии в App Store: ссылка на биржу и подпись публичного портфеля. Пустая ссылка — приложение открывает обычный сайт биржи. portfolio по языкам (ru, en, uk, el, es: title, sub, note) — заполнять только правдой: пока счёт демо, оставить пустым.",
   "exchange_name": "BingX",
   "exchange_ref": null,
-  "exchange_trade_url": "https://bingx.com/en/perpetual/{SYM}-USDT/"
+  "exchange_trade_url": "https://bingx.com/en/perpetual/{SYM}-USDT/",
+  "portfolio": {}
 }

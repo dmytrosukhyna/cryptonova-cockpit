@@ -1,0 +1,28 @@
+name: server-watch
+# 20.10.2026: watch the server's engine from outside — /v2/diag every 10 s for a few minutes; prints a timeline of
+# (process start, current step, seconds in it, status age) so a restart loop or a stuck step is visible without logging in.
+on:
+  workflow_dispatch:
+    inputs:
+      minutes: { description: "how long to watch", default: "6" }
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Poll /v2/diag
+        run: |
+          end=$(( $(date +%s) + ${{ github.event.inputs.minutes }} * 60 ))
+          : > tl.txt
+          while [ "$(date +%s)" -lt "$end" ]; do
+            d=$(curl -sS -m 8 https://app.crypto-capital.app/v2/diag || echo '{}')
+            echo "$(date -u +%H:%M:%S) $(echo "$d" | jq -c '{st: .engine_started_age_sec, step: .engine_step, in: .engine_step_sec, status_age: .engine_age_sec, cycle: .engine_cycle, err: .engine_errors}' 2>/dev/null)" | tee -a tl.txt
+            sleep 10
+          done
+          # notices: the lines where the process or the step changed (max 10 notices per step → pack them)
+          awk '{k=$0; sub(/^[^ ]+ /,"",k); split(k,a,","); key=a[2]; if (key!=prev) {print; prev=key}}' tl.txt > changes.txt
+          i=0; chunk=""
+          while IFS= read -r l; do chunk="$chunk$l  ||  "; i=$((i+1)); if [ $i -ge 6 ]; then echo "::notice title=engine::$chunk"; chunk=""; i=0; fi; done < changes.txt
+          [ -n "$chunk" ] && echo "::notice title=engine::$chunk"
+          echo "::notice title=last::$(tail -n 1 tl.txt)"

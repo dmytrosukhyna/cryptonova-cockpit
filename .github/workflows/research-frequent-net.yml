@@ -1,0 +1,49 @@
+name: research-frequent-net
+# Manual only. «Чуть-чуть больше сделок … даже на небольшом плюсе» (owner, 20.10): faster setups (4h / 1h / 15m / daily) on the
+# point-in-time top 40 Binance perps (delisted included), 15m paths, BingX costs + real funding (scripts/research/frequent_net.py).
+# The data (~all perps' daily candles → top 40 → 15m + funding) is cached between runs; results are published as annotations.
+on:
+  workflow_dispatch:
+    inputs:
+      refetch:
+        description: "yes = rebuild the cached data"
+        required: false
+        default: "no"
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - uses: actions/cache/restore@v4
+        id: cache
+        if: inputs.refetch != 'yes'
+        with: { path: fnet, key: frequent-net-data-v1-none, restore-keys: frequent-net-data-v1- }
+      - name: Data (every perp → point-in-time top 40 → 15m + funding)
+        if: steps.cache.outputs.cache-matched-key == ''
+        run: python scripts/research/frequent_net.py fetch fnet
+      - uses: actions/cache/save@v4
+        if: steps.cache.outputs.cache-matched-key == ''
+        with: { path: fnet, key: "frequent-net-data-v1-${{ github.run_id }}" }
+      - name: Funding a long pays
+        if: ${{ !cancelled() }}
+        run: python scripts/research/frequent_net.py costs fnet
+      - name: A (4h pullback) + B (1h pullback, 1R bracket)
+        if: ${{ !cancelled() }}
+        run: python scripts/research/frequent_net.py analyze fnet A,B
+      - name: C (2-day breakout on volume)
+        if: ${{ !cancelled() }}
+        run: python scripts/research/frequent_net.py analyze fnet C
+      - name: D (3-sigma 15m drop) + E (5-day breakout on volume)
+        if: ${{ !cancelled() }}
+        run: python scripts/research/frequent_net.py analyze fnet D,E
+      - name: REF (the own desk today, same data and costs)
+        if: ${{ !cancelled() }}
+        run: python scripts/research/frequent_net.py analyze fnet REF

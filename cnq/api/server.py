@@ -129,6 +129,12 @@ class Api:
                 out[key] = int(v) // (1024 * 1024) if v.isdigit() else v
             except OSError:
                 pass
+        try:                                        # what fills the account: programs (anon) or the file cache (file, dirty, writeback)
+            st = dict(ln.split() for ln in open(os.path.join(cg, "memory.stat"), encoding="utf-8").read().splitlines() if ln.strip())
+            out["engine_mem_stat_mb"] = {k: int(st[k]) // (1024 * 1024) for k in ("anon", "file", "file_dirty", "file_writeback", "shmem",
+                                                                                  "kernel", "sock") if k in st}
+        except Exception:  # noqa: BLE001
+            pass
         try:
             ev = dict(ln.split() for ln in open(os.path.join(cg, "memory.events"), encoding="utf-8").read().splitlines() if ln.strip())
             out["engine_oom_kills"] = int(ev.get("oom_kill", 0))

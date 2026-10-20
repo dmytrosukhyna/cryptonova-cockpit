@@ -463,7 +463,7 @@ def run(path: str, from15m: bool, name: str) -> dict:
     # path noise (added after the first run, NOT a pass criterion): the same rules with the weekly review on each weekday —
     # a portfolio that picks coins drifts onto a different path after any small change, so a gain smaller than this spread is noise
     noise = {}
-    for v in ["A", "B"] + [pick[f] for f in "CDE"]:
+    for v in dict.fromkeys(["A", "B"] + [pick[f] for f in "CDE"] + ["C10", "E10"]):     # C10 / E10 = averaging the alts too
         noise[v] = [round((simulate(F, j0, j1, v, cache, wd)["eq"][-1] / START_CAP - 1) * 100, 1) for wd in range(7)]
     noise_beats = {v: sum(1 for x, y in zip(noise[v], noise["A"]) if x > y) for v in noise if v != "A"}
     days_used = [ymd(int(days[j0])), ymd(int(days[j1]))]

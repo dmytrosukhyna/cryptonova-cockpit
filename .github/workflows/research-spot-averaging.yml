@@ -1,0 +1,66 @@
+name: research-spot-averaging
+# Manual only. «Умное усреднение» в спот-портфеле — docs/research/spot_averaging.md:
+#   data — daily closes + volume of every Binance spot USDT pair (delisted included) from data.binance.vision
+#          (scripts/fetch_spot1d.py) → artifact spot1d + release asset lab-data-spot1d/spot1d.npz (the research container
+#          can download releases, not workflow artifacts)
+#   test — scripts/spot_averaging_test.py on that file; results as the job summary + ::notice annotations
+#   all  — data, then test
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "data | test | all"
+        required: true
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  data:
+    if: inputs.stage == 'data' || inputs.stage == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - run: python scripts/fetch_spot1d.py --out spot1d.npz
+      - uses: actions/upload-artifact@v4
+        with: { name: spot1d, path: spot1d.npz, retention-days: 7 }
+      - name: Upload spot1d.npz to release lab-data-spot1d
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: lab-data-spot1d
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Research data (not code): daily closes + quote volume of every Binance spot USDT pair, delisted included, from data.binance.vision (scripts/fetch_spot1d.py)." --latest=false
+          gh release upload "$TAG" spot1d.npz --clobber
+
+  test:
+    needs: data
+    if: always() && (inputs.stage == 'test' || (inputs.stage == 'all' && needs.data.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install numpy
+      - uses: actions/download-artifact@v4
+        if: inputs.stage == 'all'
+        with: { name: spot1d }
+      - name: Release copy of the data
+        if: inputs.stage == 'test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download lab-data-spot1d -p spot1d.npz -R "${{ github.repository }}"
+      - run: python scripts/spot_averaging_test.py spot1d.npz --name "Спот Binance" --md results.md --json results.json
+      - name: Publish results
+        if: always()
+        run: |
+          test -f results.md || exit 0
+          cat results.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/spot_averaging_test.py --annotate results.md

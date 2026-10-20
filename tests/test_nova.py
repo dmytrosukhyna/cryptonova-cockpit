@@ -232,7 +232,7 @@ def test_knowledge_files():
     for f in facts:
         assert f["date"] and f["source"].startswith("https://") and f.get("source_date"), f["id"]
     samsung = next(f for f in facts if f["id"] == "samsung_usdc")["fact"]
-    assert "82 млн устройств" in samsung and "платить криптой" not in samsung and "USDC" in samsung
+    assert "82 млн устройств" in samsung and "платить криптой" not in samsung and "USDC" in samsung and "пока нельзя" in samsung
     assert 25 <= len(faq) <= 40 and len({i["q"] for i in faq}) == len(faq)
     for q in OWNER_QUESTIONS:
         assert k.match(q) and k.match(q)["q"] == q, q

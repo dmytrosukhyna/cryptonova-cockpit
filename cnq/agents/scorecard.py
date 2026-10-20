@@ -554,8 +554,8 @@ def resolve_all(preds: list[dict], done: set, prices: Prices, feeds: dict, now: 
 def prob(pred: dict) -> float | None:
     """the probability a line states for its event. News: the analyst names a direction and a confidence c (0 … 1); read as
     «the direction is right» with p = 0.5 + c/2 — c = 0 is a coin flip, c = 1 is certainty, and a weak bullish call is never
-    counted as a bet on a fall. news.py's own table reads p = c; on the 168 calls checked by 20.10 that reading gave the calls a
-    BETTER Brier (0.284 vs 0.301), so this choice does not flatter them."""
+    counted as a bet on a fall. news.py's own table reads p = c; on the 184 calls the server checked on 20.10 that reading gave the
+    calls a BETTER Brier (0.284 vs 0.316), so this choice does not flatter them."""
     if pred.get("ev") == "neutral":
         return None
     if pred.get("src") == "news":

@@ -41,6 +41,9 @@ def monthly(points: list) -> dict:
     for t, v in points:
         last[ym(t)] = v
         first = first if first is not None else v
+    ms = sorted(last)
+    for m in TS.months_between(ms[0], ms[-1]):     # a month with no exit (listing short) = 0 %, not folded into the next one
+        last.setdefault(m, last[max(k for k in ms if k <= m)])
     out, prev = {}, first
     for m in sorted(last):
         out[m] = last[m] / prev - 1 if prev > 0 else -1.0

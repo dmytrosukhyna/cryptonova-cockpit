@@ -35,7 +35,7 @@ Setups (longs in «рост» unless noted; one position per coin and rule):
      volume ≥ 1.5× its 30-day average; out on a close below the previous day's low, stop 2.5 ATR (3–15 %), 14 days.
      E1 market, E2 limit at the signal close (1 day).
   REF the own desk today (P + B20 with the volume mark, daily) on the same data and costs — the yardstick.
-Every rule is compared with a random entry: same coin, month, regime, side, mode and exit geometry. Stdlib + numpy."""
+Every rule is compared with a random entry: same coin, year, regime (and top 40), side, mode and exit geometry. Stdlib + numpy."""
 import datetime as dt
 import io
 import json
@@ -568,14 +568,14 @@ def run_coin(ctx, cd, sp):
         busy = r["jx"]
         r["a"], r["k"] = cd.a, int(k)
         out.append(r)
-    # random entries: same coin, month, regime, side, mode and exit geometry (stop / target / trail %, hold, rule exits)
+    # random entries: same coin, year, regime, side, mode and exit geometry (stop / target / trail %, hold, rule exits)
     if out:
         cand = np.arange(ctx.jtest // g + 1, ctx.nend // g - 1) * g
         cand = cand[ctx.gate_ok(cd.a, cand, side) & np.isfinite(cd.o[cand]) & np.isfinite(cd.c[cand - 1])]
         if len(cand):
-            mon_c = ctx.mon[cand // 96]                       # time-sorted → months are contiguous
+            mon_c = ctx.mon[cand // 96] // 100                # the year (house style: same coin, side, year); time-sorted
             for r in out:
-                mk = ctx.mon[r["jf"] // 96]
+                mk = ctx.mon[r["jf"] // 96] // 100
                 pool = cand[np.searchsorted(mon_c, mk, "left"):np.searchsorted(mon_c, mk, "right")]
                 if not len(pool):
                     continue

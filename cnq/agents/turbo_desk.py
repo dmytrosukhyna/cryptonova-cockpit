@@ -43,11 +43,35 @@ def _load(out: str, name: str) -> dict:
         return {}
 
 
-def btc_state(out: str) -> tuple[float | None, bool | None]:
+def fresh_btc(candles_db: str | None, after: int) -> float | None:
+    """The latest BTC 15m close from the engine's candle store (updated every minute), if newer than `after` (ms).
+    decision.json is refreshed only every 15–30 min, so without this the ×2 account was marked to a stale price."""
+    if not candles_db or not os.path.exists(candles_db):
+        return None
+    try:
+        c = sqlite3.connect(f"file:{candles_db}?mode=ro", uri=True, timeout=5)
+        try:
+            r = c.execute("SELECT close, close_time, open_time FROM candles WHERE symbol='BTC-USDT' AND interval='15m' "
+                          "ORDER BY open_time DESC LIMIT 1").fetchone()
+        finally:
+            c.close()
+    except Exception:  # noqa: BLE001
+        return None
+    if not r or not r[0]:
+        return None
+    t = min(int(r[1] or 0), int(time.time() * 1000)) if r[1] else int(r[2] or 0)
+    return float(r[0]) if t > after else None
+
+
+def btc_state(out: str, candles_db: str | None = None) -> tuple[float | None, bool | None]:
     dec = _load(out, "decision.json")
     b = next((c for c in dec.get("coins") or [] if str(c.get("symbol", "")).startswith("BTC")), None) or {}
     rg = b.get("regime") or {}
     px, sma, r60 = b.get("price"), rg.get("sma200"), rg.get("r60")
+    fx = fresh_btc(candles_db, int(dec.get("time") or dec.get("asof") or 0))
+    if fx and px and r60 is not None:                       # r60 moves with the price; rescale it to the fresher close
+        r60 = (1 + r60) * fx / float(px) - 1
+    px = fx or px
     if px and sma and r60 is not None:
         return float(px), bool(px > sma and r60 > 0)
     for r in _load(out, "markets.json").get("top") or []:
@@ -82,7 +106,7 @@ def _doc(key: str, equity: float, hist: list, now: int, extra: dict) -> dict:
             "month_pct": _month_pct(hist, now), "target_month_pct": TARGET_MONTH_PCT, **extra}
 
 
-def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> dict:
+def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None, candles_db: str | None = None) -> dict:
     now = now or int(time.time() * 1000)
     conn.execute("CREATE TABLE IF NOT EXISTS turbo_state(k TEXT PRIMARY KEY, v TEXT)")
     conn.execute("CREATE TABLE IF NOT EXISTS turbo_hist(desk TEXT, time INTEGER, equity REAL, PRIMARY KEY(desk, time))")
@@ -107,7 +131,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
         d["equity"] = round(eq_closed, 2)
         docs["lstx"] = d
     # ---- btcx: BTC ×2 while the regime says «рост» ----
-    px, bull = btc_state(out)
+    px, bull = btc_state(out, candles_db)
     b = st.get("btcx") or {"equity": START, "px": None, "on": False, "t": now}
     if px:
         dt_ms = max(0, now - b["t"])
@@ -134,8 +158,8 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     return docs
 
 
-def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> dict:
-    docs = step(conn, out, now)
+def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, candles_db: str | None = None) -> dict:
+    docs = step(conn, out, now, candles_db)
     p = os.path.join(out, "paper.json")
     try:
         paper = json.load(open(p, encoding="utf-8"))

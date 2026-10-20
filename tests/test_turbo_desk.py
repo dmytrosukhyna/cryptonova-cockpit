@@ -36,3 +36,20 @@ def test_turbo_listing_mirror_is_four_times_the_base_and_btc_x2_follows_the_regi
     assert abs(e / c["btcx"]["equity"] - 1) < 1e-4
     p = json.load(open(os.path.join(d, "paper.json")))
     assert {"lstx", "btcx", "lst"} <= set(p["profiles"]) and {x["key"] for x in p["profile_list"]} == {"lstx", "btcx"}
+
+
+def test_btc_x2_marks_to_the_fresher_engine_candle_not_the_stale_decision_price():
+    d = tempfile.mkdtemp()
+    files(d)                                                          # decision.json: BTC 80 000, no `time` → any candle is newer
+    db = os.path.join(d, "cnq.sqlite")
+    c = sqlite3.connect(db)
+    c.execute("CREATE TABLE candles(symbol TEXT, interval TEXT, open_time INTEGER, open REAL, high REAL, low REAL, close REAL, "
+              "volume REAL, close_time INTEGER)")
+    c.execute("INSERT INTO candles VALUES('BTC-USDT','15m',?,0,0,0,84000,0,?)", (T0, T0 + 899_999))
+    c.commit(); c.close()
+    px, bull = TD.btc_state(d, db)
+    assert px == 84_000.0 and bull is True
+    json.dump({"time": T0 + H, "coins": [{"symbol": "BTC-USDT", "price": 80_000.0, "regime": {"sma200": 70_000.0, "r60": 0.1}}]},
+              open(os.path.join(d, "decision.json"), "w"))
+    assert TD.btc_state(d, db)[0] == 80_000.0                        # the candle is older than decision.json → keep decision
+    assert TD.btc_state(d, os.path.join(d, "missing.sqlite"))[0] == 80_000.0

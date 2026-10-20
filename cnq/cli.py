@@ -313,9 +313,9 @@ def main(argv: list[str] | None = None) -> int:
         d = spot_quality.run(sqlite3.connect("data/agents.sqlite"), args.out)
         print("spot quality:", {k: d.get(k) for k in ("universe", "basket", "error", "skipped")})
     elif args.cmd == "turbo":
-        import sqlite3
+        import os, sqlite3
         from .agents import turbo_desk
-        d = turbo_desk.run(sqlite3.connect("data/agents.sqlite"), args.out)
+        d = turbo_desk.run(sqlite3.connect("data/agents.sqlite"), args.out, candles_db=os.environ.get("CNQ_DB", "data/cnq.sqlite"))
         print("turbo:", {k: (v["equity"], v.get("month_pct")) for k, v in d.items()})
     elif args.cmd == "listings":
         import os, sqlite3

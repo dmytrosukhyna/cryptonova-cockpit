@@ -23,15 +23,22 @@ API = PROVIDERS["anthropic"]["url"]
 
 
 class LLM:
-    def __init__(self, model: str | None = None, api_key: str | None = None, max_tokens: int = 2000, provider: str | None = None):
+    def __init__(self, model: str | None = None, api_key: str | None = None, max_tokens: int = 2000, provider: str | None = None,
+                 timeout: float = 120.0, max_wait_429: float = 40.0, reasoning_effort: str | None = None):
+        """timeout — seconds per HTTP call; max_wait_429 — the longest pause before the one retry after «429 rate limit»;
+        reasoning_effort — low / medium / high for reasoning models that take it (gpt-oss on groq / openrouter): their hidden
+        thinking counts against max_tokens, so a small budget with the default effort can end with an empty answer."""
         self.provider = (provider or os.environ.get("CNQ_LLM_PROVIDER") or "groq").lower()
         if self.provider not in PROVIDERS:
             self.provider = "groq"
         self.model = model or os.environ.get("CNQ_LLM_MODEL") or PROVIDERS[self.provider]["model"]
         self.key = api_key or os.environ.get("CNQ_LLM_KEY") or (os.environ.get("ANTHROPIC_API_KEY") if self.provider == "anthropic" else None)
         self.max_tokens = max_tokens
+        self.timeout, self.max_wait_429, self.reasoning_effort = timeout, max_wait_429, reasoning_effort
         self.calls = 0
         self.last_error = None
+        self.last_finish = None          # why the model stopped: "stop" / "length" (cut by max_tokens) / …
+        self.last_usage = None
 
     @property
     def available(self) -> bool:
@@ -48,15 +55,21 @@ class LLM:
         else:
             body = {"model": self.model, "max_tokens": self.max_tokens, "temperature": temperature,
                     "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+            if self.reasoning_effort and "gpt-oss" in self.model:
+                if self.provider == "groq":
+                    body["reasoning_effort"] = self.reasoning_effort
+                elif self.provider == "openrouter":
+                    body["reasoning"] = {"effort": self.reasoning_effort}
             headers = {"authorization": "Bearer " + self.key, "content-type": "application/json"}
         # Groq sits behind Cloudflare, which rejects the default Python user agent (error 1010) — send a browser-like one
         headers["user-agent"] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 cryptonova/1.0"
         headers["accept"] = "application/json"
         req = urllib.request.Request(P["url"], data=json.dumps(body).encode(), headers=headers)
         msg = None
+        self.last_finish = self.last_usage = None
         for attempt in range(2):
             try:
-                with urllib.request.urlopen(req, timeout=120) as r:
+                with urllib.request.urlopen(req, timeout=self.timeout) as r:
                     msg = json.loads(r.read().decode())
                 break
             except urllib.error.HTTPError as e:   # surface the provider's message (model name, quota, auth)
@@ -66,17 +79,20 @@ class LLM:
                 except Exception:  # noqa: BLE001
                     pass
                 self.last_error = f"HTTP {e.code}: {body_txt}"
-                if e.code == 429 and attempt == 0:       # free tier: tokens-per-minute — wait what the provider asks (≤ 40 s) and retry once
+                if e.code == 429 and attempt == 0 and self.max_wait_429 > 0:   # free tier: tokens-per-minute — wait what the provider asks (≤ max_wait_429) and retry once
                     m = re.search(r"try again in ([\d.]+)s", body_txt)
-                    time.sleep(min(40.0, float(m.group(1)) + 1 if m else 20.0))
+                    time.sleep(min(self.max_wait_429, float(m.group(1)) + 1 if m else 20.0))
                     req = urllib.request.Request(P["url"], data=json.dumps(body).encode(), headers=headers)
                     continue
                 raise RuntimeError(self.last_error) from None
         self.last_error = None
         self.calls += 1
+        self.last_usage = msg.get("usage")
         if P["style"] == "anthropic":
+            self.last_finish = {"end_turn": "stop", "max_tokens": "length"}.get(msg.get("stop_reason"), msg.get("stop_reason"))
             return "".join(b.get("text", "") for b in msg.get("content", []) if b.get("type") == "text")
         ch = (msg.get("choices") or [{}])[0]
+        self.last_finish = ch.get("finish_reason")
         return ((ch.get("message") or {}).get("content")) or ""
 
     def json(self, system: str, user: str) -> dict | list | None:

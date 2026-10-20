@@ -29,7 +29,7 @@ class FakeLLM:
 
     def complete(self, system, user, temperature=0.2):
         self.calls += 1
-        assert "КОНТЕКСТ" in user and "не обещай" in system.lower().replace("никогда не обещай", "не обещай")
+        assert "ДАННЫЕ CRYPTO NOVA" in user and "не обещай" in system.lower().replace("никогда не обещай", "не обещай")
         return "Ответ простыми словами."
 
 
@@ -80,7 +80,7 @@ def test_agent_limit(tmp_path):
         c, d = call(api, "POST", "/v2/agent", {"q": "Что такое плечо?"}, t)
         assert c == 200 and d["agent"]["left"] == 4 - i
     c, d = call(api, "POST", "/v2/agent", {"q": "Ещё вопрос"}, t)
-    assert c == 429 and llm.calls == 5
+    assert c == 200 and d["error"] == "limit" and d["answer"] and d["agent"]["left"] == 0 and llm.calls == 5
 
 
 def test_vip_check(tmp_path):
@@ -184,8 +184,10 @@ def test_real_llm_property_and_health(tmp_path):
     api.llm = LLM(api_key="")
     c, d = call(api, "GET", "/v2/health")
     assert c == 200 and d["ready"] == {"llm": False, "firebase_admin": False, "bingx_partner": False}
-    c, d = call(api, "POST", "/v2/agent", {"q": "что такое биткоин?"}, token("p1"))
-    assert c == 503 and d["error"] == "agent_unavailable"
+    c, d = call(api, "POST", "/v2/agent", {"q": "Как прошёл ваш день, NOVA?"}, token("p1"))
+    assert c == 200 and d["error"] == "busy" and d["answer"] and d["agent"]["left"] == 5
+    c, d = call(api, "POST", "/v2/agent", {"q": "что такое биткоин?"}, token("p1"))     # a FAQ question: answered from the FAQ, not counted
+    assert c == 200 and "error" not in d and d["source"] == "faq" and "21 млн" in d["answer"] and d["agent"]["left"] == 5
 
     class Ok(LLM):
         def complete(self, system, user, temperature=0.2):

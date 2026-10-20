@@ -7,6 +7,9 @@ on:
       mode:
         description: "new | old"
         default: "new"
+      questions:
+        description: "extra questions for mode=new, separated by |"
+        default: ""
 
 permissions:
   contents: read
@@ -23,6 +26,7 @@ jobs:
       - run: python scripts/nova_probe.py "$MODE"
         env:
           MODE: ${{ inputs.mode }}
+          NOVA_PROBE_QS: ${{ inputs.questions }}
           CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}
           CNQ_LLM_PROVIDER: ${{ vars.CNQ_LLM_PROVIDER }}
           CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}

@@ -4,4 +4,6 @@ __pycache__/
 data/*
 !data/agents.sqlite
 !data/.gitkeep
+!data/nova_facts.json
+!data/nova_faq.json
 web/*.bak

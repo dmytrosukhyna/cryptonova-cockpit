@@ -3,6 +3,7 @@ stopped (finish_reason), the token usage and the start of the answer — as GitH
 
   python scripts/nova_probe.py old   — the prompt as it was before 20.10 (to see why «Сколько я заработал?» failed)
   python scripts/nova_probe.py new   — the live NOVA path: cnq.api.nova (prompt, facts, FAQ, ctx) through Api._agent
+                                       (+ NOVA_PROBE_QS="вопрос 1|вопрос 2" for extra questions)
 
 Needs CNQ_LLM_KEY (+ CNQ_LLM_PROVIDER / CNQ_LLM_MODEL); prints no keys. Reads web/app_home.json from the checkout."""
 from __future__ import annotations
@@ -78,26 +79,30 @@ def old() -> None:
 
 def new() -> None:
     import tempfile
-    from cnq.api.server import Api
+    from cnq.api.server import AGENT_LLM, Api
     from cnq.api.store import Store
 
     class V:
         def verify(self, t):
             return {"uid": t}
-    api = Api(Store(os.path.join(tempfile.mkdtemp(), "api.sqlite")), V(), os.path.abspath("web"), LLM(max_tokens=600))
+    api = Api(Store(os.path.join(tempfile.mkdtemp(), "api.sqlite")), V(), os.path.abspath("web"), LLM(**AGENT_LLM))
+    note("model", f"{api.llm.provider} · {api.llm.model} · {AGENT_LLM} · key set: {bool(api.llm.key)}")
+    extra = os.environ.get("NOVA_PROBE_QS", "")
     qs = [(q, None) for q in QUESTIONS] + [
         ("Сколько я заработал?", "Мой демо-счёт: $1 000 с 20.10, сейчас $1 012 (+1.2%). Копилка: $10 в неделю, цель — учёба детей, 10 лет. Режим: DEMO."),
-        ("Это не развод?", None), ("Почему биткоин вообще будет расти?", None)]
+        ("Это не развод?", None), ("Почему все говорят про будущее крипты?", None), ("Как вывести деньги?", None),
+        ("Почему система вошла в AVAX?", None)] + [(q.strip(), None) for q in extra.split("|") if q.strip()]
     for i, (q, ctx) in enumerate(qs):
         t0 = time.time()
         body = {"q": q, **({"ctx": ctx} if ctx else {})}
         code, d = api.handle("POST", "/v2/agent", {"authorization": f"Bearer probe{i}"}, json.dumps(body, ensure_ascii=False).encode())
         a = d.get("answer") or ""
+        last = api.agent_last or {}
         note(f"new · {q}{' + ctx' if ctx else ''}",
-             json.dumps({"http": code, "sec": round(time.time() - t0, 1), "error": d.get("error"), "words": len(a.split()),
-                         "answer": a}, ensure_ascii=False))
-        time.sleep(3)
-
+             json.dumps({"http": code, "sec": round(time.time() - t0, 1), "error": d.get("error"), "source": d.get("source"),
+                         **{k: last.get(k) for k in ("result", "finish", "prompt_tokens", "reasoning_tokens")},
+                         "words": len(a.split()), "answer": a}, ensure_ascii=False))
+        time.sleep(4)
 
 if __name__ == "__main__":
     (old if (sys.argv[1:] or ["new"])[0] == "old" else new)()

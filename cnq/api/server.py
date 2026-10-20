@@ -3,18 +3,20 @@
 nginx: app.crypto-capital.app/v2/ → http://127.0.0.1:8090/v2/  (deploy/api/README.md). The old Java backend stays as it is.
 
 Public (no login):  GET /v2/health · GET /v2/home (= app_home.json, fresh every minute) · GET /v2/feed/<name>
+                    (/v2/feed/nova = web/nova.json: NOVA's greeting, starter questions and topics — see cnq/api/nova.py)
 With the Firebase ID token («Authorization: Bearer …»):
   POST /v2/me        profile + settings + piggy + lesson progress + AI-agent allowance (creates the user on first call)
   PUT  /v2/prefs     notification switches (trades, news, piggy, brief)
   PUT  /v2/piggy     the free demo piggy bank: amount, how often, goal, mode, start day
   PUT  /v2/progress  lessons done, quiz scores, XP
   POST /v2/push      the phone's FCM token
-  POST /v2/agent     a question to NOVA (free: 5 a day, VIP: 100)
+  POST /v2/agent     a question to NOVA (free: 5 a day, VIP: 100) — {"q", "ctx"?}; always 200 with an answer, see Api._agent
   POST /v2/vip/check BingX UID → invited by our link and deposited → VIP
   DELETE /v2/me      delete the account: every row on our server + the Firebase login (Apple 5.1.1(v))
 Demo only until 2.1; nothing here places orders or holds money."""
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import json
 import os
@@ -23,20 +25,21 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import bingx
+from cnq.agents.llm import LLM
+
+from . import bingx, nova
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
 VERSION = "2.0.0"
-FEEDS = {"app_home", "app_btc", "academy", "app_portfolio", "app_signals", "markets"}
+FEEDS = {"app_home", "app_btc", "academy", "app_portfolio", "app_signals", "markets", "nova"}
 LIMIT = {"free": 5, "vip": 100}
 MAX_BODY = 16 * 1024
-AGENT_SYSTEM = (
-    "Ты — NOVA, AI-помощник приложения CRYPTO NOVA. Отвечай по-русски, очень простыми словами, как для человека без опыта: "
-    "2–5 коротких предложений, цифры цифрами, пример из жизни, если помогает. Используй только числа из КОНТЕКСТА, ничего не "
-    "придумывай. Никогда не обещай доход и не советуй купить или продать конкретную монету — объясняй, как это работает и какие "
-    "риски. Если вопрос не про крипту, деньги или приложение — вежливо верни разговор к теме. В конце длинного ответа о рисках "
-    "можно напомнить: это не финансовый совет.")
+# NOVA's model call (20.10: «Сколько я заработал?» failed — the reasoning model spent 506 of max_tokens=600 on hidden thinking,
+# the answer came back cut or empty → 503 → the app said «проверьте интернет»). Low reasoning effort + room for the answer, and a
+# time budget that fits the app (60 s) and nginx (proxy_read_timeout 60 s): ≤ 20 s per call, ≤ 6 s pause before one 429 retry.
+AGENT_LLM = {"max_tokens": 1200, "timeout": 20.0, "max_wait_429": 6.0, "reasoning_effort": "low"}
+AGENT_TEMPERATURE = 0.5
 
 
 def _day() -> str:
@@ -44,9 +47,12 @@ def _day() -> str:
 
 
 class Api:
-    def __init__(self, store: Store, verifier: FirebaseVerifier, web_dir: str, llm=None, bingx_fetch=None, admin=None):
+    def __init__(self, store: Store, verifier: FirebaseVerifier, web_dir: str, llm=None, bingx_fetch=None, admin=None,
+                 knowledge: nova.Knowledge | None = None):
         self.store, self.verifier, self.web, self.llm, self.bingx_fetch = store, verifier, web_dir, llm, bingx_fetch
         self.admin = admin
+        self.nova = knowledge or nova.Knowledge()
+        self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
 
     # ---------------------------------------------------------------- helpers
     def _feed(self, name: str) -> dict | None:
@@ -90,7 +96,7 @@ class Api:
             ready = {"llm": self._llm_ready(),
                      "firebase_admin": bool(getattr(self.admin, "ready", False)),
                      "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
-            return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready}
+            return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last}
         if method == "GET" and path == "/v2/home":
             d = self._feed("app_home")
             return (200, d) if d else (503, {"error": "feed_unavailable"})
@@ -148,36 +154,62 @@ class Api:
             self.store.add_push(uid, tok, "ios" if data.get("platform") == "ios" else "android")
             return 200, {"ok": True}
         if method == "POST" and path == "/v2/agent":
-            return self._agent(uid, str(data.get("q") or "").strip())
+            try:
+                return self._agent(uid, data)
+            except Exception as e:  # noqa: BLE001 — NOVA never answers with a bare 500
+                print("agent error:", repr(e)[:300], file=sys.stderr, flush=True)
+                self.agent_last = {"result": "server_error", "ms": None, "at": int(time.time())}
+                return 200, {"error": "busy", "answer": nova.BUSY}
         if method == "POST" and path == "/v2/vip/check":
             return self._vip(uid, str(data.get("bingx_uid") or "").strip())
         return 404, {"error": "not_found"}
 
-    def _agent(self, uid: str, q: str) -> tuple[int, dict]:
-        if not 2 <= len(q) <= 500:
-            return 400, {"error": "bad_question"}
-        u = self.store.user(uid)
-        al = self._allowance(uid, u.get("tier") or "free")
+    def _agent(self, uid: str, data: dict) -> tuple[int, dict]:
+        """NOVA. Request {"q": question (≤ 500 chars, longer is cut), "ctx": optional plain-text summary of the user's own demo
+        account and piggy bank that the app builds (≤ 600 chars kept, control characters removed; given to the model as the user's
+        data, never as instructions)}.
+        Response: ALWAYS HTTP 200 with "answer" (text to show as NOVA's message) and "agent" {"limit", "left"}; "error" says why
+        it is not a model answer. The question is counted only when there is no "error" and no "source".
+          (no error)      the model answered; agent.left is the new allowance
+          source: "faq"   the model failed, but the question matched a FAQ item (data/nova_faq.json) — its answer, not counted
+          error: "busy"   the model failed, timed out, answered empty or is not configured, or any server error — not counted
+          error: "limit"  no questions left today (free 5, VIP 100) — not counted
+          error: "bad_question"  empty or unreadable question — not counted
+        Other codes of this route: 400 bad_json (the body is not a JSON object), 401 unauthorized (no or invalid Firebase token),
+        413 too_large (body > 16 KB)."""
+        u = self.store.user(uid) or {}
+        tier = u.get("tier") or "free"
+        al = self._allowance(uid, tier)
+        q = nova.clean_text(data.get("q"), nova.Q_MAX)
+        if len(q) < 2:
+            return 200, {"error": "bad_question", "answer": nova.BAD_QUESTION, "agent": al}
         if al["left"] <= 0:
-            return 429, {"error": "limit", "agent": al,
-                         "answer": "На сегодня вопросы закончились. Завтра снова 5 бесплатных. VIP — без лимита."}
-        home = self._feed("app_home") or {}
-        ctx = {k: home.get(k) for k in ("total", "market")}
-        fut = home.get("futures") or {}
-        ctx["futures"] = {k: fut.get(k) for k in ("usd", "pct", "today_usd", "trades", "wins", "worst_dd_pct", "open")}
-        ctx["spot"] = {k: (home.get("spot") or {}).get(k) for k in ("usd", "pct", "alloc", "last_action")}
-        answer = None
+            return 200, {"error": "limit", "answer": nova.LIMIT_VIP if tier == "vip" else nova.LIMIT_FREE, "agent": al}
+        ctx = nova.clean_text(data.get("ctx"), nova.CTX_MAX)
+        t0, answer, result = time.time(), "", "not_configured"
+        llm = copy.copy(self.llm) if isinstance(self.llm, LLM) else self.llm   # its own last_finish per request (threads)
         if self._llm_ready():
             try:
-                answer = self.llm.complete(AGENT_SYSTEM, "КОНТЕКСТ (демо-счета CRYPTO NOVA):\n"
-                                           + json.dumps(ctx, ensure_ascii=False) + "\n\nВОПРОС:\n" + q, temperature=0.3).strip()
-            except Exception:  # noqa: BLE001
-                answer = None
-        if not answer:
-            return 503, {"error": "agent_unavailable", "agent": al,
-                         "answer": "NOVA сейчас перегружена. Попробуйте через минуту — вопрос не списан."}
-        self.store.use(uid, _day())
-        return 200, {"answer": answer[:2000], "agent": self._allowance(uid, u.get("tier") or "free")}
+                raw = llm.complete(self.nova.system(), self.nova.user_message(q, self._feed("app_home") or {}, ctx),
+                                   temperature=AGENT_TEMPERATURE)
+                cut = getattr(llm, "last_finish", None) == "length"
+                answer = nova.tidy(raw if isinstance(raw, str) else "", cut=cut)
+                result = "empty" if not answer else ("cut" if cut else "ok")
+            except Exception as e:  # noqa: BLE001
+                msg = str(e)
+                result = "timeout" if "timed out" in msg.lower() else "rate_limit" if "429" in msg else "llm_error"
+                print(f"agent: {result}: {msg[:200]}", file=sys.stderr, flush=True)
+        use = getattr(llm, "last_usage", None) or {}
+        self.agent_last = {"result": result, "ms": round((time.time() - t0) * 1000), "at": int(time.time()),
+                           "finish": getattr(llm, "last_finish", None), "prompt_tokens": use.get("prompt_tokens"),
+                           "reasoning_tokens": (use.get("completion_tokens_details") or {}).get("reasoning_tokens")}
+        if answer:
+            self.store.use(uid, _day())
+            return 200, {"answer": answer, "agent": self._allowance(uid, tier)}
+        hit = self.nova.match(q)
+        if hit:
+            return 200, {"answer": hit["a"], "source": "faq", "agent": al}
+        return 200, {"error": "busy", "answer": nova.BUSY, "agent": al}
 
     def _vip(self, uid: str, bx: str) -> tuple[int, dict]:
         owner = self.store.bingx_owner(bx) if bx else None
@@ -205,6 +237,8 @@ def make_handler(api: Api):
             except Exception as e:  # noqa: BLE001
                 print("api error:", repr(e), file=sys.stderr, flush=True)
                 code, doc = 500, {"error": "server"}
+                if self.path.split("?", 1)[0].rstrip("/") == "/v2/agent":      # NOVA: the app shows the answer, never «нет интернета»
+                    code, doc = 200, {"error": "busy", "answer": nova.BUSY}
             self._send(code, doc)
 
         def _send(self, code: int, doc: dict) -> None:
@@ -236,10 +270,9 @@ def make_handler(api: Api):
 def main() -> int:
     run = os.environ.get("CNQ_RUN_DIR", ".")
     os.makedirs(os.path.join(run, "data"), exist_ok=True)
-    from cnq.agents.llm import LLM
     from .firebase_admin import FirebaseAdmin
     api = Api(Store(os.path.join(run, "data", "api.sqlite")), FirebaseVerifier(os.environ.get("CNQ_FIREBASE_PROJECT", "crypto-nova")),
-              os.path.join(run, "web"), LLM(max_tokens=600), admin=FirebaseAdmin())
+              os.path.join(run, "web"), LLM(**AGENT_LLM), admin=FirebaseAdmin())
     port = int(os.environ.get("CNQ_API_PORT", "8090"))
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))
     print(f"cnq-api {VERSION} on 127.0.0.1:{port}", flush=True)

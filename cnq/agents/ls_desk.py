@@ -25,6 +25,7 @@ import sqlite3
 import time
 
 from .history import thin
+from ..risk import gate as risk_gate
 
 from .own_desk import _get, fetch_daily, fetch_prices
 
@@ -185,6 +186,15 @@ def rebalance(conn, now: int, px: dict, quality: dict, daily=fetch_daily) -> lis
         for s in leg:
             tgt[s] = (side, eq * GROSS * 0.5 * w[s] / px[s], w[s])
     cur = _pos(conn)
+    # 20.10: the risk layer judges the rebalance as one basket (a half-done one would no longer be neutral): the gross it adds; refused →
+    # the old basket is kept untouched and the rebalance is tried again next run (recorded once a month)
+    added = sum(max(0.0, q - cur[s]["qty"]) * px[s] if s in cur and cur[s]["side"] == side else q * px[s] for s, (side, q, _w) in tgt.items())
+    ok, why = risk_gate.allow_entry("lsn", "*", "BOTH", added, now)
+    if not ok:
+        mon = time.strftime("%Y-%m", time.gmtime(now / 1000))
+        risk_gate.record_skip(conn, "lsn", f"LSN-{mon}", "*", "BOTH", added, why, now)
+        conn.commit()
+        return [f"ребаланс отложен: риск-слой — {why}"]
     for s, p in cur.items():                         # out of the basket first
         if s not in tgt:
             _trade(conn, p, s, p["side"], 0.0, px.get(s) or p["entry"], now, None, None, events)

@@ -44,6 +44,10 @@ from .store.db import Store
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] in ("kill", "risk"):    # 20.10 risk layer: kill on|off|status, risk [status|reset] (cnq/risk/cli.py)
+        from .risk import cli as risk_cli
+        return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
     ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")

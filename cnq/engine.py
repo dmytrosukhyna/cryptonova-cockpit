@@ -31,7 +31,9 @@ REPO = os.environ.get("CNQ_REPO_DIR", "/opt/cnq/repo")
 RUN = os.environ.get("CNQ_RUN_DIR", "/opt/cnq/run")
 INTERVAL_S = int(os.environ.get("CNQ_ENGINE_INTERVAL", "60"))
 SYNC_S = int(os.environ.get("CNQ_ENGINE_SYNC", "120"))
-FAST = ["paper", "listings", "own", "lsn", "turbo", "signalfeed", "apphome", "apppush"]          # order matters: paper rewrites paper.json, the rest add
+# order matters: risk first (20.10 portfolio risk layer, cnq/risk: it judges the fresh candles and the desks' last positions, the
+# desks then ask its gate before every entry), paper rewrites paper.json, the rest add
+FAST = ["risk", "paper", "listings", "own", "lsn", "turbo", "signalfeed", "apphome", "apppush"]
 SLOW = ["quality", "altport"]
 # 20.10: strategy conveyor LAB → PAPER → READY → RETIRED (cnq/agents/conveyor.py): once an hour (cycle 1 = soon after a restart, then
 # every 60 cycles), after the desks; it writes data/conveyor_state.json (read by the risk gate) and web/conveyor.json
@@ -39,9 +41,12 @@ HOURLY = ["conveyor"]
 OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "altseason.json", "engine.json", "app_home.json", "app_btc.json",
          # 20.10: the app home in the other languages of the app (cnq/agents/i18n.py LANGS), written in the same step as app_home.json
          "app_home.en.json", "app_home.uk.json", "app_home.el.json", "app_home.es.json",
-         "conveyor.json"]
-DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json"}          # the engine's own state — never overwritten by a pull
-STEP_TIMEOUT = {"paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90,
+         "conveyor.json",
+         "risk.json"]                                                      # 20.10: the risk layer's public summary
+# the engine's own state — never overwritten by a pull (20.10: + the conveyor's state, the risk layer's kill switch, state, reset
+# request and log)
+DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json", "kill_switch.json", "risk_state.json", "risk_reset.json", "risk_log.jsonl"}
+STEP_TIMEOUT = {"risk": 60, "paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90,
                 "conveyor": 120}
 
 

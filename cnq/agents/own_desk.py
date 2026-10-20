@@ -57,6 +57,7 @@ import sqlite3
 import time
 
 from .history import thin
+from ..risk import gate as risk_gate
 import urllib.request
 
 COINS40 = ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "DOT", "LTC", "BCH", "TRX", "NEAR", "ATOM", "ETC", "FIL",
@@ -458,6 +459,12 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                     if gross + qty * e > GROSS_CAP * eq:
                         continue
                     tid = f"OWN-{rule}-{s}-{day // DAY}"
+                    side_s = "LONG" if sg == 1 else "SHORT"
+                    ok, why = risk_gate.allow_entry("own", s, side_s, qty * e, now)       # 20.10: portfolio risk layer
+                    if not ok:
+                        if risk_gate.record_skip(conn, "own", tid, s, side_s, qty * e, why, now):
+                            events.append(f"{s} {RULE_RU[rule]}: пропуск — риск-слой: {why}")
+                        continue
                     facts = entry_facts([r[4] for r in closed], rule, [r[4] for r in K["BTC"][:-1]], [r[2] for r in closed])
                     facts.update({"vol": round(v, 2), "rank": ranked.index(s) + 1, "of": len(ranked), "atr": _r6(a)})
                     cur = conn.execute("INSERT OR IGNORE INTO own_trades(id, symbol, rule, side, opened, opened_day, entry, stop, qty, best, vol, "

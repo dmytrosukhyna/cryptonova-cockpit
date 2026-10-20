@@ -24,6 +24,7 @@ import sqlite3
 import time
 
 from .history import thin
+from ..risk import gate as risk_gate
 
 START_EQUITY = 10_000.0
 RISK = 0.01
@@ -578,6 +579,7 @@ class PaperDesk:
         e_blocked = bool(e_recent) and any(t["opened"] != now for t in e_recent)
         # 1. new signals → orders / market fills
         known = {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_ORD}")} | {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_TR}")} | self._archived_ids()
+        known |= risk_gate.skipped_ids(self.conn, self.profile)      # 20.10: a signal the risk layer refused is final, never opened later
         open_syms = {t["symbol"] for t in self._open()} | {o["symbol"] for o in self._pending()}
         for base, coin in by_sym.items():
             for s in sigs[base]:
@@ -621,6 +623,11 @@ class PaperDesk:
                     cap_qty = eq * self.P.get("max_notional", 3.0) / s["entry"]   # 17.10: tight stops must not mean 60 % of the account in one trade
                     if qty > cap_qty:
                         qty = cap_qty; risk_usd = qty * (r + s["entry"] * (2 * self.fee + SLIP))
+                ok, why = risk_gate.allow_entry(self.profile, base, s["side"], qty * s["entry"], now)   # 20.10: portfolio risk layer
+                if not ok:
+                    if risk_gate.record_skip(self.conn, self.profile, s["id"], base, s["side"], qty * s["entry"], why, now):
+                        events.append(f"пропуск {s['side']} {base} ({RULE_RU.get(s['grade'], s['grade'])}): риск-слой — {why}")
+                    continue
                 if s.get("facts") is not None:      # 20.10: what the rule saw at entry + the scan around it → the app's «why we entered»
                     f = dict(s["facts"])
                     if s["grade"] == "K":
@@ -657,7 +664,13 @@ class PaperDesk:
                 if (o["side"] == "LONG" and c[3] <= o["entry"] * (1 - thr)) or (o["side"] == "SHORT" and c[2] >= o["entry"] * (1 + thr)):
                     filled = c
                     break
-            if filled:
+            if filled:   # 20.10: a limit fill is a new entry too → the risk layer; refused → the order is cancelled, the skip recorded
+                ok, why = risk_gate.allow_entry(self.profile, o["symbol"], o["side"], o["qty"] * o["entry"], now)
+                if not ok:
+                    self.conn.execute(f"UPDATE {self.T_ORD} SET status='CANCELLED' WHERE id=?", (o["id"],))
+                    if risk_gate.record_skip(self.conn, self.profile, o["id"], o["symbol"], o["side"], o["qty"] * o["entry"], why, now):
+                        events.append(f"лимитка {o['side']} {o['symbol']} снята при исполнении: риск-слой — {why}")
+                    continue
                 hold = {"C": HOLD_C_H, "B": HOLD_B_H, "R": HOLD_R_H, "E": HOLD_E_H, "F": HOLD_F_H, "S": HOLD_S_H, "G": HOLD_G_H, "D": HOLD_D_H, "L": HOLD_L_H, "N": HOLD_N_H, "Q": HOLD_N_H, "W": 48, "X": HOLD_E_H, "Y": HOLD_D_H, "J": 24, "T": HOLD_T_H, "K": HOLD_K_H}.get(o["grade"], HOLD_C_H)
                 # conservative: if the fill candle also reached the stop, count it as stopped in the same candle
                 stopped = (o["side"] == "LONG" and filled[3] <= o["stop"]) or (o["side"] == "SHORT" and filled[2] >= o["stop"])

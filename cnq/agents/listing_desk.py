@@ -31,6 +31,7 @@ import sqlite3
 import time
 
 from .history import thin
+from ..risk import gate as risk_gate
 import urllib.request
 
 BASE = "https://open-api.bingx.com/openApi/swap/v2/quote"
@@ -180,6 +181,13 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
             continue
         qty = equity_closed * SHARE / px
         tid = f"LST-{s}-{now // H}"
+        bs = s.replace("-USDT", "")
+        ok, why = risk_gate.allow_entry("lst", bs, "SHORT", qty * px, now)     # 20.10: portfolio risk layer (also checks the ×4 mirror lstx)
+        if not ok:
+            conn.execute("UPDATE lst_known SET seeded = 5 WHERE symbol = ?", (s,))    # 5 = refused by the risk layer: final, not retried
+            if risk_gate.record_skip(conn, "lst", f"LST-{s}", bs, "SHORT", qty * px, why, now):
+                events.append(f"{bs}: не шортим — риск-слой: {why}.")
+            continue
         conn.execute("UPDATE lst_known SET facts = ? WHERE symbol = ?",
                      (json.dumps({"age_h": round(age / H, 2), "move": round(mv, 4), "qvol": None if qv is None else round(qv),
                                   "watching": len(mk), "skip_pump": SKIP_PUMP, "min_qvol": MIN_QVOL}), s))

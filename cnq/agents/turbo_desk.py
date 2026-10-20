@@ -17,6 +17,8 @@ import os
 import sqlite3
 import time
 
+from ..risk import gate as risk_gate
+
 START = 10_000.0
 LST_K = 4.0                       # 20 % per listing ÷ the base desk's 5 %
 BTC_LEV = 2.0
@@ -141,7 +143,14 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None, can
         else:
             b["equity"] *= 1 + CASH_APY * dt_ms / (365 * DAY)
         events = []
-        if bull is not None and bull != b["on"]:
+        go = bull is not None and bull != b["on"]
+        if go and bull:          # 20.10: going into BTC ×2 is a new entry → the risk layer; refused → stays in dollars, tried again next run
+            ok, why = risk_gate.allow_entry("btcx", "BTC", "LONG", BTC_LEV * b["equity"], now)
+            if not ok:
+                go = False
+                if risk_gate.record_skip(conn, "btcx", f"BTCX-{now // DAY}", "BTC", "LONG", BTC_LEV * b["equity"], why, now):
+                    events.append(f"Рынок «рост», но вход отложен — риск-слой: {why}")
+        if go:                   # leaving to dollars (an exit) is never held back
             events.append("Рынок «рост» — покупаем BTC с плечом 2." if bull else "Рынок «осторожно» — выходим в доллары.")
             b["equity"] *= 1 - 0.0005 * BTC_LEV                # taker fee on the switch
             b["on"] = bull

@@ -5,8 +5,12 @@ import os
 import sys
 
 VOICE = os.environ.get("CNQ_WELCOME_VOICE", "ru-RU-SvetlanaNeural")
+# 20.10 (owner: «плохо выговаривает слово "Нова", как-то калечит»): the name is written in Cyrillic with the stress mark on the
+# first syllable (Но́ва), and «CRYPTO NOVA» as «Крипто Но́ва», so the Russian voice does not read it as the adjective «нова́».
+STRESS = "\u0301"
+NOVA = f"Но{STRESS}ва"
 TEXT = (
-    "Привет! Я Нова — помощник CRYPTO NOVA. "
+    f"Привет! Я {NOVA} — помощник Крипто {NOVA}. "
     "Наша система каждую минуту следит за рынком криптовалют и проверяет каждую идею на истории цен. "
     "Здесь всё бесплатно: демо-счёт на десять тысяч долларов, копилка в биткоин и тридцать восемь уроков простыми словами. "
     "Деньги в демо учебные, так что можно спокойно смотреть и учиться. "

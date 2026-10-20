@@ -11,7 +11,7 @@ Evidence (weekly Binance prices 2022-01 → 2026-10, 0.2 % of the turnover per r
 Altseason gauge (daily closes of the 40 coins of the own desk, BTC and ETH excluded from the alts):
   ON = the equal-weight alt index against BTC is above its 91-day average AND ≥ 60 % of the alts beat BTC over 91 days
   AND the BTC regime is «рост» (BTC above its 200-day average and up over 60 days).
-Model (of the whole portfolio; the owner's real one is about $19 000 — amounts are never posted, only shares):
+Model (of the whole portfolio — amounts are never posted, only shares):
   futures 15 % (our signals) · dollars 10 % (Earn) · core BTC 39.2 / ETH 6.3 / SOL 4.7 / LINK 2.4 / NEAR 2.4 %
   · alt part 20 % (was 43.4 % until the honest re-check of 19.10): the 10 alts with the largest 180-day dollar volume (≥ 1 year
     of candles; own_desk.py picks them daily) equally while the gauge is on, BTC when off;

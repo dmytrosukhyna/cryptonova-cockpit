@@ -76,6 +76,13 @@ HOLD = {"P": 10, "C": 14}
 DAY = 86_400_000
 NAME = "Сигналы CRYPTO NOVA"
 RULE_RU = {"P": "откат в тренде", "C": "пробой 20 дней"}
+# 20.10 (owner: «хотелось бы видеть более серьёзное объяснение, почему мы вошли в сделку»): the conditions a coin has to meet —
+# counted in the daily scan («проверила 40 монет по 8 условиям») and shown per trade in the app (app_home.py)
+CONDITIONS = {"P": ("цена выше 50-дневной средней", "50-дневная средняя растёт", "RSI(2) ниже 10"),
+              "C": ("закрытие выше максимума 20 дней", "цена выше 20-дневной средней"),
+              "": ("режим BTC «рост»", "объём дня от 1.5× к среднему за 30 дней", "топ-40 по обороту за 30 дней")}
+N_CONDITIONS = sum(len(v) for v in CONDITIONS.values())
+SCAN_DAYS = 30                     # daily scan counters kept for the app (per trade: the scan of its entry day)
 ABOUT = ("Наши собственные сигналы раз в день на 40 самых торгуемых монетах (список обновляется каждый день по объёму за 30 дней): "
          "покупаем, только когда рынок растёт, в остальное время ждём в долларах. "
          "Два правила: «откат в тренде» (монета в росте сделала короткий откат) и «пробой 20 дней» (цена вышла из 20-дневного "
@@ -226,16 +233,60 @@ def rule_exit(t: dict, K: list) -> bool:
     return days >= HOLD[t["rule"]]
 
 
+def _r6(x):
+    return None if x is None else float(f"{x:.6g}")
+
+
+def entry_facts(closes: list, rule: str, btc_closes: list | None, highs: list | None = None) -> dict:
+    """20.10: the numbers the rule saw at the signal day's close (`closes` / `highs` end at that day, closed candles only) — stored
+    with the trade so the app can show WHY it entered. Every value is computed with the same formulas as signals() / regime();
+    what cannot be computed from the given data is left out, never filled in."""
+    c, e = closes, len(closes) - 1
+    f: dict = {"close": _r6(c[e]) if e >= 0 else None}
+    if e >= 2 and c[e - 1] and c[e - 2]:
+        f["chg1"], f["chg2"] = _r6(c[e] / c[e - 1] - 1), _r6(c[e] / c[e - 2] - 1)
+    if rule == "P":
+        f.update({"sma50": _r6(_sma(c, 50, e)), "sma50_5": _r6(_sma(c, 50, e - 5)), "rsi2": _r6(_rsi2(c, e))})
+    else:
+        f["sma20"] = _r6(_sma(c, 20, e))
+        if highs is not None and e >= 21:
+            f["hh20"] = _r6(max(highs[e - 20:e]))
+    if btc_closes:
+        b, j = btc_closes, len(btc_closes) - 1
+        s200 = _sma(b, 200, j)
+        if s200 is not None and j >= 60:
+            f["btc"] = {"close": _r6(b[j]), "sma200": _r6(s200), "c60": _r6(b[j - 60])}
+    return {k: v for k, v in f.items() if v is not None}
+
+
+def backfill_facts(conn: sqlite3.Connection, t: dict) -> dict | None:
+    """Facts for a trade opened before 20.10 (no `facts` stored): recomputed from the daily closes the desk keeps (own_closes, the
+    same candles it traded on), up to the signal day only. Highs / volume ranks are not kept → those parts stay out."""
+    sig_day = t["opened_day"] - DAY
+    cl = [r for r in conn.execute("SELECT day, close FROM own_closes WHERE symbol=? AND day<=? ORDER BY day", (t["symbol"], sig_day))]
+    bt = [r for r in conn.execute("SELECT day, close FROM own_closes WHERE symbol='BTC' AND day<=? ORDER BY day", (sig_day,))]
+
+    def whole(rows, n):                # the last n days present without a gap, ending at the signal day
+        return len(rows) >= n and rows[-1][0] == sig_day and rows[-n][0] == sig_day - (n - 1) * DAY
+    if not whole(cl, 56):
+        return None
+    f = entry_facts([x[1] for x in cl[-56:]], t["rule"], [x[1] for x in bt[-201:]] if whole(bt, 201) else None)
+    f["src"] = "closes"
+    return f
+
+
 # ------------------------------------------------------------------------------------------------ storage
 def ensure(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE TABLE IF NOT EXISTS own_state(k TEXT PRIMARY KEY, v TEXT)")
     conn.execute("""CREATE TABLE IF NOT EXISTS own_trades(id TEXT PRIMARY KEY, symbol TEXT, rule TEXT, side TEXT, opened INTEGER,
                     opened_day INTEGER, entry REAL, stop REAL, qty REAL, best REAL, closed INTEGER, exit REAL, exit_kind TEXT,
                     pnl_usd REAL)""")
-    try:
-        conn.execute("ALTER TABLE own_trades ADD COLUMN vol REAL")      # 19.10: the signal day's volume ÷ its 30-day average
-    except sqlite3.OperationalError:
-        pass
+    for col in ("vol REAL",            # 19.10: the signal day's volume ÷ its 30-day average
+                "facts TEXT"):         # 20.10: what the rule saw at entry (entry_facts), JSON — the app's «why we entered»
+        try:
+            conn.execute(f"ALTER TABLE own_trades ADD COLUMN {col}")
+        except sqlite3.OperationalError:
+            pass
     conn.execute("CREATE TABLE IF NOT EXISTS own_equity(time INTEGER PRIMARY KEY, equity REAL)")
     conn.execute("CREATE TABLE IF NOT EXISTS own_closes(symbol TEXT, day INTEGER, close REAL, PRIMARY KEY(symbol, day))")
     conn.commit()
@@ -258,7 +309,7 @@ def _close(conn, t: dict, px: float, kind: str, now: int) -> float:
 
 
 def _open_rows(conn) -> list[dict]:
-    keys = ("id", "symbol", "rule", "side", "opened", "opened_day", "entry", "stop", "qty", "best", "vol")
+    keys = ("id", "symbol", "rule", "side", "opened", "opened_day", "entry", "stop", "qty", "best", "vol", "facts")
     return [dict(zip(keys, r)) for r in conn.execute(f"SELECT {', '.join(keys)} FROM own_trades WHERE closed IS NULL ORDER BY opened")]
 
 
@@ -376,6 +427,10 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                 n_open = len(open_now)
                 gross = sum(t["qty"] * t["entry"] for t in open_now)
                 cands = []
+                ranked = sorted(universe, key=lambda s: -(dv.get(s) or 0))
+                # 20.10: the day's scan in numbers for the app — coins checked, conditions, how many rule signals, how many passed all
+                scan = {"day": day, "asof": now, "coins": len(universe), "checks": N_CONDITIONS, "bull": bull,
+                        "signals": 0, "passed": 0, "opened": 0}
                 for s, k in K.items():
                     if s not in universe:
                         continue
@@ -383,9 +438,11 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                     for rule, sg in signals(closed, bull):
                         if (LONG_ONLY and sg != 1) or (s, rule) in have:
                             continue
+                        scan["signals"] += 1
                         v = vol_surge(closed)
                         if v is None or v < VOL_MIN:            # no volume behind the signal → no trade (rounds 6–8)
                             continue
+                        scan["passed"] += 1
                         cands.append((v, s, rule, sg))
                 for v, s, rule, sg in sorted(cands, key=lambda x: -x[0]):   # the room is short → the higher volume first
                     if n_open >= MAX_OPEN:
@@ -401,13 +458,20 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
                     if gross + qty * e > GROSS_CAP * eq:
                         continue
                     tid = f"OWN-{rule}-{s}-{day // DAY}"
-                    conn.execute("INSERT OR IGNORE INTO own_trades(id, symbol, rule, side, opened, opened_day, entry, stop, qty, best, vol) "
-                                 "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                                 (tid, s, rule, "LONG" if sg == 1 else "SHORT", now, day, e, e - sg * dist, qty, closed[-1][4], round(v, 2)))
+                    facts = entry_facts([r[4] for r in closed], rule, [r[4] for r in K["BTC"][:-1]], [r[2] for r in closed])
+                    facts.update({"vol": round(v, 2), "rank": ranked.index(s) + 1, "of": len(ranked), "atr": _r6(a)})
+                    cur = conn.execute("INSERT OR IGNORE INTO own_trades(id, symbol, rule, side, opened, opened_day, entry, stop, qty, best, vol, "
+                                       "facts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                                       (tid, s, rule, "LONG" if sg == 1 else "SHORT", now, day, e, e - sg * dist, qty, closed[-1][4],
+                                        round(v, 2), json.dumps(facts)))
+                    scan["opened"] += int(cur.rowcount > 0)
                     have.add((s, rule))
                     n_open += 1
                     gross += qty * e
                     events.append(f"{s} {RULE_RU[rule]}: {'покупка' if sg == 1 else 'шорт'} по {e:g}, объём ×{v:.1f}")
+                scans = {dk: sc for dk, sc in (_state(conn, "scans", {}) or {}).items() if int(dk) > day - SCAN_DAYS * DAY}
+                scans[str(day)] = scan
+                _set(conn, "scans", scans)
             _set(conn, "regime", bull)
             _set(conn, "day", day)
             _set(conn, "coins_seen", len(K))
@@ -416,17 +480,43 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
     return {"events": events, "prices": px}
 
 
+def _trade_facts(conn: sqlite3.Connection, t: dict) -> dict | None:
+    """The stored entry facts; a trade from before 20.10 gets them once from the kept closes (backfill_facts) and stored."""
+    if t.get("facts"):
+        try:
+            return json.loads(t["facts"])
+        except ValueError:
+            return None
+    f = backfill_facts(conn, t)
+    if f is not None:
+        conn.execute("UPDATE own_trades SET facts=? WHERE id=?", (json.dumps(f), t["id"]))
+    return f
+
+
+def live_by_rule(conn: sqlite3.Connection) -> dict:
+    """The live record of each rule on this desk: closed trades, winners, average trade in % of the entry price."""
+    out = {}
+    for rule, n, wins, avg in conn.execute("SELECT rule, COUNT(*), SUM(pnl_usd > 0), AVG(pnl_usd / (qty * entry)) FROM own_trades "
+                                           "WHERE closed IS NOT NULL AND qty > 0 AND entry > 0 GROUP BY rule"):
+        out[rule] = {"n": n, "wins": int(wins or 0), "avg_pct": None if avg is None else round(avg * 100, 2)}
+    return out
+
+
 def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
     eqc = equity_closed(conn)
     out_open, open_pnl = [], 0.0
+    scans = _state(conn, "scans", {}) or {}
     for t in _open_rows(conn):
         p = px.get(t["symbol"]) or t["entry"]
         sg = 1 if t["side"] == "LONG" else -1
         u = sg * (p - t["entry"]) * t["qty"] - t["entry"] * t["qty"] * FEE
         open_pnl += u
+        facts = _trade_facts(conn, t)
+        if facts is not None and scans.get(str(t["opened_day"])):
+            facts["scan"] = scans[str(t["opened_day"])]
         out_open.append({"id": t["id"], "symbol": t["symbol"], "side": t["side"], "grade": t["rule"], "kind": "OWN_" + t["rule"],
                          "entry": t["entry"], "stop": t["stop"], "qty": t["qty"], "qty_left": t["qty"], "opened": t["opened"], "pnl_usd": 0.0,
-                         "price": p, "open_pnl_usd": round(u, 2), "vol": t.get("vol"),
+                         "price": p, "open_pnl_usd": round(u, 2), "vol": t.get("vol"), "facts": facts,
                          "reason": f"{RULE_RU[t['rule']]}" + (f", объём ×{t['vol']:.1f} к среднему" if t.get("vol") else "")
                                    + f": стоп {abs(t['stop'] / t['entry'] - 1) * 100:.1f}%, выход по правилу или через {HOLD[t['rule']]} дней"})
     eq = eqc + open_pnl
@@ -446,7 +536,10 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
     avg = conn.execute("SELECT AVG(pnl_usd / (qty * entry)) FROM own_trades WHERE closed IS NOT NULL AND qty > 0").fetchone()[0]
     first = conn.execute("SELECT MIN(time) FROM own_equity").fetchone()[0] or now
     bull = _state(conn, "regime")
+    conn.commit()                                     # facts backfilled above
+    last_scan = scans[max(scans, key=int)] if scans else None
     return {"asof": now, "profile": "own", "name": NAME, "about": ABOUT, "start_equity": START, "since": first, "reset": None,
+            "scan": last_scan, "live_by_rule": live_by_rule(conn),
             "equity": round(eqc, 2), "equity_mtm": round(eq, 2), "pnl_usd": round(eq - START, 2), "pnl_pct": round((eq / START - 1) * 100, 2),
             "open_pnl_usd": round(open_pnl, 2), "open": out_open, "pending": [], "closed": closed,
             "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "avg_trade_pct": round(avg * 100, 2) if avg is not None else None,

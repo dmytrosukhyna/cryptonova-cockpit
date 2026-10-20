@@ -88,8 +88,11 @@ def _db(conn: sqlite3.Connection):
       CREATE TABLE IF NOT EXISTS lst_trades(id TEXT PRIMARY KEY, symbol TEXT, listed INTEGER, opened INTEGER, entry REAL, stop REAL,
         qty REAL, expires INTEGER, funding_usd REAL, last_t INTEGER, closed INTEGER, exit REAL, exit_kind TEXT, pnl_usd REAL);
       CREATE TABLE IF NOT EXISTS lst_equity(time INTEGER PRIMARY KEY, equity REAL);""")
-    if "first_px" not in [r[1] for r in conn.execute("PRAGMA table_info(lst_known)")]:
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(lst_known)")]
+    if "first_px" not in cols:
         conn.execute("ALTER TABLE lst_known ADD COLUMN first_px REAL")
+    if "facts" not in cols:                   # 20.10: what the desk saw at the short's entry (JSON) — the app's «why we entered»
+        conn.execute("ALTER TABLE lst_known ADD COLUMN facts TEXT")
 
 
 def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -> dict:
@@ -177,6 +180,9 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
             continue
         qty = equity_closed * SHARE / px
         tid = f"LST-{s}-{now // H}"
+        conn.execute("UPDATE lst_known SET facts = ? WHERE symbol = ?",
+                     (json.dumps({"age_h": round(age / H, 2), "move": round(mv, 4), "qvol": None if qv is None else round(qv),
+                                  "watching": len(mk), "skip_pump": SKIP_PUMP, "min_qvol": MIN_QVOL}), s))
         conn.execute("INSERT INTO lst_trades VALUES(?,?,?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL)",
                      (tid, s, listed, now, px, px * (1 + STOP), qty, now + HOLD_D * 86_400_000, 0.0, now))
         opens.append({"id": tid, "symbol": s, "listed": listed, "opened": now, "entry": px, "stop": px * (1 + STOP), "qty": qty,
@@ -184,6 +190,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
         events.append(f"Шорт {s.replace('-USDT', '')} по {px:g}: листинг {age / H:.1f} ч назад, стоп {px * (1 + STOP):g}, выход через {HOLD_D} дней.")
     open_pnl = 0.0
     out_open = []
+    known_f = {r[0]: r[1:] for r in conn.execute("SELECT symbol, listed, first_px, facts FROM lst_known")}
     for t in opens:
         px = (mk.get(t["symbol"]) or {}).get("price") or t["entry"]
         u = (t["entry"] - px) * t["qty"] + (t["funding_usd"] or 0) - t["entry"] * t["qty"] * FEE
@@ -191,7 +198,8 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
         out_open.append({"id": t["id"], "symbol": t["symbol"].replace("-USDT", ""), "side": "SHORT", "grade": "LST", "kind": "LISTING_SHORT",
                          "entry": t["entry"], "stop": t["stop"], "qty": t["qty"], "qty_left": t["qty"], "opened": t["opened"], "pnl_usd": 0.0,
                          "expires": t["expires"], "price": px, "open_pnl_usd": round(u, 2), "funding_usd": round(t["funding_usd"] or 0, 2),
-                         "listed": t["listed"], "reason": f"Шорт листинга: через {DELAY_H} ч после появления фьючерса; стоп +30%, выход через {HOLD_D} дней."})
+                         "listed": t["listed"], "facts": entry_facts(t, known_f.get(t["symbol"])),
+                         "reason": f"Шорт листинга: через {DELAY_H} ч после появления фьючерса; стоп +30%, выход через {HOLD_D} дней."})
     equity = equity_closed + open_pnl
     conn.execute("INSERT OR REPLACE INTO lst_equity VALUES(?, ?)", (now, round(equity, 2)))
     conn.commit()
@@ -219,6 +227,23 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
             "equity_history": thin(eqh), "events": events, "error": err, "watching": len(mk),
             "rules": f"шорт через {DELAY_H} ч после листинга, {int(SHARE * 100)}% счёта, стоп +{int(STOP * 100)}%, выход через {HOLD_D} дней, "
                      f"до {MAX_OPEN} позиций, комиссия 0.05%/сторона, фандинг учитывается"}
+
+
+def entry_facts(t: dict, known: tuple | None) -> dict | None:
+    """The short's entry facts: stored at entry since 20.10; for an older trade only what the stored rows back — the listing time
+    and the first price seen (→ age at entry and the move before it); the turnover at entry was not kept, so it stays out."""
+    listed, first_px, facts = known if known else (None, None, None)
+    if facts:
+        try:
+            return json.loads(facts)
+        except ValueError:
+            pass
+    f = {"skip_pump": SKIP_PUMP, "min_qvol": MIN_QVOL}
+    if listed:
+        f["age_h"] = round((t["opened"] - listed) / H, 2)
+    if first_px:
+        f["move"] = round(t["entry"] / first_px - 1, 4)
+    return f if len(f) > 2 else None
 
 
 def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, fetch=fetch_market) -> dict:

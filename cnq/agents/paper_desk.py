@@ -81,6 +81,7 @@ RULE_RU = {"A": "откуп гэпа", "B": "откуп каскада", "R": "�
 THROUGH = {"L", "N", "Q"}        # lab limits fill only when price trades through the level by ≥ 0.01 %
 HOLD_L_H, HOLD_N_H = 72, 24
 SHARE_RULES = {"E", "F", "S", "G", "D", "X", "Y", "J", "T", "K"}   # sized as a share of equity, own position caps
+GENERATED = {"C", "R", "E", "F", "S", "T", "K", "L", "N", "Q", "W", "X", "Y", "J", "D", "G", "B"}   # rules signals() produces (A has no generator)
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
@@ -212,6 +213,10 @@ def _atr_series(b: list[list], n: int = 14) -> list[float]:
     return out
 
 
+def _f6(x):
+    return None if x is None else float(f"{x:.6g}")
+
+
 def _atr(c: list[list], n: int = 14) -> float:
     tr = []
     for i in range(1, len(c)):
@@ -239,7 +244,8 @@ class PaperDesk:
             pnl_usd REAL, pnl_r REAL, tps_hit INTEGER, reason TEXT, last_bar INTEGER);
         CREATE TABLE IF NOT EXISTS {self.T_EQ}(time INTEGER PRIMARY KEY, equity REAL);
         
-        CREATE TABLE IF NOT EXISTS paper_meta(k TEXT PRIMARY KEY, v TEXT);""")
+        CREATE TABLE IF NOT EXISTS paper_meta(k TEXT PRIMARY KEY, v TEXT);
+        CREATE TABLE IF NOT EXISTS paper_facts(id TEXT PRIMARY KEY, facts TEXT);""")
         conn.commit()
 
     # ------------------------------------------------------------------ helpers
@@ -256,6 +262,18 @@ class PaperDesk:
     def _pending(self) -> list[dict]:
         keys = ("id", "symbol", "side", "grade", "kind", "entry", "stop", "tps", "parts", "qty", "risk_usd", "created", "expires", "status", "reason")
         return [dict(zip(keys, r)) for r in self.conn.execute(f"SELECT * FROM {self.T_ORD} WHERE status='PENDING'").fetchall()]
+
+    def facts(self, ids: list[str]) -> dict:
+        """{trade id: entry facts} (20.10; trades opened before have none — the app then shows only what the row itself backs)."""
+        out = {}
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            for k, v in self.conn.execute(f"SELECT id, facts FROM paper_facts WHERE id IN ({','.join('?' * len(chunk))})", chunk):
+                try:
+                    out[k] = json.loads(v)
+                except (TypeError, ValueError):
+                    pass
+        return out
 
     def _archives(self) -> list[dict]:
         """This desk's archived states (one-time resets, see reset_desks), oldest first."""
@@ -339,6 +357,8 @@ class PaperDesk:
                 out.append({"id": f"E-{base}-{last[0]}", "symbol": base, "side": "LONG", "grade": "E", "kind": "CLIMAX_LONG",
                             "entry": entry, "stop": entry * (1 - E_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
                             "order": "MARKET", "hold_h": HOLD_E_H,
+                            "facts": {"drop": _f6(ret_oc), "vol_x": _f6(last[5] / vavg), "breadth": _f6(self._stress),
+                                      "need_breadth": E_BREADTH, "need_drop": E_DROP, "need_vol": E_VOL},
                             "reason": f"Откуп климакса: в широкой распродаже свеча {ret_oc*100:.1f}% на объёме {last[5]/vavg:.1f}× — на истории такие свечи выкупают в течение суток (+2% в среднем). "
                                       f"Выход по времени через 24 ч, катастрофический стоп −{E_STOP*100:.0f}%, размер — доля счёта, не риск по стопу."})
         # F: open-interest flush — positions forcibly closed (OI −12 % in 4 h) while price fell ≥ 5 % → long, 24 h, catastrophe stop −12 %
@@ -350,6 +370,7 @@ class PaperDesk:
                 out.append({"id": f"F-{base}-{c15[-1][0] // 3_600_000}", "symbol": base, "side": "LONG", "grade": "F", "kind": "OI_FLUSH",
                             "entry": entry, "stop": entry * (1 - F_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
                             "order": "MARKET", "hold_h": HOLD_F_H,
+                            "facts": {"oi4": _f6(oi), "px4": _f6(px4), "need_oi": F_OI, "need_px": F_PX},
                             "reason": f"Сброс позиций: открытый интерес за 4 ч {oi*100:.0f}%, цена {px4*100:.1f}% — рынок принудительно вытряс плечи. "
                                       f"На истории (18 монет, 2023–2026) после такого откуп +1.8% в среднем за сутки, 62% сделок в плюсе. "
                                       f"Выход через 24 ч, стоп −{F_STOP*100:.0f}%, размер — доля счёта."})
@@ -389,6 +410,7 @@ class PaperDesk:
             out.append({"id": f"K-{base}-{kb['bar'] // 14_400_000}", "symbol": base, "side": "LONG", "grade": "K", "kind": "BTC_IMPULSE",
                         "entry": entry, "stop": entry - K_ATR * at, "tps": [entry * 3] * 3, "parts": [1.0, 0.0, 0.0],
                         "order": "MARKET", "hold_h": HOLD_K_H,
+                        "facts": {"btc_ret": _f6(kb["ret"]), "need_btc": K_BTC, "atr_x": K_ATR},
                         "reason": f"Рывок BTC: +{kb['ret'] * 100:.1f}% за час — ликвидные альткоины обычно догоняют. Из «Лаборатории»: на 2025–2026 "
                                   f"счёт +34%, просадка −12%. Выход через 12 ч, широкий стоп {K_ATR:g} ATR ({K_ATR * at / entry * 100:.1f}%), 20% счёта."})
         # lab rules (L/N/Q): limit orders inside the range, valid ~1 h, re-placed every run
@@ -477,6 +499,7 @@ class PaperDesk:
             out.append({"id": f"D-{base}-{now // 3_600_000}", "symbol": base, "side": "LONG", "grade": "D", "kind": "BASIS_DISCOUNT",
                         "entry": entry, "stop": entry * (1 - D_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
                         "order": "MARKET", "hold_h": HOLD_D_H,
+                        "facts": {"basis": _f6(bz), "need_basis": D_BASIS},
                         "reason": f"Дисконт фьючерса: фьючерс торгуется на {bz*100:.2f}% ниже спота (среднее за час) — продавцы фьючерсов перегнули. "
                                   f"На истории (18 монет, 2023–2026) после такого откуп +1.8% в среднем за сутки, все годы в плюсе. "
                                   f"Выход через 24 ч, стоп −{D_STOP*100:.0f}%, размер — доля счёта."})
@@ -500,6 +523,8 @@ class PaperDesk:
                 out.append({"id": f"B-{base}-{last[0]}", "symbol": base, "side": "LONG", "grade": "B", "kind": "LIQ_CASCADE_LONG",
                             "entry": entry, "stop": stop, "tps": [entry + r, entry + r, entry + r], "parts": [1.0, 0.0, 0.0],
                             "order": "MARKET", "hold_h": HOLD_B_H,
+                            "facts": {"ret": _f6(ret), "sigma_x": _f6(ret / sig), "wick": _f6((min(last[1], last[4]) - last[3]) / rng),
+                                      "need_sigma": -3.5, "need_wick": 0.5},
                             "reason": f"Каскад ликвидаций: свеча {ret*100:.1f}% ({ret/sig:.1f}σ) с длинным хвостом снизу — откуп, цель 1R, до 8 ч."})
         return out
 
@@ -532,11 +557,21 @@ class PaperDesk:
         risk_off = self._stress >= 0.7
         events: list[str] = []
         eq = self.equity()
+        # every coin's signals once per step (20.10: also counted — how many coins each rule fired on, for the app's «why»)
+        sigs = {base: self.signals(coin, btc_bull, now) for base, coin in by_sym.items()}
+        fired: dict[str, int] = {}
+        for base, ss in sigs.items():
+            for g in {s["grade"] for s in ss}:
+                fired[g] = fired.get(g, 0) + 1
+        live = {b: c for b, c in by_sym.items() if len(c.get("candles") or []) >= 200}
+        n_core = sum(1 for c in live.values() if not c.get("b_only"))
+        alts = [b for b in by_sym if b != "BTC" and b in live]           # K: the alts, most traded first (by_sym is sorted for K)
+        n_rules = len(self.P["classes"] & GENERATED)
         # class E basket: all climax signals of this step share e_share of equity; one basket per E_BASKET_H hours
         e_sigs = {}
         if "E" in self.P["classes"]:
-            for base, coin in by_sym.items():
-                for s in self.signals(coin, btc_bull, now):
+            for base in by_sym:
+                for s in sigs[base]:
                     if s["grade"] == "E":
                         e_sigs[base] = s
         e_recent = [t for t in self._open() if t["grade"] == "E" and now - t["opened"] < E_BASKET_H * 3_600_000]
@@ -545,7 +580,7 @@ class PaperDesk:
         known = {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_ORD}")} | {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_TR}")} | self._archived_ids()
         open_syms = {t["symbol"] for t in self._open()} | {o["symbol"] for o in self._pending()}
         for base, coin in by_sym.items():
-            for s in self.signals(coin, btc_bull, now):
+            for s in sigs[base]:
                 if s["id"] in known or base in open_syms or s["grade"] not in self.P["classes"]:
                     continue
                 if s["grade"] == "E" and (e_blocked or base in {t["symbol"] for t in self._open()}):
@@ -586,6 +621,14 @@ class PaperDesk:
                     cap_qty = eq * self.P.get("max_notional", 3.0) / s["entry"]   # 17.10: tight stops must not mean 60 % of the account in one trade
                     if qty > cap_qty:
                         qty = cap_qty; risk_usd = qty * (r + s["entry"] * (2 * self.fee + SLIP))
+                if s.get("facts") is not None:      # 20.10: what the rule saw at entry + the scan around it → the app's «why we entered»
+                    f = dict(s["facts"])
+                    if s["grade"] == "K":
+                        f.update({"rank": alts.index(base) + 1 if base in alts else None, "slots": self.P.get("k_open"),
+                                  "scan": {"coins": len(alts), "rules": n_rules, "fired": fired.get("K", 0)}})
+                    else:
+                        f["scan"] = {"coins": n_core, "rules": n_rules, "fired": fired.get(s["grade"], 0)}
+                    self.conn.execute("INSERT OR IGNORE INTO paper_facts VALUES(?, ?)", (s["id"], json.dumps(f)))
                 if s["order"] == "MARKET":
                     fill = s["entry"] * (1 + SLIP)
                     self.conn.execute(f"INSERT INTO {self.T_TR} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -706,11 +749,12 @@ class PaperDesk:
     def snapshot(self, by_sym: dict, now: int, events: list[str]) -> dict:
         price = {k: v["candles"][-1][4] for k, v in by_sym.items()}
         opens = []
+        facts = self.facts([t["id"] for t in self._open()])
         for t in self._open():
             px = price.get(t["symbol"], t["entry"])
             sgn = 1 if t["side"] == "LONG" else -1
             r = abs(t["entry"] - t["stop"]) or 1
-            opens.append({**t, "tps": json.loads(t["tps"]), "parts": json.loads(t["parts"]), "price": px,
+            opens.append({**t, "tps": json.loads(t["tps"]), "parts": json.loads(t["parts"]), "price": px, "facts": facts.get(t["id"]),
                           "open_pnl_usd": round(sgn * (px - t["entry"]) * t["qty_left"] + t["pnl_usd"], 2), "moved_r": round(sgn * (px - t["entry"]) / r, 2)})
         keys = ("id", "symbol", "side", "grade", "kind", "entry", "stop", "stop_now", "tps", "parts", "qty", "qty_left", "risk_usd", "opened",
                 "expires", "closed", "exit_kind", "pnl_usd", "pnl_r", "tps_hit", "reason", "last_bar")

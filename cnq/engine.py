@@ -70,6 +70,7 @@ def sh(args: list[str], cwd: str, timeout: int = 120, env: dict | None = None) -
         p.kill()
         return False, round(time.time() - t0, 1), repr(e)[:300]
     tail = (out or "")[-300:] if p.returncode == 0 else ((err or "") + (out or ""))[-600:]
+    _phase(f"done {_step_name(args)} rc={p.returncode} {round(time.time() - t0, 1)}s")
     return p.returncode == 0, round(time.time() - t0, 1), tail.strip()
 
 
@@ -100,14 +101,33 @@ def _peak_mb() -> int:
 _STARTED = int(time.time() * 1000)
 
 
+def _step_name(args: list[str]) -> str:
+    return next((a for a in args if not a.startswith("-") and a not in ("-m", "cnq.cli") and not a.endswith("python") and
+                 not a.endswith("python3") and "/" not in a), " ".join(args)[-60:])
+
+
+def _write_now(doc: dict) -> None:
+    try:
+        with open(os.path.join(RUN, "web", "engine_now.json"), "w", encoding="utf-8") as f:
+            json.dump({**doc, "pid": os.getpid(), "started": _STARTED}, f)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _now_step(args: list[str], timeout: int) -> None:
     """web/engine_now.json: which step the engine is in right now (the API's /v2/diag shows it) — a hang or a restart loop is
     visible from outside without logging in to the server"""
+    _write_now({"step": _step_name(args), "since": int(time.time() * 1000), "timeout": timeout})
+
+
+def _phase(text: str) -> None:
+    """the last thing the engine finished (kept next to the current step), so a crash between steps is located too"""
     try:
-        name = next((a for a in args if not a.startswith("-") and a not in ("-m", "cnq.cli") and not a.endswith("python") and
-                     not a.endswith("python3") and "/" not in a), " ".join(args)[-60:])
-        with open(os.path.join(RUN, "web", "engine_now.json"), "w", encoding="utf-8") as f:
-            json.dump({"step": name, "since": int(time.time() * 1000), "timeout": timeout, "pid": os.getpid(), "started": _STARTED}, f)
+        p = os.path.join(RUN, "web", "engine_now.json")
+        d = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+        d["phase"], d["phase_t"] = text, int(time.time() * 1000)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(d, f)
     except Exception:  # noqa: BLE001
         pass
 
@@ -213,12 +233,35 @@ def main(argv: list[str] | None = None) -> int:
     code_mtime = os.path.getmtime(os.path.realpath(__file__))        # a git pull that changes the engine → restart (systemd)
     started, n, last_sync, t_sync = _now_ms(), 0, None, 0.0
     while True:
+        try:
+            n, last_sync, t_sync, stop = _loop_once(a, env, n, last_sync, t_sync, started, code_mtime)
+        except Exception:  # noqa: BLE001
+            import traceback
+            tb = traceback.format_exc()[-1500:]
+            print(tb, flush=True)
+            try:
+                with open(os.path.join(RUN, "web", "engine_crash.json"), "w", encoding="utf-8") as f:
+                    json.dump({"t": _now_ms(), "cycle": n, "trace": tb}, f)
+            except Exception:  # noqa: BLE001
+                pass
+            n += 1
+            time.sleep(5)
+            continue
+        if stop:
+            return 0
+
+
+def _loop_once(a, env, n, last_sync, t_sync, started, code_mtime):
+    """one minute of the engine; returns (n, last_sync, t_sync, stop)"""
+    if True:
         t0 = time.time()
         if not a.no_sync and time.time() - t_sync >= SYNC_S:
             last_sync = {"t": _now_ms(), **sync(push=False)}          # fresh inputs before the desks act
         steps = cycle(n, env)
         dt_ = time.time() - t0
+        _phase(f"cycle {n} steps done {dt_:.0f}s")
         write_status(n, steps, dt_, last_sync, started)
+        _phase(f"cycle {n} status written")
         if not a.no_sync and time.time() - t_sync >= SYNC_S:
             last_sync = {"t": _now_ms(), **sync(push=not a.no_push)}
             t_sync = time.time()
@@ -226,17 +269,19 @@ def main(argv: list[str] | None = None) -> int:
         print(time.strftime("%H:%M:%S"), f"cycle {n} {dt_:.0f}s", "errors: " + ", ".join(bad) if bad else "ok", flush=True)
         n += 1
         if a.cycles and n >= a.cycles:
-            return 0
+            return n, last_sync, t_sync, True
         try:
             if not a.cycles and os.path.getmtime(os.path.realpath(__file__)) != code_mtime:
                 print("engine code updated by git pull — exiting so systemd restarts the new version", flush=True)
-                return 0
+                return n, last_sync, t_sync, True
         except OSError:
             pass
         # start every cycle 3 s after a minute boundary: a 15-minute candle closes at :00 / :15 / :30 / :45, so the desks see it
         # within seconds (history 2020–26: the cascade buy entered 15 minutes late lost 40 % of its edge, and all of it in 2025–26)
         nxt = (int((time.time() - 3) // INTERVAL_S) + 1) * INTERVAL_S + 3
+        _phase(f"cycle {n - 1} done, sleeping")
         time.sleep(max(1.0, nxt - time.time()))
+    return n, last_sync, t_sync, False
 
 
 if __name__ == "__main__":

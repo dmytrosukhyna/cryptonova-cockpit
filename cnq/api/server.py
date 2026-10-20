@@ -133,6 +133,13 @@ class Api:
             out["engine_step_sec"] = round(time.time() - now["since"] / 1000)
             out["engine_step_timeout"] = now.get("timeout")
             out["engine_started_age_sec"] = round(time.time() - (now.get("started") or 0) / 1000)
+            if now.get("phase"):
+                out["engine_phase"] = now.get("phase")
+                out["engine_phase_age_sec"] = round(time.time() - (now.get("phase_t") or 0) / 1000)
+        crash = self._read(os.path.join(self.web, "engine_crash.json")) or {}
+        if crash.get("t"):
+            out["engine_crash_age_sec"] = round(time.time() - crash["t"] / 1000)
+            out["engine_crash"] = str(crash.get("trace", ""))[-400:]
         for name in ("app_home.json", "paper.json"):
             try:
                 out[name + "_age_sec"] = round(time.time() - os.path.getmtime(os.path.join(self.web, name)))

@@ -3,13 +3,15 @@ stopped (finish_reason), the token usage and the start of the answer — as GitH
 
   python scripts/nova_probe.py old   — the prompt as it was before 20.10 (to see why «Сколько я заработал?» failed)
   python scripts/nova_probe.py new   — the live NOVA path: cnq.api.nova (prompt, facts, FAQ, ctx) through Api._agent
-                                       (+ NOVA_PROBE_QS="вопрос 1|вопрос 2" for extra questions)
+                                       (+ NOVA_PROBE_QS="вопрос 1|вопрос 2" for extra questions; «en: What is leverage?» asks in
+                                       that language — en, ru, uk, el, es — as the app's "lang" does)
 
 Needs CNQ_LLM_KEY (+ CNQ_LLM_PROVIDER / CNQ_LLM_MODEL); prints no keys. Reads web/app_home.json from the checkout."""
 from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -92,13 +94,19 @@ def new() -> None:
         ("Сколько я заработал?", "Мой демо-счёт: $1 000 с 20.10, сейчас $1 012 (+1.2%). Копилка: $10 в неделю, цель — учёба детей, 10 лет. Режим: DEMO."),
         ("Это не развод?", None), ("Почему все говорят про будущее крипты?", None), ("Как вывести деньги?", None),
         ("Почему система вошла в AVAX?", None)] + [(q.strip(), None) for q in extra.split("|") if q.strip()]
+    if os.environ.get("NOVA_PROBE_ONLY_EXTRA") == "1":
+        qs = [(q.strip(), None) for q in extra.split("|") if q.strip()]
     for i, (q, ctx) in enumerate(qs):
         t0 = time.time()
-        body = {"q": q, **({"ctx": ctx} if ctx else {})}
+        lang = None
+        m = re.match(r"^(en|ru|uk|el|es):\s*(.+)$", q)
+        if m:
+            lang, q = m.group(1), m.group(2)
+        body = {"q": q, **({"ctx": ctx} if ctx else {}), **({"lang": lang} if lang else {})}
         code, d = api.handle("POST", "/v2/agent", {"authorization": f"Bearer probe{i}"}, json.dumps(body, ensure_ascii=False).encode())
         a = d.get("answer") or ""
         last = api.agent_last or {}
-        note(f"new · {q}{' + ctx' if ctx else ''}",
+        note(f"new · {lang + ' · ' if lang else ''}{q}{' + ctx' if ctx else ''}",
              json.dumps({"http": code, "sec": round(time.time() - t0, 1), "error": d.get("error"), "source": d.get("source"),
                          **{k: last.get(k) for k in ("result", "finish", "prompt_tokens", "reasoning_tokens")},
                          "words": len(a.split()), "answer": a}, ensure_ascii=False))

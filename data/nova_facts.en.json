@@ -1,0 +1,60 @@
+{
+  "v": 1,
+  "updated": "2026-10-20",
+  "lang": "en",
+  "about": "The checked facts of data/nova_facts.json in English, by id (dates, sources and values stay there). Translate a new or changed fact here too; a missing id falls back to the Russian text.",
+  "facts": [
+    {
+      "id": "etf_approval",
+      "fact": "On 10 January 2024 the SEC (the US regulator) approved 11 spot bitcoin ETFs: bitcoin can be bought through an ordinary brokerage account, like a fund share."
+    },
+    {
+      "id": "etf_holdings",
+      "fact": "As of 8 October 2026, US bitcoin ETFs held about 1 293 000 BTC (≈ $107 billion), of which BlackRock's fund held about 806 000 BTC."
+    },
+    {
+      "id": "vanguard",
+      "fact": "On 2 December 2025 Vanguard (over 50 million clients) allowed its clients to buy crypto ETFs, after years of opposing them."
+    },
+    {
+      "id": "nasdaq_tokenized",
+      "fact": "On 18 March 2026 the SEC approved a Nasdaq pilot: tokenized shares of Russell 1000 stocks and ETFs on the S&P 500 and Nasdaq-100 will be able to trade alongside the regular ones, at the same price and with the same rights."
+    },
+    {
+      "id": "robinhood_tokens",
+      "fact": "On 30 June 2025 Robinhood launched tokens of more than 200 US stocks and ETFs for the EU on the Arbitrum blockchain."
+    },
+    {
+      "id": "genius_act",
+      "fact": "On 18 July 2025 the GENIUS Act was signed into law in the US — the first federal rules for stablecoins."
+    },
+    {
+      "id": "shopify_usdc",
+      "fact": "On 12 June 2025 Shopify, together with Coinbase and Stripe, let stores accept payments in the USDC stablecoin (early access first)."
+    },
+    {
+      "id": "samsung_usdc",
+      "fact": "On 7 October 2026 Samsung announced that from late October 2026 Galaxy users in the US can keep USDC digital dollars in Samsung Wallet and send them to crypto wallets and to banks in 60+ countries. There are about 82 million Galaxy devices in the US compatible with Samsung Wallet. Paying with stablecoins in stores isn't possible yet — Samsung calls it a possible next step."
+    },
+    {
+      "id": "btc_pizza",
+      "fact": "On 22 May 2010 Laszlo Hanyecz paid 10 000 BTC for 2 pizzas — the first known purchase with bitcoin."
+    },
+    {
+      "id": "btc_2013",
+      "fact": "In early 2013 bitcoin cost about $13; in November 2013 it rose above $1 000 for the first time."
+    },
+    {
+      "id": "btc_ath",
+      "fact": "Bitcoin's record high is $126 210, on 6 October 2025."
+    },
+    {
+      "id": "btc_drawdowns",
+      "fact": "After the peaks of 2011, 2013, 2017 and 2021 bitcoin fell 75–93% and each time later set a new record; the past doesn't guarantee this."
+    },
+    {
+      "id": "btc_supply",
+      "fact": "There will never be more than 21 million bitcoins — that's built into its code."
+    }
+  ]
+}

@@ -1,0 +1,615 @@
+"""Server texts in the app's five languages (20.10.2026: the 2.0 app became multilingual — it picks the phone's language,
+English when the phone's is not one of these, and the user can switch).
+
+  t(lang, key, **params)   a template of the catalog T, filled with str.format — the same {placeholders} in every language
+  plural(lang, n, key)     the word for n in that language (ru / uk: one · few · many; en / el / es: one · other)
+  norm_lang(v)             "en-US" / "UK" / "ua" / None → one of LANGS; anything unknown → DEFAULT (ru, the language of the old builds)
+
+Used by cnq/agents/app_home.py (web/app_home.json = ru, web/app_home.<lang>.json = the others; field names stay *_ru, the text
+is the file's language) and cnq/api (NOVA's limit / busy answers, ?lang= on the feeds). Russian is the source; the others are
+written for people, not word for word: Ukrainian proper (not calqued Russian), Greek with accents and the polite «εσείς»,
+Spanish neutral with «tú», English plain. The app's own labels (its i18n files) are used for its sections: Piggy bank /
+Скарбничка / Κουμπαράς / Hucha, demo account, «Реальный счёт» = Real account … Stdlib only."""
+from __future__ import annotations
+
+import string
+
+LANGS = ("ru", "en", "uk", "el", "es")
+DEFAULT = "ru"
+ALIASES = {"ua": "uk", "gr": "el", "rus": "ru", "eng": "en", "ukr": "uk", "ell": "el", "gre": "el", "spa": "es"}
+
+
+def norm_lang(v) -> str:
+    s = str(v or "").strip().lower().replace("_", "-").split("-")[0]
+    s = ALIASES.get(s, s)
+    return s if s in LANGS else DEFAULT
+
+
+def file_name(base: str, lang: str, ext: str = "json") -> str:
+    """app_home + ru → app_home.json; app_home + en → app_home.en.json"""
+    return f"{base}.{ext}" if lang == DEFAULT else f"{base}.{lang}.{ext}"
+
+
+# ------------------------------------------------------------------------------------------------ the catalog
+T: dict[str, dict[str, str]] = {
+    # ---------------------------------------------------------------- spot allocation groups (spot.alloc[].name)
+    "alloc.btc": {"ru": "Биткоин", "en": "Bitcoin", "uk": "Біткоїн", "el": "Bitcoin", "es": "Bitcoin"},
+    "alloc.eth": {"ru": "Эфир", "en": "Ether", "uk": "Ефір", "el": "Ether", "es": "Ether"},
+    "alloc.sol": {"ru": "Солана", "en": "Solana", "uk": "Солана", "el": "Solana", "es": "Solana"},
+    "alloc.meme": {"ru": "мем-монеты", "en": "meme coins", "uk": "мем-монети", "el": "meme coins", "es": "monedas meme"},
+    "alloc.alt": {"ru": "крупные альты", "en": "large altcoins", "uk": "великі альткоїни", "el": "μεγάλα altcoins",
+                  "es": "altcoins grandes"},
+    "alloc.core": {"ru": "ядро", "en": "core", "uk": "ядро", "el": "πυρήνας", "es": "núcleo"},
+    "alloc.other": {"ru": "другие", "en": "other", "uk": "інші", "el": "άλλα", "es": "otras"},
+    "alloc.cash": {"ru": "доллары", "en": "dollars", "uk": "долари", "el": "δολάρια", "es": "dólares"},
+
+    # ---------------------------------------------------------------- «why we entered» (futures.open[].why)
+    "why.CLIMAX_LONG": {
+        "ru": "Рынок резко продали: свеча упала на большом объёме. После таких провалов цена чаще отскакивает за сутки.",
+        "en": "The market was sold off sharply: the candle dropped on heavy volume. After dips like this, the price more often "
+              "bounces back within a day.",
+        "uk": "Ринок різко розпродали: свічка впала на великому обсязі. Після таких провалів ціна частіше відскакує протягом доби.",
+        "el": "Η αγορά δέχτηκε απότομες πωλήσεις: το κερί έπεσε με μεγάλο όγκο. Μετά από τέτοιες βουτιές η τιμή πιο συχνά "
+              "ανακάμπτει μέσα σε 24 ώρες.",
+        "es": "El mercado se vendió de golpe: la vela cayó con mucho volumen. Tras caídas así, el precio rebota más a menudo en "
+              "menos de un día."},
+    "why.CLIMAX_SHORT": {
+        "ru": "Цену резко разогнали на большом объёме. После таких всплесков цена чаще откатывает за сутки.",
+        "en": "The price was pushed up sharply on heavy volume. After spikes like this, the price more often pulls back within a day.",
+        "uk": "Ціну різко розігнали на великому обсязі. Після таких сплесків ціна частіше відкочується протягом доби.",
+        "el": "Η τιμή εκτινάχθηκε απότομα με μεγάλο όγκο. Μετά από τέτοιες εκρήξεις η τιμή πιο συχνά υποχωρεί μέσα σε 24 ώρες.",
+        "es": "El precio se disparó de golpe con mucho volumen. Tras subidas así, el precio retrocede más a menudo en menos de un día."},
+    "why.P": {
+        "ru": "Монета в растущем тренде на день откатилась вниз. Покупаем откат: на истории 2023–2026 такие входы в среднем "
+              "давали плюс.",
+        "en": "A coin in an uptrend dipped for a day. We buy the dip: on 2023–2026 history, entries like this were profitable on "
+              "average.",
+        "uk": "Монета у висхідному тренді на день відкотилася вниз. Купуємо відкат: на даних 2023–2026 такі входи в середньому "
+              "давали плюс.",
+        "el": "Ένα νόμισμα σε ανοδική τάση υποχώρησε για μία μέρα. Αγοράζουμε την υποχώρηση: στο ιστορικό 2023–2026 τέτοιες "
+              "είσοδοι έδιναν κατά μέσο όρο κέρδος.",
+        "es": "Una moneda en tendencia alcista retrocedió un día. Compramos el retroceso: en el histórico 2023–2026, estas entradas "
+              "dieron ganancias de media."},
+    "why.C": {
+        "ru": "Цена пробила максимум 20 дней. На истории после таких пробоев тренд чаще продолжается.",
+        "en": "The price broke above its 20-day high. Historically, after breakouts like this the trend more often continues.",
+        "uk": "Ціна пробила максимум 20 днів. Історично після таких пробоїв тренд частіше триває.",
+        "el": "Η τιμή έσπασε το υψηλό 20 ημερών. Ιστορικά, μετά από τέτοιες διασπάσεις η τάση πιο συχνά συνεχίζεται.",
+        "es": "El precio superó su máximo de 20 días. En el histórico, tras rupturas así la tendencia continúa más a menudo."},
+    "why.LST": {
+        "ru": "Новая монета на бирже: после листинга цена чаще снижается. Шорт на 14 дней, небольшой размер.",
+        "en": "A new coin on the exchange: after a listing, the price more often goes down. A 14-day short, small size.",
+        "uk": "Нова монета на біржі: після лістингу ціна частіше знижується. Шорт на 14 днів, невеликий розмір.",
+        "el": "Νέο νόμισμα στο ανταλλακτήριο: μετά την εισαγωγή του η τιμή πιο συχνά πέφτει. Short για 14 ημέρες, μικρό μέγεθος.",
+        "es": "Una moneda nueva en el exchange: tras el listado, el precio baja más a menudo. Short a 14 días, tamaño pequeño."},
+    "why.K": {
+        "ru": "Биткоин резко вырос, а эта монета ещё нет — на истории альты чаще догоняют рывок BTC.",
+        "en": "Bitcoin jumped, but this coin hasn't yet — historically, alts more often catch up with a BTC surge.",
+        "uk": "Біткоїн різко зріс, а ця монета ще ні — історично альти частіше наздоганяють ривок BTC.",
+        "el": "Το bitcoin ανέβηκε απότομα, αυτό το νόμισμα όχι ακόμη — ιστορικά τα altcoins πιο συχνά ακολουθούν το άλμα του BTC.",
+        "es": "Bitcoin subió de golpe y esta moneda todavía no: en el histórico, las altcoins alcanzan más a menudo el impulso de BTC."},
+    "why.default": {
+        "ru": "Сделка по правилам CRYPTO NOVA: вход, стоп и цель заданы заранее.",
+        "en": "A trade by CRYPTO NOVA's rules: entry, stop and target are set in advance.",
+        "uk": "Угода за правилами CRYPTO NOVA: вхід, стоп і ціль задано заздалегідь.",
+        "el": "Συναλλαγή με τους κανόνες του CRYPTO NOVA: είσοδος, stop και στόχος ορίζονται εκ των προτέρων.",
+        "es": "Una operación según las reglas de CRYPTO NOVA: entrada, stop y objetivo fijados de antemano."},
+    "why.vol": {"ru": " Объём дня сигнала — ×{vol} к обычному.", "en": " The signal day's volume was ×{vol} the usual.",
+                "uk": " Обсяг дня сигналу — ×{vol} до звичайного.", "el": " Ο όγκος της ημέρας του σήματος ήταν ×{vol} του συνηθισμένου.",
+                "es": " El volumen del día de la señal fue ×{vol} el habitual."},
+
+    # ---------------------------------------------------------------- which desk / rule (futures.open[].src_ru)
+    "src.bal": {"ru": "основная стратегия", "en": "main strategy", "uk": "основна стратегія", "el": "κύρια στρατηγική",
+                "es": "estrategia principal"},
+    "src.imp": {"ru": "импульс BTC", "en": "BTC momentum", "uk": "імпульс BTC", "el": "ορμή BTC", "es": "impulso de BTC"},
+    "src.own": {"ru": "сигналы CRYPTO NOVA", "en": "CRYPTO NOVA signals", "uk": "сигнали CRYPTO NOVA", "el": "σήματα CRYPTO NOVA",
+                "es": "señales de CRYPTO NOVA"},
+    "src.lst": {"ru": "шорт листингов", "en": "listing shorts", "uk": "шорт лістингів", "el": "short σε νέες εισαγωγές",
+                "es": "shorts de listados"},
+    "src.default": {"ru": "CRYPTO NOVA", "en": "CRYPTO NOVA", "uk": "CRYPTO NOVA", "el": "CRYPTO NOVA", "es": "CRYPTO NOVA"},
+    # the rules (Russian = signal_feed.RULE_RU, the Telegram names)
+    "rule.A": {"ru": "откуп гэпа", "en": "gap buy", "uk": "викуп гепу", "el": "αγορά στο κενό τιμής", "es": "compra del gap"},
+    "rule.B": {"ru": "откуп каскада ликвидаций", "en": "liquidation cascade buy", "uk": "викуп каскаду ліквідацій",
+               "el": "αγορά μετά από ρευστοποιήσεις", "es": "compra tras liquidaciones en cascada"},
+    "rule.C": {"ru": "пробой 20 дней", "en": "20-day breakout", "uk": "пробій 20 днів", "el": "διάσπαση 20 ημερών",
+               "es": "ruptura de 20 días"},
+    "rule.D": {"ru": "откуп дисконта фьючерса", "en": "futures discount buy", "uk": "викуп дисконту ф'ючерса",
+               "el": "αγορά στην έκπτωση του future", "es": "compra con descuento del futuro"},
+    "rule.E": {"ru": "откуп паники", "en": "panic buy", "uk": "викуп паніки", "el": "αγορά στον πανικό", "es": "compra en el pánico"},
+    "rule.F": {"ru": "откуп сброса позиций", "en": "position flush buy", "uk": "викуп скидання позицій",
+               "el": "αγορά μετά από μαζικό κλείσιμο θέσεων", "es": "compra tras cierre masivo de posiciones"},
+    "rule.K": {"ru": "альт догоняет рывок BTC", "en": "alt catches up with BTC", "uk": "альт наздоганяє ривок BTC",
+               "el": "altcoin ακολουθεί το BTC", "es": "altcoin alcanza a BTC"},
+    "rule.LST": {"ru": "шорт нового листинга", "en": "new listing short", "uk": "шорт нового лістингу", "el": "short σε νέα εισαγωγή",
+                 "es": "short de nuevo listado"},
+    "rule.P": {"ru": "откат в тренде", "en": "trend pullback", "uk": "відкат у тренді", "el": "υποχώρηση σε τάση",
+               "es": "retroceso en tendencia"},
+
+    # ---------------------------------------------------------------- the setup in a few words (futures.open[].why_title)
+    "title.P": {"ru": "Откат в растущем тренде", "en": "Pullback in an uptrend", "uk": "Відкат у висхідному тренді",
+                "el": "Υποχώρηση σε ανοδική τάση", "es": "Retroceso en tendencia alcista"},
+    "title.C": {"ru": "Пробой максимума 20 дней", "en": "Breakout above the 20-day high", "uk": "Пробій максимуму 20 днів",
+                "el": "Διάσπαση του υψηλού 20 ημερών", "es": "Ruptura del máximo de 20 días"},
+    "title.E": {"ru": "Откуп паники на большом объёме", "en": "Buying the panic on heavy volume",
+                "uk": "Викуп паніки на великому обсязі", "el": "Αγορά στον πανικό με μεγάλο όγκο",
+                "es": "Compra en el pánico con mucho volumen"},
+    "title.B": {"ru": "Откуп каскада ликвидаций", "en": "Buying a liquidation cascade", "uk": "Викуп каскаду ліквідацій",
+                "el": "Αγορά μετά από καταρράκτη ρευστοποιήσεων", "es": "Compra tras una cascada de liquidaciones"},
+    "title.F": {"ru": "Откуп сброса позиций", "en": "Buying a position flush", "uk": "Викуп скидання позицій",
+                "el": "Αγορά μετά από μαζικό κλείσιμο θέσεων", "es": "Compra tras un cierre masivo de posiciones"},
+    "title.D": {"ru": "Откуп дисконта фьючерса", "en": "Buying the futures discount", "uk": "Викуп дисконту ф'ючерса",
+                "el": "Αγορά στην έκπτωση του future", "es": "Compra con el futuro en descuento"},
+    "title.K": {"ru": "Альт догоняет рывок биткоина", "en": "An alt catching up with bitcoin's surge",
+                "uk": "Альт наздоганяє ривок біткоїна", "el": "Ένα altcoin ακολουθεί το άλμα του bitcoin",
+                "es": "Una altcoin alcanza el impulso de bitcoin"},
+    "title.LST": {"ru": "Шорт нового листинга", "en": "Shorting a new listing", "uk": "Шорт нового лістингу",
+                  "el": "Short σε νέα εισαγωγή", "es": "Short de un nuevo listado"},
+    # the rule's name inside the «work» sentence
+    "rname.E": {"ru": "откуп паники", "en": "panic buy", "uk": "викуп паніки", "el": "αγορά στον πανικό", "es": "compra en el pánico"},
+    "rname.B": {"ru": "откуп каскада", "en": "cascade buy", "uk": "викуп каскаду", "el": "αγορά μετά από καταρράκτη",
+                "es": "compra tras la cascada"},
+    "rname.F": {"ru": "откуп сброса позиций", "en": "position flush buy", "uk": "викуп скидання позицій",
+                "el": "αγορά μετά από μαζικό κλείσιμο θέσεων", "es": "compra tras cierre masivo de posiciones"},
+    "rname.D": {"ru": "откуп дисконта фьючерса", "en": "futures discount buy", "uk": "викуп дисконту ф'ючерса",
+                "el": "αγορά στην έκπτωση του future", "es": "compra con descuento del futuro"},
+    "rname.K": {"ru": "альт догоняет рывок BTC", "en": "alt catches up with BTC", "uk": "альт наздоганяє ривок BTC",
+                "el": "altcoin ακολουθεί το BTC", "es": "altcoin alcanza a BTC"},
+
+    # ---------------------------------------------------------------- the rule's record on history (history.years_plus / .text)
+    "hist.every_year": {"ru": "каждый год в плюсе", "en": "profitable every year", "uk": "щороку в плюсі",
+                        "el": "κερδοφόρο κάθε χρόνο", "es": "en positivo cada año"},
+    "hist.B.years": {"ru": "5 из 6 лет в плюсе", "en": "profitable in 5 of 6 years", "uk": "5 із 6 років у плюсі",
+                     "el": "κερδοφόρο σε 5 από τα 6 έτη", "es": "en positivo 5 de 6 años"},
+    "hist.K.years": {"ru": "2025 и 2026 в плюсе", "en": "2025 and 2026 profitable", "uk": "2025 і 2026 у плюсі",
+                     "el": "κερδοφόρο το 2025 και το 2026", "es": "2025 y 2026 en positivo"},
+    "hist.P.text": {
+        "ru": "Честная проверка обоих правил «Сигналов» вместе (каждый день топ-40 монет Binance по обороту, включая снятые с "
+              "торгов): в среднем +3.1% на сделку, около +2% в месяц к счёту; отдельной статистики «отката» в отчёте нет.",
+        "en": "An honest test of both “Signals” rules together (each day the top 40 Binance coins by turnover, delisted ones "
+              "included): +3.1% per trade on average, about +2% a month on the account; the report has no separate figures for "
+              "the pullback rule.",
+        "uk": "Чесна перевірка обох правил «Сигналів» разом (щодня топ-40 монет Binance за оборотом, включно зі знятими з "
+              "торгів): у середньому +3.1% на угоду, близько +2% на місяць для рахунку; окремої статистики «відкату» у звіті немає.",
+        "el": "Έντιμος έλεγχος και των δύο κανόνων των «Σημάτων» μαζί (κάθε μέρα τα 40 νομίσματα του Binance με τον μεγαλύτερο "
+              "τζίρο, μαζί με όσα αποσύρθηκαν): κατά μέσο όρο +3.1% ανά συναλλαγή, περίπου +2% τον μήνα στον λογαριασμό· η "
+              "αναφορά δεν δίνει ξεχωριστά στοιχεία για την «υποχώρηση».",
+        "es": "Prueba honesta de las dos reglas de «Señales» juntas (cada día las 40 monedas de Binance con más volumen, "
+              "incluidas las retiradas de cotización): +3.1% por operación de media, cerca de +2% al mes para la cuenta; el "
+              "informe no da cifras aparte del «retroceso»."},
+    "hist.C.text": {
+        "ru": "18 крупных монет Binance, вход после закрытия дня с объёмом от ×1.5: 403 сделки, 53% в плюсе, в среднем +6.3% — "
+              "без снятых с торгов монет это завышено; честная проверка обоих правил вместе даёт +3.1% на сделку.",
+        "en": "18 large Binance coins, entry after a daily close on volume of ×1.5 or more: 403 trades, 53% profitable, +6.3% on "
+              "average — without delisted coins this is inflated; the honest test of both rules together gives +3.1% per trade.",
+        "uk": "18 великих монет Binance, вхід після закриття дня з обсягом від ×1.5: 403 угоди, 53% у плюсі, у середньому +6.3% — "
+              "без знятих з торгів монет це завищено; чесна перевірка обох правил разом дає +3.1% на угоду.",
+        "el": "18 μεγάλα νομίσματα του Binance, είσοδος μετά το ημερήσιο κλείσιμο με όγκο από ×1.5: 403 συναλλαγές, 53% με "
+              "κέρδος, κατά μέσο όρο +6.3% — χωρίς τα νομίσματα που αποσύρθηκαν, αυτό είναι υπερεκτιμημένο· ο έντιμος έλεγχος "
+              "και των δύο κανόνων μαζί δίνει +3.1% ανά συναλλαγή.",
+        "es": "18 monedas grandes de Binance, entrada tras el cierre diario con volumen desde ×1.5: 403 operaciones, 53% en "
+              "positivo, +6.3% de media; sin las monedas retiradas de cotización esto está inflado: la prueba honesta de las dos "
+              "reglas juntas da +3.1% por operación."},
+    "hist.E.text": {
+        "ru": "18 монет Binance: 3 414 сделок, 60% в плюсе, в среднем +1.26% за сутки — при пороге «падает 70% рынка»; с 16.10 "
+              "порог 40%, при 30–50% в среднем +1.07…+1.14%, тоже каждый год в плюсе.",
+        "en": "18 Binance coins: 3 414 trades, 60% profitable, +1.26% per day on average — with the threshold “70% of the market "
+              "is falling”; since 16.10 the threshold is 40%, and at 30–50% the average is +1.07…+1.14%, also profitable every year.",
+        "uk": "18 монет Binance: 3 414 угод, 60% у плюсі, у середньому +1.26% за добу — при порозі «падає 70% ринку»; з 16.10 "
+              "поріг 40%, при 30–50% у середньому +1.07…+1.14%, теж щороку в плюсі.",
+        "el": "18 νομίσματα του Binance: 3 414 συναλλαγές, 60% με κέρδος, κατά μέσο όρο +1.26% σε 24 ώρες — με όριο «πέφτει το "
+              "70% της αγοράς»· από 16.10 το όριο είναι 40%, και στο 30–50% ο μέσος όρος είναι +1.07…+1.14%, επίσης κερδοφόρο "
+              "κάθε χρόνο.",
+        "es": "18 monedas de Binance: 3 414 operaciones, 60% en positivo, +1.26% de media en un día, con el umbral «cae el 70% "
+              "del mercado»; desde el 16.10 el umbral es 40%, y con 30–50% la media es +1.07…+1.14%, también en positivo cada año."},
+    "hist.B.text": {
+        "ru": "18 монет Binance, вход сразу после свечи с длинным хвостом снизу: 729 сделок, 59% в плюсе, в среднем +0.95%, "
+              "за 2025–2026 +1.19%.",
+        "en": "18 Binance coins, entry right after a candle with a long lower wick: 729 trades, 59% profitable, +0.95% on "
+              "average, +1.19% in 2025–2026.",
+        "uk": "18 монет Binance, вхід одразу після свічки з довгим хвостом знизу: 729 угод, 59% у плюсі, у середньому +0.95%, "
+              "за 2025–2026 +1.19%.",
+        "el": "18 νομίσματα του Binance, είσοδος αμέσως μετά από κερί με μακριά κάτω σκιά: 729 συναλλαγές, 59% με κέρδος, κατά "
+              "μέσο όρο +0.95%, το 2025–2026 +1.19%.",
+        "es": "18 monedas de Binance, entrada justo después de una vela con una mecha inferior larga: 729 operaciones, 59% en "
+              "positivo, +0.95% de media; en 2025–2026, +1.19%."},
+    "hist.F.text": {
+        "ru": "18 монет Binance с настоящим открытым интересом: 650 сделок, 56% в плюсе, в среднем +1.53% за сутки при стопе "
+              "−6%; случайная покупка в те же годы −0.08…−0.14%.",
+        "en": "18 Binance coins with real open interest data: 650 trades, 56% profitable, +1.53% per day on average with a −6% "
+              "stop; a random buy in the same years gave −0.08…−0.14%.",
+        "uk": "18 монет Binance зі справжнім відкритим інтересом: 650 угод, 56% у плюсі, у середньому +1.53% за добу при стопі "
+              "−6%; випадкова купівля в ті самі роки −0.08…−0.14%.",
+        "el": "18 νομίσματα του Binance με πραγματικά δεδομένα ανοιχτού ενδιαφέροντος: 650 συναλλαγές, 56% με κέρδος, κατά μέσο "
+              "όρο +1.53% σε 24 ώρες με stop −6%· μια τυχαία αγορά τα ίδια χρόνια έδινε −0.08…−0.14%.",
+        "es": "18 monedas de Binance con datos reales de interés abierto: 650 operaciones, 56% en positivo, +1.53% de media en un "
+              "día con stop de −6%; una compra al azar en los mismos años daba −0.08…−0.14%."},
+    "hist.D.text": {
+        "ru": "18 монет Binance: около 0.4 сделки в день, 55% в плюсе, в среднем +1.77% за сутки; случайный вход на тот же срок "
+              "−0.12%. Прибыль держится на редких сильных перекосах.",
+        "en": "18 Binance coins: about 0.4 trades a day, 55% profitable, +1.77% per day on average; a random entry for the same "
+              "period gave −0.12%. The profit rests on rare, strong mispricings.",
+        "uk": "18 монет Binance: близько 0.4 угоди на день, 55% у плюсі, у середньому +1.77% за добу; випадковий вхід на той "
+              "самий строк −0.12%. Прибуток тримається на рідкісних сильних перекосах.",
+        "el": "18 νομίσματα του Binance: περίπου 0.4 συναλλαγές την ημέρα, 55% με κέρδος, κατά μέσο όρο +1.77% σε 24 ώρες· μια "
+              "τυχαία είσοδος για το ίδιο διάστημα έδινε −0.12%. Το κέρδος στηρίζεται σε σπάνιες, έντονες αποκλίσεις.",
+        "es": "18 monedas de Binance: unas 0.4 operaciones al día, 55% en positivo, +1.77% de media en un día; una entrada al "
+              "azar por el mismo plazo daba −0.12%. La ganancia depende de desajustes fuertes y poco frecuentes."},
+    "hist.K.text": {
+        "ru": "Проверка «Лаборатории» на топ-50 монет по обороту (с 2023): счёт из 5 позиций +34% за 2025–2026, просадка −12%; "
+              "в обвальном 2022 правило было в минусе.",
+        "en": "The “Lab” test on the top 50 coins by turnover (since 2023): a 5-position account made +34% in 2025–2026, "
+              "drawdown −12%; in the 2022 crash the rule lost money.",
+        "uk": "Перевірка «Лабораторії» на топ-50 монет за оборотом (з 2023): рахунок із 5 позицій +34% за 2025–2026, просідання "
+              "−12%; в обвальному 2022 правило було в мінусі.",
+        "el": "Έλεγχος του «Εργαστηρίου» στα 50 νομίσματα με τον μεγαλύτερο τζίρο (από το 2023): λογαριασμός 5 θέσεων +34% το "
+              "2025–2026, μέγιστη πτώση −12%· στην κατάρρευση του 2022 ο κανόνας ήταν σε ζημιά.",
+        "es": "Prueba del «Laboratorio» con las 50 monedas de mayor volumen (desde 2023): una cuenta de 5 posiciones ganó +34% "
+              "en 2025–2026, con caída máxima de −12%; en el desplome de 2022 la regla perdió dinero."},
+    "hist.LST.text": {
+        "ru": "Все 729 листингов Binance 2023–2026, включая снятые с торгов, с фандингом и комиссиями: 55% сделок в плюсе, в "
+              "среднем +2.6%; худшая сделка −43%, поэтому стоп обязателен.",
+        "en": "All 729 Binance listings of 2023–2026, delisted ones included, with funding and fees: 55% of trades profitable, "
+              "+2.6% on average; the worst trade was −43%, so the stop is a must.",
+        "uk": "Усі 729 лістингів Binance 2023–2026, включно зі знятими з торгів, із фандингом і комісіями: 55% угод у плюсі, у "
+              "середньому +2.6%; найгірша угода −43%, тому стоп обов'язковий.",
+        "el": "Και οι 729 εισαγωγές του Binance 2023–2026, μαζί με όσες αποσύρθηκαν, με funding και προμήθειες: 55% των "
+              "συναλλαγών με κέρδος, κατά μέσο όρο +2.6%· η χειρότερη συναλλαγή −43%, γι' αυτό το stop είναι υποχρεωτικό.",
+        "es": "Los 729 listados de Binance de 2023–2026, incluidos los retirados, con funding y comisiones: 55% de operaciones en "
+              "positivo, +2.6% de media; la peor operación fue −43%, así que el stop es obligatorio."},
+
+    # ---------------------------------------------------------------- the conditions checked at entry (checks[].t / .v)
+    "vs.above": {"ru": "на {pct} выше", "en": "{pct} above", "uk": "на {pct} вище", "el": "{pct} πάνω από",
+                 "es": "un {pct} por encima de"},
+    "vs.below": {"ru": "на {pct} ниже", "en": "{pct} below", "uk": "на {pct} нижче", "el": "{pct} κάτω από",
+                 "es": "un {pct} por debajo de"},
+    "chk.trend": {"ru": "Тренд", "en": "Trend", "uk": "Тренд", "el": "Τάση", "es": "Tendencia"},
+    "chk.trend.v50": {"ru": "цена {vs} средней за 50 дней", "en": "price {vs} the 50-day average",
+                      "uk": "ціна {vs} середньої за 50 днів", "el": "τιμή {vs} τον μέσο όρο 50 ημερών",
+                      "es": "precio {vs} la media de 50 días"},
+    "chk.trend.v20": {"ru": "цена {vs} средней за 20 дней", "en": "price {vs} the 20-day average",
+                      "uk": "ціна {vs} середньої за 20 днів", "el": "τιμή {vs} τον μέσο όρο 20 ημερών",
+                      "es": "precio {vs} la media de 20 días"},
+    "chk.trend_up": {"ru": "Тренд растёт", "en": "Trend rising", "uk": "Тренд зростає", "el": "Η τάση ανεβαίνει",
+                     "es": "La tendencia sube"},
+    "chk.trend_up.v": {"ru": "средняя за 50 дней {pct} за 5 дней", "en": "50-day average {pct} over 5 days",
+                       "uk": "середня за 50 днів {pct} за 5 днів", "el": "μέσος όρος 50 ημερών {pct} σε 5 ημέρες",
+                       "es": "media de 50 días {pct} en 5 días"},
+    "chk.pullback": {"ru": "Откат", "en": "Pullback", "uk": "Відкат", "el": "Υποχώρηση", "es": "Retroceso"},
+    "chk.pullback.v": {"ru": "{chg} за 2 дня, RSI(2) = {rsi} (вход ниже 10)", "en": "{chg} over 2 days, RSI(2) = {rsi} (entry below 10)",
+                       "uk": "{chg} за 2 дні, RSI(2) = {rsi} (вхід нижче 10)",
+                       "el": "{chg} σε 2 ημέρες, RSI(2) = {rsi} (είσοδος κάτω από 10)",
+                       "es": "{chg} en 2 días, RSI(2) = {rsi} (entrada por debajo de 10)"},
+    "chk.pullback.v_rsi": {"ru": "RSI(2) = {rsi} (вход ниже 10)", "en": "RSI(2) = {rsi} (entry below 10)",
+                           "uk": "RSI(2) = {rsi} (вхід нижче 10)", "el": "RSI(2) = {rsi} (είσοδος κάτω από 10)",
+                           "es": "RSI(2) = {rsi} (entrada por debajo de 10)"},
+    "chk.breakout": {"ru": "Пробой", "en": "Breakout", "uk": "Пробій", "el": "Διάσπαση", "es": "Ruptura"},
+    "chk.breakout.v": {"ru": "закрытие {vs} максимума 20 дней", "en": "close {vs} the 20-day high",
+                       "uk": "закриття {vs} максимуму 20 днів", "el": "κλείσιμο {vs} το υψηλό 20 ημερών",
+                       "es": "cierre {vs} el máximo de 20 días"},
+    "chk.market": {"ru": "Рынок", "en": "Market", "uk": "Ринок", "el": "Αγορά", "es": "Mercado"},
+    "chk.market.v": {"ru": "BTC {vs} средней за 200 дней и {pct} за 60 дней — {mode}",
+                     "en": "BTC {vs} the 200-day average and {pct} over 60 days — {mode}",
+                     "uk": "BTC {vs} середньої за 200 днів і {pct} за 60 днів — {mode}",
+                     "el": "BTC {vs} τον μέσο όρο 200 ημερών και {pct} σε 60 ημέρες — {mode}",
+                     "es": "BTC {vs} la media de 200 días y {pct} en 60 días: {mode}"},
+    "chk.market.bull": {"ru": "режим роста", "en": "uptrend mode", "uk": "режим зростання", "el": "καθεστώς ανόδου",
+                        "es": "modo alcista"},
+    "chk.market.not": {"ru": "не рост", "en": "not an uptrend", "uk": "не зростання", "el": "όχι άνοδος", "es": "no es alcista"},
+    "chk.volume": {"ru": "Объём", "en": "Volume", "uk": "Обсяг", "el": "Όγκος", "es": "Volumen"},
+    "chk.volume.v30": {"ru": "×{x} к среднему за 30 дней (нужно от ×1.5)", "en": "×{x} vs the 30-day average (needs ×1.5 or more)",
+                       "uk": "×{x} до середнього за 30 днів (потрібно від ×1.5)",
+                       "el": "×{x} σε σχέση με τον μέσο όρο 30 ημερών (χρειάζεται από ×1.5)",
+                       "es": "×{x} frente a la media de 30 días (se necesita desde ×1.5)"},
+    "chk.volume.vday": {"ru": "×{x} к среднему за сутки (нужно от ×{need})", "en": "×{x} vs the daily average (needs ×{need} or more)",
+                        "uk": "×{x} до середнього за добу (потрібно від ×{need})",
+                        "el": "×{x} σε σχέση με τον μέσο όρο της ημέρας (χρειάζεται από ×{need})",
+                        "es": "×{x} frente a la media del día (se necesita desde ×{need})"},
+    "chk.liquidity": {"ru": "Ликвидность", "en": "Liquidity", "uk": "Ліквідність", "el": "Ρευστότητα", "es": "Liquidez"},
+    "chk.liquidity.v": {"ru": "№{rank} из {of} самых торгуемых монет за 30 дней",
+                        "en": "No. {rank} of the {of} most traded coins over 30 days",
+                        "uk": "№{rank} із {of} найбільш торгованих монет за 30 днів",
+                        "el": "θέση {rank} από τα {of} νομίσματα με τις περισσότερες συναλλαγές σε 30 ημέρες",
+                        "es": "puesto {rank} de las {of} monedas más negociadas en 30 días"},
+    "chk.liquidity.vK": {"ru": "№{rank} из {n} альткоинов по обороту за сутки — места получают самые торгуемые",
+                         "en": "No. {rank} of {n} altcoins by 24h turnover — the slots go to the most traded",
+                         "uk": "№{rank} із {n} альткоїнів за оборотом за добу — місця отримують найбільш торговані",
+                         "el": "θέση {rank} από {n} altcoins σε τζίρο 24 ωρών — τις θέσεις παίρνουν όσα έχουν τις περισσότερες "
+                               "συναλλαγές",
+                         "es": "puesto {rank} de {n} altcoins por volumen en 24 h: los puestos son para las más negociadas"},
+    "chk.selloff": {"ru": "Распродажа", "en": "Sell-off", "uk": "Розпродаж", "el": "Ξεπούλημα", "es": "Venta masiva"},
+    "chk.selloff.v": {"ru": "за сутки упали больше чем на 3%: {b} монет (нужно от {need})",
+                      "en": "fell more than 3% in 24h: {b} of coins (needs {need} or more)",
+                      "uk": "за добу впали більш ніж на 3%: {b} монет (потрібно від {need})",
+                      "el": "έπεσαν πάνω από 3% σε 24 ώρες: το {b} των νομισμάτων (χρειάζεται από {need})",
+                      "es": "cayeron más de un 3% en 24 h: el {b} de las monedas (se necesita desde {need})"},
+    "chk.candle": {"ru": "Свеча", "en": "Candle", "uk": "Свічка", "el": "Κερί", "es": "Vela"},
+    "chk.candle.v": {"ru": "{drop} за 15 минут (нужно {need} и ниже)", "en": "{drop} in 15 minutes (needs {need} or lower)",
+                     "uk": "{drop} за 15 хвилин (потрібно {need} і нижче)", "el": "{drop} σε 15 λεπτά (χρειάζεται {need} ή χαμηλότερα)",
+                     "es": "{drop} en 15 minutos (se necesita {need} o menos)"},
+    "chk.crash": {"ru": "Обвал свечи", "en": "Candle crash", "uk": "Обвал свічки", "el": "Βουτιά κεριού", "es": "Desplome de la vela"},
+    "chk.crash.v": {"ru": "{ret} за 15 минут — в {x} раза больше обычного колебания (нужно от {need})",
+                    "en": "{ret} in 15 minutes — {x} times the usual swing (needs {need} or more)",
+                    "uk": "{ret} за 15 хвилин — у {x} раза більше за звичайне коливання (потрібно від {need})",
+                    "el": "{ret} σε 15 λεπτά — {x} φορές πάνω από τη συνηθισμένη διακύμανση (χρειάζεται από {need})",
+                    "es": "{ret} en 15 minutos: {x} veces la oscilación habitual (se necesita desde {need})"},
+    "chk.wick": {"ru": "Хвост снизу", "en": "Lower wick", "uk": "Хвіст знизу", "el": "Κάτω σκιά", "es": "Mecha inferior"},
+    "chk.wick.v": {"ru": "{w} свечи — падение выкупили (нужно от {need})", "en": "{w} of the candle — the drop was bought up (needs {need} or more)",
+                   "uk": "{w} свічки — падіння викупили (потрібно від {need})",
+                   "el": "{w} του κεριού — η πτώση αγοράστηκε (χρειάζεται από {need})",
+                   "es": "{w} de la vela: la caída se compró (se necesita desde {need})"},
+    "chk.oi": {"ru": "Открытый интерес", "en": "Open interest", "uk": "Відкритий інтерес", "el": "Ανοιχτό ενδιαφέρον",
+               "es": "Interés abierto"},
+    "chk.price": {"ru": "Цена", "en": "Price", "uk": "Ціна", "el": "Τιμή", "es": "Precio"},
+    "chk.4h.v": {"ru": "{x} за 4 часа (нужно {need} и ниже)", "en": "{x} in 4 hours (needs {need} or lower)",
+                 "uk": "{x} за 4 години (потрібно {need} і нижче)", "el": "{x} σε 4 ώρες (χρειάζεται {need} ή χαμηλότερα)",
+                 "es": "{x} en 4 horas (se necesita {need} o menos)"},
+    "chk.discount": {"ru": "Дисконт фьючерса", "en": "Futures discount", "uk": "Дисконт ф'ючерса", "el": "Έκπτωση του future",
+                     "es": "Descuento del futuro"},
+    "chk.discount.below": {"ru": "фьючерс {b} ниже спота в среднем за час (нужно от {need} ниже)",
+                           "en": "futures {b} below spot on average over an hour (needs {need} below or more)",
+                           "uk": "ф'ючерс на {b} нижче спота в середньому за годину (потрібно від {need} нижче)",
+                           "el": "το future {b} κάτω από το spot κατά μέσο όρο σε μία ώρα (χρειάζεται από {need} κάτω)",
+                           "es": "el futuro un {b} por debajo del spot de media en una hora (se necesita desde {need} por debajo)"},
+    "chk.discount.above": {"ru": "фьючерс {b} выше спота в среднем за час (нужно от {need} ниже)",
+                           "en": "futures {b} above spot on average over an hour (needs {need} below or more)",
+                           "uk": "ф'ючерс на {b} вище спота в середньому за годину (потрібно від {need} нижче)",
+                           "el": "το future {b} πάνω από το spot κατά μέσο όρο σε μία ώρα (χρειάζεται από {need} κάτω)",
+                           "es": "el futuro un {b} por encima del spot de media en una hora (se necesita desde {need} por debajo)"},
+    "chk.btc_jump": {"ru": "Рывок BTC", "en": "BTC surge", "uk": "Ривок BTC", "el": "Άλμα BTC", "es": "Impulso de BTC"},
+    "chk.btc_jump.v": {"ru": "{ret} за час (нужно от {need})", "en": "{ret} in an hour (needs {need} or more)",
+                       "uk": "{ret} за годину (потрібно від {need})", "el": "{ret} σε μία ώρα (χρειάζεται από {need})",
+                       "es": "{ret} en una hora (se necesita desde {need})"},
+    "chk.listing": {"ru": "Новый листинг", "en": "New listing", "uk": "Новий лістинг", "el": "Νέα εισαγωγή", "es": "Nuevo listado"},
+    "chk.listing.v": {"ru": "фьючерс появился {h} ч назад (вход через 4–24 ч)",
+                      "en": "the futures contract appeared {h} h ago (entry 4–24 h after listing)",
+                      "uk": "ф'ючерс з'явився {h} год тому (вхід через 4–24 год)",
+                      "el": "το future εμφανίστηκε πριν από {h} ώρ. (είσοδος σε 4–24 ώρ.)",
+                      "es": "el futuro apareció hace {h} h (entrada a las 4–24 h)"},
+    "chk.no_pump": {"ru": "Без пампа", "en": "No pump", "uk": "Без пампу", "el": "Χωρίς pump", "es": "Sin pump"},
+    "chk.no_pump.v": {"ru": "{move} от первой цены (пропускаем от {skip})", "en": "{move} from the first price (skipped at {skip} or more)",
+                      "uk": "{move} від першої ціни (пропускаємо від {skip})",
+                      "el": "{move} από την πρώτη τιμή (παραλείπουμε από {skip})",
+                      "es": "{move} desde el primer precio (descartamos desde {skip})"},
+    "chk.turnover": {"ru": "Оборот", "en": "Turnover", "uk": "Оборот", "el": "Τζίρος", "es": "Volumen negociado"},
+    "chk.turnover.v": {"ru": "${q} млн с листинга (нужно от ${min} млн)", "en": "${q}M since listing (needs ${min}M or more)",
+                       "uk": "${q} млн з лістингу (потрібно від ${min} млн)",
+                       "el": "${q} εκατ. από την εισαγωγή (χρειάζεται από ${min} εκατ.)",
+                       "es": "${q} M desde el listado (se necesita desde ${min} M)"},
+    "chk.token": {"ru": "Токен", "en": "Token", "uk": "Токен", "el": "Token", "es": "Token"},
+    "chk.token.v": {"ru": "настоящая монета, не синтетическая пара (валюта, товар, акция)",
+                    "en": "a real coin, not a synthetic pair (currency, commodity, stock)",
+                    "uk": "справжня монета, не синтетична пара (валюта, товар, акція)",
+                    "el": "πραγματικό κρυπτονόμισμα, όχι συνθετικό ζεύγος (συνάλλαγμα, εμπόρευμα, μετοχή)",
+                    "es": "una moneda real, no un par sintético (divisa, materia prima, acción)"},
+    "chk.coin": {"ru": "Монета", "en": "Coin", "uk": "Монета", "el": "Νόμισμα", "es": "Moneda"},
+    "chk.coin.v": {"ru": "одна из {n} основных монет, на которых правило проверено на истории",
+                   "en": "one of the {n} main coins the rule was tested on historically",
+                   "uk": "одна з {n} основних монет, на яких правило перевірено на історичних даних",
+                   "el": "ένα από τα {n} βασικά νομίσματα στα οποία ο κανόνας ελέγχθηκε στο ιστορικό",
+                   "es": "una de las {n} monedas principales con las que se probó la regla en el histórico"},
+
+    # ---------------------------------------------------------------- holding time (risk.hold)
+    "hold.P": {"ru": "до {d} дней; раньше — когда закрытие вернётся выше средней за 5 дней",
+               "en": "up to {d} days; earlier if the close gets back above the 5-day average",
+               "uk": "до {d} днів; раніше — коли закриття повернеться вище середньої за 5 днів",
+               "el": "έως {d} ημέρες· νωρίτερα, όταν το κλείσιμο επιστρέψει πάνω από τον μέσο όρο 5 ημερών",
+               "es": "hasta {d} días; antes, si el cierre vuelve por encima de la media de 5 días"},
+    "hold.C": {"ru": "до {d} дней; раньше — если закрытие уйдёт на 3 ATR ниже лучшего",
+               "en": "up to {d} days; earlier if the close falls 3 ATR below the best one",
+               "uk": "до {d} днів; раніше — якщо закриття опуститься на 3 ATR нижче найкращого",
+               "el": "έως {d} ημέρες· νωρίτερα, αν το κλείσιμο πέσει 3 ATR κάτω από το καλύτερο",
+               "es": "hasta {d} días; antes, si el cierre cae 3 ATR por debajo del mejor"},
+    "hold.time": {"ru": "{h} {hours} — выход по времени, цель только ориентир", "en": "{h} {hours} — time-based exit, the target is only a guide",
+                  "uk": "{h} {hours} — вихід за часом, ціль лише орієнтир",
+                  "el": "{h} {hours} — έξοδος βάσει χρόνου, ο στόχος είναι μόνο ενδεικτικός",
+                  "es": "{h} {hours}: salida por tiempo, el objetivo es solo orientativo"},
+    "hold.B": {"ru": "до {h} часов или до цели +1R", "en": "up to {h} hours or until the +1R target",
+               "uk": "до {h} годин або до цілі +1R", "el": "έως {h} ώρες ή μέχρι τον στόχο +1R",
+               "es": "hasta {h} horas o hasta el objetivo +1R"},
+    "hold.LST": {"ru": "{d} дней — выход по времени", "en": "{d} days — time-based exit", "uk": "{d} днів — вихід за часом",
+                 "el": "{d} ημέρες — έξοδος βάσει χρόνου", "es": "{d} días: salida por tiempo"},
+
+    # ---------------------------------------------------------------- the scan behind the signals (futures.scan.text, work)
+    "scan.head.today": {"ru": "Сегодня система проверила {n} {coins} по {k} условиям",
+                        "en": "Today the system checked {n} {coins} against {k} conditions",
+                        "uk": "Сьогодні система перевірила {n} {coins} за {k} умовами",
+                        "el": "Σήμερα το σύστημα έλεγξε {n} {coins} με {k} κριτήρια",
+                        "es": "Hoy el sistema revisó {n} {coins} con {k} condiciones"},
+    "scan.head.day": {"ru": "{day} система проверила {n} {coins} по {k} условиям",
+                      "en": "On {day} the system checked {n} {coins} against {k} conditions",
+                      "uk": "{day} система перевірила {n} {coins} за {k} умовами",
+                      "el": "Στις {day} το σύστημα έλεγξε {n} {coins} με {k} κριτήρια",
+                      "es": "El {day} el sistema revisó {n} {coins} con {k} condiciones"},
+    "scan.bear": {"ru": ": рынок не в режиме роста — покупок нет, деньги ждут в долларах.",
+                  "en": ": the market is not in uptrend mode — no buys, the money waits in dollars.",
+                  "uk": ": ринок не в режимі зростання — купівель немає, гроші чекають у доларах.",
+                  "el": ": η αγορά δεν είναι σε καθεστώς ανόδου — καμία αγορά, τα χρήματα περιμένουν σε δολάρια.",
+                  "es": ": el mercado no está en modo alcista; no hay compras y el dinero espera en dólares."},
+    "scan.signals": {"ru": ": правила дали {s} {signals}, все условия прошли {p}.",
+                     "en": ": the rules gave {s} {signals}, {p} passed every condition.",
+                     "uk": ": правила дали {s} {signals}, усі умови пройшли {p}.",
+                     "el": ": οι κανόνες έδωσαν {s} {signals}, όλα τα κριτήρια πέρασαν {p}.",
+                     "es": ": las reglas dieron {s} {signals} y {p} cumplieron todas las condiciones."},
+    "work.K": {"ru": "В момент входа система проверяла {n} {alts}: рывок BTC даёт сигнал всем, места получают самые торгуемые.",
+               "en": "At entry the system was checking {n} {alts}: a BTC surge signals them all, the slots go to the most traded.",
+               "uk": "У момент входу система перевіряла {n} {alts}: ривок BTC дає сигнал усім, місця отримують найбільш торговані.",
+               "el": "Τη στιγμή της εισόδου το σύστημα έλεγχε {n} {alts}: το άλμα του BTC δίνει σήμα σε όλα, τις θέσεις παίρνουν "
+                     "όσα έχουν τις περισσότερες συναλλαγές.",
+               "es": "En el momento de la entrada el sistema revisaba {n} {alts}: el impulso de BTC da señal a todas y los puestos "
+                     "son para las más negociadas."},
+    "work.K.slots": {"ru": "В момент входа система проверяла {n} {alts}: рывок BTC даёт сигнал всем, места получают {slots} самых "
+                           "торгуемых.",
+                     "en": "At entry the system was checking {n} {alts}: a BTC surge signals them all, the slots go to the {slots} "
+                           "most traded.",
+                     "uk": "У момент входу система перевіряла {n} {alts}: ривок BTC дає сигнал усім, місця отримують {slots} "
+                           "найбільш торгованих.",
+                     "el": "Τη στιγμή της εισόδου το σύστημα έλεγχε {n} {alts}: το άλμα του BTC δίνει σήμα σε όλα, τις θέσεις "
+                           "παίρνουν τα {slots} με τις περισσότερες συναλλαγές.",
+                     "es": "En el momento de la entrada el sistema revisaba {n} {alts}: el impulso de BTC da señal a todas y los "
+                           "puestos son para las {slots} más negociadas."},
+    "work.rule": {"ru": "В момент входа система проверяла {n} {coins} по {r} {rules} — «{rule}» сработал у {k} из них.",
+                  "en": "At entry the system was checking {n} {coins} against {r} {rules} — “{rule}” fired on {k} of them.",
+                  "uk": "У момент входу система перевіряла {n} {coins} за {r} {rules} — «{rule}» спрацював у {k} з них.",
+                  "el": "Τη στιγμή της εισόδου το σύστημα έλεγχε {n} {coins} με {r} {rules} — ο κανόνας «{rule}» ενεργοποιήθηκε "
+                        "σε {k} από αυτά.",
+                  "es": "En el momento de la entrada el sistema revisaba {n} {coins} con {r} {rules}: «{rule}» se activó en {k} "
+                        "de ellas."},
+    "work.LST": {"ru": "Система следит за {w} {futures} BingX: шорт получает только новый листинг, прошедший все фильтры.",
+                 "en": "The system watches {w} BingX {futures}: only a new listing that passes every filter gets a short.",
+                 "uk": "Система стежить за {w} {futures} BingX: шорт отримує лише новий лістинг, що пройшов усі фільтри.",
+                 "el": "Το σύστημα παρακολουθεί {w} {futures} του BingX: short παίρνει μόνο μια νέα εισαγωγή που περνά όλα τα φίλτρα.",
+                 "es": "El sistema vigila {w} {futures} de BingX: solo recibe un short el nuevo listado que pasa todos los filtros."},
+    "note.v1": {"ru": "Сделка открыта {d} по первой версии правил: объём дня и место в топ-40 по обороту тогда ещё не проверялись.",
+                "en": "The trade was opened on {d} under the first version of the rules: the day's volume and the top-40 turnover "
+                      "rank weren't checked yet.",
+                "uk": "Угоду відкрито {d} за першою версією правил: обсяг дня та місце в топ-40 за оборотом тоді ще не перевірялися.",
+                "el": "Η συναλλαγή άνοιξε στις {d} με την πρώτη έκδοση των κανόνων: ο όγκος της ημέρας και η θέση στο top-40 σε "
+                      "τζίρο δεν ελέγχονταν ακόμη.",
+                "es": "La operación se abrió el {d} con la primera versión de las reglas: entonces aún no se revisaban el volumen "
+                      "del día ni el puesto en el top 40 por volumen."},
+
+    # ---------------------------------------------------------------- the futures card (futures.status_ru / about_ru)
+    "status.main": {"ru": "Основная стратегия сейчас без сделок: она входит только после резкой распродажи на большом объёме — "
+                          "так дешевле и на истории выгоднее.",
+                    "en": "The main strategy has no trades right now: it only enters after a sharp sell-off on heavy volume — "
+                          "that's cheaper and historically more profitable.",
+                    "uk": "Основна стратегія зараз без угод: вона входить лише після різкого розпродажу на великому обсязі — так "
+                          "дешевше й на історичних даних вигідніше.",
+                    "el": "Η κύρια στρατηγική δεν έχει τώρα συναλλαγές: μπαίνει μόνο μετά από απότομο ξεπούλημα με μεγάλο όγκο — "
+                          "έτσι είναι φθηνότερα και ιστορικά πιο επικερδές.",
+                    "es": "La estrategia principal no tiene operaciones ahora: solo entra tras una venta brusca con mucho volumen; "
+                          "así sale más barato y, en el histórico, más rentable."},
+    "status.last": {"ru": " Последняя сделка: {sym}, {pnl}, {d}.", "en": " Last trade: {sym}, {pnl}, {d}.",
+                    "uk": " Остання угода: {sym}, {pnl}, {d}.", "el": " Τελευταία συναλλαγή: {sym}, {pnl}, {d}.",
+                    "es": " Última operación: {sym}, {pnl}, {d}."},
+    "status.other": {"ru": " В работе {n} {trades} других сигналов CRYPTO NOVA.",
+                     "en": " Other CRYPTO NOVA signals in progress: {n} {trades}.",
+                     "uk": " У роботі {n} {trades} інших сигналів CRYPTO NOVA.",
+                     "el": " Σε εξέλιξη {n} {trades} άλλων σημάτων του CRYPTO NOVA.",
+                     "es": " En curso: {n} {trades} de otras señales de CRYPTO NOVA."},
+    "futures.about": {"ru": "Средний счёт $10 000: те же сделки CRYPTO NOVA в 3 размерах (осторожный, сбалансированный, смелый).",
+                      "en": "Average $10 000 account: the same CRYPTO NOVA trades in 3 sizes (cautious, balanced, bold).",
+                      "uk": "Середній рахунок $10 000: ті самі угоди CRYPTO NOVA у 3 розмірах (обережний, збалансований, сміливий).",
+                      "el": "Μέσος λογαριασμός $10 000: οι ίδιες συναλλαγές του CRYPTO NOVA σε 3 μεγέθη (συντηρητικό, "
+                            "ισορροπημένο, τολμηρό).",
+                      "es": "Cuenta media de $10 000: las mismas operaciones de CRYPTO NOVA en 3 tamaños (prudente, equilibrado, "
+                            "audaz)."},
+    "sources.soon": {"ru": "арбитраж, рынки прогнозов", "en": "arbitrage, prediction markets", "uk": "арбітраж, ринки прогнозів",
+                     "el": "αρμπιτράζ, αγορές προβλέψεων", "es": "arbitraje, mercados de predicción"},
+    "home.note": {"ru": "Демо-счета CRYPTO NOVA. Прошлые результаты не гарантируют будущих. Не финансовый совет.",
+                  "en": "CRYPTO NOVA demo accounts. Past results don't guarantee future ones. Not financial advice.",
+                  "uk": "Демо-рахунки CRYPTO NOVA. Минулі результати не гарантують майбутніх. Не фінансова порада.",
+                  "el": "Λογαριασμοί demo του CRYPTO NOVA. Οι προηγούμενες αποδόσεις δεν εγγυώνται τις μελλοντικές. Δεν "
+                        "αποτελεί επενδυτική συμβουλή.",
+                  "es": "Cuentas demo de CRYPTO NOVA. Los resultados pasados no garantizan los futuros. No es asesoramiento "
+                        "financiero."},
+
+    # ---------------------------------------------------------------- the spot portfolio's last action (spot.last_action.text)
+    # Russian keeps the portfolio's own sentence (why_ru); the other languages get these, with the numbers read from it
+    "act.trim_plan": {"ru": "{sym}: {w}% счёта — больше плана {p}%; лишнее продаём.",
+                      "en": "{sym} grew to {w}% of the portfolio, above its {p}% plan — the excess is sold.",
+                      "uk": "{sym}: {w}% портфеля — більше за план {p}%; зайве продаємо.",
+                      "el": "Το {sym} έφτασε το {w}% του χαρτοφυλακίου, πάνω από το πλάνο του {p}% — πουλάμε το επιπλέον.",
+                      "es": "{sym} llegó al {w}% de la cartera, por encima de su plan del {p}%: vendemos el exceso."},
+    "act.add_core": {"ru": "Ядро: {sym} {w}% счёта — доливаем до {p}% (ядро держим крупным).",
+                     "en": "Core: {sym} is {w}% of the portfolio — topping up to {p}% (the core is kept large).",
+                     "uk": "Ядро: {sym} {w}% портфеля — доливаємо до {p}% (ядро тримаємо великим).",
+                     "el": "Πυρήνας: το {sym} είναι το {w}% του χαρτοφυλακίου — συμπληρώνουμε έως το {p}% (κρατάμε τον πυρήνα "
+                           "μεγάλο).",
+                     "es": "Núcleo: {sym} es el {w}% de la cartera; completamos hasta el {p}% (mantenemos el núcleo grande)."},
+    "act.buy_table": {"ru": "Купили {sym}: таблица монет системы дала статус «можно брать»; {w}% счёта.",
+                      "en": "Bought {sym}: the system's coin table rated it “can buy”; {w}% of the portfolio.",
+                      "uk": "Купили {sym}: таблиця монет системи дала статус «можна брати»; {w}% портфеля.",
+                      "el": "Αγοράσαμε {sym}: ο πίνακας νομισμάτων του συστήματος το χαρακτήρισε «για αγορά»· {w}% του "
+                            "χαρτοφυλακίου.",
+                      "es": "Compramos {sym}: la tabla de monedas del sistema le dio «se puede comprar»; {w}% de la cartera."},
+    "act.BUY": {"ru": "Купили {sym}: монета прошла проверки портфеля.", "en": "Bought {sym}: the coin passed the portfolio's checks.",
+                "uk": "Купили {sym}: монета пройшла перевірки портфеля.",
+                "el": "Αγοράσαμε {sym}: το νόμισμα πέρασε τους ελέγχους του χαρτοφυλακίου.",
+                "es": "Compramos {sym}: la moneda pasó los controles de la cartera."},
+    "act.ADD": {"ru": "Докупили {sym} до плановой доли.", "en": "Topped up {sym} to its planned share.",
+                "uk": "Докупили {sym} до планової частки.", "el": "Συμπληρώσαμε το {sym} έως το προβλεπόμενο μερίδιο.",
+                "es": "Completamos {sym} hasta su peso previsto."},
+    "act.TRIM": {"ru": "Продали часть {sym}: зафиксировали прибыль или вернули долю к плану.",
+                 "en": "Sold part of {sym}: profit taken or the share brought back to plan.",
+                 "uk": "Продали частину {sym}: зафіксували прибуток або повернули частку до плану.",
+                 "el": "Πουλήσαμε μέρος του {sym}: κατοχύρωση κέρδους ή επιστροφή του μεριδίου στο πλάνο.",
+                 "es": "Vendimos parte de {sym}: recogimos ganancias o devolvimos su peso al plan."},
+    "act.SELL": {"ru": "Продали {sym} по правилам портфеля (стоп, статус или пересмотр).",
+                 "en": "Sold {sym} by the portfolio's rules (stop, status or review).",
+                 "uk": "Продали {sym} за правилами портфеля (стоп, статус або перегляд).",
+                 "el": "Πουλήσαμε το {sym} σύμφωνα με τους κανόνες του χαρτοφυλακίου (stop, κατάσταση ή επανεξέταση).",
+                 "es": "Vendimos {sym} según las reglas de la cartera (stop, estado o revisión)."},
+    "act.other": {"ru": "Изменение в портфеле: {sym}.", "en": "Portfolio change: {sym}.", "uk": "Зміна в портфелі: {sym}.",
+                  "el": "Αλλαγή στο χαρτοφυλάκιο: {sym}.", "es": "Cambio en la cartera: {sym}."},
+
+    # ---------------------------------------------------------------- NOVA's own answers (POST /v2/agent, cnq/api/nova.py)
+    "nova.busy": {"ru": "NOVA сейчас отвечает очень многим сразу. Попробуйте через минуту — этот вопрос не списан.",
+                  "en": "NOVA is answering a lot of people at once right now. Try again in a minute — this question wasn't counted.",
+                  "uk": "NOVA зараз відповідає дуже багатьом одночасно. Спробуйте за хвилину — це запитання не списано.",
+                  "el": "Η NOVA απαντά αυτή τη στιγμή σε πάρα πολλούς ταυτόχρονα. Δοκιμάστε ξανά σε ένα λεπτό — αυτή η ερώτηση "
+                        "δεν χρεώθηκε.",
+                  "es": "NOVA está respondiendo a muchísima gente a la vez. Prueba de nuevo en un minuto: esta pregunta no se ha "
+                        "descontado."},
+    "nova.bad_question": {"ru": "Не получилось разобрать вопрос. Скажите или напишите его ещё раз — я на связи.",
+                          "en": "I couldn't make out the question. Say or type it again — I'm here.",
+                          "uk": "Не вдалося розібрати запитання. Скажіть або напишіть його ще раз — я на зв'язку.",
+                          "el": "Δεν κατάλαβα την ερώτηση. Πείτε ή γράψτε τη ξανά — είμαι εδώ.",
+                          "es": "No he podido entender la pregunta. Dímela o escríbela otra vez: aquí estoy."},
+    "nova.limit_free": {"ru": "На сегодня 5 бесплатных вопросов закончились — завтра будут новые. С подключённым реальным счётом — "
+                              "до 100 вопросов в день.",
+                        "en": "Your 5 free questions for today are used up — new ones come tomorrow. With a real account "
+                              "connected, you get up to 100 questions a day.",
+                        "uk": "На сьогодні 5 безкоштовних запитань закінчилися — завтра будуть нові. З підключеним реальним "
+                              "рахунком — до 100 запитань на день.",
+                        "el": "Οι 5 δωρεάν ερωτήσεις για σήμερα τελείωσαν — αύριο θα έχετε καινούργιες. Με συνδεδεμένο "
+                              "πραγματικό λογαριασμό — έως 100 ερωτήσεις την ημέρα.",
+                        "es": "Ya usaste tus 5 preguntas gratis de hoy; mañana tendrás nuevas. Con tu cuenta real conectada, "
+                              "hasta 100 preguntas al día."},
+    "nova.limit_vip": {"ru": "На сегодня вопросы закончились — завтра лимит обновится.",
+                       "en": "You're out of questions for today — the limit resets tomorrow.",
+                       "uk": "На сьогодні запитання закінчилися — завтра ліміт оновиться.",
+                       "el": "Οι ερωτήσεις για σήμερα τελείωσαν — αύριο το όριο ανανεώνεται.",
+                       "es": "Por hoy se acabaron las preguntas; mañana se renueva el límite."},
+}
+
+# plural words: ru / uk — (1, 2–4, 5+) in the case the sentence needs; en / el / es — (1, other)
+P: dict[str, dict[str, tuple[str, ...]]] = {
+    "hour": {"ru": ("час", "часа", "часов"), "uk": ("година", "години", "годин"), "en": ("hour", "hours"), "el": ("ώρα", "ώρες"),
+             "es": ("hora", "horas")},
+    "coin_acc": {"ru": ("монету", "монеты", "монет"), "uk": ("монету", "монети", "монет"), "en": ("coin", "coins"),
+                 "el": ("νόμισμα", "νομίσματα"), "es": ("moneda", "monedas")},
+    "signal": {"ru": ("сигнал", "сигнала", "сигналов"), "uk": ("сигнал", "сигнали", "сигналів"), "en": ("signal", "signals"),
+               "el": ("σήμα", "σήματα"), "es": ("señal", "señales")},
+    "altcoin_acc": {"ru": ("альткоин", "альткоина", "альткоинов"), "uk": ("альткоїн", "альткоїни", "альткоїнів"),
+                    "en": ("altcoin", "altcoins"), "el": ("altcoin", "altcoins"), "es": ("altcoin", "altcoins")},
+    "rule_by": {"ru": ("правилу", "правилам", "правилам"), "uk": ("правилом", "правилами", "правилами"), "en": ("rule", "rules"),
+                "el": ("κανόνα", "κανόνες"), "es": ("regla", "reglas")},
+    "futures_by": {"ru": ("фьючерсом", "фьючерсами", "фьючерсами"), "uk": ("ф'ючерсом", "ф'ючерсами", "ф'ючерсами"),
+                   "en": ("futures contract", "futures contracts"), "el": ("συμβόλαιο future", "συμβόλαια futures"),
+                   "es": ("futuro", "futuros")},
+    "trade": {"ru": ("сделка", "сделки", "сделок"), "uk": ("угода", "угоди", "угод"), "en": ("trade", "trades"),
+              "el": ("συναλλαγή", "συναλλαγές"), "es": ("operación", "operaciones")},
+}
+
+
+def t(lang: str, key: str, **params) -> str:
+    row = T[key]
+    s = row.get(lang if lang in LANGS else DEFAULT) or row[DEFAULT]
+    return s.format(**params) if params else s
+
+
+def plural(lang: str, n, key: str) -> str:
+    row = P[key]
+    forms = row.get(lang if lang in LANGS else DEFAULT) or row[DEFAULT]
+    n = abs(int(n))
+    if len(forms) == 3:
+        if n % 10 == 1 and n % 100 != 11:
+            return forms[0]
+        return forms[1] if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else forms[2]
+    return forms[0] if n == 1 else forms[1]
+
+
+def fields(template: str) -> set[str]:
+    """the {placeholders} of a template (the catalog test: the same in every language)"""
+    return {f for _lit, f, _spec, _conv in string.Formatter().parse(template) if f}

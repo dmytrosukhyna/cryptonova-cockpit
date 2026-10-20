@@ -12,7 +12,12 @@ Settings in `/etc/cnq.env`:
   one NOVA question is ≈ 2 000–2 500 tokens, and the free groq plan limits tokens per minute for the whole key.
 - NOVA's knowledge: `data/nova_facts.json` (checked facts with dates and sources), `data/nova_faq.json` (Q&A), `web/nova.json`
   (greeting, starter questions, topics → `GET /v2/feed/nova`). Edit and push — no restart needed. Test the real model with the
-  manual workflow `nova-probe` (notices show the time, tokens and each answer).
+  manual workflow `nova-probe` (notices show the time, tokens and each answer; `el: …` asks in Greek).
+- Languages (20.10): the app sends `?lang=en|ru|uk|el|es` on every feed and `"lang"` to `POST /v2/agent` (missing / unknown →
+  ru). Feeds: `web/<name>.<lang>.json` when it exists, else `<name>.json` (Russian) — `app_home.<lang>.json` is written by the
+  engine every minute with `app_home.json` (texts: `cnq/agents/i18n.py`), `nova.<lang>.json` is in git, `academy.<lang>.json`
+  can be added any time. NOVA: `data/nova_faq.<lang>.json` (same ids as nova_faq.json) and `data/nova_facts.<lang>.json`
+  (fact texts by id). Change an answer or a fact in every language.
 - `CNQ_BINGX_AGENT_KEY`, `CNQ_BINGX_AGENT_SECRET` — BingX partner cabinet, read-only (VIP check). Without them VIP check answers 503.
 - `CNQ_FIREBASE_PROJECT` — default `crypto-nova`.
 - `CNQ_FCM_SA=/etc/cnq-fcm.json` — the Firebase service-account JSON (Firebase console → Project settings → Service accounts →

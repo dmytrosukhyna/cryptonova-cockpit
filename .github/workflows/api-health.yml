@@ -2,6 +2,7 @@ name: api-health
 # 19.10.2026: one click (or `gh workflow run api-health.yml`) → is the 2.0 API up, is the home feed fresh, and which keys the
 # server has (only yes/no: AI agent, Firebase admin for pushes + account deletion, BingX partner for the VIP check), how the
 # last NOVA question went (agent_last) and the public NOVA feed (greeting, starter questions, topics).
+# 20.10: the languages — /v2/home?lang=en (the English home: lang, a few of its texts) and /v2/feed/nova?lang=el (the Greek intro).
 on:
   workflow_dispatch:
 
@@ -27,3 +28,11 @@ jobs:
           code=$(echo "$nova" | tail -n 1)
           summary=$(echo "$nova" | sed '$d' | jq -c '{greeting: ((.greeting // "") | .[0:90]), greeting_vip: ((.greeting_vip // "") | length > 0), suggest: ((.suggest // []) | length), topics: [(.topics // [])[] | "\(.title) (\(.qs | length))"]}' 2>/dev/null || echo "not JSON")
           echo "::notice title=nova feed::GET /v2/feed/nova → HTTP $code · $summary"
+          en=$(curl -sS -m 20 -w '\n%{http_code}' 'https://app.crypto-capital.app/v2/home?lang=en' || printf '{}\n000')
+          code=$(echo "$en" | tail -n 1)
+          summary=$(echo "$en" | sed '$d' | jq -c '{lang, age_sec: (if .asof then ((now * 1000 - .asof) / 1000 | floor) else null end), note: .note_ru, soon: ([.sources[]? | select(.key == "soon") | .label][0]), status: ((.futures.status_ru // "") | .[0:90]), open: ((.futures.open // []) | length), first: ((.futures.open // [])[0] | if . then {sym, why_title, src_ru, check: ((.checks // [])[0] | if . then "\(.t): \(.v)" else null end)} else null end), alloc: [(.spot.alloc // [])[].name], last_action: ((.spot.last_action.text // "") | .[0:90])}' 2>/dev/null || echo "not JSON")
+          echo "::notice title=home en::GET /v2/home?lang=en → HTTP $code · $summary"
+          el=$(curl -sS -m 20 -w '\n%{http_code}' 'https://app.crypto-capital.app/v2/feed/nova?lang=el' || printf '{}\n000')
+          code=$(echo "$el" | tail -n 1)
+          summary=$(echo "$el" | sed '$d' | jq -c '{lang, greeting: ((.greeting // "") | .[0:90]), greeting_vip: ((.greeting_vip // "") | .[0:90]), suggest: ((.suggest // []) | .[0:3]), topics: [(.topics // [])[] | "\(.title) (\(.qs | length))"]}' 2>/dev/null || echo "not JSON")
+          echo "::notice title=nova feed el::GET /v2/feed/nova?lang=el → HTTP $code · $summary"

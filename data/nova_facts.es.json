@@ -1,0 +1,60 @@
+{
+  "v": 1,
+  "updated": "2026-10-20",
+  "lang": "es",
+  "about": "The checked facts of data/nova_facts.json in Spanish, by id (dates, sources and values stay there). Translate a new or changed fact here too; a missing id falls back to the Russian text.",
+  "facts": [
+    {
+      "id": "etf_approval",
+      "fact": "El 10 de enero de 2024, la SEC (el regulador de Estados Unidos) aprobó 11 ETF de bitcoin al contado: bitcoin se puede comprar con una cuenta de bróker normal, como una participación de un fondo."
+    },
+    {
+      "id": "etf_holdings",
+      "fact": "A 8 de octubre de 2026, los ETF de bitcoin de Estados Unidos tenían cerca de 1 293 000 BTC (≈ $107 000 millones), de ellos unos 806 000 BTC en el fondo de BlackRock."
+    },
+    {
+      "id": "vanguard",
+      "fact": "El 2 de diciembre de 2025, Vanguard (más de 50 millones de clientes) permitió a sus clientes comprar ETF cripto, tras años en contra."
+    },
+    {
+      "id": "nasdaq_tokenized",
+      "fact": "El 18 de marzo de 2026, la SEC aprobó un piloto de Nasdaq: acciones tokenizadas del Russell 1000 y ETF sobre el S&P 500 y el Nasdaq-100 podrán negociarse junto a las normales, al mismo precio y con los mismos derechos."
+    },
+    {
+      "id": "robinhood_tokens",
+      "fact": "El 30 de junio de 2025, Robinhood lanzó para la UE tokens de más de 200 acciones y ETF estadounidenses en la blockchain Arbitrum."
+    },
+    {
+      "id": "genius_act",
+      "fact": "El 18 de julio de 2025 se firmó en Estados Unidos la ley GENIUS, las primeras normas federales para las stablecoins."
+    },
+    {
+      "id": "shopify_usdc",
+      "fact": "El 12 de junio de 2025, Shopify, junto con Coinbase y Stripe, abrió a las tiendas el cobro en la stablecoin USDC (primero en acceso anticipado)."
+    },
+    {
+      "id": "samsung_usdc",
+      "fact": "El 7 de octubre de 2026, Samsung anunció que desde finales de octubre de 2026 los usuarios de Galaxy en Estados Unidos podrán guardar dólares digitales USDC en Samsung Wallet y enviarlos a billeteras cripto y a bancos de más de 60 países. En Estados Unidos hay unos 82 millones de dispositivos Galaxy compatibles con Samsung Wallet. Todavía no se puede pagar con stablecoins en tiendas: Samsung lo presenta como un posible siguiente paso."
+    },
+    {
+      "id": "btc_pizza",
+      "fact": "El 22 de mayo de 2010, Laszlo Hanyecz pagó 10 000 BTC por 2 pizzas: la primera compra conocida con bitcoin."
+    },
+    {
+      "id": "btc_2013",
+      "fact": "A principios de 2013, bitcoin costaba unos $13; en noviembre de 2013 superó por primera vez los $1 000."
+    },
+    {
+      "id": "btc_ath",
+      "fact": "El récord de bitcoin es de $126 210, el 6 de octubre de 2025."
+    },
+    {
+      "id": "btc_drawdowns",
+      "fact": "Tras los máximos de 2011, 2013, 2017 y 2021, bitcoin cayó un 75–93% y cada vez marcó después un nuevo récord; el pasado no lo garantiza."
+    },
+    {
+      "id": "btc_supply",
+      "fact": "Nunca habrá más de 21 millones de bitcoins: así está escrito en su código."
+    }
+  ]
+}

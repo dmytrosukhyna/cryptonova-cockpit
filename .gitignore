@@ -6,4 +6,6 @@ data/*
 !data/.gitkeep
 !data/nova_facts.json
 !data/nova_faq.json
+!data/nova_faq.*.json
+!data/nova_facts.*.json
 web/*.bak

@@ -1,0 +1,551 @@
+{
+  "v": 1,
+  "updated": "2026-10-20",
+  "lang": "es",
+  "about": "NOVA's FAQ in Spanish — the same ids as data/nova_faq.json (Russian, the source). cnq/api/nova.py: the closest items go to the model as reference; when the model is down, a near-exact match (q or alt) is answered from here. Change an answer in every language.",
+  "items": [
+    {
+      "id": "safe",
+      "topic": "money",
+      "q": "¿Es seguro?",
+      "a": "En la demo, totalmente: el dinero es virtual y no hay nada que perder. Con dinero real, la regla principal es esta: siempre está en tu propia cuenta del exchange; CRYPTO NOVA no lo guarda y no puede retirarlo. Nunca pedimos contraseñas, códigos SMS ni tu frase semilla. Pero el mercado cripto en sí tiene riesgo: invierte solo lo que podrías perder sin problema.",
+      "tags": [
+        "seguro",
+        "seguridad",
+        "fiable",
+        "peligroso",
+        "riesgo",
+        "protección",
+        "confiar"
+      ]
+    },
+    {
+      "id": "scam",
+      "topic": "money",
+      "q": "¿Esto es una estafa?",
+      "a": "¡Buena pregunta! Así es justo como hay que comprobarlo. Fíjate en las señales: no tomamos tu dinero, no prometemos ganancias y no te pedimos que transfieras nada. La app 2.0 es gratis, y todas las operaciones del sistema, ganadoras y perdedoras, se ven abiertamente. Un estafador te mete prisa, promete ganancias sin riesgo y pide contraseñas: aquí no pasa nada de eso, ni pasará.",
+      "tags": [
+        "estafa",
+        "fraude",
+        "timo",
+        "engaño",
+        "scam",
+        "pirámide",
+        "ponzi",
+        "honesto",
+        "legal"
+      ],
+      "alt": [
+        "¿Es una estafa?"
+      ]
+    },
+    {
+      "id": "where_money",
+      "topic": "money",
+      "q": "¿Dónde está mi dinero?",
+      "a": "En la demo el dinero es virtual: solo existe dentro de la app. Si operas de verdad, tu dinero está en tu cuenta personal del exchange (ahora es BingX), no con nosotros. CRYPTO NOVA no recibe, no guarda ni retira dinero: solo tú lo manejas.",
+      "tags": [
+        "dinero",
+        "guardado",
+        "está",
+        "dónde",
+        "cuenta",
+        "fondos"
+      ],
+      "alt": [
+        "¿Dónde está guardado mi dinero?"
+      ]
+    },
+    {
+      "id": "withdraw",
+      "topic": "money",
+      "q": "¿Cómo retiro mi dinero?",
+      "a": "De la demo no hay nada que retirar: ese dinero es virtual. El dinero real está en tu cuenta del exchange, y lo retiras tú, en la app del exchange, en la sección de activos. Nosotros no tenemos que hacer nada para eso, y no tenemos acceso a los retiros.",
+      "tags": [
+        "retirar",
+        "retiro",
+        "sacar",
+        "cobrar",
+        "extraer",
+        "recibir dinero"
+      ]
+    },
+    {
+      "id": "my_result",
+      "topic": "money",
+      "q": "¿Cuánto he ganado?",
+      "a": "Tu resultado personal está en la tarjeta «Mi cuenta demo» de la pantalla de inicio: ahí ves tu importe y la fecha de inicio. Y yo te puedo contar cómo van las cuentas demo de la propia CRYPTO NOVA.",
+      "tags": [
+        "ganado",
+        "gané",
+        "mi resultado",
+        "mi cuenta",
+        "mi saldo",
+        "mi cuenta demo",
+        "llevo"
+      ]
+    },
+    {
+      "id": "how_much",
+      "topic": "money",
+      "q": "¿Cuánto se puede ganar?",
+      "a": "Sinceramente: nadie lo sabe de antemano, y no hay garantías. Pero puedes mirar los hechos: el resultado de las cuentas demo de CRYPTO NOVA se ve en la pantalla de inicio, con todas sus ganancias y pérdidas. También hay semanas con pérdidas, y los resultados pasados no garantizan los futuros. No es asesoramiento financiero.",
+      "tags": [
+        "ganar",
+        "ingresos",
+        "ganancia",
+        "beneficio",
+        "rentabilidad",
+        "porcentaje",
+        "cuánto"
+      ]
+    },
+    {
+      "id": "mistake",
+      "topic": "money",
+      "q": "¿Y si el sistema se equivoca?",
+      "a": "Se equivoca, como cualquier sistema, y no lo ocultamos: las operaciones con pérdidas se ven en la app junto a las ganadoras. Por eso cada operación tiene un stop, un precio en el que se cierra con una pérdida pequeña, y cada operación usa solo una parte de la cuenta. La idea es que las ganadoras compensen a las perdedoras en conjunto, pero no hay garantías.",
+      "tags": [
+        "equivoca",
+        "error",
+        "fallo",
+        "pérdida",
+        "perder",
+        "negativo"
+      ]
+    },
+    {
+      "id": "shutdown",
+      "topic": "money",
+      "q": "¿Qué pasa si CRYPTO NOVA cierra?",
+      "a": "Tu dinero no se verá afectado: está en tu cuenta del exchange, no con nosotros. Simplemente dejarías de ver las señales y las lecciones en la app. Justo por eso no guardamos el dinero de nadie.",
+      "tags": [
+        "cierra",
+        "desaparece",
+        "deja de funcionar",
+        "quiebra",
+        "bancarrota"
+      ]
+    },
+    {
+      "id": "referral",
+      "topic": "money",
+      "q": "¿Para qué el exchange y el enlace de referido?",
+      "a": "Te lo decimos con sinceridad: si abres una cuenta en BingX con nuestro enlace, el exchange le da a CRYPTO NOVA una parte de su propia comisión. Así ganamos dinero y la app sigue siendo gratis. Tus comisiones y las condiciones del exchange no cambian. Y con el enlace podemos comprobar tu UID y conectar el sistema a tu cuenta real.",
+      "tags": [
+        "referido",
+        "referidos",
+        "enlace",
+        "exchange",
+        "para qué",
+        "socio",
+        "ganan",
+        "bingx"
+      ]
+    },
+    {
+      "id": "price",
+      "topic": "money",
+      "q": "¿Cuánto cuesta?",
+      "a": "CRYPTO NOVA 2.0 es gratis: la demo, la hucha, 38 lecciones y yo, NOVA, sin suscripciones ni compras. No nos quedamos con un porcentaje de tus ganancias. Conectar una cuenta real también es gratis, para quien abrió su cuenta en el exchange con nuestro enlace. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
+      "tags": [
+        "cuesta",
+        "precio",
+        "pago",
+        "gratis",
+        "suscripción",
+        "cobran",
+        "comisión",
+        "porcentaje",
+        "pagar"
+      ]
+    },
+    {
+      "id": "passwords",
+      "topic": "money",
+      "q": "¿Necesitan mis contraseñas o claves?",
+      "a": "¡No! Nunca compartas tus contraseñas, códigos SMS ni la frase semilla de tu billetera: CRYPTO NOVA nunca los pide. Si alguien escribe en nuestro nombre y te los pide, es un estafador. Cuando llegue la copia automática de operaciones, la conexión será con una clave API solo con permiso para operar, sin permiso de retiro.",
+      "tags": [
+        "contraseña",
+        "contraseñas",
+        "clave",
+        "claves",
+        "api",
+        "semilla",
+        "frase",
+        "código",
+        "sms",
+        "acceso"
+      ]
+    },
+    {
+      "id": "start_sum",
+      "topic": "money",
+      "q": "¿Con cuánto dinero empiezo?",
+      "a": "Lo mejor es empezar con la demo: dinero virtual, precios reales y sin riesgo. Si quieres hacerlo de verdad, usa solo una cantidad que podrías perder sin problema, y nunca dinero prestado. La hucha se puede configurar incluso con poco, por ejemplo $10 a la semana. No es asesoramiento financiero.",
+      "tags": [
+        "cantidad",
+        "empezar",
+        "invertir",
+        "mínimo",
+        "depósito",
+        "cuánto necesito",
+        "cuánto poner"
+      ]
+    },
+    {
+      "id": "how_works",
+      "topic": "how",
+      "q": "¿Cómo funciona CRYPTO NOVA?",
+      "a": "CRYPTO NOVA es un sistema de IA: vigila el mercado cripto 24/7 y busca operaciones con reglas probadas en el histórico de precios. Las operaciones se hacen en una cuenta demo de $10 000: ves la entrada, el stop, el objetivo y un sencillo «por qué entramos». Al lado hay una cartera spot tranquila, una hucha en bitcoin, 38 lecciones y yo, NOVA. Es aprendizaje y demo, no un exchange ni asesoramiento financiero.",
+      "tags": [
+        "funciona",
+        "sistema",
+        "qué es",
+        "app",
+        "crypto nova",
+        "criptonova"
+      ],
+      "alt": [
+        "Háblame de CRYPTO NOVA"
+      ]
+    },
+    {
+      "id": "demo",
+      "topic": "how",
+      "q": "¿Qué es la demo?",
+      "a": "La demo es práctica: dinero virtual, pero precios reales del mercado. El sistema CRYPTO NOVA hace sus operaciones en una cuenta demo de $10 000, y tú tienes tu propia «Mi cuenta demo», donde ves qué habría pasado con tu importe. No puedes perder nada y es gratis. Pero el resultado de la demo todavía no es rentabilidad real.",
+      "tags": [
+        "demo",
+        "práctica",
+        "entrenamiento",
+        "virtual",
+        "ficticio",
+        "prueba"
+      ],
+      "alt": [
+        "¿Qué es la cuenta demo?"
+      ]
+    },
+    {
+      "id": "vip",
+      "topic": "how",
+      "q": "¿Qué es la cuenta real?",
+      "a": "La «Cuenta real» es para quien está listo para usar dinero de verdad. Los pasos: abrir una cuenta en el exchange BingX con nuestro enlace de socio, depositar fondos e introducir en la app tu UID, el número de tu cuenta en el exchange. La app lo comprueba y conecta gratis el sistema a tu cuenta. Las operaciones del sistema las repites tú, y la copia automática llega pronto. Solo para mayores de 18 años.",
+      "tags": [
+        "cuenta real",
+        "real",
+        "live",
+        "dinero real",
+        "conectar",
+        "pasar",
+        "vip"
+      ],
+      "alt": [
+        "¿Cómo paso a la cuenta real?"
+      ]
+    },
+    {
+      "id": "uid",
+      "topic": "how",
+      "q": "¿Qué es el UID y dónde lo encuentro?",
+      "a": "El UID es el número de tu cuenta en el exchange, como el número de cliente en un banco. En BingX está en tu perfil y lo puedes copiar. Solo lo necesitamos para comprobar que la cuenta se abrió con nuestro enlace: no nos da ni dinero ni acceso a tu cuenta.",
+      "tags": [
+        "uid",
+        "número",
+        "cuenta",
+        "id",
+        "identificador"
+      ]
+    },
+    {
+      "id": "copy",
+      "topic": "how",
+      "q": "¿Habrá copia automática de operaciones?",
+      "a": "Sí, es el siguiente paso, y llega pronto. Por ahora ves las operaciones del sistema y las repites tú en tu cuenta. Cuando llegue la copia automática, el dinero seguirá en tu cuenta del exchange, y la clave será solo para operar, sin permiso de retiro.",
+      "tags": [
+        "automático",
+        "automática",
+        "copia",
+        "copy trading",
+        "piloto automático",
+        "bot",
+        "operar solo"
+      ]
+    },
+    {
+      "id": "no_trades",
+      "topic": "how",
+      "q": "¿Por qué ahora no hay operaciones?",
+      "a": "El sistema no entra todo el tiempo, solo cuando ve su señal. La estrategia principal, por ejemplo, espera una venta brusca con mucho volumen, y esos momentos no son frecuentes. No entrar también es una decisión: mejor esperar que entrar al azar. El estado actual está en la pestaña «Futuros».",
+      "tags": [
+        "no hay operaciones",
+        "no opera",
+        "tranquilo",
+        "espera",
+        "por qué no",
+        "sin señales",
+        "vacío"
+      ]
+    },
+    {
+      "id": "testing",
+      "topic": "how",
+      "q": "¿Cómo prueban las estrategias?",
+      "a": "Con rigor. Primero probamos cada idea en varios años de histórico de precios, con comisiones incluidas. Luego viene un examen honesto: la regla se ajusta con el pasado y se comprueba en un periodo posterior que nunca ha visto. Las que lo superan pasan a la demo en tiempo real, donde se ve cada operación. De cientos de ideas, solo unas pocas llegan al final, y hasta una regla probada puede equivocarse.",
+      "tags": [
+        "prueban",
+        "estrategias",
+        "backtest",
+        "histórico",
+        "test",
+        "prueba",
+        "laboratorio"
+      ]
+    },
+    {
+      "id": "my_demo",
+      "topic": "how",
+      "q": "¿Qué es «Mi cuenta demo»?",
+      "a": "Es tu cuenta de práctica personal en la pantalla de inicio: el importe y la fecha de inicio que elegiste, y cómo ha cambiado desde entonces. Se guarda en tu teléfono. Los precios son reales y el dinero es virtual: no es una promesa sobre el futuro.",
+      "tags": [
+        "mi cuenta demo",
+        "cuenta demo",
+        "tarjeta",
+        "pantalla de inicio",
+        "personal"
+      ]
+    },
+    {
+      "id": "piggy",
+      "topic": "how",
+      "q": "¿Qué es la hucha y por qué bitcoin?",
+      "a": "La hucha es comprar poco a poco y con regularidad: por ejemplo, $10 a la semana, con una meta y un plazo. En la app es un modelo de aprendizaje: muestra cuánto habrías ahorrado con los precios reales de bitcoin. ¿Por qué bitcoin? Es la criptomoneda más grande y antigua, nunca habrá más de 21 millones de monedas y, después de cada gran caída pasada, más tarde marcó un nuevo récord. Pero el pasado no garantiza el futuro.",
+      "tags": [
+        "hucha",
+        "ahorrar",
+        "ahorro",
+        "regular",
+        "dca",
+        "por qué bitcoin",
+        "meta"
+      ],
+      "alt": [
+        "¿Cómo funciona la hucha?"
+      ]
+    },
+    {
+      "id": "spot",
+      "topic": "how",
+      "q": "¿Qué es el spot?",
+      "a": "Spot es comprar las monedas en sí, sin préstamos ni apalancamiento: lo que compras es tuyo. En la pestaña «Spot» está la cartera demo de largo plazo de CRYPTO NOVA: un núcleo de bitcoin, ether y solana, altcoins grandes, algunas monedas meme y una reserva en dólares. El sistema se encarga de que los pesos no se desequilibren.",
+      "tags": [
+        "spot",
+        "cartera",
+        "monedas",
+        "largo plazo",
+        "mantener"
+      ]
+    },
+    {
+      "id": "futures",
+      "topic": "how",
+      "q": "¿Qué son los futuros?",
+      "a": "Un futuro es una operación sobre el movimiento del precio: no compras la moneda en sí, sino que ganas con la subida (long) o con la bajada (short). A menudo con apalancamiento, así que tanto la ganancia como la pérdida crecen más rápido. En la pestaña «Futuros» el sistema hace estas operaciones en una cuenta demo de $10 000, con entrada, stop y objetivo.",
+      "tags": [
+        "futuros",
+        "futuro",
+        "señales",
+        "operaciones",
+        "futures"
+      ]
+    },
+    {
+      "id": "eu",
+      "topic": "how",
+      "q": "¿Por qué no veo el enlace al exchange?",
+      "a": "Si estás en la UE o el EEE, la app no muestra enlaces a exchanges: así funcionan las normas europeas para los servicios cripto. Todo lo demás funciona por completo: las lecciones, la demo, la hucha y yo, NOVA.",
+      "tags": [
+        "ue",
+        "europa",
+        "unión europea",
+        "eee",
+        "no veo",
+        "sin enlace",
+        "país"
+      ]
+    },
+    {
+      "id": "leverage",
+      "topic": "learn",
+      "q": "¿Qué es el apalancamiento?",
+      "a": "El apalancamiento es dinero que el exchange te presta para una operación. Con apalancamiento 5×, $100 operan como $500: un movimiento del precio del 1% ya da un 5% de ganancia o de pérdida. Si el precio va muy en tu contra, el exchange cierra la operación por su cuenta: es la liquidación, y puedes perder lo que pusiste. Por eso, apalancamiento solo con cuidado y siempre con stop.",
+      "tags": [
+        "apalancamiento",
+        "leverage",
+        "préstamo",
+        "liquidación",
+        "x5",
+        "margen"
+      ]
+    },
+    {
+      "id": "stop",
+      "topic": "learn",
+      "q": "¿Qué es un stop?",
+      "a": "Un stop, o stop-loss, es un precio elegido de antemano en el que la operación se cierra con una pérdida pequeña para que no crezca. Como el cinturón de seguridad: no te libra de los rasguños, pero evita que el golpe sea demasiado fuerte. Cada operación de CRYPTO NOVA tiene su stop. En un salto brusco, a veces se ejecuta un poco peor que el precio fijado.",
+      "tags": [
+        "stop",
+        "stop-loss",
+        "limitar pérdida",
+        "pérdida máxima"
+      ]
+    },
+    {
+      "id": "long_short",
+      "topic": "learn",
+      "q": "¿Qué son long y short?",
+      "a": "Long es apostar a que el precio sube: compras más barato y vendes más caro. Short es apostar a que baja: ganas si el precio cae. En futuros se pueden hacer las dos cosas, así que el sistema puede ganar también en un mercado que cae. Pero también puede equivocarse en ambas direcciones.",
+      "tags": [
+        "long",
+        "short",
+        "subida",
+        "bajada",
+        "sube",
+        "baja"
+      ]
+    },
+    {
+      "id": "stablecoin",
+      "topic": "learn",
+      "q": "¿Qué es una stablecoin?",
+      "a": "Una stablecoin es un dólar digital en una blockchain: 1 moneda vale más o menos $1, por ejemplo USDT o USDC. Es práctica para guardar una reserva y enviar dinero rápido por todo el mundo. En julio de 2025, Estados Unidos firmó la ley GENIUS, las primeras normas federales para las stablecoins. Pero no es un depósito bancario: importa quién la emite.",
+      "tags": [
+        "stablecoin",
+        "estable",
+        "usdt",
+        "usdc",
+        "tether",
+        "dólar digital"
+      ]
+    },
+    {
+      "id": "lessons",
+      "topic": "learn",
+      "q": "¿Por dónde empiezo a aprender?",
+      "a": "Empieza por el primer nivel, para conocer CRYPTO NOVA: 7 lecciones cortas sobre cómo funciona la app. Después vienen otros 4 niveles, de cero a pro: 38 lecciones en total, con ejemplos de la vida real y tests, de 4–5 minutos cada una.",
+      "tags": [
+        "aprender",
+        "lecciones",
+        "estudiar",
+        "curso",
+        "empezar",
+        "principiante",
+        "academia"
+      ]
+    },
+    {
+      "id": "bitcoin",
+      "topic": "learn",
+      "q": "¿Qué es bitcoin?",
+      "a": "Bitcoin es la primera y mayor criptomoneda: dinero digital sin un banco en medio. Funciona desde 2009, y las transferencias se registran en la blockchain, un libro común que no se puede reescribir en secreto. Nunca habrá más de 21 millones de monedas, por eso a menudo lo llaman oro digital.",
+      "tags": [
+        "bitcoin",
+        "btc",
+        "qué es bitcoin"
+      ]
+    },
+    {
+      "id": "future",
+      "topic": "future",
+      "q": "¿Por qué todos hablan del futuro de las cripto?",
+      "a": "¡Porque las cripto están pasando de un nicho a las masas! Desde enero de 2024, en Estados Unidos se puede comprar bitcoin a través de fondos cotizados, y han entrado los mayores inversores. En marzo de 2026 la SEC aprobó un piloto de Nasdaq con acciones tokenizadas, y desde finales de octubre de 2026 Samsung da a los usuarios de Galaxy en Estados Unidos dólares digitales USDC dentro de su billetera. Son pasos importantes, pero el precio aún puede caer mucho.",
+      "tags": [
+        "futuro",
+        "perspectivas",
+        "masivo",
+        "adopción",
+        "por qué sube",
+        "subirá",
+        "tendencia",
+        "crecer",
+        "subida"
+      ],
+      "alt": [
+        "¿Por qué bitcoin sube durante años?"
+      ]
+    },
+    {
+      "id": "etf",
+      "topic": "future",
+      "q": "¿Qué es un ETF de bitcoin?",
+      "a": "Un ETF es un fondo que cotiza en bolsa como una acción normal. Un ETF de bitcoin al contado guarda bitcoins reales, y el inversor lo compra a través de un bróker normal. En Estados Unidos estos fondos se aprobaron el 10 de enero de 2024, y en octubre de 2026 tenían cerca de 1 293 000 BTC. Así llegaron a las cripto los grandes fondos y los inversores prudentes.",
+      "tags": [
+        "etf",
+        "fondo",
+        "fondos",
+        "blackrock",
+        "institucionales"
+      ],
+      "alt": [
+        "¿Por qué los grandes fondos compran bitcoin?"
+      ]
+    },
+    {
+      "id": "tokenization",
+      "topic": "future",
+      "q": "¿Qué es la tokenización de acciones?",
+      "a": "Es cuando una acción tiene un gemelo digital en una blockchain: se transfiere más rápido y puede negociarse más horas que el horario normal de la bolsa. En junio de 2025 Robinhood lanzó para la UE tokens de más de 200 acciones y ETF estadounidenses, y en marzo de 2026 la SEC aprobó un piloto de Nasdaq con acciones tokenizadas. La bolsa y las cripto se van uniendo poco a poco en la misma tecnología.",
+      "tags": [
+        "tokenización",
+        "tokenizadas",
+        "acciones",
+        "nasdaq",
+        "robinhood",
+        "bolsa"
+      ]
+    },
+    {
+      "id": "too_late",
+      "topic": "future",
+      "q": "¿Es tarde para comprar bitcoin?",
+      "a": "Esa pregunta ya se hacía con bitcoin a $13 en 2013, a $1 000 y a $20 000. Nadie sabe el precio futuro, pero el mundo se mueve claramente hacia las cripto: fondos cotizados, acciones tokenizadas, dólares digitales en las billeteras. Para no tener que adivinar el momento, mucha gente compra poco a poco y con regularidad, como en la hucha. No es asesoramiento financiero.",
+      "tags": [
+        "tarde",
+        "demasiado tarde",
+        "a tiempo",
+        "comprar bitcoin",
+        "momento",
+        "caro"
+      ]
+    },
+    {
+      "id": "crash",
+      "topic": "future",
+      "q": "Bitcoin cayó, ¿es el final?",
+      "a": "La historia de bitcoin está llena de caídas fuertes: tras los máximos de 2011, 2013, 2017 y 2021 perdió entre un 75% y un 93%, y cada vez marcó después un nuevo récord. El último récord es de $126 210, el 6 de octubre de 2025. Las caídas son parte del camino, pero el pasado no garantiza el futuro, así que invierte solo lo que puedas mantener mucho tiempo.",
+      "tags": [
+        "cayó",
+        "caída",
+        "desplome",
+        "final",
+        "crash",
+        "colapso",
+        "bajista"
+      ]
+    },
+    {
+      "id": "who",
+      "topic": "learn",
+      "q": "¿Quién eres, NOVA?",
+      "a": "Soy NOVA, la asistente de IA de CRYPTO NOVA. Explico las cripto con palabras sencillas y te cuento cómo funcionan las operaciones del sistema, la hucha y las lecciones. Puedo equivocarme y no doy consejos personales de comprar o vender: la decisión siempre es tuya.",
+      "tags": [
+        "quién eres",
+        "nova",
+        "asistente",
+        "ayudante",
+        "bot"
+      ]
+    }
+  ]
+}

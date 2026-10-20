@@ -31,7 +31,9 @@ INTERVAL_S = int(os.environ.get("CNQ_ENGINE_INTERVAL", "60"))
 SYNC_S = int(os.environ.get("CNQ_ENGINE_SYNC", "120"))
 FAST = ["paper", "listings", "own", "lsn", "turbo", "signalfeed", "apphome", "apppush"]          # order matters: paper rewrites paper.json, the rest add
 SLOW = ["quality", "altport"]
-OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "altseason.json", "engine.json", "app_home.json", "app_btc.json"]
+OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "altseason.json", "engine.json", "app_home.json", "app_btc.json",
+         # 20.10: the app home in the other languages of the app (cnq/agents/i18n.py LANGS), written in the same step as app_home.json
+         "app_home.en.json", "app_home.uk.json", "app_home.el.json", "app_home.es.json"]
 DB_OWNED = {"agents.sqlite", "cnq.sqlite"}                                 # the engine's own state — never overwritten by a pull
 STEP_TIMEOUT = {"paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90}
 

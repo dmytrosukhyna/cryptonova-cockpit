@@ -1,0 +1,55 @@
+{
+  "v": 1,
+  "updated": "2026-10-20",
+  "lang": "es",
+  "greeting": "¡Hola! Soy NOVA, tu guía en el mundo cripto. Te lo explico todo con palabras sencillas: cómo funcionan las operaciones de CRYPTO NOVA, la hucha en bitcoin y por qué el mundo se está pasando tan rápido a las cripto. Estamos en el modo demo gratuito: tienes 5 preguntas al día. Pregunta con la voz o elige una pregunta abajo.",
+  "greeting_vip": "¡Hola! Soy NOVA. Tu cuenta real está conectada: ahora tienes hasta 100 preguntas al día. Pregúntame lo que quieras: sobre las operaciones del sistema, tu cuenta, la hucha y el futuro de las cripto. Pregunta con la voz o elige una pregunta abajo.",
+  "suggest": [
+    "¿Es seguro?",
+    "¿Cuánto he ganado?",
+    "¿Cómo funciona CRYPTO NOVA?",
+    "¿Qué es la hucha y por qué bitcoin?",
+    "¿Por qué ahora no hay operaciones?",
+    "¿Qué es el apalancamiento?",
+    "¿Por qué todos hablan del futuro de las cripto?",
+    "¿Qué es la cuenta real?"
+  ],
+  "topics": [
+    {
+      "title": "Dinero y seguridad",
+      "qs": [
+        "¿Esto es una estafa?",
+        "¿Dónde está mi dinero?",
+        "¿Cómo retiro mi dinero?",
+        "¿Cuánto cuesta?"
+      ]
+    },
+    {
+      "title": "Cómo funciona",
+      "qs": [
+        "¿Qué es la demo?",
+        "¿Cómo prueban las estrategias?",
+        "¿Y si el sistema se equivoca?",
+        "¿Para qué el exchange y el enlace de referido?"
+      ]
+    },
+    {
+      "title": "Cripto y futuro",
+      "qs": [
+        "¿Qué es un ETF de bitcoin?",
+        "¿Qué es la tokenización de acciones?",
+        "¿Es tarde para comprar bitcoin?",
+        "Bitcoin cayó, ¿es el final?"
+      ]
+    },
+    {
+      "title": "Aprender",
+      "qs": [
+        "¿Por dónde empiezo a aprender?",
+        "¿Qué son long y short?",
+        "¿Qué es un stop?",
+        "¿Qué es una stablecoin?"
+      ]
+    }
+  ]
+}

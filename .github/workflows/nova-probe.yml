@@ -8,8 +8,11 @@ on:
         description: "new | old"
         default: "new"
       questions:
-        description: "extra questions for mode=new, separated by |"
+        description: "extra questions for mode=new, separated by | (prefix en: / uk: / el: / es: asks in that language)"
         default: ""
+      only_extra:
+        description: "1 = ask only the extra questions"
+        default: "0"
 
 permissions:
   contents: read
@@ -27,6 +30,7 @@ jobs:
         env:
           MODE: ${{ inputs.mode }}
           NOVA_PROBE_QS: ${{ inputs.questions }}
+          NOVA_PROBE_ONLY_EXTRA: ${{ inputs.only_extra }}
           CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}
           CNQ_LLM_PROVIDER: ${{ vars.CNQ_LLM_PROVIDER }}
           CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}

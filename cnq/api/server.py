@@ -4,13 +4,16 @@ nginx: app.crypto-capital.app/v2/ → http://127.0.0.1:8090/v2/  (deploy/api/REA
 
 Public (no login):  GET /v2/health · GET /v2/home (= app_home.json, fresh every minute) · GET /v2/feed/<name>
                     (/v2/feed/nova = web/nova.json: NOVA's greeting, starter questions and topics — see cnq/api/nova.py)
+                    ?lang=en|ru|uk|el|es (20.10, the app's language): web/<name>.<lang>.json when it exists, else <name>.json
+                    (Russian); missing / unknown lang → ru. POST /v2/agent takes "lang" in its body the same way.
 With the Firebase ID token («Authorization: Bearer …»):
   POST /v2/me        profile + settings + piggy + lesson progress + AI-agent allowance (creates the user on first call)
   PUT  /v2/prefs     notification switches (trades, news, piggy, brief)
   PUT  /v2/piggy     the free demo piggy bank: amount, how often, goal, mode, start day
   PUT  /v2/progress  lessons done, quiz scores, XP
   POST /v2/push      the phone's FCM token
-  POST /v2/agent     a question to NOVA (free: 5 a day, VIP: 100) — {"q", "ctx"?}; always 200 with an answer, see Api._agent
+  POST /v2/agent     a question to NOVA (free: 5 a day, real account connected: 100) — {"q", "ctx"?, "lang"?}; always 200 with
+                     an answer in that language, see Api._agent
   POST /v2/vip/check BingX UID → invited by our link and deposited → VIP
   DELETE /v2/me      delete the account: every row on our server + the Firebase login (Apple 5.1.1(v))
 Demo only until 2.1; nothing here places orders or holds money."""
@@ -24,7 +27,9 @@ import re
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
+from cnq.agents.i18n import DEFAULT, file_name, norm_lang
 from cnq.agents.llm import LLM, PROVIDERS
 
 from . import bingx, nova
@@ -40,6 +45,10 @@ MAX_BODY = 16 * 1024
 # time budget that fits the app (60 s) and nginx (proxy_read_timeout 60 s): ≤ 20 s per call, ≤ 6 s pause before one 429 retry.
 AGENT_LLM = {"max_tokens": 800, "timeout": 20.0, "max_wait_429": 6.0, "reasoning_effort": "low"}
 AGENT_TEMPERATURE = 0.6
+# a feed the engine rewrites every minute: its translation is served only while it is as fresh as the Russian file (a language
+# file left behind by a stopped writer must not show old trades); static feeds (academy, nova) are served whatever their age
+LIVE_FEEDS = {"app_home"}
+LANG_STALE_S = 600
 
 
 def agent_llm() -> LLM:
@@ -66,12 +75,27 @@ class Api:
         self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
 
     # ---------------------------------------------------------------- helpers
-    def _feed(self, name: str) -> dict | None:
+    def _read(self, path: str) -> dict | None:
         try:
-            with open(os.path.join(self.web, f"{name}.json"), encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception:  # noqa: BLE001
             return None
+
+    def _feed(self, name: str, lang: str = DEFAULT) -> dict | None:
+        """web/<name>.json, or web/<name>.<lang>.json for another language when it exists (else the Russian one)"""
+        base = os.path.join(self.web, f"{name}.json")
+        if lang != DEFAULT:
+            p = os.path.join(self.web, file_name(name, lang))
+            try:
+                fresh = name not in LIVE_FEEDS or os.path.getmtime(p) >= os.path.getmtime(base) - LANG_STALE_S
+            except OSError:
+                fresh = os.path.exists(p)
+            if fresh:
+                d = self._read(p)
+                if d is not None:
+                    return d
+        return self._read(base)
 
     def _llm_ready(self) -> bool:
         """cnq.agents.llm.LLM has `available` as a property; test fakes may have it as a method"""
@@ -100,7 +124,9 @@ class Api:
 
     # ---------------------------------------------------------------- the router
     def handle(self, method: str, path: str, headers: dict, body: bytes) -> tuple[int, dict]:
-        path = path.split("?", 1)[0].rstrip("/")
+        url = urlsplit(path)
+        path = url.path.rstrip("/")
+        lang = norm_lang((parse_qs(url.query).get("lang") or [""])[0])
         if method == "GET" and path == "/v2/health":
             home = self._feed("app_home") or {}
             age = None if not home.get("asof") else round(time.time() - home["asof"] / 1000)
@@ -109,13 +135,13 @@ class Api:
                      "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last}
         if method == "GET" and path == "/v2/home":
-            d = self._feed("app_home")
+            d = self._feed("app_home", lang)
             return (200, d) if d else (503, {"error": "feed_unavailable"})
         m = re.fullmatch(r"/v2/feed/([a-z_]+)", path)
         if method == "GET" and m:
             if m.group(1) not in FEEDS:
                 return 404, {"error": "unknown_feed"}
-            d = self._feed(m.group(1))
+            d = self._feed(m.group(1), lang)
             return (200, d) if d is not None else (503, {"error": "feed_unavailable"})
         # ------------------------------------------------------------ signed-in user
         try:
@@ -165,24 +191,26 @@ class Api:
             self.store.add_push(uid, tok, "ios" if data.get("platform") == "ios" else "android")
             return 200, {"ok": True}
         if method == "POST" and path == "/v2/agent":
+            lang = norm_lang(data.get("lang") or lang)
             try:
-                return self._agent(uid, data)
+                return self._agent(uid, data, lang)
             except Exception as e:  # noqa: BLE001 — NOVA never answers with a bare 500
                 print("agent error:", repr(e)[:300], file=sys.stderr, flush=True)
-                self.agent_last = {"result": "server_error", "ms": None, "at": int(time.time())}
-                return 200, {"error": "busy", "answer": nova.BUSY}
+                self.agent_last = {"result": "server_error", "ms": None, "at": int(time.time()), "lang": lang}
+                return 200, {"error": "busy", "answer": nova.busy(lang)}
         if method == "POST" and path == "/v2/vip/check":
             return self._vip(uid, str(data.get("bingx_uid") or "").strip())
         return 404, {"error": "not_found"}
 
-    def _agent(self, uid: str, data: dict) -> tuple[int, dict]:
+    def _agent(self, uid: str, data: dict, lang: str = DEFAULT) -> tuple[int, dict]:
         """NOVA. Request {"q": question (≤ 500 chars, longer is cut), "ctx": optional plain-text summary of the user's own demo
         account and piggy bank that the app builds (≤ 600 chars kept, control characters removed; given to the model as the user's
-        data, never as instructions)}.
-        Response: ALWAYS HTTP 200 with "answer" (text to show as NOVA's message) and "agent" {"limit", "left"}; "error" says why
-        it is not a model answer. The question is counted only when there is no "error" and no "source".
+        data, never as instructions), "lang": the app's language — en / ru / uk / el / es, anything else → ru}.
+        Response: ALWAYS HTTP 200 with "answer" (text to show as NOVA's message, in that language) and "agent" {"limit", "left"};
+        "error" says why it is not a model answer. The question is counted only when there is no "error" and no "source".
           (no error)      the model answered; agent.left is the new allowance
-          source: "faq"   the model failed, but the question matched a FAQ item (data/nova_faq.json) — its answer, not counted
+          source: "faq"   the model failed, but the question matched a FAQ item (data/nova_faq[.<lang>].json) — its answer, not
+                          counted
           error: "busy"   the model failed, timed out, answered empty or is not configured, or any server error — not counted
           error: "limit"  no questions left today (free 5, VIP 100) — not counted
           error: "bad_question"  empty or unreadable question — not counted
@@ -193,15 +221,15 @@ class Api:
         al = self._allowance(uid, tier)
         q = nova.clean_text(data.get("q"), nova.Q_MAX)
         if len(q) < 2:
-            return 200, {"error": "bad_question", "answer": nova.BAD_QUESTION, "agent": al}
+            return 200, {"error": "bad_question", "answer": nova.bad_question(lang), "agent": al}
         if al["left"] <= 0:
-            return 200, {"error": "limit", "answer": nova.LIMIT_VIP if tier == "vip" else nova.LIMIT_FREE, "agent": al}
+            return 200, {"error": "limit", "answer": nova.limit(lang, vip=tier == "vip"), "agent": al}
         ctx = nova.clean_text(data.get("ctx"), nova.CTX_MAX)
         t0, answer, result = time.time(), "", "not_configured"
         llm = copy.copy(self.llm) if isinstance(self.llm, LLM) else self.llm   # its own last_finish per request (threads)
         if self._llm_ready():
             try:
-                raw = llm.complete(self.nova.system(), self.nova.user_message(q, self._feed("app_home") or {}, ctx),
+                raw = llm.complete(self.nova.system(lang), self.nova.user_message(q, self._feed("app_home", lang) or {}, ctx, lang),
                                    temperature=AGENT_TEMPERATURE)
                 cut = getattr(llm, "last_finish", None) == "length"
                 answer = nova.tidy(raw if isinstance(raw, str) else "", cut=cut)
@@ -211,16 +239,16 @@ class Api:
                 result = "timeout" if "timed out" in msg.lower() else "rate_limit" if "429" in msg else "llm_error"
                 print(f"agent: {result}: {msg[:200]}", file=sys.stderr, flush=True)
         use = getattr(llm, "last_usage", None) or {}
-        self.agent_last = {"result": result, "ms": round((time.time() - t0) * 1000), "at": int(time.time()),
+        self.agent_last = {"result": result, "ms": round((time.time() - t0) * 1000), "at": int(time.time()), "lang": lang,
                            "finish": getattr(llm, "last_finish", None), "prompt_tokens": use.get("prompt_tokens"),
                            "reasoning_tokens": (use.get("completion_tokens_details") or {}).get("reasoning_tokens")}
         if answer:
             self.store.use(uid, _day())
             return 200, {"answer": answer, "agent": self._allowance(uid, tier)}
-        hit = self.nova.match(q)
+        hit = self.nova.match(q, lang)
         if hit:
             return 200, {"answer": hit["a"], "source": "faq", "agent": al}
-        return 200, {"error": "busy", "answer": nova.BUSY, "agent": al}
+        return 200, {"error": "busy", "answer": nova.busy(lang), "agent": al}
 
     def _vip(self, uid: str, bx: str) -> tuple[int, dict]:
         owner = self.store.bingx_owner(bx) if bx else None
@@ -231,6 +259,14 @@ class Api:
             return 503, {"error": res["reason"]}
         self.store.set_vip(uid, bx, bool(res.get("ok")), res)
         return 200, {"vip": bool(res.get("ok")), "reason": res.get("reason"), "user": self._profile(uid)["user"]}
+
+
+def _body_lang(body: bytes) -> str:
+    try:
+        d = json.loads(body.decode() or "{}")
+        return norm_lang(d.get("lang") if isinstance(d, dict) else None)
+    except Exception:  # noqa: BLE001
+        return DEFAULT
 
 
 def make_handler(api: Api):
@@ -249,7 +285,7 @@ def make_handler(api: Api):
                 print("api error:", repr(e), file=sys.stderr, flush=True)
                 code, doc = 500, {"error": "server"}
                 if self.path.split("?", 1)[0].rstrip("/") == "/v2/agent":      # NOVA: the app shows the answer, never «нет интернета»
-                    code, doc = 200, {"error": "busy", "answer": nova.BUSY}
+                    code, doc = 200, {"error": "busy", "answer": nova.busy(_body_lang(body))}
             self._send(code, doc)
 
         def _send(self, code: int, doc: dict) -> None:
@@ -290,7 +326,10 @@ def main() -> int:
 
     def _watch() -> None:            # the engine's git pull updates the code → exit, systemd starts the new version
         here = os.path.dirname(os.path.realpath(__file__))
-        stamp = lambda: max(os.path.getmtime(os.path.join(here, f)) for f in os.listdir(here) if f.endswith(".py"))
+        agents = os.path.join(os.path.dirname(here), "agents")            # what the API imports from the engine's package
+        files = lambda: [os.path.join(here, f) for f in os.listdir(here) if f.endswith(".py")] + \
+            [os.path.join(agents, f) for f in ("i18n.py", "llm.py") if os.path.exists(os.path.join(agents, f))]
+        stamp = lambda: max(os.path.getmtime(p) for p in files())
         first = stamp()
         while True:
             time.sleep(60)

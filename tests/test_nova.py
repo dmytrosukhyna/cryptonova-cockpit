@@ -20,7 +20,7 @@ from tests.test_api import call, make, token
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EARNED = "Сколько я заработал?"
 OWNER_QUESTIONS = ["Это безопасно?", "Это не развод?", "Где мои деньги?", "Сколько можно заработать?", "Что если система ошибётся?",
-                   "Как вывести деньги?", "Что такое демо?", "Что такое VIP и реальный счёт?", "Сколько стоит?",
+                   "Как вывести деньги?", "Что такое демо?", "Что такое реальный счёт?", "Сколько стоит?",
                    "Зачем вам биржа и реферальная ссылка?", "С какой суммы начать?", "Что такое копилка и почему биткоин?",
                    "Что такое плечо?", "Что такое стоп?", "Что такое лонг и шорт?", "Почему сейчас нет сделок?",
                    "Как вы проверяете стратегии?"]
@@ -222,7 +222,8 @@ def test_nova_feed_is_public(tmp_path):
     c, d = call(api, "GET", "/v2/feed/nova")                 # no token
     assert c == 200
     assert "NOVA" in d["greeting"] and "5 вопросов в день" in d["greeting"] and "бесплатном демо-режиме" in d["greeting"]
-    assert "VIP" in d["greeting_vip"] and "100" in d["greeting_vip"]
+    # 20.10: the app no longer says «VIP» to people — the greeting for a connected real account says so in words
+    assert "VIP" not in d["greeting_vip"] and "реальный счёт подключён" in d["greeting_vip"] and "100" in d["greeting_vip"]
     assert 6 <= len(d["suggest"]) <= 8 and all(isinstance(q, str) and len(q) <= 60 for q in d["suggest"])
     assert [t["title"] for t in d["topics"]] == ["Деньги и безопасность", "Как это работает", "Крипта и будущее", "Обучение"]
     assert all(3 <= len(t["qs"]) <= 4 for t in d["topics"])

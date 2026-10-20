@@ -219,6 +219,15 @@ def _engine_facts(out: str) -> dict:
             "cycle_sec": 60}
 
 
+def _config(out: str) -> dict:
+    """web/app_config.json (in git): what the app may change without a new App Store version — the exchange partner link"""
+    c = _load(out, "app_config.json")
+    ref = c.get("exchange_ref")
+    return {"exchange_name": c.get("exchange_name") or "BingX",
+            "exchange_ref": ref if isinstance(ref, str) and ref.startswith("https://") else None,
+            "exchange_trade_url": c.get("exchange_trade_url")}
+
+
 def btc_daily(conn: sqlite3.Connection | None, out: str) -> dict:
     from . import outlook
     closes = outlook.merge(outlook.seed_closes(), outlook.local_closes(), outlook.db_closes(conn),
@@ -241,7 +250,7 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
            "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]},
            "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                        {"key": "piggy", "usd": None}, {"key": "soon", "label": "арбитраж, рынки прогнозов"}],
-           "market": _market(mk), "futures": fut, "spot": spot, "engine": _engine_facts(out),
+           "market": _market(mk), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),
            "note_ru": "Демо-счета CRYPTO NOVA. Прошлые результаты не гарантируют будущих. Не финансовый совет."}
     with open(os.path.join(out, "app_home.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))

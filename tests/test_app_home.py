@@ -54,3 +54,12 @@ def test_app_home_shows_every_mix_source(tmp_path):
     assert f["open"][0]["target"] == 14.5 and f["open"][0]["pct"] == 5.0 and "×1.8" in f["open"][0]["why"]
     assert f["trades"] == 1                                          # the main account's count, not the other desks'
     assert "ARB" in f["status_ru"] and "1 сделка других" in f["status_ru"]
+
+
+def test_app_home_config_link(tmp_path):
+    d = str(tmp_path)
+    _w(d, "app_config.json", {"exchange_name": "BingX", "exchange_ref": "https://bingx.com/invite/ABC123", "exchange_trade_url": "x"})
+    doc = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)
+    assert doc["config"]["exchange_ref"] == "https://bingx.com/invite/ABC123"
+    _w(d, "app_config.json", {"exchange_ref": "javascript:alert(1)"})
+    assert app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]["exchange_ref"] is None

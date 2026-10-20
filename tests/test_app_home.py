@@ -35,3 +35,22 @@ def test_app_home_numbers(tmp_path):
     assert names[0] == "Биткоин" and "мем-монеты" in names and names[-1] == "доллары"
     assert doc["spot"]["movers"][0] == {"sym": "BTC", "pct": 10.0}
     assert os.path.exists(os.path.join(d, "app_home.json"))
+
+
+def test_app_home_shows_every_mix_source(tmp_path):
+    """20.10: the own daily signals were open but the app showed only the main desk"""
+    d = str(tmp_path)
+    t0 = 1792300000000
+    prof = {p: {"equity": 10000.0, "open_pnl_usd": 0.0, "equity_history": [{"time": t0, "equity": 10000.0}], "open": [],
+                "closed": [{"symbol": "ARB", "side": "LONG", "pnl_usd": 191.6, "closed": t0}], "stats": {"trades": 1}}
+            for p in ("cons", "bal", "aggr")}
+    prof["own"] = {"equity": 10000.0, "open": [{"id": "OWN-P-AVAX-1", "symbol": "AVAX", "side": "LONG", "grade": "P", "kind": "OWN_P",
+                                                "entry": 10.0, "stop": 8.5, "price": 10.5, "open_pnl_usd": 12.0, "opened": t0 + 5,
+                                                "vol": 1.8}]}
+    _w(d, "paper.json", {"since": t0, "profiles": prof})
+    doc = app_home.run(sqlite3.connect(":memory:"), d, now=t0 + 120000)
+    f = doc["futures"]
+    assert len(f["open"]) == 1 and f["open"][0]["src"] == "own" and f["open"][0]["src_ru"] == "откат в тренде"
+    assert f["open"][0]["target"] == 14.5 and f["open"][0]["pct"] == 5.0 and "×1.8" in f["open"][0]["why"]
+    assert f["trades"] == 1                                          # the main account's count, not the other desks'
+    assert "ARB" in f["status_ru"] and "1 сделка других" in f["status_ru"]

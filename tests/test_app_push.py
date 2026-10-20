@@ -100,3 +100,20 @@ def test_big_move_news_once_a_day_and_brief_dedupe(tmp_path):
     (web / "markets.json").write_text(json.dumps({"top": [{"symbol": "BTC", "price": 90000, "chg24": 9.0}]}))
     app_push.run(conn, api, str(web), ms(12, 0, day=21), f)
     assert len(f.sent) == 1
+
+
+def test_new_source_is_seeded_silently_then_its_new_trades_send(tmp_path):
+    web, api, conn = setup(tmp_path)
+    (web / "paper.json").write_text(json.dumps(paper(["XRP"])))
+    f = FakeFcm()
+    app_push.run(conn, api, str(web), ms(12), f)                         # first run ever: silent
+    own_open = lambda ids: [{"id": i, "symbol": i, "side": "LONG", "entry": 1.0, "stop": 0.85, "opened": 3} for i in ids]
+    doc = paper(["XRP"])
+    doc["profiles"]["own"] = {"open": own_open(["AVAX", "FIL", "APT"]), "closed": []}
+    (web / "paper.json").write_text(json.dumps(doc))
+    app_push.run(conn, api, str(web), ms(12, 5), f)                      # «own» appears with 3 old trades → nothing sent
+    assert f.sent == []
+    doc["profiles"]["own"]["open"] = own_open(["AVAX", "FIL", "APT", "SEI"])
+    (web / "paper.json").write_text(json.dumps(doc))
+    r = app_push.run(conn, api, str(web), ms(12, 10), f)                 # a genuinely new own trade → one push
+    assert r["sent"] == 1 and "SEI" in f.sent[0][2]

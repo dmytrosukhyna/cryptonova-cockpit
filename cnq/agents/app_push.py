@@ -49,19 +49,30 @@ def _db(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE TABLE IF NOT EXISTS push_log(uid TEXT, kind TEXT, day TEXT, t INTEGER)")
 
 
+def _mix_keys() -> list[str]:
+    try:
+        from .signal_feed import SOURCES
+        return [k for k, _n, _w in SOURCES]
+    except Exception:  # noqa: BLE001
+        return ["bal"]
+
+
 def trade_events(paper: dict) -> list[dict]:
-    bal = (paper.get("profiles") or {}).get("bal") or paper
+    """20.10: trades of every source of the CRYPTO NOVA mix (the main desk + our own daily signals + …), not only the main desk"""
+    prof = paper.get("profiles") or {}
     ev = []
-    for o in bal.get("open") or []:
-        side = "рост" if str(o.get("side")).upper() == "LONG" else "падение"
-        tps = o.get("tps") or []
-        ev.append({"key": f"open:{o.get('id') or o.get('symbol')}:{o.get('opened')}", "title": "Новая сделка CRYPTO NOVA · демо",
-                   "body": f"{o.get('symbol')} · {side} · вход {_fmt_price(o.get('entry'))}, стоп {_fmt_price(o.get('stop'))}"
-                           + (f", цель {_fmt_price(tps[-1])}" if tps else ""), "sym": o.get("symbol")})
-    for c in bal.get("closed") or []:
-        pnl = float(c.get("pnl_usd") or 0)
-        ev.append({"key": f"close:{c.get('id') or c.get('symbol')}:{c.get('closed')}", "title": "Сделка закрыта · демо",
-                   "body": f"{c.get('symbol')}: {_fmt_usd(pnl)} на счёте $10 000", "sym": c.get("symbol")})
+    for src in _mix_keys():
+        desk = prof.get(src) or (paper if src == "bal" and not prof else {})
+        for o in desk.get("open") or []:
+            side = "рост" if str(o.get("side")).upper() == "LONG" else "падение"
+            tps = o.get("tps") or []
+            ev.append({"key": f"open:{o.get('id') or o.get('symbol')}:{o.get('opened')}", "title": "Новая сделка CRYPTO NOVA · демо",
+                       "body": f"{o.get('symbol')} · {side} · вход {_fmt_price(o.get('entry'))}, стоп {_fmt_price(o.get('stop'))}"
+                               + (f", цель {_fmt_price(tps[-1])}" if tps else ""), "sym": o.get("symbol"), "src": src})
+        for c in desk.get("closed") or []:
+            pnl = float(c.get("pnl_usd") or 0)
+            ev.append({"key": f"close:{c.get('id') or c.get('symbol')}:{c.get('closed')}", "title": "Сделка закрыта · демо",
+                       "body": f"{c.get('symbol')}: {_fmt_usd(pnl)} на счёте $10 000", "sym": c.get("symbol"), "src": src})
     return ev
 
 
@@ -98,11 +109,18 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
     if first_run:
         conn.execute("INSERT OR IGNORE INTO push_seen VALUES('__init__', ?)", (now_ms,))
     fresh = []
+    # a source seen for the first time (e.g. our own daily signals, added 20.10) only remembers its existing trades — silently
+    have = (paper.get("profiles") or {}).keys()
+    new_src = {s for s in _mix_keys() if s != "bal" and s in have
+               and conn.execute("SELECT 1 FROM push_seen WHERE key=?", (f"__init__:{s}",)).fetchone() is None}
+    for s in new_src:
+        conn.execute("INSERT OR IGNORE INTO push_seen VALUES(?, ?)", (f"__init__:{s}", now_ms))
     for e in trade_events(paper):
         if conn.execute("SELECT 1 FROM push_seen WHERE key=?", (e["key"],)).fetchone():
             continue
         conn.execute("INSERT INTO push_seen VALUES(?,?)", (e["key"], now_ms))
-        fresh.append(e)
+        if e.get("src") not in new_src:
+            fresh.append(e)
     conn.commit()
     if first_run:                 # the very first run only remembers what already exists — no flood of old trades
         return {"sent": 0, "first_run": True, "events": len(fresh)}

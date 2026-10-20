@@ -26,6 +26,16 @@ WHY_RU = {
     "CLIMAX_LONG": "Рынок резко продали: свеча упала на большом объёме. После таких провалов цена чаще отскакивает за сутки.",
     "CLIMAX_SHORT": "Цену резко разогнали на большом объёме. После таких всплесков цена чаще откатывает за сутки.",
 }
+# 20.10 (owner: «нету активных сигналов в системе криптонова»): the app shows the trades of EVERY source of the CRYPTO NOVA mix
+# (signal_feed.SOURCES), not only the main CNPTS desk — the own daily signals were open but invisible in the app.
+GRADE_WHY_RU = {
+    "P": "Монета в растущем тренде на день откатилась вниз. Покупаем откат: на истории 2023–2026 такие входы в среднем "
+         "давали плюс.",
+    "C": "Цена пробила максимум 20 дней. На истории после таких пробоев тренд чаще продолжается.",
+    "LST": "Новая монета на бирже: после листинга цена чаще снижается. Шорт на 14 дней, небольшой размер.",
+    "K": "Биткоин резко вырос, а эта монета ещё нет — на истории альты чаще догоняют рывок BTC.",
+}
+SRC_RU = {"bal": "основная стратегия", "imp": "импульс BTC", "own": "сигналы CRYPTO NOVA", "lst": "шорт листингов"}
 
 
 def _load(out: str, name: str) -> dict:
@@ -65,6 +75,61 @@ def _sample(points: list, n: int = 60) -> list:
     return [points[round(i * step)] for i in range(n)]
 
 
+def _mix_keys() -> list[str]:
+    try:
+        from .signal_feed import SOURCES
+        return [k for k, _n, _w in SOURCES]
+    except Exception:  # noqa: BLE001
+        return ["bal"]
+
+
+def _open_row(o: dict, src: str) -> dict:
+    """one open trade of a mix desk in the app's words; the target: the desk's last take-profit or, for the rules that exit by
+    rule / time, the same +1R/+2R/+3R ladder the Telegram message shows (its 3rd step)"""
+    entry, price, stop = o.get("entry"), o.get("price"), o.get("stop_now") or o.get("stop")
+    side = str(o.get("side") or "").upper()
+    tps = o.get("tps") or []
+    tgt = tps[-1] if tps else None
+    grade = str(o.get("grade") or "")
+    if (tgt is None or grade in ("P", "C", "LST")) and entry and stop:
+        try:
+            from .signal_feed import targets
+            tgt = targets({"entry": entry, "stop": stop, "side": side, "grade": grade, "tps": tps})[-1]
+        except Exception:  # noqa: BLE001
+            pass
+    pct = None
+    if entry and price:
+        pct = (price / entry - 1) * 100 * (1 if side == "LONG" else -1)
+    why = WHY_RU.get(str(o.get("kind") or "")) or GRADE_WHY_RU.get(grade) or \
+        "Сделка по правилам CRYPTO NOVA: вход, стоп и цель заданы заранее."
+    if o.get("vol"):
+        why += f" Объём дня сигнала — ×{float(o['vol']):.1f} к обычному."
+    try:
+        from .signal_feed import RULE_RU
+        rule = RULE_RU.get(grade) or None
+    except Exception:  # noqa: BLE001
+        rule = None
+    return {"sym": o.get("symbol"), "side": side, "entry": entry, "price": price, "stop": stop, "target": tgt,
+            "pnl_usd": _r(float(o.get("open_pnl_usd") or 0)), "pct": _r(pct, 1), "opened": o.get("opened"),
+            "expires": o.get("expires"), "why": why, "src": src, "src_ru": rule or SRC_RU.get(src, "CRYPTO NOVA")}
+
+
+def _status(bal_open: int, closed: list, opened: list) -> str | None:
+    """what the main strategy is doing, in one calm line (shown when it has nothing open)"""
+    if bal_open:
+        return None
+    last = closed[0] if closed else None
+    tail = ""
+    if last and last.get("pnl_usd") is not None:
+        d = dt.datetime.fromtimestamp((last.get("closed") or 0) / 1000, dt.timezone(dt.timedelta(hours=3)))
+        tail = f" Последняя сделка: {last['sym']}, {'+' if last['pnl_usd'] >= 0 else '−'}${abs(last['pnl_usd']):.0f}, {d:%d.%m}."
+    other = len(opened)
+    word = "сделка" if other % 10 == 1 and other % 100 != 11 else \
+        "сделки" if 2 <= other % 10 <= 4 and not 12 <= other % 100 <= 14 else "сделок"
+    return ("Основная стратегия сейчас без сделок: она входит только после резкой распродажи на большом объёме — так дешевле "
+            "и на истории выгоднее." + tail + (f" В работе {other} {word} других сигналов CRYPTO NOVA." if other else ""))
+
+
 def _futures(paper: dict, now: int) -> dict:
     prof = paper.get("profiles") or {}
     curve = _avg_curve(prof)
@@ -79,27 +144,21 @@ def _futures(paper: dict, now: int) -> dict:
         peak = max(peak, START + v)
         dd = min(dd, (START + v) / peak - 1)
     bal = prof.get("bal") or paper
-    k = 1.0  # «bal» is the middle size: cons = ½, aggr = 1½ of the same trades → the average account equals «bal»
     opened = []
-    for o in bal.get("open") or []:
-        entry, price, stop = o.get("entry"), o.get("price"), o.get("stop_now") or o.get("stop")
-        tps = o.get("tps") or []
-        tgt = tps[-1] if tps else None
-        side = str(o.get("side") or "").upper()
-        pnl = float(o.get("open_pnl_usd") or 0) * k
-        pct = None
-        if entry and price:
-            pct = (price / entry - 1) * 100 * (1 if side == "LONG" else -1)
-        opened.append({"sym": o.get("symbol"), "side": side, "entry": entry, "price": price, "stop": stop, "target": tgt,
-                       "pnl_usd": _r(pnl), "pct": _r(pct, 1), "opened": o.get("opened"), "expires": o.get("expires"),
-                       "why": WHY_RU.get(str(o.get("kind") or ""), "Сделка по правилам CRYPTO NOVA: вход, стоп и цель заданы заранее.")})
+    for src in _mix_keys():
+        desk = bal if src == "bal" else prof.get(src) or {}
+        for o in desk.get("open") or []:
+            opened.append(_open_row(o, src))
+    opened.sort(key=lambda o: -(o.get("opened") or 0))
+    bal_open = sum(1 for o in opened if o["src"] == "bal")
     closed = []
     for c in sorted(bal.get("closed") or [], key=lambda c: c.get("closed") or 0, reverse=True)[:8]:
-        closed.append({"sym": c.get("symbol"), "side": str(c.get("side") or "").upper(), "pnl_usd": _r(float(c.get("pnl_usd") or 0) * k),
+        closed.append({"sym": c.get("symbol"), "side": str(c.get("side") or "").upper(), "pnl_usd": _r(float(c.get("pnl_usd") or 0)),
                        "closed": c.get("closed")})
     st = bal.get("stats") or {}
     n_closed = int(st.get("trades") or len(bal.get("closed") or []))
-    return {"usd": _r(usd), "pct": _r(usd / START * 100), "today_usd": _r(today), "trades": n_closed + len(opened),
+    return {"usd": _r(usd), "pct": _r(usd / START * 100), "today_usd": _r(today), "trades": n_closed + bal_open,
+            "status_ru": _status(bal_open, closed, opened),
             "wins": round(float(st.get("winrate") or 0) * n_closed), "closed_n": n_closed, "worst_dd_pct": _r(dd * 100, 1),
             "open": opened, "closed": closed, "curve": [[t, _r(v)] for t, v in _sample(curve)],
             "about_ru": "Средний счёт $10 000: те же сделки CRYPTO NOVA в 3 размерах (осторожный, сбалансированный, смелый)."}

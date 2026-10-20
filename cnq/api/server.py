@@ -129,6 +129,18 @@ class Api:
                 out[key] = int(v) // (1024 * 1024) if v.isdigit() else v
             except OSError:
                 pass
+        try:                                        # every program in the engine service right now, with its memory
+            procs = []
+            for pid in open(os.path.join(cg, "cgroup.procs"), encoding="utf-8").read().split():
+                try:
+                    rss = next((int(ln.split()[1]) // 1024 for ln in open(f"/proc/{pid}/status", encoding="utf-8") if ln.startswith("VmRSS:")), 0)
+                    cmd = open(f"/proc/{pid}/cmdline", "rb").read().replace(b"\0", b" ").decode("utf-8", "replace").strip()
+                    procs.append({"pid": int(pid), "rss_mb": rss, "cmd": cmd[-90:]})
+                except OSError:
+                    pass
+            out["engine_procs"] = procs
+        except Exception:  # noqa: BLE001
+            pass
         try:                                        # what fills the account: programs (anon) or the file cache (file, dirty, writeback)
             st = dict(ln.split() for ln in open(os.path.join(cg, "memory.stat"), encoding="utf-8").read().splitlines() if ln.strip())
             out["engine_mem_stat_mb"] = {k: int(st[k]) // (1024 * 1024) for k in ("anon", "file", "file_dirty", "file_writeback", "shmem",

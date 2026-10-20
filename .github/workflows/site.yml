@@ -234,10 +234,14 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/tokenomics.json web/channel_watch.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 data/agents.sqlite; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/tokenomics.json web/channel_watch.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3; do [ -f "$f" ] && git add "$f"; done
+          # 20.10: data/agents.sqlite reached GitHub's 100 MB file limit (whale study candles/fills) — every push after 09:44 UTC was
+          # rejected, so no data reached main for hours. Past 95 MB the database stays in the Actions cache only (it is restored from there).
+          sz=$(stat -c %s data/agents.sqlite 2>/dev/null || echo 0)
+          if [ "$sz" -lt 95000000 ]; then git add data/agents.sqlite; else echo "::warning title=agents.sqlite::$((sz/1000000)) MB — kept in the cache only, not committed (GitHub limit 100 MB)"; fi
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
-          for i in 1 2 3; do git fetch origin main && git rebase -X theirs origin/main && git push origin HEAD:main && break || { git rebase --abort || true; sleep 15; }; done
+          for i in 1 2 3; do git fetch origin main && git rebase --autostash -X theirs origin/main && git push origin HEAD:main && break || { echo "::warning title=push::attempt $i failed"; git rebase --abort || true; sleep 15; }; done
       - name: Publish web/ to gh-pages branch (works without any Pages setting)
         uses: peaceiris/actions-gh-pages@v4
         with:

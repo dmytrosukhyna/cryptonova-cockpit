@@ -116,6 +116,25 @@ class Api:
             out["disk_used_pct"] = round(du.used / du.total * 100, 1)
         except OSError:
             pass
+        try:                                        # the machine's memory and the engine service's own memory account (cgroup v2)
+            mi = dict(ln.split(":", 1) for ln in open("/proc/meminfo", encoding="utf-8").read().splitlines() if ":" in ln)
+            out["mem_total_mb"] = int(mi["MemTotal"].split()[0]) // 1024
+            out["mem_avail_mb"] = int(mi["MemAvailable"].split()[0]) // 1024
+        except Exception:  # noqa: BLE001
+            pass
+        cg = "/sys/fs/cgroup/system.slice/cnq-engine.service"
+        for f, key in (("memory.current", "engine_mem_mb"), ("memory.peak", "engine_mem_peak_mb"), ("memory.max", "engine_mem_max_mb")):
+            try:
+                v = open(os.path.join(cg, f), encoding="utf-8").read().strip()
+                out[key] = int(v) // (1024 * 1024) if v.isdigit() else v
+            except OSError:
+                pass
+        try:
+            ev = dict(ln.split() for ln in open(os.path.join(cg, "memory.events"), encoding="utf-8").read().splitlines() if ln.strip())
+            out["engine_oom_kills"] = int(ev.get("oom_kill", 0))
+            out["engine_mem_max_hits"] = int(ev.get("max", 0))
+        except Exception:  # noqa: BLE001
+            pass
         eng = self._read(os.path.join(self.web, "engine.json")) or {}
         if eng.get("asof"):
             out["engine_age_sec"] = round(time.time() - eng["asof"] / 1000)
@@ -133,6 +152,7 @@ class Api:
             out["engine_step_sec"] = round(time.time() - now["since"] / 1000)
             out["engine_step_timeout"] = now.get("timeout")
             out["engine_started_age_sec"] = round(time.time() - (now.get("started") or 0) / 1000)
+            out["engine_step_rss_mb"] = now.get("rss_mb")
             if now.get("phase"):
                 out["engine_phase"] = now.get("phase")
                 out["engine_phase_age_sec"] = round(time.time() - (now.get("phase_t") or 0) / 1000)

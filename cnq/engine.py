@@ -55,7 +55,19 @@ def sh(args: list[str], cwd: str, timeout: int = 120, env: dict | None = None) -
     except Exception as e:  # noqa: BLE001
         return False, round(time.time() - t0, 1), repr(e)[:300]
     try:
-        out, err = p.communicate(timeout=timeout)
+        out = err = None
+        peak = 0
+        while True:                                  # wait in 2-second slices and note the step's memory each time (→ /v2/diag)
+            try:
+                out, err = p.communicate(timeout=2)
+                break
+            except subprocess.TimeoutExpired:
+                if time.time() - t0 > timeout:
+                    raise
+                rss = _rss_mb(p.pid)
+                if rss > peak:
+                    peak = rss
+                    _now_rss(rss)
     except subprocess.TimeoutExpired:
         try:
             os.killpg(p.pid, signal.SIGKILL)
@@ -118,6 +130,27 @@ def _now_step(args: list[str], timeout: int) -> None:
     """web/engine_now.json: which step the engine is in right now (the API's /v2/diag shows it) — a hang or a restart loop is
     visible from outside without logging in to the server"""
     _write_now({"step": _step_name(args), "since": int(time.time() * 1000), "timeout": timeout})
+
+
+def _rss_mb(pid: int) -> int:
+    try:
+        for line in open(f"/proc/{pid}/status", encoding="utf-8"):
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) // 1024
+    except OSError:
+        pass
+    return 0
+
+
+def _now_rss(mb: int) -> None:
+    try:
+        p = os.path.join(RUN, "web", "engine_now.json")
+        d = json.load(open(p, encoding="utf-8"))
+        d["rss_mb"] = mb
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(d, f)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _phase(text: str) -> None:

@@ -142,13 +142,18 @@ def _date(ms) -> str:
         return str(ms or "—")
 
 
+def _named(q: str, home: dict) -> set[str]:
+    """the open trades' coins the question names («Почему вошли в AVAX?» → {"AVAX"})"""
+    words = set(_norm(q).split())
+    return {str(o.get("sym")) for o in ((home or {}).get("futures") or {}).get("open") or []
+            if isinstance(o, dict) and str(o.get("sym") or "").lower() in words}
+
+
 def _about_trades(q: str, home: dict) -> bool:
     """does the question ask about the system's trades (or name a coin it holds)?"""
-    n = _norm(q)
-    if re.search(r"сдел|сигнал|вош|вход|позиц|лонг|шорт|стоп|цел|открыт|откат|почему.*(купил|взял)", n):
+    if re.search(r"сдел|сигнал|вош|вход|позиц|лонг|шорт|стоп|цел|открыт|откат|почему.*(купил|взял)", _norm(q)):
         return True
-    syms = {str(o.get("sym") or "").lower() for o in ((home or {}).get("futures") or {}).get("open") or [] if isinstance(o, dict)}
-    return bool(syms & set(n.split()))
+    return bool(_named(q, home))
 
 
 # ------------------------------------------------------------------------------------------------ knowledge
@@ -236,7 +241,7 @@ class Knowledge:
                     return None
         return None
 
-    def demo_block(self, home: dict, trades: bool = True) -> str:
+    def demo_block(self, home: dict, trades: bool = True, focus: set[str] | frozenset = frozenset()) -> str:
         """CRYPTO NOVA's own demo accounts from web/app_home.json, in plain Russian; trades=False leaves out the list of open
         trades (≈ 300 tokens) when the question is not about them — the free model plan counts tokens per minute"""
         if not home:
@@ -263,6 +268,12 @@ class Knowledge:
                            f"стоп {_price(o.get('stop'))}, цель {_price(o.get('target'))}" + (f", сигнал «{src}»" if src else ""))
                 if src and o.get("why") and src not in whys:
                     whys[src] = clean_text(o["why"], 240)
+                if o.get("sym") in focus:              # the coin the question names: the app's own explanation, real numbers
+                    checks = "; ".join(f"{c.get('t')}: {c.get('v')}" for c in (o.get("checks") or [])[:5] if isinstance(c, dict))
+                    hist = (o.get("history") or {}).get("text") if isinstance(o.get("history"), dict) else None
+                    out.append(f"    Подробно про {o.get('sym')}: {clean_text(o.get('why_title') or '', 60)}. {clean_text(o.get('why') or '', 240)}"
+                               + (f" Проверки входа: {clean_text(checks, 400)}." if checks else "")
+                               + (f" История правила: {clean_text(hist, 240)}" if hist else ""))
             for src, why in whys.items():
                 out.append(f"  Почему вошли («{src}»): {why}")
         s = home.get("spot") or {}
@@ -294,7 +305,7 @@ class Knowledge:
 
     def user_message(self, q: str, home: dict, ctx: str) -> str:
         try:
-            demo = self.demo_block(home, trades=_about_trades(q, home))
+            demo = self.demo_block(home, trades=_about_trades(q, home), focus=_named(q, home))
         except Exception:  # noqa: BLE001 — a strange app_home must not cost the answer
             demo = self.demo_block({})
         parts = [demo]

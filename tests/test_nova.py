@@ -168,6 +168,12 @@ def test_demo_block_from_app_home():
     # the open trades go to the model only when the question is about them (tokens per minute on the free model plan)
     sym = home["futures"]["open"][0]["sym"]
     assert f"– {sym} " in k.user_message(f"Почему система вошла в {sym}?", home, "")
+    o = dict(home["futures"]["open"][0], why_title="Откат в растущем тренде",
+             checks=[{"t": "Откат", "v": "−1.8% за 2 дня, RSI(2) = 5.9", "ok": True}], history={"text": "в среднем +3.1% на сделку"})
+    h2 = {**home, "futures": {**home["futures"], "open": [o]}}
+    msg = k.user_message(f"почему вы купили {sym.lower()}?", h2, "")
+    assert f"Подробно про {sym}: Откат в растущем тренде" in msg and "RSI(2) = 5.9" in msg and "+3.1% на сделку" in msg
+    assert "Подробно про" not in k.user_message("Какие сделки сейчас открыты?", h2, "")
     assert f"– {sym} " in k.user_message("Какие сделки сейчас открыты?", home, "")
     assert f"– {sym} " not in k.user_message("Что такое плечо?", home, "") and "открыто сейчас" in k.user_message("Что такое плечо?", home, "")
     assert "ДАННЫЕ CRYPTO NOVA" in k.user_message("q?", {"futures": {"open": "broken"}, "market": {"btc": {"price": "x"}}}, "")

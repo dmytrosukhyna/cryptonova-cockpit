@@ -33,7 +33,8 @@ INTERVAL_S = int(os.environ.get("CNQ_ENGINE_INTERVAL", "60"))
 SYNC_S = int(os.environ.get("CNQ_ENGINE_SYNC", "120"))
 # order matters: risk first (20.10 portfolio risk layer, cnq/risk: it judges the fresh candles and the desks' last positions, the
 # desks then ask its gate before every entry), paper rewrites paper.json, the rest add
-FAST = ["risk", "paper", "listings", "own", "lsn", "turbo", "signalfeed", "apphome", "apppush"]
+FAST = ["risk", "paper", "listings", "own", "lsn", "turbo", "signalfeed", "apphome", "apppush",
+        "scorecard"]       # 20.10: last — it records what the steps above (and the GitHub feeds) just published → web/scorecard.json
 SLOW = ["quality", "altport"]
 # 20.10: strategy conveyor LAB → PAPER → READY → RETIRED (cnq/agents/conveyor.py): once an hour (cycle 1 = soon after a restart, then
 # every 60 cycles), after the desks; it writes data/conveyor_state.json (read by the risk gate) and web/conveyor.json
@@ -42,12 +43,17 @@ OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "al
          # 20.10: the app home in the other languages of the app (cnq/agents/i18n.py LANGS), written in the same step as app_home.json
          "app_home.en.json", "app_home.uk.json", "app_home.el.json", "app_home.es.json",
          "conveyor.json",
-         "risk.json"]                                                      # 20.10: the risk layer's public summary
+         "risk.json",                                                      # 20.10: the risk layer's public summary
+         "scorecard.json"]                                                 # 20.10: the public prediction scorecard
 # the engine's own state — never overwritten by a pull (20.10: + the conveyor's state, the risk layer's kill switch, state, reset
 # request and log)
 DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json", "kill_switch.json", "risk_state.json", "risk_reset.json", "risk_log.jsonl"}
 STEP_TIMEOUT = {"risk": 60, "paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90,
-                "conveyor": 120}
+                "conveyor": 120, "scorecard": 60}
+# 20.10: the public scorecard's append-only, hash-chained ledgers (cnq/agents/scorecard.py) — two active files and the directory of
+# their closed segments. Unlike DB_OWNED they are public: the engine is their only writer, a pull never overwrites them, and every
+# sync commits them (like OWNED, but in data/). A fresh install starts from the repo's copy (prepare).
+DATA_OWNED = ["scorecard_ledger.jsonl", "scorecard_outcomes.jsonl", "scorecard"]
 
 
 def _now_ms() -> int:
@@ -192,11 +198,15 @@ def prepare() -> None:
             a, b = os.path.join(src, f), os.path.join(RUN, sub, f)
             if os.path.isfile(a) and not os.path.exists(b):
                 shutil.copy2(a, b)
+    for d in DATA_OWNED:                                    # directories the engine owns (closed scorecard segments): first start only
+        a, b = os.path.join(REPO, "data", d), os.path.join(RUN, "data", d)
+        if os.path.isdir(a) and not os.path.exists(b):
+            shutil.copytree(a, b)
 
 
 def pull_inputs() -> None:
     """Fresh inputs from the GitHub pipeline (news, macro, markets …) — everything except what the engine owns."""
-    for sub, keep in (("web", set(OWNED)), ("data", DB_OWNED)):
+    for sub, keep in (("web", set(OWNED)), ("data", DB_OWNED | set(DATA_OWNED))):
         src = os.path.join(REPO, sub)
         for f in os.listdir(src) if os.path.isdir(src) else []:
             a = os.path.join(src, f)
@@ -208,6 +218,29 @@ def pull_inputs() -> None:
                     shutil.copy2(a, b)
             except OSError:
                 pass
+
+
+def copy_out_data() -> list[str]:
+    """the engine's own public data/ files and directories (DATA_OWNED) → the repo checkout; returns the paths to «git add»"""
+    out = []
+    for f in DATA_OWNED:
+        a, b = os.path.join(RUN, "data", f), os.path.join(REPO, "data", f)
+        try:
+            if os.path.isdir(a):
+                os.makedirs(b, exist_ok=True)
+                for x in os.listdir(a):
+                    if x.endswith(".tmp") or not os.path.isfile(os.path.join(a, x)):
+                        continue
+                    xa, xb = os.path.join(a, x), os.path.join(b, x)
+                    if not os.path.exists(xb) or os.path.getsize(xa) != os.path.getsize(xb):
+                        shutil.copy2(xa, xb)
+                out.append(f"data/{f}")
+            elif os.path.isfile(a):
+                shutil.copy2(a, b)
+                out.append(f"data/{f}")
+        except OSError:
+            pass
+    return out
 
 
 def sync(push: bool = True) -> dict:
@@ -232,6 +265,9 @@ def sync(push: bool = True) -> dict:
             shutil.copy2(a, b)
             changed.append(f"web/{f}")
     sh(git + ["add"] + changed, REPO, 30)
+    data_changed = copy_out_data()
+    if data_changed:                                        # separate «git add»: a problem with these never blocks the desks' files
+        sh(git + ["add"] + data_changed, REPO, 30)
     ok_c, _t, out_c = sh(git + ["commit", "-q", "-m", f"engine: desks {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}"], REPO, 30)
     pushed = False
     if ok_c:

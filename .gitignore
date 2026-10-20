@@ -8,4 +8,8 @@ data/*
 !data/nova_faq.json
 !data/nova_faq.*.json
 !data/nova_facts.*.json
+# 20.10: the public scorecard's hash-chained ledgers (cnq/agents/scorecard.py), committed by the engine
+!data/scorecard_ledger.jsonl
+!data/scorecard_outcomes.jsonl
+!data/scorecard/
 web/*.bak

@@ -27,6 +27,8 @@
                                               rebuilt on Fridays (Kyiv) or when missing/older than 7 days, else only `live` → web/broadcast.json
   python -m cnq.cli conveyor [run|status] [--force]   strategy conveyor LAB → PAPER → READY → RETIRED → data/conveyor_state.json + web/conveyor.json
   python -m cnq.cli conveyor reinstate <desk> --reason «…»   the owner brings a retired desk back to PAPER (demo only)
+  python -m cnq.cli scorecard [--out web]     public prediction scorecard: every published forecast / signal → hash-chained
+                                              data/scorecard_ledger.jsonl, checked on the engine's candles → web/scorecard.json
   python -m cnq.cli appsignals [--out web]    CRYPTO NOVΛ app signals (public /api/signals/active + /history) → agents.sqlite history,
                                               outcomes checked on 15m candles under 5 exit policies, strategy profile, rules → web/app_signals.json
 """
@@ -49,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         from .risk import cli as risk_cli
         return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
     ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
     ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
@@ -374,6 +376,14 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs("data", exist_ok=True)
         d = capital.run(sqlite3.connect("data/agents.sqlite"), args.out)
         print(f"capital.json: ${d['value_usd']} ({d['pnl_pct']}%) sleeves={[(s['key'], s['weight']) for s in d['sleeves']]} month={d['month']}")
+    elif args.cmd == "scorecard":
+        from .agents import scorecard
+        d = scorecard.run(args.out, "data", args.db or cfg.db_path)
+        h = d.get("headline") or {}
+        ch = (d.get("chain") or {}).get("ledger") or {}
+        print(f"scorecard.json: this run={d.get('this_run')} recorded={h.get('recorded')} checked={h.get('checked')} pending={h.get('pending')} "
+              f"lines={ch.get('lines')} head={(ch.get('head') or '')[:12]} ok={ch.get('ok')} written={d.get('written')} "
+              f"errors={(d.get('errors') or [])[:3]} {d.get('error', '')}")
     elif args.cmd == "signalfeed":
         import os, sqlite3
         from .agents import signal_feed

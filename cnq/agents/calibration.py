@@ -171,8 +171,9 @@ def run(conn: sqlite3.Connection, report: dict, news: list[dict] | None = None, 
     resolved = cal.resolve(report["coins"], now)
     recorded = cal.record(report["coins"], btc_bull, news or [], now)
     st = cal.stats()
-    cur = {r[0].replace("-USDT", ""): {"p_up": round(r[1], 3), "up": r[2], "dn": r[3], "time": r[4]} for r in
-           conn.execute("SELECT symbol, p_up, up_target, dn_target, time FROM forecasts WHERE outcome IS NULL ORDER BY time")}
+    # 20.10: + the price at the forecast — the public scorecard (cnq/agents/scorecard.py) records every forecast from this list
+    cur = {r[0].replace("-USDT", ""): {"p_up": round(r[1], 3), "up": r[2], "dn": r[3], "time": r[4], "price": r[5]} for r in
+           conn.execute("SELECT symbol, p_up, up_target, dn_target, time, price FROM forecasts WHERE outcome IS NULL ORDER BY time")}
     return {"asof": now, "recorded": recorded, "resolved": resolved, "stats": st, "open": cur,
             "note": "Прогноз A/B записывается на сервере каждые 4 часа и проверяется через сутки: сначала к сопротивлению или к поддержке. "
                     "Попадание = сценарий A сбылся. Brier 0.25 = монетка, меньше — лучше."}

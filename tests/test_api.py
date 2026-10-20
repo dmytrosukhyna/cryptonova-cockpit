@@ -196,3 +196,15 @@ def test_real_llm_property_and_health(tmp_path):
     assert call(api, "GET", "/v2/health")[1]["ready"]["llm"] is True
     c, d = call(api, "POST", "/v2/agent", {"q": "что такое биткоин?"}, token("p1"))
     assert c == 200 and d["answer"] == "Ответ." and d["agent"]["left"] == 4
+
+
+def test_diag_shows_the_engine_pulse_without_auth(tmp_path):
+    api, _ = make(tmp_path)
+    eng = {"asof": int(time.time() * 1000) - 90_000, "cycle": 7, "cycle_sec": 41.0, "errors": ["candles"],
+           "steps": {"candles": {"ok": False, "sec": 3, "err": "network failure"}, "paper": {"ok": True, "sec": 2}},
+           "last_sync": {"t": int(time.time() * 1000) - 30_000, "pulled": True, "pushed": False, "committed": True}}
+    (tmp_path / "web" / "engine.json").write_text(json.dumps(eng))
+    c, d = call(api, "GET", "/v2/diag")
+    assert c == 200 and 80 <= d["engine_age_sec"] <= 100 and d["engine_errors"] == ["candles"]
+    assert d["engine_err_tail"] == {"candles": "network failure"} and d["last_sync"]["pushed"] is False
+    assert d["disk_free_gb"] >= 0 and "app_home.json_age_sec" in d

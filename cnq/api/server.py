@@ -23,6 +23,7 @@ import copy
 import datetime as dt
 import json
 import os
+import shutil
 import re
 import sys
 import time
@@ -105,6 +106,34 @@ class Api:
         except Exception:  # noqa: BLE001
             return False
 
+    def _diag(self) -> dict:
+        """20.10: the engine went quiet and nobody could see the server — a small public view of its pulse (no secrets): disk
+        space, the age of the engine's status and of the app home, the steps that failed in the last cycle, the last git sync."""
+        out: dict = {"now": int(time.time())}
+        try:
+            du = shutil.disk_usage(self.web)
+            out["disk_free_gb"] = round(du.free / 1e9, 2)
+            out["disk_used_pct"] = round(du.used / du.total * 100, 1)
+        except OSError:
+            pass
+        eng = self._read(os.path.join(self.web, "engine.json")) or {}
+        if eng.get("asof"):
+            out["engine_age_sec"] = round(time.time() - eng["asof"] / 1000)
+        out["engine_cycle"] = eng.get("cycle")
+        out["engine_cycle_sec"] = eng.get("cycle_sec")
+        out["engine_errors"] = eng.get("errors")
+        out["engine_err_tail"] = {k: str(v.get("err", ""))[-160:] for k, v in (eng.get("steps") or {}).items() if not v.get("ok")}
+        ls = eng.get("last_sync") or {}
+        out["last_sync"] = {k: ls.get(k) for k in ("t", "pulled", "pushed", "committed")}
+        if ls.get("t"):
+            out["last_sync_age_sec"] = round(time.time() - ls["t"] / 1000)
+        for name in ("app_home.json", "paper.json"):
+            try:
+                out[name + "_age_sec"] = round(time.time() - os.path.getmtime(os.path.join(self.web, name)))
+            except OSError:
+                pass
+        return out
+
     def _uid(self, headers: dict) -> dict:
         h = headers.get("authorization") or ""
         if not h.lower().startswith("bearer "):
@@ -134,6 +163,8 @@ class Api:
                      "firebase_admin": bool(getattr(self.admin, "ready", False)),
                      "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last}
+        if method == "GET" and path == "/v2/diag":
+            return 200, self._diag()
         if method == "GET" and path == "/v2/home":
             d = self._feed("app_home", lang)
             return (200, d) if d else (503, {"error": "feed_unavailable"})

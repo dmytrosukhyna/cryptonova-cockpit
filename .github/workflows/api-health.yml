@@ -20,6 +20,8 @@ jobs:
           body=$(curl -sS -m 20 https://app.crypto-capital.app/v2/health || echo '{"ok":false,"error":"unreachable"}')
           echo "$body"
           echo "::notice title=health::$body"
+          diag=$(curl -sS -m 20 https://app.crypto-capital.app/v2/diag || echo '{}')
+          echo "::notice title=diag::$diag"
           home=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' https://app.crypto-capital.app/v2/home || echo 000)
           echo "::notice title=home::HTTP $home"
           noauth=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' -X POST https://app.crypto-capital.app/v2/me || echo 000)

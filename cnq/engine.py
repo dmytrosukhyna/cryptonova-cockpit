@@ -201,7 +201,12 @@ def pull_inputs() -> None:
 
 def sync(push: bool = True) -> dict:
     """git pull (the repo stays clean), copy inputs in, copy the engine's files out, commit, push."""
-    git = ["git", "-C", REPO]
+    # 20.10, the real cause of the restart loop since 08:45 UTC (seen in /v2/diag): every pull started git's automatic «gc --auto»;
+    # its «pack-objects» over the 1.5 GB repo grew to 1.6+ GB inside this service, the service hit MemoryMax=2G, the OOM killer
+    # stopped the whole unit, and after the restart the next pull started the same gc again. The engine never lets git collect
+    # garbage now (gc.auto=0, maintenance off); if git ever packs, it stays small (one thread, 64 MB windows).
+    git = ["git", "-c", "gc.auto=0", "-c", "maintenance.auto=false", "-c", "pack.threads=1", "-c", "pack.windowMemory=64m",
+           "-C", REPO]
     ok, _t, out = sh(git + ["pull", "-q", "--rebase", "--autostash"], REPO, 120)
     if not ok:
         sh(git + ["rebase", "--abort"], REPO, 30)

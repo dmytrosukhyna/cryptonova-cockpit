@@ -113,7 +113,7 @@
             },
             {
               "title": "You repeat the trades yourself",
-              "text": "The system runs its trades on a demo account and shows them to you. If you want, you can repeat a trade on your own exchange account. An exchange is a marketplace where people buy and sell coins. Whether to repeat a trade is entirely up to you. Automatic trade copying is coming soon.",
+              "text": "The system runs its trades on a demo account and shows them to you. If you want, you can repeat a trade on your own exchange account. An exchange is a marketplace where people buy and sell coins. Whether to repeat a trade is entirely up to you. Full automation is available on request: leave a request — it launches only after a legal check, and we don't promise dates.",
               "example": "In real life: an experienced gardener shows you how to prune an apple tree. You watch and do the same in your own garden — or decide to wait.",
               "art": "handshake"
             },
@@ -751,8 +751,8 @@
             },
             {
               "title": "What connecting gives you",
-              "text": "Right now you see the system's trades and repeat them on your account yourself. Automatic copying is coming soon: then the system will do it for you. With a connected account, NOVA also answers 100 questions a day instead of 5, your support requests get priority, and you get new features first.",
-              "example": "In real life: a neighbor who gardens tells you when to plant, and you do the planting yourself. Soon there'll be automatic watering, but the garden is still yours.",
+              "text": "Right now you see the system's trades and repeat them on your account yourself. Full automation is available on request: leave a request — it launches only after a legal check, and we don't promise dates. With a connected account, NOVA also answers 100 questions a day instead of 5, your support requests get priority, and you get new features first.",
+              "example": "In real life: a neighbor who gardens tells you when to plant, and you do the planting yourself. You can sign up for automatic watering, but the garden is still yours.",
               "art": "target",
               "screen": "Live",
               "callouts": [
@@ -764,7 +764,7 @@
                 {
                   "n": 2,
                   "target": "auto",
-                  "text": "Automation: coming soon"
+                  "text": "Automation: on request"
                 },
                 {
                   "n": 3,
@@ -923,7 +923,7 @@
                 "As a guarantee from CRYPTO NOVA"
               ],
               "answer": 0,
-              "why": "NOVA explains things in plain words, but she can be wrong, and she doesn't know your whole situation."
+              "why": "NOVA explains things in plain words, but it can be wrong, and it doesn't know your whole situation."
             }
           ]
         }

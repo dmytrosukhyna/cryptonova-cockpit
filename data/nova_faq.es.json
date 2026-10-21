@@ -23,7 +23,7 @@
       "id": "scam",
       "topic": "money",
       "q": "¿Esto es una estafa?",
-      "a": "¡Buena pregunta! Así es justo como hay que comprobarlo. Fíjate en las señales: no tomamos tu dinero, no prometemos ganancias y no te pedimos que transfieras nada. La app 2.0 es gratis, y todas las operaciones del sistema, ganadoras y perdedoras, se ven abiertamente. Un estafador te mete prisa, promete ganancias sin riesgo y pide contraseñas: aquí no pasa nada de eso, ni pasará.",
+      "a": "¡Buena pregunta! Así es justo como hay que comprobarlo. Fíjate en las señales: no tomamos tu dinero, no prometemos ganancias y no te pedimos que transfieras nada. La app 2.0 no tiene suscripciones, y todas las operaciones del sistema, ganadoras y perdedoras, se ven abiertamente. Un estafador te mete prisa, promete ganancias sin riesgo y pide contraseñas: aquí no pasa nada de eso, ni pasará.",
       "tags": [
         "estafa",
         "fraude",
@@ -131,7 +131,7 @@
       "id": "referral",
       "topic": "money",
       "q": "¿Para qué el exchange y el enlace de referido?",
-      "a": "Te lo decimos con sinceridad: si abres una cuenta en BingX con nuestro enlace, el exchange le da a CRYPTO NOVA una parte de su propia comisión. Así ganamos dinero y la app sigue siendo gratis. Tus comisiones y las condiciones del exchange no cambian. Y con el enlace podemos comprobar tu UID y conectar el sistema a tu cuenta real.",
+      "a": "Te lo decimos con sinceridad: si abres una cuenta en BingX con nuestro enlace, el exchange le da a CRYPTO NOVA una parte de su propia comisión. Así ganamos dinero, y por eso la app no tiene suscripción. Tus comisiones y las condiciones del exchange no cambian. Y con el enlace podemos comprobar tu UID y conectar el sistema a tu cuenta real.",
       "tags": [
         "referido",
         "referidos",
@@ -147,7 +147,7 @@
       "id": "price",
       "topic": "money",
       "q": "¿Cuánto cuesta?",
-      "a": "CRYPTO NOVA 2.0 es gratis: la demo, la hucha, 56 lecciones y yo, NOVA, sin suscripciones ni compras. No nos quedamos con un porcentaje de tus ganancias. Conectar una cuenta real también es gratis, para quien abrió su cuenta en el exchange con nuestro enlace. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
+      "a": "La demo, la hucha, 56 lecciones y yo, NOVA, sin suscripciones ni compras dentro de la app. No nos quedamos con un porcentaje de tus ganancias. Conectar una cuenta real tampoco tiene coste, para quien abrió su cuenta en el exchange con nuestro enlace. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
       "tags": [
         "cuesta",
         "precio",
@@ -214,7 +214,7 @@
       "id": "demo",
       "topic": "how",
       "q": "¿Qué es la demo?",
-      "a": "La demo es práctica: dinero virtual, pero precios reales del mercado. El sistema CRYPTO NOVA hace sus operaciones en una cuenta demo de $10 000, y tú tienes tu propia «Mi cuenta demo», donde ves qué habría pasado con tu importe. No puedes perder nada y es gratis. Pero el resultado de la demo todavía no es rentabilidad real.",
+      "a": "La demo es práctica: dinero virtual, pero precios reales del mercado. El sistema CRYPTO NOVA hace sus operaciones en una cuenta demo de $10 000, y tú tienes tu propia «Mi cuenta demo», donde ves qué habría pasado con tu importe. No puedes perder nada. Pero el resultado de la demo todavía no es rentabilidad real.",
       "tags": [
         "demo",
         "práctica",
@@ -231,7 +231,7 @@
       "id": "vip",
       "topic": "how",
       "q": "¿Qué es la cuenta real?",
-      "a": "La «Cuenta real» es para quien está listo para usar dinero de verdad. Los pasos: abrir una cuenta en el exchange BingX con nuestro enlace de socio, depositar fondos e introducir en la app tu UID, el número de tu cuenta en el exchange. La app lo comprueba y conecta gratis el sistema a tu cuenta. Las operaciones del sistema las repites tú. Solo para mayores de 18 años.",
+      "a": "La «Cuenta real» es para quien está listo para usar dinero de verdad. Los pasos: abrir una cuenta en el exchange BingX con nuestro enlace de socio, depositar fondos e introducir en la app tu UID, el número de tu cuenta en el exchange. La app lo comprueba y conecta el sistema a tu cuenta. Las operaciones del sistema las repites tú. Solo para mayores de 18 años.",
       "tags": [
         "cuenta real",
         "real",
@@ -538,7 +538,7 @@
       "id": "who",
       "topic": "learn",
       "q": "¿Quién eres, NOVA?",
-      "a": "Soy NOVA, la asistente de IA de CRYPTO NOVA. Explico las cripto con palabras sencillas y te cuento cómo funcionan las operaciones del sistema, la hucha y las lecciones. Puedo equivocarme y no doy consejos personales de comprar o vender: la decisión siempre es tuya.",
+      "a": "Soy NOVA, el asistente de IA de CRYPTO NOVA. Explico las cripto con palabras sencillas y te cuento cómo funcionan las operaciones del sistema, la hucha y las lecciones. Puedo equivocarme y no doy consejos personales de comprar o vender: la decisión siempre es tuya.",
       "tags": [
         "quién eres",
         "nova",

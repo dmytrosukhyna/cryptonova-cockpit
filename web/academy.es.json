@@ -113,7 +113,7 @@
             },
             {
               "title": "Las operaciones las replicas tú",
-              "text": "El sistema hace sus operaciones en una cuenta demo y te las muestra. Si quieres, replicas la operación en tu cuenta del exchange. Un exchange es una plataforma donde se compran y venden monedas. Replicarla o no lo decides solo tú. La copia automática de operaciones llegará pronto.",
+              "text": "El sistema hace sus operaciones en una cuenta demo y te las muestra. Si quieres, replicas la operación en tu cuenta del exchange. Un exchange es una plataforma donde se compran y venden monedas. Replicarla o no lo decides solo tú. La automatización completa se puede pedir: deja una solicitud; solo se pondrá en marcha tras una revisión legal y no prometemos fechas.",
               "example": "En la vida real: un jardinero con experiencia te enseña a podar un manzano. Tú miras y lo repites en tu jardín, o decides esperar.",
               "art": "handshake"
             },
@@ -158,7 +158,7 @@
                 "Tú",
                 "CRYPTO NOVA, sin tu permiso",
                 "El exchange",
-                "NOVA, la asistente de IA"
+                "NOVA, el asistente de IA"
               ],
               "answer": 0,
               "why": "El sistema muestra las operaciones, pero replicarlas o no es solo decisión tuya. La copia automática todavía está en desarrollo."
@@ -751,8 +751,8 @@
             },
             {
               "title": "Qué te da la conexión",
-              "text": "Ahora ves las operaciones del sistema y las replicas tú mismo en tu cuenta. La copia automática llegará pronto: entonces el sistema lo hará por ti. Además, con la cuenta conectada, NOVA responde 100 preguntas al día en lugar de 5, el soporte te atiende con prioridad y recibes las novedades antes que nadie.",
-              "example": "En la vida real: un vecino que sabe de huertos te dice cuándo plantar, y tú plantas. Pronto llegará el riego automático, pero el huerto seguirá siendo tuyo.",
+              "text": "Ahora ves las operaciones del sistema y las replicas tú mismo en tu cuenta. La automatización completa se puede pedir: deja una solicitud; solo se pondrá en marcha tras una revisión legal y no prometemos fechas. Además, con la cuenta conectada, NOVA responde 100 preguntas al día en lugar de 5, el soporte te atiende con prioridad y recibes las novedades antes que nadie.",
+              "example": "En la vida real: un vecino que sabe de huertos te dice cuándo plantar, y tú plantas. Puedes apuntarte al riego automático, pero el huerto seguirá siendo tuyo.",
               "art": "target",
               "screen": "Live",
               "callouts": [
@@ -764,7 +764,7 @@
                 {
                   "n": 2,
                   "target": "auto",
-                  "text": "Automatización: pronto"
+                  "text": "Automatización: bajo solicitud"
                 },
                 {
                   "n": 3,
@@ -812,7 +812,7 @@
               "q": "¿Dónde está el dinero cuando el sistema está conectado a la cuenta real?",
               "options": [
                 "En la cuenta de CRYPTO NOVA",
-                "Lo tiene NOVA, la asistente de IA",
+                "Lo tiene NOVA, el asistente de IA",
                 "En la hucha de la app",
                 "En tu propia cuenta del exchange"
               ],
@@ -874,7 +874,7 @@
               "art": "thief"
             },
             {
-              "title": "NOVA es una asistente, no una adivina",
+              "title": "NOVA es un asistente, no un adivino",
               "text": "NOVA explica las operaciones y el mercado con palabras sencillas. Pero es una IA y puede equivocarse. NOVA no conoce toda tu vida: tus deudas, tus planes, tus ahorros. Sus respuestas no son asesoramiento financiero. No le escribas contraseñas ni datos personales. En la demo tienes 5 preguntas al día.",
               "example": "En la vida real: el GPS te indica el camino. Pero si te lleva directo a un lago, miras la carretera tú mismo.",
               "art": "robot"

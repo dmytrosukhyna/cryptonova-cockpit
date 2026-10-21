@@ -564,15 +564,15 @@ T: dict[str, dict[str, str]] = {
                           "uk": "Не вдалося розібрати запитання. Скажіть або напишіть його ще раз — я на зв'язку.",
                           "el": "Δεν κατάλαβα την ερώτηση. Πείτε ή γράψτε τη ξανά — είμαι εδώ.",
                           "es": "No he podido entender la pregunta. Dímela o escríbela otra vez: aquí estoy."},
-    "nova.limit_free": {"ru": "На сегодня 5 бесплатных вопросов закончились — завтра будут новые. С подключённым реальным счётом — "
+    "nova.limit_free": {"ru": "На сегодня 5 вопросов закончились — завтра будут новые. С подключённым реальным счётом — "
                               "до 100 вопросов в день.",
-                        "en": "Your 5 free questions for today are used up — new ones come tomorrow. With a real account "
+                        "en": "Your 5 questions for today are used up — new ones come tomorrow. With a real account "
                               "connected, you get up to 100 questions a day.",
-                        "uk": "На сьогодні 5 безкоштовних запитань закінчилися — завтра будуть нові. З підключеним реальним "
+                        "uk": "На сьогодні 5 запитань закінчилися — завтра будуть нові. З підключеним реальним "
                               "рахунком — до 100 запитань на день.",
-                        "el": "Οι 5 δωρεάν ερωτήσεις για σήμερα τελείωσαν — αύριο θα έχετε καινούργιες. Με συνδεδεμένο "
+                        "el": "Οι 5 ερωτήσεις για σήμερα τελείωσαν — αύριο θα έχετε καινούργιες. Με συνδεδεμένο "
                               "πραγματικό λογαριασμό — έως 100 ερωτήσεις την ημέρα.",
-                        "es": "Ya usaste tus 5 preguntas gratis de hoy; mañana tendrás nuevas. Con tu cuenta real conectada, "
+                        "es": "Ya usaste tus 5 preguntas de hoy; mañana tendrás nuevas. Con tu cuenta real conectada, "
                               "hasta 100 preguntas al día."},
     "nova.limit_vip": {"ru": "На сегодня вопросы закончились — завтра лимит обновится.",
                        "en": "You're out of questions for today — the limit resets tomorrow.",

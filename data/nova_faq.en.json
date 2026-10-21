@@ -24,7 +24,7 @@
       "id": "scam",
       "topic": "money",
       "q": "Is this a scam?",
-      "a": "Good question — that's exactly how you should check! Look at the signs: we don't take your money, don't promise income and don't ask you to send anything. The 2.0 app is free, and all of the system's trades, winners and losers alike, are visible openly. A scammer rushes you, promises profit without risk and asks for passwords — none of that happens here, and it never will.",
+      "a": "Good question — that's exactly how you should check! Look at the signs: we don't take your money, don't promise income and don't ask you to send anything. The 2.0 app has no subscriptions, and all of the system's trades, winners and losers alike, are visible openly. A scammer rushes you, promises profit without risk and asks for passwords — none of that happens here, and it never will.",
       "tags": [
         "scam",
         "fraud",
@@ -133,7 +133,7 @@
       "id": "referral",
       "topic": "money",
       "q": "Why the exchange and the referral link?",
-      "a": "To be honest: if you open a BingX account through our link, the exchange gives CRYPTO NOVA part of its own fee. That's how we earn, and it keeps the app free. Your fees and the exchange's terms don't change. And through the link we can check your UID and connect the system to your real account.",
+      "a": "To be honest: if you open a BingX account through our link, the exchange gives CRYPTO NOVA part of its own fee. That's how we earn, and why the app has no subscription. Your fees and the exchange's terms don't change. And through the link we can check your UID and connect the system to your real account.",
       "tags": [
         "referral",
         "ref",
@@ -149,7 +149,7 @@
       "id": "price",
       "topic": "money",
       "q": "How much does it cost?",
-      "a": "CRYPTO NOVA 2.0 is free: demo, the Piggy bank, 56 lessons and me, NOVA — no subscriptions or purchases. We don't take a cut of your profit. Connecting a real account is free too — for those who opened an exchange account through our link. If paid features ever appear, we'll show the terms and price in advance.",
+      "a": "Demo, the Piggy bank, 56 lessons and me, NOVA — no subscriptions or in-app purchases. We don't take a cut of your profit. Connecting a real account costs nothing either — for those who opened an exchange account through our link. If paid features ever appear, we'll show the terms and price in advance.",
       "tags": [
         "cost",
         "price",
@@ -218,7 +218,7 @@
       "id": "demo",
       "topic": "how",
       "q": "What is demo?",
-      "a": "Demo is practice: virtual money, but real market prices. The CRYPTO NOVA system runs its trades on a $10 000 demo account, and you have your own “My demo account” that shows what would have happened to your amount. You can't lose anything, and it's free. But a demo result isn't real returns yet.",
+      "a": "Demo is practice: virtual money, but real market prices. The CRYPTO NOVA system runs its trades on a $10 000 demo account, and you have your own “My demo account” that shows what would have happened to your amount. You can't lose anything. But a demo result isn't real returns yet.",
       "tags": [
         "demo",
         "practice",
@@ -235,7 +235,7 @@
       "id": "vip",
       "topic": "how",
       "q": "What is a real account?",
-      "a": "A “Real account” is for those ready to use real money. The steps: open an account on the BingX exchange through our partner link, fund it and enter your UID — your account number on the exchange — in the app. The app checks it and connects the system to your account for free. You repeat the system's trades yourself. 18+ only.",
+      "a": "A “Real account” is for those ready to use real money. The steps: open an account on the BingX exchange through our partner link, fund it and enter your UID — your account number on the exchange — in the app. The app checks it and connects the system to your account. You repeat the system's trades yourself. 18+ only.",
       "tags": [
         "real account",
         "real",

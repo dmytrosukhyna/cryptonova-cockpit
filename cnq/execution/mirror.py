@@ -11,6 +11,9 @@ Positions that were already open before the mirror started are not chased. Env:
   CNQ_MIRROR_SRC=<url of paper.json>          CNQ_LIVE_TRADING=yes → real account (default: Bybit demo)
 Optional «Иван тест» monitor (cnq/execution/ivan_watch.py): with IVAN_BYBIT_KEY / IVAN_BYBIT_SECRET / IVAN_PASS and CNQ_GH_TOKEN
 set, every 15 min a read-only snapshot of that account is encrypted and published to web/ivan.enc.json.
+Optional «Мой портфель · OKX» (cnq/execution/myspot_watch.py): with MYSPOT_OKX_KEY / MYSPOT_OKX_SECRET / MYSPOT_OKX_PASSPHRASE
+(a READ-ONLY OKX key) and MYSPOT_PASS, every 15 min the owner's OKX spot portfolio + the model's plan are encrypted and published
+to web/myspot.enc.json (nothing is traded).
 Log: data/mirror.jsonl, state: data/mirror_state.json. Stdlib only."""
 from __future__ import annotations
 
@@ -20,7 +23,7 @@ import sys
 import time
 import urllib.request
 
-from . import ivan_watch
+from . import ivan_watch, myspot_watch
 from .bybit_trade import BybitTrader
 
 SRC = os.environ.get("CNQ_MIRROR_SRC", "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/paper.json")
@@ -83,6 +86,15 @@ def publish(bx: BybitTrader, st: dict) -> bool:
     hdr = {"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-mirror"}
     content = base64.b64encode(json.dumps(body, ensure_ascii=False).encode()).decode()
     return ivan_watch.put_contents(url, hdr, content, "bybit demo status")   # retries a 409 conflict with a fresh sha
+
+
+def myspot_tick() -> bool:
+    """«Мой портфель · OKX»: one read-only snapshot → encrypted web/myspot.enc.json. A failure prints one line and never stops the mirror."""
+    try:
+        return myspot_watch.run() is not None
+    except Exception as e:  # noqa: BLE001
+        print(myspot_watch.describe_error(e), flush=True)
+        return False
 
 
 def ivan_tick() -> bool:
@@ -163,6 +175,9 @@ def main() -> int:
             msg = ivan_watch.check()          # None (prints nothing) when the IVAN_* lines are not in ~/.cryptonova.env
             if msg:
                 print(msg + ("" if GH_TOKEN else " · нет CNQ_GH_TOKEN — публиковать не буду"), flush=True)
+            msg = myspot_watch.check()        # None (prints nothing) when the MYSPOT_* lines are not in ~/.cryptonova.env
+            if msg:
+                print(msg + ("" if GH_TOKEN else " · нет CNQ_GH_TOKEN — публиковать не буду"), flush=True)
         return 0
     global SCALE
     eq = bx.equity()
@@ -173,6 +188,7 @@ def main() -> int:
     last_pub = 0.0
     last_pulse = time.time() - 25 * 60
     ivan_on, last_ivan, ivan_said = bool(GH_TOKEN and ivan_watch.creds()), 0.0, False
+    my_on, last_my, my_said = bool(GH_TOKEN and myspot_watch.creds()), 0.0, False
     while True:
         try:
             r = step(bx, st, fetch_desk())
@@ -196,6 +212,10 @@ def main() -> int:
             last_ivan = time.time()
             if ivan_tick() and not ivan_said:
                 ivan_said = True; print(f"Иван тест: монитор работает, web/ivan.enc.json обновляется каждые {ivan_watch.EVERY_S / 60:g} мин", flush=True)
+        if my_on and time.time() - last_my >= myspot_watch.EVERY_S:   # once at start, then every MYSPOT_EVERY min (default 15)
+            last_my = time.time()
+            if myspot_tick() and not my_said:
+                my_said = True; print(f"Мой портфель OKX: карточка обновляется каждые {myspot_watch.EVERY_S / 60:g} мин (данные зашифрованы)", flush=True)
         time.sleep(60)
 
 

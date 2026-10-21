@@ -11,6 +11,13 @@
 #     export IVAN_PASS=...           # long passphrase (4+ random words); the panel asks for it. The encrypted file
 #                                    # web/ivan.enc.json is public, only this passphrase protects it. Never send it to anyone.
 #   history of that account is kept in ~/.cryptonova_ivan.json (outside the repo)
+# - optional, private card «Мой портфель · OKX» (cnq/execution/myspot_watch.py) — your own OKX spot portfolio with the model's
+#   plan, visible only in your panel. Add these 4 lines only if you want it:
+#     export MYSPOT_OKX_KEY=...         # OKX API key created with the «Read» permission ONLY (no trade, no withdraw)
+#     export MYSPOT_OKX_SECRET=...      # its secret key
+#     export MYSPOT_OKX_PASSPHRASE=...  # the passphrase you typed when creating that key
+#     export MYSPOT_PASS=...            # the panel login password (then the panel opens the card by itself)
+#   the file web/myspot.enc.json is public but encrypted; only MYSPOT_PASS opens it. Nothing is traded.
 # - caffeinate keeps the Mac awake while the mirror runs (keep it plugged in; closing the lid on battery still sleeps)
 # - if the mirror stops (network, error), it restarts by itself after 30 s. Stop: Ctrl+C twice.
 cd "$(dirname "$0")/.." || exit 1

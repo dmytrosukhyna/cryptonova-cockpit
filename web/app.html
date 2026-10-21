@@ -3735,6 +3735,193 @@ boot();
   window.cnqAdminOpen=open;
 })();
 </script>
+<script>/* 21.10 «Мой портфель · OKX» (owner: «мой портфель на OKX … хотелось бы видеть свой портфель, список активов как на биржах,
+объяснение по каждому, почему мы его взяли … рекомендации, что докупить … учитывать недооценённые активы»).
+The Mac mirror reads OKX with a READ-ONLY key (cnq/execution/myspot_watch.py), adds the model's plan and publishes it ENCRYPTED
+as web/myspot.enc.json; only this browser decrypts it (ivanDecrypt, the owner's password). Owner only: guests never see the card. */
+(function(){
+  // self-contained: the main panel script is a closed IIFE, so this block brings its own helpers (like the «Управление» block)
+  const ld=k=>{ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } };
+  const st=(k,v)=>{ try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,v); }catch(e){} };
+  const ico=n=>`<svg class="ico"><use href="#i-${n}"/></svg>`;
+  const plur=(n,a,b,c)=>{ n=Math.abs(Math.round(n)); return n%10===1&&n%100!==11?a:(n%10>=2&&n%10<=4&&(n%100<12||n%100>14))?b:c; };
+  // the browser's copy of ivanDecrypt (scripts/ivan_decrypt.js); tests/test_myspot.py runs exactly the text between the markers
+  /*msDecrypt>*/async function msDecrypt(blob, pass) {
+  if (typeof blob === 'string') blob = JSON.parse(blob);
+  if (!blob || blob.v !== 1) throw new Error('Неизвестный формат файла');
+  const S = crypto.subtle;
+  const u8 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const salt = u8(blob.salt), nonce = u8(blob.nonce), ct = u8(blob.ct), tag = u8(blob.tag);
+  const base = await S.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const km = new Uint8Array(await S.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 200000 }, base, 512));
+  const hk = raw => S.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const encKey = await hk(km.slice(0, 32)), macKey = await hk(km.slice(32, 64));
+  const msg = new Uint8Array(salt.length + nonce.length + ct.length);
+  msg.set(salt, 0); msg.set(nonce, salt.length); msg.set(ct, salt.length + nonce.length);
+  const t = new Uint8Array(await S.sign('HMAC', macKey, msg));
+  let diff = t.length ^ tag.length;
+  for (let i = 0; i < t.length; i++) diff |= t[i] ^ (tag[i] | 0);
+  if (diff) throw new Error('Неверный пароль');
+  const blocks = await Promise.all(Array.from({ length: Math.ceil(ct.length / 32) }, (_, i) => {
+    const m = new Uint8Array(nonce.length + 4);
+    m.set(nonce, 0);
+    new DataView(m.buffer).setUint32(nonce.length, i, false);
+    return S.sign('HMAC', encKey, m).then(b => new Uint8Array(b));
+  }));
+  const pt = new Uint8Array(ct.length);
+  for (let i = 0; i < ct.length; i++) pt[i] = ct[i] ^ blocks[i >> 5][i & 31];
+  return JSON.parse(new TextDecoder().decode(pt));
+}/*<msDecrypt*/
+  const MS={d:null,t:0,err:'',state:'idle',asof:0};
+  const esc=t=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const usd=v=>(v<0?'−':'')+'$'+Math.abs(v).toLocaleString('ru-RU',{maximumFractionDigits:Math.abs(v)<100?2:0,minimumFractionDigits:Math.abs(v)<100&&Math.abs(v)%1?2:0});
+  const sgn=v=>(v>0?'+':v<0?'−':'')+'$'+Math.abs(v).toLocaleString('ru-RU',{maximumFractionDigits:Math.abs(v)<100?2:0});
+  const pc=(v,d)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d==null?(Math.abs(v)<10?1:0):d).replace('.',',')+'%';
+  const sh=v=>(+v).toFixed(v>0&&v<10?1:0).replace('.',',')+'%';
+  const qty=q=>q.toLocaleString('ru-RU',{maximumFractionDigits:q>=1000?2:q>=1?4:8});
+  const px=p=>p==null?'—':'$'+(p>=1?p.toLocaleString('ru-RU',{maximumFractionDigits:p>=1000?0:p>=100?1:2}):(+p).toPrecision(3).replace('.',','));
+  const cls=v=>v>0?'pos':v<0?'neg':'';
+  const when=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const COL=['#7cc4ff','#6fcf97','#f2c14e','#c792ea','#ff9e64','#4dd0e1','#ef7d6b','#a3be8c','#8fa1b3'];
+  const css=`
+#msCard .msh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+#msCard .mskpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0 12px}
+#msCard .mskpi>div{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;gap:2px;min-width:0}
+#msCard .mskpi small{font-size:11px;color:var(--muted)}#msCard .mskpi b{font:700 17px var(--mono);overflow-wrap:anywhere}#msCard .mskpi em{font-style:normal;font-size:11.5px}
+#msCard .mstop{display:grid;grid-template-columns:170px minmax(0,1fr);gap:16px;align-items:start}
+#msCard .msdn{width:170px;height:170px;display:block}
+#msCard .msleg{display:grid;gap:4px;font-size:12px}#msCard .msleg div{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:6px;align-items:center}
+#msCard .msleg i{width:10px;height:10px;border-radius:3px;display:inline-block}#msCard .msleg span{font-family:var(--mono);color:#cfdcec;white-space:nowrap}
+#msCard .msleg small{color:var(--muted);font-size:11px;grid-column:2/-1;margin-top:-3px}
+#msCard .mss{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px}
+#msCard .msact{display:grid;gap:0}
+#msCard .msa{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:4px 10px;align-items:baseline;padding:8px 0;border-bottom:1px dashed var(--line);font-size:12.5px}
+#msCard .msa b{font-family:var(--mono);font-size:13.5px}#msCard .msa .amt{font:700 13px var(--mono);white-space:nowrap}
+#msCard .msa .amt.buy{color:var(--up)}#msCard .msa .amt.sell{color:var(--dn)}#msCard .msa .amt.keep{color:#cfdcec}
+#msCard .msa .d{grid-column:2/-1;color:#dbe9f5;line-height:1.45}#msCard .msa details{grid-column:2/-1}#msCard .msa summary{cursor:pointer;color:var(--acc);font-size:12px;margin-top:2px}#msCard .msa .f{grid-column:2/-1;color:var(--muted);font-size:11.5px;line-height:1.4}
+#msCard .mstag{display:inline-block;font-size:10.5px;padding:1px 7px;border-radius:9px;line-height:1.5;border:1px solid var(--line2);color:#cfdcec;margin-left:6px;vertical-align:1px}
+#msCard .mstag.calm{border-color:rgba(111,207,151,.45);color:#bfe9d2}#msCard .mstag.hot{border-color:rgba(242,193,78,.45);color:#ffe2a8}
+#msCard .mstot{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}#msCard .mstot b{font-family:var(--mono);color:#e8f0fa}
+#msCard .mstab{display:grid;gap:0;font-size:12.5px}
+#msCard .msrh,#msCard .msr{display:grid;grid-template-columns:minmax(74px,1fr) minmax(86px,1fr) minmax(70px,.8fr) minmax(84px,1fr) minmax(96px,1.1fr) 64px minmax(84px,1fr);gap:8px;align-items:baseline;padding:7px 0}
+#msCard .msrh{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line2);padding-top:0}
+#msCard .msr{border-bottom:1px solid var(--line)}#msCard .msr>span{font-family:var(--mono);overflow-wrap:anywhere;text-align:right}#msCard .msr>span:first-child{text-align:left}
+#msCard .msrh>span{text-align:right}#msCard .msrh>span:first-child{text-align:left}
+#msCard .msr b{font-family:var(--mono);font-size:13.5px}#msCard .msr small{display:block;color:var(--muted);font:11px var(--body,inherit)}
+#msCard .msw{grid-column:1/-1;font-family:var(--body,inherit)!important;text-align:left!important;color:#cfdcec;font-size:12px;line-height:1.45;margin-top:-2px}
+#msCard .msw .f{display:block;color:var(--muted);font-size:11.5px}
+#msCard .msbar{display:block;height:4px;border-radius:2px;background:rgba(160,190,230,.14);position:relative;margin-top:4px}#msCard .msbar i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--acc)}#msCard .msbar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:#e8f0fa;border-radius:1px}
+#msCard .msidea{display:flex;gap:6px;flex-wrap:wrap}#msCard .msidea div{border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:12px;line-height:1.4;max-width:100%}#msCard .msidea b{font-family:var(--mono)}
+#msCard .msfoot{font-size:11px;line-height:1.5;color:var(--muted);margin-top:12px}
+#msCard .mswarn{border:1px solid rgba(242,193,78,.4);color:#ffe2a8;border-radius:10px;padding:8px 10px;font-size:12px;margin:4px 0 10px}
+#msCard .msset ol{margin:6px 0 0 18px;padding:0;display:grid;gap:7px;font-size:12.5px;line-height:1.5}#msCard .msset code,#msCard .msset pre{font:11.5px/1.5 var(--mono);color:#cfdcec}
+#msCard .msset pre{background:rgba(6,11,22,.6);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+body:not(.tab-spot) #msCard,body.guest #msCard{display:none!important}
+body.tab-spot #msCard{order:-13}body.myspot-on.tab-spot #myPortCard{display:none!important}
+@media (max-width:1150px){body.tab-spot #msCard{order:0}}
+@media (max-width:760px){#msCard .mskpi{grid-template-columns:1fr 1fr}#msCard .mstop{grid-template-columns:1fr;justify-items:center}#msCard .mstop>div{width:100%}
+ #msCard .msrh{display:none}#msCard .msr{grid-template-columns:minmax(0,1fr) auto;gap:2px 10px}#msCard .msr>span{text-align:left}
+ #msCard .msr>span:nth-child(2),#msCard .msr>span:nth-child(3){display:none}#msCard .msr>span:nth-child(4){text-align:right}
+ #msCard .msr>span:nth-child(5){grid-column:1/-1}#msCard .msr>span:nth-child(6),#msCard .msr>span:nth-child(7){font-size:12px}#msCard .msr>span:nth-child(7){text-align:right}
+ #msCard .msa{grid-template-columns:56px minmax(0,1fr) auto}}`;
+  document.head.insertAdjacentHTML('beforeend','<style id="msCss">'+css+'</style>');
+
+  function card(){ let el=document.getElementById('msCard'); if(el) return el; const anchor=document.getElementById('myPortCard'); if(!anchor) return null;
+    anchor.insertAdjacentHTML('beforebegin','<div class="card" id="msCard" hidden></div>'); return document.getElementById('msCard'); }
+  const owner=()=>!document.body.classList.contains('guest')&&!/[?&]guest\b/.test(location.search);
+  const passes=()=>[ld('cnq_myspot_pass'),ld('cnq_ivan_pass')].filter((v,i,a)=>v&&a.indexOf(v)===i);
+
+  async function loadMySpot(force){ const el=card(); if(!el) return; if(!owner()){ el.hidden=true; document.body.classList.remove('myspot-on'); return; }
+    if(!force&&MS.state==='ok'&&Date.now()-MS.t<2*60000) return render(); MS.t=Date.now();
+    let blob=null; try{ const r=await fetch('./myspot.enc.json?'+Math.floor(Date.now()/60000),{cache:'no-store'}); if(r.ok) blob=await r.json(); }catch(e){}
+    if(!blob){ MS.d=null; MS.state='setup'; return render(); }
+    MS.asof=blob.asof||0; const ps=passes(); if(!ps.length){ MS.state='pass'; MS.err=''; return render(); }
+    for(const p of ps){ try{ MS.d=await msDecrypt(blob,p); MS.state='ok'; MS.err=''; if(p!==ld('cnq_myspot_pass')) st('cnq_myspot_pass',p); return render(); }
+      catch(e){ if(!(e&&e.message==='Неверный пароль')){ MS.state='err'; MS.err='Не удалось прочитать данные: '+(e.message||e); return render(); } } }
+    st('cnq_myspot_pass',null); MS.d=null; MS.state='pass'; MS.err='Пароль не подошёл — введи тот же, что в строке MYSPOT_PASS на Маке.'; render(); }
+  window.loadMySpot=loadMySpot;
+
+  const head=(d)=>`<h2>${ico('basket')} Мой портфель · OKX <i class="otag your">ВАШ</i> <span class="r muted">${d?`обновлено ${when(d.asof||MS.asof)} · `:''}видно только тебе</span></h2>`;
+
+  function setupHtml(){ return head()+`<div class="msset"><div class="muted" style="font-size:12.5px;line-height:1.5">Здесь будет твой спот-портфель с OKX, как на бирже: монеты, стоимость, доля, изменение за сутки. По каждой монете — почему она в портфеле по модели CRYPTO NOVA, и план: что докупить (сначала недооценённые), что урезать. Ключ OKX — только для чтения, данные шифруются и видны только тебе. Продавать и переносить ничего не нужно.</div>
+    <ol><li>OKX → профиль → <b>API</b> → <b>Создать ключ V5</b>. Права — только <b>«Чтение»</b> (без «Торговли» и «Вывода»), IP можно не указывать. Запиши фразу-пароль, которую задаёшь для ключа.</li>
+    <li>На Маке в Терминале: <code>open -e ~/.cryptonova.env</code> и добавь 4 строки:<pre>export MYSPOT_OKX_KEY=...
+export MYSPOT_OKX_SECRET=...
+export MYSPOT_OKX_PASSPHRASE=...
+export MYSPOT_PASS=пароль входа в эту панель</pre></li>
+    <li>В окне зеркала: <b>Ctrl+C</b>, затем <b>стрелка вверх</b> и <b>Enter</b>. В окне появится строка «Мой портфель OKX: ключ работает».</li>
+    <li>Через минуту карточка откроется здесь сама.</li></ol>
+    <div class="msfoot">Ключи и пароль не присылай никому, в том числе в чат.</div></div>`; }
+
+  function passHtml(){ return head()+`<div class="muted" style="font-size:12.5px;margin-bottom:8px">Данные портфеля зашифрованы. Введи пароль — тот же, что в строке MYSPOT_PASS на Маке.</div>${MS.err?`<div class="mswarn">${esc(MS.err)}</div>`:''}<div class="eact"><input id="msPass" type="password" autocomplete="off" placeholder="пароль" style="flex:1;min-width:0"><button class="ib sm" id="msGo">Открыть</button></div>`; }
+
+  function donut(cv,P){ const ctx=cv.getContext('2d'), dpr=Math.min(2,window.devicePixelRatio||1), W=170; cv.width=W*dpr; cv.height=W*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,W);
+    const ring=(r,lw,key)=>{ let a=-Math.PI/2; const tot=P.reduce((s,x)=>s+x[key],0)||1; P.forEach(x=>{ const s=x[key]/tot*Math.PI*2; if(s<=0) return; ctx.beginPath(); ctx.arc(W/2,W/2,r,a,a+s-0.015); ctx.strokeStyle=x.c; ctx.lineWidth=lw; ctx.stroke(); a+=s; }); };
+    ring(70,16,'now'); ctx.globalAlpha=.55; ring(50,9,'tgt'); ctx.globalAlpha=1;
+    ctx.fillStyle='#e8f0fa'; ctx.font='700 14px ui-monospace,monospace'; ctx.textAlign='center'; ctx.fillText('сейчас',W/2,W/2-2); ctx.fillStyle='#7d93ad'; ctx.font='11px system-ui,sans-serif'; ctx.fillText('внутри — цель',W/2,W/2+14); }
+
+  function okHtml(D){ const P=D.plan||{}, A=D.assets||[], T=P.total_usd||A.reduce((s,a)=>s+a.usd,0), rows=P.rows||[], byP={}; rows.forEach(r=>byP[r.ccy]=r);
+    const ch=A.reduce((s,a)=>s+(a.ch24!=null?a.usd-a.usd/(1+a.ch24/100):0),0), pnlA=A.filter(a=>a.pnl_usd!=null), pnl=pnlA.reduce((s,a)=>s+a.pnl_usd,0);
+    const old=Date.now()-(D.asof||MS.asof)>60*60000;
+    let h=head(D)+(old?`<div class="mswarn">Данные старше часа — проверь, что зеркало на Маке запущено.</div>`:'')
+      +`<div class="mskpi"><div><small>Стоимость</small><b>${usd(T)}</b><em class="muted">${A.length} ${plur(A.length,'актив','актива','активов')} · OKX</em></div>
+        <div><small>За 24 часа</small><b class="${cls(ch)}">${sgn(ch)}</b><em class="${cls(ch)}">${T?pc(ch/(T-ch)*100):''}</em></div>
+        <div><small>Прибыль по средней цене</small>${pnlA.length?`<b class="${cls(pnl)}">${sgn(pnl)}</b><em class="muted">по ${pnlA.length} ${plur(pnlA.length,'монете','монетам','монетам')} торгового счёта</em>`:`<b>—</b><em class="muted">OKX не дал средних цен</em>`}</div>
+        <div><small>Режим рынка</small><b>${esc(P.regime||'—')}</b><em class="muted">альтсезон: ${P.altseason?'включён':'выключен'}</em></div></div>`;
+    // donut: current shares (outer) vs the model (inner)
+    const items=rows.filter(r=>r.now_pct>=3||r.target_pct>=3).sort((a,b)=>Math.max(b.now_pct,b.target_pct)-Math.max(a.now_pct,a.target_pct)).slice(0,7);
+    const rest={n:'Остальные монеты',now:Math.max(0,rows.reduce((s,r)=>s+r.now_pct,0)-items.reduce((s,r)=>s+r.now_pct,0)),tgt:Math.max(0,rows.reduce((s,r)=>s+r.target_pct,0)-items.reduce((s,r)=>s+r.target_pct,0))};
+    const C=P.cash||{now_pct:0,target_pct:0}; const seg=items.map((r,i)=>({n:r.ccy,now:r.now_pct,tgt:r.target_pct,c:COL[i%COL.length]})).concat(rest.now+rest.tgt>0.05?[{n:rest.n,now:rest.now,tgt:rest.tgt,c:'#8fa1b3'}]:[]).concat([{n:'Доллары',now:C.now_pct||0,tgt:C.target_pct||0,c:'#3a5577'}]);
+    h+=`<div class="mstop"><canvas class="msdn" id="msDn" width="170" height="170" role="img" aria-label="Доли портфеля сейчас и по модели"></canvas><div class="msleg">${seg.map(s=>`<div><i style="background:${s.c}"></i><b style="font-weight:600">${esc(s.n)}</b><span>${sh(s.now)} → ${sh(s.tgt)}</span></div>`).join('')}<small class="muted" style="grid-column:1/-1;margin-top:4px">Сейчас → цель по модели «ядро + альтсезон». Цель включает 15% под фьючерсы и 10% в USDT Earn.</small></div></div>`;
+    // the plan
+    const buy=P.buy||[], trim=P.trim||[], keep=rows.filter(r=>r.act==='keep');
+    const tag=r=>r.tag?`<span class="mstag ${r.tag==='не перегрета'?'calm':/обогнала/.test(r.tag)?'hot':''}">${esc(r.tag)}</span>`:'';
+    const line=(r,kind)=>`<div class="msa"><b>${esc(r.ccy)}</b><div>${kind==='buy'?`докупить до ${sh(r.target_pct)}`:kind==='keep'?'можно держать':r.target_pct>0?`урезать до ${sh(r.target_pct)}`:'продать — нет в модели'}${tag(r)}</div><span class="amt ${kind==='buy'?'buy':kind==='keep'?'keep':'sell'}">${kind==='keep'?usd(r.now_usd):sgn(r.gap_usd)}</span>
+      <div class="d">${esc(r.why)}</div>${r.quality?`<div class="f">Анкета качества: ${esc(r.quality.text)}.</div>`:(r.core||r.ccy==='BTC'?'':`<div class="f">Оценки анкеты качества по этой монете нет.</div>`)}</div>`;
+    h+=`<div class="mss">Что сделать по модели</div>${P.alt_note&&rows.some(r=>r.basket)?`<div class="muted" style="font-size:12px;line-height:1.45;margin-bottom:4px">${esc(P.alt_note)}</div>`:''}<div class="msact">`;
+    if(!buy.length&&!trim.length) h+=`<div class="muted" style="font-size:12.5px;padding:6px 0">Портфель совпадает с моделью: отличия меньше 1% доли — ордера не нужны.</div>`;
+    // the alts the owner does not hold yet come as one row (the same reason for all), with the list and the screen inside
+    const fresh=buy.filter(r=>r.basket&&!r.held&&!r.core), grp=fresh.length>=3?fresh:[];
+    const one=buy.filter(r=>!grp.includes(r));
+    const calmFirst=(a,b)=>((b.quality&&b.quality.calm)?1:0)-((a.quality&&a.quality.calm)?1:0);
+    const grpRow=grp.length?`<div class="msa"><b>Альты</b><div>докупить ${grp.length} ${plur(grp.length,'монету','монеты','монет')} альт-части, до ${[...new Set(grp.map(r=>sh(r.target_pct)))].join(' / ')} каждая</div><span class="amt buy">${sgn(grp.reduce((s,r)=>s+r.gap_usd,0))}</span>
+      <div class="d">${grp.slice().sort(calmFirst).map(r=>`<b>${esc(r.ccy)}</b> ${sgn(r.gap_usd)}`).join(' · ')}</div>
+      <details class="f"><summary>Почему эти монеты и что о них говорит анкета качества</summary>${grp.slice().sort(calmFirst).map(r=>`<div style="margin-top:6px"><b style="font-family:var(--mono);color:#e8f0fa">${esc(r.ccy)}</b>${tag(r)} — ${esc(r.why.replace(/^Альт-часть модели — [^:]+: /,''))}${r.quality?` Анкета: ${esc(r.quality.text)}.`:' Оценки анкеты качества нет.'}</div>`).join('')}</details></div>`:'';
+    const firstAlt=one.findIndex(r=>!r.core&&!(r.quality&&r.quality.calm));
+    h+=one.map((r,i)=>(i===firstAlt?grpRow:'')+line(r,'buy')).join('')+(firstAlt<0?grpRow:'')+trim.map(r=>line(r,'sell')).join('')+keep.map(r=>line(r,'keep')).join('');
+    if(C.target_pct!=null&&Math.abs(C.gap_usd||0)>=10) h+=`<div class="msa"><b>USDT</b><div>${C.gap_usd>0?'отложить в доллары':'лишние доллары — на покупки'}: ${sh(C.now_pct)} → ${sh(C.target_pct)}</div><span class="amt ${C.gap_usd>0?'buy':'sell'}">${sgn(C.gap_usd)}</span><div class="d">${esc(C.why||'')}</div></div>`;
+    h+=`</div>`;
+    const tb=buy.reduce((s,r)=>s+r.gap_usd,0), ts=trim.reduce((s,r)=>s-r.gap_usd,0);
+    if(tb||ts) h+=`<div class="mstot"><span>Докупить: <b>${usd(tb)}</b></span><span>Продать и урезать: <b>${usd(ts)}</b></span><span>Сначала продажи, потом покупки — лимитными ордерами.</span></div>`;
+    // assets, exchange-like
+    h+=`<div class="mss">Активы</div><div class="mstab"><div class="msrh"><span>Монета</span><span>Количество</span><span>Цена</span><span>Стоимость</span><span>Доля → цель</span><span>24 ч</span><span>Прибыль</span></div>`;
+    h+=A.map(a=>{ const r=byP[a.ccy], t=a.cash?(C.target_pct||0):(r?r.target_pct:0), why=a.cash?(C.why||''):(r?r.why:''), q=r&&r.quality;
+      return `<div class="msr"><span><b>${esc(a.ccy)}</b><small>${esc((a.where||[]).join(' · '))}</small></span><span>${qty(a.qty)}</span><span>${px(a.px)}</span><span>${usd(a.usd)}</span>
+        <span>${sh(a.share)} → ${sh(t)}<i class="msbar"><i style="width:${Math.min(100,a.share*2).toFixed(1)}%"></i><u style="left:${Math.min(99,t*2).toFixed(1)}%"></u></i></span>
+        <span class="${cls(a.ch24)}">${a.ch24!=null?pc(a.ch24):'—'}</span><span class="${cls(a.pnl_usd)}">${a.pnl_usd!=null?`${sgn(a.pnl_usd)}<small>${pc(a.pnl_pct)}${a.pnl_part?' · торговый счёт':''}</small>`:'—'}</span>
+        ${why?`<span class="msw">${esc(why)}${q?`<span class="f">Анкета качества: ${esc(q.text)}.</span>`:''}</span>`:''}</div>`; }).join('')+`</div>`;
+    const missing=rows.filter(r=>r.now_usd===0&&r.target_pct>0);
+    if(missing.length) h+=`<div class="muted" style="font-size:11.5px;margin-top:6px">В модели есть, у тебя пока нет: ${missing.map(r=>`<b style="font-family:var(--mono)">${esc(r.ccy)}</b> ${sh(r.target_pct)}`).join(' · ')}.</div>`;
+    // ideas: calm quality alts with revenue that neither the owner nor the model holds
+    if((P.ideas||[]).length) h+=`<div class="mss">На заметку — недооценённые по анкете качества</div><div class="msidea">${P.ideas.map(i=>`<div><b>${esc(i.ccy)}</b> · ${esc(i.quality.text)}</div>`).join('')}</div><div class="muted" style="font-size:11px;margin-top:6px">Их нет ни у тебя, ни в модели: не обгоняли BTC за 3 месяца, объём не раздут, у проекта есть выручка. Это кандидаты для альт-части, а не сигнал купить.</div>`;
+    h+=`<div class="msfoot">${esc(P.note||'')} Данные с OKX через ключ только для чтения (${esc(D.host||'okx.com')}); файл в репозитории зашифрован, открывается только твоим паролем.${D.perm&&/trade|withdraw/.test(D.perm)?' <b style="color:#ffe2a8">У ключа есть право торговли или вывода — пересоздай ключ только с правом «Чтение».</b>':''}</div>`;
+    return {h,seg}; }
+
+  function render(){ const el=card(); if(!el) return; if(!owner()){ el.hidden=true; return; } el.hidden=false;
+    const a=document.activeElement; if(a&&el.contains(a)&&a.id==='msPass') return;
+    const ctl=el.querySelector(':scope>.cctl');
+    let html, seg=null;
+    if(MS.state==='ok'&&MS.d){ const r=okHtml(MS.d); html=r.h; seg=r.seg; document.body.classList.add('myspot-on'); }
+    else { document.body.classList.remove('myspot-on'); html=MS.state==='pass'?passHtml():MS.state==='err'?head()+`<div class="mswarn">${esc(MS.err)}</div>`:MS.state==='setup'?setupHtml():head()+'<div class="muted" style="font-size:12.5px">Загружаю…</div>'; }
+    el.innerHTML=html; if(ctl) el.prepend(ctl);
+    if(seg){ const cv=el.querySelector('#msDn'); if(cv) donut(cv,seg); }
+    const go=()=>{ const v=(el.querySelector('#msPass')||{}).value; if(!v) return; st('cnq_myspot_pass',v); MS.err=''; loadMySpot(true); };
+    const b=el.querySelector('#msGo'); if(b){ b.addEventListener('click',go); el.querySelector('#msPass').addEventListener('keydown',e=>{ if(e.key==='Enter') go(); }); } }
+
+  // the main script marks guests on <body> while it boots: check again after it, then every 5 min on the Spot tab
+  const start=()=>{ try{ loadMySpot(); }catch(e){} setTimeout(()=>{ try{ loadMySpot(true); }catch(e){} },4000); setInterval(()=>{ try{ if(document.body.classList.contains('tab-spot')) loadMySpot(); }catch(e){} },5*60000); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else setTimeout(start,0);
+})();</script>
 <script src="nova-sphere.js?v=20261021atom5"></script>
 <script>/* 21.10: mount every NOVA sphere with the speaking state (faster and brighter while NOVA talks or types); hidden ones (chat, report) resize when shown */
 (function(){ if(!window.NovaSphere) return; const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;

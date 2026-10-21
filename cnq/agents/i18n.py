@@ -495,13 +495,31 @@ T: dict[str, dict[str, str]] = {
                      "uk": " У роботі {n} {trades} інших сигналів CRYPTO NOVA.",
                      "el": " Σε εξέλιξη {n} {trades} άλλων σημάτων του CRYPTO NOVA.",
                      "es": " En curso: {n} {trades} de otras señales de CRYPTO NOVA."},
-    "futures.about": {"ru": "Средний счёт $10 000: те же сделки CRYPTO NOVA в 3 размерах (осторожный, сбалансированный, смелый).",
-                      "en": "Average $10 000 account: the same CRYPTO NOVA trades in 3 sizes (cautious, balanced, bold).",
-                      "uk": "Середній рахунок $10 000: ті самі угоди CRYPTO NOVA у 3 розмірах (обережний, збалансований, сміливий).",
-                      "el": "Μέσος λογαριασμός $10 000: οι ίδιες συναλλαγές του CRYPTO NOVA σε 3 μεγέθη (συντηρητικό, "
-                            "ισορροπημένο, τολμηρό).",
-                      "es": "Cuenta media de $10 000: las mismas operaciones de CRYPTO NOVA en 3 tamaños (prudente, equilibrado, "
-                            "audaz)."},
+    "futures.about": {"ru": "Один демо-счёт $10 000 по настоящим ценам: система сама делит его между проверенными стратегиями. "
+                            "Сделки «в проверке» войдут в итог после 30 закрытых сделок.",
+                      "en": "One $10 000 demo account at real prices: the system splits it between proven strategies itself. "
+                            "Trades marked «in testing» join the result after 30 closed trades.",
+                      "uk": "Один демо-рахунок $10 000 за справжніми цінами: система сама ділить його між перевіреними стратегіями. "
+                            "Угоди «на перевірці» увійдуть у підсумок після 30 закритих угод.",
+                      "el": "Ένας demo λογαριασμός $10 000 σε πραγματικές τιμές: το σύστημα τον μοιράζει μόνο του σε δοκιμασμένες "
+                            "στρατηγικές. Οι συναλλαγές «σε δοκιμή» μπαίνουν στο αποτέλεσμα μετά από 30 κλεισμένες συναλλαγές.",
+                      "es": "Una cuenta demo de $10 000 a precios reales: el sistema la reparte solo entre estrategias probadas. "
+                            "Las operaciones «en prueba» entran en el resultado tras 30 operaciones cerradas."},
+    # ---------------------------------------------------------------- «Если покупать сегодня» (buy_now.items[].why / grade_text)
+    "buy.sma200": {"ru": "выше 200-дневной средней", "en": "above its 200-day average", "uk": "вище 200-денної середньої",
+                   "el": "πάνω από τον μέσο όρο 200 ημερών", "es": "por encima de su media de 200 días"},
+    "buy.support": {"ru": "у поддержки {p} (касаний: {n})", "en": "at support {p} ({n} touches)",
+                    "uk": "біля підтримки {p} (дотиків: {n})", "el": "κοντά στη στήριξη {p} ({n} αγγίγματα)",
+                    "es": "en el soporte {p} ({n} toques)"},
+    "buy.rsi": {"ru": "RSI {v} — не перегрета", "en": "RSI {v}: not overheated", "uk": "RSI {v} — не перегріта",
+                "el": "RSI {v}: όχι υπερθερμασμένο", "es": "RSI {v}: no sobrecalentada"},
+    "buy.quality": {"ru": "анкета качества {v}/100", "en": "quality score {v}/100", "uk": "анкета якості {v}/100",
+                    "el": "βαθμός ποιότητας {v}/100", "es": "puntuación de calidad {v}/100"},
+    "buy.whales": {"ru": "крупные трейдеры в лонге", "en": "the largest traders are long", "uk": "великі трейдери в лонгу",
+                   "el": "οι μεγαλύτεροι traders είναι long", "es": "los grandes traders están en largo"},
+    "buy.grade.strong": {"ru": "сильный", "en": "strong", "uk": "сильний", "el": "ισχυρός", "es": "fuerte"},
+    "buy.grade.good": {"ru": "хороший", "en": "good", "uk": "добрий", "el": "καλός", "es": "bueno"},
+    "buy.grade.possible": {"ru": "возможный", "en": "possible", "uk": "можливий", "el": "πιθανός", "es": "posible"},
     "sources.soon": {"ru": "арбитраж, рынки прогнозов", "en": "arbitrage, prediction markets", "uk": "арбітраж, ринки прогнозів",
                      "el": "αρμπιτράζ, αγορές προβλέψεων", "es": "arbitraje, mercados de predicción"},
     "home.note": {"ru": "Демо-счета CRYPTO NOVA. Прошлые результаты не гарантируют будущих. Не финансовый совет.",

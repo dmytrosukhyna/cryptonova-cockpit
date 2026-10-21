@@ -377,11 +377,73 @@ def _status(bal_open: int, closed: list, opened: list, lang: str = DEFAULT) -> s
     return t(lang, "status.main") + tail + (t(lang, "status.other", n=other, trades=plural(lang, other, "trade")) if other else "")
 
 
+# 22.10 (owner on build 43: «график стоит на месте … сегодня 0 долларов», while 5 trades were open): the app's futures result was
+# the average of the old cons/bal/aggr accounts — idle for days — while the open trades listed came from the whole mix. Now the
+# app shows the same «CRYPTO NOVA» futures account as the owner's panel (web/app.html novaRes / novaSeries): the strategies the
+# allocator runs (bal + imp; the own daily signals join after their live record passes the gate), each from 18.10 (FUT_D0), as
+# ONE $10 000 account; open P&L included, so the curve and «today» move with the open trades. Trades of a desk that is still
+# being checked are listed with «in_result»: false and its progress to the gate (check.n of check.of closed trades).
+FUT_D0 = int(dt.datetime(2026, 10, 16, 21, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
+NOVA_BASE = ("bal", "imp")
+OWN_GATE_N, OWN_GATE_AVG = 30, 0.3
+
+
+def nova_keys(prof: dict) -> list[str]:
+    """the desks inside the CRYPTO NOVA futures result (the panel's novaRes)"""
+    s = (prof.get("own") or {}).get("stats") or {}
+    avg = s.get("avg_trade_pct")
+    ok = int(s.get("trades") or 0) >= OWN_GATE_N and isinstance(avg, (int, float)) and avg >= OWN_GATE_AVG
+    return [k for k in (*NOVA_BASE, *(("own",) if ok else ())) if prof.get(k)]
+
+
+def _base_d0(v: dict) -> float:
+    """the desk's equity at the CRYPTO NOVA start (18.10), or its own start when it began later"""
+    h = v.get("equity_history") or []
+    st = float(v.get("start_equity") or START)
+    if not h or int(h[0].get("time") or 0) >= FUT_D0:
+        return st
+    b = float(h[0].get("equity") or st)
+    for e in h:
+        if int(e.get("time") or 0) <= FUT_D0:
+            b = float(e.get("equity") or b)
+        else:
+            break
+    return b or st
+
+
+def _fut_eq(v: dict) -> float:
+    return float(v.get("equity", START)) + float(v.get("open_pnl_usd") or 0)
+
+
+def nova_result(prof: dict, now: int) -> tuple[float, list[tuple[int, float]]]:
+    """(the CRYPTO NOVA account's $ result now, its curve [(t, $)] from 18.10 ending with the live point)"""
+    keys = nova_keys(prof)
+    if not keys:
+        return 0.0, []
+    desks = [prof[k] for k in keys]
+    bases = [_base_d0(v) for v in desks]
+    sb = sum(float(v.get("start_equity") or START) for v in desks) or 1.0
+    usd = sum(_fut_eq(v) - b for v, b in zip(desks, bases)) / sb * START
+    hs = [sorted((int(e["time"]), float(e["equity"])) for e in (v.get("equity_history") or [])
+                 if e.get("time") is not None and e.get("equity") is not None) for v in desks]
+    ts = sorted({t_ for h in hs for t_, _e in h if t_ >= FUT_D0})
+    curve, idx = [], [-1] * len(hs)
+    for t_ in ts:
+        r = 0.0
+        for i, h in enumerate(hs):
+            while idx[i] + 1 < len(h) and h[idx[i] + 1][0] <= t_:
+                idx[i] += 1
+            r += (h[idx[i]][1] if idx[i] >= 0 else bases[i]) - bases[i]
+        curve.append((t_, r / sb * START))
+    if not curve or curve[-1][0] < now:
+        curve.append((now, usd))                                # the live point: open trades move the line
+    return usd, curve
+
+
 def _futures(paper: dict, now: int, lang: str = DEFAULT) -> dict:
     prof = paper.get("profiles") or {}
-    curve = _avg_curve(prof)
-    eq = [(prof.get(p) or {}) for p in PROFILES if prof.get(p)]
-    usd = sum(float(p.get("equity", START)) + float(p.get("open_pnl_usd") or 0) - START for p in eq) / max(1, len(eq))
+    keys = nova_keys(prof)
+    usd, curve = nova_result(prof, now)
     day0 = int(dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
                .timestamp() * 1000)
     before = [v for t_, v in curve if t_ < day0]
@@ -390,25 +452,43 @@ def _futures(paper: dict, now: int, lang: str = DEFAULT) -> dict:
     for _, v in curve:
         peak = max(peak, START + v)
         dd = min(dd, (START + v) / peak - 1)
-    bal = prof.get("bal") or paper
+    own_s = (prof.get("own") or {}).get("stats") or {}
     opened = []
     for src in _mix_keys():
-        desk = bal if src == "bal" else prof.get(src) or {}
+        desk = prof.get(src) or (paper if src == "bal" else {})
         for o in desk.get("open") or []:
-            opened.append(_open_row(o, src, desk, now, lang))
+            row = _open_row(o, src, desk, now, lang)
+            row["in_result"] = src in keys
+            if not row["in_result"] and src == "own":
+                row["check"] = {"n": int(own_s.get("trades") or 0), "of": OWN_GATE_N}
+            opened.append(row)
     opened.sort(key=lambda o: -(o.get("opened") or 0))
-    bal_open = sum(1 for o in opened if o["src"] == "bal")
+    in_open = sum(1 for o in opened if o["in_result"])
+    closed_all = [c for k in keys for c in (prof.get(k) or {}).get("closed") or []]
     closed = []
-    for c in sorted(bal.get("closed") or [], key=lambda c: c.get("closed") or 0, reverse=True)[:8]:
+    for c in sorted(closed_all, key=lambda c: c.get("closed") or 0, reverse=True)[:8]:
         closed.append({"sym": c.get("symbol"), "side": str(c.get("side") or "").upper(), "pnl_usd": _r(float(c.get("pnl_usd") or 0)),
                        "closed": c.get("closed")})
-    st = bal.get("stats") or {}
-    n_closed = int(st.get("trades") or len(bal.get("closed") or []))
-    return {"usd": _r(usd), "pct": _r(usd / START * 100), "today_usd": _r(today), "trades": n_closed + bal_open,
-            "status_ru": _status(bal_open, closed, opened, lang), "scan": _scan((prof.get("own") or {}).get("scan"), now, lang),
-            "wins": round(float(st.get("winrate") or 0) * n_closed), "closed_n": n_closed, "worst_dd_pct": _r(dd * 100, 1),
-            "open": opened, "closed": closed, "curve": [[t_, _r(v)] for t_, v in _sample(curve)],
+    n_closed = wins = 0
+    for k in keys:
+        st = (prof.get(k) or {}).get("stats") or {}
+        n = int(st.get("trades") or len((prof.get(k) or {}).get("closed") or []))
+        n_closed += n
+        wins += round(float(st.get("winrate") or 0) * n)
+    others = [o for o in opened if not o["in_result"]]
+    return {"usd": _r(usd), "pct": _r(usd / START * 100), "today_usd": _r(today), "trades": n_closed + in_open,
+            "status_ru": _status(in_open, closed, others, lang), "scan": _scan((prof.get("own") or {}).get("scan"), now, lang),
+            "wins": wins, "closed_n": n_closed, "worst_dd_pct": _r(dd * 100, 1), "since": FUT_D0, "in_result": keys,
+            "open": opened, "closed": closed, "curve": [[t_, _r(v)] for t_, v in _sample_keep_last(curve)],
             "about_ru": t(lang, "futures.about")}
+
+
+def _sample_keep_last(points: list, n: int = 60) -> list:
+    """≤ n points, always ending on the newest one (the live point)"""
+    out = _sample(points, n)
+    if points and out and out[-1] is not points[-1]:
+        out[-1] = points[-1]
+    return out
 
 
 _TRIM_PLAN = re.compile(r"^(?:Ядро|План): ([A-Z0-9]+) ([\d.]+)% счёта — больше (?:плана|плановых) ([\d.]+)%")
@@ -599,6 +679,34 @@ def _public_portfolio(out: str) -> dict | None:
             "regime": (c.get("regime") or {}).get("key")}
 
 
+BUY_KEYS = {"sma200", "support", "rsi", "quality", "whales"}
+
+
+def _buy_now(out: str, now: int, lang: str = DEFAULT) -> dict | None:
+    """22.10: «Если покупать сегодня» on the app's Home — web/buy_now.json (cnq/agents/buy_now.py) in this file's language.
+    None when the file is missing or older than 3 hours (the app then hides the block)."""
+    d = _load(out, "buy_now.json")
+    if not d.get("available") or not isinstance(d.get("asof"), (int, float)) or now - d["asof"] > 3 * 3_600_000:
+        return None
+    items = []
+    for x in d.get("items") or []:
+        why = []
+        for w in x.get("why") or []:
+            k = w.get("k")
+            if k not in BUY_KEYS:
+                continue
+            if k == "support":
+                why.append(t(lang, "buy.support", p=_num(float(w.get("p") or 0)), n=int(w.get("n") or 0)))
+            elif k in ("rsi", "quality"):
+                why.append(t(lang, f"buy.{k}", v=int(w.get("v") or 0)))
+            else:
+                why.append(t(lang, f"buy.{k}"))
+        g = x.get("grade") if x.get("grade") in ("strong", "good", "possible") else "possible"
+        items.append({"sym": x.get("sym"), "price": x.get("price"), "chg24": x.get("chg24"), "score": x.get("score"), "grade": g,
+                      "grade_text": t(lang, f"buy.grade.{g}"), "why": why})
+    return {"asof": int(d["asof"]), "checked": int(d.get("checked") or 0), "items": items}
+
+
 def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT, ex: dict | None = None) -> dict:
     """app_home in one language — the same numbers in every language, only the words differ"""
     fut, spot = _futures(paper, now, lang), _spot(pf, lang, ex)
@@ -609,6 +717,7 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
             "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),
+            "buy_now": _buy_now(out, now, lang),
             "note_ru": t(lang, "home.note")}
 
 

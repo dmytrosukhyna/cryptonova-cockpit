@@ -149,7 +149,7 @@
       "id": "price",
       "topic": "money",
       "q": "How much does it cost?",
-      "a": "Demo, the Piggy bank, 56 lessons and me, NOVA — no subscriptions or in-app purchases. We don't take a cut of your profit. Connecting a real account costs nothing either — for those who opened an exchange account through our link. If paid features ever appear, we'll show the terms and price in advance.",
+      "a": "Demo, the Piggy bank, 49 lessons and me, NOVA — no subscriptions or in-app purchases. We don't take a cut of your profit. Connecting a real account costs nothing either — for those who opened an exchange account through our link. If paid features ever appear, we'll show the terms and price in advance.",
       "tags": [
         "cost",
         "price",
@@ -199,7 +199,7 @@
       "id": "how_works",
       "topic": "how",
       "q": "How does CRYPTO NOVA work?",
-      "a": "CRYPTO NOVA is an AI system: it watches the crypto market 24/7 and looks for trades using rules tested on price history. The trades run on a $10 000 demo account — you see the entry, stop, target and a simple “why we entered”. Next to it there's a calm spot portfolio, a bitcoin Piggy bank, 56 lessons and me, NOVA. It's learning and demo, not an exchange and not financial advice.",
+      "a": "CRYPTO NOVA is an AI system: it watches the crypto market 24/7 and looks for trades using rules tested on price history. The trades run on a $10 000 demo account — you see the entry, stop, target and a simple “why we entered”. Next to it there's a calm spot portfolio, a bitcoin Piggy bank, 49 lessons and me, NOVA. It's learning and demo, not an exchange and not financial advice.",
       "tags": [
         "work",
         "works",
@@ -440,7 +440,7 @@
       "id": "lessons",
       "topic": "learn",
       "q": "Where should I start learning?",
-      "a": "Start with the first level, getting to know CRYPTO NOVA: 7 short lessons about how the app works. Then come 4 more levels, from complete beginner to advanced: 56 lessons in total, with real-life examples and quizzes, each 4–5 minutes long.",
+      "a": "Learning has 4 levels, from complete beginner to advanced: 49 lessons with real-life examples and quizzes, 4–5 minutes each. Start with the first level. How the app itself works is shown by the short tour on the Home screen.",
       "tags": [
         "learn",
         "learning",

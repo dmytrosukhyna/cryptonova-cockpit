@@ -47,6 +47,11 @@ const ok=t=>({choices:[{message:{content:t},finish_reason:'stop'}]});
   await run('srvRetry',[[200,{error:'rate_limit',ms:10}],[200,{answer:'Со второй',ms:900}]],'groq',{server:true});
   await run('srv403',[[403,{error:'admin_disabled'}]],'groq',{server:true});
   await run('noServerFlag',[[200,{answer:'x'}]],'groq',{});
+  // 21.10 owner: an invalid browser key + a working «Управление» token → the chat retries through the server, then keeps using it
+  SET.anth='bad'; await run('fallback',[[401,{error:{message:'Invalid API Key'}}],[200,{answer:'Через сервер',ms:700}]],'groq',{server:true});
+  await run('afterBad',[[200,{answer:'Сразу сервер',ms:600}]],'groq',{server:true});
+  await run('briefNoServer',[[401,{error:{message:'Invalid API Key'}}]],'groq',{});
+  SET.anth='';
   TOK=''; await run('noRoute',[],'groq',{server:true});
   R.log=load('cnq_ai_log',[]).length;
   globalThis.console.log(JSON.stringify(R)); })();
@@ -68,6 +73,10 @@ def test_panel_ai_call_states():
     assert "лимит длины" in R["empty"]["err"]
     assert R["net"]["err"] == "нет связи с Groq" and R["net"]["n"] == 2
     assert R["anth"]["out"] == "Да"
+    assert R["fallback"]["out"] == "Через сервер" and R["fallback"]["n"] == 2          # key 401 → one retry through the server
+    assert R["afterBad"]["out"] == "Сразу сервер" and R["afterBad"]["n"] == 1          # the session then goes straight to the server
+    assert R["afterBad"]["body"]["__url"].endswith("/nova")
+    assert R["briefNoServer"]["err"] == "Invalid API Key" and R["briefNoServer"]["n"] == 1   # a non-chat call never falls back to the server
     assert R["srv"]["out"] == "Через сервер" and R["srv"]["body"]["__url"].endswith("/v2/admin/nova")
     assert R["srv"]["body"]["__auth"] == "Bearer tok123" and R["srv"]["body"]["user"] == "q"
     assert R["srvRetry"]["out"] == "Со второй" and R["srvRetry"]["n"] == 2

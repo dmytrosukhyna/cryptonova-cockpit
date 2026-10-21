@@ -50,13 +50,33 @@ def connect_name(what: str) -> str:
 # no administrator: the person opens an exchange account (our partner link when web/app_config.json has one) and follows the app.
 CONNECT = ("Вы выбрали: <b>{name}</b>.\n\n"
            "<b>Как начать работу с CRYPTO NOVA — около 15 минут.</b> Пошаговая инструкция:\n"
-           "1. Зарегистрируйтесь на бирже BingX{ref}.\n"
+           "1. Откройте счёт на бирже BingX{ref}. Счёт на ваше имя — деньги всегда у вас.\n"
            "2. Пройдите проверку личности (KYC) — так требует биржа.\n"
            "3. Пополните счёт в USDT на сумму, которую не страшно потерять.\n"
-           "4. Откройте в приложении CRYPTO NOVA портфель и сделки: у каждой сделки видны вход, стоп и цель — повторяйте их на своём счёте.\n\n"
-           "Деньги всегда остаются на вашем счёте на бирже: мы их не храним и доступа к ним не получаем.\n"
+           "4. <b>Пришлите сюда свой UID</b> — номер счёта BingX: в приложении биржи нажмите на аватар, UID рядом с ним. "
+           "Я проверю, что счёт открыт по ссылке CRYPTO NOVA и пополнен, и отвечу. UID — не пароль: по нему нельзя войти в счёт.\n"
+           "5. Откройте в приложении CRYPTO NOVA портфель и сделки: у каждой сделки видны вход, стоп и цель — повторяйте их на своём счёте.\n\n"
+           "Копирование сделок в один клик на BingX готовим: запустим, когда биржа письменно подтвердит программу. Кто прислал UID — узнает первым.\n"
            "Нужна помощь — напишите сюда, подскажем по шагам.\n\n"
            "Важно: торговля связана с риском, прошлый результат не гарантирует будущий.")
+
+# 21.10 22:52 owner: «напишите в поддержку — это нашему боту? бот перепроверит UID и подключит?». A UID sent to the bot is checked with
+# the BingX partner API (cnq/api/bingx.py, CNQ_BINGX_AGENT_KEY / _SECRET); without the partner key it is queued for the owner (24 h).
+# Only the number is stored (bot_uids) — a UID is not a secret and gives no access to the account.
+UID_RE = re.compile(r"(?i)^\s*(?:bingx\s*)?(?:uid|юид|уид|айди|id)?\s*[:#№-]?\s*(\d{6,12})\s*$")
+UID_REPLY = {
+    "ok": "UID {uid} подтверждён: счёт открыт по ссылке CRYPTO NOVA и пополнен. Спасибо! Дальше — сделки и портфель в приложении CRYPTO NOVA. "
+          "Когда запустим копирование в один клик, напишу вам первым.",
+    "no_deposit": "Счёт {uid} открыт по ссылке CRYPTO NOVA, но пока не пополнен. Пополните его в USDT и пришлите UID ещё раз — проверю снова.",
+    "not_invited": "Счёт {uid} открыт не по ссылке CRYPTO NOVA. Ничего менять не нужно: приложением можно пользоваться и так. "
+                   "Если номер с ошибкой — пришлите UID ещё раз.",
+    "pending": "UID {uid} получен. Проверим вручную в течение 24 часов и ответим здесь. Пока можно открыть сделки и портфель в приложении CRYPTO NOVA.",
+}
+
+
+def uid_of(text: str) -> str | None:
+    m = UID_RE.match(text or "")
+    return m.group(1) if m else None
 
 
 def exchange_ref() -> str:
@@ -177,6 +197,43 @@ class Mailbox:
         r = self.conn.execute("SELECT v FROM bot_meta WHERE k='owner_chat'").fetchone()
         return int(r[0]) if r else None
 
+    def uid(self, chat_id: int, username: str | None, uid: str, now: int, check=None) -> str:
+        """Record a BingX UID and check it once; → the reply for the person. check(uid) → bingx.check_referral result."""
+        self.conn.execute("CREATE TABLE IF NOT EXISTS bot_uids(time INTEGER, chat_id INTEGER, username TEXT, uid TEXT, status TEXT, detail TEXT, notified INTEGER)")
+        if check is None:
+            from ..api.bingx import check_referral as check
+        try:
+            res = check(uid) or {}
+        except Exception as e:  # noqa: BLE001
+            res = {"ok": False, "reason": "exchange_error", "detail": str(e)[:120]}
+        status = "ok" if res.get("ok") else res.get("reason") if res.get("reason") in ("no_deposit", "not_invited") else "pending"
+        detail = json.dumps({k: res.get(k) for k in ("reason", "invited", "deposited", "kyc") if k in res}, ensure_ascii=False)
+        self.conn.execute("INSERT INTO bot_uids VALUES(?,?,?,?,?,?,0)", (now, chat_id, username, uid, status, detail))
+        self.conn.commit()
+        return UID_REPLY[status].format(uid=uid)
+
+    def notify_uids(self, token: str, owner_chat: int | None) -> int:
+        """Tell the owner about each new UID once: verified ones for his records, «pending» ones to check by hand."""
+        if not owner_chat:
+            return 0
+        try:
+            rows = self.conn.execute("SELECT rowid, username, chat_id, uid, status FROM bot_uids WHERE notified=0").fetchall()
+        except sqlite3.OperationalError:
+            return 0
+        ru = {"ok": "подтверждён (по ссылке CRYPTO NOVA, пополнен)", "no_deposit": "по нашей ссылке, но не пополнен",
+              "not_invited": "открыт не по нашей ссылке", "pending": "нужна ручная проверка в партнёрском кабинете BingX (ключ партнёра не подключён)"}
+        n = 0
+        for rid, un, cid, uid, st in rows:
+            who = f"@{un}" if un else f"id {cid}"
+            try:
+                _api(token, "sendMessage", {"chat_id": owner_chat, "text": f"UID BingX от {who}: {uid} — {ru.get(st, st)}."})
+                self.conn.execute("UPDATE bot_uids SET notified=1 WHERE rowid=?", (rid,))
+                n += 1
+            except Exception:  # noqa: BLE001
+                pass
+        self.conn.commit()
+        return n
+
     def lead(self, chat_id: int, username: str | None, first_name: str | None, what: str, now: int) -> None:
         self.conn.execute("CREATE TABLE IF NOT EXISTS bot_leads(time INTEGER, chat_id INTEGER, username TEXT, first_name TEXT, strategy TEXT, notified INTEGER)")
         self.conn.execute("INSERT INTO bot_leads VALUES(?,?,?,?,?,0)", (now, chat_id, username, first_name, what))
@@ -285,6 +342,10 @@ class Mailbox:
                 reply = HELP
             elif text.startswith("/channel"):
                 reply = "Канал CRYPTO NOVA: https://t.me/crypto_nova_news"
+            elif uid_of(text):
+                reply = self.uid(cid, frm.get("username"), uid_of(text), now)
+            elif re.search(r"(?i)\buid\b|\bюид\b", text) and not re.search(r"\d{6,12}", text):
+                reply = "Пришлите UID цифрами: это номер вашего счёта BingX — в приложении биржи нажмите на аватар, UID рядом с ним."
             elif text:
                 reply = answer_fn(text, {"chat_id": cid, "username": frm.get("username")}) if answer_fn else None
                 if not reply:
@@ -329,4 +390,5 @@ def run(conn: sqlite3.Connection, llm=None, token: str | None = None, owner: str
                 pass
     res["signals_chat"] = bool(mb.meta("signals_chat"))
     res["leads_sent"] = mb.notify_leads(token, res["owner_chat"])
+    res["uids_sent"] = mb.notify_uids(token, res["owner_chat"])
     return res

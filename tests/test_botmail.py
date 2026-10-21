@@ -132,3 +132,39 @@ def test_owner_dm_without_a_channel_gets_the_forward_instruction_and_the_poll_is
     assert "Перешлите мне" in sent[0]["text"]
     lp = _json.loads(mb.meta("last_poll"))
     assert lp["ok"] and lp["n"] == 1 and lp["types"] == ["message"]
+
+
+def test_uid_is_checked_and_answered_honestly_and_the_owner_hears_once():
+    """21.10 22:52 owner: «бот перепроверит UID и подключит?» — a UID is checked with the BingX partner API; without the partner key
+    it waits for the owner (24 h). Only the number is stored."""
+    conn = sqlite3.connect(":memory:")
+    calls = []
+
+    def fake_api(token, method, data=None, timeout=20):
+        calls.append((method, data))
+        if method == "getUpdates":
+            return {"ok": True, "result": [
+                {"update_id": 1, "message": {"chat": {"id": 901, "type": "private"}, "from": {"username": "anna"}, "text": "UID: 123456789"}},
+                {"update_id": 2, "message": {"chat": {"id": 902, "type": "private"}, "from": {"username": "bob"}, "text": "мой uid какой?"}}]}
+        return {"ok": True}
+    botmail._api = fake_api
+    assert botmail.uid_of("123456789") == "123456789" and botmail.uid_of("uid 12345678") == "12345678"
+    assert botmail.uid_of("BingX UID: 98765432") == "98765432" and botmail.uid_of("12345") is None and botmail.uid_of("цена 123456789 $") is None
+    mb = botmail.Mailbox(conn)
+    import os
+    os.environ.pop("CNQ_BINGX_AGENT_KEY", None); os.environ.pop("CNQ_BINGX_AGENT_SECRET", None)
+    mb.poll("t")
+    sent = [d for m, d in calls if m == "sendMessage"]
+    assert "123456789" in sent[0]["text"] and "24 час" in sent[0]["text"]          # no partner key → honest manual check
+    assert "цифрами" in sent[1]["text"]
+    row = conn.execute("SELECT uid, status FROM bot_uids").fetchone()
+    assert row == ("123456789", "pending")
+    calls.clear()
+    assert mb.notify_uids("t", 555) == 1 and mb.notify_uids("t", 555) == 0
+    note = [d for m, d in calls if m == "sendMessage"][0]
+    assert note["chat_id"] == 555 and "@anna" in note["text"] and "123456789" in note["text"]
+    # with the partner answer: verified / not deposited / not ours
+    assert "подтверждён" in mb.uid(1, "x", "11111111", 0, check=lambda u: {"ok": True, "reason": "ok", "invited": True, "deposited": True})
+    assert "не пополнен" in mb.uid(1, "x", "22222222", 0, check=lambda u: {"ok": False, "reason": "no_deposit", "invited": True, "deposited": False})
+    assert "не по ссылке" in mb.uid(1, "x", "33333333", 0, check=lambda u: {"ok": False, "reason": "not_invited"})
+    assert "вручную" in mb.uid(1, "x", "44444444", 0, check=lambda u: (_ for _ in ()).throw(RuntimeError("net")))

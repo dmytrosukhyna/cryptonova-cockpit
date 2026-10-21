@@ -37,7 +37,9 @@ import urllib.request
 from . import ivan_watch
 
 HOSTS = ["https://www.okx.com", "https://eea.okx.com", "https://my.okx.com"]   # global · OKX Europe (EEA) · OKX for some regions
-KEY_REJECTED = {"50101", "50111", "50119", "50114"}   # wrong environment / invalid key / key doesn't exist / invalid authorization
+# wrong environment / invalid key / key doesn't exist / invalid authorization / 60032: an OKX Europe key on the wrong domain
+# (OKX Europe keys work only on eea.okx.com or my.okx.com) — all mean «try the next host»
+KEY_REJECTED = {"50101", "50111", "50119", "50114", "60032"}
 PATH = "web/myspot.enc.json"
 DEFAULT_REPO = ivan_watch.DEFAULT_REPO
 MODEL_SRC = os.environ.get("MYSPOT_MODEL_SRC", "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/")
@@ -177,20 +179,39 @@ def _f(x) -> float | None:
 
 
 def prices(tickers: list) -> dict:
-    """BASE → (last, open24h) from the *-USDT spot tickers; stablecoins are $1."""
-    px = {}
+    """BASE → (last, open24h) in dollars from the spot tickers: *-USDT first, then *-USDC (OKX Europe has no USDT pairs), then
+    *-EUR converted at the USDC-EUR / USDT-EUR rate; stablecoins are $1."""
+    px, by = {}, {}
     for t in tickers or []:
         inst = str(t.get("instId") or "")
-        if inst.endswith("-USDT"):
-            last, o = _f(t.get("last")), _f(t.get("open24h"))
-            if last:
-                px[inst[:-5]] = (last, o)
+        last, o = _f(t.get("last")), _f(t.get("open24h"))
+        if last and "-" in inst:
+            by[inst] = (last, o)
+    eur = None                 # dollars per euro = 1 / (euros per USDC or USDT)
+    for k in ("USDC-EUR", "USDT-EUR"):
+        if k in by:
+            last, o = by[k]
+            eur = (1 / last, (1 / o) if o else None)
+            break
+    for inst, (last, o) in by.items():
+        base, quote = inst.rsplit("-", 1)
+        if quote == "USDT":
+            px[base] = (last, o)
+    for inst, (last, o) in by.items():
+        base, quote = inst.rsplit("-", 1)
+        if base in px:
+            continue
+        if quote == "USDC":
+            px[base] = (last, o)
+    for inst, (last, o) in by.items():
+        base, quote = inst.rsplit("-", 1)
+        if base in px or quote != "EUR" or not eur or base in ("USDT", "USDC"):
+            continue
+        px[base] = (last * eur[0], (o * eur[1]) if o and eur[1] else None)
     for c in ("USDT", "USDC", "FDUSD", "DAI", "TUSD", "USDE", "PYUSD", "USDG", "USD"):
         px.setdefault(c, (1.0, 1.0))
-    if "EUR" not in px:        # OKX Europe holds EUR; the EUR price comes from the USDT-EUR ticker (dollars per euro = 1 / that)
-        for t in tickers or []:
-            if t.get("instId") == "USDT-EUR" and _f(t.get("last")):
-                px["EUR"] = (1 / _f(t["last"]), (1 / _f(t["open24h"])) if _f(t.get("open24h")) else None)
+    if "EUR" not in px and eur:  # OKX Europe holds EUR
+        px["EUR"] = eur
     return px
 
 
@@ -435,8 +456,16 @@ def snapshot(fetch, state: dict, now: int, model=None) -> dict:
     else:
         hist[-1] = [now, p["total_usd"]]
     state["hist"] = hist[-MAX_HIST:]
-    return {"asof": now, "host": host.replace("https://", ""), "perm": raw.get("perm") or "", "assets": rows, "plan": p,
-            "hist": state["hist"]}
+    out = {"asof": now, "host": host.replace("https://", ""), "perm": raw.get("perm") or "", "assets": rows, "plan": p,
+           "hist": state["hist"]}
+    try:                       # «Автопилот OKX» state for the card (local file on this Mac; no keys, no network) — okx_autopilot.py
+        from . import okx_autopilot
+        ap = okx_autopilot.status()
+        if ap:
+            out["autopilot"] = ap
+    except Exception:  # noqa: BLE001
+        pass
+    return out
 
 
 def run(state: dict | None = None, now: int | None = None, fetch=None, put=None, env=None, save=None, model=None):

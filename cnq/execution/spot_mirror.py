@@ -172,6 +172,11 @@ def main(argv=None) -> int:
     if exch == "okx":
         from .okx_spot import OkxSpot
         acct = OkxSpot()
+        if run and acct.live:
+            # 22.10: the owner's real OKX account is run by okx_autopilot (the card's model, limit orders, caps, kill switch, EEA host);
+            # this older path (another portfolio, market orders) must never touch real money by mistake.
+            print("Для своего реального счёта OKX используй автопилот: python3 -m cnq.execution.okx_autopilot --plan / --run")
+            return 2
         mode, venue = acct.mode, "OKX"
     else:
         bx = BybitTrader()

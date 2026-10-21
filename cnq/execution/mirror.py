@@ -14,6 +14,8 @@ set, every 15 min a read-only snapshot of that account is encrypted and publishe
 Optional «Мой портфель · OKX» (cnq/execution/myspot_watch.py): with MYSPOT_OKX_KEY / MYSPOT_OKX_SECRET / MYSPOT_OKX_PASSPHRASE
 (a READ-ONLY OKX key) and MYSPOT_PASS, every 15 min the owner's OKX spot portfolio + the model's plan are encrypted and published
 to web/myspot.enc.json (nothing is traded).
+«Автопилот OKX» (cnq/execution/okx_autopilot.py) runs in its OWN window (okx_autopilot --loop), not here: CNQ_LIVE_TRADING=yes
+for it must never reach this Bybit futures mirror. `--check` here also prints the autopilot's key, host and state.
 Log: data/mirror.jsonl, state: data/mirror_state.json. Stdlib only."""
 from __future__ import annotations
 
@@ -23,7 +25,7 @@ import sys
 import time
 import urllib.request
 
-from . import ivan_watch, myspot_watch
+from . import ivan_watch, myspot_watch, okx_autopilot
 from .bybit_trade import BybitTrader
 
 SRC = os.environ.get("CNQ_MIRROR_SRC", "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/paper.json")
@@ -175,9 +177,9 @@ def main() -> int:
             msg = ivan_watch.check()          # None (prints nothing) when the IVAN_* lines are not in ~/.cryptonova.env
             if msg:
                 print(msg + ("" if GH_TOKEN else " · нет CNQ_GH_TOKEN — публиковать не буду"), flush=True)
-            msg = myspot_watch.check()        # None (prints nothing) when the MYSPOT_* lines are not in ~/.cryptonova.env
-            if msg:
-                print(msg + ("" if GH_TOKEN else " · нет CNQ_GH_TOKEN — публиковать не буду"), flush=True)
+            if myspot_watch.creds() or okx_autopilot.creds():     # «Мой портфель» (read-only key) + «Автопилот OKX» (trade key)
+                for line in okx_autopilot.check():
+                    print(line + ("" if GH_TOKEN or not line.startswith("Мой портфель") else " · нет CNQ_GH_TOKEN — публиковать не буду"), flush=True)
         return 0
     global SCALE
     eq = bx.equity()

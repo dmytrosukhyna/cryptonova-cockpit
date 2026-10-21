@@ -3934,6 +3934,9 @@ as web/myspot.enc.json; only this browser decrypts it (ivanDecrypt, the owner's 
 #msCard .msidea{display:flex;gap:6px;flex-wrap:wrap}#msCard .msidea div{border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:12px;line-height:1.4;max-width:100%}#msCard .msidea b{font-family:var(--mono)}
 #msCard .msfoot{font-size:11px;line-height:1.5;color:var(--muted);margin-top:12px}
 #msCard .mswarn{border:1px solid rgba(242,193,78,.4);color:#ffe2a8;border-radius:10px;padding:8px 10px;font-size:12px;margin:4px 0 10px}
+#msCard .msap{border:1px solid rgba(127,211,255,.25);background:rgba(127,211,255,.06);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.45;margin:4px 0 10px}
+#msCard .msap.on{border-color:rgba(61,220,151,.45);background:rgba(61,220,151,.07)}#msCard .msap.stop{border-color:rgba(255,107,107,.5);background:rgba(255,107,107,.07)}
+#msCard .msap b{color:#e8f0fa}#msCard .msap .muted{font-size:11.5px}
 #msCard .msset ol{margin:6px 0 0 18px;padding:0;display:grid;gap:7px;font-size:12.5px;line-height:1.5}#msCard .msset code,#msCard .msset pre{font:11.5px/1.5 var(--mono);color:#cfdcec}
 #msCard .msset pre{background:rgba(6,11,22,.6);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 body:not(.tab-spot) #msCard,body.guest #msCard{display:none!important}
@@ -3983,7 +3986,12 @@ export MYSPOT_PASS=пароль входа в эту панель</pre></li>
   function okHtml(D){ const P=D.plan||{}, A=D.assets||[], T=P.total_usd||A.reduce((s,a)=>s+a.usd,0), rows=P.rows||[], byP={}; rows.forEach(r=>byP[r.ccy]=r);
     const ch=A.reduce((s,a)=>s+(a.ch24!=null?a.usd-a.usd/(1+a.ch24/100):0),0), pnlA=A.filter(a=>a.pnl_usd!=null), pnl=pnlA.reduce((s,a)=>s+a.pnl_usd,0);
     const old=Date.now()-(D.asof||MS.asof)>60*60000;
-    let h=head(D)+(old?`<div class="mswarn">Данные старше часа — проверь, что зеркало на Маке запущено.</div>`:'')
+    // 22.10 «Автопилот OKX» (cnq/execution/okx_autopilot.py): its state comes inside this encrypted blob — on / off / stop, last rebalance
+    const AP=D.autopilot, apOn=!!(AP&&AP.armed&&AP.enabled&&!AP.stopped), APL=(AP&&AP.last)||{};
+    const apHtml=AP?`<div class="msap ${AP.stopped?'stop':apOn?'on':''}"><b>Автопилот OKX: ${AP.stopped?'остановлен (стоп)':apOn?'включён — держит портфель по модели сам':'выключен'}</b> · ${esc(AP.mode||'')}`
+      +(AP.last_run?` · последняя ребалансировка ${when(AP.last_run)}${APL.reason?` (${esc(APL.reason)})`:''}: продано ${usd(APL.sold_usd||0)}, куплено ${usd(APL.bought_usd||0)}, ордеров ${APL.orders||0}${APL.partial?`, частично ${APL.partial}`:''}${APL.failed?`, ошибок ${APL.failed}`:''}${APL.limit?' · дневной лимит':''}`:' · ребалансировок ещё не было')
+      +`<div class="muted">${esc(AP.rule||'')}${AP.stopped?' · снять стоп: bash scripts/okx_autopilot_mac.sh resume':''}</div></div>`:'';
+    let h=head(D)+(old?`<div class="mswarn">Данные старше часа — проверь, что зеркало на Маке запущено.</div>`:'')+apHtml
       +`<div class="mskpi"><div><small>Стоимость</small><b>${usd(T)}</b><em class="muted">${A.length} ${plur(A.length,'актив','актива','активов')} · OKX</em></div>
         <div><small>За 24 часа</small><b class="${cls(ch)}">${sgn(ch)}</b><em class="${cls(ch)}">${T?pc(ch/(T-ch)*100):''}</em></div>
         <div><small>Прибыль по средней цене</small>${pnlA.length?`<b class="${cls(pnl)}">${sgn(pnl)}</b><em class="muted">по ${pnlA.length} ${plur(pnlA.length,'монете','монетам','монетам')} торгового счёта</em>`:`<b>—</b><em class="muted">OKX не дал средних цен</em>`}</div>
@@ -4024,7 +4032,7 @@ export MYSPOT_PASS=пароль входа в эту панель</pre></li>
     if(missing.length) h+=`<div class="muted" style="font-size:11.5px;margin-top:6px">В модели есть, у тебя пока нет: ${missing.map(r=>`<b style="font-family:var(--mono)">${esc(r.ccy)}</b> ${sh(r.target_pct)}`).join(' · ')}.</div>`;
     // ideas: calm quality alts with revenue that neither the owner nor the model holds
     if((P.ideas||[]).length) h+=`<div class="mss">На заметку — недооценённые по анкете качества</div><div class="msidea">${P.ideas.map(i=>`<div><b>${esc(i.ccy)}</b> · ${esc(i.quality.text)}</div>`).join('')}</div><div class="muted" style="font-size:11px;margin-top:6px">Их нет ни у тебя, ни в модели: не обгоняли BTC за 3 месяца, объём не раздут, у проекта есть выручка. Это кандидаты для альт-части, а не сигнал купить.</div>`;
-    h+=`<div class="msfoot">${esc(P.note||'')} Данные с OKX через ключ только для чтения (${esc(D.host||'okx.com')}); файл в репозитории зашифрован, открывается только твоим паролем.${D.perm&&/trade|withdraw/.test(D.perm)?' <b style="color:#ffe2a8">У ключа есть право торговли или вывода — пересоздай ключ только с правом «Чтение».</b>':''}</div>`;
+    h+=`<div class="msfoot">${esc(apOn?(P.note||'').replace('Ордеров система не ставит: решаете вы.','Ордера ставит автопилот OKX на твоём Маке: только спот, лимитные ордера, без вывода и без плеча.'):(P.note||''))} Данные с OKX через ключ только для чтения (${esc(D.host||'okx.com')}); файл в репозитории зашифрован, открывается только твоим паролем.${D.perm&&/trade|withdraw/.test(D.perm)?' <b style="color:#ffe2a8">У ключа есть право торговли или вывода — пересоздай ключ только с правом «Чтение».</b>':''}</div>`;
     return {h,seg}; }
 
   function render(){ const el=card(); if(!el) return; if(!owner()){ el.hidden=true; return; } el.hidden=false;

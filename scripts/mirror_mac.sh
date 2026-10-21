@@ -18,6 +18,15 @@
 #     export MYSPOT_OKX_PASSPHRASE=...  # the passphrase you typed when creating that key
 #     export MYSPOT_PASS=...            # the panel login password (then the panel opens the card by itself)
 #   the file web/myspot.enc.json is public but encrypted; only MYSPOT_PASS opens it. Nothing is traded.
+# - optional «Автопилот OKX» (cnq/execution/okx_autopilot.py) — your OWN OKX spot account follows the same model by itself.
+#   A SEPARATE key: «Чтение» + «Торговля», NEVER «Вывод», bound to this Mac's IP. Steps: claude/cryptonova-okx-autopilot-2026-10-22.md
+#     export OKX_API_KEY=...            # the trade key (read + trade, no withdraw)
+#     export OKX_API_SECRET=...
+#     export OKX_API_PASSPHRASE=...
+#     export OKX_AUTOPILOT=on           # after the first manual run the autopilot window rebalances by itself (model change, Mondays)
+#   check / plan / run / stop:  python3 -m cnq.execution.okx_autopilot --check | --plan | --run | --stop
+#   Real money: CNQ_LIVE_TRADING=yes ONLY on the autopilot's own command line, in its own window:
+#     bash scripts/okx_autopilot_mac.sh        (never put CNQ_LIVE_TRADING=yes into this file: this mirror would read it too)
 # - caffeinate keeps the Mac awake while the mirror runs (keep it plugged in; closing the lid on battery still sleeps)
 # - if the mirror stops (network, error), it restarts by itself after 30 s. Stop: Ctrl+C twice.
 cd "$(dirname "$0")/.." || exit 1

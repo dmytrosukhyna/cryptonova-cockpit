@@ -49,7 +49,7 @@ def connect_name(what: str) -> str:
 # 21.10 owner: «сосредоточимся просто на реферальной системе … 10% — потом, когда изучим юридическую часть» — no fee, no API keys,
 # no administrator: the person opens an exchange account (our partner link when web/app_config.json has one) and follows the app.
 CONNECT = ("Вы выбрали: <b>{name}</b>.\n\n"
-           "<b>Подключение к системе CRYPTO NOVA — около 15 минут.</b> Пошаговая инструкция:\n"
+           "<b>Как начать работу с CRYPTO NOVA — около 15 минут.</b> Пошаговая инструкция:\n"
            "1. Зарегистрируйтесь на бирже BingX{ref}.\n"
            "2. Пройдите проверку личности (KYC) — так требует биржа.\n"
            "3. Пополните счёт в USDT на сумму, которую не страшно потерять.\n"

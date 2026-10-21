@@ -89,7 +89,7 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
     for x in range(int(xz) - ph, int(L + pw), 14):
         d.line([max(x, xz), T + (max(x, xz) - x), min(x + ph, L + pw), T + (min(x + ph, L + pw) - x)], fill=(124, 196, 255, 14))
     d.line([xz, T, xz, T + ph], fill=(124, 196, 255, 150), width=1)
-    d.text((xz + 12, T + 8), "УРОВНИ · следующие 24 часа", font=_font(14, True), fill=(124, 196, 255))
+    d.text((xz + 12, T + 8), "ЗОНА ПРОГНОЗА · следующие 24 часа", font=_font(14, True), fill=(124, 196, 255))
     # grid + axis
     taken = [Y(price)] + ([Y(t) for t in (cal_open.get("up"), cal_open.get("dn")) if t] if cal_open else [])
     for k in range(6):
@@ -122,21 +122,26 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
         if t.hour == 0 and t.day not in seen:
             seen.add(t.day); d.line([X(i), T + ph, X(i), T + ph + 5], fill=(125, 147, 173))
             d.text((X(i) - 18, T + ph + 8), f"{t.day} {MONTHS[t.month - 1][:3]}", font=f11, fill=(125, 147, 173))
-    # 21.10 owner: levels only, no A/B paths and no probabilities — the forecast's direction kept missing, the levels are facts
+    # scenarios: rugged paths into the zone, big labels
     x0, y0 = pts[-1]
-    if cal_open and (cal_open.get("up") is not None or cal_open.get("dn") is not None):
-        xe = L + pw - 6
-        for tgt, lab, col in ((cal_open.get("up"), "Сопротивление", (124, 196, 255)), (cal_open.get("dn"), "Поддержка", (170, 190, 215))):
+    if cal_open and cal_open.get("p_up") is not None:
+        p = cal_open["p_up"]; a_up = p >= 0.5; pa = round((p if a_up else 1 - p) * 100)
+        ta = cal_open["up"] if a_up else cal_open["dn"]; tb = cal_open["dn"] if a_up else cal_open["up"]
+        xe = L + pw - 6; n = 40
+        amp = (hi - lo) / (hi - lo) * ph * 0.10
+        for tgt, lab, col, wdt, seed in ((tb, f"B {100 - pa}%", (170, 190, 215), 3, 7), (ta, f"A {pa}%", (124, 196, 255), 5, 3)):
             if tgt is None:
                 continue
             ye = Y(min(hi, max(lo, tgt)))
-            for x in range(int(x0), int(xe), 12):
-                d.line([x, ye, x + 6, ye], fill=col + (210,), width=3)
-            d.ellipse([xe - 6, ye - 6, xe + 6, ye + 6], fill=col)
-            tx = xe - 250; ty = ye - (40 if ye < y0 else -14)
+            ys = _bridge(n, y0, ye, amp, seed)
+            path = [(x0 + (xe - x0) * k / n, ys[k]) for k in range(n + 1)]
+            for w, a in ((wdt + 8, 30), (wdt, 235)):
+                d.line(path, fill=col + (a,), width=w, joint="curve")
+            d.ellipse([xe - 7, ye - 7, xe + 7, ye + 7], fill=col)
+            tx = xe - 230; ty = ye - (40 if ye < y0 else -14)
             ty = max(T + 30, min(T + ph - 30, ty))
-            d.rounded_rectangle([tx - 8, ty - 4, tx + 242, ty + 26], radius=7, fill=(6, 11, 22, 210), outline=col + (200,))
-            d.text((tx, ty), f"{lab} {_fmt(tgt)}", font=_font(18, True), fill=col)
+            d.rounded_rectangle([tx - 8, ty - 4, tx + 222, ty + 26], radius=7, fill=(6, 11, 22, 210), outline=col + (200,))
+            d.text((tx, ty), f"{lab} → {_fmt(tgt)}", font=_font(18, True), fill=col)
             taken.append(ye)
     # price tag
     y = Y(price)
@@ -178,7 +183,7 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
     r = coin.get("regime") or {}
     if r.get("long"):
         foot.append("режим: " + ("бычий (выше 200-дневной средней)" if r["long"] == "BULL" else "медвежий (ниже 200-дневной средней)"))
-    d.text((L, H - 30), " · ".join(foot) + " · уровни — ориентиры, не гарантия · не финансовый совет", font=f12, fill=(125, 147, 173))
+    d.text((L, H - 30), " · ".join(foot) + " · сценарии — оценка, не гарантия · не финансовый совет", font=f12, fill=(125, 147, 173))
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     img.save(out_path, "PNG", optimize=True)
     return out_path

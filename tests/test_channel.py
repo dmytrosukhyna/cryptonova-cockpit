@@ -131,16 +131,17 @@ def test_evening_slot_opens_at_2130_kyiv():
     assert slot_for(at(8, 0)) == "morning" and slot_for(at(11, 0)) == "news1"
 
 
-def test_evening_names_the_morning_scenario_only_when_it_hit():
+def test_posts_show_levels_not_scenarios():
+    # 21.10 owner chose option 2: the channel gives the day's levels, no A/B scenarios and no probabilities
     tmp = tempfile.mkdtemp(); _web(tmp)
-    term = json.load(open(os.path.join(tmp, "terminal.json"))); term["coins"][0]["price"] = 80000      # below the 80 141 target of A
-    json.dump(term, open(os.path.join(tmp, "terminal.json"), "w"))
     conn = sqlite3.connect(":memory:"); ch = channel.Channel(conn, tmp)
+    m = ch.post("morning")
+    assert "Уровни на день" in m and "Сопротивление: <b>82 331</b>" in m and "Поддержка: <b>80 141</b>" in m
+    assert "Сценарий" not in m and "%)" not in m.split("Уровни на день")[1].split("Вывод")[0]
     now = dt.datetime(2026, 10, 15, 8, 30, tzinfo=channel.KYIV)
-    ch.run(lambda t: True, now=now)                                                    # the morning post sets scenario A
-    sent = []
-    ev = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=21, minute=40))
-    assert ev["sent"] and "Утром ставили сценарий A" in sent[-1] and "цель достигнута" in sent[-1]
+    ev = ch.post("evening", now.replace(hour=21, minute=40))
+    assert "Уровни на завтра: сопротивление <b>82 331</b>, поддержка <b>80 141</b>" in ev and "Сценарий" not in ev
+    assert ch.lint("— Сценарий A (основной): 56% — к сопротивлению 84 206", {})       # an LLM draft with scenarios is sent back
 
 
 def test_deals_plural_and_caption_fit():

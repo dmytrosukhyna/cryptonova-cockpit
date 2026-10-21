@@ -1020,7 +1020,7 @@ function connOpen(key,name){ key=String(key||'cryptonova').toLowerCase().replace
   const spot=CONN_SPOT.has(key), what=spot?'портфель CRYPTO NOVA: какие монеты и в каких долях держать':'сделки CRYPTO NOVA: вход, стоп и цель каждой сделки';
   ov.innerHTML=`<div class="connbox wide" role="dialog" aria-modal="true" aria-label="Подключить"><button class="ib sm connx" data-connclose aria-label="Закрыть">✕</button>${!IS_GUEST?'<div class="connprev">Предпросмотр: так окно увидит клиент</div>':''}
    <div class="connhero"><small>Пошаговая инструкция · около 15 минут</small><h3>Подключить ${mypEsc(name||'CRYPTO NOVA')}</h3>
-   <div class="connlead">Система CRYPTO NOVA бесплатна. Счёт открывается на бирже на ваше имя — деньги всегда у вас, пароли и ключи от биржи нам не нужны. Приложение показывает ${what}, а вы повторяете на своём счёте.</div></div>
+   <div class="connlead">Счёт открывается на бирже на ваше имя — деньги всегда у вас, пароли и ключи от биржи нам не нужны. Приложение показывает ${what}, а вы повторяете на своём счёте.</div></div>
    <div class="connq" id="connQ"><b>Нужна пошаговая инструкция по подключению?</b><div class="connqa"><button class="ib" id="connYes">Да, покажите</button><button class="ib" id="connNo">Нет, спасибо</button></div></div>
    <div id="connSteps" hidden></div>
    <div class="muted connrisk">Торговля связана с риском; прошлый результат не гарантирует будущий. Начинайте с демо в приложении, потом — с небольшой суммы.</div></div>`;
@@ -1590,7 +1590,7 @@ function spcDraw(series,opts){ const c=$('#spcCv'); if(!c) return; const [x,W,H]
   [hi-pad,lo+pad].forEach(v=>{ x.fillText(opts.fmt(v),2,Y(v)+4); }); }
 async function renderSpotChart(){ const el=$('#spotChart'); if(!el) return; const P=PF&&PF.portfolios&&PF.portfolios[SPROF]; if(!P){ el.innerHTML='<h2>Спот-портфель</h2><div class="muted">Портфель загружается…</div>'; return; }
   const pos=(P.positions||[]).filter(x=>x.status==='OPEN'); const val=10000*(P.index||100)/100, pnl=val-10000;
-  if(!$('#spcCv')) el.innerHTML=`<h2>${ico('basket')} Спот-портфель CRYPTO NOVA <span id="spcTag"></span><span class="r muted" id="spcMeta"></span></h2><div class="spcsw" id="spcSw"></div><canvas id="spcCv" class="spccv"></canvas><div class="muted enote" id="spcNote"></div><div class="spcfoot"><span class="muted">Пользоваться системой — бесплатно, с пошаговой инструкцией.</span><button class="ib" data-connect="portfolio" data-cname="CRYPTO NOVA портфель">Подключить</button></div>`;
+  if(!$('#spcCv')) el.innerHTML=`<h2>${ico('basket')} Спот-портфель CRYPTO NOVA <span id="spcTag"></span><span class="r muted" id="spcMeta"></span></h2><div class="spcsw" id="spcSw"></div><canvas id="spcCv" class="spccv"></canvas><div class="muted enote" id="spcNote"></div><div class="spcfoot"><span class="muted">Подключение — по пошаговой инструкции, около 15 минут.</span><button class="ib" data-connect="portfolio" data-cname="CRYPTO NOVA портфель">Подключить</button></div>`;
   { const tg=$('#spcTag'); if(tg) tg.innerHTML=otag(SPROF==='ideas'?'our':'pick'); } { const vl=spotEq(P), s0=P.start_usd||10000; $('#spcMeta').innerHTML=`$${Math.round(vl).toLocaleString('ru-RU')} ${resFmt(vl-s0,s0,sSince(P))}`; }
   $('#spcSw').innerHTML=[['all','Весь портфель'],...pos.map(p=>[p.symbol,p.symbol])].map(([k,t])=>`<button data-k="${k}" aria-pressed="${SPC.sel===k}">${t}</button>`).join('');
   $$('#spcSw button').forEach(b=>b.addEventListener('click',()=>{ SPC.sel=b.dataset.k; renderSpotChart(); }));

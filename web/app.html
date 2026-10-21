@@ -3591,5 +3591,12 @@ boot();
 })();
 
 </script>
+<script>/* 21.10.2026: owner-only link to the admin panel (users, CRM, pushes, connectors, growth) — web/admin.html; hidden for guests */
+(function(){ function put(){ try{ var a=document.getElementById('adminBtn'), g=document.body.classList.contains('guest');
+  if(!a){ var ref=document.getElementById('setBtn')||document.getElementById('loginBtn'); if(!ref||!ref.parentNode) return; a=document.createElement('a'); a.id='adminBtn'; a.className='ib'; a.href='admin.html';
+    a.title='Админ-панель: пользователи, CRM, рассылки, коннекторы, рост'; a.innerHTML='<svg viewBox="0 0 24 24"><path d="M4 5h16v4H4zM4 11h7v8H4zM13 11h7v3h-7zM13 16h7v3h-7z"/></svg><span>Админ-панель</span>'; ref.parentNode.insertBefore(a,ref); }
+  a.style.display=g?'none':''; }catch(e){} }
+  put(); try{ new MutationObserver(put).observe(document.body,{attributes:true,attributeFilter:['class']}); }catch(e){} })();
+</script>
 </body>
 </html>

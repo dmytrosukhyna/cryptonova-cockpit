@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://app.crypto-capital.app http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<title>CRYPTO NOVΛ · Админ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#070f0d;--bg2:#0c1a17;--panel:rgba(12,28,25,.74);--panel2:rgba(18,38,34,.62);--line:rgba(150,215,190,.14);--line2:rgba(150,215,190,.32);
+  --fg:#e6f2ec;--fg2:#b9cfc6;--muted:#7fa397;--acc:#8fe3c0;--bar:#33ad78;--bar2:#2a8c62;--up:#79d9a3;--dn:#ef8a7a;--amber:#e9c46a;
+  --body:'Manrope',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,Menlo,monospace;--r:12px;color-scheme:dark;
+}
+*{box-sizing:border-box}html{-webkit-font-smoothing:antialiased}
+body{margin:0;min-height:100vh;color:var(--fg);font:14px/1.45 var(--body);background:#060d0b}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(1100px 500px at 50% -10%,rgba(120,210,170,.12),transparent 60%),linear-gradient(180deg,#0f201c 0%,#0a1412 45%,#060d0b 100%)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--acc)}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.wrap{max-width:1360px;margin:0 auto;padding:0 20px 80px}
+/* header */
+.top{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);background:linear-gradient(180deg,rgba(7,15,13,.95),rgba(7,15,13,.78));border-bottom:1px solid var(--line)}
+.top .in{max-width:1360px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:12px}
+.logo{font-weight:700;letter-spacing:.16em;font-size:15px;white-space:nowrap}.logo i{color:var(--acc);font-style:normal}
+.logo small{display:inline-block;margin-left:10px;padding:2px 8px;border:1px solid var(--line2);border-radius:6px;font-size:10.5px;letter-spacing:.14em;color:var(--acc);vertical-align:2px}
+.tabs{display:flex;gap:2px;padding:3px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:0;background:transparent;color:var(--muted);padding:6px 13px;border-radius:8px;font-weight:600;font-size:13px;white-space:nowrap;transition:.15s}
+.tabs button[aria-selected="true"]{background:rgba(143,227,192,.14);color:#fff;box-shadow:inset 0 0 0 1px rgba(143,227,192,.45)}
+.sp{flex:1}
+.ib{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);font-size:12.5px;font-weight:600;white-space:nowrap;text-decoration:none;transition:.15s}
+.ib:hover{border-color:var(--line2)}
+.ib svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ib.sys{border-color:rgba(143,227,192,.45);color:var(--acc)}
+.ib.pri{background:rgba(143,227,192,.16);border-color:rgba(143,227,192,.55);color:#fff}
+.ib.warn{border-color:rgba(239,138,122,.55);color:#ffd7d0;background:rgba(239,138,122,.12)}
+.ib[disabled]{opacity:.45;cursor:not-allowed}
+.pulse{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.dot.ok{background:var(--up);box-shadow:0 0 10px rgba(121,217,163,.6)}.dot.bad{background:var(--dn)}.dot.mid{background:var(--amber)}
+/* layout */
+h1{font-size:22px;margin:22px 0 4px;letter-spacing:.01em}
+.lead{color:var(--fg2);margin:0 0 16px;max-width:820px}
+.grid{display:grid;gap:12px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.cols2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
+.cols3{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;min-width:0}
+.card h3{margin:0 0 4px;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.card .sub{color:var(--muted);font-size:12.5px;margin:0 0 12px}
+.kpi{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:16px 12px;background:linear-gradient(180deg,rgba(150,230,200,.06),rgba(150,230,200,.015)),var(--panel)}
+.kpi small{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.kpi b{font-family:var(--mono);font-size:30px;font-weight:500;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--fg2)}
+.note{font-size:12.5px;color:var(--muted);margin-top:10px}
+.sec{margin-top:22px}
+.sec>h2{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);margin:0 0 10px;font-weight:700}
+/* bar chart (HTML bars: responsive, hit area = full column) */
+.chart{position:relative;height:150px;display:flex;align-items:flex-end;gap:2px;border-bottom:1px solid var(--line2);padding-top:18px}
+.chart .col{flex:1;height:100%;display:flex;align-items:flex-end;min-width:0;cursor:default}
+.chart .col i{display:block;width:100%;background:var(--bar);border-radius:4px 4px 0 0;min-height:0;transition:background .1s}
+.chart .col:hover i,.chart .col:focus i{background:var(--acc)}
+.chart .col.z i{height:2px!important;background:rgba(150,215,190,.18);border-radius:1px}
+.chart .ymax{position:absolute;top:0;left:0;font:11px var(--mono);color:var(--muted)}
+.chart .grid1{position:absolute;left:0;right:0;top:18px;border-top:1px dashed rgba(150,215,190,.12);pointer-events:none}
+.xl{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted);margin-top:6px}
+.tot{font:500 24px var(--mono);font-variant-numeric:tabular-nums}.tot small{font:12px var(--body);color:var(--muted);margin-left:6px}
+details.tbl{margin-top:8px;font-size:12.5px}details.tbl summary{cursor:pointer;color:var(--muted)}
+details.tbl table{margin-top:6px}
+#tip{position:fixed;z-index:60;pointer-events:none;background:#0d1f1b;border:1px solid var(--line2);border-radius:8px;padding:6px 9px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none;white-space:nowrap}
+#tip b{font-family:var(--mono);font-weight:500}
+/* hbars (funnel, languages, lessons) */
+.hb{display:grid;grid-template-columns:minmax(110px,170px) 1fr 64px;align-items:center;gap:10px;margin:7px 0;font-size:13px}
+.hb .tr{height:14px;background:rgba(150,215,190,.07);border-radius:4px;overflow:hidden}
+.hb .tr i{display:block;height:100%;background:var(--bar);border-radius:0 4px 4px 0}
+.hb .v{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.conv{font:11.5px var(--mono);color:var(--muted);margin:-2px 0 -2px calc(min(170px,30%) + 10px)}
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:#0c1a17}
+td{padding:9px 12px;border-bottom:1px solid rgba(150,215,190,.07);vertical-align:middle}
+td.r,th.r{text-align:right}td.c,th.c{text-align:center}
+tbody tr.click{cursor:pointer}tbody tr.click:hover{background:rgba(143,227,192,.05)}
+.who b{display:block;font-weight:600}.who small{color:var(--muted);font-size:12px;word-break:break-all}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;border:1px solid var(--line2);white-space:nowrap;color:var(--fg2)}
+.chip.ok{border-color:rgba(121,217,163,.5);color:#bff0d3;background:rgba(121,217,163,.08)}
+.chip.mid{border-color:rgba(233,196,106,.5);color:#f4dea4;background:rgba(233,196,106,.08)}
+.chip.bad{border-color:rgba(239,138,122,.5);color:#ffcfc7;background:rgba(239,138,122,.08)}
+.chip.tag{border-color:rgba(143,227,192,.35);color:var(--acc)}
+.chip svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+/* toolbar */
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.in1{background:rgba(5,12,10,.6);border:1px solid var(--line);border-radius:9px;padding:8px 11px;min-width:0;outline:none}
+.in1:focus{border-color:rgba(143,227,192,.6)}
+select.in1{padding-right:28px}
+input.in1[type=search]{flex:1;min-width:200px}
+.pager{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:12.5px;color:var(--muted)}
+/* drawer */
+.dim{position:fixed;inset:0;background:rgba(2,6,5,.6);z-index:40;display:none}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);z-index:41;background:#0b1715;border-left:1px solid var(--line2);overflow-y:auto;transform:translateX(105%);transition:transform .2s ease;padding:18px 20px 40px}
+body.open .dim{display:block}body.open .drawer{transform:none}
+.drawer h2{margin:0;font-size:19px}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:13px;margin:10px 0}
+.kv dt{color:var(--muted)}.kv dd{margin:0;word-break:break-word}
+.dh{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+textarea.in1{width:100%;min-height:84px;resize:vertical}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.presets button{border:1px dashed var(--line2);background:transparent;border-radius:999px;padding:3px 10px;font-size:12px;color:var(--fg2)}
+.presets button[aria-pressed="true"]{border-style:solid;border-color:rgba(143,227,192,.6);color:#fff;background:rgba(143,227,192,.12)}
+.notes{margin:10px 0 0;padding:0;list-style:none}
+.notes li{border-left:2px solid var(--line2);padding:4px 0 4px 10px;margin:8px 0;font-size:13px;white-space:pre-wrap}
+.notes li small{display:block;color:var(--muted);font-size:11.5px;white-space:normal}
+/* push */
+.phone{background:linear-gradient(160deg,#16302a,#0a1613);border:1px solid var(--line2);border-radius:22px;padding:18px 14px;max-width:360px}
+.ntf{background:rgba(235,245,240,.92);color:#0b1412;border-radius:14px;padding:10px 12px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.ntf .h{display:flex;justify-content:space-between;font-size:11.5px;color:#4a5d57;margin-bottom:3px;letter-spacing:.04em}
+.ntf b{display:block;font-size:13.5px}
+.ntf p{margin:2px 0 0;line-height:1.35;word-break:break-word}
+.cnt{font:11.5px var(--mono);color:var(--muted);text-align:right;margin-top:3px}
+.cnt.over{color:var(--dn)}
+.reach{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:12px 0}
+.reach div{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.reach b{display:block;font:500 22px var(--mono)}.reach small{color:var(--muted);font-size:11.5px}
+.alert{border:1px solid rgba(233,196,106,.45);background:rgba(233,196,106,.08);border-radius:10px;padding:10px 12px;font-size:13px;margin:8px 0;color:#f4e3b6}
+.alert.bad{border-color:rgba(239,138,122,.5);background:rgba(239,138,122,.08);color:#ffd3cb}
+.alert.ok{border-color:rgba(121,217,163,.45);background:rgba(121,217,163,.07);color:#cdeedb}
+.rules{margin:10px 0 0;padding-left:18px;color:var(--fg2);font-size:12.5px}.rules li{margin:3px 0}
+/* connectors */
+.conn{display:flex;flex-direction:column;gap:8px}
+.conn .hd{display:flex;align-items:center;gap:10px}
+.conn .hd b{font-size:15px}
+.conn p{margin:0;color:var(--fg2);font-size:13px}
+.conn details{border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.conn summary{cursor:pointer;font-weight:600;color:var(--acc);font-size:13px}
+.conn ol{margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--fg2)}.conn ol li{margin:5px 0}
+.conn code,.code{font-family:var(--mono);font-size:12px;background:rgba(5,12,10,.7);border:1px solid var(--line);border-radius:6px;padding:1px 6px;word-break:break-all}
+.links{display:flex;flex-wrap:wrap;gap:6px}
+.links a{font-size:12px;text-decoration:none;border:1px solid var(--line);border-radius:7px;padding:3px 8px}
+.links a:hover{border-color:var(--line2)}
+.facts{display:flex;flex-wrap:wrap;gap:6px}.facts .chip{white-space:normal;flex-wrap:wrap;max-width:100%}
+/* growth */
+.plan td input{width:100%;background:rgba(5,12,10,.6);border:1px solid var(--line);border-radius:7px;padding:6px 8px;outline:none}
+.plan td input:focus{border-color:rgba(143,227,192,.6)}
+.plan td select{background:rgba(5,12,10,.6);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.check{list-style:none;margin:0;padding:0}
+.check li{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:start;padding:9px 0;border-bottom:1px solid rgba(150,215,190,.07);font-size:13.5px}
+.check li small{display:block;color:var(--muted);font-size:12px}
+.check input{width:18px;height:18px;accent-color:#33ad78;margin-top:2px}
+.save{position:sticky;bottom:0;display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px;padding:18px 0 14px;background:linear-gradient(180deg,transparent,rgba(6,13,11,.92) 45%)}
+/* login */
+.login{max-width:460px;margin:9vh auto 0;padding:26px 26px 22px}
+.login h1{margin:0 0 6px}
+.login .row{display:flex;gap:8px;margin-top:14px}
+.login input[type=password]{flex:1}
+.login label{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--fg2);margin-top:10px}
+.err{color:#ffb4a8;font-size:13px;margin-top:10px;min-height:18px}
+/* modal + toasts */
+.modal{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(2,6,5,.66);padding:16px}
+.modal.on{display:flex}
+.modal .box{max-width:460px;width:100%;background:#0d1d19;border:1px solid var(--line2);border-radius:14px;padding:20px}
+.modal h3{margin:0 0 8px;font-size:17px}.modal p{color:var(--fg2);margin:0 0 14px;white-space:pre-wrap}
+.modal .act{display:flex;justify-content:flex-end;gap:8px}
+.toasts{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:6px;align-items:center}
+.toast{background:#10241f;border:1px solid var(--line2);border-radius:10px;padding:9px 14px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.skel{height:14px;border-radius:6px;background:linear-gradient(90deg,rgba(150,215,190,.06),rgba(150,215,190,.14),rgba(150,215,190,.06));background-size:200% 100%;animation:sk 1.2s infinite}
+@keyframes sk{to{background-position:-200% 0}}
+[hidden]{display:none!important}
+@media (max-width:1499px){ #pulse .t{display:none} }
+@media (max-width:900px){
+  .top .in{flex-wrap:wrap;padding:8px 14px}
+  .tabs{order:3;width:100%}
+  .wrap{padding:0 14px 80px}
+  .cols2,.cols3{grid-template-columns:1fr}
+  .tabs{-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);mask-image:linear-gradient(90deg,#000 88%,transparent)}
+}
+@media (max-width:640px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpi b{font-size:24px}
+  .ib span.l{display:none}
+  #refresh{display:none}
+  .logo{font-size:13px;letter-spacing:.1em}.logo small{margin-left:6px;padding:1px 6px;font-size:9.5px}
+  .bar input.in1[type=search]{flex:1 1 100%}
+  .bar select.in1{flex:1 1 40%;min-width:0}
+  .top .in{gap:8px}
+  .top .ib{padding:6px 9px}
+  .reach{grid-template-columns:repeat(auto-fit,minmax(88px,1fr))}
+
+  .hb{grid-template-columns:minmax(90px,38%) 1fr 44px;gap:8px}
+  .conv{margin-left:calc(38% + 8px)}
+  /* tables → cards */
+  table.cards thead{display:none}
+  table.cards,table.cards tbody,table.cards tr,table.cards td{display:block;width:100%}
+  table.cards tr{border-bottom:1px solid var(--line);padding:8px 4px}
+  table.cards td{border:0;padding:3px 10px;display:flex;justify-content:space-between;gap:12px;text-align:right}
+  table.cards td::before{content:attr(data-l);color:var(--muted);font-size:12px;text-align:left;flex:none}
+  table.cards td.who{display:block;text-align:left}table.cards td.who::before{content:none}
+  table.cards.compact tr{display:flex;flex-wrap:wrap;gap:6px 14px;padding:11px 12px}
+  table.cards.compact td{display:inline-flex;width:auto;padding:0;gap:5px;font-size:12.5px;align-items:center}
+  table.cards.compact td::before{font-size:11.5px}
+  table.cards.compact td.who{display:block;width:100%}
+  table.cards.compact td.e,table.cards.compact td.hm{display:none}
+  .kv{grid-template-columns:110px 1fr}
+  h1{font-size:19px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-q" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v5M12 16h.01"/></symbol>
+</svg>
+
+<header class="top" id="top" hidden>
+  <div class="in">
+    <div class="logo">CRYPTO NOV<i>Λ</i><small>АДМИН</small></div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-t="overview">Обзор</button>
+      <button role="tab" data-t="users">Пользователи</button>
+      <button role="tab" data-t="leads">Лиды</button>
+      <button role="tab" data-t="push">Рассылки</button>
+      <button role="tab" data-t="connectors">Коннекторы</button>
+      <button role="tab" data-t="growth">Масштабирование</button>
+    </nav>
+    <div class="sp"></div>
+    <span class="pulse" id="pulse" title="Связь с сервером приложения"><span class="dot" id="pdot"></span><span class="t" id="ptxt">—</span></span>
+    <button class="ib" id="refresh" title="Обновить данные (R)"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/></svg><span class="l">Обновить</span></button>
+    <a class="ib sys" href="app.html" id="toSystem" title="Перейти в систему (торговая панель)"><span>Система</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <button class="ib" id="logout" title="Выйти: токен удаляется из этого браузера"><svg viewBox="0 0 24 24"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="l">Выйти</span></button>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- login -->
+  <section id="loginView" hidden>
+    <div class="card login">
+      <div class="logo" style="margin-bottom:16px">CRYPTO NOV<i>Λ</i><small>АДМИН</small></div>
+      <h1>Вход в админ-панель</h1>
+      <p class="lead" style="margin:0">Пользователи, CRM, рассылки, коннекторы и рост. Только для владельца.</p>
+      <div class="row">
+        <input class="in1" type="password" id="tok" placeholder="Токен админ-панели" autocomplete="current-password" spellcheck="false">
+        <button class="ib pri" id="enter">Войти</button>
+      </div>
+      <label><input type="checkbox" id="remember" checked> Запомнить на этом устройстве</label>
+      <div class="err" id="loginErr" role="alert"></div>
+      <p class="note">Токен — строка <span class="code">CNQ_ADMIN_TOKEN</span> из файла <span class="code">/etc/cnq.env</span> на сервере. Он хранится только в этом браузере и уходит только на сервер приложения. Никому его не пересылайте.</p>
+      <div style="margin-top:14px"><a class="ib sys" href="app.html"><span>Система</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></div>
+    </div>
+  </section>
+
+  <!-- overview -->
+  <section id="v-overview" hidden>
+    <h1>Обзор</h1>
+    <p class="lead" id="ovLead">Приложение CRYPTO NOVA 2.0: люди, вовлечённость и путь к подтверждённому UID.</p>
+    <div class="grid kpis" id="kpis"></div>
+    <div class="sec"><h2>Воронка</h2>
+      <div class="grid cols2">
+        <div class="card"><h3>От установки до VIP</h3><p class="sub">Установки — ваши числа из App Store Connect и Google Play (вкладка «Масштабирование»). Остальное — из базы приложения.</p><div id="funnel"></div></div>
+        <div class="card"><h3>Новые пользователи · 30 дней</h3><div id="chNew"></div></div>
+      </div>
+    </div>
+    <div class="sec"><h2>Вовлечённость</h2>
+      <div class="grid cols3">
+        <div class="card"><h3>Вопросы NOVA · 30 дней</h3><div id="chNova"></div></div>
+        <div class="card"><h3>Уроки академии</h3><p class="sub" id="lesSub"></p><div id="lessons"></div></div>
+        <div class="card"><h3>Языки приложения</h3><p class="sub">У кого какой язык включён.</p><div id="langs"></div></div>
+      </div>
+    </div>
+    <div class="sec"><h2>Каналы связи</h2>
+      <div class="grid cols3">
+        <div class="card"><h3>Push-уведомления</h3><div id="pushBox"></div></div>
+        <div class="card"><h3>Копилка (демо)</h3><div id="piggyBox"></div></div>
+        <div class="card"><h3>Лиды Telegram-бота · 30 дней</h3><div id="chLeads"></div></div>
+      </div>
+    </div>
+    <p class="note" id="ovNote"></p>
+  </section>
+
+  <!-- users -->
+  <section id="v-users" hidden>
+    <h1>Пользователи</h1>
+    <p class="lead">Поиск по почте, имени, uid или BingX UID. Нажмите на строку — откроется карточка с заметками и тегами.</p>
+    <div class="bar">
+      <input class="in1" type="search" id="uq" placeholder="Поиск: почта, имя, uid, BingX UID" autocomplete="off">
+      <select class="in1" id="useg" aria-label="Сегмент"></select>
+      <select class="in1" id="usort" aria-label="Сортировка">
+        <option value="created">Новые</option><option value="seen">По визиту</option>
+        <option value="nova">По NOVA</option><option value="lessons">По урокам</option>
+      </select>
+      <button class="ib" id="ucsv" title="Скачать эту страницу таблицы в CSV"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span class="l">CSV</span></button>
+    </div>
+    <div class="tw"><table class="cards compact" id="utable"><thead><tr><th>Пользователь</th><th>Создан</th><th>Был</th><th class="c">Язык</th><th class="r">Уроки</th><th>Копилка</th><th class="r">NOVA 30 д / всего</th><th>BingX UID</th><th class="c">Push</th><th>Теги</th></tr></thead><tbody></tbody></table></div>
+    <div class="pager" id="upager"></div>
+  </section>
+
+  <!-- leads -->
+  <section id="v-leads" hidden>
+    <h1>Лиды Telegram-бота</h1>
+    <p class="lead">Люди, которые написали боту CRYPTO NOVA. Написать можно тем, у кого есть @username.</p>
+    <div class="grid kpis" id="lkpis"></div>
+    <div class="grid cols2 sec" style="margin-top:12px">
+      <div class="card"><h3>Новые лиды · 30 дней</h3><div id="chLeads2"></div></div>
+      <div class="card"><h3>Как превратить лида в пользователя</h3>
+        <ol class="rules" style="font-size:13px">
+          <li>Ответить в течение дня: что такое приложение и что демо-счёт бесплатный.</li>
+          <li>Дать ссылку на приложение (страница скачивания на сайте) — не на биржу.</li>
+          <li>Через 2–3 дня: спросить, получилось ли пройти первый урок.</li>
+          <li>Без обещаний дохода и без «сигналов в личку».</li>
+        </ol>
+      </div>
+    </div>
+    <div class="bar" style="margin-top:18px"><input class="in1" type="search" id="lq" placeholder="Поиск: @username, имя, chat id" autocomplete="off"></div>
+    <div class="tw"><table class="cards compact" id="ltable"><thead><tr><th>Кто</th><th>Первый контакт</th><th>Последнее сообщение</th><th class="r">Сообщений</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="pager" id="lpager"></div>
+  </section>
+
+  <!-- push -->
+  <section id="v-push" hidden>
+    <h1>Рассылки</h1>
+    <p class="lead">Push в приложение выбранной группе. Сначала «Проверить охват» — ничего не отправляется. Потом отдельное подтверждение.</p>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>Сообщение</h3>
+        <div class="bar" style="margin-top:10px"><select class="in1" id="pseg" style="flex:1" aria-label="Кому"></select></div>
+        <input class="in1" id="ptitle" maxlength="70" placeholder="Заголовок (до 60 знаков)" style="width:100%">
+        <div class="cnt" id="ptc">0 / 60</div>
+        <textarea class="in1" id="pbody" maxlength="200" placeholder="Текст (до 180 знаков)"></textarea>
+        <div class="cnt" id="pbc">0 / 180</div>
+        <div class="bar" style="margin-top:8px">
+          <button class="ib" id="pdry"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Проверить охват</button>
+          <button class="ib pri" id="psend" disabled>Отправить</button>
+        </div>
+        <div id="preach"></div>
+        <ul class="rules">
+          <li>Получат только те, у кого в приложении включены «Новости».</li>
+          <li>Тихие часы 22:00–09:00 по Киеву — отправка закрыта (как и у автоматических push).</li>
+          <li>Тот же текст в ту же группу второй раз за 30 минут не уйдёт — защита от двойного нажатия.</li>
+          <li>Без обещаний дохода и призывов торговать: правила App Store и Google Play и наш принцип честности.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Как это увидят</h3>
+        <div class="phone" style="margin-top:10px"><div class="ntf"><div class="h"><span>CRYPTO NOVA</span><span>сейчас</span></div><b id="pvT">Заголовок</b><p id="pvB">Текст сообщения</p></div></div>
+        <div id="plast" style="margin-top:14px"></div>
+      </div>
+    </div>
+    <div class="sec"><h2>История</h2><div class="tw"><table class="cards" id="phist"><thead><tr><th>Когда</th><th>Кому</th><th>Сообщение</th><th class="r">Людей / устройств</th><th>Итог</th></tr></thead><tbody></tbody></table></div></div>
+  </section>
+
+  <!-- connectors -->
+  <section id="v-connectors" hidden>
+    <h1>Коннекторы</h1>
+    <p class="lead">Что подключено к приложению и как подключить остальное. Сервер показывает только «есть / нет» — сами ключи никогда не выводятся. Ключи вписываются только в <span class="code">/etc/cnq.env</span> на сервере, не в чат.</p>
+    <div class="grid cols2" id="conns"></div>
+  </section>
+
+  <!-- growth -->
+  <section id="v-growth" hidden>
+    <h1>Масштабирование</h1>
+    <p class="lead">План роста: ваши числа из магазинов, бюджеты по каналам, реферальная ссылка и чек-лист запуска. Сохраняется на сервере — виден с любого устройства.</p>
+    <div class="grid cols2">
+      <div class="card">
+        <h3>Установки из магазинов</h3>
+        <p class="sub">App Store Connect → Аналитика → Загрузки; Google Play Console → Статистика → Установки. Впишите итог — он станет первым шагом воронки.</p>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+          <label class="muted" style="font-size:12.5px">iPhone (App Store)<input class="in1 num" id="gIos" inputmode="numeric" style="width:100%;margin-top:4px"></label>
+          <label class="muted" style="font-size:12.5px">Android (Google Play)<input class="in1 num" id="gAnd" inputmode="numeric" style="width:100%;margin-top:4px"></label>
+        </div>
+        <label class="muted" style="font-size:12.5px;display:block;margin-top:10px">На дату<input class="in1" id="gAsof" type="date" style="width:100%;margin-top:4px"></label>
+      </div>
+      <div class="card">
+        <h3>Реферальная ссылка BingX</h3>
+        <div id="refBox"></div>
+      </div>
+    </div>
+    <div class="sec"><h2>Каналы и бюджеты</h2>
+      <div class="tw"><table class="plan cards" id="gch"><thead><tr><th>Канал</th><th>Бюджет, $ в месяц</th><th>Установок из канала</th><th class="r">Цена установки</th><th>Статус</th><th>Заметка</th></tr></thead><tbody></tbody></table></div>
+      <p class="note">Цена установки считается только там, где вписаны и бюджет, и установки из этого канала. Итог: <b class="num" id="gTot">—</b></p>
+    </div>
+    <div class="sec"><h2>Чек-лист запуска рекламы</h2>
+      <div class="card"><ul class="check" id="gcheck"></ul></div>
+    </div>
+    <div class="sec"><h2>Заметки</h2>
+      <div class="card"><textarea class="in1" id="gnotes" placeholder="Идеи, договорённости с блогерами, результаты тестов…" style="min-height:110px"></textarea></div>
+    </div>
+    <div class="save"><span class="pulse" id="gstate"></span><button class="ib pri" id="gsave">Сохранить план</button></div>
+  </section>
+</main>
+
+<div class="dim" id="dim"></div>
+<aside class="drawer" id="drawer" aria-label="Карточка пользователя"></aside>
+<div id="tip"></div>
+<div class="modal" id="modal" role="dialog" aria-modal="true"><div class="box"><h3 id="mT"></h3><p id="mB"></p><div class="act"><button class="ib" id="mNo">Отмена</button><button class="ib pri" id="mYes">Да</button></div></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function(){
+'use strict';
+/* ------------------------------------------------------------------ config */
+const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+const API = (()=>{ const q=new URLSearchParams(location.search).get('api'); return (LOCAL&&q)?q.replace(/\/+$/,''):'https://app.crypto-capital.app'; })();
+const KEY='cnq_admin_token';
+let MEM='';
+const tokenStore={
+  get(){ try{ return sessionStorage.getItem(KEY)||localStorage.getItem(KEY)||MEM; }catch(e){ return MEM; } },
+  set(v,remember){ MEM=v; try{ sessionStorage.setItem(KEY,v); if(remember) localStorage.setItem(KEY,v); else localStorage.removeItem(KEY); }catch(e){} },
+  clear(){ MEM=''; try{ sessionStorage.removeItem(KEY); localStorage.removeItem(KEY); }catch(e){} }
+};
+const LANGS={ru:'русский',en:'английский',uk:'украинский',el:'греческий',es:'испанский'};
+const REASON={ok:'подтверждён',not_invited:'зарегистрирован не по нашей ссылке',no_deposit:'по нашей ссылке, депозита нет',bad_uid:'неверный UID',exchange_error:'ошибка биржи',not_configured:'ключ партнёра не подключён',other:'другое'};
+const GOAL={pension:'пенсия',kids:'дети',dream:'мечта'}; const FREQ={week:'раз в неделю',month:'раз в месяц'};
+const TAGS=['VIP','Горячий','Партнёр','Блогер','Ждёт ответа','Не беспокоить','Проблема'];
+
+/* ------------------------------------------------------------------ helpers */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nf=new Intl.NumberFormat('ru-RU');
+const n0=v=>v==null?'—':nf.format(v);
+const pct=(a,b)=>b?Math.round(a/b*1000)/10+'%':'—';
+const pad=x=>String(x).padStart(2,'0');
+const fd=ms=>{ if(!ms) return '—'; const d=new Date(ms); return pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+d.getFullYear(); };
+const fdt=ms=>{ if(!ms) return '—'; const d=new Date(ms); return fd(ms)+' '+pad(d.getHours())+':'+pad(d.getMinutes()); };
+const ago=ms=>{ if(!ms) return '—'; const s=(Date.now()-ms)/1000; if(s<90) return 'только что'; if(s<3600) return Math.round(s/60)+' мин назад'; if(s<86400) return Math.round(s/3600)+' ч назад'; const d=Math.floor(s/86400); return d===1?'вчера':d+' дн назад'; };
+const dshort=iso=>iso?iso.slice(8,10)+'.'+iso.slice(5,7):'';
+const ico=id=>`<svg><use href="#i-${id}"/></svg>`;
+function toast(t){ const e=document.createElement('div'); e.className='toast'; e.textContent=t; $('#toasts').appendChild(e); setTimeout(()=>e.remove(),3800); }
+function ask(title,body,yes){ return new Promise(res=>{ $('#mT').textContent=title; $('#mB').textContent=body; $('#mYes').textContent=yes||'Да'; $('#modal').classList.add('on');
+  const done=v=>{ $('#modal').classList.remove('on'); $('#mYes').onclick=$('#mNo').onclick=null; res(v); }; $('#mYes').onclick=()=>done(true); $('#mNo').onclick=()=>done(false); $('#mYes').focus(); }); }
+
+/* ------------------------------------------------------------------ API */
+let TOKEN='';
+async function api(path,opt){ opt=opt||{};
+  let r; try{ r=await fetch(API+path,{method:opt.method||'GET',cache:'no-store',headers:Object.assign({'Authorization':'Bearer '+TOKEN},opt.body?{'Content-Type':'application/json'}:{}),body:opt.body?JSON.stringify(opt.body):undefined}); }
+  catch(e){ setPulse('bad','нет связи'); return {code:0,d:{error:'network'}}; }
+  let d={}; try{ d=await r.json(); }catch(e){}
+  if(r.status===401||r.status===403||r.status===429){ if(!opt.login){ signOut(denyText(r.status,d)); } }
+  else setPulse('ok','сервер на связи');
+  return {code:r.status,d};
+}
+function denyText(code,d){ if(code===403) return 'Админ-доступ на сервере выключен: в /etc/cnq.env нет CNQ_ADMIN_TOKEN (или он короче 24 знаков).';
+  if(code===429) return 'Слишком много неверных попыток. Подождите '+Math.ceil(((d&&d.retry_after_sec)||600)/60)+' мин.';
+  if(code===0) return 'Сервер приложения не отвечает. Проверьте интернет или сервер.'; return 'Неверный токен.'; }
+function setPulse(k,t){ $('#pdot').className='dot '+k; $('#ptxt').textContent=t; }
+
+/* ------------------------------------------------------------------ charts */
+function bars(el,vals,days,unit){
+  const max=Math.max(1,...vals), tot=vals.reduce((a,b)=>a+b,0);
+  if(!tot){ el.innerHTML=`<div class="tot">0<small>за 30 дней</small></div><p class="note">За 30 дней — ни одного. График появится с первыми данными.</p>`; return; }
+  const cols=vals.map((v,i)=>`<div class="col${v?'':' z'}" tabindex="0" data-tip="${esc(dshort(days[i]))} · <b>${esc(n0(v))}</b> ${esc(unit)}"><i style="height:${v?Math.max(3,v/max*100):0}%"></i></div>`).join('');
+  el.innerHTML=`<div class="tot">${n0(tot)}<small>за 30 дней</small></div>
+   <div class="chart" role="img" aria-label="${esc(unit)} по дням, всего ${tot}"><span class="ymax">макс. ${n0(max)}</span><span class="grid1"></span>${cols}</div>
+   <div class="xl"><span>${esc(dshort(days[0]))}</span><span>${esc(dshort(days[Math.floor(days.length/2)]))}</span><span>${esc(dshort(days[days.length-1]))}</span></div>
+   <details class="tbl"><summary>Числа по дням</summary><table><tbody>${days.map((d,i)=>vals[i]?`<tr><td>${esc(dshort(d))}</td><td class="r num">${n0(vals[i])}</td></tr>`:'').join('')||'<tr><td class="muted">Пока ни одного дня с данными.</td></tr>'}</tbody></table></details>`;
+}
+function hbars(el,rows,opt){ opt=opt||{}; const max=Math.max(1,...rows.map(r=>r.n||0));
+  el.innerHTML=rows.map((r,i)=>{ const conv=(opt.conv&&i>0&&rows[i-1].n!=null&&r.n!=null)?`<div class="conv">↓ ${pct(r.n,rows[i-1].n)} из предыдущего шага</div>`:'';
+    return conv+`<div class="hb"><span>${esc(r.label)}</span><span class="tr"><i style="width:${r.n==null?0:Math.max(r.n?1.5:0,r.n/max*100)}%"></i></span><span class="v">${r.n==null?'<span class="muted">—</span>':n0(r.n)}</span></div>`+(r.hint?`<div class="note" style="margin:-4px 0 6px">${r.hint}</div>`:''); }).join('');
+}
+document.addEventListener('mouseover',e=>{ const c=e.target.closest&&e.target.closest('[data-tip]'); const t=$('#tip'); if(!c){ t.style.display='none'; return; } t.innerHTML=c.getAttribute('data-tip'); t.style.display='block'; });
+document.addEventListener('mousemove',e=>{ const t=$('#tip'); if(t.style.display!=='block') return; const w=t.offsetWidth; t.style.left=Math.min(innerWidth-w-8,e.clientX+12)+'px'; t.style.top=(e.clientY-36)+'px'; });
+
+/* ------------------------------------------------------------------ tabs */
+const VIEWS=['overview','users','leads','push','connectors','growth'];
+let CUR='overview';
+function show(v){ if(!VIEWS.includes(v)) v='overview'; CUR=v;
+  VIEWS.forEach(x=>{ $('#v-'+x).hidden=x!==v; }); document.querySelectorAll('#tabs button').forEach(b=>{ b.setAttribute('aria-selected',b.dataset.t===v?'true':'false'); if(b.dataset.t===v){ try{ b.scrollIntoView({inline:'nearest',block:'nearest'}); }catch(e){} } });
+  try{ history.replaceState(null,'','#'+v); }catch(e){} load(v); }
+document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.t)));
+const loaders={};
+function load(v){ (loaders[v]||(()=>{}))(); }
+
+/* ------------------------------------------------------------------ overview */
+let OV=null, LEADS=null, CONN=null;
+loaders.overview=async()=>{
+  if(!OV) $('#kpis').innerHTML=Array(6).fill('<div class="card kpi"><div class="skel" style="width:60%"></div><div class="skel" style="width:40%;height:26px"></div></div>').join('');
+  const [o,l]=await Promise.all([api('/v2/admin/overview'),api('/v2/admin/leads?size=1')]);
+  if(o.code!==200) return; OV=o.d; LEADS=l.code===200?l.d:null; const d=OV, u=d.users;
+  const k=(t,v,s)=>`<div class="card kpi"><small>${t}</small><b>${v}</b><span>${s}</span></div>`;
+  $('#kpis').innerHTML=[
+    k('Пользователей',n0(u.total),'+'+n0(u.new_30d)+' за 30 дней'),
+    k('Активны 7 дней',n0(u.active_7d),'сегодня '+n0(u.active_1d)+' · 30 дн '+n0(u.active_30d)),
+    k('Вопросов NOVA',n0(d.nova.total_30d),n0(d.nova.users_30d)+' чел. за 30 дней'),
+    k('Push включён',n0(d.push.users),n0(d.push.devices)+' устройств'),
+    k('UID BingX',n0(d.bingx.submitted),'подтверждён у '+n0(d.bingx.verified)),
+    k('Лиды бота',LEADS&&LEADS.available?n0(LEADS.total):'—',LEADS&&LEADS.available?'активны 7 дн: '+n0(LEADS.active_7d):'база бота не найдена'),
+  ].join('');
+  const F={install:'Установки',signup:'Регистрация',uid:'UID отправлен',verified:'UID подтверждён'};
+  hbars($('#funnel'),d.funnel.map(s=>({label:F[s.k]||s.k,n:s.n,hint:s.k==='install'&&s.n==null?'Не введено — <a href="#growth" data-go="growth">впишите во вкладке «Масштабирование»</a>':''})),{conv:true});
+  bars($('#chNew'),u.new_per_day,d.days,'новых');
+  bars($('#chNova'),d.nova.per_day,d.days,'вопросов');
+  const L=d.lessons; $('#lesSub').textContent=(L.total?'Всего уроков: '+L.total+'. ':'')+'Начали учиться: '+n0(L.started)+' чел. Распределение по числу пройденных уроков:';
+  hbars($('#lessons'),L.dist.map(x=>({label:x.label+' уроков',n:x.n})));
+  const lg=Object.entries(u.by_lang); hbars($('#langs'),lg.length?lg.map(([k2,v])=>({label:LANGS[k2]||k2,n:v})):[{label:'нет данных',n:0}]);
+  const pf=d.push.by_platform||{};
+  $('#pushBox').innerHTML=`<div class="tot">${n0(d.push.users)}<small>чел. из ${n0(u.total)} (${pct(d.push.users,u.total)})</small></div>`+
+    `<div class="hb"><span>iPhone</span><span class="tr"><i style="width:${(pf.ios||0)/Math.max(1,d.push.devices)*100}%"></i></span><span class="v">${n0(pf.ios||0)}</span></div>`+
+    `<div class="hb"><span>Android</span><span class="tr"><i style="width:${(pf.android||0)/Math.max(1,d.push.devices)*100}%"></i></span><span class="v">${n0(pf.android||0)}</span></div>`+
+    `<p class="note">Рассылка — вкладка <a href="#push" data-go="push">«Рассылки»</a>.</p>`;
+  const pg=d.piggy;
+  $('#piggyBox').innerHTML=`<div class="tot">${n0(pg.on)}<small>включили · настроили ${n0(pg.users)}</small></div>`+
+    (Object.keys(pg.by_goal).length?Object.entries(pg.by_goal).map(([g,v])=>`<div class="hb"><span>${esc(GOAL[g]||g)}</span><span class="tr"><i style="width:${v/Math.max(1,pg.on)*100}%"></i></span><span class="v">${n0(v)}</span></div>`).join(''):'<p class="note">Пока никто не включил.</p>')+
+    `<p class="note">Демо-копилка: это настройки, а не деньги.</p>`;
+  if(LEADS&&LEADS.available) bars($('#chLeads'),LEADS.new_per_day,LEADS.days,'новых лидов'); else $('#chLeads').innerHTML='<p class="note">База бота на сервере не найдена (data/agents.sqlite).</p>';
+  const age=d.engine&&d.engine.home_age_sec;
+  $('#ovNote').innerHTML='Обновлено '+fdt(d.now)+'. Данные — из базы приложения на сервере, без оценок и округлений вверх.'+(age!=null?` Лента приложения обновлялась ${age<120?'меньше 2 минут':Math.round(age/60)+' мин'} назад.`:'');
+  setPulse(age!=null&&age>600?'mid':'ok',age!=null&&age>600?'лента приложения отстаёт':'сервер на связи');
+};
+document.addEventListener('click',e=>{ const a=e.target.closest&&e.target.closest('[data-go]'); if(a){ e.preventDefault(); show(a.dataset.go); scrollTo(0,0); } });
+
+/* ------------------------------------------------------------------ users */
+const US={q:'',seg:'all',sort:'created',page:1,size:matchMedia('(max-width:640px)').matches?25:50}; let UROWS=[];
+function segOptions(sel,withAll){ const o=[['all',withAll||'Все'],...Object.entries(LANGS).map(([k,v])=>['lang:'+k,'Язык: '+v]),['verified','UID подтверждён (VIP)'],['uid_pending','UID отправлен, не подтверждён'],['inactive7','Не заходили 7+ дней'],['push_only','С включёнными push'],...TAGS.map(t=>['tag:'+t,'Тег: '+t])];
+  sel.innerHTML=o.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join(''); }
+segOptions($('#useg'));
+const bx=s=>s==='verified'?`<span class="chip ok">${ico('ok')}подтверждён</span>`:s==='pending'?`<span class="chip mid">${ico('q')}ждёт</span>`:'<span class="muted">—</span>';
+loaders.users=async()=>{
+  const p=new URLSearchParams({q:US.q,seg:US.seg,sort:US.sort,page:US.page,size:US.size});
+  const r=await api('/v2/admin/users?'+p); if(r.code!==200) return; const d=r.d; UROWS=d.rows;
+  $('#utable tbody').innerHTML=d.rows.length?d.rows.map(x=>`<tr class="click" data-uid="${esc(x.uid)}">
+    <td class="who"><b>${esc(x.name||'Без имени')}</b><small>${esc(x.email||x.uid)}</small></td>
+    <td data-l="Создан" class="num hm">${fd(x.created)}</td><td data-l="Был">${esc(ago(x.seen))}</td>
+    <td data-l="Язык" class="c">${esc((x.lang||'ru').toUpperCase())}</td><td data-l="Уроки" class="r num${x.lessons?'':' e'}">${n0(x.lessons)}</td>
+    <td data-l="Копилка" class="${x.piggy&&x.piggy.on?'':'e'}">${x.piggy?(x.piggy.on?'$'+esc(x.piggy.amount)+' '+esc(FREQ[x.piggy.freq]||''):'<span class="muted">выкл.</span>'):'<span class="muted">—</span>'}</td>
+    <td data-l="NOVA" class="r num${x.nova_total?'':' e'}">${n0(x.nova_30d)} / ${n0(x.nova_total)}</td><td data-l="BingX UID" class="${x.bingx==='none'?'e':''}">${bx(x.bingx)}</td>
+    <td data-l="Push" class="c${x.push?'':' e'}">${x.push?`<span class="chip ok">${ico('ok')}${x.push}</span>`:'<span class="muted">—</span>'}</td>
+    <td data-l="Теги" class="${(x.tags||[]).length?'':'e'}"><div class="tags">${(x.tags||[]).map(t=>`<span class="chip tag">${esc(t)}</span>`).join('')||'<span class="muted">—</span>'}</div></td></tr>`).join('')
+    :`<tr><td colspan="10" class="empty">${US.q||US.seg!=='all'?'Никого не нашлось — измените поиск или сегмент.':'Пока нет ни одного пользователя.'}</td></tr>`;
+  pager($('#upager'),d,pg=>{ US.page=pg; loaders.users(); });
+};
+function pager(el,d,go){ el.innerHTML=`<span>Найдено: <b class="num">${n0(d.total!=null&&d.found==null?d.total:d.found)}</b></span><span>·</span><span>стр. ${d.page} из ${d.pages}</span>
+  <button class="ib" ${d.page<=1?'disabled':''} data-p="${d.page-1}">Назад</button><button class="ib" ${d.page>=d.pages?'disabled':''} data-p="${d.page+1}">Дальше</button>`;
+  el.querySelectorAll('button[data-p]').forEach(b=>b.onclick=()=>go(+b.dataset.p)); }
+let uT=0; $('#uq').addEventListener('input',e=>{ clearTimeout(uT); uT=setTimeout(()=>{ US.q=e.target.value.trim(); US.page=1; loaders.users(); },300); });
+$('#useg').addEventListener('change',e=>{ US.seg=e.target.value; US.page=1; loaders.users(); });
+$('#usort').addEventListener('change',e=>{ US.sort=e.target.value; US.page=1; loaders.users(); });
+$('#utable').addEventListener('click',e=>{ const tr=e.target.closest('tr[data-uid]'); if(tr) openUser(tr.dataset.uid); });
+$('#ucsv').addEventListener('click',()=>{ const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const head=['uid','email','name','created','seen','lang','lessons','nova_30d','nova_total','bingx','push','tags'];
+  const lines=[head.join(',')].concat(UROWS.map(x=>[x.uid,x.email,x.name,fd(x.created),fd(x.seen),x.lang,x.lessons,x.nova_30d,x.nova_total,x.bingx,x.push,(x.tags||[]).join(' ')].map(q).join(',')));
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+lines.join('\n')],{type:'text/csv'})); a.download='cryptonova-users-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); });
+
+/* user card */
+let CARD=null, SELTAGS=[];
+async function openUser(uid){ document.body.classList.add('open'); const dr=$('#drawer'); dr.innerHTML='<div class="skel" style="width:50%;height:22px"></div><div class="skel" style="margin-top:14px"></div><div class="skel" style="margin-top:8px;width:70%"></div>';
+  const r=await api('/v2/admin/user/'+encodeURIComponent(uid)); if(r.code!==200){ dr.innerHTML='<p class="empty">Пользователь не найден.</p>'; return; }
+  CARD=r.d; SELTAGS=(CARD.crm.tags||[]).slice(); renderCard(); }
+function renderCard(){ const c=CARD,u=c.user,dr=$('#drawer');
+  const pr=c.prefs||{}, pg=c.piggy, L=c.lessons;
+  const sw=(k,t)=>`<span class="chip ${pr[k]?'ok':''}">${ico(pr[k]?'ok':'x')}${t}</span>`;
+  dr.innerHTML=`<div class="dh"><div style="flex:1"><h2>${esc(u.name||'Без имени')}</h2><div class="muted" style="word-break:break-all">${esc(u.email||'')}</div></div>
+    <button class="ib" id="dClose" aria-label="Закрыть">${'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>'}</button></div>
+    <div class="facts">${c.bingx==='none'?'<span class="chip">UID BingX не отправлен</span>':bx(c.bingx)}${u.tier==='vip'?'<span class="chip ok">VIP</span>':''}<span class="chip">${esc(LANGS[u.lang||'ru']||u.lang)}</span>${c.devices.length?`<span class="chip ok">${ico('ok')}push · ${c.devices.length}</span>`:'<span class="chip">push выкл.</span>'}</div>
+    ${u.email?`<div style="margin-top:10px"><a class="ib" href="mailto:${esc(u.email)}">Написать письмо</a></div>`:''}
+    <dl class="kv"><dt>UID</dt><dd class="mono" style="font-size:12px">${esc(u.uid)}</dd><dt>Создан</dt><dd>${fdt(u.created)}</dd><dt>Последний визит</dt><dd>${fdt(u.seen)} · ${esc(ago(u.seen))}</dd>
+    <dt>BingX UID</dt><dd class="mono">${esc(u.bingx_uid||'—')}</dd><dt>VIP с</dt><dd>${fd(u.vip_since)}</dd>
+    <dt>Уроки</dt><dd><b class="num">${n0(L.done.length)}</b>${L.total?' из '+L.total:''} · XP <span class="num">${n0(L.xp)}</span></dd>
+    <dt>NOVA</dt><dd><span class="num">${n0(c.nova.per_day.reduce((a,b)=>a+b,0))}</span> за 30 дней · всего <span class="num">${n0(c.nova.total)}</span></dd>
+    <dt>Копилка (демо)</dt><dd>${pg?(pg.on===false?'выключена':'$'+esc(pg.amount)+' '+esc(FREQ[pg.freq]||'')+' · цель: '+esc(GOAL[pg.goal]||pg.goal||'—')):'не настроена'}</dd>
+    <dt>Уведомления</dt><dd class="tags">${sw('trades','сделки')}${sw('news','новости')}${sw('piggy','копилка')}${sw('brief','итоги недели')}</dd></dl>
+    ${c.checks.length?`<div class="card" style="padding:12px 14px;margin:10px 0"><h3>Проверки UID</h3>${c.checks.map(k=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:6px"><span>${fdt(k.t)} · <span class="mono">${esc(k.bingx_uid)}</span></span><span class="chip ${k.ok?'ok':'mid'}">${esc(REASON[k.reason]||k.reason||'—')}</span></div>`).join('')}</div>`:''}
+    <div class="card" style="padding:14px;margin:10px 0"><h3>CRM</h3>
+      <div class="presets" id="dTags">${Array.from(new Set(TAGS.concat(SELTAGS))).map(t=>`<button type="button" aria-pressed="${SELTAGS.includes(t)}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <div class="bar"><input class="in1" id="dNewTag" maxlength="24" placeholder="Свой тег" style="flex:1"><button class="ib" id="dAddTag">Добавить</button></div>
+      <textarea class="in1" id="dNote" maxlength="2000" placeholder="Заметка: о чём говорили, что обещали, когда напомнить"></textarea>
+      <div class="bar" style="margin-top:8px;justify-content:flex-end"><button class="ib pri" id="dSave">Сохранить</button></div>
+      <ul class="notes">${c.crm.notes.filter(n=>n.note).map(n=>`<li>${esc(n.note)}<small>${fdt(n.t)}</small></li>`).join('')||'<li class="muted" style="border:0">Заметок пока нет.</li>'}</ul>
+    </div>
+    <div class="card" style="padding:12px 14px;margin:10px 0"><h3>NOVA по дням</h3><div id="dNova"></div></div>
+    ${c.devices.length?`<p class="note">Устройства: ${c.devices.map(v=>esc(v.platform==='ios'?'iPhone':'Android')+' (обновлено '+fd(v.updated)+')').join(', ')}</p>`:''}`;
+  bars($('#dNova'),c.nova.per_day,c.nova.days,'вопросов');
+  $('#dClose').onclick=closeUser;
+  $('#dTags').onclick=e=>{ const b=e.target.closest('button[data-tag]'); if(!b) return; const t=b.dataset.tag; SELTAGS=SELTAGS.includes(t)?SELTAGS.filter(x=>x!==t):SELTAGS.concat(t); b.setAttribute('aria-pressed',SELTAGS.includes(t)); };
+  $('#dAddTag').onclick=()=>{ const v=$('#dNewTag').value.trim().slice(0,24); if(!v) return; if(!SELTAGS.includes(v)) SELTAGS.push(v); const note=$('#dNote').value; renderCard(); $('#dNote').value=note; };
+  $('#dSave').onclick=async()=>{ const note=$('#dNote').value.trim(); const changed=JSON.stringify(SELTAGS)!==JSON.stringify(c.crm.tags||[]);
+    if(!note&&!changed){ toast('Нечего сохранять: нет заметки и теги не менялись.'); return; }
+    const r=await api('/v2/admin/crm',{method:'POST',body:{uid:c.user.uid,note:note||undefined,tags:changed?SELTAGS:undefined,confirm:true}});
+    if(r.code===200){ c.crm=r.d.crm; SELTAGS=(c.crm.tags||[]).slice(); renderCard(); toast('Сохранено в CRM.'); if(CUR==='users') loaders.users(); } else toast('Не сохранилось: '+(r.d.error||r.code)); };
+}
+function closeUser(){ document.body.classList.remove('open'); }
+$('#dim').addEventListener('click',closeUser);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if($('#modal').classList.contains('on')) $('#mNo').click(); else closeUser(); }
+  if(e.target.matches&&e.target.matches('input,textarea,select')) return;
+  if(!TOKEN) return; const i='123456'.indexOf(e.key); if(i>=0&&!e.metaKey&&!e.ctrlKey&&!e.altKey) show(VIEWS[i]); if(e.key==='r'||e.key==='R') load(CUR); });
+
+/* ------------------------------------------------------------------ leads */
+const LS={q:'',page:1};
+loaders.leads=async()=>{ const r=await api('/v2/admin/leads?'+new URLSearchParams({q:LS.q,page:LS.page,size:50})); if(r.code!==200) return; const d=r.d;
+  if(!d.available){ $('#lkpis').innerHTML=''; $('#chLeads2').innerHTML=''; $('#ltable tbody').innerHTML='<tr><td colspan="5" class="empty">База Telegram-бота на сервере не найдена (data/agents.sqlite). Бот подключается во вкладке «Коннекторы».</td></tr>'; $('#lpager').innerHTML=''; return; }
+  const k=(t,v,s)=>`<div class="card kpi"><small>${t}</small><b>${v}</b><span>${s}</span></div>`;
+  $('#lkpis').innerHTML=k('Всего лидов',n0(d.total),'написали боту')+k('Активны 7 дней',n0(d.active_7d),'писали за неделю')+k('Сообщений',n0(d.messages),'всего от лидов')+k('Новых за 30 дней',n0(d.new_per_day.reduce((a,b)=>a+b,0)),d.signals_channel?'канал сигналов подключён':'канал сигналов не подключён');
+  bars($('#chLeads2'),d.new_per_day,d.days,'новых лидов');
+  $('#ltable tbody').innerHTML=d.rows.length?d.rows.map(x=>`<tr><td class="who"><b>${esc(x.first_name||'Без имени')}</b><small>${x.username?'@'+esc(x.username):'chat '+esc(x.chat_id)}</small></td>
+    <td data-l="Первый контакт">${fdt(x.first_seen)}</td><td data-l="Последнее">${esc(ago(x.last_seen))}</td><td data-l="Сообщений" class="r num">${n0(x.n_msgs)}</td>
+    <td>${x.username?`<a class="ib" href="https://t.me/${encodeURIComponent(x.username)}" target="_blank" rel="noopener">Написать</a>`:''}</td></tr>`).join('')
+    :'<tr><td colspan="5" class="empty">Никого не нашлось.</td></tr>';
+  pager($('#lpager'),d,pg=>{ LS.page=pg; loaders.leads(); });
+};
+let lT=0; $('#lq').addEventListener('input',e=>{ clearTimeout(lT); lT=setTimeout(()=>{ LS.q=e.target.value.trim(); LS.page=1; loaders.leads(); },300); });
+
+/* ------------------------------------------------------------------ push */
+segOptions($('#pseg'),'Все (у кого включены «Новости»)');
+let DRY=null, POLL=0;
+const SEGNAME=v=>{ const o=[...$('#pseg').options].find(x=>x.value===v); return o?o.textContent:v; };
+function pkey(){ return JSON.stringify([$('#pseg').value,$('#ptitle').value.trim(),$('#pbody').value.trim()]); }
+function pupd(){ const t=$('#ptitle').value.trim(), b=$('#pbody').value.trim();
+  $('#ptc').textContent=t.length+' / 60'; $('#ptc').classList.toggle('over',t.length>60); $('#pbc').textContent=b.length+' / 180'; $('#pbc').classList.toggle('over',b.length>180);
+  $('#pvT').textContent=t||'Заголовок'; $('#pvB').textContent=b||'Текст сообщения';
+  const ready=DRY&&DRY.key===pkey()&&DRY.d.fcm_ready&&!DRY.d.quiet_now&&DRY.d.devices>0;
+  $('#psend').disabled=!ready; $('#psend').textContent=ready?'Отправить '+n0(DRY.d.people)+' чел.':'Отправить'; }
+['#ptitle','#pbody','#pseg'].forEach(s=>$(s).addEventListener('input',pupd));
+$('#pdry').addEventListener('click',async()=>{ const body={segment:$('#pseg').value,title:$('#ptitle').value.trim(),body:$('#pbody').value.trim(),dry_run:true};
+  if(!body.title||!body.body){ toast('Нужны заголовок и текст.'); return; }
+  const r=await api('/v2/admin/push',{method:'POST',body}); const d=r.d;
+  if(r.code!==200){ $('#preach').innerHTML=`<div class="alert bad">${d.error==='bad_text'?'Заголовок до 60 знаков, текст до 180.':d.error==='bad_segment'?'Такой группы нет.':'Ошибка: '+esc(d.error||r.code)}</div>`; DRY=null; pupd(); return; }
+  DRY={key:pkey(),d};
+  $('#preach').innerHTML=`<div class="reach"><div><b>${n0(d.people_in_segment)}</b><small>в группе</small></div><div><b>${n0(d.people)}</b><small>получат</small></div><div><b>${n0(d.devices)}</b><small>устройств</small></div><div><b>${n0(Math.max(0,d.news_off))}</b><small>выключили новости</small></div></div>`+
+   (!d.fcm_ready?'<div class="alert bad">Push на сервере не подключён (нет ключа Firebase). Как подключить — вкладка «Коннекторы» → Push.</div>':'')+
+   (d.quiet_now?'<div class="alert">Сейчас тихие часы (22:00–09:00 по Киеву). Отправка откроется в 09:00.</div>':'')+
+   (d.fcm_ready&&!d.quiet_now&&!d.devices?'<div class="alert">В этой группе нет ни одного устройства с включёнными новостями.</div>':'')+
+   (d.fcm_ready&&!d.quiet_now&&d.devices?'<div class="alert ok">Проверено. Ничего не отправлено. Теперь можно нажать «Отправить».</div>':'');
+  pupd(); });
+$('#psend').addEventListener('click',async()=>{ if(!DRY||DRY.key!==pkey()) return; const d=DRY.d;
+  const ok=await ask('Отправить рассылку?',`«${$('#ptitle').value.trim()}»\n\nКому: ${SEGNAME($('#pseg').value)}\n${n0(d.people)} чел., ${n0(d.devices)} устройств.\n\nОтменить после отправки нельзя.`,'Отправить');
+  if(!ok) return;
+  const r=await api('/v2/admin/push',{method:'POST',body:{segment:$('#pseg').value,title:$('#ptitle').value.trim(),body:$('#pbody').value.trim(),confirm:true}});
+  if(r.code!==200){ const m={duplicate:'Этот текст уже ушёл этой группе в последние 30 минут.',quiet_hours:'Тихие часы — отправка закрыта до 09:00 по Киеву.',push_not_configured:'Push не подключён на сервере.',busy:'Предыдущая рассылка ещё идёт.',nobody:'Некому отправлять.'};
+    toast(m[r.d.error]||('Не отправлено: '+(r.d.error||r.code))); return; }
+  toast('Рассылка началась.'); DRY=null; pupd(); clearInterval(POLL); POLL=setInterval(pollPush,1500); pollPush(); });
+async function pollPush(){ const r=await api('/v2/admin/push'); if(r.code!==200){ clearInterval(POLL); return; } renderPush(r.d); if(!r.d.last||r.d.last.done) clearInterval(POLL); }
+function resTxt(res){ if(!res) return '<span class="muted">идёт…</span>'; const p=[]; if(res.ok) p.push(`<span class="chip ok">${ico('ok')}доставлено ${n0(res.ok)}</span>`); if(res.gone) p.push(`<span class="chip">удалили приложение ${n0(res.gone)}</span>`); if(res.error) p.push(`<span class="chip bad">${ico('x')}ошибка ${n0(res.error)}</span>`); if(res.dry) p.push('<span class="chip">без ключа '+n0(res.dry)+'</span>'); return '<div class="tags">'+(p.join('')||'—')+'</div>'; }
+function renderPush(d){ const L=d.last;
+  $('#plast').innerHTML=L?`<h3>Последняя рассылка</h3><p class="note" style="margin:4px 0 8px">${fdt(L.t)} · ${esc(SEGNAME(L.segment))} · ${n0(L.people)} чел. / ${n0(L.devices)} устр.</p>${resTxt(L.done?L.results:(Object.keys(L.results||{}).length?L.results:null))}${L.done?'':'<p class="note">Отправляется…</p>'}`:
+    `<p class="note">${d.fcm_ready?'Push на сервере подключён.':'Push на сервере не подключён — см. <a href="#connectors" data-go="connectors">«Коннекторы»</a>.'} ${d.quiet_now?'Сейчас тихие часы (22:00–09:00 по Киеву).':''}</p>`;
+  $('#phist tbody').innerHTML=d.history.length?d.history.map(h=>`<tr><td data-l="Когда">${fdt(h.t)}</td><td data-l="Кому">${esc(SEGNAME(h.segment))}</td><td class="who"><b>${esc(h.title)}</b><small>${esc(h.body)}</small></td><td data-l="Людей / устройств" class="r num">${n0(h.people)} / ${n0(h.devices)}</td><td data-l="Итог">${resTxt(h.results)}</td></tr>`).join('')
+    :'<tr><td colspan="5" class="empty">Рассылок ещё не было.</td></tr>'; }
+loaders.push=async()=>{ pupd(); const r=await api('/v2/admin/push'); if(r.code===200) renderPush(r.d); };
+
+/* ------------------------------------------------------------------ connectors */
+const SRV='root@91.99.193.20';
+const CN={
+  admin:{name:'Админ-доступ',what:'Токен этой панели. Лежит только в /etc/cnq.env на сервере и в этом браузере.',steps:['Уже подключено — вы вошли.','Сменить токен: на сервере заменить строку <code>CNQ_ADMIN_TOKEN=…</code> в <code>/etc/cnq.env</code> и выполнить <code>systemctl restart cnq-api</code>. Старый токен сразу перестанет работать.'],links:[]},
+  firebase:{name:'Firebase — вход и удаление аккаунта',what:'Ключ сервисного аккаунта Firebase: сервер удаляет вход пользователя вместе с аккаунтом и отправляет push.',steps:[
+    'Firebase console → проект crypto-nova → Настройки проекта (шестерёнка) → «Сервисные аккаунты» → «Создать закрытый ключ». Скачается файл .json.',
+    'С Mac в Терминале: <code>scp ~/Downloads/crypto-nova-*.json '+SRV+':/etc/cnq-fcm.json</code>',
+    'На сервере: <code>chown cnq:cnq /etc/cnq-fcm.json &amp;&amp; chmod 600 /etc/cnq-fcm.json</code>',
+    'В <code>/etc/cnq.env</code> строка <code>CNQ_FCM_SA=/etc/cnq-fcm.json</code>, затем <code>systemctl restart cnq-api cnq-engine</code>.',
+    'Файл никому не пересылать и в чат не отправлять.'],links:[['Firebase: сервисные аккаунты','https://console.firebase.google.com/project/crypto-nova/settings/serviceaccounts/adminsdk']]},
+  push:{name:'Push-уведомления (FCM)',what:'Уведомления в приложение: сделки демо-счёта, копилка, важное на рынке и ваши рассылки.',steps:[
+    'Нужен тот же ключ Firebase, что выше — отдельного ключа нет.',
+    'Для iPhone: Firebase → Настройки проекта → Cloud Messaging → «Apple app configuration» → загрузить APNs Authentication Key (.p8 из Apple Developer → Certificates, IDs &amp; Profiles → Keys). Сервер это проверить не может — только вручную.',
+    'Проверка: вкладка «Рассылки» → группа «Тег: …» с одним тестовым пользователем (поставьте себе тег) → «Проверить охват» → «Отправить».'],links:[['Firebase: Cloud Messaging','https://console.firebase.google.com/project/crypto-nova/settings/cloudmessaging'],['Apple: ключи','https://developer.apple.com/account/resources/authkeys/list']]},
+  bingx_partner:{name:'BingX партнёр — проверка UID',what:'Ключ партнёрского кабинета (только чтение): приложение проверяет, что аккаунт BingX зарегистрирован по нашей ссылке и пополнен, и открывает VIP.',steps:[
+    'bingx.com → войти в партнёрский аккаунт → меню «Ещё» → Partner Hub → раздел API → создать ключ <b>только для чтения</b>.',
+    'На сервере в <code>/etc/cnq.env</code>: <code>CNQ_BINGX_AGENT_KEY=…</code> и <code>CNQ_BINGX_AGENT_SECRET=…</code>',
+    '<code>systemctl restart cnq-api</code>',
+    'Ключ и секрет в чат не отправлять.'],links:[['BingX: партнёрская программа','https://bingx.com/en/global-partner']]},
+  exchange_ref:{name:'Реферальная ссылка в приложении',what:'Куда ведёт кнопка «Открыть биржу» в приложении. Без неё люди регистрируются на BingX без нашей метки, и проверка UID пишет «не по нашей ссылке».',steps:[
+    'Partner Hub BingX → ссылки → скопировать реферальную ссылку.',
+    'Ссылка не секрет: пришлите её в чат или впишите в <code>web/app_config.json</code>, поле <code>exchange_ref</code>.',
+    'Приложение подхватит её без новой версии в магазинах.'],links:[]},
+  nova:{name:'NOVA — ИИ-модель',what:'Ключ языковой модели для ответов NOVA в приложении.',steps:[
+    'Свой ключ для NOVA (например, платный план groq или openrouter) отделяет NOVA от движка и снимает общие лимиты.',
+    'На сервере в <code>/etc/cnq.env</code>: <code>CNQ_NOVA_LLM_KEY=…</code> (и при необходимости <code>CNQ_NOVA_LLM_PROVIDER=groq</code>).',
+    '<code>systemctl restart cnq-api</code>. Проверка: «Обзор» → «Вопросы NOVA».'],links:[['groq: ключи','https://console.groq.com/keys'],['OpenRouter: ключи','https://openrouter.ai/settings/keys']]},
+  telegram:{name:'Telegram — бот и каналы',what:'Бот принимает сообщения (это ваши лиды) и пишет в каналы. Сигналы в @crypto_nova_news не отправляются.',steps:[
+    '@BotFather → /mybots → бот CRYPTO NOVA → API Token.',
+    'На сервере в <code>/etc/cnq.env</code>: <code>CNQ_TG_TOKEN=…</code>; канал новостей — <code>CNQ_TG_CHAT=…</code>, канал сигналов — <code>CNQ_SIGNALS_CHAT=…</code>.',
+    '<code>systemctl restart cnq-engine</code>. Новые лиды появятся во вкладке «Лиды».'],links:[['@BotFather','https://t.me/BotFather']]},
+  meta:{name:'Meta (Facebook / Instagram)',what:'Meta SDK в приложении: для рекламы и подсчёта установок.',steps:[
+    'developers.facebook.com → «Мои приложения» → CRYPTO NOVA (App ID ниже) → убедиться, что приложение в режиме Live.',
+    'Events Manager → «Источники данных» → приложение CRYPTO NOVA → «Тестовые события» → открыть приложение на телефоне: должны прийти установка и запуск.',
+    'Для iPhone: Events Manager → настройки приложения → «Aggregated Event Measurement» (iOS 14+) — включить.',
+    'До запуска рекламы: реклама сервисов для торговли криптовалютой в Meta идёт только с предварительного письменного разрешения — подать заявку по правилу «Cryptocurrency products and services».',
+    'Ads Manager → «Создать» → цель «Продвижение приложения» → CRYPTO NOVA в App Store / Google Play. Тексты — без обещаний дохода, со словами «демо» и «обучение».'],
+    links:[['Meta: приложение','https://developers.facebook.com/apps/1635827251297802/dashboard/'],['Events Manager','https://business.facebook.com/events_manager2'],['Ads Manager','https://adsmanager.facebook.com/'],['Правило о криптовалюте','https://transparency.meta.com/policies/ad-standards/restricted-goods-services/cryptocurrency-products-and-services']]},
+  appstore:{name:'App Store Connect',what:'Установки, оценки и отзывы iPhone-версии. Сервер к нему не подключается — числа вы вписываете сами.',steps:[
+    'App Store Connect → «Приложения» → CRYPTO NOVA → «Аналитика» → «Загрузки» за 30 дней.',
+    'Вписать число во вкладке «Масштабирование» → «Установки из магазинов».',
+    'Реклама в поиске App Store — Apple Search Ads (тот же Apple ID).'],links:[['App Store Connect','https://appstoreconnect.apple.com/apps'],['Apple Search Ads','https://searchads.apple.com/']]},
+  play:{name:'Google Play Console',what:'Установки и отзывы Android-версии. Сервер к нему не подключается — числа вы вписываете сами.',steps:[
+    'Play Console → CRYPTO NOVA → «Статистика» → «Установки на устройствах».',
+    'Вписать число во вкладке «Масштабирование».',
+    'Реклама: Google Ads → кампания «Приложения» (App campaign). Google тоже требует сертификации для рекламы криптобирж в ряде стран.'],links:[['Google Play Console','https://play.google.com/console'],['Google Ads','https://ads.google.com/']]},
+};
+function light(ok){ return ok===true?`<span class="chip ok">${ico('ok')}Подключено</span>`:ok===false?`<span class="chip bad">${ico('x')}Не подключено</span>`:`<span class="chip mid">${ico('q')}Проверяется вручную</span>`; }
+function connFacts(it){ const d=it.detail||{}, f=[];
+  if(it.id==='firebase') f.push('проект '+esc(d.project));
+  if(it.id==='push') f.push('устройств в базе: '+n0(d.devices));
+  if(it.id==='exchange_ref') f.push(d.link?'ссылка: <span class="code">'+esc(d.link)+'</span>':'ссылка не задана');
+  if(it.id==='nova'){ f.push(d.own_key?'свой ключ NOVA':'общий ключ движка'); f.push('провайдер: '+esc(d.provider)); }
+  if(it.id==='telegram'){ f.push('бот: '+(d.bot?'да':'нет')); f.push('канал новостей: '+(d.news_channel?'да':'нет')); f.push('канал сигналов: '+(d.signals_channel?'да':'нет')); f.push('база лидов: '+(d.leads_db?'да':'нет')); }
+  if(it.id==='meta'){ f.push('App ID <span class="mono">'+esc(d.app_id)+'</span>'); f.push('отправляет: установка, запуск'); f.push('<span style="color:#f4dea4">регистрация из версии 2.0 пока не передаётся</span>'); }
+  if(it.env) f.push('ключи: '+it.env.map(e=>'<span class="code">'+esc(e)+'</span>').join(' '));
+  return f.map(x=>`<span class="chip">${x}</span>`).join(''); }
+loaders.connectors=async()=>{ const r=await api('/v2/admin/connectors'); if(r.code!==200) return; CONN=r.d;
+  $('#conns').innerHTML=r.d.items.map(it=>{ const c=CN[it.id]||{name:it.id,what:'',steps:[],links:[]};
+    const part=it.ok&&it.detail&&(it.detail.missing||[]).length;
+    return `<div class="card conn"><div class="hd"><b style="flex:1">${esc(c.name)}</b>${part?`<span class="chip mid">${ico('q')}Частично</span>`:light(it.ok)}</div><p>${c.what}</p><div class="facts">${connFacts(it)}</div>
+      ${c.steps.length?`<details ${it.ok===false?'open':''}><summary>Как подключить</summary><ol>${c.steps.map(s=>'<li>'+s+'</li>').join('')}</ol></details>`:''}
+      ${c.links.length?`<div class="links">${c.links.map(([t,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join('')}</div>`:''}</div>`; }).join('');
+};
+
+/* ------------------------------------------------------------------ growth */
+const CHANNELS=[['meta','Meta: Facebook + Instagram'],['google','Google Ads (App campaign)'],['asa','Apple Search Ads'],['tiktok','TikTok Ads'],['tgads','Telegram Ads'],['bloggers','Блогеры и обзоры'],['channel','Свой канал @crypto_nova_news'],['seo','Сайт и поиск (cryptonova.vip)']];
+const STAT=[['plan','план'],['test','тест'],['live','идёт'],['stop','стоп']];
+const CHECK=[
+  ['ref','Реферальная ссылка BingX в приложении','Без неё регистрации на BingX не засчитываются нам.',()=>conn('exchange_ref')],
+  ['bxkey','Ключ партнёра BingX на сервере','Проверка UID и VIP работают автоматически.',()=>conn('bingx_partner')],
+  ['push','Push подключён (ключ Firebase + APNs для iPhone)','Возвращаем людей уведомлениями, а не рекламой.',()=>conn('push')],
+  ['meta_live','Meta: приложение в режиме Live, события установки приходят','Events Manager → Тестовые события.',null],
+  ['meta_reg','Meta: событие «регистрация» из версии 2.0','Доработка приложения: без него реклама оптимизируется только на установки.',null],
+  ['meta_perm','Meta: письменное разрешение на рекламу криптосервисов','Подать заявку до первой кампании.',null],
+  ['aso','Страницы в App Store и Google Play на 5 языках','Скриншоты, описание, ключевые слова.',null],
+  ['legal','Тексты рекламы: «демо», «обучение», без обещаний дохода','Проверить каждое объявление перед запуском.',null],
+  ['test','Тестовая кампания: 1 канал, 7 дней, небольшой бюджет','Сравнить цену установки и долю регистраций.',null],
+  ['pin','Закреп в Telegram-канале со ссылкой на приложение','Бесплатный канал — первым.',null],
+];
+const conn=id=>{ const it=CONN&&CONN.items.find(x=>x.id===id); return it?it.ok:null; };
+let PLAN={};
+loaders.growth=async()=>{
+  const [p,o,c]=await Promise.all([api('/v2/admin/plan'),OV?Promise.resolve({code:200,d:OV}):api('/v2/admin/overview'),CONN?Promise.resolve({code:200,d:CONN}):api('/v2/admin/connectors')]);
+  if(p.code!==200) return; PLAN=p.d.plan||{}; if(o.code===200) OV=o.d; if(c.code===200) CONN=c.d;
+  $('#gIos').value=PLAN.installs_ios??''; $('#gAnd').value=PLAN.installs_android??''; $('#gAsof').value=PLAN.installs_asof||''; $('#gnotes').value=PLAN.notes||'';
+  const ch=PLAN.channels||{};
+  $('#gch tbody').innerHTML=CHANNELS.map(([id,name])=>{ const c2=ch[id]||{}; return `<tr data-ch="${id}"><td class="who"><b>${esc(name)}</b></td>
+    <td data-l="Бюджет, $/мес"><input class="num" data-f="budget" inputmode="decimal" value="${esc(c2.budget??'')}" placeholder="0"></td>
+    <td data-l="Установок"><input class="num" data-f="installs" inputmode="numeric" value="${esc(c2.installs??'')}" placeholder="—"></td>
+    <td data-l="Цена установки" class="r num" data-cpi>—</td>
+    <td data-l="Статус"><select data-f="status">${STAT.map(([v,t])=>`<option value="${v}" ${c2.status===v?'selected':''}>${t}</option>`).join('')}</select></td>
+    <td data-l="Заметка"><input data-f="note" value="${esc(c2.note||'')}" maxlength="200"></td></tr>`; }).join('');
+  cpi();
+  const done=PLAN.checklist||{};
+  $('#gcheck').innerHTML=CHECK.map(([id,t,s,auto])=>{ const a=auto?auto():null; return `<li><input type="checkbox" data-c="${id}" ${auto?'disabled':''} ${(auto?a===true:done[id])?'checked':''} aria-label="${esc(t)}"><div>${esc(t)}<small>${esc(s)}</small></div>${auto?light(a):''}</li>`; }).join('');
+  const R=OV&&OV.referrals;
+  $('#refBox').innerHTML=R?`${R.exchange_ref_set?'<div class="alert ok">Ссылка задана в приложении.</div>':'<div class="alert bad">Ссылка в приложении не задана — как задать: «Коннекторы» → «Реферальная ссылка».</div>'}
+    <div class="reach"><div><b>${n0(R.people)}</b><small>проверили UID</small></div><div><b>${n0(R.confirmed)}</b><small>подтверждено</small></div><div><b>${pct(R.confirmed,R.people)}</b><small>доля</small></div></div>
+    ${hbarsHtml(Object.entries(R.reasons).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({label:REASON[k]||k,n:v})))}<div id="chRef" style="margin-top:12px"></div>`:'<p class="note">Нет данных.</p>';
+  if(R) bars($('#chRef'),R.per_day,OV.days,'проверок');
+  $('#gstate').textContent=PLAN.saved_at?'сохранено '+fdt(PLAN.saved_at):'';
+};
+function hbarsHtml(rows){ const d=document.createElement('div'); hbars(d,rows.length?rows:[{label:'проверок ещё не было',n:0}]); return d.innerHTML; }
+function num(v){ const s=String(v||'').replace(/\s/g,'').replace(',','.'); if(s==='') return null; const n=Number(s); return isFinite(n)&&n>=0?n:null; }
+function cpi(){ let tb=0,ti=0; document.querySelectorAll('#gch tbody tr').forEach(tr=>{ const b=num(tr.querySelector('[data-f=budget]').value), i=num(tr.querySelector('[data-f=installs]').value);
+  tr.querySelector('[data-cpi]').textContent=(b!=null&&i)?'$'+(b/i).toFixed(2):'—'; if(b!=null) tb+=b; if(b!=null&&i) ti+=i; });
+  $('#gTot').textContent='$'+nf.format(tb)+' в месяц'+(ti?' · средняя цена установки $'+(tb/ti).toFixed(2)+' (по каналам с данными)':''); }
+$('#gch').addEventListener('input',cpi);
+$('#gsave').addEventListener('click',async()=>{ const ch={}; document.querySelectorAll('#gch tbody tr').forEach(tr=>{ const o={}; tr.querySelectorAll('[data-f]').forEach(i=>{ o[i.dataset.f]=i.dataset.f==='budget'||i.dataset.f==='installs'?num(i.value):i.value.trim(); }); ch[tr.dataset.ch]=o; });
+  const cl={}; document.querySelectorAll('#gcheck input[data-c]:not([disabled])').forEach(i=>cl[i.dataset.c]=i.checked);
+  const data={installs_ios:num($('#gIos').value),installs_android:num($('#gAnd').value),installs_asof:$('#gAsof').value||null,channels:ch,checklist:cl,notes:$('#gnotes').value.slice(0,4000),saved_at:Date.now()};
+  const r=await api('/v2/admin/plan',{method:'POST',body:{data,confirm:true}});
+  if(r.code===200){ PLAN=r.d.plan; OV=null; toast('План сохранён.'); $('#gstate').textContent='сохранено '+fdt(PLAN.saved_at); } else toast('Не сохранилось: '+(r.d.error||r.code)); });
+
+/* ------------------------------------------------------------------ session */
+function signIn(){ $('#loginView').hidden=true; $('#top').hidden=false; show((location.hash||'#overview').slice(1)); }
+function signOut(msg){ TOKEN=''; tokenStore.clear(); closeUser(); $('#top').hidden=true; VIEWS.forEach(x=>$('#v-'+x).hidden=true); $('#loginView').hidden=false; $('#loginErr').textContent=msg||''; OV=LEADS=CONN=null; setTimeout(()=>$('#tok').focus(),50); }
+async function tryToken(t,remember){ TOKEN=t; $('#loginErr').textContent=''; $('#enter').disabled=true;
+  const r=await api('/v2/admin/ping',{login:true}); $('#enter').disabled=false;
+  if(r.code===200){ tokenStore.set(t,remember); signIn(); return true; }
+  const msg=denyText(r.code,r.d);
+  if(r.code===0){ TOKEN=''; $('#top').hidden=true; $('#loginView').hidden=false; $('#loginErr').textContent=msg+(tokenStore.get()?' Сохранённый токен не удалён — нажмите «Войти», чтобы повторить.':''); return false; }
+  signOut(msg); return false; }
+$('#enter').addEventListener('click',()=>{ const t=$('#tok').value.trim()||tokenStore.get(); if(!t){ $('#loginErr').textContent='Вставьте токен.'; return; } tryToken(t,$('#remember').checked).then(ok=>{ if(ok) $('#tok').value=''; }); });
+$('#tok').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#enter').click(); });
+$('#logout').addEventListener('click',()=>signOut('Вы вышли. Токен удалён из этого браузера.'));
+$('#refresh').addEventListener('click',()=>{ if(CUR==='overview') OV=null; load(CUR); toast('Обновлено.'); });
+setInterval(()=>{ if(TOKEN&&CUR==='overview'&&!document.hidden) loaders.overview(); },60000);
+const saved=tokenStore.get();
+if(saved){ TOKEN=saved; $('#loginView').hidden=true; tryToken(saved,(()=>{ try{ return !!localStorage.getItem(KEY); }catch(e){ return false; } })()); }
+else signOut('');
+})();
+</script>
+</body>
+</html>

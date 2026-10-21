@@ -24,6 +24,12 @@ Settings in `/etc/cnq.env`:
   Generate new private key; `chown cnq:cnq`, `chmod 600`). Used for pushes (engine) and to delete the Firebase login when a
   user deletes the account (`DELETE /v2/me`). Without it pushes are only logged and the app deletes the login on the phone.
 
+- `CNQ_ADMIN_TOKEN` — the owner's admin panel https://cryptonova.vip/admin.html (users, CRM notes and tags, Telegram bot leads,
+  segment pushes, connector status, growth plan; API `/v2/admin/*`, `cnq/api/console.py`). A random string of at least 24
+  characters, created on the server and never sent anywhere else:
+  `grep -q '^CNQ_ADMIN_TOKEN=' /etc/cnq.env || echo "CNQ_ADMIN_TOKEN=$(openssl rand -hex 32)" >> /etc/cnq.env && systemctl restart cnq-api`.
+  Without it every admin call answers 403. The system panel (app.html) shows «Админ-панель» only in owner mode.
+
 Endpoints: see the docstring of `cnq/api/server.py`. Data: `/opt/cnq/run/data/api.sqlite` (not in git).
 
 Legal pages for the stores (published with the site): https://cryptonova.vip/privacy.html · terms.html · delete.html

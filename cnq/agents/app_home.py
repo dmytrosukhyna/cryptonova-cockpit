@@ -513,14 +513,30 @@ def _spot(pf: dict, lang: str = DEFAULT, ex: dict | None = None) -> dict:
             "started": pf.get("started"), "coins": _coins(pf, ex or {}, lang)}
 
 
-def _market(mk: dict) -> dict:
+_FNG_RU = {"крайний страх": "Extreme Fear", "страх": "Fear", "нейтрально": "Neutral", "жадность": "Greed", "крайняя жадность": "Extreme Greed"}
+
+
+def _fng_label(fng: dict, lang: str) -> str | None:
+    """markets.json keeps the Russian word for today and the English one in the history — either way, the app's language"""
+    raw = str(fng.get("label") or "")
+    key = _FNG_RU.get(raw.lower(), raw)
+    if not key:
+        hist = fng.get("history") or []
+        key = (hist[-1] or {}).get("label") if hist else None
+    return t(lang, "fng." + key) if key and ("fng." + key) in T else (raw or None)
+
+
+def _market(mk: dict, lang: str = DEFAULT) -> dict:
     top = {str(r.get("symbol") or "").upper(): r for r in mk.get("top") or []}
     btc = top.get("BTC") or {}
     fng = mk.get("fng") or {}
     return {"btc": {"price": btc.get("price"), "chg24": _r(btc.get("chg24"), 2)},
             "eth": {"price": (top.get("ETH") or {}).get("price"), "chg24": _r((top.get("ETH") or {}).get("chg24"), 2)},
-            "fng": {"value": fng.get("value"), "label": fng.get("label")},
-            "regime": None if mk.get("btc_bull") is None else ("рост" if mk.get("btc_bull") else "спад")}
+            # «label» / «regime» keep the Russian words the released app compares against («рост» → green);
+            # «label_text» / «regime_text» are the same words in the feed's language for the new app to show
+            "fng": {"value": fng.get("value"), "label": fng.get("label"), "label_text": _fng_label(fng, lang)},
+            "regime": None if mk.get("btc_bull") is None else ("рост" if mk.get("btc_bull") else "спад"),
+            "regime_text": None if mk.get("btc_bull") is None else t(lang, "regime.up" if mk.get("btc_bull") else "regime.down")}
 
 
 def _engine_facts(out: str) -> dict:
@@ -592,7 +608,7 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
             "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub,
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
-            "market": _market(mk), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),
+            "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),
             "note_ru": t(lang, "home.note")}
 
 

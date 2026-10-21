@@ -42,6 +42,14 @@ T: dict[str, dict[str, str]] = {
     "alloc.core": {"ru": "ядро", "en": "core", "uk": "ядро", "el": "πυρήνας", "es": "núcleo"},
     "alloc.other": {"ru": "другие", "en": "other", "uk": "інші", "el": "άλλα", "es": "otras"},
     "alloc.cash": {"ru": "доллары", "en": "dollars", "uk": "долари", "el": "δολάρια", "es": "dólares"},
+    # 21.10: the app showed «жадность» / «рост» in English — market words per language
+    "fng.Extreme Fear": {"ru": "крайний страх", "en": "extreme fear", "uk": "крайній страх", "el": "ακραίος φόβος", "es": "miedo extremo"},
+    "fng.Fear": {"ru": "страх", "en": "fear", "uk": "страх", "el": "φόβος", "es": "miedo"},
+    "fng.Neutral": {"ru": "нейтрально", "en": "neutral", "uk": "нейтрально", "el": "ουδέτερο", "es": "neutral"},
+    "fng.Greed": {"ru": "жадность", "en": "greed", "uk": "жадібність", "el": "απληστία", "es": "codicia"},
+    "fng.Extreme Greed": {"ru": "крайняя жадность", "en": "extreme greed", "uk": "крайня жадібність", "el": "ακραία απληστία", "es": "codicia extrema"},
+    "regime.up": {"ru": "рост", "en": "rising", "uk": "зростання", "el": "άνοδος", "es": "subida"},
+    "regime.down": {"ru": "спад", "en": "falling", "uk": "спад", "el": "πτώση", "es": "bajada"},
 
     # ---------------------------------------------------------------- «why we entered» (futures.open[].why)
     "why.CLIMAX_LONG": {

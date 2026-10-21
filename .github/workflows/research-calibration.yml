@@ -1,0 +1,34 @@
+name: research-calibration
+# Manual only. Backlog #11: why the panel's A/B forecast misses — scripts/calibration_study.py on the live forecasts table
+# (data/agents.sqlite lives in the Actions cache since 20.10, > 95 MB). Read-only: the cache is restored, never saved.
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "score only forecasts made at or after this time (ms since epoch); 0 = all"
+        required: false
+        default: "0"
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Restore department state (read-only)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/cnq.sqlite
+            data/agents.sqlite
+          key: cnq-state-none
+          restore-keys: |
+            cnq-state-
+            cnq-db-
+      - run: python scripts/calibration_study.py --since "$SINCE"
+        env: { SINCE: "${{ inputs.since || '0' }}" }

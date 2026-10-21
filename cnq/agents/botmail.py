@@ -60,6 +60,27 @@ CONNECT = ("Вы выбрали: <b>{name}</b>.\n\n"
            "Нужна помощь — напишите сюда, подскажем по шагам.\n\n"
            "Важно: торговля связана с риском, прошлый результат не гарантирует будущий.")
 
+# 22.10 decision B (claude/cryptonova-okx-vs-bingx-2026-10-22.md): BingX does not register people from the EU, and BingX links must not
+# be shown to EU residents. The bot asks once where the person lives: EU → OKX (OKX Europe: MiCA + MiFID; USDC/EUR, no USDT;
+# futures = X-Perps up to 10x, ~20 pairs), elsewhere → BingX. The answer is kept per chat (bot_region) for the UID check.
+REGION_Q = ("Вы выбрали: <b>{name}</b>.\n\n<b>Где вы живёте?</b> От этого зависит биржа: в ЕС работает OKX (лицензия ЕС), "
+            "в других странах — BingX. Нажмите кнопку ниже или напишите «ЕС» или «другая страна».")
+REGION_KB = {"keyboard": [[{"text": "Живу в ЕС"}, {"text": "Живу в другой стране"}]], "resize_keyboard": True, "one_time_keyboard": True}
+EU_RE = re.compile(r"(?i)^\s*(?:я\s+)?(?:живу\s+)?(?:в\s+)?(?:ЕС|EU|Евросоюзе?|Европе|Европа|Греции|Греция)\s*[.!]?\s*$")
+WORLD_RE = re.compile(r"(?i)^\s*(?:я\s+)?(?:живу\s+)?(?:в\s+)?(?:другой\s+стране|другая\s+страна|не\s+в\s+ЕС|вне\s+ЕС|other|Украине|Украина)\s*[.!]?\s*$")
+CONNECT_OKX = ("Вы выбрали: <b>{name}</b>. Вы живёте в ЕС — значит, биржа <b>OKX</b> (лицензия ЕС).\n\n"
+               "<b>Как начать работу с CRYPTO NOVA — около 15 минут.</b> Пошаговая инструкция:\n"
+               "1. Откройте счёт на OKX{ref}. Счёт на ваше имя — деньги всегда у вас.\n"
+               "2. Пройдите проверку личности (KYC) — так требует биржа.\n"
+               "3. Пополните счёт в USDC или евро (USDT в ЕС на OKX недоступен) на сумму, которую не страшно потерять.\n"
+               "4. <b>Пришлите сюда свой UID</b> — номер счёта OKX: в приложении биржи откройте профиль, UID рядом с именем. "
+               "UID — не пароль: по нему нельзя войти в счёт.\n"
+               "5. Откройте в приложении CRYPTO NOVA портфель и сделки: у каждой сделки видны вход, стоп и цель — повторяйте их на своём счёте. "
+               "Фьючерсы в ЕС на OKX называются X-Perps: плечо до 10x, около 20 пар, так что часть монет может быть недоступна; "
+               "спот и портфель работают полностью.\n\n"
+               "Нужна помощь — напишите сюда, подскажем по шагам.\n\n"
+               "Важно: торговля связана с риском, прошлый результат не гарантирует будущий.")
+
 # 21.10 22:52 owner: «напишите в поддержку — это нашему боту? бот перепроверит UID и подключит?». A UID sent to the bot is checked with
 # the BingX partner API (cnq/api/bingx.py, CNQ_BINGX_AGENT_KEY / _SECRET); without the partner key it is queued for the owner (24 h).
 # Only the number is stored (bot_uids) — a UID is not a secret and gives no access to the account.
@@ -67,7 +88,7 @@ UID_RE = re.compile(r"(?i)^\s*(?:bingx\s*)?(?:uid|юид|уид|айди|id)?\s*
 UID_REPLY = {
     "ok": "UID {uid} подтверждён: счёт открыт по ссылке CRYPTO NOVA и пополнен. Спасибо! Дальше — сделки и портфель в приложении CRYPTO NOVA. "
           "Когда запустим копирование в один клик, напишу вам первым.",
-    "no_deposit": "Счёт {uid} открыт по ссылке CRYPTO NOVA, но пока не пополнен. Пополните его в USDT и пришлите UID ещё раз — проверю снова.",
+    "no_deposit": "Счёт {uid} открыт по ссылке CRYPTO NOVA, но пока не пополнен. Пополните его в {cur} и пришлите UID ещё раз — проверю снова.",
     "not_invited": "Счёт {uid} открыт не по ссылке CRYPTO NOVA. Ничего менять не нужно: приложением можно пользоваться и так. "
                    "Если номер с ошибкой — пришлите UID ещё раз.",
     "pending": "UID {uid} получен. Проверим вручную в течение 24 часов и ответим здесь. Пока можно открыть сделки и портфель в приложении CRYPTO NOVA.",
@@ -79,15 +100,18 @@ def uid_of(text: str) -> str | None:
     return m.group(1) if m else None
 
 
-def exchange_ref() -> str:
-    """The partner (referral) link from web/app_config.json → « по нашей ссылке: …», or «» when it is not set yet."""
+def exchange_ref(key: str = "exchange_ref") -> str:
+    """The partner (referral) link from web/app_config.json (exchange_ref = BingX, okx_ref = OKX) → « по нашей ссылке: …»,
+    or «» when it is not set yet (OKX: the plain EU site, no partner wording)."""
     try:
         here = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(here, "..", "..", "web", "app_config.json"), encoding="utf-8") as f:
-            ref = (json.load(f) or {}).get("exchange_ref")
-        return f" по нашей ссылке: {ref}" if ref else ""
+            ref = (json.load(f) or {}).get(key)
+        if ref:
+            return f" по нашей ссылке: {ref}"
     except Exception:  # noqa: BLE001
-        return ""
+        pass
+    return ": https://www.okx.com/eu" if key == "okx_ref" else ""
 
 
 HELP = ("Система CRYPTO NOVA:\n— утренний обзор рынка (08:00 Киев), разбор главных новостей днём, итоги дня вечером;\n"
@@ -197,20 +221,43 @@ class Mailbox:
         r = self.conn.execute("SELECT v FROM bot_meta WHERE k='owner_chat'").fetchone()
         return int(r[0]) if r else None
 
-    def uid(self, chat_id: int, username: str | None, uid: str, now: int, check=None) -> str:
-        """Record a BingX UID and check it once; → the reply for the person. check(uid) → bingx.check_referral result."""
+    def region(self, chat_id: int) -> str | None:
+        """'eu' | 'world' | None — the answer to «Где вы живёте?» (decision B)."""
+        try:
+            r = self.conn.execute("SELECT region FROM bot_region WHERE chat_id=?", (chat_id,)).fetchone()
+        except sqlite3.OperationalError:
+            return None
+        return r[0] if r and r[0] in ("eu", "world") else None
+
+    def set_region(self, chat_id: int, region: str | None, now: int, what: str | None = None) -> str | None:
+        """Remember the region (and the strategy the person came for); → that strategy key (the last one asked)."""
+        self.conn.execute("CREATE TABLE IF NOT EXISTS bot_region(chat_id INTEGER PRIMARY KEY, region TEXT, what TEXT, time INTEGER)")
+        old = self.conn.execute("SELECT what FROM bot_region WHERE chat_id=?", (chat_id,)).fetchone()
+        what = what or (old[0] if old else None)
+        self.conn.execute("INSERT OR REPLACE INTO bot_region VALUES(?,?,?,?)", (chat_id, region, what, now))
+        self.conn.commit()
+        return what
+
+    def uid(self, chat_id: int, username: str | None, uid: str, now: int, check=None, exchange: str | None = None) -> str:
+        """Record a UID and check it once; → the reply for the person. EU (decision B) → OKX (cnq/api/okx_aff.py), else BingX
+        (cnq/api/bingx.py). check(uid) → {ok, reason, invited, deposited, kyc}."""
         self.conn.execute("CREATE TABLE IF NOT EXISTS bot_uids(time INTEGER, chat_id INTEGER, username TEXT, uid TEXT, status TEXT, detail TEXT, notified INTEGER)")
+        exchange = exchange or ("okx" if self.region(chat_id) == "eu" else "bingx")
         if check is None:
-            from ..api.bingx import check_referral as check
+            if exchange == "okx":
+                from ..api.okx_aff import check_invitee as check
+            else:
+                from ..api.bingx import check_referral as check
         try:
             res = check(uid) or {}
         except Exception as e:  # noqa: BLE001
             res = {"ok": False, "reason": "exchange_error", "detail": str(e)[:120]}
         status = "ok" if res.get("ok") else res.get("reason") if res.get("reason") in ("no_deposit", "not_invited") else "pending"
-        detail = json.dumps({k: res.get(k) for k in ("reason", "invited", "deposited", "kyc") if k in res}, ensure_ascii=False)
+        detail = json.dumps({"exchange": exchange, **{k: res.get(k) for k in ("reason", "invited", "deposited", "kyc") if k in res}},
+                            ensure_ascii=False)
         self.conn.execute("INSERT INTO bot_uids VALUES(?,?,?,?,?,?,0)", (now, chat_id, username, uid, status, detail))
         self.conn.commit()
-        return UID_REPLY[status].format(uid=uid)
+        return UID_REPLY[status].format(uid=uid, cur="USDC или евро" if exchange == "okx" else "USDT")
 
     def notify_uids(self, token: str, owner_chat: int | None) -> int:
         """Tell the owner about each new UID once: verified ones for his records, «pending» ones to check by hand."""
@@ -220,13 +267,19 @@ class Mailbox:
             rows = self.conn.execute("SELECT rowid, username, chat_id, uid, status FROM bot_uids WHERE notified=0").fetchall()
         except sqlite3.OperationalError:
             return 0
-        ru = {"ok": "подтверждён (по ссылке CRYPTO NOVA, пополнен)", "no_deposit": "по нашей ссылке, но не пополнен",
-              "not_invited": "открыт не по нашей ссылке", "pending": "нужна ручная проверка в партнёрском кабинете BingX (ключ партнёра не подключён)"}
         n = 0
         for rid, un, cid, uid, st in rows:
             who = f"@{un}" if un else f"id {cid}"
             try:
-                _api(token, "sendMessage", {"chat_id": owner_chat, "text": f"UID BingX от {who}: {uid} — {ru.get(st, st)}."})
+                ex = (json.loads(self.conn.execute("SELECT detail FROM bot_uids WHERE rowid=?", (rid,)).fetchone()[0] or "{}") or {}).get("exchange")
+            except Exception:  # noqa: BLE001
+                ex = None
+            exn = "OKX" if ex == "okx" else "BingX"
+            ru = {"ok": "подтверждён (по ссылке CRYPTO NOVA, пополнен)", "no_deposit": "по нашей ссылке, но не пополнен",
+                  "not_invited": "открыт не по нашей ссылке",
+                  "pending": f"нужна ручная проверка в партнёрском кабинете {exn} (ключ партнёра не подключён)"}
+            try:
+                _api(token, "sendMessage", {"chat_id": owner_chat, "text": f"UID {exn} от {who}: {uid} — {ru.get(st, st)}."})
                 self.conn.execute("UPDATE bot_uids SET notified=1 WHERE rowid=?", (rid,))
                 n += 1
             except Exception:  # noqa: BLE001
@@ -325,7 +378,7 @@ class Mailbox:
             else:
                 self.conn.execute("INSERT INTO bot_chats VALUES(?,?,?,?,?,1)", (cid, frm.get("username"), frm.get("first_name"), now, now)); n_new += 1
             text = (m.get("text") or "").strip()
-            reply = None
+            reply, markup = None, None
             own = self.owner_chat(owner_username)
             is_owner = (own is not None and frm.get("id") == own) or (
                 owner_username and (frm.get("username") or "").lower() == owner_username.lstrip("@").lower())
@@ -334,8 +387,15 @@ class Mailbox:
                          "этот бот) — я проверю, что вы его администратор, и подключу. Бот должен быть администратором канала.")
             elif text.startswith("/start connect_"):
                 what = text.split("connect_", 1)[1].strip().split()[0][:40]
-                reply = CONNECT.format(name=connect_name(what), ref=exchange_ref())
+                reply, markup = REGION_Q.format(name=connect_name(what)), REGION_KB      # decision B: ask where the person lives first
+                self.set_region(cid, self.region(cid), now, what)
                 self.lead(cid, frm.get("username"), frm.get("first_name"), what, now)
+            elif EU_RE.match(text) or WORLD_RE.match(text):
+                eu = bool(EU_RE.match(text))
+                what = self.set_region(cid, "eu" if eu else "world", now) or "cryptonova"
+                reply = (CONNECT_OKX.format(name=connect_name(what), ref=exchange_ref("okx_ref")) if eu
+                         else CONNECT.format(name=connect_name(what), ref=exchange_ref()))
+                markup = {"remove_keyboard": True}
             elif text.startswith("/start"):
                 reply = WELCOME
             elif text.startswith("/help"):
@@ -345,14 +405,15 @@ class Mailbox:
             elif uid_of(text):
                 reply = self.uid(cid, frm.get("username"), uid_of(text), now)
             elif re.search(r"(?i)\buid\b|\bюид\b", text) and not re.search(r"\d{6,12}", text):
-                reply = "Пришлите UID цифрами: это номер вашего счёта BingX — в приложении биржи нажмите на аватар, UID рядом с ним."
+                reply = "Пришлите UID цифрами: это номер вашего счёта на бирже — в приложении биржи откройте профиль, UID рядом с именем."
             elif text:
                 reply = answer_fn(text, {"chat_id": cid, "username": frm.get("username")}) if answer_fn else None
                 if not reply:
                     reply = "Спасибо, сообщение получено — ответим в течение дня. Обзоры рынка: @crypto_nova_news"
             if reply:
                 try:
-                    _api(token, "sendMessage", {"chat_id": cid, "text": reply, "parse_mode": "HTML", "disable_web_page_preview": True}); n_reply += 1
+                    _api(token, "sendMessage", {"chat_id": cid, "text": reply, "parse_mode": "HTML", "disable_web_page_preview": True,
+                                                **({"reply_markup": markup} if markup else {})}); n_reply += 1
                 except Exception:  # noqa: BLE001
                     pass
         self.set_meta("offset", str(offset))

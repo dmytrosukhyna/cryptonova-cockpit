@@ -41,7 +41,7 @@
       "id": "where_money",
       "topic": "money",
       "q": "Where is my money?",
-      "a": "In demo the money is virtual — it exists only in the app. If you trade for real, your money sits in your own account on the exchange (currently BingX), not with us. CRYPTO NOVA doesn't accept, hold or withdraw money — only you control it.",
+      "a": "In demo the money is virtual — it exists only in the app. If you trade for real, your money sits in your own account on the exchange (OKX in the EU, BingX elsewhere), not with us. CRYPTO NOVA doesn't accept, hold or withdraw money — only you control it.",
       "tags": [
         "money",
         "kept",
@@ -133,7 +133,7 @@
       "id": "referral",
       "topic": "money",
       "q": "Why the exchange and the referral link?",
-      "a": "To be honest: if you open a BingX account through our link, the exchange gives CRYPTO NOVA part of its own fee. That's how we earn, and why the app has no subscription. Your fees and the exchange's terms don't change. And through the link we can check your UID and connect the system to your real account.",
+      "a": "To be honest: if you open an exchange account through our link (BingX outside the EU; there is no partner link for OKX in the EU yet), the exchange gives CRYPTO NOVA part of its own fee. That's how we earn, and why the app has no subscription. Your fees and the exchange's terms don't change. And through the link we can check your UID and connect the system to your real account.",
       "tags": [
         "referral",
         "ref",
@@ -235,7 +235,7 @@
       "id": "vip",
       "topic": "how",
       "q": "What is a real account?",
-      "a": "A “Real account” is for those ready to use real money. The steps: open an account on the BingX exchange through our partner link, fund it and enter your UID — your account number on the exchange — in the app. The app checks it and connects the system to your account. You repeat the system's trades yourself. 18+ only.",
+      "a": "A “Real account” is for those ready to use real money. The steps: open an account on an exchange that works in your country (OKX in the EU, BingX elsewhere through our partner link), fund it and enter your UID — your account number on the exchange — in the app. The app checks it and connects the system to your account. You repeat the system's trades yourself. 18+ only.",
       "tags": [
         "real account",
         "real",
@@ -254,7 +254,7 @@
       "id": "uid",
       "topic": "how",
       "q": "What is a UID and where do I find it?",
-      "a": "A UID is your account number on the exchange, like a customer number at a bank. In BingX you'll find it in your profile, and you can copy it. We only need it to check that the account was opened through our link — it gives us neither money nor access to your account.",
+      "a": "A UID is your account number on the exchange, like a customer number at a bank. In the exchange app (OKX or BingX) you'll find it in your profile, and you can copy it. We only need it to check that the account was opened through our link — it gives us neither money nor access to your account.",
       "tags": [
         "uid",
         "number",

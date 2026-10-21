@@ -40,9 +40,23 @@ def test_connect_deep_link_explains_terms_and_tells_the_owner_once():
     botmail._api = fake_api
     mb = botmail.Mailbox(conn)
     mb.poll("t")
+    first = [d for m, d in calls if m == "sendMessage"][0]
+    assert "CRYPTO NOVA (отобранные сигналы)" in first["text"] and "Где вы живёте" in first["text"]   # 22.10 decision B: region first
+    assert first["reply_markup"]["keyboard"][0][0]["text"] == "Живу в ЕС"
+    # the answer «другая страна» → the BingX steps for the strategy asked before
+    calls.clear()
+    def answer_api(token, method, data=None, timeout=20):
+        calls.append((method, data))
+        if method == "getUpdates":
+            return {"ok": True, "result": [{"update_id": 2, "message": {"chat": {"id": 777, "type": "private"}, "from": {"username": "ivan_k"},
+                                                                       "text": "Живу в другой стране"}}]}
+        return {"ok": True}
+    botmail._api = answer_api
+    mb.poll("t")
     reply = [d for m, d in calls if m == "sendMessage"][0]["text"]
     assert "CRYPTO NOVA (отобранные сигналы)" in reply and "бесплатно" not in reply and "пошаговая инструкция" in reply.lower()
-    assert "10%" not in reply and "ключ" not in reply.lower()       # 21.10 owner: referral only — no fee, no API keys
+    assert "BingX" in reply and "10%" not in reply and "ключ" not in reply.lower()       # 21.10 owner: referral only — no fee, no API keys
+    botmail._api = fake_api
     calls.clear()
     assert mb.notify_leads("t", 555) == 1 and mb.notify_leads("t", 555) == 0
     note = [d for m, d in calls if m == "sendMessage"][0]
@@ -168,3 +182,60 @@ def test_uid_is_checked_and_answered_honestly_and_the_owner_hears_once():
     assert "не пополнен" in mb.uid(1, "x", "22222222", 0, check=lambda u: {"ok": False, "reason": "no_deposit", "invited": True, "deposited": False})
     assert "не по ссылке" in mb.uid(1, "x", "33333333", 0, check=lambda u: {"ok": False, "reason": "not_invited"})
     assert "вручную" in mb.uid(1, "x", "44444444", 0, check=lambda u: (_ for _ in ()).throw(RuntimeError("net")))
+
+
+def test_eu_resident_gets_okx_never_bingx_and_the_uid_goes_to_okx():
+    """22.10 decision B: an EU resident is pointed to OKX (USDC/EUR, X-Perps) and never sees BingX; the UID is checked as an OKX UID."""
+    conn = sqlite3.connect(":memory:")
+    calls = []
+    msgs = iter([["/start connect_capital"], ["Живу в ЕС"], ["12345678"]])
+
+    def fake_api(token, method, data=None, timeout=20):
+        calls.append((method, data))
+        if method == "getUpdates":
+            batch = next(msgs, [])
+            return {"ok": True, "result": [{"update_id": 10 + i, "message": {"chat": {"id": 31, "type": "private"}, "from": {"username": "eva"},
+                                                                         "text": t}} for i, t in enumerate(batch)]}
+        return {"ok": True}
+    botmail._api = fake_api
+    import os
+    for k in ("CNQ_OKX_AFF_KEY", "CNQ_OKX_AFF_SECRET", "CNQ_OKX_AFF_PASSPHRASE"):
+        os.environ.pop(k, None)
+    mb = botmail.Mailbox(conn)
+    mb.poll("t"); mb.poll("t")
+    okx = [d for m, d in calls if m == "sendMessage"][-1]
+    assert "OKX" in okx["text"] and "USDC" in okx["text"] and "X-Perps" in okx["text"] and "bingx" not in okx["text"].lower()
+    assert "okx.com/eu" in okx["text"] and okx["reply_markup"] == {"remove_keyboard": True}
+    assert mb.region(31) == "eu"
+    mb.poll("t")
+    uid_reply = [d for m, d in calls if m == "sendMessage"][-1]["text"]
+    assert "12345678" in uid_reply and "24 час" in uid_reply and "bingx" not in uid_reply.lower()
+    st, detail = conn.execute("SELECT status, detail FROM bot_uids").fetchone()
+    assert st == "pending" and '"exchange": "okx"' in detail
+    calls.clear()
+    assert mb.notify_uids("t", 555) == 1
+    assert "UID OKX" in [d for m, d in calls if m == "sendMessage"][0]["text"]
+    # the region answers are recognised, other text is not
+    assert botmail.EU_RE.match("ЕС") and botmail.EU_RE.match("Живу в ЕС") and botmail.WORLD_RE.match("другая страна")
+    assert not botmail.EU_RE.match("что в ЕС с налогами?") and not botmail.WORLD_RE.match("привет")
+    # an OKX UID with no deposit asks for USDC or euro, not USDT
+    assert "USDC или евро" in mb.uid(31, "eva", "87654321", 0, check=lambda u: {"ok": False, "reason": "no_deposit", "invited": True})
+
+
+def test_okx_affiliate_check_reads_the_invitee_detail():
+    from cnq.api import okx_aff
+    assert okx_aff.check_invitee("123", env={}) == {"ok": False, "reason": "not_configured"}
+    seen = {}
+
+    def fetch(url, headers):
+        seen["url"], seen["h"] = url, headers
+        return {"code": "0", "data": [{"depAmt": "250.5", "kycTime": "1700000000000", "volMonth": "12000", "accFee": "6.1"}]}
+    r = okx_aff.check_invitee("123456", fetch=fetch, env={"CNQ_OKX_AFF_KEY": "k", "CNQ_OKX_AFF_SECRET": "s", "CNQ_OKX_AFF_PASSPHRASE": "p"})
+    assert r["ok"] and r["reason"] == "ok" and r["kyc"] and r["volume_month"] == 12000
+    assert seen["url"] == "https://www.okx.com/api/v5/affiliate/invitee/detail?uid=123456"
+    assert seen["h"]["OK-ACCESS-KEY"] == "k" and seen["h"]["OK-ACCESS-PASSPHRASE"] == "p" and seen["h"]["OK-ACCESS-SIGN"]
+    env = {"CNQ_OKX_AFF_KEY": "k", "CNQ_OKX_AFF_SECRET": "s", "CNQ_OKX_AFF_PASSPHRASE": "p"}
+    assert okx_aff.check_invitee("1", fetch=lambda u, h: {"code": "0", "data": [{"depAmt": "0"}]}, env=env)["reason"] == "no_deposit"
+    assert okx_aff.check_invitee("1", fetch=lambda u, h: {"code": "51621", "msg": "not invitee"}, env=env)["reason"] == "not_invited"
+    assert okx_aff.check_invitee("1", fetch=lambda u, h: {"code": "50011", "msg": "rate"}, env=env)["reason"] == "exchange_error"
+    assert okx_aff.check_invitee("abc", fetch=lambda u, h: {}, env=env)["reason"] == "bad_uid"

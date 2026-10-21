@@ -43,7 +43,7 @@
       "id": "where_money",
       "topic": "money",
       "q": "¿Dónde está mi dinero?",
-      "a": "En la demo el dinero es virtual: solo existe dentro de la app. Si operas de verdad, tu dinero está en tu cuenta personal del exchange (ahora es BingX), no con nosotros. CRYPTO NOVA no recibe, no guarda ni retira dinero: solo tú lo manejas.",
+      "a": "En la demo el dinero es virtual: solo existe dentro de la app. Si operas de verdad, tu dinero está en tu cuenta personal del exchange (OKX en la UE, BingX en otros países), no con nosotros. CRYPTO NOVA no recibe, no guarda ni retira dinero: solo tú lo manejas.",
       "tags": [
         "dinero",
         "guardado",
@@ -131,7 +131,7 @@
       "id": "referral",
       "topic": "money",
       "q": "¿Para qué el exchange y el enlace de referido?",
-      "a": "Te lo decimos con sinceridad: si abres una cuenta en BingX con nuestro enlace, el exchange le da a CRYPTO NOVA una parte de su propia comisión. Así ganamos dinero, y por eso la app no tiene suscripción. Tus comisiones y las condiciones del exchange no cambian. Y con el enlace podemos comprobar tu UID y conectar el sistema a tu cuenta real.",
+      "a": "Te lo decimos con sinceridad: si abres una cuenta en un exchange con nuestro enlace (BingX fuera de la UE; para OKX en la UE aún no hay enlace de socio), el exchange le da a CRYPTO NOVA una parte de su propia comisión. Así ganamos dinero, y por eso la app no tiene suscripción. Tus comisiones y las condiciones del exchange no cambian. Y con el enlace podemos comprobar tu UID y conectar el sistema a tu cuenta real.",
       "tags": [
         "referido",
         "referidos",
@@ -231,7 +231,7 @@
       "id": "vip",
       "topic": "how",
       "q": "¿Qué es la cuenta real?",
-      "a": "La «Cuenta real» es para quien está listo para usar dinero de verdad. Los pasos: abrir una cuenta en el exchange BingX con nuestro enlace de socio, depositar fondos e introducir en la app tu UID, el número de tu cuenta en el exchange. La app lo comprueba y conecta el sistema a tu cuenta. Las operaciones del sistema las repites tú. Solo para mayores de 18 años.",
+      "a": "La «Cuenta real» es para quien está listo para usar dinero de verdad. Los pasos: abrir una cuenta en un exchange que funcione en tu país (OKX en la UE, BingX en otros países con nuestro enlace de socio), depositar fondos e introducir en la app tu UID, el número de tu cuenta en el exchange. La app lo comprueba y conecta el sistema a tu cuenta. Las operaciones del sistema las repites tú. Solo para mayores de 18 años.",
       "tags": [
         "cuenta real",
         "real",
@@ -249,7 +249,7 @@
       "id": "uid",
       "topic": "how",
       "q": "¿Qué es el UID y dónde lo encuentro?",
-      "a": "El UID es el número de tu cuenta en el exchange, como el número de cliente en un banco. En BingX está en tu perfil y lo puedes copiar. Solo lo necesitamos para comprobar que la cuenta se abrió con nuestro enlace: no nos da ni dinero ni acceso a tu cuenta.",
+      "a": "El UID es el número de tu cuenta en el exchange, como el número de cliente en un banco. En la app del exchange (OKX o BingX) está en tu perfil y lo puedes copiar. Solo lo necesitamos para comprobar que la cuenta se abrió con nuestro enlace: no nos da ni dinero ni acceso a tu cuenta.",
       "tags": [
         "uid",
         "número",

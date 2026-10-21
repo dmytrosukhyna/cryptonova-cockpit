@@ -1,148 +1,67 @@
-/* Copy of the CRYPTO NOVA brand sphere for the system panel. Source of truth: cryptonova-site/assets/sphere.js — change it there, then copy here.
-   Panel copy adds: a canvas hidden when it mounted (chat, report window) resizes itself when shown; a 0-px canvas is skipped; one failing canvas does not stop the rest. */
-/* CRYPTO NOVA — the NOVA AI sphere. One crisp glass sphere with a slowly turning light lattice inside.
-   NovaSphere.mount(canvas, {ring:true}) animates it; NovaSphere.draw(ctx, cx, cy, R, t, opt) draws one frame (icons, exports).
-   Brand rule: crisp rim, tight glow, smooth slow motion — never a blurry blob. */
+/* Copied from cryptonova-site/assets/sphere.js — the single source of truth; change it there and copy here. */
+/* CRYPTO NOVA — the NOVA AI sphere: the white plasma sphere the system shows while NOVA gives its report
+   (owner 21.10 16:31: «красивая, беленькая, светилась при докладе» — that one, not a planet).
+   Drawn on a 64-unit design grid and scaled to any size at the screen's pixel density, so the edge stays crisp.
+   NovaSphere.draw(ctx, cx, cy, half, t, {busy, still}) — one frame in a box of 2·half;
+   NovaSphere.mount(canvas, {busy: fn}) — animates a canvas; every <canvas data-sphere> mounts itself. */
 (function (w) {
   "use strict";
   var TAU = Math.PI * 2;
-  function rgba(c, a) { return "rgba(" + c + "," + a.toFixed(3) + ")"; }
+  var SPARKS = [];
+  for (var i = 0; i < 8; i++) SPARKS.push({ a: i * 0.8, r: 0.6 + 0.32 * Math.sin(i * 2.1), sp: 0.8 + i * 0.15, tilt: 0.45 + i * 0.37, sz: 1.1 + (i % 3) * 0.55 });
 
-  /* project a point on the unit sphere: spin around Y, then tilt toward the viewer around X */
-  function proj(lat, lon, spin, tilt) {
-    var cl = Math.cos(lat), x = cl * Math.cos(lon + spin), y = Math.sin(lat), z = cl * Math.sin(lon + spin);
-    var ct = Math.cos(tilt), st = Math.sin(tilt);
-    return { x: x, y: y * ct - z * st, z: y * st + z * ct };
-  }
-
-  /* a neural lattice: points spread evenly over the sphere, each wired to its nearest neighbours */
-  var NET = {};
-  function net(n) {
-    if (NET[n]) return NET[n];
-    var P = [], E = [], ga = Math.PI * (3 - Math.sqrt(5));
-    for (var i = 0; i < n; i++) { var y = 1 - (i + 0.5) / n * 2, r = Math.sqrt(1 - y * y), th = ga * i; P.push({ lat: Math.asin(y), lon: Math.atan2(Math.sin(th) * r, Math.cos(th) * r) }); }
-    function v(p) { return [Math.cos(p.lat) * Math.cos(p.lon), Math.sin(p.lat), Math.cos(p.lat) * Math.sin(p.lon)]; }
-    var V = P.map(v), seen = {};
-    V.forEach(function (a, i) {
-      var d = V.map(function (b, j) { return [j, (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2])]; }).sort(function (x, y) { return x[1] - y[1]; });
-      for (var k = 1; k <= 4; k++) { var j = d[k][0], key = Math.min(i, j) + "-" + Math.max(i, j); if (!seen[key]) { seen[key] = 1; E.push([i, j]); } }
-    });
-    return (NET[n] = { P: P, E: E });
-  }
-
-  function lattice(ctx, cx, cy, R, t, spin, tilt, small, still) {
-    var nw = net(small ? 22 : 72), Q = nw.P.map(function (p) { return proj(p.lat, p.lon, spin, tilt); }), lw = Math.max(0.8, R / 110);
-    ctx.lineCap = "round";
-    nw.E.forEach(function (e) {
-      var a = Q[e[0]], b = Q[e[1]], z = (a.z + b.z) / 2;
-      ctx.strokeStyle = z > 0 ? rgba("205,240,255", 0.12 + 0.36 * z) : rgba("140,190,255", 0.06);
-      ctx.lineWidth = z > 0 ? lw : lw * 0.8;
-      ctx.beginPath(); ctx.moveTo(cx + a.x * R, cy - a.y * R); ctx.lineTo(cx + b.x * R, cy - b.y * R); ctx.stroke();
-    });
-    // signals running along the wires
-    if (!still) {
-      var m = small ? 3 : 14;
-      for (var k = 0; k < m; k++) {
-        var tk = Math.abs(t) * 0.7 + k * 0.31, e = nw.E[(k * 37 + Math.floor(tk)) % nw.E.length], ph = tk % 1;
-        var a = Q[e[0]], b = Q[e[1]], x = a.x + (b.x - a.x) * ph, y = a.y + (b.y - a.y) * ph, z = a.z + (b.z - a.z) * ph;
-        if (z <= 0) continue;
-        var r = Math.max(1, R / 55) * (0.6 + 0.4 * z);
-        var g = ctx.createRadialGradient(cx + x * R, cy - y * R, 0, cx + x * R, cy - y * R, r * 4);
-        g.addColorStop(0, rgba("140,255,214", 0.55 * z)); g.addColorStop(1, "rgba(140,255,214,0)");
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx + x * R, cy - y * R, r * 4, 0, TAU); ctx.fill();
-        ctx.fillStyle = rgba("230,255,246", 0.9 * z); ctx.beginPath(); ctx.arc(cx + x * R, cy - y * R, r, 0, TAU); ctx.fill();
-      }
-    }
-    Q.forEach(function (q) {
-      if (q.z <= -0.2) return;
-      var r = Math.max(0.9, R / 70) * (0.55 + 0.45 * Math.max(0, q.z));
-      ctx.fillStyle = rgba("235,250,255", 0.25 + 0.6 * Math.max(0, q.z)); ctx.beginPath(); ctx.arc(cx + q.x * R, cy - q.y * R, r, 0, TAU); ctx.fill();
-    });
-  }
-
-  function draw(ctx, cx, cy, R, t, opt) {
+  function draw(g, cx0, cy0, half, t, opt) {
     opt = opt || {};
-    var small = R < 34, spin = t * 0.18, tilt = 0.42, breathe = 0.5 + 0.5 * Math.sin(t * 1.3);
-    // tight halo — just enough to read as light, edge stays sharp
-    var g = ctx.createRadialGradient(cx, cy, R * 0.92, cx, cy, R * (small ? 1.28 : 1.42));
-    g.addColorStop(0, rgba("110,200,255", 0.30 + 0.08 * breathe)); g.addColorStop(1, "rgba(110,200,255,0)");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.45, 0, TAU); ctx.fill();
-    if (opt.ring) {   // back half of the orbit ring
-      ring(ctx, cx, cy, R, t, false);
+    var busy = !!opt.busy, k = half / 32, cx = 32, cy = 32;
+    g.save(); g.translate(cx0 - half, cy0 - half); g.scale(k, k);
+    var R = 9.5 + 1.1 * Math.sin(t * 2) + (busy ? 1.6 * Math.abs(Math.sin(t * 7)) : 0);
+    // soft light around the sphere
+    var hz = g.createRadialGradient(cx, cy, R * 0.3, cx, cy, 31);
+    hz.addColorStop(0, "rgba(150,215,255,.55)"); hz.addColorStop(0.45, "rgba(90,170,255,.22)"); hz.addColorStop(1, "rgba(90,170,255,0)");
+    g.fillStyle = hz; g.beginPath(); g.arc(cx, cy, 31.5, 0, TAU); g.fill();
+    var pts = SPARKS.map(function (s) { var a = s.a + t * s.sp, x = Math.cos(a) * 22 * s.r, z = Math.sin(a) * 22 * s.r; return { a: a, s: s, x: cx + x, y: cy + z * Math.sin(s.tilt) * 0.6, z: Math.cos(s.tilt) * z }; });
+    function spark(p) {
+      var q = (p.z + 22) / 44;
+      for (var j = 3; j >= 1; j--) {
+        var a2 = p.a - j * 0.09 * p.s.sp, x2 = cx + Math.cos(a2) * 22 * p.s.r, z2 = Math.sin(a2) * 22 * p.s.r;
+        g.fillStyle = "rgba(150,215,255," + (0.10 * (4 - j) * (0.4 + q)).toFixed(3) + ")"; g.beginPath(); g.arc(x2, cy + z2 * Math.sin(p.s.tilt) * 0.6, p.s.sz * (0.5 + 0.6 * q), 0, TAU); g.fill();
+      }
+      g.fillStyle = "rgba(" + (q > 0.5 ? "245,251,255" : "160,220,255") + "," + (0.5 + 0.5 * q).toFixed(3) + ")"; g.shadowColor = "rgba(140,210,255,1)"; g.shadowBlur = (5 + 8 * q) * k;
+      g.beginPath(); g.arc(p.x, p.y, p.s.sz * (0.65 + 0.85 * q), 0, TAU); g.fill(); g.shadowBlur = 0;
     }
-    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.clip();
-    // glass body: ice light from the upper left falling into deep navy
-    var b = ctx.createRadialGradient(cx - R * 0.06, cy - R * 0.08, 0, cx, cy, R * 1.08);
-    b.addColorStop(0, "#EFFBFF"); b.addColorStop(0.16, "#9BE2FF"); b.addColorStop(0.42, "#2F8BEA");
-    b.addColorStop(0.7, "#14409E"); b.addColorStop(0.9, "#0A1D57"); b.addColorStop(1, "#050B22");
-    ctx.fillStyle = b; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-    // a second, cooler light from below — gives the glass depth
-    var d = ctx.createRadialGradient(cx + R * 0.38, cy + R * 0.62, 0, cx + R * 0.38, cy + R * 0.62, R * 0.95);
-    d.addColorStop(0, "rgba(96,120,255,.42)"); d.addColorStop(1, "rgba(96,120,255,0)");
-    ctx.fillStyle = d; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-    // the core breathing inside
-    var c = ctx.createRadialGradient(cx - R * 0.06, cy - R * 0.08, 0, cx - R * 0.06, cy - R * 0.08, R * 0.5);
-    c.addColorStop(0, rgba("255,255,255", 0.35 + 0.2 * breathe)); c.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = c; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-    lattice(ctx, cx, cy, R * 0.9, t, spin, tilt, small, opt.still);
-    // edge shading → volume
-    var e = ctx.createRadialGradient(cx, cy, R * 0.78, cx, cy, R);
-    e.addColorStop(0, "rgba(2,6,22,0)"); e.addColorStop(1, "rgba(2,6,22,.55)");
-    ctx.fillStyle = e; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-    // bottom caustic
-    var f = ctx.createRadialGradient(cx + R * 0.05, cy + R * 1.02, 0, cx + R * 0.05, cy + R * 1.02, R * 0.62);
-    f.addColorStop(0, "rgba(140,230,255,.38)"); f.addColorStop(1, "rgba(140,230,255,0)");
-    ctx.fillStyle = f; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
-    // specular highlight
-    ctx.save(); ctx.translate(cx - R * 0.36, cy - R * 0.5); ctx.rotate(-0.55); ctx.scale(1, 0.52);
-    var h = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.34);
-    h.addColorStop(0, "rgba(255,255,255,.72)"); h.addColorStop(0.55, "rgba(255,255,255,.18)"); h.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = h; ctx.beginPath(); ctx.arc(0, 0, R * 0.34, 0, TAU); ctx.fill(); ctx.restore();
-    ctx.restore();
-    // crisp rim
-    var rg = ctx.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
-    rg.addColorStop(0, "rgba(225,247,255,.95)"); rg.addColorStop(0.5, "rgba(120,200,255,.55)"); rg.addColorStop(1, "rgba(80,120,255,.85)");
-    ctx.strokeStyle = rg; ctx.lineWidth = Math.max(1, R / 55); ctx.beginPath(); ctx.arc(cx, cy, R - ctx.lineWidth / 2, 0, TAU); ctx.stroke();
-    if (opt.ring) ring(ctx, cx, cy, R, t, true);
+    if (!opt.still) pts.filter(function (p) { return p.z < 0; }).forEach(spark);
+    // rings behind the core (back halves dimmer)
+    for (var i = 0; i < 3; i++) { var rx = 17 + i * 5, ry = rx * Math.abs(Math.sin(t * (0.6 + i * 0.35) + i * 1.3)), rot = t * (0.45 - i * 0.27); g.strokeStyle = "rgba(190,232,255," + (0.22 + 0.12 * i) + ")"; g.lineWidth = 0.75; g.beginPath(); g.ellipse(cx, cy, rx, Math.max(0.6, ry), rot, Math.PI, TAU); g.stroke(); }
+    // plasma core: white centre, ice body, glowing rim
+    var cg = g.createRadialGradient(cx - R * 0.35, cy - R * 0.4, 0.5, cx, cy, R);
+    cg.addColorStop(0, "#ffffff"); cg.addColorStop(0.35, "#d6f1ff"); cg.addColorStop(0.7, "#6cc2ff"); cg.addColorStop(1, "rgba(60,150,255,.55)");
+    g.fillStyle = cg; g.shadowColor = "#8fd3ff"; g.shadowBlur = (18 + (busy ? 10 : 0)) * k; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.fill(); g.shadowBlur = 0;
+    // a slow swirl inside
+    g.save(); g.beginPath(); g.arc(cx, cy, R * 0.92, 0, TAU); g.clip();
+    for (var m = 0; m < 3; m++) { g.strokeStyle = "rgba(255,255,255," + (0.35 - 0.08 * m) + ")"; g.lineWidth = 0.9; g.beginPath(); g.arc(cx + Math.cos(t * 1.3 + m * 2.1) * R * 0.25, cy + Math.sin(t * 1.1 + m * 2.1) * R * 0.25, R * (0.45 + 0.15 * m), t * (1.6 + m * 0.4) + m, t * (1.6 + m * 0.4) + m + 2.2); g.stroke(); }
+    g.restore();
+    g.fillStyle = "rgba(255,255,255,.85)"; g.beginPath(); g.ellipse(cx - R * 0.38, cy - R * 0.45, R * 0.22, R * 0.13, -0.6, 0, TAU); g.fill();
+    // rings in front
+    for (var n = 0; n < 3; n++) { var rx2 = 17 + n * 5, ry2 = rx2 * Math.abs(Math.sin(t * (0.6 + n * 0.35) + n * 1.3)), rot2 = t * (0.45 - n * 0.27); g.strokeStyle = "rgba(225,245,255," + (0.45 + 0.15 * n) + ")"; g.lineWidth = 0.85; g.shadowColor = "rgba(140,210,255,.9)"; g.shadowBlur = 3 * k; g.beginPath(); g.ellipse(cx, cy, rx2, Math.max(0.6, ry2), rot2, 0, Math.PI); g.stroke(); g.shadowBlur = 0; }
+    if (!opt.still) pts.filter(function (p) { return p.z >= 0; }).forEach(spark);
+    g.restore();
   }
 
-  /* a thin tilted orbit with one satellite — the sphere is "working" */
-  function ring(ctx, cx, cy, R, t, front) {
-    var rx = R * 1.32, ry = R * 0.36, rot = -0.32, a0 = front ? 0 : Math.PI, a1 = front ? Math.PI : TAU;
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
-    ctx.strokeStyle = front ? "rgba(170,225,255,.55)" : "rgba(170,225,255,.18)"; ctx.lineWidth = Math.max(1, R / 80);
-    ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, a0, a1); ctx.stroke();
-    var s = (t * 0.5) % TAU, inFront = Math.sin(s) > 0;
-    if (inFront === front) {
-      var x = Math.cos(s) * rx, y = Math.sin(s) * ry, r = Math.max(1.6, R / 26);
-      var g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2); g.addColorStop(0, "rgba(120,255,200,.75)"); g.addColorStop(1, "rgba(120,255,200,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, TAU); ctx.fill();
-      ctx.fillStyle = "#C9FFE9"; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  /* animate on a canvas; the sphere fills the canvas (with room for the halo/ring) */
   function mount(cv, opt) {
     if (!cv || !cv.getContext) return null;
     opt = opt || {};
-    var ctx = cv.getContext("2d"), dpr = 1, W = 0, H = 0, run = false, vis = true, t0 = performance.now();
+    var ctx = cv.getContext("2d"), W = 0, H = 0, run = false, vis = true, t = 0, last = 0;
     var reduce = w.matchMedia && w.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    function size() {
-      dpr = Math.min(w.devicePixelRatio || 1, 2);
-      W = cv.width = Math.max(1, Math.round(cv.clientWidth * dpr)); H = cv.height = Math.max(1, Math.round(cv.clientHeight * dpr));
-    }
+    function size() { var d = Math.min(3, w.devicePixelRatio || 1); W = cv.width = Math.max(1, Math.round(cv.clientWidth * d)); H = cv.height = Math.max(1, Math.round(cv.clientHeight * d)); }
     function frame(now) {
       if (!run && now !== -1) return;
-      if (Math.round(cv.clientWidth * Math.min(w.devicePixelRatio || 1, 2)) !== W) size();
-      var t = Math.max(0, ((now === -1 ? t0 + 2600 : now) - t0) / 1000);
+      var busy = typeof opt.busy === "function" ? opt.busy() : false;
+      if (now !== -1) { var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016; last = now; t += dt * (busy ? 3 : 1); } else t = t || 1.3;
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
-      var R = Math.min(W, H) / 2 / (opt.ring ? 1.5 : 1.46);
-      if (R >= 4) draw(ctx, W / 2, H / 2, R, t, { ring: opt.ring, still: now === -1 });   // hidden canvas (0 px): skip until it is shown
-      if (opt.onFrame) opt.onFrame(t);
+      draw(ctx, W / 2, H / 2, Math.min(W, H) / 2, t, { busy: busy, still: now === -1 && reduce });
       if (now !== -1) requestAnimationFrame(frame);
     }
-    function set() { var want = vis && !document.hidden && !reduce; if (want && !run) { run = true; requestAnimationFrame(frame); } else if (!want) { run = false; frame(-1); } }
+    function set() { var want = vis && !document.hidden && !reduce; if (want && !run) { run = true; last = 0; requestAnimationFrame(frame); } else if (!want) { run = false; frame(-1); } }
     size(); w.addEventListener("resize", function () { size(); if (!run) frame(-1); });
     document.addEventListener("visibilitychange", set);
     if ("IntersectionObserver" in w) new IntersectionObserver(function (en) { vis = en[0].isIntersecting; set(); }).observe(cv);
@@ -151,8 +70,7 @@
   }
 
   w.NovaSphere = { draw: draw, mount: mount };
-  /* every <canvas data-sphere> on the page comes alive by itself */
-  function auto() { [].forEach.call(document.querySelectorAll("canvas[data-sphere]"), function (c) { if (!c._sph) { try { c._sph = mount(c, { ring: c.getAttribute("data-sphere") === "ring" }); } catch (e) { /* one bad canvas must not stop the others */ } } }); }
+  function auto() { [].forEach.call(document.querySelectorAll("canvas[data-sphere]"), function (c) { if (!c._sph) c._sph = mount(c, {}); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", auto); else auto();
   w.NovaSphere.auto = auto;
 })(window);

@@ -451,17 +451,13 @@ body.tab-futures #topCard{order:-5}body.tab-futures #apRadar{order:-4}body.tab-f
  body.tab-spot #spotChart{order:1}body.tab-spot #below{order:2}body.tab-spot #memesCard{order:3}body.tab-spot #ideasCard{order:4}body.tab-spot #qualityCard{order:4}body.tab-spot #coreCard{order:5}body.tab-spot #whCard{order:6}body.tab-spot #fcCard{order:7}body.tab-spot #globeCard{order:8}body.tab-spot #aiCard{order:9}
  body.tab-futures #fdeskBox{order:1}body.tab-futures #ivanCard{order:2}body.tab-futures #topCard{order:3}body.tab-futures #apRadar{order:4}body.tab-futures #battleCard{order:5}body.tab-futures #fcCard{order:6}body.tab-futures #calCard{order:7}body.tab-futures #jrCard{order:8}body.tab-futures #macroCard{order:9}
 }
-/* ---- assistant: 21.10 owner «слишком размазанный» — one crisp brand sphere (nova-sphere.js), right-centre, draggable */
+/* ---- assistant: 21.10 owner «слишком размазанный» — the white report sphere (nova-sphere.js) everywhere, right-centre, draggable */
 #analystBtn.analyst{width:72px!important;height:72px!important;border:0!important;border-radius:50%;background:none!important;box-shadow:none!important;animation:none!important;filter:none!important;top:50%;right:10px!important;bottom:auto!important;transform:translateY(-50%);padding:0;cursor:grab;touch-action:none;z-index:40}
 #analystBtn .ring2,#analystBtn>.ico{display:none!important}
 #analystBtn .nsph{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;transition:filter .3s}
 #analystBtn:hover .nsph{filter:brightness(1.12)}
-#analystBtn.talking .nsph{filter:brightness(1.22) saturate(1.1);animation:nsphTalk .9s ease-in-out infinite}
-@keyframes nsphTalk{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
 #analystBtn .albl{display:block!important;position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);font:700 9px/1 var(--mono);letter-spacing:.14em;color:#fff;text-shadow:0 0 6px rgba(124,196,255,.8);white-space:nowrap;pointer-events:none}
-body.nova-talking .orbcv{filter:brightness(1.2) saturate(1.1)}
 .orbcv{display:block}
-@media (prefers-reduced-motion:reduce){#analystBtn.talking .nsph{animation:none}}
 @media (max-width:760px){#analystBtn.analyst{width:62px!important;height:62px!important;right:6px!important}}
 .ideas .irow{display:grid;grid-template-columns:28px 78px minmax(0,1fr) auto 26px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}.ideas .irow .n{color:var(--muted);font:600 11px var(--mono)}.ideas .irow b{font-family:var(--mono)}.ideas .irow small{display:block;font-size:10.5px;color:var(--muted)}
 .ideas .ibtn{width:22px;height:22px;border-radius:50%;border:1px solid var(--line2);background:transparent;color:#7cc4ff;font:700 12px/1 Georgia,serif;cursor:pointer}
@@ -938,7 +934,7 @@ body:not(.tab-overview) #sigRadar{display:none}
     <div class="card" id="myPortCard" hidden></div>
   </section>
   <aside class="col">
-    <div id="briefWin" class="card" hidden><div class="bh"><canvas class="orbcv" id="briefOrb" data-sphere="ring" aria-hidden="true"></canvas><b>Ассистент · доклад</b><span class="lamp"></span></div><div class="bt" id="briefTxt"></div><div class="ba"><button class="ib" id="briefOk">Понял, к работе</button><button class="ib" id="briefTour">Показать, как всё устроено</button><button class="ib sm" id="briefAsk">Спросить</button><button class="ib sm" id="briefMute" title="Остановить голос">тихо</button></div></div>
+    <div id="briefWin" class="card" hidden><div class="bh"><canvas class="orbcv" id="briefOrb" data-sphere aria-hidden="true"></canvas><b>Ассистент · доклад</b><span class="lamp"></span></div><div class="bt" id="briefTxt"></div><div class="ba"><button class="ib" id="briefOk">Понял, к работе</button><button class="ib" id="briefTour">Показать, как всё устроено</button><button class="ib sm" id="briefAsk">Спросить</button><button class="ib sm" id="briefMute" title="Остановить голос">тихо</button></div></div>
     <div class="dock" id="dock" hidden></div>
     <div class="card" id="aiCard" data-dock="bell|Важное"><h2>Ассистент · важное <span class="r"><span class="proc" id="proc"><i></i><span id="procTxt">работает</span></span></span></h2><div id="aiFeed" class="aifeed"></div></div>
     <div class="card" id="sigRadar"><h2>Радар сигналов</h2><div class="srwrap"><canvas id="srCv" role="img" aria-label="Радар сигналов: монеты по близости к входу, зелёные — открытые сделки"></canvas></div><div class="srleg"><span><i class="d g"></i>сделка открыта</span><span><i class="d a"></i>близко к входу</span><span><i class="d b"></i>ждём условия</span></div><div class="muted srnote">ближе к центру — ближе к входу · зелёные — сделка открыта</div><div class="muted srnote">Нажмите на точку — условия по монете.</div><div class="muted srnote" id="srEmpty" hidden>Данные появятся после следующего запуска сервера.</div><div class="srdet" id="srDet"></div></div>
@@ -3536,7 +3532,7 @@ function guestWelcome(){ const w=$('#welcome'); if(!w) return; WELCOME_ON=true; 
 function welcomeClose(tour){ const w=$('#welcome'); if(!w) return; WELCOME_ON=false; w.hidden=true; if(typing){ clearInterval(typing); typing=null; } try{ speechSynthesis.cancel(); }catch(e){} speaking=false; if(tour) setTimeout(()=>tourStart(0),350); else setTimeout(()=>toast('Обучение можно запустить в любой момент — кнопка «?» вверху.'),400); }
 (function welcomeInit(){ if(!$('#welcome')) return; $('#wTour').addEventListener('click',()=>welcomeClose(true)); $('#wSkip').addEventListener('click',()=>welcomeClose(false)); $('#wVoice').addEventListener('click',()=>{ VOICE_ON=true; speak(guestText()); }); window.guestWelcome=guestWelcome; })();
 
-// assistant sphere: drawn by nova-sphere.js (every <canvas data-sphere> animates itself)
+// assistant spheres (button, chat, report): the white report sphere from nova-sphere.js, mounted at the end of the page
 // ---------------------------------------------------------------- onboarding tour: dims everything, cuts a window around the element, explains, can be finished, resumed, or asked about
 const TOUR={step:+load('cnq_tour_step','0')||0,done:!!load('cnq_tour_done',''),on:false};
 const TOUR_STEPS=[   // 17.10: short, current, switches tabs by itself; on phones the box sits at the bottom
@@ -3647,6 +3643,12 @@ boot();
   a.style.display=g?'none':''; }catch(e){} }
   put(); try{ new MutationObserver(put).observe(document.body,{attributes:true,attributeFilter:['class']}); }catch(e){} })();
 </script>
-<script src="nova-sphere.js?v=20261021"></script>
+<script src="nova-sphere.js?v=20261021b"></script>
+<script>/* 21.10: mount every NOVA sphere with the speaking state (faster and brighter while NOVA talks or types); hidden ones (chat, report) resize when shown */
+(function(){ if(!window.NovaSphere) return; const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const busy=()=>{ try{ return speaking||typing!=null||document.body.classList.contains('nova-talking')||(('speechSynthesis' in window)&&speechSynthesis.speaking); }catch(e){ return false; } };
+  document.querySelectorAll('canvas[data-sphere]').forEach(c=>{ try{ if(!c._sph) c._sph=NovaSphere.mount(c,{busy}); }catch(e){ return; }
+    if('ResizeObserver' in window){ let w0=c.clientWidth; new ResizeObserver(()=>{ if(c.clientWidth===w0||!c._sph) return; w0=c.clientWidth; c._sph.size(); if(reduce) window.dispatchEvent(new Event('resize')); }).observe(c); } });
+})();</script>
 </body>
 </html>

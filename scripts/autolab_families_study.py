@@ -132,6 +132,44 @@ def xs_portfolio(data, keys, ppy, cost, top, L, skip, long_only):
     return common, out
 
 
+def market_rows(data, meta, fams):
+    rows, tried = [], 0
+    for key, (dates, c) in data.items():
+        cls = meta[key][2]
+        ppy = 365 if cls == "crypto" else 252
+        wd = np.array([dt.date.fromisoformat(d).weekday() for d in dates])
+        pos, fe = month_pos(dates)
+        days = list(range(7)) if cls == "crypto" else list(range(5))
+        fset = dict(fams)
+        fset["dow"] = ("Один день недели", days)
+        fset["dowx"] = ("Все дни, кроме одного", days)
+        for fam, (_ru, params) in fset.items():
+            raws = {p: sig(fam, p, c, dates, wd, pos, fe) for p in params}
+            for mode in A.MODES:
+                tried += len(params)
+                A._W.clear()
+                ser = {p: A.strat_returns(c, raws[p], mode, A.COST[cls], ppy) for p in params}
+                oos, start, chosen = A.walk_forward(ser, ppy)
+                st = A.stats(oos, dates[start:], ppy)
+                if not st:
+                    continue
+                h1, h2 = halves(oos, ppy)
+                rows.append({"m": key, "cls": cls, "f": fam, "mode": mode, "p": chosen[-1] if chosen else None,
+                             "sh": st["sharpe"], "cagr": st["cagr"], "dd": st["dd"], "py": f"{st['pos_years']}/{st['n_years']}",
+                             "_py": st["pos_years"] / max(1, st["n_years"]), "_ny": st["n_years"], "s3": st["sharpe3y"],
+                             "h1": h1, "h2": h2, "from": st["from"]})
+    return rows, tried
+
+
+def judge(rows, N):
+    for r in rows:
+        hurdle = math.sqrt(2 * math.log(N)) / math.sqrt(max(1, r["_ny"]))
+        r["passes"] = bool(r["sh"] >= 0.4 and r["_ny"] >= 3 and r["_py"] >= 0.6 and r["dd"] >= -35 and r["s3"] > 0)
+        r["reliable"] = bool(r["passes"] and r["sh"] >= hurdle)
+        r["hurdle"] = round(hurdle, 2)
+        r["both_halves"] = bool(r["h1"] > 0 and r["h2"] > 0)
+
+
 def main():
     t0 = time.time()
     with ThreadPoolExecutor(5) as ex:
@@ -148,30 +186,7 @@ def main():
             cover[key] = err
     A.note("families · data", json.dumps(cover, ensure_ascii=False))
     fams = {"tom": ("Начало/конец месяца", TOM), "volbrk": ("Пробой волатильности", VB)}
-    rows, tried = [], 0
-    for key, (dates, c) in data.items():
-        cls = meta[key][2]
-        ppy = 365 if cls == "crypto" else 252
-        wd = np.array([dt.date.fromisoformat(d).weekday() for d in dates])
-        pos, fe = month_pos(dates)
-        days = list(range(7)) if cls == "crypto" else list(range(5))
-        fset = dict(fams)
-        fset["dow"] = ("Один день недели", days)
-        fset["dowx"] = ("Все дни, кроме одного", days)
-        for fam, (_ru, params) in fset.items():
-            raws = {p: sig(fam, p, c, dates, wd, pos, fe) for p in params}
-            for mode in A.MODES:
-                tried += len(params)
-                ser = {p: A.strat_returns(c, raws[p], mode, A.COST[cls], ppy) for p in params}
-                oos, start, chosen = A.walk_forward(ser, ppy)
-                st = A.stats(oos, dates[start:], ppy)
-                if not st:
-                    continue
-                h1, h2 = halves(oos, ppy)
-                rows.append({"m": key, "cls": cls, "f": fam, "mode": mode, "p": chosen[-1] if chosen else None,
-                             "sh": st["sharpe"], "cagr": st["cagr"], "dd": st["dd"], "py": f"{st['pos_years']}/{st['n_years']}",
-                             "_py": st["pos_years"] / max(1, st["n_years"]), "_ny": st["n_years"], "s3": st["sharpe3y"],
-                             "h1": h1, "h2": h2, "from": st["from"]})
+    rows, tried = market_rows(data, meta, fams)
     # cross-market momentum (walk-forward over the lookback)
     xs = {}
     groups = {"noncrypto": ([k for k in data if meta[k][2] != "crypto"], 252, 0.0005, 3),
@@ -202,12 +217,7 @@ def main():
         st = A.stats(rs[b:], common[b:], ppy)
         xs[f"yardstick·{g}·equal long"] = {k: st[k] for k in ("sharpe", "cagr", "dd", "from")}
     N = len(rows) + NIGHTLY_RULES
-    for r in rows:
-        hurdle = math.sqrt(2 * math.log(N)) / math.sqrt(max(1, r["_ny"]))
-        r["passes"] = bool(r["sh"] >= 0.4 and r["_ny"] >= 3 and r["_py"] >= 0.6 and r["dd"] >= -35 and r["s3"] > 0)
-        r["reliable"] = bool(r["passes"] and r["sh"] >= hurdle)
-        r["hurdle"] = round(hurdle, 2)
-        r["both_halves"] = bool(r["h1"] > 0 and r["h2"] > 0)
+    judge(rows, N)
     clean = lambda r: {k: v for k, v in r.items() if not k.startswith("_")}  # noqa: E731
     by_f = {}
     for r in rows:
@@ -222,13 +232,36 @@ def main():
                "reliable": sum(r["reliable"] for r in rows), "minutes": round((time.time() - t0) / 60, 1)}
     A.note("families · summary", json.dumps(summary))
     A.note("families · by family", json.dumps(by_f, ensure_ascii=False))
-    passed = sorted([clean(r) for r in rows if r["passes"]], key=lambda r: -r["sh"])
-    A.note("families · passed", json.dumps(passed[:30], ensure_ascii=False))
+    fmt = lambda r: f"{r['m']} {r['f']}/{r['mode']} p={r['p']} Sh {r['sh']} ({r['h1']}/{r['h2']}) {r['cagr']}%/г dd {r['dd']} лет+ {r['py']} 3г {r['s3']} порог {r['hurdle']}{' НАДЁЖНО' if r['reliable'] else ''}"  # noqa: E731
+    passed = sorted([r for r in rows if r["passes"]], key=lambda r: -r["sh"])
+    A.note("families · passed", "\n".join(fmt(r) for r in passed))
     A.note("families · cross-market", json.dumps(xs, ensure_ascii=False))
-    idx = [clean(r) for r in rows if r["cls"] == "index" and r["f"] == "tom"]
-    A.note("families · tom on indices", json.dumps(idx, ensure_ascii=False))
-    cr = [clean(r) for r in rows if r["cls"] == "crypto" and r["f"] in ("tom", "volbrk") and r["mode"] != "inv"]
-    A.note("families · crypto tom/volbrk", json.dumps(cr, ensure_ascii=False)[:3900])
+    # parameter neighbourhood of the volatility breakout on crypto: every (k, H) on the whole history (not a test — a stability look)
+    grid = {}
+    for key, (dates, c) in data.items():
+        if meta[key][2] != "crypto":
+            continue
+        for mode in ("long", "ls"):
+            line = []
+            for p in VB:
+                A._W.clear()
+                x = A.strat_returns(c, sig("volbrk", p, c, None, None, None, None), mode, A.COST["crypto"], 365)[200:]
+                line.append(round(float(x.mean() / x.std() * math.sqrt(365)), 2) if x.std() else 0)
+            grid[f"{key}·{mode}"] = line
+    A.note("families · volbrk grid (k×H: 1.5/1,5,10 · 2/… · 2.5/…)", json.dumps(grid))
+    # NULL: the same pipeline on shuffled daily returns (no calendar, no momentum by construction) → how many pass by luck
+    rng = np.random.default_rng(7)
+    null = []
+    for rep in range(3):
+        sh_data = {}
+        for key, (dates, c) in data.items():
+            r = c[1:] / c[:-1]
+            sh_data[key] = (dates, np.r_[c[0], c[0] * np.cumprod(rng.permutation(r))])
+        nr, _ = market_rows(sh_data, meta, fams)
+        judge(nr, N)
+        null.append({"passed": sum(x["passes"] for x in nr), "reliable": sum(x["reliable"] for x in nr), "rows": len(nr),
+                     "crypto_volbrk_passed": sum(x["passes"] for x in nr if x["cls"] == "crypto" and x["f"] == "volbrk")})
+    A.note("families · null (shuffled returns, 3 runs)", json.dumps(null))
     os.makedirs("out", exist_ok=True)
     with open("out/autolab_families.json", "w", encoding="utf-8") as f:
         json.dump({"summary": summary, "by_family": by_f, "rows": [clean(r) for r in rows], "xs": xs}, f, ensure_ascii=False)

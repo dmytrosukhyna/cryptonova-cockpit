@@ -41,10 +41,20 @@ def fit_caption(text: str, limit: int = 1024) -> str:
     return out
 
 
-def send_photo(path: str, caption: str = "", token: str | None = None, chat: str | None = None, parse_mode: str = "HTML") -> bool:
-    """sendPhoto with a multipart body (stdlib only). Caption ≤ 1024 chars."""
+def send_photo(path, caption: str = "", token: str | None = None, chat: str | None = None, parse_mode: str = "HTML") -> bool:
+    """sendPhoto with a multipart body (stdlib only). Caption ≤ 1024 chars. A list of paths goes out as one album
+    (sendMediaGroup, caption under the album); if the album fails, the first picture is sent alone."""
     token = token or os.environ.get("CNQ_TG_TOKEN"); chat = chat or os.environ.get("CNQ_TG_CHAT")
-    if not token or not chat or not os.path.exists(path):
+    if isinstance(path, (list, tuple)):
+        paths = [p for p in path if p and os.path.exists(p)][:10]
+        if len(paths) >= 2 and token and chat:
+            try:
+                if send_album(paths, caption, token, chat, parse_mode):
+                    return True
+            except Exception:  # noqa: BLE001
+                pass
+        path = paths[0] if paths else ""
+    if not token or not chat or not path or not os.path.exists(path):
         return False
     import uuid
     boundary = "----cnq" + uuid.uuid4().hex
@@ -57,6 +67,24 @@ def send_photo(path: str, caption: str = "", token: str | None = None, chat: str
     req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendPhoto", data=body,
                                  headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
     with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode()).get("ok", False)
+
+
+def send_album(paths: list[str], caption: str, token: str, chat: str, parse_mode: str = "HTML") -> bool:
+    import uuid
+    boundary = "----cnq" + uuid.uuid4().hex
+    media = [{"type": "photo", "media": f"attach://p{i}"} for i in range(len(paths))]
+    media[0].update({"caption": fit_caption(caption), "parse_mode": parse_mode})
+    body = b""
+    for k, v in {"chat_id": chat, "media": json.dumps(media, ensure_ascii=False)}.items():
+        body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode()
+    for i, p in enumerate(paths):
+        body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"p{i}\"; filename=\"p{i}.png\"\r\nContent-Type: image/png\r\n\r\n".encode()
+        body += open(p, "rb").read() + b"\r\n"
+    body += f"--{boundary}--\r\n".encode()
+    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMediaGroup", data=body,
+                                 headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(req, timeout=60) as r:
         return json.loads(r.read().decode()).get("ok", False)
 
 

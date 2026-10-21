@@ -7,7 +7,7 @@ import datetime as dt
 import os
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
 except Exception:  # noqa: BLE001
     Image = None
 
@@ -55,8 +55,47 @@ def _bridge(n: int, y0: float, y1: float, amp: float, seed: int) -> list[float]:
 MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"]
 
 
+def _smooth(pts: list[tuple], k: int = 6) -> list[tuple]:
+    """Catmull-Rom through the points — the soft «wave» line of the panel."""
+    if len(pts) < 3:
+        return pts
+    out = []
+    P = [pts[0]] + pts + [pts[-1]]
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
+        for j in range(k):
+            t = j / k; t2 = t * t; t3 = t2 * t
+            out.append(tuple(0.5 * ((2 * p1[c]) + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t2 + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t3) for c in (0, 1)))
+    out.append(pts[-1])
+    return out
+
+
+def _glow(img, pts: list[tuple], col: tuple, width: int = 10, blur: float = 6, alpha: int = 150) -> None:
+    """Neon glow under a line: draw it on a transparent layer of the same colour, blur, paste. No dotted overlaps."""
+    if len(pts) < 2:
+        return
+    layer = Image.new("RGBA", img.size, col[:3] + (0,))
+    ImageDraw.Draw(layer).line(pts, fill=col[:3] + (alpha,), width=width, joint="curve")
+    layer = layer.filter(ImageFilter.GaussianBlur(blur))
+    img.paste(layer, (0, 0), layer)
+
+
+def _label(d, xy: tuple, text: str, font, col: tuple) -> None:
+    """Small text on a dark pill so a line crossing it never makes it unreadable."""
+    x, y = xy; w = d.textlength(text, font=font)
+    d.rounded_rectangle([x - 5, y - 2, x + w + 5, y + font.size + 4], radius=5, fill=(6, 11, 22, 200))
+    d.text((x, y), text, font=font, fill=col)
+
+
+def _ema(xs: list[float], n: int) -> list[float]:
+    a = 2 / (n + 1); out = []; e = xs[0]
+    for x in xs:
+        e = a * x + (1 - a) * e; out.append(e)
+    return out
+
+
 def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, title: str | None = None, chg24: float | None = None,
-           when: str | None = None, conclusion: list[str] | None = None) -> str | None:
+           when: str | None = None, conclusion: list[str] | None = None, mode: str = "line") -> str | None:
     if Image is None or not coin.get("candles"):
         return None
     W, H = 1280, 720
@@ -105,16 +144,44 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
         d.rectangle([L, Y(lv["hi"]), L + pw, Y(lv["lo"])], fill=col + (20 if strong else 10,))
         edge = Y(lv["hi"] if s_ else lv["lo"])
         d.line([L, edge, L + pw, edge], fill=col + (160 if strong else 80,), width=1)
-        d.text((L + 8, edge - 16), f"{'поддержка' if s_ else 'сопротивление'} {_fmt(lv['lo'])}–{_fmt(lv['hi'])}", font=f11, fill=col + (220,))
-    # history wave
+        _label(d, (L + 8, edge - (17 if not s_ else -5)), f"{'поддержка' if s_ else 'сопротивление'} {_fmt(lv['lo'])}–{_fmt(lv['hi'])}", f11, col + (230,))
+    # history
     pts = [(X(i), Y(k[4])) for i, k in enumerate(bars)]
-    d.polygon(pts + [(pts[-1][0], T + ph), (pts[0][0], T + ph)], fill=(124, 196, 255, 30))
-    for w, a in ((9, 26), (5, 60), (2, 255)):
-        d.line(pts, fill=(200, 230, 255, a), width=w, joint="curve")
     vmax = max(k[5] for k in bars) or 1
-    for i, k in enumerate(bars):
-        vh = k[5] / vmax * ph * 0.12
-        d.rectangle([X(i) - 2, T + ph - vh, X(i) + 2, T + ph], fill=(96, 200, 214, 60))
+    if mode == "wave":
+        # the panel's «Волна»: price as a soft glowing wave, the 20- and 50-hour averages behind it, volume as a gold wave
+        closes_all = [k[4] for k in _hourly(coin["candles"])]
+        e20 = _ema(closes_all, 20)[-len(bars):]; e50 = _ema(closes_all, 50)[-len(bars):]
+        p20 = _smooth([(X(i), Y(v)) for i, v in enumerate(e20)][::2] + [(X(len(bars) - 1), Y(e20[-1]))])
+        p50 = _smooth([(X(i), Y(v)) for i, v in enumerate(e50)][::2] + [(X(len(bars) - 1), Y(e50[-1]))])
+        d.polygon(p20 + [(p20[-1][0], T + ph), (p20[0][0], T + ph)], fill=(143, 211, 255, 26))
+        d.line(p20, fill=(143, 211, 255, 170), width=2, joint="curve")
+        d.line(p50, fill=(184, 167, 255, 190), width=2, joint="curve")
+        vs = [k[5] for k in bars]; vs = [sum(vs[max(0, i - 2):i + 3]) / len(vs[max(0, i - 2):i + 3]) for i in range(len(vs))]
+        pv = _smooth([(X(i), T + ph - v / vmax * ph * 0.18) for i, v in enumerate(vs)][::2] + [(X(len(vs) - 1), T + ph - vs[-1] / vmax * ph * 0.18)])
+        d.polygon(pv + [(pv[-1][0], T + ph), (pv[0][0], T + ph)], fill=(255, 190, 90, 40))
+        d.line(pv, fill=(255, 200, 110, 150), width=2, joint="curve")
+        cl = [k[4] for k in bars]; cl = [sum(cl[max(0, i - 1):i + 2]) / len(cl[max(0, i - 1):i + 2]) for i in range(len(cl))]
+        cl[-1] = bars[-1][4]
+        sp = _smooth([(X(i), Y(v)) for i, v in enumerate(cl)][::2] + [(X(len(cl) - 1), Y(cl[-1]))], k=8)
+        d.polygon(sp + [(sp[-1][0], T + ph), (sp[0][0], T + ph)], fill=(200, 230, 255, 22))
+        _glow(img, sp, (150, 215, 255), width=12, blur=7, alpha=170)
+        d = ImageDraw.Draw(img, "RGBA")
+        d.line(sp, fill=(236, 247, 255), width=3, joint="curve")
+        # legend under the header
+        lx, ly = L, 76
+        for col, txt in (((236, 247, 255), "цена"), ((143, 211, 255), "средняя за 20 ч"), ((184, 167, 255), "средняя за 50 ч"), ((255, 200, 110), "объём торгов")):
+            d.line([lx, ly + 7, lx + 22, ly + 7], fill=col, width=3)
+            d.text((lx + 28, ly), txt, font=f12, fill=(190, 205, 228)); lx += 28 + d.textlength(txt, font=f12) + 22
+        d.text((lx + 4, ly), "цена выше средних — импульс вверх, ниже — вниз", font=f12, fill=MUTED)
+    else:
+        d.polygon(pts + [(pts[-1][0], T + ph), (pts[0][0], T + ph)], fill=(124, 196, 255, 30))
+        _glow(img, pts, (170, 220, 255), width=9, blur=5, alpha=150)
+        d = ImageDraw.Draw(img, "RGBA")
+        d.line(pts, fill=(214, 236, 255), width=2, joint="curve")
+        for i, k in enumerate(bars):
+            vh = k[5] / vmax * ph * 0.12
+            d.rectangle([X(i) - 2, T + ph - vh, X(i) + 2, T + ph], fill=(96, 200, 214, 60))
     # day labels under the history
     seen = set()
     for i, k in enumerate(bars):
@@ -135,8 +202,11 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
             ye = Y(min(hi, max(lo, tgt)))
             ys = _bridge(n, y0, ye, amp, seed)
             path = [(x0 + (xe - x0) * k / n, ys[k]) for k in range(n + 1)]
-            for w, a in ((wdt + 8, 30), (wdt, 235)):
-                d.line(path, fill=col + (a,), width=w, joint="curve")
+            if mode == "wave":
+                path = _smooth(path[::4] + [path[-1]])
+            _glow(img, path, col, width=wdt + 8, blur=6, alpha=120)
+            d = ImageDraw.Draw(img, "RGBA")
+            d.line(path, fill=col + (240,), width=wdt, joint="curve")
             d.ellipse([xe - 7, ye - 7, xe + 7, ye + 7], fill=col)
             tx = xe - 230; ty = ye - (40 if ye < y0 else -14)
             ty = max(T + 30, min(T + ph - 30, ty))
@@ -279,6 +349,265 @@ def board(chart_png: str, out_path: str, eth: dict | None = None, sol: dict | No
     _spark_tile(d, boxes[1], "Солана · SOL", sol, sol_chg)
     _fng_tile(d, boxes[2], fng)
     _rows_tile(d, boxes[3], result_title, result or [])
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    img.save(out_path, "PNG", optimize=True)
+    return out_path
+
+
+
+# ------------------------------------------------------------------------------------------------------------ heatmap
+def _squarify(items: list[tuple], x: float, y: float, w: float, h: float) -> list[tuple]:
+    """Squarified treemap: items = [(weight, payload)] sorted desc → [(x, y, w, h, payload)]."""
+    out = []
+    items = [it for it in items if it[0] > 0]
+    total = sum(v for v, _ in items) or 1
+    scale = w * h / total
+    rest = [(v * scale, p) for v, p in items]
+
+    def worst(row, side):
+        s_ = sum(r for r, _ in row)
+        return max(max(side * side * r / (s_ * s_), (s_ * s_) / (side * side * r)) for r, _ in row)
+
+    while rest:
+        side = min(w, h); row = [rest.pop(0)]
+        while rest and worst(row + [rest[0]], side) <= worst(row, side):
+            row.append(rest.pop(0))
+        s_ = sum(r for r, _ in row)
+        if w >= h:
+            cw = s_ / h; yy = y
+            for r, pl in row:
+                ch = r / cw; out.append((x, yy, cw, ch, pl)); yy += ch
+            x += cw; w -= cw
+        else:
+            rh = s_ / w; xx = x
+            for r, pl in row:
+                cw_ = r / rh; out.append((xx, y, cw_, rh, pl)); xx += cw_
+            y += rh; h -= rh
+    return out
+
+
+def heatmap(markets: dict, out_path: str, when: str | None = None, n: int = 30) -> str | None:
+    """The crypto market map: the top coins by market cap as tiles sized by cap and coloured by the 24 h change. 1280 × 720."""
+    if Image is None:
+        return None
+    skip = {"XAUT", "PAXG", "WBT", "LEO", "WBTC", "WETH", "STETH", "WSTETH", "WEETH", "CBBTC"}
+    coins = [c for c in markets.get("top", []) if not c.get("stable") and not c.get("wrapped") and c.get("mcap") and c.get("chg24") is not None
+             and c.get("symbol") not in skip and str(c.get("symbol", "")).isalnum()][:n]
+    if len(coins) < 8:
+        return None
+    W, H = 1280, 720
+    img = Image.new("RGB", (W, H), (6, 11, 22)); d = ImageDraw.Draw(img, "RGBA")
+    for i in range(40):
+        d.rectangle([0, i * 6, W, i * 6 + 6], fill=(124, 196, 255, int(24 * (1 - i / 40))))
+    d.text((36, 22), "CRYPTO NOVA", font=_font(24, True), fill=TXT)
+    d.text((246, 30), "Карта рынка · топ-30 монет за сутки", font=_font(15), fill=(170, 195, 225))
+    if when:
+        d.text((246, 52), when, font=_font(13), fill=MUTED)
+    g = markets.get("global") or {}
+    ups = sum(1 for c in coins if c["chg24"] >= 0)
+    d.text((W - 36, 24), f"растут {ups} из {len(coins)}", font=_font(22, True), fill=UP if ups * 2 >= len(coins) else DOWN, anchor="ra")
+    sub = []
+    if g.get("total_mcap"):
+        sub.append(f"рынок ${g['total_mcap'] / 1e12:.2f} трлн")
+    if g.get("btc_dom"):
+        sub.append(f"доля биткоина {g['btc_dom']:.1f}%")
+    if sub:
+        d.text((W - 36, 56), " · ".join(sub), font=_font(13), fill=MUTED, anchor="ra")
+    # area ∝ sqrt(cap) so altcoins stay readable next to bitcoin
+    items = [(c["mcap"] ** 0.5, c) for c in coins]
+    for x, y, w, h, c in _squarify(items, 36, 92, W - 72, H - 92 - 46):
+        ch = max(-8.0, min(8.0, c["chg24"])); k = abs(ch) / 8
+        base = (24, 150, 100) if ch >= 0 else (190, 55, 75)
+        col = tuple(int(14 + (b_ - 14) * (0.25 + 0.75 * k)) for b_ in base)
+        d.rounded_rectangle([x + 2, y + 2, x + w - 2, y + h - 2], radius=8, fill=col + (255,), outline=(255, 255, 255, 30))
+        big = min(w, h)
+        fs = max(11, min(40, int(big / 4.2)))
+        if w > 46 and h > 30:
+            d.text((x + w / 2, y + h / 2 - fs * 0.25), c["symbol"], font=_font(fs, True), fill=(245, 250, 255), anchor="mb")
+            d.text((x + w / 2, y + h / 2 + fs * 0.15), ("0.0%" if abs(c["chg24"]) < 0.05 else f"{c['chg24']:+.1f}%"), font=_font(max(10, int(fs * 0.62))), fill=(235, 245, 255, 230), anchor="mt")
+    d.text((36, H - 30), "площадь — капитализация монеты, цвет — изменение за сутки · данные CoinGecko · не финансовый совет", font=_font(12), fill=MUTED)
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    img.save(out_path, "PNG", optimize=True)
+    return out_path
+
+
+# -------------------------------------------------------------------------------------------------------- engine card
+def _turbine(d, cx: float, cy: float, r: float, blades: int = 10, phase: float = 0.0):
+    import math
+    d.ellipse([cx - r * 1.28, cy - r * 1.28, cx + r * 1.28, cy + r * 1.28], fill=(0, 180, 216, 22))
+    for k in range(48):
+        a = k * math.pi / 24; l = 0.12 if k % 4 == 0 else 0.06
+        d.line([cx + math.cos(a) * r * 1.1, cy + math.sin(a) * r * 1.1, cx + math.cos(a) * r * (1.1 + l), cy + math.sin(a) * r * (1.1 + l)], fill=(127, 211, 255, 110), width=1)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(8, 16, 44, 255), outline=(127, 211, 255, 150), width=2)
+    for i in range(blades):
+        a0 = phase + i * 2 * math.pi / blades
+        poly = []
+        for t, off in ((0.26, -0.02), (0.56, -0.30), (0.86, -0.10), (0.86, 0.04), (0.55, -0.04), (0.26, 0.10)):
+            ang = a0 + off; rr = r * t
+            poly.append((cx + math.cos(ang) * rr, cy + math.sin(ang) * rr))
+        d.polygon(poly, fill=(127, 211, 255, 70), outline=(170, 225, 255, 160))
+    for k in range(10, 0, -1):
+        rr = r * 0.24 * k / 10
+        col = (int(14 + 220 * (1 - k / 10)), int(120 + 125 * (1 - k / 10)), int(200 + 55 * (1 - k / 10)))
+        d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=col + (255,))
+
+
+IRIS = [(127, 227, 255), (154, 166, 255), (210, 156, 255), (255, 194, 166)]
+
+
+def _fit(d, text: str, maxw: float, size: int, bold: bool = True, min_size: int = 14):
+    while size > min_size and d.textlength(text, font=_font(size, bold)) > maxw:
+        size -= 1
+    return _font(size, bold)
+
+
+def _wrap(d, text: str, font, maxw: float) -> list[str]:
+    lines, cur = [], ""
+    for w_ in text.split():
+        if cur and d.textlength(cur + " " + w_, font=font) > maxw:
+            lines.append(cur); cur = w_
+        else:
+            cur = (cur + " " + w_).strip()
+    return lines + ([cur] if cur else [])
+
+
+def _viz_pulse(img, d, box, cycle: int):
+    import math
+    x0, y0, x1, y1 = box; mid = (y0 + y1) / 2; pts = []
+    n = 140
+    for i in range(n + 1):
+        x = x0 + (x1 - x0) * i / n; ph_ = (i % 23) / 23
+        y = mid
+        if 0.40 < ph_ < 0.46: y = mid - (y1 - y0) * 0.42
+        elif 0.46 <= ph_ < 0.52: y = mid + (y1 - y0) * 0.30
+        elif 0.30 < ph_ <= 0.40: y = mid - (y1 - y0) * 0.06 * math.sin((ph_ - 0.3) * 31)
+        pts.append((x, y))
+    _glow(img, pts, ICE, width=6, blur=4, alpha=140)
+    d = ImageDraw.Draw(img, "RGBA")
+    d.line(pts, fill=ICE + (230,), width=2)
+    d.ellipse([x1 - 6, mid - 6, x1 + 6, mid + 6], fill=ICE)
+    return d
+
+
+def _viz_funnel(d, box, nums: list[int]):
+    x0, y0, x1, y1 = box; n = len(nums); g = 10; w = (x1 - x0 - g * (n - 1)) / n; top = max(nums) or 1
+    for i, v in enumerate(nums):
+        h = max(8, (y1 - y0 - 18) * (v / top) ** 0.5); cx = x0 + i * (w + g)
+        col = IRIS[i % len(IRIS)]
+        d.rounded_rectangle([cx, y1 - 18 - h, cx + w, y1 - 18], radius=5, fill=col + (200,))
+        d.text((cx + w / 2, y1 - 14), f"{v}", font=_font(13, True), fill=TXT, anchor="mt")
+        if i < n - 1:
+            d.text((cx + w + g / 2, y1 - 18 - 10), "›", font=_font(14, True), fill=MUTED, anchor="mm")
+
+
+def _viz_stages(d, box, stages: list[tuple[str, int]]):
+    x0, y0, x1, y1 = box; n = len(stages); g = 18; w = (x1 - x0 - g * (n - 1)) / n
+    for i, (lab, v) in enumerate(stages):
+        cx = x0 + i * (w + g); col = IRIS[i % len(IRIS)]
+        d.rounded_rectangle([cx, y0 + 4, cx + w, y1], radius=10, fill=col + (34,), outline=col + (200,), width=2)
+        d.text((cx + w / 2, y0 + 10), str(v), font=_font(20, True), fill=TXT, anchor="mt")
+        d.text((cx + w / 2, y1 - 6), lab, font=_font(11), fill=(200, 215, 238), anchor="mb")
+        if i < n - 1:
+            d.text((cx + w + g / 2, (y0 + y1) / 2 + 2), "→", font=_font(15, True), fill=ICE, anchor="mm")
+
+
+def _viz_limits(d, box, limits: list[dict]):
+    short = {"daily_loss": "день", "drawdown": "просадка", "leverage": "плечо", "coin": "монета", "cluster": "кластер", "data_age": "данные"}
+    x0, y0, x1, y1 = box; n = max(1, len(limits)); g = 8; w = (x1 - x0 - g * (n - 1)) / n; hh = y1 - y0 - 18
+    for i, l in enumerate(limits):
+        p = max(0.0, min(100.0, float(l.get("pct_of_limit") or 0))); cx = x0 + i * (w + g)
+        col = UP if p < 70 else ((255, 190, 90) if p < 90 else DOWN)
+        d.rounded_rectangle([cx, y0, cx + w, y0 + hh], radius=5, fill=(20, 32, 58))
+        if p > 0:
+            d.rounded_rectangle([cx, y0 + hh * (1 - p / 100), cx + w, y0 + hh], radius=5, fill=col + (220,))
+        d.text((cx + w / 2, y1), short.get(l.get("key"), str(l.get("key", ""))[:7]), font=_font(11), fill=(190, 205, 228), anchor="mb")
+
+
+def _viz_spark(img, d, box, vals: list[float]):
+    x0, y0, x1, y1 = box
+    if len(vals) < 3:
+        return d
+    lo, hi = min(vals), max(vals); sp = (hi - lo) or 1
+    pts = [(x0 + (x1 - x0) * i / (len(vals) - 1), y1 - (v - lo) / sp * (y1 - y0)) for i, v in enumerate(vals)]
+    col = UP if vals[-1] >= vals[0] else DOWN
+    d.polygon(pts + [(x1, y1), (x0, y1)], fill=col + (34,))
+    _glow(img, pts, col, width=6, blur=4, alpha=120)
+    d = ImageDraw.Draw(img, "RGBA")
+    d.line(pts, fill=col, width=2, joint="curve")
+    d.ellipse([pts[-1][0] - 4, pts[-1][1] - 4, pts[-1][0] + 4, pts[-1][1] + 4], fill=col)
+    return d
+
+
+def _viz_chain(d, box, lines: int, head: str):
+    x0, y0, x1, y1 = box; n = 4; g = 16; w = (x1 - x0 - g * (n - 1)) / n
+    for i in range(n):
+        cx = x0 + i * (w + g); last = i == n - 1; col = IRIS[i % len(IRIS)]
+        d.rounded_rectangle([cx, y0, cx + w, y1], radius=8, fill=(14, 26, 50), outline=col + (230 if last else 120,), width=2)
+        d.text((cx + w / 2, y0 + 8), f"№{lines - n + 1 + i}", font=_font(12, True), fill=TXT, anchor="mt")
+        d.text((cx + w / 2, y1 - 6), (head[:6] if last and head else "· · ·"), font=_font(11), fill=col, anchor="mb")
+        if i < n - 1:
+            d.line([cx + w, (y0 + y1) / 2, cx + w + g, (y0 + y1) / 2], fill=ICE + (200,), width=2)
+
+
+def engine_card(home: dict, conveyor: dict | None, risk: dict | None, scorecard: dict | None, out_path: str, when: str | None = None) -> str | None:
+    """«Двигатели CRYPTO NOVA сегодня»: six drawn turbines, each with its live number and a small live picture of what it
+    does (pulse, funnel, conveyor, risk bars, portfolio curve, hash chain). Shows the technology people get. 1280 × 720."""
+    if Image is None or not home:
+        return None
+    W, H = 1280, 720
+    img = Image.new("RGB", (W, H), (6, 11, 22)); d = ImageDraw.Draw(img, "RGBA")
+    for i in range(40):
+        d.rectangle([0, i * 6, W, i * 6 + 6], fill=(124, 196, 255, int(24 * (1 - i / 40))))
+    d.text((36, 22), "CRYPTO NOVA", font=_font(24, True), fill=TXT)
+    d.text((246, 30), "Шесть двигателей системы · работают 24/7", font=_font(15), fill=(170, 195, 225))
+    if when:
+        d.text((246, 52), when, font=_font(13), fill=MUTED)
+    e = home.get("engine") or {}; pf = home.get("portfolio") or {}
+    cnt = (conveyor or {}).get("counts") or {}; rk = risk or {}; sc = (scorecard or {}).get("headline") or {}
+    limits = rk.get("limits") or []
+    ok = sum(1 for l in limits if l.get("status") == "ok")
+    chain = (((scorecard or {}).get("chain") or {}).get("ledger") or {})
+    curve = [c[1] for c in (pf.get("curve") or []) if isinstance(c, (list, tuple)) and len(c) > 1]
+    cards = [
+        ("Сканер рынка", f"цикл {int(e.get('cycle_sec') or 60)} секунд", f"проверено сигналов по настоящим ценам: {e.get('signals_checked', 0)}", "pulse"),
+        ("Лаборатория стратегий", f"{e.get('lab_tried', 0)} правил за ночь", "придумано → на истории → экзамен → тест на везение", "funnel"),
+        ("Конвейер стратегий", f"{cnt.get('paper', 0)} на демо-счетах", "переход дальше — только через ворота с порогами", "stages"),
+        ("Риск-щит", f"{ok} из {len(limits)} лимитов в норме" if limits else "лимиты в норме", "проверка каждую минуту, при нарушении — стоп", "limits"),
+        ("Публичный портфель", f"${_fmt(pf['value_usd'])}" if pf.get("value_usd") else "—",
+         f"{pf.get('pnl_pct', 0):+.2f}% на демо-счёте $10 000, 7 источников" if pf.get("value_usd") else "", "spark"),
+        ("Журнал прогнозов", f"{sc.get('recorded', 0)} записей", "каждая сцеплена хешем SHA-256 — прошлое не исправить", "chain"),
+    ]
+    g = 18; cw = (W - 72 - 2 * g) / 3; chh = 236; y0 = 92
+    for i, (t, big, sub, viz) in enumerate(cards):
+        cx = 36 + (i % 3) * (cw + g); cy = y0 + (i // 3) * (chh + g); acc = IRIS[i % len(IRIS)]
+        d.rounded_rectangle([cx, cy, cx + cw, cy + chh], radius=18, fill=(10, 19, 38), outline=acc + (90,))
+        d.ellipse([cx + 16, cy + 18, cx + 96, cy + 98], fill=acc + (26,))
+        _turbine(d, cx + 56, cy + 58, 32, blades=8 + i, phase=i * 0.4)
+        d.text((cx + 112, cy + 22), t, font=_font(16, True), fill=(200, 220, 245))
+        d.text((cx + 112, cy + 46), big, font=_fit(d, big, cw - 128, 25), fill=acc)
+        fs = _font(13)
+        for k, ln in enumerate(_wrap(d, sub, fs, cw - 128)[:2]):
+            d.text((cx + 112, cy + 80 + 18 * k), ln, font=fs, fill=(175, 192, 218))
+        box = (cx + 20, cy + 134, cx + cw - 20, cy + chh - 18)
+        d.rounded_rectangle([box[0] - 8, box[1] - 8, box[2] + 8, box[3] + 8], radius=12, fill=(7, 14, 30))
+        if viz == "pulse":
+            d = _viz_pulse(img, d, box, int(e.get("cycle_sec") or 60))
+        elif viz == "funnel":
+            _viz_funnel(d, box, [int(e.get(k) or 0) for k in ("lab_tried", "lab_tested", "lab_passed", "lab_reliable")])
+        elif viz == "stages":
+            _viz_stages(d, box, [("исследование", int(cnt.get("lab") or 0)), ("демо-счета", int(cnt.get("paper") or 0)), ("прошли ворота", int(cnt.get("ready") or 0))])
+        elif viz == "limits":
+            _viz_limits(d, box, limits[:6])
+        elif viz == "spark":
+            d = _viz_spark(img, d, box, curve[-160:])
+        elif viz == "chain":
+            _viz_chain(d, box, int(chain.get("lines") or sc.get("recorded") or 4), str(chain.get("head") or ""))
+    by = y0 + 2 * chh + g + 14
+    d.rounded_rectangle([36, by, W - 36, by + 56], radius=14, fill=(14, 24, 48), outline=(127, 211, 255, 110))
+    d.text((56, by + 9), "Зачем это вам", font=_font(14, True), fill=ICE)
+    d.text((56, by + 30), "система круглые сутки проверяет рынок и отсеивает слабые стратегии — результат и каждую проверку видно в приложении",
+           font=_fit(d, "система круглые сутки проверяет рынок и отсеивает слабые стратегии — результат и каждую проверку видно в приложении", W - 120, 15, False, 11), fill=TXT)
+    d.text((36, H - 26), "CRYPTO NOVA AI · демо-счета, цифры с сервера на момент поста · не финансовый совет", font=_font(12), fill=MUTED)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     img.save(out_path, "PNG", optimize=True)
     return out_path

@@ -748,8 +748,11 @@ class Channel:
                 concl.append(f"Сценарий A ({pa}%): {'рост к сопротивлению' if a_up else 'снижение к поддержке'} {_fmt(ta)}.")
                 concl.append(f"Сценарий B ({100 - pa}%): {'снижение к поддержке' if a_up else 'рост к сопротивлению'} {_fmt(tb)}.")
                 concl.append("Работаем от зон: вход только после реакции цены, стоп заранее.")
+            # 21.10 owner: «либо в режиме волна … придумай что и показывай» — morning and evening alternate the plain line
+            # and the «Волна» look (smooth glowing price, 20/50-hour averages, volume wave), so the picture changes every post
+            mode = "wave" if (now.toordinal() + (slot == "evening")) % 2 == 0 else "line"
             png = postchart.render(btc, op, None, os.path.join(self.out, "post_chart.png"), title=title,
-                                   chg24=mb.get("chg24") if mb else None, when=when, conclusion=concl)
+                                   chg24=mb.get("chg24") if mb else None, when=when, conclusion=concl, mode=mode)
             if not png:
                 return None
             # 21.10 owner: «более интересный график … разное совмещать» — the BTC chart on top, live tiles under it
@@ -779,6 +782,22 @@ class Channel:
                 return png
         except Exception:  # noqa: BLE001
             return None
+
+    def extra(self, x: dict, slot: str) -> str | None:
+        """Second picture of the album: the market map in the morning, the six engines in the evening — the technology
+        behind the post and why it matters to people. None when data is missing (the post then goes with one picture)."""
+        try:
+            from . import postchart
+            now = kyiv_now()
+            when = f"{'утренний обзор' if slot == 'morning' else 'итоги дня'} · {now.day} {self.MONTHS[now.month - 1]} {now.year}"
+            if slot == "morning":
+                return postchart.heatmap(x.get("markets") or {}, os.path.join(self.out, "post_map.png"), when=when)
+            if slot == "evening":
+                return postchart.engine_card(_load(self.out, "app_home.json") or {}, _load(self.out, "conveyor.json"), _load(self.out, "risk.json"),
+                                             _load(self.out, "scorecard.json"), os.path.join(self.out, "post_engines.png"), when=when)
+        except Exception:  # noqa: BLE001
+            return None
+        return None
 
     def run(self, send_fn, llm=None, now: dt.datetime | None = None, force_slot: str | None = None, photo_fn=None) -> dict:
         now = now or kyiv_now()
@@ -816,10 +835,12 @@ class Channel:
         # picture + text as ONE message: Telegram allows a photo caption up to 1024 characters, so morning/evening posts
         # are written compact (the chart carries prices and scenarios); a longer text falls back to photo + text
         if photo_fn and slot in ("morning", "evening"):
-            png = self.chart(self.ctx(), slot)
+            cx_ = self.ctx()
+            png = self.chart(cx_, slot)
+            ex = self.extra(cx_, slot) if png else None
             if png and len(re.sub(r"<[^>]+>", "", t)) <= 1024:
                 try:
-                    if photo_fn(png, t):
+                    if photo_fn([png, ex] if ex else png, t):
                         self.record(day, slot, t); sent += 1; texts.append((slot, t))
                         self._log(day, slot, {"sent": True, "photo": True, "review": self.last_review})
                         return {"slot": slot, "sent": True, "n": sent, "text": t, "photo": True, "review": self.last_review}

@@ -167,3 +167,53 @@ def test_post_picture_board_has_the_live_tiles():
                           fng={"value": 63, "label": "Greed", "yesterday": 55}, result=[("Спот", "+$230", postchart.UP)])
     im = postchart.Image.open(out)
     assert im.size == (1280, 1000)
+
+
+def test_post_album_wave_map_and_engines():
+    # 21.10 owner: «либо в режиме волна … придумай что и показывай … продемонстрировать нашу технологичность» —
+    # the wave look renders, the market map sizes tiles by cap, the engine card shows six engines with live numbers
+    from cnq.agents import postchart
+    if postchart.Image is None:
+        return
+    tmp = tempfile.mkdtemp()
+    candles = [[1_760_000_000_000 + i * 900_000, 100 + i % 7, 101 + i % 7, 99 + i % 7, 100 + (i % 9), 10 + i % 5] for i in range(400)]
+    coin = {"candles": candles, "price": 104, "levels": []}
+    op = {"p_up": 0.6, "up": 108, "dn": 97}
+    w = postchart.render(coin, op, None, os.path.join(tmp, "w.png"), conclusion=["Сценарий A (60%): рост к сопротивлению 108."], mode="wave")
+    assert w and postchart.Image.open(w).size == (1280, 720)
+    top = [{"symbol": f"C{i}", "mcap": 1e9 * (40 - i), "chg24": (i % 5) - 2.0} for i in range(30)] + [{"symbol": "USDT", "mcap": 1e11, "chg24": 0, "stable": True}]
+    m = postchart.heatmap({"top": top, "global": {"total_mcap": 2.8e12, "btc_dom": 59.5}}, os.path.join(tmp, "m.png"))
+    assert m and postchart.Image.open(m).size == (1280, 720)
+    rects = postchart._squarify([(4.0, "a"), (2.0, "b"), (1.0, "c"), (1.0, "d")], 0, 0, 80, 100)
+    assert abs(sum(r[2] * r[3] for r in rects) - 8000) < 1 and len(rects) == 4
+    home = {"engine": {"cycle_sec": 60, "signals_checked": 327, "lab_tried": 800, "lab_tested": 260, "lab_passed": 30, "lab_reliable": 3},
+            "portfolio": {"value_usd": 10193, "pnl_pct": 1.93, "curve": [[i, i * 1.5] for i in range(50)]}}
+    risk = {"limits": [{"key": "leverage", "pct_of_limit": 66.7, "status": "ok"}, {"key": "coin", "pct_of_limit": 95, "status": "ok"}]}
+    e = postchart.engine_card(home, {"counts": {"lab": 33, "paper": 13, "ready": 0}}, risk,
+                              {"headline": {"recorded": 1615}, "chain": {"ledger": {"lines": 1615, "head": "39a07d3b"}}}, os.path.join(tmp, "e.png"))
+    assert e and postchart.Image.open(e).size == (1280, 720)
+    assert postchart.heatmap({"top": top[:3]}, os.path.join(tmp, "x.png")) is None       # too few coins → no map, post keeps one picture
+
+
+def test_send_photo_album_falls_back_to_one_picture():
+    from cnq.terminal import notify
+    calls = []
+    orig_album = notify.send_album
+    try:
+        notify.send_album = lambda paths, cap, tok, chat, pm="HTML": (calls.append(("album", len(paths))), False)[1]
+        tmp = tempfile.mkdtemp(); a = os.path.join(tmp, "a.png"); open(a, "wb").write(b"x")
+        import urllib.request as ur
+        orig = ur.urlopen
+
+        class R:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return b'{"ok": true}'
+        ur.urlopen = lambda req, timeout=30: (calls.append(("photo", req.full_url.rsplit("/", 1)[-1])), R())[1]
+        try:
+            assert notify.send_photo([a, a, os.path.join(tmp, "missing.png")], "текст", token="t", chat="c")
+        finally:
+            ur.urlopen = orig
+    finally:
+        notify.send_album = orig_album
+    assert calls == [("album", 2), ("photo", "sendPhoto")]

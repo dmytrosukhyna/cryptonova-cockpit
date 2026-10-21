@@ -40,7 +40,8 @@ def test_channel_templates_slots_and_guard():
     r3 = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=15))
     assert not r3["sent"] and r3["why"] == "nothing worth posting"                    # the only strong news is used up
     ev = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=21, minute=40))   # 20.10: the evening slot opens at 21:30
-    assert ev["sent"] and "Итоги дня" in sent[-1] and "Утром ставили сценарий A (78%)" in sent[-1]
+    # 21.10 owner: a morning scenario that missed its target is not written about (BTC 81 000 never reached the 80 141 support)
+    assert ev["sent"] and "Итоги дня" in sent[-1] and "Утром ставили" not in sent[-1] and "не сработал" not in sent[-1]
     # number guard: an invented figure is rejected, faithful text passes
     facts = ch.facts(ch.ctx(), now)
     assert not ch.guard("<b>Рынок:</b> биткоин $80 984, а завтра будет 95 000. " + "x" * 200, facts)
@@ -128,3 +129,26 @@ def test_evening_slot_opens_at_2130_kyiv():
     assert slot_for(at(20, 30)) is None and slot_for(at(21, 29)) is None
     assert slot_for(at(21, 30)) == "evening" and slot_for(at(22, 59)) == "evening" and slot_for(at(23, 0)) is None
     assert slot_for(at(8, 0)) == "morning" and slot_for(at(11, 0)) == "news1"
+
+
+def test_evening_names_the_morning_scenario_only_when_it_hit():
+    tmp = tempfile.mkdtemp(); _web(tmp)
+    term = json.load(open(os.path.join(tmp, "terminal.json"))); term["coins"][0]["price"] = 80000      # below the 80 141 target of A
+    json.dump(term, open(os.path.join(tmp, "terminal.json"), "w"))
+    conn = sqlite3.connect(":memory:"); ch = channel.Channel(conn, tmp)
+    now = dt.datetime(2026, 10, 15, 8, 30, tzinfo=channel.KYIV)
+    ch.run(lambda t: True, now=now)                                                    # the morning post sets scenario A
+    sent = []
+    ev = ch.run(lambda t: sent.append(t) or True, now=now.replace(hour=21, minute=40))
+    assert ev["sent"] and "Утром ставили сценарий A" in sent[-1] and "цель достигнута" in sent[-1]
+
+
+def test_deals_plural_and_caption_fit():
+    from cnq.terminal.notify import fit_caption
+    assert [channel.Channel._deals(n) for n in (1, 3, 9, 11, 21, 25)] == ["1 сделку", "3 сделки", "9 сделок", "11 сделок", "21 сделку", "25 сделок"]
+    post = "<b>Итоги дня</b>\n\n" + "\n".join(f"— строка <b>{i}</b>" for i in range(60)) + "\n\n<b>Вывод CRYPTO NOVA</b>\nДолгосрочный тренд биткоина вверх."
+    assert len(post) > 1024 >= len(__import__("re").sub(r"<[^>]+>", "", post))
+    assert fit_caption(post) == post                                                   # tags don't count: nothing is cut
+    long = post + "\n\n" + "я" * 400
+    out = fit_caption(long)
+    assert out == post and out.count("<b>") == out.count("</b>")                       # whole paragraphs dropped, never cut mid-tag

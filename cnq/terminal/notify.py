@@ -4,7 +4,7 @@ Env: CNQ_TG_TOKEN, CNQ_TG_CHAT. Sends the daily brief and alerts on new events.
 Alerts are de-duplicated with a small state file so a cron run never re-sends."""
 from __future__ import annotations
 
-import json
+import json, re
 import os
 import urllib.request
 
@@ -24,6 +24,23 @@ def send(text: str, token: str | None = None, chat: str | None = None, parse_mod
         return json.loads(r.read().decode()).get("ok", False)
 
 
+def fit_caption(text: str, limit: int = 1024) -> str:
+    """Telegram counts the caption AFTER HTML parsing (tags don't count). 21.10: the raw HTML was cut at 1024 characters, so a
+    966-character evening post lost its last line («Долгосрочный тренд би…»). Keep the whole text when it fits; otherwise drop
+    whole paragraphs from the end (never cut inside a tag or a word)."""
+    vis = lambda t: len(re.sub(r"<[^>]+>", "", t))
+    if vis(text) <= limit:
+        return text
+    paras = text.split("\n\n")
+    while len(paras) > 1 and vis("\n\n".join(paras)) > limit:
+        paras.pop()
+    out = "\n\n".join(paras)
+    if vis(out) > limit:                       # one huge paragraph: plain text cut at a word boundary
+        plain = re.sub(r"<[^>]+>", "", out)[:limit - 1]
+        out = plain[:plain.rfind(" ")] + "…"
+    return out
+
+
 def send_photo(path: str, caption: str = "", token: str | None = None, chat: str | None = None, parse_mode: str = "HTML") -> bool:
     """sendPhoto with a multipart body (stdlib only). Caption ≤ 1024 chars."""
     token = token or os.environ.get("CNQ_TG_TOKEN"); chat = chat or os.environ.get("CNQ_TG_CHAT")
@@ -31,7 +48,7 @@ def send_photo(path: str, caption: str = "", token: str | None = None, chat: str
         return False
     import uuid
     boundary = "----cnq" + uuid.uuid4().hex
-    fields = {"chat_id": chat, "caption": caption[:1024], "parse_mode": parse_mode}
+    fields = {"chat_id": chat, "caption": fit_caption(caption), "parse_mode": parse_mode}
     body = b""
     for k, v in fields.items():
         body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode()

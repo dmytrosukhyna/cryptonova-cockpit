@@ -114,6 +114,74 @@ def short(L: dict, delay_h: int, hold_d: int, stop) -> tuple | None:
     return ret + fund - COST, fund, int(L["listed"])
 
 
+def recent_check(data: list, cutoff: str) -> dict:
+    """21.10.2026 (backlog #7): the LIVE desk rule (4 h / 14 d / stop +30 %, skip a first-4 h rise ≥ 10 % and the thinnest third by
+    first-4 h turnover) on listings since `cutoff` vs the ones before it. The turnover threshold is taken from the listings BEFORE
+    the cutoff only, so the recent months are judged with a rule fixed beforehand (one variant, nothing re-fitted). Caveat: the
+    rule itself was chosen on 18.10 on data that already contained these months — this is a recent-regime check, not a clean
+    out-of-sample test. Funding of the current month is missing in the monthly archive (a small bias against the short)."""
+    cut = int(dt.datetime.strptime(cutoff, "%Y-%m-%d").replace(tzinfo=dt.timezone.utc).timestamp() * 1000)
+    rows = []
+    for d in data:
+        r = short(d, 4, 14, 0.3)
+        m4 = d["c"][3] / d["o"][0] - 1 if len(d["c"]) > 4 else None
+        p7 = d["c"][1 + 7 * 24] / d["o"][1] - 1 if len(d["c"]) > 1 + 7 * 24 else None
+        p30 = d["c"][1 + 30 * 24] / d["o"][1] - 1 if len(d["c"]) > 1 + 30 * 24 else None
+        rows.append({"sym": d["sym"], "listed": d["listed"], "ret": r[0] if r else None, "fund": r[1] if r else None,
+                     "m4": m4, "q4": float(d["q"][:4].sum()), "p7": p7, "p30": p30, "recent": d["listed"] >= cut,
+                     "month": dt.datetime.fromtimestamp(d["listed"] / 1000, dt.timezone.utc).strftime("%Y-%m")})
+    old_q = sorted(x["q4"] for x in rows if not x["recent"])
+    q_lo = old_q[len(old_q) // 3] if old_q else 0.0
+    for x in rows:
+        x["skip"] = ("rose≥10%" if x["m4"] is not None and x["m4"] >= 0.10 else "thin" if x["q4"] <= q_lo else None)
+
+    def stat(xs):
+        v = np.array([x["ret"] for x in xs if x["ret"] is not None])
+        if not len(v):
+            return {"n": 0}
+        out = {"n": int(len(v)), "avg_pct": round(float(v.mean()) * 100, 2), "median_pct": round(float(np.median(v)) * 100, 1),
+               "win_pct": round(float((v > 0).mean()) * 100), "worst_pct": round(float(v.min()) * 100),
+               "loss_25_plus": int((v <= -0.25).sum()),
+               "acct_5pct_pct": round(float(v.sum()) * 5, 1)}
+        if len(v) >= 5:                                   # bootstrap: share of resamples with a mean ≤ 0
+            rng = np.random.default_rng(7)
+            bs = rng.choice(v, (5000, len(v))).mean(1)
+            out["p_mean_le_0"] = round(float((bs <= 0).mean()), 3)
+            out["t"] = round(float(v.mean() / (v.std(ddof=1) / np.sqrt(len(v)))), 2) if v.std(ddof=1) > 0 else None
+        return out
+
+    old, new = [x for x in rows if not x["recent"]], [x for x in rows if x["recent"]]
+    res = {"cutoff": cutoff, "thin_q4_usdt": round(q_lo), "n_recent_listings": len(new),
+           "before": {"all": stat(old), "live_rule": stat([x for x in old if not x["skip"]])},
+           "since": {"all": stat(new), "live_rule": stat([x for x in new if not x["skip"]]),
+                     "skipped_rose": stat([x for x in new if x["skip"] == "rose≥10%"]),
+                     "skipped_thin": stat([x for x in new if x["skip"] == "thin"])},
+           "by_month": {}, "price_path_since": {}, "listings": []}
+    for mo in sorted({x["month"] for x in rows if x["month"] >= "2025-07"}):
+        res["by_month"][mo] = {"all": stat([x for x in rows if x["month"] == mo]),
+                               "live_rule": stat([x for x in rows if x["month"] == mo and not x["skip"]])}
+    for k in ("p7", "p30"):
+        v = np.array([x[k] for x in new if x[k] is not None])
+        if len(v):
+            res["price_path_since"][k] = {"n": int(len(v)), "median_pct": round(float(np.median(v)) * 100, 1),
+                                         "down_pct": round(float((v < 0).mean()) * 100), "up_50_pct": round(float((v > 0.5).mean()) * 100, 1)}
+    for x in sorted(new, key=lambda x: x["listed"]):
+        res["listings"].append([x["sym"].replace("USDT", ""), dt.datetime.fromtimestamp(x["listed"] / 1000, dt.timezone.utc).strftime("%m-%d"),
+                                None if x["ret"] is None else round(x["ret"] * 100, 1), None if x["m4"] is None else round(x["m4"] * 100),
+                                round(x["q4"] / 1e6, 1), x["skip"] or "trade"])
+    note("listings · recent check · before vs since " + cutoff, json.dumps({k: res[k] for k in ("thin_q4_usdt", "n_recent_listings", "before")}, ensure_ascii=False), "warning")
+    note("listings · recent check · since " + cutoff, json.dumps(res["since"], ensure_ascii=False), "warning")
+    note("listings · recent check · by month (2025-07+)", json.dumps({m: [b["all"].get("n"), b["all"].get("avg_pct"), b["live_rule"].get("n"),
+                                                                       b["live_rule"].get("avg_pct"), b["live_rule"].get("win_pct")]
+                                                                  for m, b in res["by_month"].items()}, ensure_ascii=False), "warning")
+    note("listings · recent check · price path since", json.dumps(res["price_path_since"], ensure_ascii=False), "warning")
+    L = res["listings"]
+    for i in range(0, len(L), 60):
+        note(f"listings · recent check · each listing [sym, date, ret %, first-4h %, 4h turnover $M, decision] {i // 60 + 1}",
+             json.dumps(L[i:i + 60], ensure_ascii=False), "warning")
+    return res
+
+
 def study(a):
     today = dt.datetime.now(dt.timezone.utc).date()
     syms = sorted(s for s in vision_symbols() if s.endswith("USDT"))
@@ -200,6 +268,8 @@ def study(a):
                                                             ("≥ 0", lambda x: x["f0"] is not None and x["f0"] >= 0)]),
             "btc_regime": bucket("BTC regime", [("BTC выше 200-дневной", lambda x: x["bull"] is True), ("BTC ниже", lambda x: x["bull"] is False)]),
         }
+    if a.recent:
+        res["recent"] = recent_check(data, a.recent)
     res["share_positive"] = round(sum(1 for g in grid if g["avg_pct"] > 0) / max(1, len(grid)) * 100)
     res["share_positive_2025_26"] = round(sum(1 for g in grid if (g["recent_avg_pct"] or -1) > 0) / max(1, len(grid)) * 100)
     with open(a.out, "w") as fh:
@@ -223,4 +293,5 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="listings.json")
     ap.add_argument("--splits", action="store_true", help="split the chosen rule by what is known at entry")
+    ap.add_argument("--recent", default="", help="YYYY-MM-DD: the live rule on listings since this date vs before (21.10)")
     study(ap.parse_args())

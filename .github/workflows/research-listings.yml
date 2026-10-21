@@ -2,7 +2,12 @@ name: research-listings
 # Manual only. «Шорт новых листингов» study: scripts/listings_study.py on the Binance public archive (every USDT-M perp listed
 # 2023-01 or later, delisted included, 1h klines + funding). Result: job summary + annotations + artifact listings (7 days).
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      args:
+        description: "arguments for scripts/listings_study.py besides --out, e.g. '--splits' or '--recent 2026-06-01'"
+        required: false
+        default: "--splits"
 
 permissions:
   contents: read
@@ -16,6 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install numpy
-      - run: python scripts/listings_study.py --out listings.json --splits
+      - run: python scripts/listings_study.py --out listings.json $ARGS
+        env: { ARGS: "${{ inputs.args || '--splits' }}" }
       - uses: actions/upload-artifact@v4
         with: { name: listings, path: listings.json, retention-days: 7 }

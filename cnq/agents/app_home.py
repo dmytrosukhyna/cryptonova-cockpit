@@ -128,6 +128,13 @@ def _num(x: float) -> str:
     return f"{x:.1f}".rstrip("0").rstrip(".")
 
 
+def _price(x: float) -> str:
+    """a price as the app writes it: 84 655 · 2 490.16 · 1.234 · 0.2281 (a support of a cheap coin keeps its digits)"""
+    a = abs(x)
+    d = 0 if a >= 1000 else 2 if a >= 10 else 3 if a >= 1 else 4 if a >= 0.01 else 6
+    return f"{x:,.{d}f}".replace(",", " ")
+
+
 def _checks(grade: str, f: dict, sym: str = "", lang: str = DEFAULT) -> list[dict]:
     """the conditions the rule checked at entry, with THIS trade's numbers (only those the stored facts back)"""
     out: list[dict] = []
@@ -699,7 +706,7 @@ def _buy_now(out: str, now: int, lang: str = DEFAULT) -> dict | None:
             if k not in BUY_KEYS:
                 continue
             if k == "support":
-                why.append(t(lang, "buy.support", p=_num(float(w.get("p") or 0)), n=int(w.get("n") or 0)))
+                why.append(t(lang, "buy.support", p=_price(float(w.get("p") or 0)), n=int(w.get("n") or 0)))
             elif k in ("rsi", "quality"):
                 why.append(t(lang, f"buy.{k}", v=int(w.get("v") or 0)))
             else:

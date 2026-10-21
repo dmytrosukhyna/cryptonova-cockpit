@@ -4,6 +4,8 @@ already produce (web/*.json). Four slots a day in Kyiv time, in the format Dmytr
   11–13  Новость                — одна главная новость: своя шапка, что случилось, почему важно, вывод, ссылка на источник
   15–17  Новость                — вторая новость дня (если есть сильная)
   20–22  Итоги дня              — главные события, как вёл себя рынок, прогноз кратко/средне/долгосрочно, вывод (+ картинка)
+  + сделка закрыта         — 08–23: на каждую закрытую сделку автопилота отдельный пост с карточкой (дата, вход/выход, итог $ и %);
+                             вечерние итоги перечисляют сделки за день (21.10, владелец)
 The LLM writes the text from a compact facts JSON; a post is accepted only if every number in it exists in the facts
 (no invented figures). Without an LLM a plain template is sent. One post per slot per day (table channel_posts).
 """
@@ -439,6 +441,113 @@ class Channel:
         return {"futures": self._usd(fut) if fut is not None else None, "spot": self._usd(spot) if spot is not None else None, "total": self._usd(tot),
                 "futures_trades_closed": len(closed), "total_sign": "заработали" if tot >= 0 else "потеряли"}
 
+    # ------------------------------------------------------------------ trade results (owner 21.10)
+    # «в новости наши, в канал, нужно ещё добавлять результаты сделок … выделять жирным дату … скриншот»: every closed trade of
+    # the autopilot («сбалансированная», the same account the evening «Итог дня» counts) gets its own short post with a
+    # picture card, and the evening post lists the day's closed trades. Losses go out exactly like wins.
+    WHY_RU = {"A": "после гэпа цена вернулась к уровню — вошли на возврат",
+              "B": "после каскада ликвидаций покупатели выкупили падение — вошли на отскок",
+              "D": "фьючерс стоил дешевле спота — вошли на сближение цен",
+              "E": "после резкой распродажи покупатели начали выкупать падение — вошли на отскок",
+              "F": "после массового закрытия позиций рынок разгрузился — вошли на отскок"}
+    EXIT_RU = {"TIME": "по времени", "STOP": "по стопу", "BREAKEVEN": "в ноль по стопу", "TARGET": "по цели", "TRAIL": "подтянутым стопом"}
+    TRADE_HOURS = (8, 23)          # Kyiv: a trade closed at night is posted in the morning (it stays eligible for TRADE_WINDOW)
+    TRADE_WINDOW = 14 * 3600_000   # only trades closed in the last 14 h — no flood of old trades on the first run
+
+    def trade_view(self, t: dict) -> dict:
+        entry = t.get("entry"); qty = t.get("qty") or 0; pnl = t.get("pnl_usd")
+        long_ = str(t.get("side", "LONG")).upper() == "LONG"
+        exit_ = None; pct = None
+        if entry and qty and pnl is not None:
+            exit_ = entry + (pnl / qty if long_ else -pnl / qty)
+            pct = pnl / (qty * entry) * 100
+        net = t.get("net_usd") if t.get("net_usd") is not None else pnl
+        closed = t.get("closed")
+        if closed and t.get("exit_kind") == "TIME":
+            closed += 900_000                    # a time exit fills at the close of the 15-minute bar stamped by its open
+        cl = kyiv_now(closed) if closed else None
+        return {"id": t.get("id"), "symbol": t.get("symbol"), "side": t.get("side"), "entry": entry, "exit": exit_, "pct": pct,
+                "net_usd": net or 0.0, "opened": t.get("opened"), "closed": closed,
+                "exit_ru": self.EXIT_RU.get(t.get("exit_kind"), "по правилу"), "why_ru": self.WHY_RU.get(t.get("grade")),
+                "date": cl.strftime("%d.%m.%Y") if cl else "", "date_ru": self.date_ru(cl) if cl else ""}
+
+    def closed_trades(self, x: dict, since_ms: float) -> list[dict]:
+        bal = (x["paper"].get("profiles") or {}).get("bal") or {}
+        return [self.trade_view(t) for t in sorted(bal.get("closed") or [], key=lambda t: t.get("closed") or 0)
+                if isinstance(t, dict) and (t.get("closed") or 0) > since_ms]
+
+    def trades_block(self, x: dict) -> str:
+        """«Сделки за день» for the evening post: closed in the last 24 h, then the ones still open. Empty when there are none."""
+        bal = (x["paper"].get("profiles") or {}).get("bal") or {}
+        lines = []
+        for v in self.closed_trades(x, time.time() * 1000 - 86400_000)[-4:]:
+            pc = f" ({v['pct']:+.1f}%)".replace("-", "−") if v.get("pct") is not None else ""
+            lines.append(f"— <b>{v['date'][:5]}</b> · {v['symbol']} {'лонг' if str(v['side']).upper() == 'LONG' else 'шорт'}: "
+                         f"<b>{self._usd(v['net_usd'])}{pc}</b>, закрыта {v['exit_ru']}")
+        for o in [o for o in bal.get("open") or [] if isinstance(o, dict)][: max(0, 5 - len(lines))]:
+            u = o.get("open_pnl_usd")
+            lines.append(f"— {o.get('symbol')} {'лонг' if str(o.get('side', 'LONG')).upper() == 'LONG' else 'шорт'}: в работе"
+                         + (f", сейчас {self._usd(u)}" if u is not None else ""))
+        return ("<b>Сделки за день:</b>\n" + "\n".join(lines)) if lines else ""
+
+    @staticmethod
+    def insert_block(text: str, block: str) -> str:
+        if not block:
+            return text
+        for mark in ("\n\n<b>Что дальше", "\n\n<b>Вывод CRYPTO NOVA"):
+            i = text.find(mark)
+            if i >= 0:
+                return text[:i] + "\n\n" + block + text[i:]
+        return text + "\n\n" + block
+
+    def trade_text(self, v: dict, bal: dict) -> str:
+        long_ = str(v["side"]).upper() == "LONG"
+        pc = f" ({v['pct']:+.1f}%)".replace("-", "−") if v.get("pct") is not None else ""
+        op = kyiv_now(v["opened"]) if v.get("opened") else None
+        cl = kyiv_now(v["closed"]) if v.get("closed") else None
+        parts = [f"<b>Сделка закрыта · {v['date']}</b>",
+                 f"<b>{v['symbol']}</b>, {'лонг — ставка на рост' if long_ else 'шорт — ставка на падение'}\n"
+                 + (f"— Вход: <b>{_fmt(v['entry'])}</b>" + (f" ({op:%d.%m в %H:%M})" if op else "") + "\n" if v.get("entry") else "")
+                 + (f"— Выход: <b>{_fmt(v['exit'])}</b>" + (f" ({cl:%d.%m в %H:%M}), {v['exit_ru']}" if cl else "") + "\n" if v.get("exit") else "")
+                 + f"— Результат: <b>{self._usd(v['net_usd'])}{pc}</b> после комиссий"]
+        if v.get("why_ru"):
+            parts.append(f"<b>Почему вошли:</b> {v['why_ru'][0].upper() + v['why_ru'][1:]}.")
+        st = bal.get("stats") or {}
+        if st.get("trades"):
+            w = round((st.get("winrate") or 0) * st["trades"])
+            parts.append(f"<b>С начала счёта:</b> {self._deals(st['trades'])}, в плюсе {w}, итог <b>{self._usd(bal.get('pnl_usd') or 0)}</b>.")
+        parts.append("Демо-счёт $10 000, время киевское. Прошлые результаты не гарантируют будущих, это не инвестиционный совет.")
+        return "\n\n".join(parts)
+
+    def trade_posts(self, send_fn, photo_fn=None, now: dt.datetime | None = None) -> list[tuple[str, str]]:
+        """One post per newly closed autopilot trade (text + picture card); recorded as day='trade', slot='trade:<id>'."""
+        now = now or kyiv_now()
+        if not (self.TRADE_HOURS[0] <= now.hour < self.TRADE_HOURS[1]):
+            return []
+        x = self.ctx()
+        bal = (x["paper"].get("profiles") or {}).get("bal") or {}
+        out = []
+        for v in self.closed_trades(x, now.timestamp() * 1000 - self.TRADE_WINDOW):
+            key = f"trade:{v['id'] or (str(v['symbol']) + ':' + str(v['closed']))}"
+            if self.already("trade", key):
+                continue
+            t = self.trade_text(v, bal)
+            ok = False
+            if photo_fn:
+                try:
+                    from . import postchart
+                    coin = self.coin(x["terminal"], str(v["symbol"]))
+                    png = postchart.trade_card(coin, v, os.path.join(self.out, "post_trade.png"), when="автопилот · демо-счёт, сбалансированный риск")
+                    ok = bool(png) and bool(photo_fn(png, t))
+                except Exception:  # noqa: BLE001
+                    ok = False
+            if not ok:
+                ok = bool(send_fn(t))
+            if ok:
+                self.record("trade", key, t); out.append((key, t))
+                self._log(now.strftime("%Y-%m-%d"), key, {"sent": True})
+        return out
+
     def impacts(self, x: dict, n: int) -> list[dict]:
         d = x["decision"].get("news") or {}
         seen = set(); out = []
@@ -691,8 +800,11 @@ class Channel:
                 if "цель достигнута" in v:
                     facts["scenario_verdict"] = v
         facts["_max_len"] = 1000                 # morning / evening go out as a photo caption (Telegram limit 1024)
+        block = self.trades_block(x) if slot == "evening" else ""
+        if block:                                # added as is after the text is written: exact numbers, room kept in the caption
+            facts["_max_len"] = max(600, 1000 - len(re.sub(r"<[^>]+>", "", block)) - 2)
         txt = self.write(slot, facts, llm) or self.template(slot, facts)
-        return txt
+        return self.insert_block(txt, block)
 
     def intro(self) -> str:
         return ("<b>CRYPTO NOVA — запуск AI-платформы для крипторынка</b>\n\n"
@@ -819,6 +931,11 @@ class Channel:
                 t = self.intro()
                 if send_fn(t):
                     self.record("once", f"intro:{ver}", t); sent += 1; texts.append(("intro", t))
+        try:
+            for k_, t_ in self.trade_posts(send_fn, photo_fn, now):
+                sent += 1; texts.append((k_, t_))
+        except Exception:  # noqa: BLE001
+            pass
         if not slot:
             return {"slot": None, "sent": bool(sent), "n": sent, "why": "outside posting hours"}
         if not force_slot and self.already(day, slot):

@@ -217,3 +217,37 @@ def test_send_photo_album_falls_back_to_one_picture():
     finally:
         notify.send_album = orig_album
     assert calls == [("album", 2), ("photo", "sendPhoto")]
+
+
+def test_closed_trade_gets_its_own_post_and_the_evening_lists_it():
+    """Owner 21.10: results of the trades go to the channel — a post per closed trade (bold date, picture card) and a
+    «Сделки за день» block in the evening. Losses are posted like wins; old trades and night hours are skipped."""
+    tmp = tempfile.mkdtemp(); _web(tmp)
+    now = dt.datetime.now(channel.KYIV).replace(hour=14, minute=5)
+    ms = int(now.timestamp() * 1000)
+    win = {"id": "E-ARB-1", "symbol": "ARB", "side": "LONG", "grade": "E", "entry": 0.17552, "qty": 11396.0, "pnl_usd": 191.6, "net_usd": 190.59,
+           "opened": ms - 25 * 3600_000, "closed": ms - 3600_000, "exit_kind": "TIME"}
+    loss = {"id": "E-DOT-1", "symbol": "DOT", "side": "LONG", "grade": "E", "entry": 1.1121, "qty": 299.79, "pnl_usd": -7.64, "net_usd": -7.81,
+            "opened": ms - 26 * 3600_000, "closed": ms - 2 * 3600_000, "exit_kind": "STOP"}
+    old = dict(win, id="E-SOL-old", symbol="SOL", closed=ms - 3 * 86400_000)
+    pj = json.load(open(os.path.join(tmp, "paper.json")))
+    pj["profiles"]["bal"] = {"pnl_pct": 1.86, "pnl_usd": 186.34, "open": [], "closed": [old, loss, win], "stats": {"trades": 7, "winrate": 0.714}}
+    json.dump(pj, open(os.path.join(tmp, "paper.json"), "w"))
+    conn = sqlite3.connect(":memory:"); ch = channel.Channel(conn, tmp)
+    sent, photos = [], []
+    out = ch.trade_posts(lambda t: sent.append(t) or True, lambda p, c: photos.append((p, c)) or True, now)
+    assert len(out) == 2 and not any("SOL" in t for _, t in out)
+    t_loss, t_win = out[0][1], out[1][1]
+    d = now.strftime("%d.%m.%Y")
+    assert f"<b>Сделка закрыта · {d}</b>" in t_win and "<b>+$191 (+9.6%)</b>" in t_win and "Демо-счёт $10 000" in t_win
+    assert "<b>−$8 (−2.3%)</b>" in t_loss and "по стопу" in t_loss
+    assert "в плюсе 5" in t_win and "+$186" in t_win
+    assert len(photos) == 2 or len(sent) == 2                                # picture card when Pillow is there, text otherwise
+    assert ch.trade_posts(lambda t: sent.append(t) or True, None, now) == []    # once per trade
+    ch2 = channel.Channel(sqlite3.connect(":memory:"), tmp)
+    assert ch2.trade_posts(lambda t: True, None, now.replace(hour=3)) == []     # no posts at night
+    blk = ch.trades_block(ch.ctx())
+    assert blk.startswith("<b>Сделки за день:</b>") and "ARB лонг: <b>+$191 (+9.6%)</b>" in blk and "DOT" in blk and "SOL" not in blk
+    ev = ch.post("evening", now=now.replace(hour=21, minute=40))
+    assert "<b>Сделки за день:</b>" in ev and ev.index("Сделки за день") < ev.index("Вывод CRYPTO NOVA")
+    assert ch.lint(ev, {}) == []

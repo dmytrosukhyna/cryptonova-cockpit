@@ -611,3 +611,96 @@ def engine_card(home: dict, conveyor: dict | None, risk: dict | None, scorecard:
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     img.save(out_path, "PNG", optimize=True)
     return out_path
+
+
+# ------------------------------------------------------------------------------------------------------------ trade card
+def trade_card(coin: dict | None, trade: dict, out_path: str, when: str | None = None, footer: str | None = None) -> str | None:
+    """«Сделка закрыта» (owner 21.10: «в канал добавлять результаты сделок … жирным дата … скриншот»): the coin's hourly
+    price around the trade with the entry and the exit marked, the result in $ and %, entry / exit / hold / how it closed.
+    trade = {symbol, side, entry, exit, opened, closed, net_usd, pct, exit_ru, date_ru}; coin = terminal.json coin (candles
+    optional — without them the card is drawn without the chart). 1280 × 720."""
+    if Image is None:
+        return None
+    W, H = 1280, 720
+    img = Image.new("RGB", (W, H), (6, 11, 22)); d = ImageDraw.Draw(img, "RGBA")
+    for i in range(40):
+        d.rectangle([0, i * 6, W, i * 6 + 6], fill=(124, 196, 255, int(24 * (1 - i / 40))))
+    win = (trade.get("net_usd") or 0) >= 0
+    col = UP if win else DOWN
+    long_ = str(trade.get("side", "LONG")).upper() == "LONG"
+    d.text((36, 22), "CRYPTO NOVA", font=_font(24, True), fill=TXT)
+    d.text((246, 30), "Сделка закрыта", font=_font(16, True), fill=(170, 195, 225))
+    if when:
+        d.text((246, 52), when, font=_font(13), fill=MUTED)
+    d.text((W - 36, 26), trade.get("date_ru") or "", font=_font(26, True), fill=TXT, anchor="ra")
+    # headline: coin + side, result
+    d.text((36, 92), f"{trade.get('symbol', '?')} · {'лонг (на рост)' if long_ else 'шорт (на падение)'}", font=_font(34, True), fill=TXT)
+    net = trade.get("net_usd") or 0
+    res = f"{'+' if net >= 0 else '−'}${abs(net):,.0f}".replace(",", " ")
+    pct = trade.get("pct")
+    d.text((36, 140), res, font=_font(64, True), fill=col)
+    if pct is not None:
+        w = d.textlength(res, font=_font(64, True))
+        d.text((36 + w + 20, 166), f"{pct:+.1f}%".replace("-", "−"), font=_font(34, True), fill=col)
+    # right column: facts
+    rows = [("Вход", _fmt(trade["entry"]) if trade.get("entry") else "—"), ("Выход", _fmt(trade["exit"]) if trade.get("exit") else "—")]
+    if trade.get("opened") and trade.get("closed"):
+        hrs = (trade["closed"] - trade["opened"]) / 3_600_000
+        rows.append(("Держали", f"{hrs:.0f} ч" if hrs >= 1 else f"{hrs * 60:.0f} мин"))
+    if trade.get("exit_ru"):
+        rows.append(("Как вышли", trade["exit_ru"]))
+    bx0, by0, bx1 = 760, 92, W - 36
+    d.rounded_rectangle([bx0, by0, bx1, by0 + 44 * len(rows) + 24], radius=16, fill=(10, 19, 38), outline=(40, 62, 98))
+    for k, (a, b) in enumerate(rows):
+        y = by0 + 16 + k * 44
+        d.text((bx0 + 18, y), a, font=_font(17), fill=(170, 195, 225))
+        d.text((bx1 - 18, y), b, font=_font(19, True), fill=TXT, anchor="ra")
+    # chart: hourly closes from 24 h before the entry to 6 h after the exit
+    L, R, T, B = 36, 110, 300, 70
+    # 15-minute bars plotted at their CLOSE time (open + 15 min), so a fill at a bar close sits on that point
+    bars = [[k[0] + 900_000] + list(k[1:]) for k in ((coin or {}).get("candles") or [])]
+    if trade.get("opened") and trade.get("closed") and bars:
+        a = trade["opened"] - 24 * 3_600_000; b = trade["closed"] + 6 * 3_600_000
+        bars = [k for k in bars if a <= k[0] <= b]
+    if len(bars) >= 6:
+        closes = [k[4] for k in bars]; ts = [k[0] for k in bars]
+        lo = min(min(closes), trade.get("entry") or closes[0], trade.get("exit") or closes[-1])
+        hi = max(max(closes), trade.get("entry") or closes[0], trade.get("exit") or closes[-1])
+        pad = (hi - lo) * 0.12 or hi * 0.01; lo -= pad; hi += pad
+        pw, ph = W - L - R, H - T - B
+        X = lambda t: L + (t - ts[0]) / ((ts[-1] - ts[0]) or 1) * pw
+        Y = lambda p: T + (hi - p) / (hi - lo) * ph
+        for k in range(5):
+            p = lo + (hi - lo) * k / 4; y = Y(p)
+            d.line([L, y, L + pw, y], fill=(160, 190, 230, 24))
+            d.text((L + pw + 8, y - 7), _fmt(p), font=_font(12), fill=MUTED)
+        xe = max(L, min(L + pw, X(trade["opened"]))); xx = max(L, min(L + pw, X(trade["closed"])))
+        d.rectangle([xe, T, xx, T + ph], fill=col + (22,))
+        pts = [(X(t), Y(c)) for t, c in zip(ts, closes)]
+        d.line(pts, fill=(124, 196, 255, 255), width=2, joint="curve")
+        if trade.get("entry"):
+            ye = Y(trade["entry"])
+            for x in range(int(xe), int(xx), 14):
+                d.line([x, ye, min(x + 7, xx), ye], fill=(234, 246, 255, 150), width=2)
+        for x, p, lab, c_ in ((xe, trade.get("entry"), "ВХОД", ICE), (xx, trade.get("exit"), "ВЫХОД", col)):
+            if p is None:
+                continue
+            y = Y(p)
+            d.line([x, T, x, T + ph], fill=c_ + (90,), width=1)
+            d.ellipse([x - 8, y - 8, x + 8, y + 8], fill=c_, outline=(6, 11, 22), width=2)
+            d.text((x, T - 6), lab, font=_font(13, True), fill=c_, anchor="md")
+        for t in (ts[0], trade["opened"], trade["closed"]):
+            if ts[0] <= t <= ts[-1]:
+                try:
+                    from zoneinfo import ZoneInfo
+                    tz = ZoneInfo("Europe/Kyiv")
+                except Exception:  # noqa: BLE001
+                    tz = dt.timezone(dt.timedelta(hours=3))
+                lt = dt.datetime.fromtimestamp(t / 1000, tz)
+                d.text((X(t), T + ph + 10), f"{lt:%d.%m %H:%M}", font=_font(12), fill=MUTED, anchor="la" if X(t) < L + 40 else "ma")
+    else:
+        d.text((36, T + 40), "график цены за время сделки недоступен", font=_font(15), fill=MUTED)
+    d.text((36, H - 30), footer or "Демо-счёт $10 000 · результат после комиссий · не инвестиционный совет", font=_font(13), fill=MUTED)
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    img.save(out_path, "PNG", optimize=True)
+    return out_path

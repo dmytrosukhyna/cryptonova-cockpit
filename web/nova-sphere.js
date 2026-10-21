@@ -62,6 +62,34 @@
   }
 
   var TEMPO = 1.35;   // owner 21.10 18:11: «чуть-чуть ускорить» — every motion a third faster
+  /* «coins» variant (owner 21.10 19:17: the big atom like the icon — bitcoin and ether on the orbits, the N in the core) */
+  function coin(g, x, y, r, kind, dim) {
+    var h = g.createRadialGradient(x, y, r * 0.8, x, y, r * 2.6);
+    h.addColorStop(0, kind === "btc" ? "rgba(255,170,60," + (0.45 * dim).toFixed(3) + ")" : "rgba(140,170,255," + (0.4 * dim).toFixed(3) + ")"); h.addColorStop(1, "rgba(120,160,255,0)");
+    g.fillStyle = h; g.beginPath(); g.arc(x, y, r * 2.6, 0, TAU); g.fill();
+    var b = g.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+    if (kind === "btc") { b.addColorStop(0, "#FFE3A3"); b.addColorStop(0.45, "#F7A43A"); b.addColorStop(1, "#B9650E"); }
+    else { b.addColorStop(0, "#3A4A86"); b.addColorStop(0.6, "#18224F"); b.addColorStop(1, "#0B1233"); }
+    g.globalAlpha = dim; g.fillStyle = b; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    g.lineWidth = r * 0.14; g.strokeStyle = kind === "btc" ? "rgba(255,226,160,.95)" : "rgba(170,190,255,.9)"; g.beginPath(); g.arc(x, y, r * 0.93, 0, TAU); g.stroke();
+    if (kind === "btc") {
+      g.fillStyle = "#FFF6E0"; g.font = "700 " + (r * 1.25).toFixed(2) + "px Arial,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("\u20BF", x + r * 0.03, y + r * 0.06);
+    } else {   // the ether diamond
+      g.fillStyle = "rgba(235,240,255,.95)"; g.beginPath(); g.moveTo(x, y - r * 0.62); g.lineTo(x + r * 0.38, y + r * 0.02); g.lineTo(x, y + r * 0.2); g.lineTo(x - r * 0.38, y + r * 0.02); g.closePath(); g.fill();
+      g.fillStyle = "rgba(200,210,255,.85)"; g.beginPath(); g.moveTo(x, y + r * 0.3); g.lineTo(x + r * 0.38, y + r * 0.1); g.lineTo(x, y + r * 0.64); g.lineTo(x - r * 0.38, y + r * 0.1); g.closePath(); g.fill();
+    }
+    g.globalAlpha = 1;
+  }
+  function glyphN(g, RS, t) {   // the brand N: one smooth wave and a small four-point star
+    var s = RS / 17;
+    g.save(); g.scale(s, s); g.lineCap = "round"; g.lineJoin = "round";
+    var gr = g.createLinearGradient(-7, 6, 7, -6); gr.addColorStop(0, "rgba(190,225,255,.95)"); gr.addColorStop(1, "#FFFFFF");
+    g.shadowColor = "rgba(160,215,255,.9)"; g.shadowBlur = 6 * s;
+    g.strokeStyle = gr; g.lineWidth = 2.6; g.beginPath(); g.moveTo(-7, 5.5); g.bezierCurveTo(-7.5, -7, -2.5, -7.5, 0, 0); g.bezierCurveTo(2.5, 7.5, 7.5, 7, 7, -5.5); g.stroke();
+    var tw = 0.75 + 0.25 * Math.sin(t * 3), sx = 9.4, sy = -7.6, a = 2.4 * tw, b2 = 0.55 * tw;
+    g.fillStyle = "#FFFFFF"; g.beginPath(); g.moveTo(sx, sy - a); g.lineTo(sx + b2, sy - b2); g.lineTo(sx + a, sy); g.lineTo(sx + b2, sy + b2); g.lineTo(sx, sy + a); g.lineTo(sx - b2, sy + b2); g.lineTo(sx - a, sy); g.lineTo(sx - b2, sy - b2); g.closePath(); g.fill();
+    g.shadowBlur = 0; g.restore();
+  }
   function draw(g, cx0, cy0, half, t, opt) {
     opt = opt || {}; t = t * TEMPO;
     var busy = !!opt.busy, k = 1, small = half < 22, glow = busy ? 1.35 : 1, rot = t * 0.07, RO = 43, RS = 17;
@@ -74,9 +102,9 @@
     var E = [];
     ORB.forEach(function (o, oi) {
       ribbon(g, o, RO, rot, false, t, k, glow, small);
-      o.e.forEach(function (e0, ei) { var th = e0 + t * o.w * (busy ? 2.2 : 1); var p = op(o, th, RO, rot); E.push({ p: p, r: 2.7 * (small ? 1.2 : 1), warm: oi === 2 }); });
+      o.e.forEach(function (e0, ei) { var th = e0 + t * o.w * (busy ? 2.2 : 1); var p = op(o, th, RO, rot); E.push({ p: p, r: 2.7 * (small ? 1.2 : 1), warm: oi === 2, coin: opt.coins ? ["btc", "eth", null][oi] : null }); });
     });
-    E.filter(function (e) { return e.p.z < 0; }).forEach(function (e) { bead(g, e.p.x, e.p.y, e.r * (0.85 + 0.15 * (1 + e.p.z / RO)), e.warm, 0.55); });
+    E.filter(function (e) { return e.p.z < 0; }).forEach(function (e) { var rr = e.r * (0.85 + 0.15 * (1 + e.p.z / RO)); if (e.coin) coin(g, e.p.x, e.p.y, rr * 1.75, e.coin, 0.6); else bead(g, e.p.x, e.p.y, rr, e.warm, 0.55); });
     // the sphere: a small universe in glass
     var sg = g.createRadialGradient(0, 0, RS * 0.9, 0, 0, RS * 1.35);
     sg.addColorStop(0, "rgba(110,190,255," + (0.5 * glow).toFixed(3) + ")"); sg.addColorStop(1, "rgba(110,190,255,0)");
@@ -95,12 +123,13 @@
       g.beginPath(); g.arc(x * RS, s.y * RS, s.s * (small ? 1.6 : 1), 0, TAU); g.fill();
     });
     var hl = g.createRadialGradient(RS * 0.42, -RS * 0.22, 0, RS * 0.42, -RS * 0.22, RS * 0.55);
-    hl.addColorStop(0, "rgba(255,255,255," + (0.85 + 0.15 * Math.sin(t * 1.4)).toFixed(3) + ")"); hl.addColorStop(1, "rgba(255,255,255,0)");
+    hl.addColorStop(0, "rgba(255,255,255," + ((opt.coins ? 0.3 : 0.85) + 0.15 * Math.sin(t * 1.4)).toFixed(3) + ")"); hl.addColorStop(1, "rgba(255,255,255,0)");
     g.fillStyle = hl; g.fillRect(-RS, -RS, RS * 2, RS * 2);
     var ed = g.createRadialGradient(0, 0, RS * 0.7, 0, 0, RS);
     ed.addColorStop(0, "rgba(4,8,30,0)"); ed.addColorStop(1, "rgba(4,8,30,.45)");
     g.fillStyle = ed; g.fillRect(-RS, -RS, RS * 2, RS * 2);
     g.restore();
+    if (opt.coins) glyphN(g, RS, t);
     // glass rim and a reflection
     var rg = g.createLinearGradient(-RS, -RS, RS, RS);
     rg.addColorStop(0, "rgba(190,230,255,.9)"); rg.addColorStop(0.5, "rgba(90,160,255,.55)"); rg.addColorStop(1, "rgba(160,220,255,.85)");
@@ -108,7 +137,7 @@
     g.strokeStyle = "rgba(255,255,255,.45)"; g.lineWidth = 0.9; g.beginPath(); g.arc(0, 0, RS * 0.84, Math.PI * 1.08, Math.PI * 1.42); g.stroke();
     // front halves and electrons in front
     ORB.forEach(function (o) { ribbon(g, o, RO, rot, true, t, k, glow, small); });
-    E.filter(function (e) { return e.p.z >= 0; }).forEach(function (e) { bead(g, e.p.x, e.p.y, e.r * (0.85 + 0.15 * (1 + e.p.z / RO)), e.warm, 1); });
+    E.filter(function (e) { return e.p.z >= 0; }).forEach(function (e) { var rr = e.r * (0.85 + 0.15 * (1 + e.p.z / RO)); if (e.coin) coin(g, e.p.x, e.p.y, rr * 1.75, e.coin, 1); else bead(g, e.p.x, e.p.y, rr, e.warm, 1); });
     g.restore();
   }
 
@@ -123,7 +152,7 @@
       var busy = typeof opt.busy === "function" ? opt.busy() : false;
       if (now !== -1) { var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016; last = now; t += dt * (busy ? 3 : 1); } else t = t || 1.3;
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
-      draw(ctx, W / 2, H / 2, Math.min(W, H) / 2, t, { busy: busy, still: now === -1 && reduce });
+      draw(ctx, W / 2, H / 2, Math.min(W, H) / 2, t, { busy: busy, still: now === -1 && reduce, coins: !!opt.coins });
       if (now !== -1) requestAnimationFrame(frame);
     }
     function set() { var want = vis && !document.hidden && !reduce; if (want && !run) { run = true; last = 0; requestAnimationFrame(frame); } else if (!want) { run = false; frame(-1); } }
@@ -137,7 +166,7 @@
   }
 
   w.NovaSphere = { draw: draw, mount: mount };
-  function auto() { [].forEach.call(document.querySelectorAll("canvas[data-sphere]"), function (c) { if (!c._sph) try { c._sph = mount(c, {}); } catch (e) { c._sph = true; } }); }
+  function auto() { [].forEach.call(document.querySelectorAll("canvas[data-sphere]"), function (c) { if (!c._sph) try { c._sph = mount(c, { coins: c.getAttribute("data-sphere") === "coins" }); } catch (e) { c._sph = true; } }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", auto); else auto();
   w.NovaSphere.auto = auto;
 })(window);

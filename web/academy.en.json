@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "updated": "2026-10-21",
   "title": "Learn with CRYPTO NOVA",
   "note": "Not financial advice. Past results don't guarantee future ones.",
@@ -29,13 +29,13 @@
             },
             {
               "title": "What's in the app",
-              "text": "The sections are at the bottom of the screen. “Home” shows the overall result. “Futures” has trades that bet on prices going up or down. “Spot” is a calm set of major coins. “Learn” is these lessons. In the middle is NOVA, an AI assistant for your questions. You open the “Piggy bank” from Home, and your “Account” from the round profile icon at the top.",
+              "text": "At the bottom of the screen are the tabs: “Home”, “Futures”, “Spot” and “Learn”. In the middle is the glowing NOVA orb, an AI assistant for your questions. Home has 6 more buttons, including “Piggy bank” and “Tour”. Tap the round profile icon at the top to open “Account”.",
               "example": "In real life: it's like a shopping mall with several floors. You don't have to see everything at once. Start with one shop — the rest will wait.",
               "art": "phone_app"
             },
             {
-              "title": "No subscriptions",
-              "text": "CRYPTO NOVA 2.0 is free: no subscriptions and no paid features. To get started, there's a demo account — a practice account with virtual money. The prices are real, but the money isn't. You can watch, try things out and make mistakes with no risk.",
+              "title": "Start with the demo",
+              "text": "To begin, there's the demo: a practice portfolio with virtual money. The prices are real, but the money isn't. You can look around, try things and make mistakes with no risk. Real money only comes in when you connect your own exchange account yourself.",
               "example": "In real life: at driving school, you start on a simulator. The wheel and the road feel real, but a mistake costs nothing.",
               "art": "coins"
             },
@@ -48,7 +48,7 @@
           ],
           "remember": [
             "CRYPTO NOVA looks for trades around the clock, using rules tested on past prices.",
-            "The app is free. You can start with a demo account and virtual money.",
+            "You can start with the demo: virtual money, real prices.",
             "The system can be wrong, and past results don't promise future ones."
           ],
           "quiz": [
@@ -61,7 +61,7 @@
                 "Sells a paid subscription to signals"
               ],
               "answer": 2,
-              "why": "The system watches the market and shows you every trade it makes. It doesn't hold your money or promise profit, and the app is free."
+              "why": "The system watches the market and shows every trade it makes. It doesn't hold your money and doesn't promise profit."
             },
             {
               "q": "What is a demo account?",
@@ -172,8 +172,8 @@
           "goal": "By the end, you'll know what the Home screen shows and where to tap next.",
           "cards": [
             {
-              "title": "At the top: Demo or Real",
-              "text": "At the very top is the “Demo / Real” switch. A blinking red dot next to “Demo” reminds you that everything is in virtual money right now. “Real” works once you've connected the system to your own exchange account. Next to it is the round profile icon: it opens your “Account”.",
+              "title": "At the top: PUBLIC, DEMO or REAL",
+              "text": "Under the name is the portfolio switch. PUBLIC is the CRYPTO NOVA public portfolio: the system's demo accounts at real prices. DEMO is your own demo portfolio with virtual money. REAL is your exchange account, once you've connected it. Your choice stays for Home, Spot and Futures. The profile icon at the top right opens “Account”.",
               "example": "In real life: a “Learner” sign on a driving-school car. Everyone can see right away that it's practice.",
               "art": "phone_app",
               "screen": "Main",
@@ -181,18 +181,18 @@
                 {
                   "n": 1,
                   "target": "mode_switch",
-                  "text": "Demo / Real: which money you're looking at"
+                  "text": "PUBLIC / DEMO / REAL: which portfolio you see"
                 },
                 {
                   "n": 2,
                   "target": "avatar",
-                  "text": "Profile icon: the way into your “Account”"
+                  "text": "Profile icon: the way into “Account”"
                 }
               ]
             },
             {
-              "title": "The main card: two accounts",
-              "text": "The main card has 2 tabs. “CRYPTO NOVA account” shows how much the system's demo accounts have earned since October 17, 2026. Below the number is a chart, and the “Day”, “Week”, “Month” and “All” buttons change the period. On the “My demo account” tab you can enter any amount and watch how it changes along with the system.",
+              "title": "The main card: the chosen portfolio",
+              "text": "In PUBLIC mode the card shows “Total earned”: the public portfolio's result since the test began, with a chart. The “Day”, “Week”, “Month” and “All” buttons change the period. In DEMO mode you can create your own demo portfolio here for any amount and watch it change along with the system.",
               "example": "In real life: you try on a jacket in a shop without buying it. Your own demo account is that kind of fitting: the money is virtual, but the prices are real.",
               "art": "chart_up",
               "screen": "Main",
@@ -200,7 +200,7 @@
                 {
                   "n": 1,
                   "target": "total",
-                  "text": "CRYPTO NOVA account: total and chart"
+                  "text": "Total earned: result and chart"
                 },
                 {
                   "n": 2,
@@ -210,26 +210,26 @@
                 {
                   "n": 3,
                   "target": "my_demo",
-                  "text": "My demo account: enter your own amount"
+                  "text": "DEMO: create your own demo portfolio"
                 }
               ]
             },
             {
-              "title": "A button and two tiles",
-              "text": "Below that is the “Connect a real account” button. Under it are 2 bright tiles. “How CRYPTO NOVA works” is a 1-minute guide to the system, demo and real accounts. “Piggy bank” is for saving in bitcoin from $5 a week. If you're new, these two tiles are the best place to start.",
+              "title": "Trades and six buttons",
+              "text": "Below are the system's open trades and 6 equal buttons: “Spot”, “Futures”, “Nova AI”, “Piggy bank”, “Learn” and “Tour”. “Tour” shows you how everything works in a minute. Beginners should start with it and with the “Piggy bank”.",
               "example": "In real life: at a museum entrance, you join a short tour. In a minute you know what's where, and after that it's easy to find your way.",
               "art": "piggy",
               "screen": "Main",
               "callouts": [
                 {
                   "n": 1,
-                  "target": "connect",
-                  "text": "Connect a real account"
+                  "target": "open_trades",
+                  "text": "The system's open trades"
                 },
                 {
                   "n": 2,
                   "target": "guide",
-                  "text": "How CRYPTO NOVA works: a 1-minute guide"
+                  "text": "Tour: how it all works"
                 },
                 {
                   "n": 3,
@@ -239,31 +239,21 @@
               ]
             },
             {
-              "title": "Where the earnings come from",
-              "text": "The “Where the earnings come from” block shows what makes up the total. “Futures”: trades on prices rising and falling, and how many are active right now. “Spot”: a portfolio of coins bought with no borrowed money. “Piggy bank”: your savings. “New sources”: things the system is still testing. Tap a line to open that section.",
+              "title": "How the public portfolio is split",
+              "text": "In PUBLIC mode you'll see below how the public portfolio is spread across sources: spot, futures, dollar yield and others. The system moves the shares with the market trend and rebalances them on Mondays. All of it is a demo at real prices.",
               "example": "In real life: a family budget shows how much came from salary, how much from the vegetable garden, and how much from a side job.",
               "art": "coins",
               "screen": "Main",
               "callouts": [
                 {
                   "n": 1,
-                  "target": "futures",
-                  "text": "Futures: active trades and results"
+                  "target": "sources",
+                  "text": "Income sources and their shares"
                 },
                 {
                   "n": 2,
-                  "target": "spot",
-                  "text": "Spot: the coin portfolio"
-                },
-                {
-                  "n": 3,
-                  "target": "piggy",
-                  "text": "Piggy bank: your savings"
-                },
-                {
-                  "n": 4,
-                  "target": "soon",
-                  "text": "New sources: coming soon"
+                  "target": "rebalance",
+                  "text": "Shares are rebalanced on Mondays"
                 }
               ]
             },
@@ -293,7 +283,7 @@
             },
             {
               "title": "Tabs at the bottom, and NOVA",
-              "text": "At the very bottom are the tabs: Home, Futures, Spot, Learn. In the middle is NOVA's glowing orb. She's an AI assistant: ask in plain words, for example “Why did the system enter this trade?” You can use your voice too: press and hold the mic, speak, then let go.",
+              "text": "At the very bottom are the tabs: Home, Futures, Spot, Learn. In the middle is the glowing NOVA orb. It's an AI assistant: ask in plain words, for example, “Why did the system enter this trade?” You can use your voice too: tap the microphone, say your question and tap it again.",
               "example": "In real life: NOVA is like a helpful shop assistant. She'll give tips and explain things. But shop assistants sometimes get things wrong, too.",
               "art": "robot",
               "screen": "Main",
@@ -312,21 +302,21 @@
             }
           ],
           "remember": [
-            "At the top is “Demo / Real”: the red dot means virtual money.",
-            "In “My demo account”, enter any amount and watch how it changes.",
-            "New here? Start with the “How CRYPTO NOVA works” and “Piggy bank” tiles."
+            "At the top: PUBLIC, DEMO or REAL — which portfolio you see.",
+            "In DEMO mode, create your own demo portfolio for any amount.",
+            "Beginners: start with the “Tour” and “Piggy bank” buttons."
           ],
           "quiz": [
             {
-              "q": "How can you tell you're looking at virtual money?",
+              "q": "What does DEMO mode show?",
               "options": [
-                "From the chart on Home",
-                "“Demo” with a red dot is selected at the top",
-                "From the bitcoin price",
-                "From the “Sentiment” tile"
+                "Your exchange account with real money",
+                "Your demo portfolio: any amount, virtual money",
+                "Only the bitcoin price",
+                "Market sentiment"
               ],
               "answer": 1,
-              "why": "The “Demo / Real” switch is always at the top. The red dot next to “Demo” reminds you that the money is for practice."
+              "why": "DEMO is your practice portfolio: the prices are real, but the money is virtual. Real money is only in REAL mode, on your own exchange account."
             },
             {
               "q": "Where can you enter your own amount to see how it would change along with the system?",
@@ -334,10 +324,10 @@
                 "In the “Trend” tile",
                 "In “Account”, under “Language”",
                 "On the “Learn” tab",
-                "On Home, in the “My demo account” tab"
+                "On Home, in DEMO mode: “Create your own demo portfolio”"
               ],
               "answer": 3,
-              "why": "In the “My demo account” tab, you can enter any amount. The money is virtual, but the prices are real."
+              "why": "In DEMO mode you can enter any amount. The money is virtual, but the prices are real."
             },
             {
               "q": "The “Trend” tile says “uptrend”. What does that mean?",
@@ -360,7 +350,7 @@
           "cards": [
             {
               "title": "The total at the top",
-              "text": "At the top is the result of the system's futures demo account: $10,000 since October 17, 2026. You can see how much it has earned, how much today, and how many trades there have been. “Drawdown” is the account's biggest drop from its highest point. Tap the card and it flips over to show a chart.",
+              "text": "At the top is “System status”: the $10,000 futures demo account and its chart. You can see how much has been earned, how much today, how many trades there were and the drawdown. “Drawdown” is the account's deepest fall from its highest point.",
               "example": "In real life: after a hike, it's not just about how far you got. It also matters how deep a ravine you had to climb down along the way.",
               "art": "chart_up",
               "screen": "Futures",
@@ -377,14 +367,14 @@
                 },
                 {
                   "n": 3,
-                  "target": "flip",
-                  "text": "Tap to see the chart"
+                  "target": "chart",
+                  "text": "The account's chart"
                 }
               ]
             },
             {
               "title": "A trade in progress",
-              "text": "The “Active” block shows open trades. For each one, you see the coin, the direction and the result in dollars. “UP (LONG)” means the system expects the price to rise. “DOWN (SHORT)” means it expects the price to fall. If there are no trades, the system is waiting for a good entry. That's normal.",
+              "text": "The “Open trades” block shows the trades in progress. For each one you can see the coin, the direction and the result in dollars. “Long” means the system expects the price to rise. “Short” means it expects the price to fall. If there are no trades, the system is waiting for a good entry point. That's normal.",
               "example": "In real life: going long is like buying firewood in summer because you expect it to cost more by winter.",
               "art": "target",
               "screen": "Futures",
@@ -460,7 +450,7 @@
             },
             {
               "title": "Closed trades, no secrets",
-              "text": "At the bottom is “Closed”: every finished trade, winners and losers alike. Every system has losses, and we don't hide them. Judge a system by many trades and by its drawdown, not by one lucky trade.",
+              "text": "Further down is “Closed trades”: every finished trade, both winners and losers. Every system has losses, and we don't hide them. Judge a system by many trades and by its drawdown, not by one lucky trade.",
               "example": "In real life: you judge a café by a dozen visits, not by one lunch. And honest reviews are always mixed.",
               "art": "scale",
               "screen": "Futures",
@@ -541,7 +531,7 @@
             },
             {
               "title": "What's in the portfolio",
-              "text": "The “Allocation” block shows the shares. The core is bitcoin, ether, solana and other major coins. About 15% sits in dollars as a reserve. The money is spread across different coins, so trouble with one doesn't hit the whole portfolio.",
+              "text": "The “Allocation” block shows the shares. The core is bitcoin, ether, solana and other large coins. About 15% is kept in dollars as a reserve. Tap a coin and the app explains why it's in the portfolio: what the project is, its risks and its unlocks.",
               "example": "In real life: you don't carry all your eggs in one basket. Drop one basket, and the eggs in the others are fine.",
               "art": "basket_eggs",
               "screen": "Spot",
@@ -554,7 +544,7 @@
                 {
                   "n": 2,
                   "target": "coins",
-                  "text": "How each coin has changed since purchase"
+                  "text": "Tap a coin: “Why is this asset in the portfolio?”"
                 }
               ]
             },
@@ -627,7 +617,7 @@
             },
             {
               "title": "How the Piggy bank keeps count",
-              "text": "The Piggy bank keeps its numbers on a demo account at real bitcoin prices, and reminds you on buy day. The “If you'd saved like this” block shows what would have happened in the past. You buy real bitcoin yourself on an exchange, if you're 18 or older. Soon you'll be able to run your Piggy bank right on the exchange through the app.",
+              "text": "The Piggy bank runs its numbers on the demo at real bitcoin prices and reminds you on each buying day. The “If you'd saved like this” block shows what would have happened in the past. To save for real, turn on a recurring bitcoin buy on your own exchange account (“Auto-invest” or “Recurring buy”) with the same amount. The exchange makes the buys, and the money stays with you. Real money only from age 18.",
               "example": "In real life: an alarm clock won't get up for you, but it will remind you on time. The Piggy bank is the same: it reminds you to buy, and you decide.",
               "art": "calendar",
               "screen": "Piggy",
@@ -635,12 +625,17 @@
                 {
                   "n": 1,
                   "target": "history",
-                  "text": "If you'd saved like this for the last few years"
+                  "text": "If you'd saved like this in recent years"
                 },
                 {
                   "n": 2,
                   "target": "start",
                   "text": "Start a demo Piggy bank"
+                },
+                {
+                  "n": 3,
+                  "target": "real",
+                  "text": "Save for real: step by step"
                 }
               ]
             }
@@ -694,7 +689,7 @@
           "cards": [
             {
               "title": "Demo: practice with no risk",
-              "text": "Demo means practice accounts with virtual money. The system has 2 demo accounts of $10,000 each: one for futures and one for spot. The prices are real, and you see every trade, winners and losers alike. On Home, you can also create your own demo account with any amount.",
+              "text": "Demo means practice accounts with virtual money. The CRYPTO NOVA public portfolio (PUBLIC mode) is the system's own demo accounts. The prices are real, and every trade is visible, winners and losers alike. And in DEMO mode you can set up your own demo portfolio for any amount.",
               "example": "In real life: a friendly match before the championship. The teams play for real, but the points don't count in the table.",
               "art": "phone_app",
               "screen": "Main",
@@ -702,18 +697,18 @@
                 {
                   "n": 1,
                   "target": "total",
-                  "text": "CRYPTO NOVA account: $10,000 each on futures and spot"
+                  "text": "PUBLIC: the system's demo accounts"
                 },
                 {
                   "n": 2,
                   "target": "my_demo",
-                  "text": "My demo account: your amount"
+                  "text": "DEMO: your demo portfolio"
                 }
               ]
             },
             {
               "title": "A real account is your own",
-              "text": "A real account is your own account on BingX, our partner exchange. You connect the CRYPTO NOVA system to it. Your money stays in your exchange account the whole time. We don't accept it or hold it, and we can't withdraw it. Real money is for ages 18 and up only.",
+              "text": "A real account is your own account on the BingX exchange, our partner. You open it through the CRYPTO NOVA link and repeat the system's trades on it. The money stays with you on the exchange the whole time. We don't accept it, hold it or have any way to withdraw it. Real money only from age 18.",
               "example": "In real life: you hire a decorator to hang wallpaper. He works in your apartment, but the apartment is still yours, and so are the keys.",
               "art": "bank",
               "screen": "Live",
@@ -726,8 +721,8 @@
               ]
             },
             {
-              "title": "Connecting in 3 steps",
-              "text": "Step 1: open a BingX account using the link in the app. Step 2: fund it in the exchange app — start with an amount you could afford to lose. Step 3: enter your account number (UID); you'll find it in your exchange profile. We'll check that the account was opened via our link and connect the system.",
+              "title": "Connecting in 4 steps",
+              "text": "Step 1: open a BingX account using the link in the app. Step 2: verify your identity (KYC) in the exchange app: an ID document and a selfie, usually 5–15 minutes. Step 3: deposit USDT, starting with an amount you could afford to lose. Step 4: enter your account number (UID) from your exchange profile and tap “Check”. We'll check that the account was opened via our link and switch on REAL mode.",
               "example": "In real life: a UID is like a library card number. The library knows you by it, but no one can borrow your books with just the number.",
               "art": "key_lock",
               "screen": "Live",
@@ -740,18 +735,23 @@
                 {
                   "n": 2,
                   "target": "step2",
-                  "text": "Fund the account in the exchange app"
+                  "text": "Verify your identity (KYC)"
                 },
                 {
                   "n": 3,
                   "target": "step3",
+                  "text": "Deposit USDT"
+                },
+                {
+                  "n": 4,
+                  "target": "step4",
                   "text": "Enter your UID and tap “Check”"
                 }
               ]
             },
             {
               "title": "What connecting gives you",
-              "text": "For now, you see the system's trades and repeat them on your account yourself. Automatic copying is coming soon: then the system will do it for you. Also, with a connected account, NOVA answers with no daily limit, you get priority support, and you're first in line for new features.",
+              "text": "Right now you see the system's trades and repeat them on your account yourself. Automatic copying is coming soon: then the system will do it for you. With a connected account, NOVA also answers 100 questions a day instead of 5, your support requests get priority, and you get new features first.",
               "example": "In real life: a neighbor who gardens tells you when to plant, and you do the planting yourself. Soon there'll be automatic watering, but the garden is still yours.",
               "art": "target",
               "screen": "Live",
@@ -759,23 +759,23 @@
                 {
                   "n": 1,
                   "target": "trades",
-                  "text": "System trades — on your account"
+                  "text": "The system's trades on your account"
                 },
                 {
                   "n": 2,
                   "target": "auto",
-                  "text": "Automation — coming soon"
+                  "text": "Automation: coming soon"
                 },
                 {
                   "n": 3,
                   "target": "nova",
-                  "text": "NOVA with unlimited questions"
+                  "text": "NOVA: 100 questions a day"
                 }
               ]
             },
             {
               "title": "How CRYPTO NOVA makes money",
-              "text": "The app is free, with no subscriptions. When you open an account through our link, the exchange pays CRYPTO NOVA a reward out of its own fees. Your fees and exchange terms stay the same: you don't pay anything extra.",
+              "text": "When you open an account through our link, the exchange pays CRYPTO NOVA a reward out of its own fees. Your fees and exchange terms don't change: you don't pay any more.",
               "example": "In real life: a shop pays a blogger for bringing in a customer. The price stays the same for the customer.",
               "art": "handshake",
               "screen": "Live",
@@ -789,7 +789,7 @@
             },
             {
               "title": "If you live in the EU",
-              "text": "The EU and EEA countries, and some others, have their own rules for crypto exchanges. There, the app doesn't show exchange links, and a real account through the app isn't available yet. Lessons, demo accounts, the Piggy bank and NOVA work fully.",
+              "text": "In the EU and EEA, the MiCA rules have applied in full since 1 July 2026: only companies with an EU licence may provide crypto services there. That's why in the EU, the EEA and some other countries the app doesn't show exchange links, and a real account through the app isn't available yet. Lessons, the demo, the Piggy bank and NOVA work fully there.",
               "example": "In real life: every country has its own traffic rules. It's the same car, but in some places certain roads are still closed to you.",
               "art": "globe",
               "screen": "Live",
@@ -828,18 +828,18 @@
                 "It sells your data"
               ],
               "answer": 1,
-              "why": "The app is free. The exchange pays CRYPTO NOVA out of its own fees, and your fees don't go up."
+              "why": "The exchange pays CRYPTO NOVA out of its own fees, and your fees don't go up."
             },
             {
               "q": "What do you need to connect a real account?",
               "options": [
-                "A BingX account opened via the CRYPTO NOVA link, a deposit and your account number (UID)",
+                "A BingX account opened via the CRYPTO NOVA link, identity verification, a deposit and your account number (UID)",
                 "Your exchange password and an SMS code",
                 "Your wallet's secret phrase",
                 "A photo of your bank card"
               ],
               "answer": 0,
-              "why": "It takes just 3 steps: an account via our link, a deposit and your UID. We will never ask for passwords, codes or your secret phrase."
+              "why": "It takes 4 steps: an account via our link, identity verification on the exchange, a deposit and your UID. We will never ask for passwords, codes or your secret phrase."
             }
           ]
         },
@@ -869,7 +869,7 @@
             },
             {
               "title": "Fake “support”",
-              "text": "A scammer often messages you first and rushes you: “Urgent, or your account will be blocked!” They ask for a password, a code, or a money transfer “for verification.” They promise income with no risk. Always open our support yourself, from the app: “Account” → “Support”. Our only website is cryptonova.vip.",
+              "text": "A scammer often messages you first and rushes you: “Urgent, or your account will be blocked!” They ask for a password, a code, or a money transfer “for verification.” They promise income with no risk. Always open our support yourself, from the app: “Account” → “Support”. Only use links to our website from the app itself.",
               "example": "In real life: a “bank employee” calls and tries to scare you. A real bank doesn't do that. Hang up and call the bank yourself.",
               "art": "thief"
             },
@@ -1068,13 +1068,13 @@
             },
             {
               "title": "Who invented it",
-              "text": "Bitcoin appeared in 2009. It was created by a person or group of people using the name Satoshi Nakamoto. No one knows who that really is. Satoshi launched the system and disappeared. And bitcoin has been running without him for more than 15 years.",
+              "text": "Bitcoin appeared in 2009. It was created by a person or group of people using the name Satoshi Nakamoto. No one knows who that really is. Satoshi launched the system and disappeared. And bitcoin has been running without him for more than 17 years.",
               "example": "In real life: someone made up the rules of a new game, shared them with everyone and walked away. The game goes on without them.",
               "art": "magnifier"
             },
             {
               "title": "Only 21,000,000 coins",
-              "text": "There will never be more than 21,000,000 bitcoins. That's been in the rules from the very start. About 20,000,000 have already been created. New ones come out more and more slowly: about every 4 years, the number released is cut in half. Regular money can be printed without limit, but bitcoin can't. That's why it's called “digital gold.”",
+              "text": "There will never be more than 21,000,000 bitcoins. That's been written into the rules from the very start. The 20-millionth bitcoin was created in March 2026. The last million will take more than 100 more years: about every 4 years, the issuance is cut in half. Ordinary money can be printed without limit, but bitcoin can't. That's why it's called “digital gold.”",
               "example": "In real life: gold can't be printed either. It has to be mined, and there's only so much of it on Earth.",
               "art": "coins",
               "chart": {
@@ -1087,24 +1087,24 @@
                   "already created",
                   "still to come"
                 ],
-                "caption": "Approximate, as of October 2026"
+                "caption": "As of October 2026"
               }
             },
             {
               "title": "You can buy a small piece",
-              "text": "You don't need to buy a whole bitcoin. It splits into 100,000,000 tiny parts. The smallest part is called a “satoshi,” after its creator. In October 2026, 1 bitcoin cost about $82,000. But you can buy a piece of it for just a few dollars.",
+              "text": "You don't need to buy a whole bitcoin. It splits into 100,000,000 tiny parts. The smallest part is called a “satoshi,” after its creator. As of 21.10.2026, 1 bitcoin cost about $83,000. But you can buy a piece of it for just a few dollars.",
               "example": "In real life: you don't have to order a whole pizza. You can get a slice — it's from the same pizza.",
               "art": "calculator"
             },
             {
               "title": "Why people believe in it",
-              "text": "Since January 2024, the US has had exchange-traded funds for bitcoin (ETFs). People buy them like ordinary stocks, and through them individuals, companies and big funds hold bitcoin. Financial companies are already issuing fund shares and bonds on the blockchain — this is called tokenization. Many see this as the start of crypto going mainstream.",
+              "text": "Since January 2024, the US has had exchange-traded funds (ETFs) for bitcoin, since July 2024 for ether, and since autumn 2025 for other coins too. People buy them like ordinary stocks, and through them individuals, companies and big funds hold bitcoin. Financial companies are already issuing fund shares and bonds on the blockchain — this is called tokenization. Many see this as the start of crypto going mainstream.",
               "example": "In real life: people used to go to the bank to buy a gold bar. Now they buy a share of a gold fund in an app. The same thing is happening with bitcoin.",
               "art": "chart_up"
             },
             {
               "title": "The honest truth about risk",
-              "text": "Bitcoin's price swings a lot. In the past, it has lost more than half its value several times, and then gone on to set new records. But the past doesn't promise the future. That's why sensible people only invest what they can afford to lose, and buy a little at a time.",
+              "text": "Bitcoin's price swings a lot. On 6 October 2025 it set a record of about $126,000, and in October 2026 it was worth roughly a third less. In the past, it has lost more than half its value several times, and then gone on to set new records. But the past doesn't promise the future. That's why sensible people only invest what they can afford to lose, and buy a little at a time.",
               "example": "In real life: the sea can be calm or stormy. Anyone heading out to sea always takes a life jacket.",
               "art": "rollercoaster"
             }
@@ -1551,6 +1551,12 @@
               "art": "warning"
             },
             {
+              "title": "Rules for stablecoins",
+              "text": "Governments have taken on stablecoins. In July 2025 the US passed the GENIUS Act: the reserve must be held 1:1 in dollars and short-term US Treasury bills, and a report on it must come out every month. In the EU the MiCA rules apply: exchanges with an EU licence don't sell stablecoins that lack authorization, such as USDT. There, people use USDC and euro stablecoins. This is as of October 2026.",
+              "example": "In real life: the cloakroom used to run on trust. Now an inspector comes by and counts the coats on the hangers.",
+              "art": "shield"
+            },
+            {
               "title": "Why they're useful",
               "text": "On an exchange, a stablecoin works like a “dollar wallet.” You sell bitcoin, get USDT, and wait calmly. When you want to buy again, you pay with the same USDT. You don't have to move money back to the bank every time.",
               "example": "In real life: on a trip, you keep some money in the local currency. That way you don't have to run to an exchange booth every time.",
@@ -1642,7 +1648,7 @@
             },
             {
               "title": "Signs 5–7: “we'll double it,” fake sites, celebrities",
-              "text": "5. “Send us 1 bitcoin and we'll send back 2.” You'll get nothing back. 6. Fake websites: the address is off by 1 letter, but the site looks like the real thing. 7. “A celebrity is giving away crypto.” The videos and photos are fake, and the star knows nothing about it.",
+              "text": "5. “Send us 1 bitcoin and we'll send back 2.” You'll get nothing back. 6. Fake websites: the address is off by 1 letter, but the site looks like the real thing. 7. “A celebrity is giving away crypto.” The videos, photos and even the voice are faked with AI, and the star knows nothing about it.",
               "example": "In real life: a letter says, “You've won $1,000,000! Just pay for shipping.” There's no such thing as a free lunch.",
               "art": "magnifier"
             },
@@ -1702,7 +1708,7 @@
           "cards": [
             {
               "title": "Ether is more than a coin",
-              "text": "Ethereum (ether, ETH) launched in 2015. It is the second-largest cryptocurrency. Bitcoin mostly stores and moves money, while the Ethereum network also runs programs.",
+              "text": "Ethereum (ether, ETH) launched in 2015. As of October 2026, it's the second-largest cryptocurrency after bitcoin. Bitcoin mostly stores and moves money, while the Ethereum network also runs programs.",
               "example": "In real life: bitcoin is a reliable safe, ether is a safe with automation that opens by itself when a condition is met.",
               "art": "globe"
             },
@@ -1923,6 +1929,150 @@
               ],
               "answer": 1,
               "why": "If the phone is lost, the notes on it are lost too. Paper in a safe place is the simplest way."
+            }
+          ]
+        },
+        {
+          "id": "l1-deepfakes",
+          "title": "AI fakes: voices, faces and videos",
+          "minutes": 4,
+          "goal": "By the end, you'll be able to spot a fake made with AI and know how to check it.",
+          "cards": [
+            {
+              "title": "Scams got smarter",
+              "text": "Scammers now use AI. It fakes the voices, faces and videos of people you know and of celebrities, and writes smooth messages with no mistakes. According to Chainalysis, scammers took about $17 billion in crypto in 2025. And cases where they pretend to be someone else became about 15 times more common.",
+              "example": "In real life: a fake used to give itself away with clumsy handwriting. Now a signature can be faked so well you can't tell by eye.",
+              "art": "robot"
+            },
+            {
+              "title": "What it looks like",
+              "text": "A video: a famous businessman “gives away” bitcoin or praises a platform paying 3% a day. A voice message from your “son”: “Mom, send money right now.” A video call from an “exchange employee” with the real logo. A fake like this takes a few minutes to make.",
+              "example": "Example: an ad on social media where a news anchor “recommends” a new crypto platform. The anchor is real, but the words were generated by AI.",
+              "art": "warning"
+            },
+            {
+              "title": "A one-minute check",
+              "text": "Don't trust your eyes and ears — check the channel. Hang up and call back yourself on a number you know. Ask a question only the real person can answer. Agree on a code word with your family. Open websites yourself, from a bookmark, not from a link in a video.",
+              "example": "In real life: a courier says he's from the bank. You don't argue with him — you just call the bank yourself.",
+              "art": "phone_app"
+            },
+            {
+              "title": "The main sign hasn't changed",
+              "text": "The technology is new, but the scheme is old: rushing you, income with no risk, and a request to send money or share a code. If you see that, it's a scam, however real the video looks. CRYPTO NOVA doesn't call you, doesn't ask you to send money and doesn't ask for codes.",
+              "example": "In real life: a fake banknote can look beautiful. But if someone is rushing to pay with it in the dark, be on your guard.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "AI fakes voices, faces and videos — you can't trust your eyes and ears.",
+            "Check it yourself: call back, ask the code word, open the site from a bookmark.",
+            "Rushing, income with no risk, a request to send money — it's a scam."
+          ],
+          "quiz": [
+            {
+              "q": "You get a voice message: your son's voice asks you to urgently send $500 in crypto. What do you do first?",
+              "options": [
+                "Send it: that's definitely his voice",
+                "Send half",
+                "Hang up and call your son back yourself on his number",
+                "Ask him to send a photo"
+              ],
+              "answer": 2,
+              "why": "A voice can be faked in minutes, and so can a photo. The check is simple: call back yourself on a number you know."
+            },
+            {
+              "q": "A video: a celebrity recommends a platform paying 3% a day. How should you treat it?",
+              "options": [
+                "It's a scam: the video is fake, and there's no income without risk",
+                "You could invest a little",
+                "If a celebrity recommends it, it must be safe",
+                "Forward it to friends"
+              ],
+              "answer": 0,
+              "why": "There are 2 signs at once: “a star recommends it” and huge income with no risk. Videos like this are often made with AI."
+            },
+            {
+              "q": "What helps a family avoid falling for a faked voice?",
+              "options": [
+                "Answering every call",
+                "Agreeing on a code word and calling back yourself",
+                "Keeping passwords in your notes",
+                "Turning off the internet"
+              ],
+              "answer": 1,
+              "why": "Only your own people know the code word. And when you call back on a known number, you reach the real person."
+            }
+          ]
+        },
+        {
+          "id": "l1-withdraw",
+          "title": "How to withdraw money from an exchange",
+          "minutes": 4,
+          "goal": "By the end, you'll know how to get money from an exchange back to your card without making mistakes on a transfer.",
+          "cards": [
+            {
+              "title": "Only you withdraw",
+              "text": "The money in your exchange account is yours. You withdraw it yourself, in the exchange app. CRYPTO NOVA can't withdraw it and doesn't ask for withdrawal access. Before a withdrawal, the exchange may ask for a code from an app or an SMS — that protects your account.",
+              "example": "In real life: only you can take cash from an ATM — with your card and your PIN.",
+              "art": "bank"
+            },
+            {
+              "title": "To your card: 3 steps",
+              "text": "Step 1: sell your coins for dollars — USDT or USDC. Step 2: choose a withdrawal to a card or a bank account. Exchanges do this through partners, and the buttons have different names. Step 3: check the amount, the fee and the timing. The money usually arrives within a few minutes to a few days.",
+              "example": "In real life: when travelling, you first change money at an exchange office, then take out cash. Same here: dollars first, then the card.",
+              "art": "phone_app"
+            },
+            {
+              "title": "Sending to a wallet: network and address",
+              "text": "You can also send coins to your own wallet or another exchange. Two things matter here: the network and the address. The sender's and the receiver's network must match. Copy the address instead of typing it, and check the first and last characters. A mistaken transfer is almost impossible to get back.",
+              "example": "Example: you're sending 100 USDT to a new address. First, a test transfer of 5 USDT. Once it arrives, send the other 95.",
+              "art": "chain"
+            },
+            {
+              "title": "Fees and taxes",
+              "text": "Withdrawals have fees. Sending coins costs a fixed network fee; a card withdrawal costs a percentage to the exchange's partner. So withdraw less often and in bigger amounts. In many countries, selling coins is the moment when tax is calculated. Keep your exchange statement.",
+              "example": "In real life: one big trip to the shop is cheaper than ten small ones.",
+              "art": "calculator"
+            }
+          ],
+          "remember": [
+            "You withdraw money yourself, in the exchange app.",
+            "To a card: sell for dollars → withdraw → check the fee.",
+            "When sending coins, check the network and address, and start with a small amount."
+          ],
+          "quiz": [
+            {
+              "q": "Who can withdraw money from your exchange account?",
+              "options": [
+                "CRYPTO NOVA",
+                "Only you",
+                "Anyone who knows your UID",
+                "“Support” from a messenger app"
+              ],
+              "answer": 1,
+              "why": "Only you make withdrawals, in the exchange app. Your UID number gives no access to the money."
+            },
+            {
+              "q": "You're sending USDT to a new address for the first time. What's sensible?",
+              "options": [
+                "Send everything at once",
+                "Type the address by hand",
+                "Send a small amount first and check it",
+                "Pick any network"
+              ],
+              "answer": 2,
+              "why": "A test transfer checks both the address and the network. A mistaken transfer is almost impossible to get back."
+            },
+            {
+              "q": "Why is it cheaper to withdraw less often and in bigger amounts?",
+              "options": [
+                "Withdrawals have fees, and small withdrawals eat up more",
+                "Bitcoin grows faster that way",
+                "The exchange bans small withdrawals",
+                "It makes no difference"
+              ],
+              "answer": 0,
+              "why": "The network fee is fixed, and card withdrawals take a percentage. Ten small withdrawals usually cost more than one."
             }
           ]
         }
@@ -2475,7 +2625,7 @@
             },
             {
               "title": "What a halving is",
-              "text": "About every 4 years, the miners' reward is cut in half. That's the halving. It happened in 2012, 2016, 2020 and 2024. The next one is expected around 2028. This rule has been built into bitcoin from the very start.",
+              "text": "About every 4 years, the miners' reward is cut in half. That's the halving. It happened in 2012, 2016, 2020 and 2024. The next one is expected around April 2028. This rule has been built into bitcoin from the very start.",
               "example": "In real life: a bakery that's allowed to bake less and less bread. Every 4 years, half as much as before.",
               "art": "calendar",
               "chart": {
@@ -2524,7 +2674,7 @@
           ],
           "remember": [
             "A halving: about every 4 years, the miners' reward is cut in half.",
-            "Halvings happened in 2012, 2016, 2020 and 2024. The next is around 2028.",
+            "Halvings happened in 2012, 2016, 2020 and 2024. The next is around April 2028.",
             "In the past, the price rose after halvings, but that's not a law."
           ],
           "quiz": [
@@ -2548,7 +2698,7 @@
                 "Whenever the exchanges decide"
               ],
               "answer": 2,
-              "why": "Halvings happened in 2012, 2016, 2020 and 2024. The next one is expected around 2028."
+              "why": "Halvings happened in 2012, 2016, 2020 and 2024. The next one is expected around April 2028."
             },
             {
               "q": "The price rose after past halvings. Does that mean it will happen again?",
@@ -2693,7 +2843,7 @@
             },
             {
               "title": "Taxes: check with a professional",
-              "text": "Crypto tax rules differ from country to country, and they change. We don't give tax advice. Find out the rules from a tax professional in your country. Your log will be a big help here: all the dates and amounts will be right at hand.",
+              "text": "Crypto tax rules differ from country to country, and they change. Since 2026, exchanges in many countries collect data on their clients' trades for the tax authorities. We don't give tax advice. Find out the rules from a tax professional in your country. Your log will be a big help here: all the dates and amounts will be right at hand.",
               "example": "In real life: it's best to see a doctor with your test results in hand. And to see a tax professional with your purchase log.",
               "art": "bank"
             },
@@ -3004,6 +3154,222 @@
               ],
               "answer": 0,
               "why": "The money will be needed at the worst moment — and you will have to sell at any price."
+            }
+          ]
+        },
+        {
+          "id": "l2-etf",
+          "title": "Exchange-traded funds (ETFs): crypto through a broker",
+          "minutes": 4,
+          "goal": "By the end, you'll understand what a crypto ETF is and how it differs from buying coins on an exchange.",
+          "cards": [
+            {
+              "title": "What an ETF is",
+              "text": "An ETF is a fund whose shares you buy on a stock exchange, just like a stock. A crypto ETF holds real coins. The fund keeps the coins, and you hold a share of the fund in your brokerage account.",
+              "example": "In real life: instead of keeping a gold bar at home, you buy a share in a vault. The bar stays there, and you hold a certificate for your share.",
+              "art": "bank"
+            },
+            {
+              "title": "Which funds exist",
+              "text": "In the US, bitcoin funds have traded since January 2024 and ether funds since July 2024. Since autumn 2025, funds for solana, XRP and other coins have appeared: the regulator simplified the rules for launching them. In Europe, similar exchange-traded products are called ETPs. As of October 2026, both individuals and big companies hold bitcoin through such funds.",
+              "example": "Example: the largest bitcoin fund charges about 0.25% a year. On $1,000, that's $2.50 a year.",
+              "art": "globe"
+            },
+            {
+              "title": "Pros and cons",
+              "text": "Pros: you buy through a familiar broker, you don't need to keep keys, and a regulator watches the fund. Cons: trading only during stock exchange hours, a fee to the fund every year, and you can't withdraw the coins themselves to your own wallet. The price swings just like the coin's.",
+              "example": "In real life: an ETF is like a taxi, and your own coin is like your own car. In a taxi you don't think about repairs, but you ride by its rules and pay for the trip.",
+              "art": "scale"
+            },
+            {
+              "title": "Which to choose",
+              "text": "If you just want to hold bitcoin for years in a brokerage account, an ETF is convenient. If you want to save a little at a time, move coins and use crypto services, you need the coins themselves on an exchange or in a wallet. Which funds are available depends on your country. The risk is the same: a fall in bitcoin hits the fund too.",
+              "example": "In real life: tea comes in bags or loose. It's the same tea, but convenience and price differ.",
+              "art": "compass"
+            }
+          ],
+          "remember": [
+            "An ETF is a share in a fund that holds real coins.",
+            "Convenient through a broker, but there's a fund fee and you can't withdraw the coins.",
+            "The fund's price swings with the coin: the risk is the same."
+          ],
+          "quiz": [
+            {
+              "q": "What do you buy when you buy a bitcoin ETF?",
+              "options": [
+                "A share of a fund that holds bitcoins",
+                "The bitcoins themselves, to your own wallet",
+                "A share in the BingX exchange",
+                "Protection from a price fall"
+              ],
+              "answer": 0,
+              "why": "The fund keeps the coins, and you hold a share in your brokerage account. An ETF doesn't protect you from a price fall."
+            },
+            {
+              "q": "Since when have bitcoin funds traded in the US?",
+              "options": [
+                "Since 2009",
+                "Since January 2024",
+                "Since 2030",
+                "They don't exist"
+              ],
+              "answer": 1,
+              "why": "The first bitcoin ETFs started trading in the US in January 2024, and ether ETFs in July 2024."
+            },
+            {
+              "q": "A fund charges 0.25% a year. How much is that on $2,000?",
+              "options": [
+                "$0.25",
+                "$50",
+                "$5",
+                "$25"
+              ],
+              "answer": 2,
+              "why": "$2,000 × 0.25% = $5 a year. Not much, but the fee is charged every year you hold the fund."
+            }
+          ]
+        },
+        {
+          "id": "l2-taxes",
+          "title": "Taxes and exchange reports: what changed in 2026",
+          "minutes": 4,
+          "goal": "By the end, you'll know what data exchanges pass to tax authorities and how to prepare for it.",
+          "cards": [
+            {
+              "title": "Exchanges started reporting",
+              "text": "Since 1 January 2026, under new rules — DAC8 in the EU and CARF worldwide — exchanges in 48 countries, including the EU and the UK, collect data on their clients' trades. From 2027, this data will start going to tax authorities. Dozens more countries will join later. This is as of October 2026.",
+              "example": "In real life: the tax office already knows your salary from your employer. Now the exchange reports your trades too.",
+              "art": "books"
+            },
+            {
+              "title": "In the US: Form 1099-DA",
+              "text": "In the US, exchanges send clients Form 1099-DA. For 2025 trades it shows only the sale amounts. For 2026 trades it also shows the purchase price. You still work out the profit and the tax yourself.",
+              "example": "Example: you sold bitcoin for $1,000 that you bought for $800. The exchange reports the $1,000, and you work out and declare the $200 difference yourself.",
+              "art": "globe"
+            },
+            {
+              "title": "What tax is usually paid on",
+              "text": "In many countries, tax is paid on the profit when you sell coins or swap one coin for another. Profit is the difference between the sale price and the purchase price. Buying and simply holding usually don't create tax. But rates, rules and allowances differ in every country, and they change.",
+              "example": "Example: you bought coins for $500 and sold them for $650. The profit is $150. That's what tax is calculated on, if your country has it.",
+              "art": "calculator"
+            },
+            {
+              "title": "How to prepare",
+              "text": "Keep a log of your buys and sales — see the lesson “Keep a record of your purchases”. Save your exchange statements once a year. Check your country's rules with a tax professional. We don't give tax advice.",
+              "example": "In real life: people keep receipts for repairs so they don't have to argue about the warranty later. Exchange statements are the same kind of receipt.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "Since 2026, exchanges in many countries collect trade data for tax authorities.",
+            "Tax is usually paid on the profit when you sell or swap.",
+            "Keep a log and check the rules with a tax professional."
+          ],
+          "quiz": [
+            {
+              "q": "What changed on 1 January 2026?",
+              "options": [
+                "Crypto was banned",
+                "Exchanges in the EU, the UK and other countries collect trade data for tax authorities",
+                "Crypto taxes were abolished",
+                "Exchanges stopped checking identity"
+              ],
+              "answer": 1,
+              "why": "Under DAC8 and CARF, exchanges collect data from 2026 and pass it to tax authorities from 2027."
+            },
+            {
+              "q": "You bought coins for $500 and sold them for $650. What amount is tax usually calculated on?",
+              "options": [
+                "$650",
+                "$500",
+                "$1,150",
+                "$150"
+              ],
+              "answer": 3,
+              "why": "Tax is usually calculated on the profit: $650 − $500 = $150. The rate and rules depend on the country."
+            },
+            {
+              "q": "What helps you work out your tax calmly?",
+              "options": [
+                "Deleting your trade history",
+                "A log of buys and sales plus exchange statements",
+                "Advice from a chat",
+                "Nothing: the exchange will calculate everything"
+              ],
+              "answer": 1,
+              "why": "To work out the profit you need the dates and prices of your buys. The exchange doesn't report everything — often you have to do the maths yourself."
+            }
+          ]
+        },
+        {
+          "id": "l2-rules",
+          "title": "Crypto laws: what changed by 2026",
+          "minutes": 4,
+          "goal": "By the end, you'll know the main new rules for crypto and how to check that a service operates legally.",
+          "cards": [
+            {
+              "title": "There are more rules now",
+              "text": "Not long ago, crypto had almost no laws of its own. By 2026, major countries had passed them. The goal is for services to hold client money honestly, check who opens an account, and be honest about the risks. But every country has its own rules.",
+              "example": "In real life: when the roads filled with cars, driving licences, traffic lights and vehicle inspections appeared.",
+              "art": "books"
+            },
+            {
+              "title": "Europe: the MiCA rules",
+              "text": "The MiCA rules apply in the EU. The transition period ended on 1 July 2026: now only companies with an EU licence may provide crypto services to EU residents. You can check a company in the register of the European regulator ESMA. Exchanges with an EU licence don't sell stablecoins that lack authorization, such as USDT.",
+              "example": "Example: you live in Spain. Before opening an account, look the exchange up in the ESMA register. If it isn't there, that's a reason to be careful.",
+              "art": "globe"
+            },
+            {
+              "title": "The US: the stablecoin law",
+              "text": "In July 2025, the US passed the GENIUS Act on stablecoins. Only vetted companies will be able to issue them, and the reserve must be held 1:1 in dollars and short-term US Treasury bills. A report on the reserve comes out every month. The law takes full effect by January 2027 at the latest.",
+              "example": "In real life: a bank must keep reserves. Now stablecoin issuers must also keep a reserve and show it.",
+              "art": "bank"
+            },
+            {
+              "title": "What it means for you",
+              "text": "Only use services that are allowed in your country. Don't get around bans with a VPN: you lose the protection of the law, and your account can be closed. Laws don't protect you from a price fall — market risk stays yours. That's why CRYPTO NOVA doesn't show exchange links in the EU and some other countries.",
+              "example": "In real life: car insurance doesn't save you from black ice. It helps if someone else is at fault, but you still need to drive carefully.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "By 2026, the EU and the US had laws for crypto.",
+            "In the EU, since 1 July 2026, crypto services require an EU licence.",
+            "Laws protect you from dishonest services, but not from a price fall."
+          ],
+          "quiz": [
+            {
+              "q": "You live in the EU. How do you check that an exchange operates legally?",
+              "options": [
+                "By how nice its website looks",
+                "By reviews in a chat",
+                "Find it in the ESMA register",
+                "Ask a bot in a messenger app"
+              ],
+              "answer": 2,
+              "why": "Since 1 July 2026, only licensed companies provide crypto services in the EU. They're listed in the ESMA register."
+            },
+            {
+              "q": "What does the US GENIUS Act require?",
+              "options": [
+                "That bitcoin costs $1",
+                "That a stablecoin has a 1:1 reserve in dollars and short-term US Treasury bills",
+                "That the government issues all coins",
+                "That exchanges charge no fees"
+              ],
+              "answer": 1,
+              "why": "The stablecoin law requires a full reserve and monthly reports on it."
+            },
+            {
+              "q": "Do the new laws protect you from a fall in the bitcoin price?",
+              "options": [
+                "Yes, now the price can't fall",
+                "Yes, the government will cover losses",
+                "No: laws keep services honest, but market risk is yours",
+                "Only in the EU"
+              ],
+              "answer": 2,
+              "why": "Laws require honesty from exchanges and stablecoin issuers. But the price can still fall."
             }
           ]
         }
@@ -4295,7 +4661,7 @@
             },
             {
               "title": "The interest rate is the price of money",
-              "text": "A country's central bank sets the main interest rate. It decides what interest banks charge on loans. The rate is the price of money. A high rate means money is expensive. A low rate means it's cheap. The US central bank is called the Federal Reserve, or the Fed.",
+              "text": "A country's central bank sets the main interest rate. It decides what interest banks charge on loans. The rate is the price of money. A high rate means money is expensive. A low rate means it's cheap. The US central bank is called the Federal Reserve, or the Fed. As of October 2026: in September 2026 the Fed raised its rate to 3.75–4% a year, its first hike since 2023.",
               "example": "Example: a $10,000 loan at 5% a year costs $500 in interest. At 20%, it's $2,000. When loans are expensive, people take them out less often.",
               "art": "bank"
             },
@@ -4868,6 +5234,78 @@
               ],
               "answer": 1,
               "why": "In calm periods bitcoin usually moves 2–4% a day. Small coins move more."
+            }
+          ]
+        },
+        {
+          "id": "l4-yield",
+          "title": "Yield on dollars: where the interest comes from and where the risk is",
+          "minutes": 5,
+          "goal": "By the end, you'll understand where stablecoin yield comes from and why it never comes without risk.",
+          "cards": [
+            {
+              "title": "Where the interest comes from",
+              "text": "Stablecoins can do more than sit there: you can lend them through blockchain services such as Aave. The interest is paid by borrowers — most often traders who need dollars against their coins as collateral. When many people want to borrow, the rate goes up. When few do, it drops to a couple of percent.",
+              "example": "Example: $1,000 at 5% a year earns about $50 a year. But the rate floats: a month later it could be 3% or 8%.",
+              "art": "bank"
+            },
+            {
+              "title": "Other sources",
+              "text": "There are also savings stablecoins, where the service itself pays the rate out of its income, for example Sky. And Ethena's “yield-bearing dollar” sUSDe earns mostly from funding — payments between futures traders. While traders pay a lot, the yield is high. When the market falls, it can drop almost to zero.",
+              "example": "In real life: a bank pays interest on deposits while it earns on loans itself. When borrowers struggle, the interest falls too.",
+              "art": "chain"
+            },
+            {
+              "title": "Where the risk is",
+              "text": "A bug in the code — and hackers can drain the money. A stablecoin can lose its $1 peg. The service or the issuer can freeze coins. There's no insurance like on a bank deposit. The higher the promised yield, the bigger the hidden risk.",
+              "example": "In real life: a bank offering 20% a year when everyone else pays 5% is a reason to be wary, not to celebrate.",
+              "art": "warning"
+            },
+            {
+              "title": "How CRYPTO NOVA does it",
+              "text": "The CRYPTO NOVA public portfolio has a “Dollar yield” source: lending USDC and USDT through Aave and Sky. As of October 2026, that's about 15% of the portfolio, plus about 5% in Ethena sUSDe. It's a demo at real rates. The shares are capped so that trouble with one service doesn't hit the whole portfolio.",
+              "example": "In real life: eggs go in different baskets. Even if one falls, the others are fine.",
+              "art": "scale"
+            }
+          ],
+          "remember": [
+            "Stablecoin interest is paid by borrowers or by the service itself — the rate floats.",
+            "Risks: hacks, losing the $1 peg, freezes. There's no insurance.",
+            "There's no high yield without risk."
+          ],
+          "quiz": [
+            {
+              "q": "Who pays the interest when you lend USDC through a service?",
+              "options": [
+                "The government",
+                "Borrowers who need dollars",
+                "CRYPTO NOVA",
+                "Nobody: the interest appears by itself"
+              ],
+              "answer": 1,
+              "why": "The interest is paid by those who borrow. Fewer borrowers means a lower rate."
+            },
+            {
+              "q": "A service promises 25% a year on dollars with no risk. How should you treat it?",
+              "options": [
+                "It's a warning sign: there's no high yield without risk",
+                "It's a normal rate",
+                "Put everything in before the offer ends",
+                "It's dollars, so there's no risk"
+              ],
+              "answer": 0,
+              "why": "The higher the promised yield, the bigger the hidden risk. The words “no risk” are the main sign of a scam."
+            },
+            {
+              "q": "Why shouldn't you keep all your dollars in one service?",
+              "options": [
+                "The rate is higher that way",
+                "Services forbid it",
+                "If it gets hacked or frozen, all your money is hit",
+                "It's inconvenient"
+              ],
+              "answer": 2,
+              "why": "These services have no deposit insurance. Spreading across services limits the damage."
             }
           ]
         }

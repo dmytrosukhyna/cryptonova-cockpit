@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "updated": "2026-10-21",
   "title": "Aprender con CRYPTO NOVA",
   "note": "No es asesoramiento financiero. Los resultados pasados no garantizan los futuros.",
@@ -29,13 +29,13 @@
             },
             {
               "title": "Qué hay en la app",
-              "text": "Abajo en la pantalla están las secciones. «Inicio»: el resumen general. «Futuros»: operaciones al alza y a la baja del precio. «Spot»: un conjunto tranquilo de grandes monedas. «Aprender»: estas lecciones. En el centro está NOVA, la asistente de IA para tus preguntas. La «Hucha» se abre desde Inicio, y «Mi cuenta», con el icono redondo de perfil de arriba.",
+              "text": "Abajo de la pantalla están las pestañas: «Inicio», «Futuros», «Spot» y «Aprender». En el centro está la esfera luminosa de NOVA, el asistente de IA para tus preguntas. En Inicio hay otros 6 botones, entre ellos «Hucha» y «Recorrido». «Mi cuenta» se abre con el icono redondo de perfil de arriba.",
               "example": "En la vida real: es como un centro comercial con varias plantas. No hace falta recorrerlo todo de una vez: empieza por una tienda y las demás te esperan.",
               "art": "phone_app"
             },
             {
-              "title": "Sin suscripciones",
-              "text": "CRYPTO NOVA 2.0 es gratis: no hay suscripciones ni funciones de pago. Para empezar tienes una cuenta demo, una cuenta de práctica con dinero virtual. Los precios son reales, pero el dinero no. Puedes mirar, probar y equivocarte sin riesgo.",
+              "title": "Empieza con la demo",
+              "text": "Para empezar tienes la demo: una cartera de práctica con dinero virtual. Los precios son reales, pero el dinero no. Puedes mirar, probar y equivocarte sin riesgo. El dinero real solo entra cuando tú mismo conectas tu propia cuenta del exchange.",
               "example": "En la vida real: en la autoescuela primero se practica en un simulador. El volante y la carretera parecen reales, pero un error no cuesta nada.",
               "art": "coins"
             },
@@ -48,7 +48,7 @@
           ],
           "remember": [
             "CRYPTO NOVA busca operaciones las 24 horas con reglas probadas en el pasado.",
-            "La app es gratis. Puedes empezar con una cuenta demo con dinero virtual.",
+            "Puedes empezar con la demo: dinero virtual, precios reales.",
             "El sistema puede equivocarse, y los resultados pasados no prometen los futuros."
           ],
           "quiz": [
@@ -61,7 +61,7 @@
                 "Vende una suscripción de pago a señales"
               ],
               "answer": 2,
-              "why": "El sistema vigila el mercado y te muestra cada operación. No guarda dinero, no promete ganancias y la app es gratis."
+              "why": "El sistema vigila el mercado y muestra cada una de sus operaciones. No guarda tu dinero ni promete ganancias."
             },
             {
               "q": "¿Qué es una cuenta demo?",
@@ -172,8 +172,8 @@
           "goal": "Al terminar, sabrás qué muestra Inicio y dónde tocar después.",
           "cards": [
             {
-              "title": "Arriba: Demo o Real",
-              "text": "Arriba del todo está el selector «Demo / Real». El punto rojo que parpadea junto a «Demo» te recuerda que ahora todo es con dinero virtual. «Real» funciona cuando conectas el sistema a tu cuenta del exchange. Al lado está el icono redondo de perfil: abre «Mi cuenta».",
+              "title": "Arriba: PUBLIC, DEMO o REAL",
+              "text": "Debajo del nombre está el selector de cartera. PUBLIC es la cartera pública de CRYPTO NOVA: las cuentas demo del sistema con precios reales. DEMO es tu propia cartera demo con dinero virtual. REAL es tu cuenta del exchange, cuando ya la has conectado. Tu elección se mantiene en Inicio, Spot y Futuros. Arriba a la derecha, el icono de perfil abre «Mi cuenta».",
               "example": "En la vida real: el cartel de «Autoescuela» en un auto de prácticas. Todos ven enseguida que es un entrenamiento.",
               "art": "phone_app",
               "screen": "Main",
@@ -181,7 +181,7 @@
                 {
                   "n": 1,
                   "target": "mode_switch",
-                  "text": "Demo / Real: qué dinero estás viendo"
+                  "text": "PUBLIC / DEMO / REAL: qué cartera ves"
                 },
                 {
                   "n": 2,
@@ -191,8 +191,8 @@
               ]
             },
             {
-              "title": "La tarjeta principal: dos cuentas",
-              "text": "La tarjeta principal tiene 2 pestañas. «Cuenta CRYPTO NOVA»: cuánto han ganado las cuentas demo del sistema desde el 17.10.2026. Debajo del número hay un gráfico, y los botones «Día», «Semana», «Mes» y «Todo» cambian el periodo. En la pestaña «Mi cuenta demo» puedes escribir cualquier cantidad y ver cómo cambia junto con el sistema.",
+              "title": "La tarjeta principal: la cartera elegida",
+              "text": "En modo PUBLIC la tarjeta muestra la «Ganancia total»: el resultado de la cartera pública desde el inicio de la prueba y un gráfico. Los botones «Día», «Semana», «Mes» y «Todo» cambian el periodo. En modo DEMO puedes crear aquí tu propia cartera demo con cualquier cantidad y ver cómo cambia junto con el sistema.",
               "example": "En la vida real: te pruebas una chaqueta en la tienda sin comprarla. Tu cuenta demo es esa prueba: el dinero es virtual, pero los precios son reales.",
               "art": "chart_up",
               "screen": "Main",
@@ -200,36 +200,36 @@
                 {
                   "n": 1,
                   "target": "total",
-                  "text": "Cuenta CRYPTO NOVA: resultado y gráfico"
+                  "text": "Ganancia total: resultado y gráfico"
                 },
                 {
                   "n": 2,
                   "target": "period",
-                  "text": "Día, semana, mes o todo el tiempo"
+                  "text": "Día, semana, mes o todo el periodo"
                 },
                 {
                   "n": 3,
                   "target": "my_demo",
-                  "text": "Mi cuenta demo: escribe tu cantidad"
+                  "text": "DEMO: crea tu propia cartera demo"
                 }
               ]
             },
             {
-              "title": "Un botón y dos recuadros",
-              "text": "Más abajo está el botón «Conectar cuenta real». Debajo hay 2 recuadros de colores. «Cómo funciona CRYPTO NOVA»: una guía de 1 minuto sobre el sistema, la demo y la cuenta real. «Hucha»: ahorro en bitcoin desde $5 a la semana. Si empiezas, lo mejor es comenzar por estos dos recuadros.",
+              "title": "Operaciones y seis botones",
+              "text": "Más abajo están las operaciones abiertas del sistema y 6 botones iguales: «Spot», «Futuros», «Nova AI», «Hucha», «Aprender» y «Recorrido». El «Recorrido» te enseña en un minuto cómo funciona todo. Si empiezas, mejor arranca por él y por la «Hucha».",
               "example": "En la vida real: a la entrada de un museo haces una visita guiada corta. En un minuto entiendes dónde está cada cosa, y luego recorrerlo es fácil.",
               "art": "piggy",
               "screen": "Main",
               "callouts": [
                 {
                   "n": 1,
-                  "target": "connect",
-                  "text": "Conectar cuenta real"
+                  "target": "open_trades",
+                  "text": "Operaciones abiertas del sistema"
                 },
                 {
                   "n": 2,
                   "target": "guide",
-                  "text": "Cómo funciona CRYPTO NOVA: guía de 1 minuto"
+                  "text": "Recorrido: cómo funciona todo"
                 },
                 {
                   "n": 3,
@@ -239,31 +239,21 @@
               ]
             },
             {
-              "title": "Fuentes de ganancia",
-              "text": "El bloque «Fuentes de ganancia» muestra de dónde sale el resultado. «Futuros»: operaciones al alza y a la baja, y cuántas están en curso ahora. «Spot»: una cartera de monedas sin deuda. «Hucha»: tus ahorros. «Nuevas fuentes»: lo que el sistema todavía está probando. Toca una línea y se abrirá esa sección.",
+              "title": "Reparto de la cartera pública",
+              "text": "En modo PUBLIC verás más abajo cómo se reparte la cartera pública entre fuentes: spot, futuros, rendimiento en dólares y otras. El sistema mueve las proporciones según la tendencia del mercado y las reajusta cada lunes. Todo es una demo con precios reales.",
               "example": "En la vida real: en el presupuesto familiar ves cuánto vino del sueldo, cuánto del huerto y cuánto de un trabajo extra.",
               "art": "coins",
               "screen": "Main",
               "callouts": [
                 {
                   "n": 1,
-                  "target": "futures",
-                  "text": "Futuros: operaciones en curso y resultado"
+                  "target": "sources",
+                  "text": "Fuentes de ingresos y sus proporciones"
                 },
                 {
                   "n": 2,
-                  "target": "spot",
-                  "text": "Spot: cartera de monedas"
-                },
-                {
-                  "n": 3,
-                  "target": "piggy",
-                  "text": "Hucha: tus ahorros"
-                },
-                {
-                  "n": 4,
-                  "target": "soon",
-                  "text": "Nuevas fuentes: pronto"
+                  "target": "rebalance",
+                  "text": "Reajuste de proporciones cada lunes"
                 }
               ]
             },
@@ -293,7 +283,7 @@
             },
             {
               "title": "Las pestañas de abajo y NOVA",
-              "text": "Abajo del todo están las pestañas: Inicio, Futuros, Spot y Aprender. En el centro está la esfera luminosa de NOVA. Es la asistente de IA: pregúntale con palabras sencillas, por ejemplo «¿Por qué el sistema entró en esta operación?». También puedes hablarle: mantén presionado el micrófono, habla y luego suéltalo.",
+              "text": "Abajo del todo están las pestañas: Inicio, Futuros, Spot y Aprender. En el centro está la esfera luminosa de NOVA. Es el asistente de IA: pregúntale con palabras sencillas, por ejemplo «¿Por qué el sistema entró en esta operación?». También puedes hablarle: toca el micrófono, di tu pregunta y vuelve a tocarlo.",
               "example": "En la vida real: NOVA es como un vendedor en una tienda. Te orienta y te explica. Pero un vendedor también se equivoca a veces.",
               "art": "robot",
               "screen": "Main",
@@ -312,21 +302,21 @@
             }
           ],
           "remember": [
-            "Arriba, «Demo / Real»: el punto rojo indica dinero virtual.",
-            "«Mi cuenta demo»: escribe cualquier cantidad y mira cómo cambia.",
-            "Si empiezas: los recuadros «Cómo funciona CRYPTO NOVA» y «Hucha»."
+            "Arriba: PUBLIC, DEMO o REAL — qué cartera ves.",
+            "En modo DEMO, crea tu propia cartera demo con cualquier cantidad.",
+            "Si empiezas: los botones «Recorrido» y «Hucha»."
           ],
           "quiz": [
             {
-              "q": "¿Cómo sabes que estás viendo dinero virtual?",
+              "q": "¿Qué muestra el modo DEMO?",
               "options": [
-                "Por el gráfico de Inicio",
-                "Arriba está elegido «Demo», con un punto rojo",
-                "Por el precio de bitcoin",
-                "Por el recuadro «Sentimiento»"
+                "Tu cuenta del exchange con dinero real",
+                "Tu cartera demo: cualquier cantidad, dinero virtual",
+                "Solo el precio de bitcoin",
+                "El sentimiento del mercado"
               ],
               "answer": 1,
-              "why": "El selector «Demo / Real» siempre está arriba. El punto rojo junto a «Demo» te recuerda que el dinero es de práctica."
+              "why": "DEMO es tu cartera de práctica: los precios son reales y el dinero es virtual. El dinero real solo está en modo REAL, en tu propia cuenta del exchange."
             },
             {
               "q": "¿Dónde escribes tu cantidad para ver cómo habría cambiado junto con el sistema?",
@@ -334,10 +324,10 @@
                 "En el recuadro «Tendencia»",
                 "En «Mi cuenta», en la sección «Idioma»",
                 "En la pestaña «Aprender»",
-                "En Inicio, en la pestaña «Mi cuenta demo»"
+                "En Inicio, en modo DEMO: «Crea tu propia cartera demo»"
               ],
               "answer": 3,
-              "why": "En la pestaña «Mi cuenta demo» puedes poner cualquier cantidad. El dinero es virtual, pero los precios son reales."
+              "why": "En modo DEMO puedes escribir cualquier cantidad. El dinero es virtual, pero los precios son reales."
             },
             {
               "q": "El recuadro «Tendencia» dice «alcista». ¿Qué significa?",
@@ -360,7 +350,7 @@
           "cards": [
             {
               "title": "El resultado, arriba",
-              "text": "Arriba ves el resultado de la cuenta demo de futuros del sistema: $10 000 desde el 17.10.2026. Se ve cuánto ha ganado, cuánto hoy y cuántas operaciones hubo. «Caída máx.» es la mayor caída de la cuenta desde su punto más alto. Toca la tarjeta: se dará la vuelta y te mostrará el gráfico.",
+              "text": "Arriba está el «Estado del sistema»: la cuenta demo de futuros de $10 000 y su gráfico. Se ve cuánto ha ganado, cuánto hoy, cuántas operaciones hubo y la caída máxima. La «Caída máx.» es la mayor caída de la cuenta desde su punto más alto.",
               "example": "En la vida real: después de una caminata no solo importa hasta dónde llegaste. También importa lo hondo que fue el barranco que bajaste por el camino.",
               "art": "chart_up",
               "screen": "Futures",
@@ -368,23 +358,23 @@
                 {
                   "n": 1,
                   "target": "result",
-                  "text": "Ganancia de la cuenta de $10 000"
+                  "text": "Ganado en la cuenta de $10 000"
                 },
                 {
                   "n": 2,
                   "target": "stats",
-                  "text": "Hoy, operaciones, caída máxima"
+                  "text": "Hoy, operaciones, caída máx."
                 },
                 {
                   "n": 3,
-                  "target": "flip",
-                  "text": "Toca y aparecerá el gráfico"
+                  "target": "chart",
+                  "text": "Gráfico de la cuenta"
                 }
               ]
             },
             {
               "title": "Una operación en curso",
-              "text": "En el bloque «En curso» están las operaciones abiertas. En cada una ves la moneda, la dirección y el resultado en dólares. «ALCISTA (LONG)»: el sistema espera que el precio suba. «BAJISTA (SHORT)»: espera que baje. Si no hay operaciones, el sistema está esperando un buen punto de entrada. Es normal.",
+              "text": "En el bloque «Operaciones abiertas» están las operaciones en curso. En cada una ves la moneda, la dirección y el resultado en dólares. «Al alza» (LONG): el sistema espera que el precio suba. «A la baja» (SHORT): espera que baje. Si no hay operaciones, el sistema está esperando un buen punto de entrada. Es normal.",
               "example": "En la vida real: un long es como comprar leña en verano si esperas que en invierno esté más cara.",
               "art": "target",
               "screen": "Futures",
@@ -460,7 +450,7 @@
             },
             {
               "title": "Operaciones cerradas, sin secretos",
-              "text": "Abajo están las «Cerradas»: todas las operaciones terminadas, con ganancia y con pérdida. Cualquier sistema tiene pérdidas, y nosotros no las escondemos. Un sistema se juzga por muchas operaciones y por su caída máxima, no por una que salió bien.",
+              "text": "Más abajo están las «Operaciones cerradas»: todas las terminadas, con ganancia y con pérdida. Cualquier sistema tiene pérdidas, y nosotros no las escondemos. Un sistema se juzga por muchas operaciones y por su caída máxima, no por una que salió bien.",
               "example": "En la vida real: un restaurante no se juzga por una sola comida, sino por diez visitas. Y las opiniones honestas siempre son variadas.",
               "art": "scale",
               "screen": "Futures",
@@ -541,7 +531,7 @@
             },
             {
               "title": "De qué está hecha la cartera",
-              "text": "El bloque «Distribución de fondos» muestra las partes. La base son bitcoin, ether, solana y otras grandes monedas. Cerca del 15% está en dólares, como reserva. El dinero se reparte entre varias monedas para que un problema con una no golpee a toda la cartera.",
+              "text": "El bloque «Distribución de fondos» muestra las proporciones. La base son bitcoin, ether, solana y otras monedas grandes. Cerca del 15% se guarda en dólares como reserva. Toca una moneda y la app te explicará por qué está en la cartera: qué es el proyecto, qué riesgos y qué desbloqueos tiene.",
               "example": "En la vida real: no se llevan todos los huevos en una sola cesta. Si se te cae una, los huevos de las otras siguen enteros.",
               "art": "basket_eggs",
               "screen": "Spot",
@@ -549,12 +539,12 @@
                 {
                   "n": 1,
                   "target": "allocation",
-                  "text": "Partes en monedas y en dólares"
+                  "text": "Proporciones de monedas y dólares"
                 },
                 {
                   "n": 2,
                   "target": "coins",
-                  "text": "Cómo cambió cada moneda desde la compra"
+                  "text": "Toca una moneda: «¿Por qué este activo está en la cartera?»"
                 }
               ]
             },
@@ -627,7 +617,7 @@
             },
             {
               "title": "Cómo calcula la hucha",
-              "text": "La hucha hace sus cálculos en una cuenta demo con precios reales de bitcoin y te avisa el día de compra. El bloque «Si hubieras ahorrado así» muestra qué habría pasado en el pasado. El bitcoin real lo compras tú en el exchange, a partir de 18 años. Pronto podrás llevar la hucha directamente en el exchange desde la app.",
+              "text": "La hucha hace sus cálculos en la demo con precios reales de bitcoin y te avisa el día de compra. El bloque «Si hubieras ahorrado así» muestra qué habría pasado en el pasado. Para ahorrar de verdad, activa en tu propia cuenta del exchange una compra periódica de bitcoin («Auto-invest» o «Compra recurrente») con la misma cantidad. Las compras las hace el exchange y el dinero sigue siendo tuyo. Dinero real, solo a partir de 18 años.",
               "example": "En la vida real: el despertador no se levanta por ti, pero te avisa a tiempo. La hucha igual: te recuerda la compra, y tú decides.",
               "art": "calendar",
               "screen": "Piggy",
@@ -641,6 +631,11 @@
                   "n": 2,
                   "target": "start",
                   "text": "Crear hucha demo"
+                },
+                {
+                  "n": 3,
+                  "target": "real",
+                  "text": "Ahorrar de verdad, paso a paso"
                 }
               ]
             }
@@ -694,7 +689,7 @@
           "cards": [
             {
               "title": "Demo: entrenar sin riesgo",
-              "text": "La demo son cuentas de práctica con dinero virtual. El sistema tiene 2 cuentas demo de $10 000: una en futuros y otra en spot. Los precios son reales, y se ve cada operación, con ganancia o con pérdida. Y en Inicio puedes crear tu propia cuenta demo con cualquier cantidad.",
+              "text": "La demo son cuentas de práctica con dinero virtual. La cartera pública de CRYPTO NOVA (modo PUBLIC) son las cuentas demo del propio sistema. Los precios son reales y se ve cada operación, con ganancia y con pérdida. Y en modo DEMO puedes crear tu propia cartera demo con cualquier cantidad.",
               "example": "En la vida real: un partido amistoso antes del campeonato. Se juega en serio, pero los puntos no cuentan para la tabla.",
               "art": "phone_app",
               "screen": "Main",
@@ -702,18 +697,18 @@
                 {
                   "n": 1,
                   "target": "total",
-                  "text": "Cuenta CRYPTO NOVA: $10 000 en futuros y $10 000 en spot"
+                  "text": "PUBLIC: las cuentas demo del sistema"
                 },
                 {
                   "n": 2,
                   "target": "my_demo",
-                  "text": "Mi cuenta demo: tu cantidad"
+                  "text": "DEMO: tu cartera demo"
                 }
               ]
             },
             {
               "title": "La cuenta real es tuya",
-              "text": "La cuenta real es tu propia cuenta en el exchange BingX, nuestro socio. Tú le conectas el sistema CRYPTO NOVA. El dinero está siempre en tu cuenta del exchange. Nosotros no lo recibimos, no lo guardamos y no podemos retirarlo. Dinero real: solo a partir de 18 años.",
+              "text": "La cuenta real es tu propia cuenta en el exchange BingX, nuestro socio. La abres con el enlace de CRYPTO NOVA y replicas en ella las operaciones del sistema. El dinero está siempre contigo, en el exchange. Nosotros no lo recibimos, no lo guardamos y no podemos retirarlo. Dinero real, solo a partir de 18 años.",
               "example": "En la vida real: llamas a alguien para que te pinte la casa. Trabaja en tu casa, pero la casa sigue siendo tuya, y las llaves también.",
               "art": "bank",
               "screen": "Live",
@@ -726,8 +721,8 @@
               ]
             },
             {
-              "title": "Conexión en 3 pasos",
-              "text": "Paso 1: abre una cuenta en BingX con el enlace de la app. Paso 2: deposita fondos desde la app del exchange; empieza con una cantidad que podrías perder sin problemas. Paso 3: escribe tu número de cuenta (UID), que está en tu perfil del exchange. Comprobaremos que la cuenta se abrió con nuestro enlace y conectaremos el sistema.",
+              "title": "Conexión en 4 pasos",
+              "text": "Paso 1: abre una cuenta en BingX con el enlace de la app. Paso 2: verifica tu identidad (KYC) en la app del exchange: documento y selfie, normalmente 5–15 minutos. Paso 3: deposita USDT; empieza con una cantidad que podrías perder sin problemas. Paso 4: escribe tu número de cuenta (UID) del perfil del exchange y toca «Comprobar». Comprobaremos que la cuenta se abrió con nuestro enlace y activaremos el modo REAL.",
               "example": "En la vida real: el UID es como el número de tu carné de biblioteca. Con él te reconocen en la biblioteca, pero nadie puede llevarse tus libros solo con ese número.",
               "art": "key_lock",
               "screen": "Live",
@@ -740,18 +735,23 @@
                 {
                   "n": 2,
                   "target": "step2",
-                  "text": "Depositar fondos en la app del exchange"
+                  "text": "Verificar tu identidad (KYC)"
                 },
                 {
                   "n": 3,
                   "target": "step3",
+                  "text": "Depositar USDT"
+                },
+                {
+                  "n": 4,
+                  "target": "step4",
                   "text": "Escribir el UID y tocar «Comprobar»"
                 }
               ]
             },
             {
               "title": "Qué te da la conexión",
-              "text": "Ahora ves las operaciones del sistema y las replicas tú mismo en tu cuenta. La copia automática llegará pronto: entonces el sistema lo hará por ti. Además, con la cuenta conectada, NOVA responde sin límite diario, el soporte te atiende con prioridad y recibes las novedades antes que nadie.",
+              "text": "Ahora ves las operaciones del sistema y las replicas tú mismo en tu cuenta. La copia automática llegará pronto: entonces el sistema lo hará por ti. Además, con la cuenta conectada, NOVA responde 100 preguntas al día en lugar de 5, el soporte te atiende con prioridad y recibes las novedades antes que nadie.",
               "example": "En la vida real: un vecino que sabe de huertos te dice cuándo plantar, y tú plantas. Pronto llegará el riego automático, pero el huerto seguirá siendo tuyo.",
               "art": "target",
               "screen": "Live",
@@ -759,7 +759,7 @@
                 {
                   "n": 1,
                   "target": "trades",
-                  "text": "Operaciones del sistema, en tu cuenta"
+                  "text": "Las operaciones del sistema, en tu cuenta"
                 },
                 {
                   "n": 2,
@@ -769,13 +769,13 @@
                 {
                   "n": 3,
                   "target": "nova",
-                  "text": "NOVA sin límite de preguntas"
+                  "text": "NOVA: 100 preguntas al día"
                 }
               ]
             },
             {
               "title": "Cómo gana dinero CRYPTO NOVA",
-              "text": "La app es gratis y no hay suscripciones. Cuando abres una cuenta con nuestro enlace, el exchange le paga a CRYPTO NOVA una recompensa que sale de su propia comisión. Tus comisiones y condiciones en el exchange no cambian por eso: no pagas más.",
+              "text": "Cuando abres una cuenta con nuestro enlace, el exchange paga a CRYPTO NOVA una recompensa de su propia comisión. Tus comisiones y las condiciones del exchange no cambian: no pagas más.",
               "example": "En la vida real: una tienda le paga a un influencer por traerle un cliente. El precio del producto para el cliente no cambia.",
               "art": "handshake",
               "screen": "Live",
@@ -789,7 +789,7 @@
             },
             {
               "title": "Si vives en la UE",
-              "text": "En los países de la UE y del EEE, y en algunos otros, hay normas propias para los exchanges de cripto. Allí la app no muestra enlaces al exchange, y la cuenta real desde la app aún no está disponible. Las lecciones, las cuentas demo, la hucha y NOVA funcionan por completo.",
+              "text": "En la UE y el EEE, desde el 1 de julio de 2026 las reglas MiCA se aplican por completo: allí solo prestan servicios cripto las empresas con licencia de la UE. Por eso, en la UE, el EEE y algunos otros países la app no muestra enlaces al exchange y la cuenta real desde la app aún no está disponible. Las lecciones, la demo, la hucha y NOVA funcionan allí por completo.",
               "example": "En la vida real: cada país tiene sus normas de tráfico. El auto es el mismo, pero por algunas carreteras todavía no se puede pasar.",
               "art": "globe",
               "screen": "Live",
@@ -828,18 +828,18 @@
                 "Vende tus datos"
               ],
               "answer": 1,
-              "why": "La app es gratis. El exchange le paga a CRYPTO NOVA de su propia comisión, y tus comisiones no suben por eso."
+              "why": "El exchange paga a CRYPTO NOVA de su propia comisión, y tus comisiones no suben."
             },
             {
               "q": "¿Qué necesitas para conectar la cuenta real?",
               "options": [
-                "Una cuenta en BingX con el enlace de CRYPTO NOVA, fondos y tu número de cuenta (UID)",
+                "Una cuenta en BingX con el enlace de CRYPTO NOVA, la verificación de identidad, fondos y tu número de cuenta (UID)",
                 "La contraseña del exchange y el código del SMS",
                 "La frase secreta de tu billetera",
                 "Una foto de tu tarjeta bancaria"
               ],
               "answer": 0,
-              "why": "Solo hacen falta 3 pasos: cuenta con nuestro enlace, depósito y UID. Nunca pedimos contraseñas, códigos ni la frase secreta."
+              "why": "Hacen falta 4 pasos: cuenta con nuestro enlace, verificación de identidad en el exchange, depósito y UID. Nunca pedimos contraseñas, códigos ni la frase secreta."
             }
           ]
         },
@@ -869,7 +869,7 @@
             },
             {
               "title": "El falso «soporte»",
-              "text": "El estafador suele escribir primero y meter prisa: «Urgente, o bloquearán tu cuenta». Pide la contraseña, un código o que transfieras dinero «para verificar». Promete ganancias sin riesgo. Abre nuestro soporte tú mismo, desde la app: «Mi cuenta» → «Soporte». Nuestra web es solo cryptonova.vip.",
+              "text": "El estafador suele escribir primero y meter prisa: «Urgente, o bloquearán tu cuenta». Pide la contraseña, un código o que transfieras dinero «para verificar». Promete ganancias sin riesgo. Abre nuestro soporte tú mismo, desde la app: «Mi cuenta» → «Soporte». Los enlaces a nuestra web, tómalos solo desde la propia app.",
               "example": "En la vida real: un supuesto «empleado del banco» te llama y te asusta. Un banco de verdad no hace eso. Cuelga y llama tú al banco.",
               "art": "thief"
             },
@@ -1068,13 +1068,13 @@
             },
             {
               "title": "Quién lo inventó",
-              "text": "Bitcoin nació en 2009. Lo creó una persona o un grupo con el nombre de Satoshi Nakamoto. Nadie sabe quién es en realidad. Satoshi puso el sistema en marcha y desapareció. Y bitcoin funciona sin él desde hace más de 15 años.",
+              "text": "Bitcoin nació en 2009. Lo creó una persona o un grupo con el nombre de Satoshi Nakamoto. Nadie sabe quién es en realidad. Satoshi puso el sistema en marcha y desapareció. Y bitcoin funciona sin él desde hace más de 17 años.",
               "example": "En la vida real: alguien inventó las reglas de un juego nuevo, se las dio a todos y se fue. Y el juego sigue sin él.",
               "art": "magnifier"
             },
             {
               "title": "Solo 21 000 000 de unidades",
-              "text": "Nunca habrá más de 21 000 000 de bitcoins. Está escrito en las reglas desde el principio. Ya se han emitido unos 20 000 000. Los nuevos salen cada vez más despacio: más o menos cada 4 años, la emisión se reduce a la mitad. El dinero de siempre se puede imprimir sin límite; bitcoin, no. Por eso lo llaman «oro digital».",
+              "text": "Nunca habrá más de 21 000 000 de bitcoins. Está escrito en las reglas desde el principio. En marzo de 2026 se emitió el bitcoin número 20 millones. El último millón tardará más de 100 años en emitirse: más o menos cada 4 años la emisión se reduce a la mitad. El dinero normal se puede imprimir sin límite; bitcoin, no. Por eso lo llaman «oro digital».",
               "example": "En la vida real: el oro tampoco se puede imprimir. Se extrae de la tierra, y en el planeta hay una cantidad limitada.",
               "art": "coins",
               "chart": {
@@ -1087,24 +1087,24 @@
                   "ya emitidos",
                   "por emitir"
                 ],
-                "caption": "Aproximado, a octubre de 2026"
+                "caption": "Datos de octubre de 2026"
               }
             },
             {
               "title": "Puedes comprar un pedacito",
-              "text": "No hace falta comprar un bitcoin entero. Se divide en 100 000 000 de partes pequeñas. La parte más pequeña se llama «satoshi», en honor a su creador. En octubre de 2026, 1 bitcoin costaba unos $82 000. Pero un pedacito se puede comprar con unos pocos dólares.",
+              "text": "No hace falta comprar un bitcoin entero. Se divide en 100 000 000 de partes pequeñas. La parte más pequeña se llama «satoshi», en honor a su creador. A 21.10.2026, 1 bitcoin costaba unos $83 000. Pero un pedacito se puede comprar con unos pocos dólares.",
               "example": "En la vida real: no hace falta pedir la pizza entera. Puedes tomar una porción, y es de la misma pizza.",
               "art": "calculator"
             },
             {
               "title": "Por qué la gente confía en él",
-              "text": "Desde enero de 2024, en EE. UU. funcionan fondos cotizados de bitcoin (ETF). Se compran como acciones normales, y a través de ellos compran bitcoin personas, empresas y grandes fondos. Además, las empresas financieras ya emiten en blockchain participaciones de fondos y bonos: a esto se le llama tokenización. Muchos ven en esto el inicio del uso masivo de las cripto.",
+              "text": "Desde enero de 2024, en EE. UU. funcionan fondos cotizados (ETF) de bitcoin; desde julio de 2024, de ether, y desde el otoño de 2025, también de otras monedas. Se compran como acciones normales, y a través de ellos tienen bitcoin personas, empresas y grandes fondos. Además, las empresas financieras ya emiten en blockchain participaciones de fondos y bonos: a esto se le llama tokenización. Muchos ven en esto el inicio del uso masivo de las cripto.",
               "example": "En la vida real: antes, para tener oro, ibas al banco por un lingote. Ahora compras una parte de un fondo de oro en una app. Con bitcoin está pasando lo mismo.",
               "art": "chart_up"
             },
             {
               "title": "Sin rodeos sobre el riesgo",
-              "text": "El precio de bitcoin sube y baja con fuerza. En el pasado, más de una vez perdió más de la mitad de su valor y luego marcó nuevos récords. Pero el pasado no promete el futuro. Por eso la gente sensata invierte solo lo que podría perder sin miedo, y compra poco a poco.",
+              "text": "El precio de bitcoin sube y baja con fuerza. El 6 de octubre de 2025 marcó un récord de unos $126 000, y en octubre de 2026 valía alrededor de un tercio menos. En el pasado, más de una vez perdió más de la mitad de su valor y luego marcó nuevos récords. Pero el pasado no promete el futuro. Por eso la gente sensata invierte solo lo que podría perder sin miedo, y compra poco a poco.",
               "example": "En la vida real: en el mar hay días de calma y días de tormenta. Quien sale al mar siempre lleva chaleco salvavidas.",
               "art": "rollercoaster"
             }
@@ -1551,6 +1551,12 @@
               "art": "warning"
             },
             {
+              "title": "Reglas para las stablecoins",
+              "text": "Los gobiernos se ocuparon de las stablecoins. En julio de 2025 EE. UU. aprobó la ley GENIUS: la reserva debe estar 1:1 en dólares y bonos cortos del Tesoro de EE. UU., con un informe cada mes. En la UE rigen las reglas MiCA: los exchanges con licencia de la UE no venden stablecoins sin autorización, como USDT. Allí se usan USDC y stablecoins en euros. Datos de octubre de 2026.",
+              "example": "En la vida real: antes el guardarropa funcionaba con la palabra de honor. Ahora llega una inspección y cuenta los abrigos de las perchas.",
+              "art": "shield"
+            },
+            {
               "title": "Para qué sirven",
               "text": "En un exchange, una stablecoin funciona como una «billetera en dólares». Vendes bitcoin, recibes USDT y esperas tranquilo. Cuando quieres volver a comprar, pagas con esos mismos USDT. No hace falta sacar el dinero al banco cada vez.",
               "example": "En la vida real: de viaje, guardas parte del dinero en moneda local. Así no tienes que ir a la casa de cambio cada vez.",
@@ -1642,7 +1648,7 @@
             },
             {
               "title": "Señales 5–7: «lo duplicamos», webs falsas, famosos",
-              "text": "5. «Envía 1 bitcoin y te devolvemos 2». No te devolverán nada. 6. Webs falsas: la dirección cambia en 1 letra, pero parece la de verdad. 7. «Un famoso regala cripto». El video y las fotos son falsos, y el famoso ni lo sabe.",
+              "text": "5. «Envía 1 bitcoin y te devolvemos 2». No te devolverán nada. 6. Webs falsas: la dirección cambia en 1 letra, pero parece la de verdad. 7. «Un famoso regala cripto». El video, las fotos y hasta la voz son falsos, hechos con IA, y el famoso ni lo sabe.",
               "example": "En la vida real: un correo dice «Ganaste $1 000 000, paga el envío del premio». Nadie regala nada: el queso gratis solo está en la ratonera.",
               "art": "magnifier"
             },
@@ -1702,7 +1708,7 @@
           "cards": [
             {
               "title": "Ether es más que una moneda",
-              "text": "Ethereum (ether, ETH) se lanzó en 2015. Es la segunda criptomoneda más grande. Bitcoin sobre todo guarda y mueve dinero, mientras que la red de Ethereum además ejecuta programas.",
+              "text": "Ethereum (ether, ETH) se lanzó en 2015. A octubre de 2026 es la segunda criptomoneda más grande después de bitcoin. Bitcoin sobre todo guarda y mueve dinero, mientras que la red de Ethereum además ejecuta programas.",
               "example": "En la vida real: bitcoin es una caja fuerte fiable; ether, una caja fuerte con automatismo que se abre sola cuando se cumple una condición.",
               "art": "globe"
             },
@@ -1923,6 +1929,150 @@
               ],
               "answer": 1,
               "why": "Si se pierde el móvil, se pierden también sus notas. El papel en un lugar seguro es lo más sencillo."
+            }
+          ]
+        },
+        {
+          "id": "l1-deepfakes",
+          "title": "Falsificaciones con IA: voz, cara y video",
+          "minutes": 4,
+          "goal": "Al terminar, reconocerás una falsificación hecha con IA y sabrás cómo comprobarla.",
+          "cards": [
+            {
+              "title": "El engaño se volvió más listo",
+              "text": "Los estafadores ahora usan IA. Falsifica la voz, la cara y los videos de conocidos y de famosos, y escribe mensajes impecables, sin faltas. Según Chainalysis, en 2025 los estafadores se llevaron unos $17 000 millones en cripto. Y los casos en que se hacen pasar por otra persona se multiplicaron por 15, más o menos.",
+              "example": "En la vida real: antes una falsificación se notaba por la letra torpe. Ahora una firma se falsifica tan bien que a simple vista no se distingue.",
+              "art": "robot"
+            },
+            {
+              "title": "Cómo se ve",
+              "text": "Un video: un empresario famoso «regala» bitcoin o elogia una plataforma que paga un 3% al día. Un audio de tu «hijo»: «Mamá, transfiéreme dinero ya». Una videollamada de un «empleado del exchange» con el logo de verdad. Algo así se fabrica en pocos minutos.",
+              "example": "Ejemplo: un anuncio en redes sociales en el que un presentador de noticias «recomienda» una nueva plataforma cripto. El presentador es real, pero sus palabras las generó una IA.",
+              "art": "warning"
+            },
+            {
+              "title": "Comprobación en un minuto",
+              "text": "No te fíes de tus ojos ni de tus oídos: comprueba el canal. Cuelga y llama tú a un número que conozcas. Haz una pregunta que solo la persona real sabría responder. Acuerda una palabra clave con tu familia. Abre las webs tú mismo, desde un marcador, no desde un enlace de un video.",
+              "example": "En la vida real: un mensajero dice que viene del banco. No discutes con él: simplemente llamas tú al banco.",
+              "art": "phone_app"
+            },
+            {
+              "title": "La señal principal es la misma",
+              "text": "La tecnología es nueva, pero el truco es viejo: prisa, ganancias sin riesgo y la petición de enviar dinero o dar un código. Si ves eso, es un engaño, por muy real que parezca el video. CRYPTO NOVA no te llama, no te pide que envíes dinero y no te pregunta códigos.",
+              "example": "En la vida real: un billete falso puede ser bonito. Pero si alguien tiene prisa por pagar con él a oscuras, desconfía.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "La IA falsifica voces, caras y videos: no basta con tus ojos y oídos.",
+            "Compruébalo tú: vuelve a llamar, pide la palabra clave, abre la web desde un marcador.",
+            "Prisa, ganancias sin riesgo, petición de enviar dinero: es un engaño."
+          ],
+          "quiz": [
+            {
+              "q": "Llega un audio: la voz de tu hijo te pide enviar ya $500 en cripto. ¿Qué haces primero?",
+              "options": [
+                "Enviarlos: seguro que es su voz",
+                "Enviar la mitad",
+                "Colgar y llamar tú a tu hijo a su número",
+                "Pedirle que mande una foto"
+              ],
+              "answer": 2,
+              "why": "Una voz se falsifica en minutos, y una foto también. La comprobación es sencilla: llama tú a un número que conozcas."
+            },
+            {
+              "q": "Un video: un famoso recomienda una plataforma que paga un 3% al día. ¿Cómo lo tomas?",
+              "options": [
+                "Es un engaño: el video es falso y no hay ganancias sin riesgo",
+                "Puedo invertir un poco",
+                "Si lo recomienda un famoso, es fiable",
+                "Reenviarlo a mis amigos"
+              ],
+              "answer": 0,
+              "why": "Hay 2 señales a la vez: «lo recomienda un famoso» y ganancias enormes sin riesgo. Estos videos a menudo se hacen con IA."
+            },
+            {
+              "q": "¿Qué ayuda a una familia a no caer con una voz falsa?",
+              "options": [
+                "Contestar todas las llamadas",
+                "Acordar una palabra clave y devolver la llamada uno mismo",
+                "Guardar las contraseñas en las notas",
+                "Apagar internet"
+              ],
+              "answer": 1,
+              "why": "La palabra clave solo la conocen los tuyos. Y si llamas a un número conocido, hablarás con la persona de verdad."
+            }
+          ]
+        },
+        {
+          "id": "l1-withdraw",
+          "title": "Cómo retirar dinero del exchange",
+          "minutes": 4,
+          "goal": "Al terminar, sabrás cómo devolver el dinero del exchange a tu tarjeta sin equivocarte en una transferencia.",
+          "cards": [
+            {
+              "title": "Solo retiras tú",
+              "text": "El dinero de tu cuenta del exchange es tuyo. Lo retiras tú mismo, en la app del exchange. CRYPTO NOVA no puede retirarlo ni pide acceso a retiros. Antes de un retiro, el exchange puede pedirte un código de una app o un SMS: eso protege tu cuenta.",
+              "example": "En la vida real: sacar dinero del cajero solo puedes tú, con tu tarjeta y tu PIN.",
+              "art": "bank"
+            },
+            {
+              "title": "A la tarjeta: 3 pasos",
+              "text": "Paso 1: vende tus monedas por dólares, USDT o USDC. Paso 2: elige el retiro a tarjeta o a cuenta bancaria. Los exchanges lo hacen a través de socios, y los botones tienen nombres distintos. Paso 3: revisa la cantidad, la comisión y el plazo. El dinero suele llegar en un plazo de unos minutos a unos días.",
+              "example": "En la vida real: de viaje, primero cambias moneda en una casa de cambio y luego sacas efectivo. Aquí igual: primero dólares, luego tarjeta.",
+              "art": "phone_app"
+            },
+            {
+              "title": "Enviar a una billetera: red y dirección",
+              "text": "También puedes enviar monedas a tu propia billetera o a otro exchange. Aquí importan 2 cosas: la red y la dirección. La red del que envía y la del que recibe deben coincidir. Copia la dirección en vez de escribirla y revisa los primeros y los últimos caracteres. Una transferencia equivocada casi nunca se recupera.",
+              "example": "Ejemplo: vas a enviar 100 USDT a una dirección nueva. Primero, una transferencia de prueba de 5 USDT. ¿Llegaron? Envía los otros 95.",
+              "art": "chain"
+            },
+            {
+              "title": "Comisiones e impuestos",
+              "text": "Los retiros tienen comisión. Enviar monedas cuesta una tarifa fija de red; retirar a tarjeta, un porcentaje para el socio del exchange. Por eso conviene retirar menos veces y cantidades mayores. En muchos países, vender monedas es el momento en que se calcula el impuesto. Guarda el extracto del exchange.",
+              "example": "En la vida real: hacer la compra en un solo viaje grande sale más barato que en diez pequeños.",
+              "art": "calculator"
+            }
+          ],
+          "remember": [
+            "El dinero lo retiras tú, en la app del exchange.",
+            "A la tarjeta: vender por dólares → retirar → revisar la comisión.",
+            "Al enviar monedas, revisa la red y la dirección, y empieza con poco."
+          ],
+          "quiz": [
+            {
+              "q": "¿Quién puede retirar dinero de tu cuenta del exchange?",
+              "options": [
+                "CRYPTO NOVA",
+                "Solo tú",
+                "Cualquiera que sepa tu UID",
+                "El «soporte» de una app de mensajería"
+              ],
+              "answer": 1,
+              "why": "Los retiros los haces solo tú, en la app del exchange. El número UID no da acceso al dinero."
+            },
+            {
+              "q": "Envías USDT a una dirección nueva por primera vez. ¿Qué es sensato?",
+              "options": [
+                "Enviarlo todo de una vez",
+                "Escribir la dirección a mano",
+                "Enviar primero una cantidad pequeña y comprobar",
+                "Elegir cualquier red"
+              ],
+              "answer": 2,
+              "why": "La transferencia de prueba comprueba la dirección y la red. Una transferencia equivocada casi nunca se recupera."
+            },
+            {
+              "q": "¿Por qué conviene retirar menos veces y cantidades mayores?",
+              "options": [
+                "Los retiros tienen comisión, y los pequeños se comen más",
+                "Así bitcoin sube más rápido",
+                "El exchange prohíbe los retiros pequeños",
+                "Da igual"
+              ],
+              "answer": 0,
+              "why": "La tarifa de red es fija y el retiro a tarjeta cobra un porcentaje. Diez retiros pequeños suelen costar más que uno."
             }
           ]
         }
@@ -2475,7 +2625,7 @@
             },
             {
               "title": "Qué es el halving",
-              "text": "Más o menos cada 4 años, la recompensa de los mineros se reduce a la mitad. Eso es el halving, que en inglés significa «partir por la mitad». Pasó en 2012, 2016, 2020 y 2024. El siguiente se espera hacia 2028. Esta regla está en bitcoin desde el principio.",
+              "text": "Más o menos cada 4 años, la recompensa de los mineros se reduce a la mitad. Eso es el halving, que en inglés significa «partir por la mitad». Pasó en 2012, 2016, 2020 y 2024. El siguiente se espera hacia abril de 2028. Esta regla está en bitcoin desde el principio.",
               "example": "En la vida real: una panadería a la que se le permite hornear cada vez menos pan. Cada 4 años, la mitad que antes.",
               "art": "calendar",
               "chart": {
@@ -2524,7 +2674,7 @@
           ],
           "remember": [
             "Halving: más o menos cada 4 años, la recompensa de los mineros se reduce a la mitad.",
-            "Hubo halvings en 2012, 2016, 2020 y 2024. El siguiente, hacia 2028.",
+            "Hubo halvings en 2012, 2016, 2020 y 2024. El siguiente, hacia abril de 2028.",
             "Después de los halvings el precio subió en el pasado, pero no es una ley."
           ],
           "quiz": [
@@ -2548,7 +2698,7 @@
                 "Cuando lo decidan los exchanges"
               ],
               "answer": 2,
-              "why": "Hubo halvings en 2012, 2016, 2020 y 2024. El siguiente se espera hacia 2028."
+              "why": "Hubo halvings en 2012, 2016, 2020 y 2024. El siguiente se espera hacia abril de 2028."
             },
             {
               "q": "Después de los halvings anteriores el precio subió. ¿Significa que volverá a pasar?",
@@ -2693,7 +2843,7 @@
             },
             {
               "title": "Impuestos: consulta a un especialista",
-              "text": "Las reglas de impuestos sobre cripto son distintas en cada país, y cambian. No damos asesoramiento fiscal. Consulta las reglas con un especialista en impuestos de tu país. Aquí el registro ayuda muchísimo: tendrás a mano todas las fechas y cantidades.",
+              "text": "Las reglas de impuestos sobre cripto son distintas en cada país, y cambian. Desde 2026, los exchanges de muchos países recopilan datos de las operaciones de sus clientes para las autoridades fiscales. No damos asesoramiento fiscal. Consulta las reglas con un especialista en impuestos de tu país. Aquí el registro ayuda muchísimo: tendrás a mano todas las fechas y cantidades.",
               "example": "En la vida real: al médico conviene ir con los resultados de los análisis. Y al especialista en impuestos, con tu registro de compras.",
               "art": "bank"
             },
@@ -3004,6 +3154,222 @@
               ],
               "answer": 0,
               "why": "El dinero hará falta en el peor momento, y habrá que vender a cualquier precio."
+            }
+          ]
+        },
+        {
+          "id": "l2-etf",
+          "title": "Fondos cotizados (ETF): cripto a través de un bróker",
+          "minutes": 4,
+          "goal": "Al terminar, entenderás qué es un ETF cripto y en qué se diferencia de comprar monedas en un exchange.",
+          "cards": [
+            {
+              "title": "Qué es un ETF",
+              "text": "Un ETF es un fondo cuyas participaciones se compran en la bolsa, como una acción. Un ETF cripto tiene monedas reales. Las monedas las guarda el fondo, y tú tienes una participación del fondo en tu cuenta del bróker.",
+              "example": "En la vida real: en vez de guardar un lingote en casa, compras una parte de una cámara acorazada. El lingote se queda allí, y tú tienes un documento de tu parte.",
+              "art": "bank"
+            },
+            {
+              "title": "Qué fondos hay",
+              "text": "En EE. UU., los fondos de bitcoin funcionan desde enero de 2024, y los de ether, desde julio de 2024. Desde el otoño de 2025 han aparecido fondos de solana, XRP y otras monedas: el regulador simplificó las reglas para lanzarlos. En Europa, productos cotizados parecidos se llaman ETP. A octubre de 2026, a través de estos fondos tienen bitcoin tanto particulares como grandes empresas.",
+              "example": "Ejemplo: el mayor fondo de bitcoin cobra alrededor de un 0.25% al año. Sobre $1 000, son $2.50 al año.",
+              "art": "globe"
+            },
+            {
+              "title": "Pros y contras",
+              "text": "Pros: compras con un bróker conocido, no tienes que guardar claves y un regulador vigila el fondo. Contras: solo se opera en horario de bolsa, el fondo cobra cada año y no puedes sacar las monedas a tu propia billetera. El precio sube y baja igual que el de la moneda.",
+              "example": "En la vida real: un ETF es como un taxi, y tu propia moneda, como tu propio coche. En el taxi no piensas en reparaciones, pero vas con sus reglas y pagas el viaje.",
+              "art": "scale"
+            },
+            {
+              "title": "Qué elegir",
+              "text": "Si solo quieres tener bitcoin durante años en una cuenta del bróker, un ETF es cómodo. Si quieres ahorrar poco a poco, mover monedas y usar servicios cripto, necesitas las monedas en un exchange o en una billetera. Qué fondos hay disponibles depende del país. El riesgo es el mismo: si bitcoin cae, el fondo también.",
+              "example": "En la vida real: el té viene en bolsitas o a granel. Es el mismo té, pero cambian la comodidad y el precio.",
+              "art": "compass"
+            }
+          ],
+          "remember": [
+            "Un ETF es una participación en un fondo que tiene monedas reales.",
+            "Cómodo con un bróker, pero el fondo cobra y no puedes sacar las monedas.",
+            "El precio del fondo se mueve con la moneda: el riesgo es el mismo."
+          ],
+          "quiz": [
+            {
+              "q": "¿Qué compras cuando compras un ETF de bitcoin?",
+              "options": [
+                "Una participación de un fondo que tiene bitcoins",
+                "Los propios bitcoins, a tu billetera",
+                "Una acción del exchange BingX",
+                "Protección contra la caída del precio"
+              ],
+              "answer": 0,
+              "why": "Las monedas las guarda el fondo, y tú tienes una participación en tu cuenta del bróker. El ETF no te protege de una caída del precio."
+            },
+            {
+              "q": "¿Desde cuándo funcionan en EE. UU. los fondos de bitcoin?",
+              "options": [
+                "Desde 2009",
+                "Desde enero de 2024",
+                "Desde 2030",
+                "No existen"
+              ],
+              "answer": 1,
+              "why": "Los primeros ETF de bitcoin empezaron a cotizar en EE. UU. en enero de 2024, y los de ether, en julio de 2024."
+            },
+            {
+              "q": "El fondo cobra un 0.25% al año. ¿Cuánto es sobre $2 000?",
+              "options": [
+                "$0.25",
+                "$50",
+                "$5",
+                "$25"
+              ],
+              "answer": 2,
+              "why": "$2 000 × 0.25% = $5 al año. Es poco, pero se cobra cada año mientras tengas el fondo."
+            }
+          ]
+        },
+        {
+          "id": "l2-taxes",
+          "title": "Impuestos e informes de los exchanges: qué cambió en 2026",
+          "minutes": 4,
+          "goal": "Al terminar, sabrás qué datos pasan los exchanges a las autoridades fiscales y cómo prepararte.",
+          "cards": [
+            {
+              "title": "Los exchanges empezaron a informar",
+              "text": "Desde el 1 de enero de 2026, con nuevas reglas —DAC8 en la UE y CARF en el mundo—, los exchanges de 48 países, incluidos la UE y el Reino Unido, recopilan datos de las operaciones de sus clientes. Desde 2027 esos datos empezarán a llegar a las autoridades fiscales. Decenas de países más se sumarán después. Datos de octubre de 2026.",
+              "example": "En la vida real: de tu sueldo, Hacienda ya sabe por tu empleador. Ahora el exchange también informa de tus operaciones.",
+              "art": "books"
+            },
+            {
+              "title": "En EE. UU.: el formulario 1099-DA",
+              "text": "En EE. UU., los exchanges envían a sus clientes el formulario 1099-DA. Para las operaciones de 2025 solo trae los importes de venta. Para las de 2026 trae también el precio de compra. La ganancia y el impuesto los sigues calculando tú.",
+              "example": "Ejemplo: vendiste bitcoin por $1 000 que habías comprado por $800. El exchange informará de los $1 000, y la diferencia de $200 la calculas y la declaras tú.",
+              "art": "globe"
+            },
+            {
+              "title": "Sobre qué se suele pagar impuesto",
+              "text": "En muchos países se paga impuesto sobre la ganancia al vender monedas o al cambiar una moneda por otra. La ganancia es la diferencia entre el precio de venta y el de compra. Comprar y simplemente guardar no suele generar impuesto. Pero los tipos, las reglas y las exenciones cambian de un país a otro, y con el tiempo.",
+              "example": "Ejemplo: compraste monedas por $500 y las vendiste por $650. La ganancia es de $150. Sobre ella se calcula el impuesto, si existe en tu país.",
+              "art": "calculator"
+            },
+            {
+              "title": "Cómo prepararte",
+              "text": "Lleva un registro de compras y ventas: de eso trata la lección «Anota tus compras». Guarda una vez al año los extractos del exchange. Consulta las reglas de tu país con un especialista en impuestos. No damos asesoramiento fiscal.",
+              "example": "En la vida real: los tiques de una reparación se guardan para no discutir después la garantía. Los extractos del exchange son ese mismo tipo de tique.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "Desde 2026, los exchanges de muchos países recopilan datos de operaciones para las autoridades fiscales.",
+            "El impuesto se suele pagar sobre la ganancia al vender o cambiar.",
+            "Lleva un registro y consulta las reglas con un especialista en impuestos."
+          ],
+          "quiz": [
+            {
+              "q": "¿Qué cambió el 1 de enero de 2026?",
+              "options": [
+                "Se prohibieron las cripto",
+                "Los exchanges de la UE, el Reino Unido y otros países recopilan datos de operaciones para las autoridades fiscales",
+                "Se eliminaron los impuestos sobre cripto",
+                "Los exchanges dejaron de verificar la identidad"
+              ],
+              "answer": 1,
+              "why": "Con DAC8 y CARF, los exchanges recopilan datos desde 2026 y los pasan a las autoridades fiscales desde 2027."
+            },
+            {
+              "q": "Compraste monedas por $500 y las vendiste por $650. ¿Sobre qué cantidad se suele calcular el impuesto?",
+              "options": [
+                "$650",
+                "$500",
+                "$1 150",
+                "$150"
+              ],
+              "answer": 3,
+              "why": "Normalmente el impuesto se calcula sobre la ganancia: $650 − $500 = $150. El tipo y las reglas dependen del país."
+            },
+            {
+              "q": "¿Qué te ayuda a calcular el impuesto con calma?",
+              "options": [
+                "Borrar el historial de operaciones",
+                "Un registro de compras y ventas y los extractos del exchange",
+                "Un consejo de un chat",
+                "Nada: el exchange lo calcula todo"
+              ],
+              "answer": 1,
+              "why": "Para calcular la ganancia necesitas las fechas y los precios de compra. El exchange no informa de todo: muchas veces la cuenta la haces tú."
+            }
+          ]
+        },
+        {
+          "id": "l2-rules",
+          "title": "Leyes sobre cripto: qué cambió hasta 2026",
+          "minutes": 4,
+          "goal": "Al terminar, conocerás las principales reglas nuevas para las cripto y cómo comprobar que un servicio opera legalmente.",
+          "cards": [
+            {
+              "title": "Ahora hay más reglas",
+              "text": "Hasta hace poco, las cripto casi no tenían leyes propias. Hasta 2026, los grandes países las aprobaron. El objetivo: que los servicios guarden con honestidad el dinero de los clientes, comprueben quién abre una cuenta y hablen claro de los riesgos. Pero cada país tiene sus propias reglas.",
+              "example": "En la vida real: cuando las carreteras se llenaron de coches, aparecieron el carné de conducir, los semáforos y la ITV.",
+              "art": "books"
+            },
+            {
+              "title": "Europa: las reglas MiCA",
+              "text": "En la UE rigen las reglas MiCA. El 1 de julio de 2026 terminó el periodo de transición: ahora solo las empresas con licencia de la UE pueden prestar servicios cripto a residentes de la UE. Puedes comprobar una empresa en el registro del regulador europeo ESMA. Los exchanges con licencia de la UE no venden stablecoins sin autorización, como USDT.",
+              "example": "Ejemplo: vives en España. Antes de abrir una cuenta, busca el exchange en el registro de ESMA. Si no está, es motivo para desconfiar.",
+              "art": "globe"
+            },
+            {
+              "title": "EE. UU.: la ley de stablecoins",
+              "text": "En julio de 2025, EE. UU. aprobó la ley GENIUS sobre stablecoins. Solo podrán emitirlas empresas verificadas, y la reserva debe estar 1:1 en dólares y bonos cortos del Tesoro de EE. UU. Informe sobre la reserva: cada mes. La ley entrará plenamente en vigor, a más tardar, en enero de 2027.",
+              "example": "En la vida real: un banco está obligado a tener reservas. Ahora quienes emiten stablecoins también deben tener reserva y mostrarla.",
+              "art": "bank"
+            },
+            {
+              "title": "Qué significa para ti",
+              "text": "Usa solo servicios permitidos en tu país. No te saltes las prohibiciones con una VPN: pierdes la protección de la ley y pueden cerrarte la cuenta. Las leyes no te protegen de una caída del precio: el riesgo de mercado sigue siendo tuyo. Por eso, en la UE y algunos países, CRYPTO NOVA no muestra enlaces al exchange.",
+              "example": "En la vida real: el seguro del coche no te salva del hielo en la carretera. Ayuda si la culpa es de otro, pero igual hay que conducir con cuidado.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "Hasta 2026, la UE y EE. UU. aprobaron leyes para las cripto.",
+            "En la UE, desde el 1 de julio de 2026, servicios cripto solo con licencia de la UE.",
+            "Las leyes protegen de servicios deshonestos, no de una caída del precio."
+          ],
+          "quiz": [
+            {
+              "q": "Vives en la UE. ¿Cómo compruebas que un exchange opera legalmente?",
+              "options": [
+                "Por lo bonita que es su web",
+                "Por las opiniones de un chat",
+                "Buscándolo en el registro de ESMA",
+                "Preguntando a un bot de mensajería"
+              ],
+              "answer": 2,
+              "why": "Desde el 1 de julio de 2026, en la UE solo prestan servicios cripto las empresas con licencia. Su lista está en el registro de ESMA."
+            },
+            {
+              "q": "¿Qué exige la ley estadounidense GENIUS?",
+              "options": [
+                "Que bitcoin cueste $1",
+                "Que una stablecoin tenga una reserva 1:1 en dólares y bonos cortos del Tesoro de EE. UU.",
+                "Que el Estado emita todas las monedas",
+                "Que los exchanges no cobren comisión"
+              ],
+              "answer": 1,
+              "why": "La ley de stablecoins exige una reserva completa e informes mensuales sobre ella."
+            },
+            {
+              "q": "¿Te protegen las nuevas leyes de una caída del precio de bitcoin?",
+              "options": [
+                "Sí, ahora el precio no puede caer",
+                "Sí, el Estado cubrirá las pérdidas",
+                "No: las leyes vigilan la honestidad de los servicios, pero el riesgo de mercado es tuyo",
+                "Solo en la UE"
+              ],
+              "answer": 2,
+              "why": "Las leyes exigen honestidad a los exchanges y a quienes emiten stablecoins. Pero el precio puede seguir cayendo."
             }
           ]
         }
@@ -4295,7 +4661,7 @@
             },
             {
               "title": "La tasa de interés: el precio del dinero",
-              "text": "El banco central de cada país fija la tasa de interés principal. De ella depende a qué interés prestan los bancos. La tasa es el precio del dinero. Tasa alta: el dinero es caro. Tasa baja: es barato. Al banco central de EE. UU. se le llama la Fed (Reserva Federal).",
+              "text": "El banco central de cada país fija la tasa de interés principal. De ella depende a qué interés prestan los bancos. La tasa es el precio del dinero. Tasa alta: el dinero es caro. Tasa baja: es barato. Al banco central de EE. UU. se le llama la Fed (Reserva Federal). Datos de octubre de 2026: en septiembre de 2026 la Fed subió su tasa al 3.75–4% anual, la primera subida desde 2023.",
               "example": "Ejemplo: un crédito de $10 000 al 5% anual cuesta $500 de intereses. Al 20%, ya $2 000. Cuando el crédito es caro, se pide menos.",
               "art": "bank"
             },
@@ -4868,6 +5234,78 @@
               ],
               "answer": 1,
               "why": "En periodos tranquilos bitcoin suele moverse un 2–4 % al día. Las monedas pequeñas, más."
+            }
+          ]
+        },
+        {
+          "id": "l4-yield",
+          "title": "Rendimiento en dólares: de dónde sale el interés y dónde está el riesgo",
+          "minutes": 5,
+          "goal": "Al terminar, entenderás de dónde sale el rendimiento de las stablecoins y por qué nunca llega sin riesgo.",
+          "cards": [
+            {
+              "title": "De dónde sale el interés",
+              "text": "Las stablecoins no solo se guardan: también se pueden prestar a través de servicios en blockchain, por ejemplo Aave. El interés lo pagan los prestatarios, casi siempre traders que necesitan dólares dejando sus monedas como garantía. Cuando muchos quieren pedir prestado, la tasa sube. Cuando pocos, baja a un par de puntos.",
+              "example": "Ejemplo: $1 000 al 5% anual dan unos $50 al año. Pero la tasa flota: al mes siguiente puede ser un 3% o un 8%.",
+              "art": "bank"
+            },
+            {
+              "title": "Otras fuentes",
+              "text": "También hay stablecoins de ahorro: la tasa la paga el propio servicio con sus ingresos, por ejemplo Sky. Y el «dólar con rendimiento» sUSDe de Ethena gana sobre todo con el funding, los pagos entre traders de futuros. Mientras los traders pagan mucho, el rendimiento es alto. Cuando el mercado cae, puede quedarse casi en cero.",
+              "example": "En la vida real: el banco paga intereses por los depósitos mientras él gana con los préstamos. Si a los prestatarios les va mal, los intereses también bajan.",
+              "art": "chain"
+            },
+            {
+              "title": "Dónde está el riesgo",
+              "text": "Un fallo en el código y los hackers pueden vaciar el dinero. Una stablecoin puede perder su paridad con $1. El servicio o el emisor pueden congelar monedas. No hay un seguro como el de un depósito bancario. Cuanto mayor es el rendimiento prometido, mayor es el riesgo oculto.",
+              "example": "En la vida real: un banco que paga un 20% anual cuando todos pagan un 5% es motivo para desconfiar, no para alegrarse.",
+              "art": "warning"
+            },
+            {
+              "title": "Cómo lo hace CRYPTO NOVA",
+              "text": "La cartera pública de CRYPTO NOVA tiene la fuente «Rendimiento en dólares»: préstamo de USDC y USDT a través de Aave y Sky. A octubre de 2026 es cerca del 15% de la cartera, y otro 5% aproximadamente está en sUSDe de Ethena. Es una demo con tasas reales. Las proporciones tienen un límite para que un problema en un servicio no golpee toda la cartera.",
+              "example": "En la vida real: los huevos se reparten en distintas cestas. Aunque se caiga una, las demás siguen enteras.",
+              "art": "scale"
+            }
+          ],
+          "remember": [
+            "El interés de las stablecoins lo pagan los prestatarios o el propio servicio: la tasa flota.",
+            "Riesgos: hackeos, pérdida de la paridad con $1, congelación. No hay seguro.",
+            "No existe un rendimiento alto sin riesgo."
+          ],
+          "quiz": [
+            {
+              "q": "¿Quién paga el interés cuando prestas USDC a través de un servicio?",
+              "options": [
+                "El Estado",
+                "Los prestatarios que necesitan dólares",
+                "CRYPTO NOVA",
+                "Nadie: el interés aparece solo"
+              ],
+              "answer": 1,
+              "why": "El interés lo pagan quienes piden prestado. Menos prestatarios, tasa más baja."
+            },
+            {
+              "q": "Un servicio promete un 25% anual en dólares sin riesgo. ¿Cómo lo tomas?",
+              "options": [
+                "Es una señal de peligro: no hay rendimiento alto sin riesgo",
+                "Es una tasa normal",
+                "Hay que meterlo todo antes de que se acabe la oferta",
+                "Son dólares, así que no hay riesgo"
+              ],
+              "answer": 0,
+              "why": "Cuanto mayor es el rendimiento prometido, mayor es el riesgo oculto. Las palabras «sin riesgo» son la señal principal de un engaño."
+            },
+            {
+              "q": "¿Por qué no conviene tener todos tus dólares en un solo servicio?",
+              "options": [
+                "Así la tasa es más alta",
+                "Los servicios lo prohíben",
+                "Si ahí hay un hackeo o una congelación, todo tu dinero se ve afectado",
+                "Es incómodo"
+              ],
+              "answer": 2,
+              "why": "Estos servicios no tienen seguro de depósitos. Repartir entre servicios limita el daño."
             }
           ]
         }

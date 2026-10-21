@@ -3094,9 +3094,9 @@
               "art": "key_lock"
             },
             {
-              "title": "Contacto de legado en el iPhone",
-              "text": "En el iPhone puedes añadir un Contacto de legado: Ajustes → tu nombre → Inicio de sesión y seguridad → Contacto de legado. Con la clave de acceso y el certificado de defunción, recibe tus fotos, notas, archivos y copias de seguridad de iCloud. No recibe las contraseñas del Llavero ni el dinero de los exchanges. Pero si tu plan está en Notas de iCloud, tu heredero lo encontrará.",
-              "example": "Ejemplo: guardas el plan en una nota de iCloud y nombraste a tu hijo Contacto de legado. Verá qué está dónde, pero sin contraseñas.",
+              "title": "Contacto para legado en el iPhone",
+              "text": "En el iPhone puedes añadir un Contacto para legado: Ajustes → tu nombre → Inicio de sesión y seguridad → Contacto para legado. Con la clave de acceso y el certificado de defunción, recibe tus fotos, notas, archivos y copias de seguridad de iCloud. No recibe las contraseñas del Llavero ni el dinero de los exchanges. Pero si tu plan está en Notas de iCloud, tu heredero lo encontrará.",
+              "example": "Ejemplo: guardas el plan en una nota de iCloud y nombraste a tu hijo Contacto para legado. Verá qué está dónde, pero sin contraseñas.",
               "art": "phone_app"
             },
             {
@@ -3128,14 +3128,14 @@
               "options": [
                 "Basta con la contraseña del correo",
                 "A través del soporte del exchange, con documentos de la defunción y del derecho a heredar",
-                "Mediante el Contacto de legado del iPhone",
+                "Mediante el Contacto para legado del iPhone",
                 "De ninguna forma, el dinero se pierde"
               ],
               "answer": 1,
               "why": "El exchange entrega las monedas a los herederos después de revisar los documentos. Cada exchange tiene su propio proceso."
             },
             {
-              "q": "¿Qué da un Contacto de legado en el iPhone?",
+              "q": "¿Qué da un Contacto para legado en el iPhone?",
               "options": [
                 "Acceso al dinero de un exchange",
                 "Las contraseñas del Llavero",
@@ -3143,7 +3143,7 @@
                 "Nada"
               ],
               "answer": 2,
-              "why": "El Contacto de legado recibe datos de iCloud, pero no contraseñas ni dinero en exchanges. Por eso un plan en Notas de iCloud es una pista útil para tu familia."
+              "why": "El Contacto para legado recibe datos de iCloud, pero no contraseñas ni dinero en exchanges. Por eso un plan en Notas de iCloud es una pista útil para tu familia."
             }
           ]
         },

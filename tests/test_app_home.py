@@ -219,3 +219,22 @@ def test_app_home_config_link(tmp_path):
     assert doc["config"]["exchange_ref"] == "https://bingx.com/invite/ABC123"
     _w(d, "app_config.json", {"exchange_ref": "javascript:alert(1)"})
     assert app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]["exchange_ref"] is None
+
+
+def test_spot_coins_explain_themselves_in_russian_only(tmp_path):
+    # 21.10 owner's app spec §8: «Почему этот актив в портфеле?» — numbers in every language, the engine's Russian
+    # explanations only in the Russian feed (other languages never show Russian text)
+    w = tmp_path
+    (w / "app_portfolio.json").write_text(json.dumps({"index": 103, "cash_pct": 10, "positions": [
+        {"symbol": "ZEC", "name": "Zcash", "weight": 0.08, "entry": 1150.0, "price": 1260.0, "kind_ru": "крупный альт", "horizon_ru": "1–3 месяца"}]}))
+    (w / "portfolio.json").write_text(json.dumps({"portfolios": {"ideas": {"positions": [
+        {"symbol": "ZEC", "reason": "План: ZEC 8% счёта.", "table_status_ru": "можно брать", "table_why_ru": "анкета 51",
+         "levels": {"stop": 920.7}, "reco": {"t": "Держать", "why": "стоп −20%"}}]}}}))
+    (w / "tokenomics.json").write_text(json.dumps({"tokens": {}, "unlocks_next": {"ZEC": {"date": "2026-11-02", "pct_circ": 1.5}}}))
+    (w / "coin_profiles.json").write_text(json.dumps({"coins": {"ZEC": {"what_ru": "Приватные платежи.", "risks_ru": "Регуляторы ЕС."}}}))
+    ru = app_home.run(None, str(w))
+    c = ru["spot"]["coins"][0]
+    assert c["sym"] == "ZEC" and c["weight"] == 8.0 and c["stop"] == 920.7 and abs(c["pct"] - 9.6) < 0.1
+    assert c["why_ru"].startswith("План") and "можно брать" in c["mark_ru"] and "2026-11-02" in c["unlock_ru"] and c["about_ru"]
+    en = json.loads((w / "app_home.en.json").read_text())["spot"]["coins"][0]
+    assert en["sym"] == "ZEC" and en["weight"] == 8.0 and not any(k.endswith("_ru") for k in en)

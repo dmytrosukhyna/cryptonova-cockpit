@@ -437,7 +437,48 @@ def _action_text(a: dict, lang: str) -> str | None:
     return t(lang, f"act.{act}" if act in ("BUY", "ADD", "TRIM", "SELL") else "act.other", sym=sym)
 
 
-def _spot(pf: dict, lang: str = DEFAULT) -> dict:
+def _money(x) -> str:
+    x = float(x or 0)
+    return f"${x / 1e9:.1f} млрд" if x >= 1e9 else f"${x / 1e6:.1f} млн" if x >= 1e6 else f"${x / 1e3:.0f} тыс." if x >= 1e3 else f"${x:.0f}"
+
+
+def _coins(pf: dict, ex: dict, lang: str) -> list[dict]:
+    """21.10 (owner's app spec §8 «Почему этот актив в портфеле?»): one entry per coin the portfolio holds — numbers in every
+    language; the system's own explanations (written in Russian by the engine) only in the Russian feed, so other languages
+    never show Russian text (the app falls back to its translated generic rule there)."""
+    ideas = {p.get("symbol"): p for p in ex.get("ideas") or []}
+    tok = ex.get("tok") or {}
+    tokens, unlocks, profs = tok.get("tokens") or {}, tok.get("unlocks_next") or {}, ex.get("profiles") or {}
+    out = []
+    for p in pf.get("positions") or []:
+        sym = p.get("symbol")
+        if not sym:
+            continue
+        q, prof = ideas.get(sym) or {}, profs.get(sym) or {}
+        entry, price = p.get("entry"), p.get("price")
+        c = {"sym": sym, "name": p.get("name"), "weight": _r(float(p.get("weight") or 0) * 100, 1),
+             "entry": entry and _r(entry, 6 if entry < 1 else 4 if entry < 100 else 2), "price": price,
+             "pct": _r((price / entry - 1) * 100, 1) if entry and price else None,
+             "stop": (q.get("levels") or {}).get("stop"), "image": p.get("image")}
+        if lang == DEFAULT:
+            reco = q.get("reco") or {}
+            mark = " — ".join(x for x in (q.get("table_status_ru"), q.get("table_why_ru")) if x)
+            hold = tokens.get(sym) or {}
+            tparts = [prof.get("tokenomics_ru")] if prof.get("tokenomics_ru") else []
+            if hold.get("holders_rev_30d_usd"):
+                tparts.append(f"Держатели получают от протокола {_money(hold['holders_rev_30d_usd'])} за 30 дней (по DefiLlama).")
+            un = unlocks.get(sym) or {}
+            unlock = (f"Ближайший разлок {un['date']}: {un.get('pct_circ')}% монет в обращении"
+                      + (f" (≈${un['usd_m']} млн)" if un.get("usd_m") else "") + ".") if un.get("date") else "Крупных разлоков в ближайшие 60 дней нет."
+            c.update({"kind_ru": p.get("kind_ru"), "horizon_ru": p.get("horizon_ru"), "why_ru": q.get("reason"), "mark_ru": mark or None,
+                      "reco_ru": (f"{reco.get('t')}: {reco.get('why')}" if reco.get("t") else None),
+                      "token_ru": " ".join(tparts) or None, "unlock_ru": unlock, "risk_ru": prof.get("risks_ru"),
+                      "about_ru": prof.get("what_ru"), "ahead_ru": prof.get("catalysts_ru")})
+        out.append(c)
+    return out
+
+
+def _spot(pf: dict, lang: str = DEFAULT, ex: dict | None = None) -> dict:
     hist = pf.get("history") or []
     idx = pf.get("index")
     usd = None if idx is None else (float(idx) - 100.0) * START / 100.0
@@ -469,7 +510,7 @@ def _spot(pf: dict, lang: str = DEFAULT) -> dict:
             "curve": [[h["t"], _r((float(h["v"]) - 100.0) * START / 100.0)] for h in _sample(hist) if h.get("v") is not None],
             "last_action": None if not last else {"t": last.get("time"), "text": _action_text(last, lang), "sym": last.get("symbol"),
                                                   "action": last.get("action")},
-            "started": pf.get("started")}
+            "started": pf.get("started"), "coins": _coins(pf, ex or {}, lang)}
 
 
 def _market(mk: dict) -> dict:
@@ -542,9 +583,9 @@ def _public_portfolio(out: str) -> dict | None:
             "regime": (c.get("regime") or {}).get("key")}
 
 
-def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT) -> dict:
+def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT, ex: dict | None = None) -> dict:
     """app_home in one language — the same numbers in every language, only the words differ"""
-    fut, spot = _futures(paper, now, lang), _spot(pf, lang)
+    fut, spot = _futures(paper, now, lang), _spot(pf, lang, ex)
     pub = _public_portfolio(out)
     total = pub["pnl_usd"] if pub else round((fut["usd"] or 0) + (spot["usd"] or 0), 2)
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
@@ -568,7 +609,9 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
     """web/app_home.json (ru) + web/app_home.<lang>.json for the other languages; returns the Russian one"""
     now = now or int(time.time() * 1000)
     paper, pf, mk = _load(out, "paper.json"), _load(out, "app_portfolio.json"), _load(out, "markets.json")
-    docs = {lang: build(paper, pf, mk, out, now, lang) for lang in LANGS}
+    ex = {"ideas": ((_load(out, "portfolio.json").get("portfolios") or {}).get("ideas") or {}).get("positions") or [],
+          "tok": _load(out, "tokenomics.json"), "profiles": _load(out, "coin_profiles.json").get("coins") or {}}
+    docs = {lang: build(paper, pf, mk, out, now, lang, ex) for lang in LANGS}
     for lang in [x for x in LANGS if x != DEFAULT] + [DEFAULT]:          # Russian last: its mtime says «all languages written»
         _write(out, file_name("app_home", lang), docs[lang])
     if int(now / 60000) % 60 == 0 or not os.path.exists(os.path.join(out, "app_btc.json")):

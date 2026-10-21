@@ -24,8 +24,9 @@ Safety:
   • real money only with CNQ_LIVE_TRADING=yes, given on the autopilot's own command line (scripts/okx_autopilot_mac.sh --live asks
     to type «ДА»), never in ~/.cryptonova.env (the Bybit futures mirror reads that file). Otherwise OKX demo trading (header
     x-simulated-trading: 1, needs a demo key).
-  • the host is found by itself: www.okx.com, then eea.okx.com, then my.okx.com (an OKX Europe key fails on www with 60032);
-    OKX_HOST forces one. On OKX Europe the plan trades in USDC (USDT is not tradeable in the EEA), else EUR.
+  • the host is found by itself: www.okx.com first (the owner's account is the global one: USDT pairs, spot fees 0.08 % maker /
+    0.10 % taker), then eea.okx.com and my.okx.com as a fallback (an OKX Europe key fails on www with 60032); OKX_HOST forces one.
+    The quote is USDT on the global account; only an OKX Europe account would trade in USDC / EUR.
   • every order is a limit IOC at most OKX_SLIP (0.4 %) worse than the best price — never a blind market order;
     one order ≤ OKX_MAX_ORDER_USD ($3 000; bigger ones are split), all orders in a day ≤ OKX_MAX_DAY_USD ($25 000).
   • kill switch: the file ~/.cryptonova_okx_stop (made by --stop) is checked before every order.
@@ -693,8 +694,9 @@ def check(env=None, opener=None) -> list[str]:
             cfg = cl.config()
             perm, ip = perm_of(cfg), str(cfg.get("ip") or "").strip()
             mode = ("РЕАЛЬНЫЕ ДЕНЬГИ" if live(env) else "демо (без ордеров на реальном счёте)")
-            out.append(f"Автопилот OKX: ключ OKX_API_KEY работает · сервер {cl.host.replace('https://', '')}"
-                       f"{' (OKX Europe)' if is_eea(cl) else ''} · это ключ {'ДЕМО-торговли' if cl.demo else 'РЕАЛЬНОГО счёта'} · режим окна: {mode}")
+            out.append(f"Автопилот OKX: ключ OKX_API_KEY работает · сервер {cl.host.replace('https://', '')} · "
+                       f"{'OKX Europe (ЕЭЗ)' if is_eea(cl) else 'глобальный счёт OKX'} · это ключ {'ДЕМО-торговли' if cl.demo else 'РЕАЛЬНОГО счёта'}"
+                       f" · режим окна: {mode}")
             bad = world_ok(cl, env)
             if bad:
                 out.append("  " + bad)

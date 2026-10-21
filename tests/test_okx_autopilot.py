@@ -33,8 +33,9 @@ class FakeOkx:
     """One OKX Europe account: the key works on eea.okx.com only (www answers 60032 like a real EEA key there); spot pairs are
     -USDC and -EUR, no -USDT. Orders fill fully at the limit price. Records every call."""
 
-    def __init__(self, perm="read_only,trade", demo_key=False, balances=None, funding=None, fill=1.0):
+    def __init__(self, perm="read_only,trade", demo_key=False, balances=None, funding=None, fill=1.0, host=EEA, quote="USDC"):
         self.perm, self.demo_key, self.fill, self.calls, self.orders, self.cancels = perm, demo_key, fill, [], [], []
+        self.host, self.quote = host, quote
         self.bal = balances or {"BTC": 0.01, "ETH": 1.0, "DOGE": 1000.0, "USDC": 5800.0}
         self.funding = funding or {"SOL": 2.0}
         self.pend = []
@@ -44,7 +45,7 @@ class FakeOkx:
         host, path, q = f"{u.scheme}://{u.netloc}", u.path, dict(urllib.parse.parse_qsl(u.query))
         self.calls.append((method, host, path, q, body, dict(headers)))
         signed = "OK-ACCESS-KEY" in headers
-        if signed and host != EEA:
+        if signed and host != self.host:
             return {"code": "60032", "msg": "API key is not valid for this domain", "data": []}
         if signed and (headers.get("x-simulated-trading") == "1") != self.demo_key:
             return {"code": "50101", "msg": "APIKey does not match current environment", "data": []}
@@ -59,12 +60,12 @@ class FakeOkx:
         if path == "/api/v5/account/config":
             return {"code": "0", "data": [{"perm": self.perm, "ip": "203.0.113.7"}]}
         if path == "/api/v5/market/tickers":
-            return {"code": "0", "data": [{"instId": f"{c}-USDC", "last": str(p), "open24h": str(p)} for c, p in PX.items()]
+            return {"code": "0", "data": [{"instId": f"{c}-{self.quote}", "last": str(p), "open24h": str(p)} for c, p in PX.items()]
                     + [{"instId": "USDC-EUR", "last": "0.9", "open24h": "0.9"}]}
         if path == "/api/v5/public/instruments":
             inst = q.get("instId", "")
             base, quote = inst.split("-")
-            if quote != "USDC" or base not in PX:
+            if quote != self.quote or base not in PX:
                 return {"code": "0", "data": []}
             tick = "0.01" if PX[base] >= 1000 else "0.001" if PX[base] >= 1 else "0.00001"
             return {"code": "0", "data": [{"instId": inst, "state": "live", "lotSz": "0.0001", "minSz": "0.0001", "tickSz": tick}]}
@@ -254,3 +255,19 @@ def test_card_prices_eea_pairs_and_shows_the_autopilot_state():
     st = ap.status(e)
     assert st["configured"] and not st["armed"] and st["mode"] == "демо-торговля OKX"
     assert ap.status({"OKX_AUTOPILOT_STATE": os.path.join(tmp, "x")}) is None
+
+
+def test_autopilot_global_account_uses_www_usdt_and_global_fee():
+    """The owner's real case (22.10): the Ukrainian / global OKX account — www.okx.com, USDT pairs, 0.10 % taker."""
+    tmp = tempfile.mkdtemp()
+    fk = FakeOkx(host="https://www.okx.com", quote="USDT", balances={"BTC": 0.01, "ETH": 1.0, "DOGE": 1000.0, "USDT": 5800.0})
+    e = env(tmp, CNQ_LIVE_TRADING="yes")
+    cl = ap.connect(e, fk, {}, nosleep)
+    assert cl.host == "https://www.okx.com" and not ap.is_eea(cl)
+    assert {c[1] for c in fk.calls} == {"https://www.okx.com"}                # the first host works: nothing else is tried
+    assert ap.pick_quote(cl, e) == "USDT" and ap.taker_fee(cl, e) == 0.001
+    b = ap.build(cl, e, MODEL)
+    assert all(o["inst"].endswith("-USDT") for o in b["sells"] + b["buys"]) and not b["eea"]
+    text = "\n".join(ap.check(e, FakeOkx(host="https://www.okx.com", quote="USDT")))
+    assert "www.okx.com · глобальный счёт OKX" in text and "валюта торговли: USDT" in text and "комиссия 0,1%" in text
+    assert "OKX Europe" not in text

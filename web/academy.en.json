@@ -34,7 +34,7 @@
               "art": "phone_app"
             },
             {
-              "title": "It's all free",
+              "title": "No subscriptions",
               "text": "CRYPTO NOVA 2.0 is free: no subscriptions and no paid features. To get started, there's a demo account — a practice account with virtual money. The prices are real, but the money isn't. You can watch, try things out and make mistakes with no risk.",
               "example": "In real life: at driving school, you start on a simulator. The wheel and the road feel real, but a mistake costs nothing.",
               "art": "coins"
@@ -216,7 +216,7 @@
             },
             {
               "title": "A button and two tiles",
-              "text": "Below that is the “Connect a real account” button. Under it are 2 bright tiles. “How CRYPTO NOVA works” is a 1-minute guide to the system, demo and real accounts. “Piggy bank” is for saving in bitcoin from $5 a week, for free. If you're new, these two tiles are the best place to start.",
+              "text": "Below that is the “Connect a real account” button. Under it are 2 bright tiles. “How CRYPTO NOVA works” is a 1-minute guide to the system, demo and real accounts. “Piggy bank” is for saving in bitcoin from $5 a week. If you're new, these two tiles are the best place to start.",
               "example": "In real life: at a museum entrance, you join a short tour. In a minute you know what's where, and after that it's easy to find your way.",
               "art": "piggy",
               "screen": "Main",
@@ -234,7 +234,7 @@
                 {
                   "n": 3,
                   "target": "piggy",
-                  "text": "Piggy bank: free, from $5 a week"
+                  "text": "Piggy bank: from $5 a week"
                 }
               ]
             },
@@ -584,7 +584,7 @@
             },
             {
               "title": "Piggy bank: what for and how much",
-              "text": "The Piggy bank is a free way to save in bitcoin, a little at a time. Step 1: what you're saving for — “Retirement”, “Kids' education” or “Dream” — and for how long. Step 2: the amount — $5, $10, $25 or $50, weekly or monthly. The app instantly shows how much you'll put aside.",
+              "text": "The Piggy bank is a way to save in bitcoin, a little at a time. Step 1: what you're saving for — “Retirement”, “Kids' education” or “Dream” — and for how long. Step 2: the amount — $5, $10, $25 or $50, weekly or monthly. The app instantly shows how much you'll put aside.",
               "example": "Example: $10 a week. In a year, that's $10 × 52 = $520 of your own contributions. In 10 years, $5,200.",
               "art": "piggy",
               "screen": "Piggy",
@@ -647,7 +647,7 @@
           ],
           "remember": [
             "Spot means coins with no debt: bitcoin, ether, other major coins and a dollar reserve.",
-            "Piggy bank: a goal, an amount from $5, weekly or monthly. Free.",
+            "Piggy bank: a goal, an amount from $5, weekly or monthly.",
             "New here? Pick “Steady”: bitcoin only, no leverage."
           ],
           "quiz": [
@@ -694,7 +694,7 @@
           "cards": [
             {
               "title": "Demo: practice with no risk",
-              "text": "Demo means practice accounts with virtual money. The system has 2 demo accounts of $10,000 each: one for futures and one for spot. The prices are real, and you see every trade, winners and losers alike. On Home, you can also create your own demo account with any amount. It's all free.",
+              "text": "Demo means practice accounts with virtual money. The system has 2 demo accounts of $10,000 each: one for futures and one for spot. The prices are real, and you see every trade, winners and losers alike. On Home, you can also create your own demo account with any amount.",
               "example": "In real life: a friendly match before the championship. The teams play for real, but the points don't count in the table.",
               "art": "phone_app",
               "screen": "Main",
@@ -803,7 +803,7 @@
             }
           ],
           "remember": [
-            "Demo is free: virtual money, real prices, and every trade in plain sight.",
+            "Demo: virtual money, real prices, and every trade in plain sight.",
             "A real account is your own BingX account: the money stays with you, and we don't hold it.",
             "CRYPTO NOVA gets a reward from the exchange. Your terms stay the same."
           ],
@@ -1390,7 +1390,7 @@
             },
             {
               "title": "Practice first",
-              "text": "Before spending real money, you can practice. CRYPTO NOVA has a free demo account: virtual money and real prices. Mistakes there cost nothing. And the Piggy bank will show you how regular purchases work.",
+              "text": "Before spending real money, you can practice. CRYPTO NOVA has a demo account: virtual money and real prices. Mistakes there cost nothing. And the Piggy bank will show you how regular purchases work.",
               "example": "In real life: before driving in the city, you learn on the driving school's practice lot.",
               "art": "seatbelt"
             }
@@ -2048,7 +2048,7 @@
             {
               "title": "How the Piggy bank works",
               "text": "You choose an amount and how often to buy. For example, $10 every week. And you buy on that day, whatever the price. No news, no worry. This is called averaging: you end up paying an average price — not the lowest, but not the highest either.",
-              "example": "That's how the “Piggy bank” works in CRYPTO NOVA: from $5 to $50, weekly or monthly. It's free and reminds you on buy day.",
+              "example": "That's how the “Piggy bank” works in CRYPTO NOVA: from $5 to $50, weekly or monthly. It reminds you on buy day.",
               "art": "piggy"
             },
             {

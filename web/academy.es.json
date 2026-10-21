@@ -34,7 +34,7 @@
               "art": "phone_app"
             },
             {
-              "title": "Todo es gratis",
+              "title": "Sin suscripciones",
               "text": "CRYPTO NOVA 2.0 es gratis: no hay suscripciones ni funciones de pago. Para empezar tienes una cuenta demo, una cuenta de práctica con dinero virtual. Los precios son reales, pero el dinero no. Puedes mirar, probar y equivocarte sin riesgo.",
               "example": "En la vida real: en la autoescuela primero se practica en un simulador. El volante y la carretera parecen reales, pero un error no cuesta nada.",
               "art": "coins"
@@ -216,7 +216,7 @@
             },
             {
               "title": "Un botón y dos recuadros",
-              "text": "Más abajo está el botón «Conectar cuenta real». Debajo hay 2 recuadros de colores. «Cómo funciona CRYPTO NOVA»: una guía de 1 minuto sobre el sistema, la demo y la cuenta real. «Hucha»: ahorro en bitcoin desde $5 a la semana, gratis. Si empiezas, lo mejor es comenzar por estos dos recuadros.",
+              "text": "Más abajo está el botón «Conectar cuenta real». Debajo hay 2 recuadros de colores. «Cómo funciona CRYPTO NOVA»: una guía de 1 minuto sobre el sistema, la demo y la cuenta real. «Hucha»: ahorro en bitcoin desde $5 a la semana. Si empiezas, lo mejor es comenzar por estos dos recuadros.",
               "example": "En la vida real: a la entrada de un museo haces una visita guiada corta. En un minuto entiendes dónde está cada cosa, y luego recorrerlo es fácil.",
               "art": "piggy",
               "screen": "Main",
@@ -234,7 +234,7 @@
                 {
                   "n": 3,
                   "target": "piggy",
-                  "text": "Hucha: gratis, desde $5 a la semana"
+                  "text": "Hucha: desde $5 a la semana"
                 }
               ]
             },
@@ -584,7 +584,7 @@
             },
             {
               "title": "Hucha: para qué y cuánto",
-              "text": "La hucha es un ahorro gratis en bitcoin, poco a poco. Paso 1: para qué ahorras («Jubilación», «Educación» o «Un sueño») y durante cuánto tiempo. Paso 2: la cantidad, $5, $10, $25 o $50, cada semana o cada mes. La app te muestra enseguida cuánto habrás apartado.",
+              "text": "La hucha es un ahorro en bitcoin, poco a poco. Paso 1: para qué ahorras («Jubilación», «Educación» o «Un sueño») y durante cuánto tiempo. Paso 2: la cantidad, $5, $10, $25 o $50, cada semana o cada mes. La app te muestra enseguida cuánto habrás apartado.",
               "example": "Ejemplo: $10 a la semana. En un año son $10 × 52 = $520 de tus aportes. En 10 años, $5 200.",
               "art": "piggy",
               "screen": "Piggy",
@@ -647,7 +647,7 @@
           ],
           "remember": [
             "Spot: monedas sin deuda. Bitcoin, ether, otras grandes y una reserva en dólares.",
-            "Hucha: una meta y una cantidad desde $5, cada semana o cada mes. Gratis.",
+            "Hucha: una meta y una cantidad desde $5, cada semana o cada mes.",
             "Si empiezas: «Constante», solo bitcoin y sin apalancamiento."
           ],
           "quiz": [
@@ -694,7 +694,7 @@
           "cards": [
             {
               "title": "Demo: entrenar sin riesgo",
-              "text": "La demo son cuentas de práctica con dinero virtual. El sistema tiene 2 cuentas demo de $10 000: una en futuros y otra en spot. Los precios son reales, y se ve cada operación, con ganancia o con pérdida. Y en Inicio puedes crear tu propia cuenta demo con cualquier cantidad. Todo es gratis.",
+              "text": "La demo son cuentas de práctica con dinero virtual. El sistema tiene 2 cuentas demo de $10 000: una en futuros y otra en spot. Los precios son reales, y se ve cada operación, con ganancia o con pérdida. Y en Inicio puedes crear tu propia cuenta demo con cualquier cantidad.",
               "example": "En la vida real: un partido amistoso antes del campeonato. Se juega en serio, pero los puntos no cuentan para la tabla.",
               "art": "phone_app",
               "screen": "Main",
@@ -803,7 +803,7 @@
             }
           ],
           "remember": [
-            "Demo gratis: dinero virtual, precios reales y todas las operaciones a la vista.",
+            "Demo: dinero virtual, precios reales y todas las operaciones a la vista.",
             "Cuenta real: tu cuenta en BingX. El dinero es tuyo; nosotros no lo guardamos.",
             "CRYPTO NOVA recibe una recompensa del exchange. Para ti, las condiciones son las mismas."
           ],
@@ -1390,7 +1390,7 @@
             },
             {
               "title": "Primero, practica",
-              "text": "Antes de gastar dinero real, puedes practicar. CRYPTO NOVA tiene una cuenta demo gratis: dinero virtual y precios reales. Ahí los errores no cuestan nada. Y la hucha te muestra cómo funcionan las compras regulares.",
+              "text": "Antes de gastar dinero real, puedes practicar. CRYPTO NOVA tiene una cuenta demo: dinero virtual y precios reales. Ahí los errores no cuestan nada. Y la hucha te muestra cómo funcionan las compras regulares.",
               "example": "En la vida real: antes de salir a la ciudad, se aprende a conducir en la pista de la autoescuela.",
               "art": "seatbelt"
             }
@@ -2048,7 +2048,7 @@
             {
               "title": "Cómo funciona la hucha",
               "text": "Eliges una cantidad y cada cuánto comprar. Por ejemplo, $10 cada semana. Y compras ese día, esté como esté el precio. Sin noticias ni nervios. A esto se le llama promediar: el precio de compra sale en un punto medio, ni el más bajo ni el más alto.",
-              "example": "En CRYPTO NOVA así funciona la «Hucha»: de $5 a $50, cada semana o cada mes. Es gratis y te avisa el día de compra.",
+              "example": "En CRYPTO NOVA así funciona la «Hucha»: de $5 a $50, cada semana o cada mes. Te avisa el día de compra.",
               "art": "piggy"
             },
             {

@@ -1,1 +1,1 @@
-{"asof": 1792544354679, "mode": "BYBIT-DEMO", "equity": 10228.0, "start_equity": 9989.68, "positions": [{"symbol": "ADA", "side": "LONG", "size": 1523.0, "entry": 0.2177, "upnl": 10.81, "stop": 0.1924}]}
+{"asof": 1792544660027, "mode": "BYBIT-DEMO", "equity": 10227.63, "start_equity": 9989.68, "positions": [{"symbol": "ADA", "side": "LONG", "size": 1523.0, "entry": 0.2177, "upnl": 9.9, "stop": 0.1924}]}

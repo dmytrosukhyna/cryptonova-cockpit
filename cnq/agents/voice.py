@@ -51,6 +51,37 @@ def result(x: float) -> str:
     return "в нуле" if abs(x) < 5 else (f"в плюсе на {usd(x)}" if x > 0 else f"в минусе на {usd(x)}")
 
 
+def nova_result(paper: dict, out: str = "web") -> tuple[float | None, str]:
+    """CRYPTO NOVA futures as the panel shows it (novaRes): the desks of the mix averaged into one $10 000 account, each desk counted since its own
+    start (equity + open P&L − start), dated by the FIRST desk's start. Returns (result in $, «dd.mm»)."""
+    pr = paper.get("profiles") or {}
+    try:
+        from .capital import own_gate
+        keys = ("bal", "imp", "own") if own_gate(out)[0] else ("bal", "imp")
+    except Exception:  # noqa: BLE001
+        keys = ("bal", "imp")
+    res, base, first = 0.0, 0.0, None
+    for k in keys:
+        d = pr.get(k) or {}
+        if d.get("equity") is None:
+            continue
+        st = float(d.get("start_equity") or 10_000)
+        res += float(d["equity"]) + sum(o.get("open_pnl_usd") or 0 for o in d.get("open") or []) - st
+        base += st
+        h = d.get("equity_history") or []
+        if h and h[0].get("time") and (first is None or h[0]["time"] < first):
+            first = h[0]["time"]
+    if not base:
+        return None, ""
+    since = (dt.datetime.utcfromtimestamp(first / 1000) + dt.timedelta(hours=3)).strftime("%d.%m") if first else ""
+    return res / base * 10_000, since
+
+
+def spoken(text: str) -> str:
+    """What the neural voice reads: the Latin brand is read badly («Новa» / letters), so it gets the Cyrillic name with the stress mark."""
+    return text.replace("CRYPTO NOVA", "Крипто Но́ва")
+
+
 def compose(out: str = "web") -> str:
     """Executive report in plain words: what we closed, where we stand, how many trades are open, market direction."""
     hour = (dt.datetime.utcnow() + dt.timedelta(hours=3)).hour
@@ -72,18 +103,12 @@ def compose(out: str = "web") -> str:
             parts.append(f"в работе {deals(n)}, {'она' if n == 1 else 'они'} сейчас {result(upnl)}")
         else:
             parts.append("открытых сделок нет — автопилот ждёт свой сигнал")
-        eq = prof.get("equity")
-        if eq:
-            fut_res = eq + sum(o.get("open_pnl_usd") or 0 for o in opened) - 10_000
-            # 18.10: our futures result = CRYPTO NOVA = the desks in the mix (CNPTS «Сбалансированная» + «Импульс BTC»); 19.10: the app
-            # signals' «умный разворот» left the mix (no edge on 3 037 golden signals over 10 months — scripts/golden_history.py)
-            from .capital import own_gate
-            for k in (("imp", "own") if own_gate(out)[0] else ("imp",)):      # own signals join after their live gate
-                d = (paper.get("profiles") or {}).get(k) or {}
-                if d.get("equity") is not None:
-                    fut_res += d["equity"] + sum(o.get("open_pnl_usd") or 0 for o in d.get("open") or []) - 10_000
-        L.append("По фьючерсам, CRYPTO NOVA: " + "; ".join(parts) + "."
-                 + (f" Итог {result(fut_res)}." if fut_res is not None else ""))
+        # 18.10: our futures result = CRYPTO NOVA = the desks in the mix (CNPTS «Сбалансированная» + «Импульс BTC»); own signals join after
+        # their live gate. 21.10: the panel shows the mix as ONE $10 000 account — the AVERAGE of its desks (novaRes) — and the brief must say
+        # the same number, or the panel refuses the neural audio and falls back to the robotic browser voice (owner: «голос робота снова»)
+        fut_res, since = nova_result(paper, out)
+        L.append("По фьючерсам, CRYPTO NOVA — отобранные сигналы" + (f": с {since} {result(fut_res)}; " if fut_res is not None else ": ")
+                 + "; ".join(parts) + ".")
     spot_res = None
     pf = _load(out, "portfolio.json") or {}
     # 18.10 (owner): the header and the brief show OUR strategies (CNPTS «Сбалансированная» + the AI portfolio), not the leader
@@ -105,15 +130,11 @@ def compose(out: str = "web") -> str:
         w = ((_load(out, f"{k}.json") or {}).get("week") or {}).get("virtual_pnl_usd")
         if w is not None:
             extra[k] = float(w)
-    cap = _load(out, "capital.json") or {}
-    if cap.get("value_usd") is not None:
-        # 18.10 (owner): the main screen is «CRYPTO NOVA Портфолио» — $10 000 as if real, split by the system
-        tot = float(cap["pnl_usd"])
-        L.append(f"Портфолио CRYPTO NOVA — {usd(cap['value_usd'])}: за всё время {result(tot)}.")
-    elif fut_res is not None and spot_res is not None:
-        tot = fut_res + spot_res + sum(extra.values())
-        L.append(f"Заработано всего — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}"
-                 + (", вместе с фандингом и арбитражем." if extra else "."))
+    # 19.10 (owner: «всё простым языком»): «Заработано всего» = futures + spot, exactly the two accounts of the panel's «Доход онлайн»;
+    # funding, arbitrage and triangle are on probation (tab «Заработок») and are not in the total — so they are not in the keys either
+    if fut_res is not None and spot_res is not None:
+        tot = fut_res + spot_res
+        L.append(f"Заработано всего — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}.")
     else:
         tot = None
     markets = _load(out, "markets.json") or {}
@@ -130,11 +151,11 @@ def compose(out: str = "web") -> str:
     if imp:
         L.append("Из новостей стоит отметить: " + re.sub(r"\.$", "", imp.get("title") or imp["reasoning"]) + ".")
     L.append("Если понадоблюсь — на связи.")
-    compose.keys = {"fut": "cryptonova", "spot": sp_key, "fut_open": len(prof.get("open") or []) if prof else None,
-                    "total": round(tot) if tot is not None else None, "mode": "portfolio" if cap.get("value_usd") is not None else "desks",
-                    "parts": {"fut": round(fut_res) if fut_res is not None else None, "spot": round(spot_res) if spot_res is not None else None,
-                              **{k: round(v, 2) for k, v in extra.items()}},
-                    "btc": btc.get("price") if btc else None}
+    # the same shape as the panel's briefKeys(): fut 'nova', spot 'ideas', open trades of «Сбалансированная», total = futures + spot
+    compose.keys = {"fut": "nova" if fut_res is not None else "bal", "spot": sp_key, "fut_open": len(prof.get("open") or []) if prof else None,
+                    "total": round(tot) if tot is not None else None, "mode": "desks",
+                    "parts": {"fut": round(fut_res) if fut_res is not None else None, "spot": round(spot_res) if spot_res is not None else None},
+                    "btc": btc.get("price") if btc else None, "probation": {k: round(v, 2) for k, v in extra.items()}}
     return " ".join(L)
 
 
@@ -153,7 +174,7 @@ def run(out: str = "web") -> dict:
             for attempt in range(3):
                 try:
                     async def synth(v=voice):
-                        c = edge_tts.Communicate(text, v, rate="-4%")
+                        c = edge_tts.Communicate(spoken(text), v, rate="+0%")   # 21.10: normal speed (was −4%, «еле-еле говорящая»)
                         await c.save(path)
                     asyncio.run(synth())
                     if os.path.getsize(path) > 2000:
@@ -169,7 +190,7 @@ def run(out: str = "web") -> dict:
     if not res["audio"]:
         try:
             from gtts import gTTS
-            gTTS(text, lang="ru").save(path)
+            gTTS(spoken(text), lang="ru").save(path)
             res["audio"], res["voice"] = "brief.mp3", "google-ru"
         except Exception as e:  # noqa: BLE001
             errs.append("gtts: " + str(e)[:80])

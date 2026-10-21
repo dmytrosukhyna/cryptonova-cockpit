@@ -16,6 +16,7 @@ With the Firebase ID token («Authorization: Bearer …»):
                      an answer in that language, see Api._agent
   POST /v2/vip/check BingX UID → invited by our link and deposited → VIP
   DELETE /v2/me      delete the account: every row on our server + the Firebase login (Apple 5.1.1(v))
+The owner's admin panel (web/admin.html), its own token CNQ_ADMIN_TOKEN, not Firebase: /v2/admin/* — see cnq/api/console.py.
 Demo only until 2.1; nothing here places orders or holds money."""
 from __future__ import annotations
 
@@ -33,7 +34,7 @@ from urllib.parse import parse_qs, urlsplit
 from cnq.agents.i18n import DEFAULT, file_name, norm_lang
 from cnq.agents.llm import LLM, PROVIDERS
 
-from . import bingx, nova
+from . import bingx, console as admin_console, nova
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -69,9 +70,10 @@ def _day() -> str:
 
 class Api:
     def __init__(self, store: Store, verifier: FirebaseVerifier, web_dir: str, llm=None, bingx_fetch=None, admin=None,
-                 knowledge: nova.Knowledge | None = None):
+                 knowledge: nova.Knowledge | None = None, console: admin_console.Console | None = None):
         self.store, self.verifier, self.web, self.llm, self.bingx_fetch = store, verifier, web_dir, llm, bingx_fetch
-        self.admin = admin
+        self.admin = admin                       # Firebase Admin (deletes the login with the account)
+        self.console = console or admin_console.Console(store, web_dir)   # the owner's admin panel, /v2/admin/*
         self.nova = knowledge or nova.Knowledge()
         self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
 
@@ -225,6 +227,8 @@ class Api:
                 return 404, {"error": "unknown_feed"}
             d = self._feed(m.group(1), lang)
             return (200, d) if d is not None else (503, {"error": "feed_unavailable"})
+        if path == "/v2/admin" or path.startswith("/v2/admin/"):          # the owner's admin panel: its own token, not Firebase
+            return self.console.handle(method, path, url.query, headers, body)
         # ------------------------------------------------------------ signed-in user
         try:
             who = self._uid(headers)
@@ -370,14 +374,35 @@ def make_handler(api: Api):
                     code, doc = 200, {"error": "busy", "answer": nova.busy(_body_lang(body))}
             self._send(code, doc)
 
+        def _is_admin(self) -> bool:
+            p = self.path.split("?", 1)[0].rstrip("/")
+            return p == "/v2/admin" or p.startswith("/v2/admin/")
+
+        def _cors(self) -> None:          # the admin page lives on cryptonova.vip and calls this API from the owner's browser
+            self.send_header("Access-Control-Allow-Origin", admin_console.origin())
+            self.send_header("Vary", "Origin")
+
         def _send(self, code: int, doc: dict) -> None:
             raw = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode()
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(raw)))
             self.send_header("Cache-Control", "no-store" if code != 200 or "/v2/feed" not in self.path else "public, max-age=30")
+            if self._is_admin():
+                self._cors()
             self.end_headers()
             self.wfile.write(raw)
+
+        def do_OPTIONS(self):  # noqa: N802 — CORS preflight, only for the admin panel
+            if not self._is_admin():
+                return self._send(404, {"error": "not_found"})
+            self.send_response(204)
+            self._cors()
+            self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Max-Age", "600")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
 
         def do_GET(self):  # noqa: N802
             self._go("GET")

@@ -1,4 +1,5 @@
-"""SQLite state of the 2.0 app: users (Firebase uid), piggy bank settings, notification prefs, AI-agent usage, VIP checks.
+"""SQLite state of the 2.0 app: users (Firebase uid), piggy bank settings, notification prefs, AI-agent usage, VIP checks; the
+owner's admin console (cnq/api/console.py): CRM notes and tags per user, an audit log of admin actions, the growth plan.
 One file on the server (data/api.sqlite, never in git). Nothing secret is stored in clear text here: exchange keys (2.1) go
 through cnq.api.vault (encrypted with a server key from /etc/cnq.env)."""
 from __future__ import annotations
@@ -17,6 +18,10 @@ CREATE TABLE IF NOT EXISTS push(uid TEXT, token TEXT, platform TEXT, updated INT
 CREATE TABLE IF NOT EXISTS usage(uid TEXT, day TEXT, n INTEGER, PRIMARY KEY(uid, day));
 CREATE TABLE IF NOT EXISTS vip_checks(uid TEXT, bingx_uid TEXT, t INTEGER, ok INTEGER, detail TEXT);
 CREATE TABLE IF NOT EXISTS progress(uid TEXT PRIMARY KEY, data TEXT, updated INTEGER);
+CREATE TABLE IF NOT EXISTS crm(uid TEXT, t INTEGER, note TEXT, tags TEXT);
+CREATE INDEX IF NOT EXISTS crm_uid ON crm(uid, t);
+CREATE TABLE IF NOT EXISTS admin_log(t INTEGER, action TEXT, detail TEXT);
+CREATE TABLE IF NOT EXISTS admin_kv(k TEXT PRIMARY KEY, v TEXT, t INTEGER);
 """
 
 DEFAULT_PREFS = {"trades": True, "news": True, "piggy": False, "brief": True}
@@ -113,7 +118,7 @@ class Store:
     def delete_user(self, uid: str) -> int:
         """Account deletion from the app: every row of this user goes, nothing is kept (GDPR erasure, Apple 5.1.1(v))."""
         n = 0
-        for table in ("users", "prefs", "piggy", "push", "usage", "vip_checks", "progress"):
+        for table in ("users", "prefs", "piggy", "push", "usage", "vip_checks", "progress", "crm"):
             with self.lock:
                 n += self.conn.execute(f"DELETE FROM {table} WHERE uid=?", (uid,)).rowcount
                 self.conn.commit()

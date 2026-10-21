@@ -61,8 +61,9 @@
     g.fillStyle = b; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
   }
 
+  var TEMPO = 1.35;   // owner 21.10 18:11: «чуть-чуть ускорить» — every motion a third faster
   function draw(g, cx0, cy0, half, t, opt) {
-    opt = opt || {};
+    opt = opt || {}; t = t * TEMPO;
     var busy = !!opt.busy, k = 1, small = half < 22, glow = busy ? 1.35 : 1, rot = t * 0.07, RO = 43, RS = 17;
     g.save(); g.translate(cx0, cy0); g.scale(half / 50, half / 50);
     // bloom

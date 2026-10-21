@@ -41,7 +41,7 @@ def test_connect_deep_link_explains_terms_and_tells_the_owner_once():
     mb = botmail.Mailbox(conn)
     mb.poll("t")
     reply = [d for m, d in calls if m == "sendMessage"][0]["text"]
-    assert "CRYPTO NOVA (отобранные сигналы)" in reply and "бесплатно" in reply and "пошаговая инструкция" in reply.lower()
+    assert "CRYPTO NOVA (отобранные сигналы)" in reply and "бесплатно" not in reply and "пошаговая инструкция" in reply.lower()
     assert "10%" not in reply and "ключ" not in reply.lower()       # 21.10 owner: referral only — no fee, no API keys
     calls.clear()
     assert mb.notify_leads("t", 555) == 1 and mb.notify_leads("t", 555) == 0

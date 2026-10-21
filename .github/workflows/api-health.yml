@@ -2,6 +2,7 @@ name: api-health
 # 19.10.2026: one click (or `gh workflow run api-health.yml`) → is the 2.0 API up, is the home feed fresh, and which keys the
 # server has (only yes/no: AI agent, Firebase admin for pushes + account deletion, BingX partner for the VIP check), how the
 # last NOVA question went (agent_last) and the public NOVA feed (greeting, starter questions, topics).
+# 21.10: /v2/agent/selftest — one real NOVA answer end to end (result, time, the first words).
 # 20.10: the languages — /v2/home?lang=en (the English home: lang, a few of its texts) and /v2/feed/nova?lang=el (the Greek intro).
 on:
   workflow_dispatch:
@@ -20,6 +21,9 @@ jobs:
           body=$(curl -sS -m 20 https://app.crypto-capital.app/v2/health || echo '{"ok":false,"error":"unreachable"}')
           echo "$body"
           echo "::notice title=health::$body"
+          # 21.10: a real NOVA call through the server (same prompt and model as the app; one real call per 10 min, else cached)
+          st=$(curl -sS -m 40 -w '\n%{http_code} %{time_total}s' https://app.crypto-capital.app/v2/agent/selftest || printf '{}\n000')
+          echo "::notice title=nova selftest::$(echo "$st" | tail -n 1) · $(echo "$st" | sed '$d' | jq -c '{result, ms, cached, age_sec, model, finish, error, answer_head}' 2>/dev/null || echo "$st" | head -c 300)"
           diag=$(curl -sS -m 20 https://app.crypto-capital.app/v2/diag || echo '{}')
           echo "::notice title=diag::$diag"
           home=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' https://app.crypto-capital.app/v2/home || echo 000)

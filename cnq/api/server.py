@@ -2,7 +2,7 @@
 
 nginx: app.crypto-capital.app/v2/ → http://127.0.0.1:8090/v2/  (deploy/api/README.md). The old Java backend stays as it is.
 
-Public (no login):  GET /v2/health · GET /v2/home (= app_home.json, fresh every minute) · GET /v2/feed/<name>
+Public (no login):  GET /v2/health · GET /v2/agent/selftest (one real NOVA call per 10 min, see _selftest) · GET /v2/home (= app_home.json, fresh every minute) · GET /v2/feed/<name>
                     (/v2/feed/nova = web/nova.json: NOVA's greeting, starter questions and topics — see cnq/api/nova.py)
                     ?lang=en|ru|uk|el|es (20.10, the app's language): web/<name>.<lang>.json when it exists, else <name>.json
                     (Russian); missing / unknown lang → ru. POST /v2/agent takes "lang" in its body the same way.
@@ -27,6 +27,7 @@ import os
 import shutil
 import re
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
@@ -76,6 +77,8 @@ class Api:
         self.console = console or admin_console.Console(store, web_dir)   # the owner's admin panel, /v2/admin/*
         self.nova = knowledge or nova.Knowledge()
         self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
+        self.selftest: dict | None = None        # GET /v2/agent/selftest: the last real model call on a fixed question
+        self._selftest_lock = threading.Lock()
 
     # ---------------------------------------------------------------- helpers
     def _read(self, path: str) -> dict | None:
@@ -218,6 +221,8 @@ class Api:
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last}
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()
+        if method == "GET" and path == "/v2/agent/selftest":
+            return 200, self._selftest(lang)
         if method == "GET" and path == "/v2/home":
             d = self._feed("app_home", lang)
             return (200, d) if d else (503, {"error": "feed_unavailable"})
@@ -335,6 +340,42 @@ class Api:
         if hit:
             return 200, {"answer": hit["a"], "source": "faq", "agent": al}
         return 200, {"error": "busy", "answer": nova.busy(lang), "agent": al}
+
+    SELFTEST_EVERY_S = 600
+    SELFTEST_Q = {"ru": "Что такое CRYPTO NOVA и как он работает?", "en": "What is CRYPTO NOVA and how does it work?"}
+
+    def _selftest(self, lang: str = DEFAULT) -> dict:
+        """21.10 (owner: «проверить, работает ли AI»): the same model call as /v2/agent — NOVA's system prompt, the live home
+        feed, the same limits — on one fixed question, without a login, so a health check (api-health workflow) proves the
+        whole chain to the model and back. At most one real call per 10 minutes for everyone; in between the last result is
+        returned with its age. Shows the result, the time and the first 200 characters — never a key."""
+        now = time.time()
+        with self._selftest_lock:
+            last = self.selftest
+            if last and now - last["at"] < self.SELFTEST_EVERY_S:
+                return {**last, "cached": True, "age_sec": round(now - last["at"])}
+            lang = lang if lang in self.SELFTEST_Q else DEFAULT
+            out: dict = {"at": int(now), "lang": lang, "model": getattr(self.llm, "model", None),
+                         "provider": getattr(self.llm, "provider", None), "timeout_s": AGENT_LLM["timeout"]}
+            if not self._llm_ready():
+                out.update(result="not_configured", ms=None)
+            else:
+                llm = copy.copy(self.llm) if isinstance(self.llm, LLM) else self.llm
+                t0 = time.time()
+                try:
+                    raw = llm.complete(self.nova.system(lang), self.nova.user_message(self.SELFTEST_Q[lang], self._feed("app_home", lang) or {}, "", lang),
+                                       temperature=AGENT_TEMPERATURE)
+                    cut = getattr(llm, "last_finish", None) == "length"
+                    answer = nova.tidy(raw if isinstance(raw, str) else "", cut=cut)
+                    out.update(result="empty" if not answer else ("cut" if cut else "ok"), answer_head=answer[:200])
+                except Exception as e:  # noqa: BLE001
+                    msg = str(e)
+                    out.update(result="timeout" if "timed out" in msg.lower() else "rate_limit" if "429" in msg else "llm_error",
+                               error=msg[:200])
+                    print(f"agent selftest: {out['result']}: {msg[:200]}", file=sys.stderr, flush=True)
+                out.update(ms=round((time.time() - t0) * 1000), finish=getattr(llm, "last_finish", None))
+            self.selftest = out
+            return {**out, "cached": False, "age_sec": 0}
 
     def _vip(self, uid: str, bx: str) -> tuple[int, dict]:
         owner = self.store.bingx_owner(bx) if bx else None

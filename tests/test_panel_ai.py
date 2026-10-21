@@ -1,0 +1,119 @@
+"""The closed system's NOVA chat (web/app.html askLLM) — 21.10, owner: «AI-помощник не отвечает».
+The browser call had no timeout, read every error body as JSON and asked gpt-oss for 600 tokens without reasoning effort
+(the server's 20.10 incident: hidden thinking ate the budget → empty answer). These run the real function in node with a
+fake fetch: abort after the timeout, one retry on 5xx, the provider's own error text, low effort for gpt-oss, empty answer."""
+import json
+import os
+import re
+import shutil
+import subprocess
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _block() -> str:
+    s = open(os.path.join(ROOT, "web", "app.html"), encoding="utf-8").read()
+    i = s.index("const LLM_TIMEOUT_MS=")
+    j = s.index("throw new Error(last||'нет ответа'); }", i) + len("throw new Error(last||'нет ответа'); }")
+    return s[i:j]
+
+
+HARNESS = r"""
+const LLMP={groq:{url:'https://g/x',model:'openai/gpt-oss-120b',name:'Groq · бесплатно'},gemini:{url:'https://m/x',model:'gemini-x',name:'Google Gemini · бесплатно'},anthropic:{url:'https://a/x',model:'claude',name:'Anthropic · платно'}};
+const SET={anth:'k',llm:'groq'}; const LS={}; const store=(k,v)=>{LS[k]=JSON.stringify(v)}; const load=(k,d)=>LS[k]?JSON.parse(LS[k]):d;
+const console={warn(){} , log:globalThis.console.log};
+let calls=[]; let script=[];
+function resp(status,body,hdr){ return {ok:status>=200&&status<300,status,headers:{get:k=>(hdr||{})[k.toLowerCase()]||null},text:async()=>typeof body==='string'?body:JSON.stringify(body)}; }
+globalThis.fetch=(url,o)=>{ calls.push(JSON.parse(o.body)); const step=script.shift();
+  if(step==='hang') return new Promise((res,rej)=>o.signal.addEventListener('abort',()=>{ const e=new Error('aborted'); e.name='AbortError'; rej(e); }));
+  if(step==='neterr') return Promise.reject(new TypeError('Failed to fetch'));
+  return Promise.resolve(resp(step[0],step[1],step[2])); };
+__BLOCK__
+const ok=t=>({choices:[{message:{content:t},finish_reason:'stop'}]});
+(async()=>{ const R={};
+  const run=async(name,steps,llm,opt)=>{ calls=[]; script=steps.slice(); SET.llm=llm||'groq'; const t0=Date.now();
+    try{ R[name]={out:await askLLM('sys','q',600,opt),n:calls.length,body:calls[0],ms:Date.now()-t0}; }catch(e){ R[name]={err:e.message,n:calls.length,ms:Date.now()-t0}; } };
+  await run('ok',[[200,ok('Привет')]]);
+  await run('hang',['hang'],null,{timeout:300});
+  await run('retry5xx',[[503,'<html>bad gateway</html>'],[200,ok('Ответ')]]);
+  await run('gemini',[[400,[{error:{code:400,message:'API key not valid'}}]]],'gemini');
+  await run('empty',[[200,{choices:[{message:{content:''},finish_reason:'length'}]}]]);
+  await run('net',['neterr','neterr']);
+  await run('anth',[[200,{content:[{type:'text',text:'Да'}],stop_reason:'end_turn'}]],'anthropic');
+  R.log=load('cnq_ai_log',[]).length;
+  globalThis.console.log(JSON.stringify(R)); })();
+"""
+
+
+def test_panel_ai_call_states():
+    node = shutil.which("node")
+    if not node:
+        return
+    r = subprocess.run([node, "-e", HARNESS.replace("__BLOCK__", _block())], capture_output=True, text=True, timeout=60)
+    R = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {}
+    assert R, r.stderr
+    assert R["ok"]["out"] == "Привет" and R["ok"]["n"] == 1
+    assert R["ok"]["body"]["reasoning_effort"] == "low" and R["ok"]["body"]["max_tokens"] >= 1500     # room for the answer
+    assert R["hang"]["err"].startswith("нет ответа за") and R["hang"]["ms"] < 5000 and R["hang"]["n"] == 1   # never «…» forever
+    assert R["retry5xx"]["out"] == "Ответ" and R["retry5xx"]["n"] == 2                                     # one retry on 5xx
+    assert R["gemini"]["err"] == "API key not valid"       # the provider's own words
+    assert "лимит длины" in R["empty"]["err"]
+    assert R["net"]["err"] == "нет связи с Groq" and R["net"]["n"] == 2
+    assert R["anth"]["out"] == "Да"
+    assert R["log"] >= 7
+
+
+def test_panel_chat_has_states_and_retry():
+    s = open(os.path.join(ROOT, "web", "app.html"), encoding="utf-8").read()
+    i = s.index("async function ask(q,bubble)")
+    body = s[i:s.index("async function checkAI()", i)]
+    assert "NOVA думает" in body and "Повторить" in body and "clearInterval(tick)" in body
+    assert "a.textContent='…'" not in body                      # no bare ellipsis left waiting
+    assert re.search(r'id="sAiBtn"', s) and "checkAI" in s       # Settings → «Проверить ИИ»
+    assert "SET.anth" not in s[s.index("function aiLog"):s.index("function llmErrText")]   # the log never stores the key
+
+
+class _LLM:
+    """a stand-in for cnq.agents.llm.LLM: available, counts calls, answers or raises"""
+    model, provider = "openai/gpt-oss-120b", "groq"
+
+    def __init__(self, answer="CRYPTO NOVA — это система.", exc=None):
+        self.answer, self.exc, self.calls, self.last_finish, self.seen = answer, exc, 0, "stop", []
+
+    @property
+    def available(self):
+        return True
+
+    def complete(self, system, user, temperature=0.2):
+        self.calls += 1
+        self.seen.append(user)
+        if self.exc:
+            raise self.exc
+        return self.answer
+
+
+def test_agent_selftest_real_call_rate_limited(tmp_path):
+    """GET /v2/agent/selftest (no login): the same model call as /v2/agent on a fixed question; one real call per 10 min."""
+    import time as _t
+    from cnq.api.auth import FirebaseVerifier
+    from cnq.api.server import Api
+    from cnq.api.store import Store
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "app_home.json").write_text(json.dumps({"asof": int(_t.time() * 1000), "total": {"usd": 1}, "futures": {}, "spot": {}}))
+    llm = _LLM()
+    api = Api(Store(str(tmp_path / "api.sqlite")), FirebaseVerifier("crypto-nova", keys={}), str(web), llm)
+    c, d = api.handle("GET", "/v2/agent/selftest", {}, b"")
+    assert c == 200 and d["result"] == "ok" and d["cached"] is False and d["answer_head"].startswith("CRYPTO NOVA")
+    assert d["model"] == "openai/gpt-oss-120b" and isinstance(d["ms"], int) and "Что такое CRYPTO NOVA" in llm.seen[0]
+    c, d = api.handle("GET", "/v2/agent/selftest?lang=en", {}, b"")
+    assert d["cached"] is True and llm.calls == 1                      # at most one real call per 10 minutes
+    api.selftest["at"] -= 601
+    llm.exc = RuntimeError("HTTP 401: invalid api key")
+    c, d = api.handle("GET", "/v2/agent/selftest", {}, b"")
+    assert c == 200 and d["result"] == "llm_error" and "401" in d["error"] and llm.calls == 2
+    api.selftest["at"] -= 601
+    llm.exc, llm.answer = None, "  "
+    assert api.handle("GET", "/v2/agent/selftest", {}, b"")[1]["result"] == "empty"
+    api.selftest, api.llm = None, None
+    assert api.handle("GET", "/v2/agent/selftest", {}, b"")[1]["result"] == "not_configured"

@@ -638,8 +638,11 @@ def _config(out: str) -> dict:
     pf = c.get("portfolio") if isinstance(c.get("portfolio"), dict) else {}
     pf = {lang: {k: str(v) for k, v in t.items() if k in ("title", "sub", "note") and v}
           for lang, t in pf.items() if isinstance(lang, str) and isinstance(t, dict)}
+    okx = c.get("okx_ref")
     return {"exchange_name": c.get("exchange_name") or "BingX",
             "exchange_ref": ref if isinstance(ref, str) and ref.startswith("https://") else None,
+            # build 44: the OKX link for the EU/EEA (OKX Europe, MiCA); a referral only once the owner joins OKX's programme
+            "okx_ref": okx if isinstance(okx, str) and okx.startswith("https://") else None,
             "exchange_trade_url": c.get("exchange_trade_url"),
             "portfolio": {k: v for k, v in pf.items() if v}}
 

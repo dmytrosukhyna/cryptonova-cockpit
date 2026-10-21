@@ -217,8 +217,11 @@ def test_app_home_config_link(tmp_path):
     _w(d, "app_config.json", {"exchange_name": "BingX", "exchange_ref": "https://bingx.com/invite/ABC123", "exchange_trade_url": "x"})
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)
     assert doc["config"]["exchange_ref"] == "https://bingx.com/invite/ABC123"
-    _w(d, "app_config.json", {"exchange_ref": "javascript:alert(1)"})
-    assert app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]["exchange_ref"] is None
+    _w(d, "app_config.json", {"exchange_ref": "javascript:alert(1)", "okx_ref": "javascript:x"})
+    cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
+    assert cfg["exchange_ref"] is None and cfg["okx_ref"] is None
+    _w(d, "app_config.json", {"okx_ref": "https://www.okx.com/eu/join/X"})
+    assert app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]["okx_ref"] == "https://www.okx.com/eu/join/X"
 
 
 def test_spot_coins_explain_themselves_in_russian_only(tmp_path):

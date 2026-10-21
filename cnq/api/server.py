@@ -227,7 +227,14 @@ class Api:
             return 200, self._selftest(lang)
         if method == "GET" and path == "/v2/home":
             d = self._feed("app_home", lang)
-            return (200, d) if d else (503, {"error": "feed_unavailable"})
+            if not d:
+                return 503, {"error": "feed_unavailable"}
+            # build 44: the caller's country when the proxy in front knows it (Cloudflare CF-IPCountry or nginx geoip → X-Country);
+            # the app uses it only to choose which exchange to name (never a BingX link in the EU/EEA). Nothing is stored.
+            cc = str(headers.get("cf-ipcountry") or headers.get("x-country") or "").strip().upper()
+            if re.fullmatch(r"[A-Z]{2}", cc) and cc not in ("XX", "T1"):
+                d = {**d, "geo": {"country": cc}}
+            return 200, d
         m = re.fullmatch(r"/v2/feed/([a-z_]+)", path)
         if method == "GET" and m:
             if m.group(1) not in FEEDS:

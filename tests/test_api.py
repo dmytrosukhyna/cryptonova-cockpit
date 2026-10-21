@@ -60,6 +60,15 @@ def test_public_and_auth(tmp_path):
     assert c == 200 and d["user"]["uid"] == "u1" and d["user"]["tier"] == "free" and d["agent"] == {"limit": 5, "left": 5}
 
 
+def test_home_geo_country(tmp_path):
+    api, _ = make(tmp_path)
+    c, d = api.handle("GET", "/v2/home", {"cf-ipcountry": "de"}, b"")
+    assert c == 200 and d["geo"] == {"country": "DE"}
+    c, d = api.handle("GET", "/v2/home", {"x-country": "XX"}, b"")
+    assert c == 200 and "geo" not in d
+    assert "geo" not in call(api, "GET", "/v2/home")[1]
+
+
 def test_piggy_prefs_progress(tmp_path):
     api, _ = make(tmp_path)
     t = token()

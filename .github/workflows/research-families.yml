@@ -1,0 +1,24 @@
+name: research-families
+# Manual only. New rule families for the Автолаборатория (turn of month, weekday, volatility breakout, cross-market momentum)
+# with the nightly lab's data, walk-forward and pass rules (scripts/autolab_families_study.py, backlog #4). Public data only.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "all"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy yfinance
+      - run: python scripts/autolab_families_study.py

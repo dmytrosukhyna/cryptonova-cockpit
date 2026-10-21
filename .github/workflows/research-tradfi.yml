@@ -1,0 +1,24 @@
+name: research-tradfi
+# Manual only. Metals / indices / commodities / stocks as USDT perps on Binance — liquidity, funding, tracking, and the cost of
+# running «Мультирынок · тренд» on them (scripts/tradfi_perps_study.py, backlog #3). Public data only: no keys, no orders.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "all"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy yfinance
+      - run: python scripts/tradfi_perps_study.py

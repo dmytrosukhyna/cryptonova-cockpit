@@ -231,7 +231,10 @@ def profile(sym):
         out["corr_daily"] = round(float(np.corrcoef(rp, ru)[0, 1]), 2)
         out["track_err_ann_pct"] = round(float(np.std(rp - ru) * math.sqrt(252)) * 100, 1)
         out["level_ratio_med"] = round(float(np.median(p / u)), 3)
-    out["tracks"] = bool(out.get("corr_daily") is not None and out["corr_daily"] >= 0.6)
+        pw, uw = np.diff(np.log(p[::5])), np.diff(np.log(u[::5]))          # 5-trading-day returns: the UTC-midnight vs
+        if len(pw) > 6:                                                    # NY-close timing gap washes out
+            out["corr_weekly"] = round(float(np.corrcoef(pw, uw)[0, 1]), 2)
+    out["tracks"] = bool(max(out.get("corr_daily") or 0, out.get("corr_weekly") or 0) >= 0.6)
     return out, y
 
 
@@ -293,8 +296,12 @@ def main():
     with ThreadPoolExecutor(4) as ex:
         res = list(ex.map(profile, hits))
     rows = [r for r, _ in res]
-    for r in rows:
-        note(f"tradfi · {r['sym']}", json.dumps(r, ensure_ascii=False))
+    # GitHub keeps only 10 notices per step → compact rows, ~12 per notice
+    short = lambda r: (f"{r['sym'][:-4]}|{r.get('first')}|d{r.get('days')}|v{r.get('vol30_med_musd')}M|f{r.get('fund_ann_all_pct')}/{r.get('fund_ann_90d_pct')}"   # noqa: E731
+                       f"|lp{r.get('fund_longs_pay_share')}|we{r.get('weekend_vol_share')}/{r.get('weekend_abs_move_pct')}|c{r.get('corr_daily')}/{r.get('corr_weekly')}|te{r.get('track_err_ann_pct')}|L{r.get('level_ratio_med')}")
+    for i in range(0, len(rows), 12):
+        note(f"tradfi · perps {i // 12 + 1}", "sym|first|days|vol30 med $M/day|funding %/yr all/90d|longs-pay share|weekend vol share/abs move %|corr d/w|TE %|perp/under\n"
+             + "\n".join(short(r) for r in rows[i:i + 12]))
     # Multirynok on perps: one tracking perp per underlying ticker (the most liquid)
     best = {}
     for (r, y) in res:

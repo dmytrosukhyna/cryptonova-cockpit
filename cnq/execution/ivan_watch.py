@@ -448,20 +448,41 @@ def publish_ivan(blob: dict, token: str, repo: str = DEFAULT_REPO, http=None, pa
         return False
     if not isinstance(blob, dict) or not {"salt", "nonce", "ct", "tag"} <= set(blob) or set(blob) - BLOB_KEYS:
         raise ValueError("ivan: refusing to publish a payload that is not the encrypted blob")
-    http = http or _http
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
     hdr = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-ivan"}
-    sha = None
-    try:
-        st, js = http("GET", url + "?ref=main", hdr, None)
-        if st == 200 and isinstance(js, dict):
-            sha = js.get("sha")
-    except Exception:  # noqa: BLE001
-        pass
-    data = {"message": message, "branch": "main",
-            "content": base64.b64encode(json.dumps(blob, separators=(",", ":")).encode()).decode(), **({"sha": sha} if sha else {})}
-    st, _ = http("PUT", url, {**hdr, "Content-Type": "application/json"}, json.dumps(data).encode())
-    return st in (200, 201)
+    content = base64.b64encode(json.dumps(blob, separators=(",", ":")).encode()).decode()
+    return put_contents(url, hdr, content, message, http=http)
+
+
+CONFLICT = (409, 422)      # the file changed between GET and PUT: main gets bot commits every few minutes
+
+
+def put_contents(url: str, hdr: dict, content_b64: str, message: str, http=None, tries: int = 3, sleep=time.sleep) -> bool:
+    """GitHub contents API: GET the current sha, PUT the new content. On a version conflict (409/422 — another commit landed
+    between GET and PUT) wait and retry with a fresh sha, up to `tries` times; the last conflict is raised as HTTPError."""
+    http = http or _http
+    for i in range(tries):
+        sha = None
+        try:
+            st, js = http("GET", url + "?ref=main", hdr, None)
+            if st == 200 and isinstance(js, dict):
+                sha = js.get("sha")
+        except Exception:  # noqa: BLE001
+            pass
+        data = {"message": message, "branch": "main", "content": content_b64, **({"sha": sha} if sha else {})}
+        try:
+            st, _ = http("PUT", url, {**hdr, "Content-Type": "application/json"}, json.dumps(data).encode())
+        except urllib.error.HTTPError as e:
+            if e.code not in CONFLICT or i == tries - 1:
+                raise
+            st = e.code
+        if st in (200, 201):
+            return True
+        if st not in CONFLICT:
+            return False
+        if i < tries - 1:
+            sleep(2 * (i + 1))
+    raise urllib.error.HTTPError(url, 409, "conflict", None, None)
 
 
 # ── entry points ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -501,7 +522,11 @@ def describe_error(e: Exception) -> str:
                  -403: "Bybit не пускает запросы из этой сети (HTTP 403)"}
         return f"Иван тест: {known.get(e.code) or f'Bybit ответил {e.code} {e.msg}'}"[:220]
     if isinstance(e, urllib.error.HTTPError):
-        return f"Иван тест: GitHub не принял файл (HTTP {e.code}) — проверь CNQ_GH_TOKEN"
+        if e.code in (401, 403, 404):
+            return f"Иван тест: GitHub не принял файл (HTTP {e.code}) — проверь CNQ_GH_TOKEN"
+        if e.code in CONFLICT:
+            return "Иван тест: GitHub был занят другим обновлением — повторю в следующий раз, ничего делать не нужно"
+        return f"Иван тест: GitHub ответил HTTP {e.code} — повторю в следующий раз"
     if isinstance(e, (urllib.error.URLError, TimeoutError, OSError)):
         return "Иван тест: нет связи с Bybit/GitHub — повторю в следующий раз"
     return f"Иван тест: ошибка — {str(e)[:150]}"

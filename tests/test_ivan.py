@@ -267,3 +267,31 @@ def test_ivan_js_decrypt_matches_python():
     assert json.loads(r.stdout) == obj, r.stderr
     r = subprocess.run([node, "-e", code, js, p, "wrong"], capture_output=True, text=True, timeout=120)
     assert r.stdout.strip() == "ERR:Неверный пароль", r.stdout + r.stderr
+
+
+def test_ivan_publish_retries_a_github_conflict():
+    """main gets bot commits every few minutes: a 409 between GET and PUT is retried with a fresh sha, not reported as a token problem."""
+    import urllib.error
+    sent, shas = [], iter(["old", "new"])
+
+    def http(method, url, headers, data=None):
+        sent.append((method, json.loads(data) if data else None))
+        if method == "GET":
+            return 200, {"sha": next(shas)}
+        if json.loads(data)["sha"] == "old":
+            raise urllib.error.HTTPError(url, 409, "conflict", None, None)
+        return 200, {}
+
+    waits = []
+    assert iw.put_contents("https://api.github.com/repos/o/r/contents/x", {}, "e30=", "m", http=http, sleep=waits.append) is True
+    assert [m for m, _ in sent] == ["GET", "PUT", "GET", "PUT"] and sent[3][1]["sha"] == "new" and waits == [2]
+
+    def busy(method, url, headers, data=None):
+        return (200, {"sha": "s"}) if method == "GET" else (409, {})
+    try:
+        iw.put_contents("u", {}, "e30=", "m", http=busy, sleep=lambda s: None)
+        raise AssertionError("conflict swallowed")
+    except urllib.error.HTTPError as e:
+        assert e.code == 409
+        assert "занят" in iw.describe_error(e) and "CNQ_GH_TOKEN" not in iw.describe_error(e)
+    assert "CNQ_GH_TOKEN" in iw.describe_error(urllib.error.HTTPError("u", 401, "bad", None, None))

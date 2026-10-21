@@ -64,17 +64,8 @@ def pulse() -> bool:
     import base64
     url = f"https://api.github.com/repos/{GH_REPO}/contents/web/pulse.json"
     hdr = {"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-mirror"}
-    sha = None
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url + "?ref=main", headers=hdr), timeout=15) as r:
-            sha = json.loads(r.read().decode()).get("sha")
-    except Exception:  # noqa: BLE001
-        pass
-    data = {"message": "pulse: run the server", "branch": "main",
-            "content": base64.b64encode(json.dumps({"t": int(time.time() * 1000)}).encode()).decode(), **({"sha": sha} if sha else {})}
-    req = urllib.request.Request(url, data=json.dumps(data).encode(), method="PUT", headers={**hdr, "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return r.status in (200, 201)
+    content = base64.b64encode(json.dumps({"t": int(time.time() * 1000)}).encode()).decode()
+    return ivan_watch.put_contents(url, hdr, content, "pulse: run the server")   # retries a 409 conflict with a fresh sha
 
 
 def publish(bx: BybitTrader, st: dict) -> bool:
@@ -90,17 +81,8 @@ def publish(bx: BybitTrader, st: dict) -> bool:
                            "stop": float(v.get("stopLoss") or 0) or None} for k, v in pos.items()]}
     url = f"https://api.github.com/repos/{GH_REPO}/contents/web/bybit.json"
     hdr = {"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-mirror"}
-    sha = None
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url + "?ref=main", headers=hdr), timeout=15) as r:
-            sha = json.loads(r.read().decode()).get("sha")
-    except Exception:  # noqa: BLE001
-        pass
-    data = {"message": "bybit demo status", "branch": "main",
-            "content": base64.b64encode(json.dumps(body, ensure_ascii=False).encode()).decode(), **({"sha": sha} if sha else {})}
-    req = urllib.request.Request(url, data=json.dumps(data).encode(), method="PUT", headers={**hdr, "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return r.status in (200, 201)
+    content = base64.b64encode(json.dumps(body, ensure_ascii=False).encode()).decode()
+    return ivan_watch.put_contents(url, hdr, content, "bybit demo status")   # retries a 409 conflict with a fresh sha
 
 
 def ivan_tick() -> bool:

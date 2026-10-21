@@ -1353,6 +1353,90 @@
           ]
         },
         {
+          "id": "l1-marketcap",
+          "title": "Capitalización: por qué una moneda «barata» no es barata",
+          "minutes": 4,
+          "goal": "Después de la lección sabrás cuánto vale de verdad una moneda y no caerás en las monedas «baratas» de céntimos.",
+          "cards": [
+            {
+              "title": "El precio de una moneda no dice nada",
+              "text": "Cada moneda tiene su propia cantidad de unidades. Una tiene 20 M, otra un billón. Por eso el precio de una sola moneda no dice si es cara o barata.",
+              "example": "En la vida: una pizza de $10 cuesta lo mismo si la cortas en 8 trozos o en 100. El trozo es más barato; la pizza es la misma.",
+              "art": "coins"
+            },
+            {
+              "title": "Capitalización = precio × cantidad",
+              "text": "Para ver cuánto vale toda la moneda, multiplica el precio por las monedas en circulación. Eso es la capitalización. Bitcoin en octubre de 2026: unos $83 000 × unos 20 M de monedas ≈ $1,66 billones. El gráfico muestra dos monedas: la «barata» A a $0.001 y la «cara» B a $50.",
+              "example": "En la vida: una acción de $1 no es necesariamente más barata que una de $500. Lo que importa es cuánto vale toda la empresa.",
+              "art": "calculator",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  1000,
+                  500
+                ],
+                "labels": [
+                  "A · $0.001 × 1 billón",
+                  "B · $50 × 10 M"
+                ],
+                "caption": "Capitalización, $ M. La «barata» A vale el doble que B"
+              }
+            },
+            {
+              "title": "La trampa de la moneda «barata»",
+              "text": "«Una moneda de $0.001 seguro que llegará a $1» es un sueño habitual. Eso es subir 1 000 veces. Si hay 1 billón de esas monedas, a $1 toda la moneda valdría $1 billón: casi tanto como todo el bitcoin. Calcula la capitalización y el cuento se ve enseguida.",
+              "example": "En la vida: «un piso por solo $1 000»: lo miras y es el precio por metro cuadrado, no por todo el piso.",
+              "art": "magnifier"
+            },
+            {
+              "title": "Monedas futuras: FDV",
+              "text": "Parte de las monedas aún no se ha emitido y saldrá más tarde. Precio × todas las monedas, incluidas las futuras, es el FDV, la capitalización totalmente diluida. Si el FDV es mucho mayor que la capitalización, las monedas nuevas se irán vendiendo poco a poco y eso presiona el precio. Ambas cifras están en CoinMarketCap y CoinGecko.",
+              "example": "En la vida: una empresa anuncia que emitirá otras tantas acciones. Tu parte se hace más pequeña.",
+              "art": "calendar"
+            }
+          ],
+          "remember": [
+            "El precio de una sola moneda no dice si es cara o barata.",
+            "Capitalización = precio × monedas en circulación.",
+            "Si aún faltan muchas monedas por salir (FDV mucho mayor), eso presiona el precio."
+          ],
+          "quiz": [
+            {
+              "q": "La moneda A cuesta $0.001 y hay 1 billón. La moneda B cuesta $50 y hay 10 M. ¿Cuál tiene mayor capitalización?",
+              "options": [
+                "A: $1 000 M",
+                "B: $500 M",
+                "Igual",
+                "No se puede calcular"
+              ],
+              "answer": 0,
+              "why": "A: $0.001 × 1 000 000 000 000 = $1 000 000 000. B: $50 × 10 000 000 = $500 000 000. La «barata» A vale el doble."
+            },
+            {
+              "q": "¿Cómo se calcula la capitalización?",
+              "options": [
+                "Precio × monedas en circulación",
+                "Precio ÷ número de monedas",
+                "Volumen negociado en un día",
+                "Es el precio de una moneda"
+              ],
+              "answer": 0,
+              "why": "La capitalización es el precio de una moneda por el número de monedas en circulación. Muestra cuánto vale toda la moneda."
+            },
+            {
+              "q": "Una moneda cuesta $0.01 y hay 100 000 M. ¿Qué capitalización tendría si el precio llegara a $1?",
+              "options": [
+                "$1 000 M",
+                "$10 000 M",
+                "$100 000 M",
+                "$1 billón"
+              ],
+              "answer": 2,
+              "why": "100 000 000 000 × $1 = $100 000 M. Hoy 100 000 M × $0.01 = $1 000 M: haría falta subir 100 veces."
+            }
+          ]
+        },
+        {
           "id": "l1-exchange",
           "title": "Dónde se compran las cripto: el exchange",
           "minutes": 5,

@@ -1353,6 +1353,90 @@
           ]
         },
         {
+          "id": "l1-marketcap",
+          "title": "Market cap: why a «cheap» coin isn't cheap",
+          "minutes": 4,
+          "goal": "After this lesson you'll see what a coin is really worth and won't fall for «cheap» coins that cost a fraction of a cent.",
+          "cards": [
+            {
+              "title": "The price of one coin says nothing",
+              "text": "Every coin has its own number of units. One has 20 M, another has a trillion. So the price of one coin on its own doesn't tell you if it's expensive or cheap.",
+              "example": "In real life: a $10 pizza costs the same whether you cut it into 8 slices or 100. The slice is cheaper — the pizza is the same.",
+              "art": "coins"
+            },
+            {
+              "title": "Market cap = price × number of coins",
+              "text": "To see what the whole coin is worth, multiply the price by the number of coins in circulation. That's the market cap. Bitcoin in October 2026: about $83 000 × about 20 M coins ≈ $1.66 trillion. The chart shows two coins: «cheap» A at $0.001 and «expensive» B at $50.",
+              "example": "In real life: a $1 share isn't necessarily cheaper than a $500 share. What matters is what the whole company is worth.",
+              "art": "calculator",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  1000,
+                  500
+                ],
+                "labels": [
+                  "A · $0.001 × 1 T",
+                  "B · $50 × 10 M"
+                ],
+                "caption": "Market cap, $ M. «Cheap» A is worth twice as much as B"
+              }
+            },
+            {
+              "title": "The «cheap coin» trap",
+              "text": "«A $0.001 coin will surely reach $1» is a common dream. That's a 1 000× rise. If there are 1 trillion of those coins, at $1 the whole coin would be worth $1 trillion — almost as much as all of bitcoin. Work out the market cap and the fairy tale shows.",
+              "example": "In real life: «a flat for just $1 000» — you check and it's the price per square metre, not for the whole flat.",
+              "art": "magnifier"
+            },
+            {
+              "title": "Future coins: FDV",
+              "text": "Some coins haven't been released yet and will come out later. Price × all coins, including future ones, is FDV, the fully diluted value. If FDV is much bigger than the market cap, new coins will be sold bit by bit, and that weighs on the price. Both numbers are on CoinMarketCap and CoinGecko.",
+              "example": "In real life: a company announces it will issue as many shares again. Your share of it gets smaller.",
+              "art": "calendar"
+            }
+          ],
+          "remember": [
+            "The price of one coin on its own doesn't say if it's expensive or cheap.",
+            "Market cap = price × number of coins in circulation.",
+            "If many more coins are still to come (FDV much bigger), that weighs on the price."
+          ],
+          "quiz": [
+            {
+              "q": "Coin A costs $0.001 and there are 1 trillion of them. Coin B costs $50 and there are 10 M of them. Which has the bigger market cap?",
+              "options": [
+                "A: $1 billion",
+                "B: $500 million",
+                "They're equal",
+                "It can't be worked out"
+              ],
+              "answer": 0,
+              "why": "A: $0.001 × 1 000 000 000 000 = $1 000 000 000. B: $50 × 10 000 000 = $500 000 000. «Cheap» A is worth twice as much."
+            },
+            {
+              "q": "How is market cap calculated?",
+              "options": [
+                "Price × number of coins in circulation",
+                "Price ÷ number of coins",
+                "Trading volume over a day",
+                "It's the price of one coin"
+              ],
+              "answer": 0,
+              "why": "Market cap is the price of one coin times the number of coins in circulation. It shows what the whole coin is worth."
+            },
+            {
+              "q": "A coin costs $0.01 and there are 100 billion of them. What would its market cap be if the price reached $1?",
+              "options": [
+                "$1 billion",
+                "$10 billion",
+                "$100 billion",
+                "$1 trillion"
+              ],
+              "answer": 2,
+              "why": "100 000 000 000 × $1 = $100 billion. Today it's 100 billion × $0.01 = $1 billion — so it would need to grow 100×."
+            }
+          ]
+        },
+        {
           "id": "l1-exchange",
           "title": "Where people buy crypto: the exchange",
           "minutes": 5,

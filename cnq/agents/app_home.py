@@ -545,7 +545,7 @@ def _engine_facts(out: str) -> dict:
     return {"lab_tried": al.get("tried"), "lab_tested": al.get("tested"), "lab_passed": al.get("passed"),
             "lab_reliable": al.get("reliable"), "lab_markets": len(al.get("coverage") or {}) or None,
             "signals_checked": (sig.get("counts") or {}).get("resolved"),
-            "lessons": sum(len(lv.get("lessons") or []) for lv in ac.get("levels") or []) or None,
+            "lessons": sum(len(lv.get("lessons") or []) for lv in ac.get("levels") or [] if lv.get("level") != "L0") or None,   # what Learning shows (the app-intro level is reached from the tour)
             "cycle_sec": 60}
 
 

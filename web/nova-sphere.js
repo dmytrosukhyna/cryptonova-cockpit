@@ -8,10 +8,11 @@
 (function (w) {
   "use strict";
   var TAU = Math.PI * 2;
-  var ORB = [{ g: 1.62, b: 0.30, w: 0.78, e: [0, 2.9] }, { g: 0.36, b: 0.27, w: -0.64, e: [1.4, 4.4] }, { g: -0.30, b: 0.33, w: 0.71, e: [3.6] }];
+  // owner 21.10 18:06: the live sphere stays simple — one electron per orbit, no sparks, no extra lines (the coins live on the icon)
+  var ORB = [{ g: 1.62, b: 0.30, w: 0.78, e: [0] }, { g: 0.36, b: 0.27, w: -0.64, e: [2.2] }, { g: -0.30, b: 0.33, w: 0.71, e: [4.1] }];
   var STARS = [];
   (function () { var s = 7; function r() { s = (s * 16807) % 2147483647; return s / 2147483647; }
-    for (var i = 0; i < 46; i++) { var u = r() * 2 - 1, a = r() * TAU, rr = Math.cbrt(r()) * 0.92, q = Math.sqrt(1 - u * u); STARS.push({ x: q * Math.cos(a) * rr, y: u * rr, z: q * Math.sin(a) * rr, s: 0.25 + r() * 0.55, ph: r() * TAU, warm: r() < 0.3 }); } })();
+    for (var i = 0; i < 26; i++) { var u = r() * 2 - 1, a = r() * TAU, rr = Math.cbrt(r()) * 0.92, q = Math.sqrt(1 - u * u); STARS.push({ x: q * Math.cos(a) * rr, y: u * rr, z: q * Math.sin(a) * rr, s: 0.25 + r() * 0.55, ph: r() * TAU, warm: r() < 0.3 }); } })();
   var SPARK = [];
   (function () { for (var i = 0; i < 9; i++) SPARK.push({ o: i % 3, th: i * 0.73 + 0.3, sp: 0.05 + (i % 4) * 0.02, ph: i * 1.7 }); })();
 
@@ -44,11 +45,10 @@
       grad.addColorStop(0.45, "rgba(90,165,255,.85)"); grad.addColorStop(0.7, "rgba(60,130,255,.8)"); grad.addColorStop(0.85, "rgba(225,244,255,.95)"); grad.addColorStop(1, "rgba(90,170,255,.9)");
     }
     g.lineCap = "butt"; g.lineJoin = "round";
-    path(rad); g.strokeStyle = "rgba(70,150,255," + ((front ? 0.16 : 0.09) * glow).toFixed(3) + ")"; g.lineWidth = 5.2 * k; g.stroke();
+    path(rad); g.strokeStyle = "rgba(70,150,255," + ((front ? 0.16 : 0.09) * glow).toFixed(3) + ")"; g.lineWidth = 4.6 * k; g.stroke();
     path(rad); g.strokeStyle = grad; g.lineWidth = 2.5 * k; g.stroke();
     path(rad); g.strokeStyle = "rgba(255,255,255,.75)"; g.lineWidth = 0.7 * k; g.stroke();
-    if (!small) { path(rad * 0.955); g.strokeStyle = "rgba(170,215,255,.3)"; g.lineWidth = 0.5 * k; g.stroke(); }
-    if (conic) { var sh = shade(g, o, rot); path(rad); g.strokeStyle = sh; g.lineWidth = 2.7 * k; g.stroke(); if (!small) { path(rad * 0.955); g.lineWidth = 0.7 * k; g.stroke(); } }
+    if (conic) { var sh = shade(g, o, rot); path(rad); g.strokeStyle = sh; g.lineWidth = 2.7 * k; g.stroke(); }
     else if (!front) { path(rad); g.strokeStyle = "rgba(4,10,34,.45)"; g.lineWidth = 2.7 * k; g.stroke(); }
   }
   function bead(g, x, y, r, warm, dim) {
@@ -73,7 +73,7 @@
     var E = [];
     ORB.forEach(function (o, oi) {
       ribbon(g, o, RO, rot, false, t, k, glow, small);
-      o.e.forEach(function (e0, ei) { var th = e0 + t * o.w * (busy ? 2.2 : 1); var p = op(o, th, RO, rot); E.push({ p: p, r: (ei ? 1.9 : 2.7) * (small ? 1.25 : 1), warm: oi === 1 && ei === 1 || oi === 2 }); });
+      o.e.forEach(function (e0, ei) { var th = e0 + t * o.w * (busy ? 2.2 : 1); var p = op(o, th, RO, rot); E.push({ p: p, r: 2.7 * (small ? 1.2 : 1), warm: oi === 2 }); });
     });
     E.filter(function (e) { return e.p.z < 0; }).forEach(function (e) { bead(g, e.p.x, e.p.y, e.r * (0.85 + 0.15 * (1 + e.p.z / RO)), e.warm, 0.55); });
     // the sphere: a small universe in glass
@@ -108,11 +108,6 @@
     // front halves and electrons in front
     ORB.forEach(function (o) { ribbon(g, o, RO, rot, true, t, k, glow, small); });
     E.filter(function (e) { return e.p.z >= 0; }).forEach(function (e) { bead(g, e.p.x, e.p.y, e.r * (0.85 + 0.15 * (1 + e.p.z / RO)), e.warm, 1); });
-    // sparks drifting along the orbits
-    if (!small && !opt.still) SPARK.forEach(function (s) {
-      var o = ORB[s.o], p = op(o, s.th + t * s.sp * (o.w > 0 ? 1 : -1), RO * 1.04, rot), a = 0.5 + 0.5 * Math.sin(t * 3 + s.ph);
-      g.fillStyle = "rgba(220,240,255," + (a * (p.z > 0 ? 0.9 : 0.35)).toFixed(3) + ")"; g.beginPath(); g.arc(p.x, p.y, 0.6, 0, TAU); g.fill();
-    });
     g.restore();
   }
 

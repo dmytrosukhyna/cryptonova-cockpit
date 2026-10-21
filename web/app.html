@@ -818,6 +818,21 @@ tr.spotrow{cursor:pointer}tr.spotrow.on>td{background:rgba(124,196,255,.08)}tr.s
 .morelist>.ib{justify-content:flex-start;width:100%;border-color:transparent;background:transparent}.morelist>.ib:hover{background:rgba(124,196,255,.08)}.morelist>.ib span{display:inline!important}
 .top .morelist>.ib{font-size:13px!important;gap:8px!important;padding:8px 10px!important}.top .morelist>#docsBtn,.top .morelist>#reportBtn,.top .morelist>#streamBtn{display:inline-flex!important}
 @media (max-width:760px){.morelist{position:fixed;top:64px;left:12px;right:12px;min-width:0}.vlbl{display:none}}
+
+/* 21.10 «Радар сигналов» — only on Обзор */
+body:not(.tab-overview) #sigRadar{display:none}
+#sigRadar .srwrap{position:relative;width:100%;max-width:340px;margin:4px auto 0;aspect-ratio:1/1}
+#srCv{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipulation}
+#sigRadar .srleg{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 14px;font:500 10px var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:8px}#sigRadar .srleg span{white-space:nowrap}
+#sigRadar .srleg .d{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:0}
+#sigRadar .srleg .g{background:#3ADB93;box-shadow:0 0 8px #3ADB93}#sigRadar .srleg .a{background:#f0c674}#sigRadar .srleg .b{background:#7FD3FF}
+#sigRadar .srnote{font-size:11px;text-align:center;margin-top:4px}
+#sigRadar .srdet:not(:empty){margin-top:10px;border-top:1px solid var(--line2);padding-top:8px}
+#sigRadar .srdet .rrow{border-top:0;border-bottom:0;padding-top:0}#sigRadar .srdet .rrow>b{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#sigRadar .srdet .srline{font-size:12px;margin-top:4px}
+#sigRadar .srdet .ib{margin-top:8px}
+#sigRadar .rbar{grid-template-columns:1fr!important;row-gap:2px;margin:6px 0}#sigRadar .rbar>span{grid-row:1!important;grid-column:1!important;font-size:11.5px;color:var(--muted)}#sigRadar .rbar>b{grid-row:2!important;grid-column:1!important;text-align:left!important;white-space:normal;font-size:11px;color:var(--fg)}#sigRadar .rbar .gb{grid-row:3!important;grid-column:1!important}
+@media (max-width:1150px){ body.tab-overview #sigRadar{order:3} #sigRadar .srwrap{max-width:320px} }
 </style>
 </head>
 <body>
@@ -934,6 +949,7 @@ tr.spotrow{cursor:pointer}tr.spotrow.on>td{background:rgba(124,196,255,.08)}tr.s
     <div id="briefWin" class="card" hidden><div class="bh"><canvas class="orbcv" id="briefOrb" width="64" height="64"></canvas><b>Ассистент · доклад</b><span class="lamp"></span></div><div class="bt" id="briefTxt"></div><div class="ba"><button class="ib" id="briefOk">Понял, к работе</button><button class="ib" id="briefTour">Показать, как всё устроено</button><button class="ib sm" id="briefAsk">Спросить</button><button class="ib sm" id="briefMute" title="Остановить голос">тихо</button></div></div>
     <div class="dock" id="dock" hidden></div>
     <div class="card" id="aiCard" data-dock="bell|Важное"><h2>Ассистент · важное <span class="r"><span class="proc" id="proc"><i></i><span id="procTxt">работает</span></span></span></h2><div id="aiFeed" class="aifeed"></div></div>
+    <div class="card" id="sigRadar"><h2>Радар сигналов</h2><div class="srwrap"><canvas id="srCv" role="img" aria-label="Радар сигналов: монеты по близости к входу, зелёные — открытые сделки"></canvas></div><div class="srleg"><span><i class="d g"></i>сделка открыта</span><span><i class="d a"></i>близко к входу</span><span><i class="d b"></i>ждём условия</span></div><div class="muted srnote">ближе к центру — ближе к входу · зелёные — сделка открыта</div><div class="muted srnote">Нажмите на точку — условия по монете.</div><div class="muted srnote" id="srEmpty" hidden>Данные появятся после следующего запуска сервера.</div><div class="srdet" id="srDet"></div></div>
     <div class="card" id="coreCard"><h2>Карта перекупленности <span class="r tfs mini" id="mapTf"><button data-m="4h" aria-pressed="true">4ч</button><button data-m="1d" aria-pressed="false">день</button><button data-m="1w" aria-pressed="false">нед</button></span></h2><canvas id="reactor"></canvas><div class="muted" style="font-size:11px;margin-top:4px"><span id="coreLists">считаю RSI…</span></div></div>
     <div class="card" id="recoCard" hidden></div>
     <div class="card" id="propCard" hidden></div>
@@ -1186,7 +1202,7 @@ function deskNotify(){ try{
   for(const m of msgs.slice(0,5)){ toast(m); try{ if('Notification' in window&&Notification.permission==='granted') new Notification('CRYPTO NOVΛ',{body:m}); }catch(e){} }
 }catch(e){} }
 let ALTS=null;   // 19.10: the altseason gauge (alt_portfolio.py → altseason.json)
-async function loadJson(){ try{ PF=await (await fetch('./portfolio.json',{cache:'no-store'})).json(); }catch(e){ PF=null; } try{ WEEKLY=await (await fetch('./weekly.json',{cache:'no-store'})).json(); }catch(e){ WEEKLY=null; } try{ PAPER=await (await fetch('./paper.json',{cache:'no-store'})).json(); }catch(e){ PAPER=null; } try{ STATUS=await (await fetch('./status.json',{cache:'no-store'})).json(); }catch(e){ STATUS=null; } try{ CAL=await (await fetch('./calibration.json',{cache:'no-store'})).json(); }catch(e){ CAL=null; } try{ MK=await (await fetch('./markets.json',{cache:'no-store'})).json(); }catch(e){ MK=null; } try{ const r=await fetch('./capital.json',{cache:'no-store'}); CAP=r.ok?await r.json():null; }catch(e){ CAP=null; } try{ const r=await fetch('./altseason.json',{cache:'no-store'}); ALTS=r.ok?await r.json():null; }catch(e){ ALTS=null; } try{ const r=await fetch('./yield.json',{cache:'no-store'}); YLD=r.ok?await r.json():null; }catch(e){ YLD=null; } try{ const r=await fetch('./basis.json',{cache:'no-store'}); BAS=r.ok?await r.json():null; }catch(e){ BAS=null; } try{ RS=await (await fetch('./research.json',{cache:'no-store'})).json(); }catch(e){ RS=null; } try{ WHS=await (await fetch('./whales.json',{cache:'no-store'})).json(); }catch(e){ WHS=null; } try{ renderKpi(); renderTape(); renderWhalesServer(); checkVersion(); }catch(e){} renderAccounts(); feedServer(); renderFeed(); renderProc(); try{ renderLive(); renderAssistant(); }catch(e){} deskNotify(); try{ renderSpotChart(); }catch(e){} try{ renderApRadar(); renderUrgent(); renderTopTraders(); }catch(e){} try{ renderOvAccounts(); }catch(e){} try{ renderMyPort(); }catch(e){} try{ renderNovaCalc(); }catch(e){} try{ renderCapital(); }catch(e){} try{ renderModelCard(); }catch(e){} loadMemesCal().then(()=>loadStratData()).then(()=>{ try{ renderMemes(); renderCal(); renderStrats(); renderMacro(); }catch(e){} try{ renderIdeas(); }catch(e){} try{ renderQuality(); renderReco(); renderSprofTests(); }catch(e){} try{ renderMyPort(); }catch(e){} try{ renderOutlook(); }catch(e){} try{ renderSigs(); }catch(e){} try{ renderWtop(); renderWhalesServer(); }catch(e){} try{ renderChw(); }catch(e){} try{ renderPropCard(); }catch(e){} }); loadIvan(); }
+async function loadJson(){ try{ PF=await (await fetch('./portfolio.json',{cache:'no-store'})).json(); }catch(e){ PF=null; } try{ WEEKLY=await (await fetch('./weekly.json',{cache:'no-store'})).json(); }catch(e){ WEEKLY=null; } try{ PAPER=await (await fetch('./paper.json',{cache:'no-store'})).json(); }catch(e){ PAPER=null; } try{ STATUS=await (await fetch('./status.json',{cache:'no-store'})).json(); }catch(e){ STATUS=null; } try{ CAL=await (await fetch('./calibration.json',{cache:'no-store'})).json(); }catch(e){ CAL=null; } try{ MK=await (await fetch('./markets.json',{cache:'no-store'})).json(); }catch(e){ MK=null; } try{ const r=await fetch('./capital.json',{cache:'no-store'}); CAP=r.ok?await r.json():null; }catch(e){ CAP=null; } try{ const r=await fetch('./altseason.json',{cache:'no-store'}); ALTS=r.ok?await r.json():null; }catch(e){ ALTS=null; } try{ const r=await fetch('./yield.json',{cache:'no-store'}); YLD=r.ok?await r.json():null; }catch(e){ YLD=null; } try{ const r=await fetch('./basis.json',{cache:'no-store'}); BAS=r.ok?await r.json():null; }catch(e){ BAS=null; } try{ RS=await (await fetch('./research.json',{cache:'no-store'})).json(); }catch(e){ RS=null; } try{ WHS=await (await fetch('./whales.json',{cache:'no-store'})).json(); }catch(e){ WHS=null; } try{ renderKpi(); renderTape(); renderWhalesServer(); checkVersion(); }catch(e){} renderAccounts(); feedServer(); renderFeed(); renderProc(); try{ renderLive(); renderAssistant(); }catch(e){} deskNotify(); try{ renderSpotChart(); }catch(e){} try{ renderApRadar(); try{ SIGR.update(); }catch(e){} renderUrgent(); renderTopTraders(); }catch(e){} try{ renderOvAccounts(); }catch(e){} try{ renderMyPort(); }catch(e){} try{ renderNovaCalc(); }catch(e){} try{ renderCapital(); }catch(e){} try{ renderModelCard(); }catch(e){} loadMemesCal().then(()=>loadStratData()).then(()=>{ try{ renderMemes(); renderCal(); renderStrats(); renderMacro(); }catch(e){} try{ renderIdeas(); }catch(e){} try{ renderQuality(); renderReco(); renderSprofTests(); }catch(e){} try{ renderMyPort(); }catch(e){} try{ renderOutlook(); }catch(e){} try{ renderSigs(); }catch(e){} try{ renderWtop(); renderWhalesServer(); }catch(e){} try{ renderChw(); }catch(e){} try{ renderPropCard(); }catch(e){} }); loadIvan(); }
 // ---------------------------------------------------------------- data
 const live={ok:false}; const K={}; const META={}; const LIQ_RECENT={}; const SETUPS={}; let BTC_BULL=true;
 async function rest(path){ const r=await fetch(FAPI+path,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
@@ -1608,19 +1624,84 @@ function whAdvice(){ const S=WHS.summary, fm=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M
   out.push('<div class="muted enote">Справочно: что держат крупнейшие счета Hyperliquid. Похожий показатель крупных трейдеров Binance на истории 2023–2026 цену не предсказывал — это не сигнал на вход.</div>');
   return out.join(''); }
 /* ---- futures tab: autopilot radar (how close each rule is to firing), urgent news, top traders of Binance/Bybit */
+/* «Ждём вход» rows — shared by the futures list and the «Радар сигналов» on Обзор (21.10). Same formulas as before, only moved out. */
+const apPc=(v,d)=>(v>0?'+':v<0?'−':'')+Math.abs(v*100).toFixed(d==null?1:d)+'%';
+const apBar=(f,lab,txt)=>{ f=Math.max(0,Math.min(1,f||0)); return `<div class="rbar"><span>${lab}</span><div class="gb"><i style="width:${(f*100).toFixed(0)}%;background:${f>=1?'var(--up)':f>0.7?'#f0c674':'var(--acc)'}"></i></div><b>${txt}</b></div>`; };
+const apPRN=k=>(IS_GUEST?(STRATS[k]&&STRATS[k].name):{cons:'Консервативная',bal:'Сбалансированная',aggr:'Агрессивная',lab:'Новые идеи',exp:'Свинг'}[k])||k;
+const apInPos=c=>{ const pr=(PAPER&&PAPER.profiles)||{}; const who=Object.entries(pr).filter(([k,v])=>(v.open||[]).some(o=>(o.symbol||'').replace('USDT','').replace('-','')===c)).map(([k])=>apPRN(k)); return who.length?` <small class="rsc pos">${IS_GUEST?'уже в сделке':'уже в сделке: '+who.join(', ')}</small>`:''; };
+function apScanRows(S){ return ((S&&S.rows)||[]).map(r=>{ const needB=(r.b_sigma&&r.ret_last!=null)?-3.5*Math.abs(r.ret_last/r.b_sigma):null; const b=needB?Math.max(0,-r.ret_last)/Math.abs(needB):0, f=(r.oi4!=null&&r.px4!=null)?Math.min(Math.max(0,-r.oi4)/0.12,Math.max(0,-r.px4)/0.05):0, d=r.basis!=null?Math.max(0,-r.basis)/(r.b_only?0.0025:0.002):0; return {...r,needB,fb:b,ff:f,fd:d,score:Math.max(b,f,d)}; }).sort((a,b)=>b.score-a.score); }
+function apRowHtml(r){ const pc=apPc, bar=apBar, inPos=apInPos; const bars=[]; if(r.needB) bars.push([r.fb,bar(r.fb,'Пролив за 15 минут',`${pc(r.ret_last,2)} · нужно ${pc(r.needB,2)}`)]); if(r.oi4!=null) bars.push([r.ff,bar(r.ff,'Сброс позиций за 4 часа',`ставки ${pc(r.oi4)} (нужно −12%) · цена ${pc(r.px4||0)} (нужно −5%)`)]); if(r.basis!=null) bars.push([r.fd,bar(r.fd,'Фьючерс дешевле спота',`${pc(-r.basis,2).replace('+','')} · нужно ${r.b_only?'0.25':'0.20'}%`)]); bars.sort((a,b)=>b[0]-a[0]);
+      return `<div class="rrow"><b>${r.coin}${r.b_only?` <small class="muted">альткоин${IS_GUEST?'':' · счёт «'+((STRATS.lab||{}).name||'Тест новых идей')+'»'}</small>`:''}${inPos(r.coin)} <small class="rsc ${r.score>=1?'pos':''}">до сигнала ${Math.min(100,Math.round(r.score*100))}%</small></b>${bars.length?bars[0][1]:''}${bars.length>1?`<details class="rmore"><summary>ещё ${bars.length-1} ${bars.length-1===1?'условие':'условия'}</summary>${bars.slice(1).map(x=>x[1]).join('')}</details>`:''}${r.score>=1&&!inPos(r.coin)?'<div class="muted" style="font-size:11px">Условие выполнено: вход будет на ближайшем запуске сервера, если по этой монете ещё нет позиции и есть свободный лимит сделок.</div>':r.score>=1?'<div class="muted" style="font-size:11px">Условие выполнено — сделка по этой монете уже открыта, вторую на ту же монету не открываем.</div>':''}</div>`; }
 function renderApRadar(){ const el=$('#apRadar'); if(!el) return; const S=PAPER&&PAPER.scan; if(!S){ el.innerHTML='<h2>Радар автопилота</h2><div class="muted">Появится после следующего запуска сервера.</div>'; return; }
   // 17.10: plain words instead of σ — every line says «сейчас X, для сделки нужно Y»
-  const pc=(v,d)=>(v>0?'+':v<0?'−':'')+Math.abs(v*100).toFixed(d==null?1:d)+'%';
-  const bar=(f,lab,txt)=>{ f=Math.max(0,Math.min(1,f||0)); return `<div class="rbar"><span>${lab}</span><div class="gb"><i style="width:${(f*100).toFixed(0)}%;background:${f>=1?'var(--up)':f>0.7?'#f0c674':'var(--acc)'}"></i></div><b>${txt}</b></div>`; };
-  const PRN=k=>(IS_GUEST?(STRATS[k]&&STRATS[k].name):{cons:'Консервативная',bal:'Сбалансированная',aggr:'Агрессивная',lab:'Новые идеи',exp:'Свинг'}[k])||k; const inPos=c=>{ const pr=(PAPER&&PAPER.profiles)||{}; const who=Object.entries(pr).filter(([k,v])=>(v.open||[]).some(o=>(o.symbol||'').replace('USDT','').replace('-','')===c)).map(([k])=>PRN(k)); return who.length?` <small class="rsc pos">${IS_GUEST?'уже в сделке':'уже в сделке: '+who.join(', ')}</small>`:''; };
+  const bar=apBar;
   const br=S.breadth||0, nb=S.need_breadth||0.4;
-  const rows=(S.rows||[]).map(r=>{ const needB=(r.b_sigma&&r.ret_last!=null)?-3.5*Math.abs(r.ret_last/r.b_sigma):null; const b=needB?Math.max(0,-r.ret_last)/Math.abs(needB):0, f=(r.oi4!=null&&r.px4!=null)?Math.min(Math.max(0,-r.oi4)/0.12,Math.max(0,-r.px4)/0.05):0, d=r.basis!=null?Math.max(0,-r.basis)/(r.b_only?0.0025:0.002):0; return {...r,needB,fb:b,ff:f,fd:d,score:Math.max(b,f,d)}; }).sort((a,b)=>b.score-a.score).slice(0,8);
+  const rows=apScanRows(S).slice(0,8);
   el.innerHTML=`<h2>${ico('radar')} Ждём вход <span class="r muted">панель наблюдения · обновление раз в 30 мин</span></h2>
     <div class="muted enote">Автопилот покупает только после резких падений. В каждой строке: что сейчас и сколько нужно для сделки. Полоска дошла до конца — будет вход.</div>
     ${bar(br/nb,'Паника по рынку: доля падающих монет',`${Math.round(br*100)}% · нужно ${Math.round(nb*100)}%`)}
-    <h3>Ближе всего к сигналу</h3>${rows.slice(0,6).map(r=>{ const bars=[]; if(r.needB) bars.push([r.fb,bar(r.fb,'Пролив за 15 минут',`${pc(r.ret_last,2)} · нужно ${pc(r.needB,2)}`)]); if(r.oi4!=null) bars.push([r.ff,bar(r.ff,'Сброс позиций за 4 часа',`ставки ${pc(r.oi4)} (нужно −12%) · цена ${pc(r.px4||0)} (нужно −5%)`)]); if(r.basis!=null) bars.push([r.fd,bar(r.fd,'Фьючерс дешевле спота',`${pc(-r.basis,2).replace('+','')} · нужно ${r.b_only?'0.25':'0.20'}%`)]); bars.sort((a,b)=>b[0]-a[0]);
-      return `<div class="rrow"><b>${r.coin}${r.b_only?` <small class="muted">альткоин${IS_GUEST?'':' · счёт «'+((STRATS.lab||{}).name||'Тест новых идей')+'»'}</small>`:''}${inPos(r.coin)} <small class="rsc ${r.score>=1?'pos':''}">до сигнала ${Math.min(100,Math.round(r.score*100))}%</small></b>${bars.length?bars[0][1]:''}${bars.length>1?`<details class="rmore"><summary>ещё ${bars.length-1} ${bars.length-1===1?'условие':'условия'}</summary>${bars.slice(1).map(x=>x[1]).join('')}</details>`:''}${r.score>=1&&!inPos(r.coin)?'<div class="muted" style="font-size:11px">Условие выполнено: вход будет на ближайшем запуске сервера, если по этой монете ещё нет позиции и есть свободный лимит сделок.</div>':r.score>=1?'<div class="muted" style="font-size:11px">Условие выполнено — сделка по этой монете уже открыта, вторую на ту же монету не открываем.</div>':''}</div>`; }).join('')}
+    <h3>Ближе всего к сигналу</h3>${rows.slice(0,6).map(r=>`<div data-rcoin="${r.coin}">${apRowHtml(r)}</div>`).join('')}
     <div class="muted" style="font-size:11px;margin-top:6px">«Пролив» — насколько резко упала цена за 15 минут; «нужно» — в 3.5 раза больше обычного движения этой монеты. «Ставки» — открытый интерес: сколько денег в позициях на фьючерсах.</div>`; }
+/* ---- «Радар сигналов» on Обзор (owner 21.10 15:27 «радар может быть в системе»). Real data only:
+   blips = the autopilot scan (the same rows as «Ждём вход» on Фьючерсы) + open CRYPTO NOVA futures trades.
+   Distance from the centre = 1 − «до сигнала»; open trades sit on the inner ring in green. The sweep lights a blip and shows its ticker. */
+const SIGR=(function(){
+  let cv=null, ctx=null, W=0, H=0, dpr=1, sw=-Math.PI/2, blips=[], sel=null, running=false, visible=true, last=0, ro=null, mixAsked=false;
+  const reduce=(()=>{ try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } })();
+  const ICE='127,211,255', GRN='58,219,147', AMB='240,198,116', TAU=Math.PI*2, SPD=TAU/4.2;
+  const ang=s=>{ let h=2166136261; for(const ch of String(s)){ h^=ch.charCodeAt(0); h=Math.imul(h,16777619); } return ((h>>>0)%7200)/7200*TAU; };
+  function build(){ const out=[], pr=(PAPER&&PAPER.profiles)||{}; let desks=[];
+    try{ const N=novaRes(); desks=[...new Set([...(N?N.comps.map(c=>c.k):[]),...novaMix()])].filter(k=>pr[k]); }catch(e){ desks=[]; }
+    const open=new Map(); desks.forEach(k=>(pr[k].open||[]).forEach(o=>{ const c=String(o.symbol||'').replace('USDT','').replace('-',''); if(c&&!open.has(c)) open.set(c,{k,o}); }));
+    open.forEach((v,c)=>out.push({coin:c,open:true,k:v.k,o:v.o,score:1}));
+    const S=PAPER&&PAPER.scan; if(S) apScanRows(S).filter(r=>!open.has(r.coin)).slice(0,Math.max(0,24-out.length)).forEach(r=>out.push({coin:r.coin,open:false,r,score:r.score}));
+    return out.slice(0,24).map(b=>{ const a=ang(b.coin); const rf=b.open?0.12+((a*7)%1)*0.05:Math.min(0.95,0.24+0.71*(1-Math.min(1,b.score||0))); return {...b,a,rf,lit:0,x:0,y:0}; }).map((b,i,arr)=>{ b.tag=b.open||arr.filter(x=>!x.open).indexOf(b)<6; return b; }); }
+  function size(){ if(!cv) return; dpr=Math.min(window.devicePixelRatio||1,2); const w=cv.clientWidth, h=cv.clientHeight; if(!w||!h) return; W=cv.width=Math.round(w*dpr); H=cv.height=Math.round(h*dpr); if(!running) frame(-1); }
+  function col(b){ return b.open?GRN:(b.score>=0.7?AMB:ICE); }
+  function frame(now){ if(!cv||!W) return; if(now!==-1&&!running) return;
+    const tm=now===-1?0:now/1000, dt=last&&now!==-1?Math.min(0.06,tm-last):0; last=tm;
+    const cx=W/2, cy=H/2, R=Math.min(W,H)/2-14*dpr; ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H);
+    const bg=ctx.createRadialGradient(cx,cy,0,cx,cy,R); bg.addColorStop(0,'rgba(12,28,58,.95)'); bg.addColorStop(1,'rgba(5,11,26,.95)'); ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(cx,cy,R,0,TAU); ctx.fill();
+    ctx.lineWidth=dpr; [0.2,0.47,0.73,1].forEach((f,i)=>{ ctx.strokeStyle=`rgba(${i===0?GRN:ICE},${i===0?0.45:i===3?0.42:0.2})`; ctx.setLineDash(i===3||i===0?[]:[2*dpr,5*dpr]); ctx.beginPath(); ctx.arc(cx,cy,R*f,0,TAU); ctx.stroke(); }); ctx.setLineDash([]);
+    ctx.strokeStyle=`rgba(${ICE},.1)`; ctx.beginPath(); for(let k=0;k<12;k++){ const a=k/12*TAU; ctx.moveTo(cx+Math.cos(a)*R*0.2,cy+Math.sin(a)*R*0.2); ctx.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R); } ctx.stroke();
+    ctx.font=`500 ${Math.round(8.5*dpr)}px 'JetBrains Mono',ui-monospace,monospace`; ctx.textAlign='left'; ctx.textBaseline='bottom'; ctx.fillStyle=`rgba(${ICE},.5)`;
+    ctx.fillText('ВХОД',cx+3*dpr,cy-R*0.2-2*dpr); ctx.fillText('БЛИЗКО',cx+3*dpr,cy-R*0.47-2*dpr); ctx.fillText('ДАЛЕКО',cx+3*dpr,cy-R*0.95+12*dpr);
+    if(!reduce){ sw=(sw+SPD*dt)%TAU;
+      const g=ctx.createConicGradient?ctx.createConicGradient(sw-0.9,cx,cy):null;
+      if(g){ g.addColorStop(0,`rgba(${ICE},0)`); g.addColorStop(0.9/TAU,`rgba(${ICE},.22)`); g.addColorStop(0.9/TAU+0.0001,`rgba(${ICE},0)`); g.addColorStop(1,`rgba(${ICE},0)`); ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,sw-0.9,sw); ctx.closePath(); ctx.fill(); }
+      ctx.strokeStyle=`rgba(${ICE},.75)`; ctx.lineWidth=1.4*dpr; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(sw)*R,cy+Math.sin(sw)*R); ctx.stroke(); }
+    const pos=[], rect=cv.getBoundingClientRect();
+    blips.forEach(b=>{ b.x=cx+Math.cos(b.a)*R*b.rf; b.y=cy+Math.sin(b.a)*R*b.rf;
+      if(!reduce){ const d=((sw-b.a)%TAU+TAU)%TAU; if(d<SPD*Math.max(dt,0.02)*1.5) b.lit=1; else b.lit=Math.max(0,b.lit-dt/2.6); }
+      const c=col(b), r=(b.open?4.2:3.2)*dpr, on=Math.max(b.lit,sel===b?1:0, b.open?0.35:0.18);
+      const gl=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,r*4.5); gl.addColorStop(0,`rgba(${c},${(0.55*on).toFixed(3)})`); gl.addColorStop(1,`rgba(${c},0)`); ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(b.x,b.y,r*4.5,0,TAU); ctx.fill();
+      ctx.fillStyle=`rgba(${c},${(0.45+0.55*on).toFixed(3)})`; ctx.beginPath(); ctx.arc(b.x,b.y,r,0,TAU); ctx.fill();
+      if(sel===b){ ctx.strokeStyle=`rgba(${c},.95)`; ctx.lineWidth=1.3*dpr; ctx.beginPath(); ctx.arc(b.x,b.y,r+5*dpr,0,TAU); ctx.stroke(); }
+      if(b.lit>0.25||sel===b||(reduce&&b.tag)){ ctx.font=`600 ${Math.round(9.5*dpr)}px 'JetBrains Mono',ui-monospace,monospace`; const right=b.x<cx+R*0.55; ctx.textAlign=right?'left':'right'; ctx.textBaseline='middle'; ctx.fillStyle=`rgba(${c},${Math.min(1,0.35+(sel===b?1:b.lit)).toFixed(3)})`; ctx.fillText(b.coin,b.x+(right?1:-1)*(r+5*dpr),b.y); }
+      pos.push([Math.round(rect.left+b.x/dpr),Math.round(rect.top+b.y/dpr),b.coin]); });
+    window.__sigBlipPos=pos;
+    ctx.fillStyle=`rgba(${GRN},.9)`; ctx.beginPath(); ctx.arc(cx,cy,2.2*dpr,0,TAU); ctx.fill();
+    if(now!==-1) requestAnimationFrame(frame); }
+  function setRun(){ const want=!!cv&&visible&&!document.hidden&&!reduce&&blips.length>0; if(want&&!running){ running=true; last=0; requestAnimationFrame(frame); } else if(!want){ running=false; } }
+  function detail(b){ const el=$('#srDet'); if(!el) return; if(!b){ el.innerHTML=''; return; }
+    const go=`<button class="ib sm" id="srGo">${b.open?'Открыть сделку во Фьючерсах':'Все условия — «Ждём вход»'} →</button>`;
+    if(!b.open){ el.innerHTML=apRowHtml(b.r)+go; }
+    else { const o=b.o, px=pxNow(o.symbol)||o.price||o.entry, sg=o.side==='LONG'?1:-1, pc=o.entry?sg*(px/o.entry-1)*100:0, st=o.stop_now||o.stop;
+      el.innerHTML=`<div class="rrow"><b>${b.coin} <small class="rsc pos">сделка открыта${IS_GUEST?'':' · '+apPRN(b.k)}</small></b><div class="srline">${sg>0?'лонг':'шорт'} от ${fmtP(o.entry)} · сейчас ${fmtP(px)} <b class="${pc>=0?'pos':'neg'}">${pc>=0?'+':''}${pc.toFixed(2)}%</b>${st!=null?` · стоп ${fmtP(st)}`:''}</div>${o.reason||o.why_ru?`<div class="muted srline">${String(o.reason||o.why_ru).slice(0,220)}</div>`:''}</div>${go}`; }
+    const g=$('#srGo'); if(g) g.onclick=()=>{ const t=document.querySelector('#segSub button[data-s="futures"]'); if(t) t.click(); setTimeout(()=>{ const c=b.open?document.querySelector('details.ftc'):($(`#apRadar [data-rcoin="${b.coin}"]`)||$('#apRadar')); if(c){ try{ c.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} if(c.tagName==='DETAILS'){ const all=[...document.querySelectorAll('details.ftc')]; const m=all.find(d=>(d.textContent||'').includes(b.coin)); if(m){ m.open=true; m.scrollIntoView({behavior:'smooth',block:'center'}); } } } },350); }; }
+  function pick(ev){ if(!cv||!blips.length) return; const r=cv.getBoundingClientRect(), x=(ev.clientX-r.left)*dpr, y=(ev.clientY-r.top)*dpr; let best=null, bd=1e9; blips.forEach(b=>{ const d=Math.hypot(b.x-x,b.y-y); if(d<bd){ bd=d; best=b; } }); sel=bd<=18*dpr?best:null; detail(sel); if(!running) frame(-1); }
+  function init(){ const card=$('#sigRadar'); if(!card||cv) return; card.querySelector('h2').innerHTML=`${ico('radar')} Радар сигналов <span class="r muted" id="srMeta"></span>`;
+    cv=$('#srCv'); ctx=cv.getContext('2d'); cv.addEventListener('click',pick);
+    if('ResizeObserver' in window){ ro=new ResizeObserver(()=>size()); ro.observe(cv); } else window.addEventListener('resize',size);
+    if('IntersectionObserver' in window) new IntersectionObserver(en=>{ visible=en[0].isIntersecting; setRun(); }).observe(cv);
+    document.addEventListener('visibilitychange',setRun); }
+  function update(){ init(); if(!cv) return; if(!NOVAF&&!mixAsked){ mixAsked=true; try{ loadStratData().then(()=>{ if(NOVAF) update(); }).catch(()=>{}); }catch(e){} } const keep=sel&&sel.coin; blips=build(); sel=keep?blips.find(b=>b.coin===keep)||null:null; window.__sigBlips=blips.length;
+    const nOpen=blips.filter(b=>b.open).length, nNear=blips.filter(b=>!b.open&&b.score>=0.7).length, m=$('#srMeta');
+    if(m) m.textContent=blips.length?`${blips.length} монет · в сделке ${nOpen} · близко к входу ${nNear}`:'';
+    const e=$('#srEmpty'); if(e) e.hidden=blips.length>0;
+    detail(sel); size(); setRun(); }
+  return {update};
+})();
 function renderUrgent(){ const im=(DEC&&DEC.news&&DEC.news.impacts)||[]; const day=Date.now()-12*3600e3;
   const xs=im.filter(i=>i.magnitude>=4&&i.created>=day&&/[а-яё]/i.test(i.title||'')).sort((a,b)=>b.created-a.created);
   let seen=[]; try{ seen=JSON.parse(localStorage.getItem('cnq_urg_seen')||'[]'); }catch(e){} const key=i=>String(i.id||i.title).slice(0,60);

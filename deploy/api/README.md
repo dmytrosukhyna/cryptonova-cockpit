@@ -29,6 +29,8 @@ Settings in `/etc/cnq.env`:
   characters, created on the server and never sent anywhere else:
   `grep -q '^CNQ_ADMIN_TOKEN=' /etc/cnq.env || echo "CNQ_ADMIN_TOKEN=$(openssl rand -hex 32)" >> /etc/cnq.env && systemctl restart cnq-api`.
   Without it every admin call answers 403. The system panel (app.html) shows «Админ-панель» only in owner mode.
+  21.10: the same token also switches on NOVA in the closed system's chat (`POST /v2/admin/nova`, the server's model key) —
+  sign in once in «Управление» with «Запомнить на этом устройстве»; Settings → «Проверить ИИ» shows the time or the exact error.
 
 Endpoints: see the docstring of `cnq/api/server.py`. Data: `/opt/cnq/run/data/api.sqlite` (not in git).
 

@@ -25,6 +25,8 @@ Write — each needs "confirm": true, else 400 confirm_required:
   POST /v2/admin/push  {segment, title, body, dry_run: true} → how many people and devices, nothing sent;
                        {segment, title, body, confirm: true} → sends in the background (GET /v2/admin/push shows the result)
   POST /v2/admin/plan  {data: {...}, confirm}
+  POST /v2/admin/nova  {system, user, max_tokens} → the closed system's NOVA chat through the server's model key (handled in
+                       server.py: Api._panel_nova, the same token check)
 Segments: all · lang:<ru|en|uk|el|es> · verified (BingX UID confirmed) · uid_pending (UID sent, not confirmed) · inactive7 (no
 visit for 7 days) · push_only · tag:<CRM tag>. A broadcast reaches only people whose «Новости» switch is on; it is refused during
 the quiet hours 22:00–09:00 Kyiv (the engine's own pushes keep the same rule) and when the same text went to the same segment in

@@ -78,6 +78,7 @@ class Api:
         self.nova = knowledge or nova.Knowledge()
         self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
         self.selftest: dict | None = None        # GET /v2/agent/selftest: the last real model call on a fixed question
+        self.panel_last: dict | None = None      # the last closed-system NOVA call (POST /v2/admin/nova): result + time
         self._selftest_lock = threading.Lock()
 
     # ---------------------------------------------------------------- helpers
@@ -218,7 +219,8 @@ class Api:
             ready = {"llm": self._llm_ready(),
                      "firebase_admin": bool(getattr(self.admin, "ready", False)),
                      "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
-            return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last}
+            return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last,
+                         "panel_last": self.panel_last}
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()
         if method == "GET" and path == "/v2/agent/selftest":
@@ -232,6 +234,9 @@ class Api:
                 return 404, {"error": "unknown_feed"}
             d = self._feed(m.group(1), lang)
             return (200, d) if d is not None else (503, {"error": "feed_unavailable"})
+        if method == "POST" and path == "/v2/admin/nova":                # the closed system's NOVA chat through the server's key
+            deny = self.console.check(headers)
+            return deny if deny else self._panel_nova(body)
         if path == "/v2/admin" or path.startswith("/v2/admin/"):          # the owner's admin panel: its own token, not Firebase
             return self.console.handle(method, path, url.query, headers, body)
         # ------------------------------------------------------------ signed-in user
@@ -340,6 +345,45 @@ class Api:
         if hit:
             return 200, {"answer": hit["a"], "source": "faq", "agent": al}
         return 200, {"error": "busy", "answer": nova.busy(lang), "agent": al}
+
+    PANEL_SYS_MAX, PANEL_USER_MAX = 4000, 40000
+
+    def _panel_nova(self, body: bytes) -> tuple[int, dict]:
+        """POST /v2/admin/nova (owner only, CNQ_ADMIN_TOKEN) — 21.10, owner: «в закрытой системе AI-помощник не отвечает».
+        The panel's chat asked the model from the browser with a key kept in that browser; without one it only had rule-based
+        answers. With the owner's admin token it now asks through the server's own NOVA key. Request {"system", "user",
+        "max_tokens"}; answer always 200: {"answer", "ms", "finish"} or {"error": timeout / rate_limit / llm_error / empty /
+        not_configured, "detail", "ms"}. Nothing is stored; the last result (no text) is in /v2/health as panel_last."""
+        try:
+            data = json.loads(body.decode() or "{}") if body else {}
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            return 400, {"error": "bad_json"}
+        system = str(data.get("system") or "")[: self.PANEL_SYS_MAX]
+        user = str(data.get("user") or "")[: self.PANEL_USER_MAX]
+        if len(user) < 2:
+            return 400, {"error": "bad_question"}
+        t0, out = time.time(), {}
+        if not self._llm_ready():
+            out = {"error": "not_configured"}
+        else:
+            llm = copy.copy(self.llm) if isinstance(self.llm, LLM) else self.llm
+            try:
+                llm.max_tokens = max(200, min(1200, int(data.get("max_tokens") or 800)))
+            except (TypeError, ValueError):
+                pass
+            try:
+                raw = llm.complete(system, user, temperature=0.3)
+                txt = (raw if isinstance(raw, str) else "").strip()
+                out = {"answer": txt, "finish": getattr(llm, "last_finish", None)} if txt else {"error": "empty", "finish": getattr(llm, "last_finish", None)}
+            except Exception as e:  # noqa: BLE001
+                msg = str(e)
+                out = {"error": "timeout" if "timed out" in msg.lower() else "rate_limit" if "429" in msg else "llm_error", "detail": msg[:160]}
+                print(f"panel nova: {out['error']}: {msg[:200]}", file=sys.stderr, flush=True)
+        out["ms"] = round((time.time() - t0) * 1000)
+        self.panel_last = {"result": out.get("error") or "ok", "ms": out["ms"], "at": int(time.time())}
+        return 200, out
 
     SELFTEST_EVERY_S = 600
     SELFTEST_Q = {"ru": "Что такое CRYPTO NOVA и как он работает?", "en": "What is CRYPTO NOVA and how does it work?"}

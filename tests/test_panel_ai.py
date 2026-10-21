@@ -14,17 +14,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def _block() -> str:
     s = open(os.path.join(ROOT, "web", "app.html"), encoding="utf-8").read()
     i = s.index("const LLM_TIMEOUT_MS=")
-    j = s.index("throw new Error(last||'нет ответа'); }", i) + len("throw new Error(last||'нет ответа'); }")
+    k = s.index("async function askLLM(", i)
+    j = s.index("throw new Error(last||'нет ответа'); }", k) + len("throw new Error(last||'нет ответа'); }")
     return s[i:j]
 
 
 HARNESS = r"""
 const LLMP={groq:{url:'https://g/x',model:'openai/gpt-oss-120b',name:'Groq · бесплатно'},gemini:{url:'https://m/x',model:'gemini-x',name:'Google Gemini · бесплатно'},anthropic:{url:'https://a/x',model:'claude',name:'Anthropic · платно'}};
-const SET={anth:'k',llm:'groq'}; const LS={}; const store=(k,v)=>{LS[k]=JSON.stringify(v)}; const load=(k,d)=>LS[k]?JSON.parse(LS[k]):d;
+const SET={anth:'k',llm:'groq'}; const LS={}; let TOK=''; const sessionStorage={getItem:k=>k==='cnq_admin_token'?TOK:null}; const localStorage={getItem:()=>null}; const store=(k,v)=>{LS[k]=JSON.stringify(v)}; const load=(k,d)=>LS[k]?JSON.parse(LS[k]):d;
 const console={warn(){} , log:globalThis.console.log};
 let calls=[]; let script=[];
 function resp(status,body,hdr){ return {ok:status>=200&&status<300,status,headers:{get:k=>(hdr||{})[k.toLowerCase()]||null},text:async()=>typeof body==='string'?body:JSON.stringify(body)}; }
-globalThis.fetch=(url,o)=>{ calls.push(JSON.parse(o.body)); const step=script.shift();
+globalThis.fetch=(url,o)=>{ calls.push(Object.assign(JSON.parse(o.body),{__url:url,__auth:(o.headers||{}).authorization||(o.headers||{})['x-api-key']})); const step=script.shift();
   if(step==='hang') return new Promise((res,rej)=>o.signal.addEventListener('abort',()=>{ const e=new Error('aborted'); e.name='AbortError'; rej(e); }));
   if(step==='neterr') return Promise.reject(new TypeError('Failed to fetch'));
   return Promise.resolve(resp(step[0],step[1],step[2])); };
@@ -40,6 +41,13 @@ const ok=t=>({choices:[{message:{content:t},finish_reason:'stop'}]});
   await run('empty',[[200,{choices:[{message:{content:''},finish_reason:'length'}]}]]);
   await run('net',['neterr','neterr']);
   await run('anth',[[200,{content:[{type:'text',text:'Да'}],stop_reason:'end_turn'}]],'anthropic');
+  // no browser key: the chat goes through the server with the «Управление» token; other callers still need a key
+  SET.anth=''; TOK='tok123';
+  await run('srv',[[200,{answer:'Через сервер',ms:900}]],'groq',{server:true});
+  await run('srvRetry',[[200,{error:'rate_limit',ms:10}],[200,{answer:'Со второй',ms:900}]],'groq',{server:true});
+  await run('srv403',[[403,{error:'admin_disabled'}]],'groq',{server:true});
+  await run('noServerFlag',[[200,{answer:'x'}]],'groq',{});
+  TOK=''; await run('noRoute',[],'groq',{server:true});
   R.log=load('cnq_ai_log',[]).length;
   globalThis.console.log(JSON.stringify(R)); })();
 """
@@ -60,6 +68,12 @@ def test_panel_ai_call_states():
     assert "лимит длины" in R["empty"]["err"]
     assert R["net"]["err"] == "нет связи с Groq" and R["net"]["n"] == 2
     assert R["anth"]["out"] == "Да"
+    assert R["srv"]["out"] == "Через сервер" and R["srv"]["body"]["__url"].endswith("/v2/admin/nova")
+    assert R["srv"]["body"]["__auth"] == "Bearer tok123" and R["srv"]["body"]["user"] == "q"
+    assert R["srvRetry"]["out"] == "Со второй" and R["srvRetry"]["n"] == 2
+    assert "токен «Управления»" in R["srv403"]["err"]
+    assert R["noServerFlag"]["err"] == "нет ключа" and R["noServerFlag"]["n"] == 0     # brief / translations never use the server key
+    assert R["noRoute"]["err"] == "нет ключа"
     assert R["log"] >= 7
 
 
@@ -117,3 +131,32 @@ def test_agent_selftest_real_call_rate_limited(tmp_path):
     assert api.handle("GET", "/v2/agent/selftest", {}, b"")[1]["result"] == "empty"
     api.selftest, api.llm = None, None
     assert api.handle("GET", "/v2/agent/selftest", {}, b"")[1]["result"] == "not_configured"
+
+
+def test_admin_nova_route_owner_only(tmp_path, monkeypatch=None):
+    """POST /v2/admin/nova: the closed system's chat through the server's key — only with CNQ_ADMIN_TOKEN."""
+    import time as _t
+    from cnq.api.auth import FirebaseVerifier
+    from cnq.api.server import Api
+    from cnq.api.store import Store
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "app_home.json").write_text(json.dumps({"asof": int(_t.time() * 1000)}))
+    llm = _LLM(answer="BTC в бычьем режиме. Что делаем: ждать.")
+    api = Api(Store(str(tmp_path / "api.sqlite")), FirebaseVerifier("crypto-nova", keys={}), str(web), llm)
+    body = json.dumps({"system": "sys", "user": "Контекст… Вопрос: что по рынку?", "max_tokens": 600}).encode()
+    keep = os.environ.pop("CNQ_ADMIN_TOKEN", None)
+    try:
+        assert api.handle("POST", "/v2/admin/nova", {}, body)[0] == 403                        # no token on the server
+        os.environ["CNQ_ADMIN_TOKEN"] = "t" * 40
+        assert api.handle("POST", "/v2/admin/nova", {"authorization": "Bearer wrong"}, body)[0] == 401
+        c, d = api.handle("POST", "/v2/admin/nova", {"authorization": "Bearer " + "t" * 40}, body)
+        assert c == 200 and d["answer"].startswith("BTC") and isinstance(d["ms"], int) and llm.seen[-1].endswith("что по рынку?")
+        llm.exc = RuntimeError("HTTP 429: rate limit")
+        c, d = api.handle("POST", "/v2/admin/nova", {"authorization": "Bearer " + "t" * 40}, body)
+        assert c == 200 and d["error"] == "rate_limit" and api.panel_last["result"] == "rate_limit"
+        assert api.handle("GET", "/v2/health", {}, b"")[1]["panel_last"]["result"] == "rate_limit"
+    finally:
+        os.environ.pop("CNQ_ADMIN_TOKEN", None)
+        if keep is not None:
+            os.environ["CNQ_ADMIN_TOKEN"] = keep

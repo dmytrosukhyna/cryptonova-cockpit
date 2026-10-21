@@ -1086,7 +1086,23 @@ const LLMP={groq:{url:'https://api.groq.com/openai/v1/chat/completions',model:'o
 const LLM_TIMEOUT_MS=25000;
 function aiLog(rec){ try{ const L=load('cnq_ai_log',[]); L.unshift(Object.assign({t:Date.now(),prov:SET.llm},rec)); store('cnq_ai_log',L.slice(0,20)); }catch(e){} if(!rec.ok) console.warn('[NOVA-AI]',rec); }
 function llmErrText(j,status){ if(Array.isArray(j)) j=j[0]; const e=j&&j.error; const m=e?(typeof e==='string'?e:(e.message||JSON.stringify(e))):''; return String(m||('HTTP '+status)).replace(/\s+/g,' ').slice(0,160); }
-async function askLLM(system,user,maxTokens,opt){ opt=opt||{}; const P=LLMP[SET.llm]||LLMP.groq; if(!SET.anth) throw new Error('нет ключа');
+/* 21.10: in the owner's browser there was no AI key at all (cnq_anth empty) — the chat could only answer by rules. With the
+   «Управление» token (the same one the admin tab uses) the chat now asks NOVA through the server's own key. */
+const ADMIN_API='https://app.crypto-capital.app/v2/admin';
+function adminTok(){ try{ return sessionStorage.getItem('cnq_admin_token')||localStorage.getItem('cnq_admin_token')||''; }catch(e){ return ''; } }
+function aiRoute(){ return SET.anth?'key':(adminTok()?'server':''); }
+async function askServer(system,user,maxTokens,opt){ const tok=adminTok(); if(!tok) throw new Error('нет ключа'); let last='';
+  for(let attempt=0;attempt<2;attempt++){ const ac=new AbortController(), t0=performance.now(), lim=opt.timeout||35000, tm=setTimeout(()=>ac.abort(),lim); let r,j=null;
+    try{ r=await fetch(ADMIN_API+'/nova',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+tok},body:JSON.stringify({system,user,max_tokens:maxTokens||800}),signal:ac.signal}); const tx=await r.text(); try{ j=JSON.parse(tx); }catch(e){} }
+    catch(e){ clearTimeout(tm); last=e.name==='AbortError'?`сервер не ответил за ${Math.round(lim/1000)} с`:'нет связи с сервером CRYPTO NOVA'; aiLog({ok:false,prov:'server',ms:Math.round(performance.now()-t0),err:last,attempt}); if(attempt===0&&e.name!=='AbortError'){ await new Promise(z=>setTimeout(z,1500)); continue; } throw new Error(last); }
+    clearTimeout(tm); const ms=Math.round(performance.now()-t0);
+    if(r.status===401||r.status===403){ last=r.status===403?'на сервере не задан токен «Управления»':'токен «Управления» не подошёл — войдите заново'; aiLog({ok:false,prov:'server',ms,status:r.status,err:last}); throw new Error(last); }
+    if(!r.ok||!j){ last='сервер ответил '+r.status; aiLog({ok:false,prov:'server',ms,status:r.status,err:last,attempt}); if(attempt===0&&r.status>=500){ await new Promise(z=>setTimeout(z,2000)); continue; } throw new Error(last); }
+    if(j.answer){ aiLog({ok:true,prov:'server',ms,status:200,attempt}); return String(j.answer).trim(); }
+    last={timeout:'модель не успела ответить',rate_limit:'лимит запросов модели — через минуту',empty:'пустой ответ модели',not_configured:'на сервере нет ключа ИИ'}[j.error]||('ошибка модели'+(j.detail?': '+String(j.detail).slice(0,80):''));
+    aiLog({ok:false,prov:'server',ms,status:200,err:last,attempt}); if(attempt===0&&j.error==='rate_limit'){ await new Promise(z=>setTimeout(z,4000)); continue; } throw new Error(last); }
+  throw new Error(last||'нет ответа'); }
+async function askLLM(system,user,maxTokens,opt){ opt=opt||{}; const P=LLMP[SET.llm]||LLMP.groq; if(!SET.anth){ if(opt.server&&adminTok()) return askServer(system,user,maxTokens,opt); throw new Error('нет ключа'); }
   const think=/gpt-oss/.test(P.model), mt=Math.max(maxTokens||600, think?1500:0); let url=P.url, headers, body;
   if(SET.llm==='anthropic'){ headers={'content-type':'application/json','x-api-key':SET.anth,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}; body={model:P.model,max_tokens:mt,system,messages:[{role:'user',content:user}]}; }
   else { headers={'content-type':'application/json','authorization':'Bearer '+SET.anth}; body={model:P.model,max_tokens:mt,temperature:0.3,messages:[{role:'system',content:system},{role:'user',content:user}]}; if(think){ if(SET.llm==='groq') body.reasoning_effort='low'; else if(SET.llm==='openrouter') body.reasoning={effort:'low'}; } }
@@ -3200,7 +3216,7 @@ function ctxPack(){ const s=cur; const b=K[s]&&(K[s]['15m']||K[s]['1h']), d=K[s]
 const ANALYST_SYS=`Ты — персональный аналитик CRYPTO NOVΛ: спокойный, точный, говоришь просто, как для новичка, но по делу. Отвечай по-русски, 3–7 предложений, без воды.
 Используй ТОЛЬКО факты из JSON-контекста (цены, зоны, режимы, сигналы, портфель, новости, статистика). Если данных нет — так и скажи, не выдумывай числа.
 Каждый ответ заканчивай строкой «Что делаем: …» — конкретное действие: покупать / продавать / ждать / наблюдать, с уровнем и стопом, если уместно. Никаких гарантий доходности. Если спрашивают монету, которой нет в данных, — скажи, что панель её не отслеживает.`;
-function chatMode(){ $('#chatMode').textContent=SET.anth?'живой · '+(LLMP[SET.llm]||LLMP.groq).name.split(' ·')[0]:'по правилам · добавьте ключ в Слои'; }
+function chatMode(){ const r=aiRoute(); $('#chatMode').textContent=r==='key'?'живой · '+(LLMP[SET.llm]||LLMP.groq).name.split(' ·')[0]:r==='server'?'живой · сервер CRYPTO NOVA':'по правилам · ИИ не подключён'; }
 function ruleAnswer(q){ const ql=q.toLowerCase(); { const any=!coinFromText(' '+ql+' ')&&anyCoinFromText(' '+ql+' '); if(any){ const c=RSC(any); if(c) return cardAnswer(c); const m=MK.top.find(x=>x.symbol===any); if(m) return `${m.name} (${any}): #${m.rank}, ${fmtP(m.price)}, за сутки ${(m.chg24||0).toFixed(1)}%, за неделю ${(m.chg7||0).toFixed(1)}%. Анкета ещё собирается.`; } } const hit=UNIVERSE.find(s=>ql.includes(nm(s).toLowerCase())||ql.includes(nmI(s).toLowerCase().split(' ')[0])); if(hit&&hit!==cur){ select(hit); } const a=advise(cur); const P=ctxPack(); let t=`${dispName(cur)}: ${P.current.price?fmtP(P.current.price):'—'}. ${a.head}. ${a.text}`; if(a.why.length) t+='\n'+a.why.slice(0,3).map(w=>'• '+w).join('\n'); if(/рынок|битк|btc|общ/.test(ql)) t=`Рынок: BTC ${BTC_BULL?'в бычьем режиме — лонги разрешены':'в медвежьем режиме — лонги по альтам запрещены'}. Активных сигналов: ${UNIVERSE.reduce((n,s)=>n+(SETUPS[s]||[]).filter(x=>x.state!=='СЛЕДИТЬ').length,0)}. ${P.news.length?'Главная новость: '+P.news[0].title+'.':''}\n`+t; return t+`\nЧто делаем: ${a.head.toLowerCase()}.`; }
 /* 21.10: the answer bubble shows «NOVA думает · N с» while waiting (never a bare «…» forever); a failure says why in plain words,
    offers «Повторить» and still gives the panel's rule-based answer, clearly labelled as such. The context sent to the model is
@@ -3209,16 +3225,19 @@ function ctxForAI(){ const C=ctxPack(); if(Array.isArray(C.coins)&&C.coins.lengt
 async function ask(q,bubble){ if(!bubble&&isGreeting(q)){ voiceCommand(q); return; } const m=$('#chatMsgs'); let a=bubble;
   if(!a){ const u=document.createElement('div'); u.className='u'; u.textContent=q; m.appendChild(u); a=document.createElement('div'); a.className='a'; m.appendChild(a); }
   m.scrollTop=m.scrollHeight;
-  if(!SET.anth){ a.textContent=ruleAnswer(q); m.scrollTop=m.scrollHeight; return; }
+  if(!aiRoute()){ a.textContent=ruleAnswer(q); if(!ask.hinted){ ask.hinted=true; const h=document.createElement('span'); h.className='airule'; h.textContent='\nЭто ответ по правилам панели — ИИ сейчас не подключён. Включить: войдите во вкладку «Управление» (токен) или вставьте бесплатный ключ Groq: Настройки → «Ключ ИИ-аналитика».'; a.appendChild(h); } m.scrollTop=m.scrollHeight; return; }
   const t0=Date.now(); a.classList.add('wait'); a.textContent='NOVA думает…'; const tick=setInterval(()=>{ const sec=Math.round((Date.now()-t0)/1000); if(sec>=4) a.textContent=`NOVA думает… ${sec} с`; },1000);
-  try{ const txt=await askLLM(ANALYST_SYS,`Контекст панели (JSON):\n${JSON.stringify(ctxForAI())}\n\nВопрос: ${q}`,600); clearInterval(tick); a.classList.remove('wait'); a.textContent=txt; }
+  try{ const txt=await askLLM(ANALYST_SYS,`Контекст панели (JSON):\n${JSON.stringify(ctxForAI())}\n\nВопрос: ${q}`,600,{server:true}); clearInterval(tick); a.classList.remove('wait'); a.textContent=txt; }
   catch(e){ clearInterval(tick); a.classList.remove('wait'); a.textContent='';
     const h=document.createElement('span'); h.className='aierr'; h.textContent=`ИИ не ответил: ${e.message}.`; a.appendChild(h);
     const b=document.createElement('button'); b.className='airetry'; b.type='button'; b.textContent='Повторить'; b.addEventListener('click',()=>ask(q,a)); a.appendChild(b);
     const r=document.createElement('span'); r.className='airule'; r.textContent='Пока — ответ по правилам панели:\n'+ruleAnswer(q); a.appendChild(r); }
   m.scrollTop=m.scrollHeight; }
 /* Settings → «Проверить ИИ»: one tiny request to the chosen provider; says OK with the time, or the exact error */
-async function checkAI(){ const out=$('#sAiCheck'); if(!out) return; const key=$('#sAnth').value.trim(), prov=$('#sLlmP').value; if(!key){ out.textContent='Сначала вставьте ключ.'; return; }
+async function checkAI(){ const out=$('#sAiCheck'); if(!out) return; const key=$('#sAnth').value.trim(), prov=$('#sLlmP').value;
+  if(!key){ if(!adminTok()){ out.textContent='Ключа нет и вход в «Управление» не выполнен — ИИ не подключён.'; return; } out.textContent='Проверяю сервер…'; const t0=performance.now();
+    try{ const t=await askServer('Ты проверка связи. Ответь одним словом.','Скажи слово: работает',200,{timeout:30000}); out.textContent=`Работает через сервер CRYPTO NOVA: ответ за ${((performance.now()-t0)/1000).toFixed(1)} с («${t.slice(0,30)}»).`; }
+    catch(e){ out.textContent=`Не работает: ${e.message}`; } return; }
   const keep=[SET.anth,SET.llm]; SET.anth=key; SET.llm=prov; out.textContent='Проверяю…'; const t0=performance.now();
   try{ const t=await askLLM('Ты проверка связи. Ответь одним словом.','Скажи слово: работает',60,{timeout:20000}); out.textContent=`Работает: ${(LLMP[prov]||LLMP.groq).name.split(' ·')[0]} ответил за ${((performance.now()-t0)/1000).toFixed(1)} с («${t.slice(0,30)}»).`; }
   catch(e){ out.textContent=`Не работает: ${e.message}`; }

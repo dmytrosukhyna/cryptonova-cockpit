@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-10-20",
+  "updated": "2026-10-21",
   "title": "Learn with CRYPTO NOVA",
   "note": "Not financial advice. Past results don't guarantee future ones.",
   "levels": [
@@ -942,28 +942,30 @@
           "cards": [
             {
               "title": "Bread got more expensive",
-              "text": "Think back to what bread cost 10 years ago. Most likely, less than it does now. The same goes for bus fares and utility bills. Bread didn't get bigger or tastier. Its price just creeps up year after year — you can see it on the chart.",
+              "text": "Think back to what bread cost 10 years ago. Most likely, less than it does now. The same goes for bus fares and utility bills. Bread didn't get bigger or tastier — prices just creep up year after year. The chart shows real US data: what cost $100 in 2000 cost about $182 in 2024.",
               "example": "In real life: Grandma says, “This money used to buy me a full bag of groceries.” And she's right.",
               "art": "shop",
               "chart": {
                 "kind": "line",
                 "points": [
-                  2.0,
-                  2.1,
-                  2.2,
-                  2.3,
-                  2.4,
-                  2.5
+                  100.0,
+                  109.7,
+                  125.0,
+                  133.3,
+                  139.4,
+                  150.3,
+                  182.2
                 ],
                 "labels": [
-                  "year 1",
-                  "year 2",
-                  "year 3",
-                  "year 4",
-                  "year 5",
-                  "year 6"
+                  "2000",
+                  "2004",
+                  "2008",
+                  "2012",
+                  "2016",
+                  "2020",
+                  "2024"
                 ],
-                "caption": "Illustrative example: price of a loaf of bread, $"
+                "caption": "US consumer price index (CPI-U, BLS): what cost $100 in 2000"
               }
             },
             {
@@ -1689,6 +1691,238 @@
               ],
               "answer": 3,
               "why": "There are 2 signs here at once: “we'll double it” and “a celebrity is giving it away.” The video is fake, and whatever you send won't come back."
+            }
+          ]
+        },
+        {
+          "id": "l1-ethereum",
+          "title": "Ether and smart contracts",
+          "minutes": 4,
+          "goal": "After this lesson you will understand how ether differs from bitcoin and what a smart contract is.",
+          "cards": [
+            {
+              "title": "Ether is more than a coin",
+              "text": "Ethereum (ether, ETH) launched in 2015. It is the second-largest cryptocurrency. Bitcoin mostly stores and moves money, while the Ethereum network also runs programs.",
+              "example": "In real life: bitcoin is a reliable safe, ether is a safe with automation that opens by itself when a condition is met.",
+              "art": "globe"
+            },
+            {
+              "title": "A smart contract",
+              "text": "A smart contract is a program on a blockchain that follows the rule «if A happens, do B». It cannot be quietly rewritten afterwards, and it works without a middleman. Coin swaps, loans and stablecoins run on smart contracts.",
+              "example": "In real life: a vending machine. Drop a coin, get water. No shop assistant needed.",
+              "art": "robot"
+            },
+            {
+              "title": "Gas is the fee for an action",
+              "text": "Every action on the Ethereum network costs a small fee called gas. It is paid in ether to those who keep the network running. When many people use the network, gas gets pricier; when few do, it gets cheaper.",
+              "example": "In real life: a taxi costs more at rush hour and less at night.",
+              "art": "calculator"
+            },
+            {
+              "title": "Risks",
+              "text": "Smart-contract code can contain bugs, and money has been stolen through them more than once. Ether's price usually swings harder than bitcoin's. So start small and use only well-known services.",
+              "example": "In real life: even a good lock can be faulty. That is why big sums are not kept where you are unsure.",
+              "art": "warning"
+            }
+          ],
+          "remember": [
+            "Ether is a network for programs, not just a coin.",
+            "A smart contract carries out an «if — then» rule by itself, without a middleman.",
+            "Actions on the network cost gas; code can contain bugs."
+          ],
+          "quiz": [
+            {
+              "q": "What is a smart contract?",
+              "options": [
+                "A paper agreement at a notary",
+                "A program on a blockchain that carries out a condition by itself",
+                "A bank loan",
+                "An exchange app"
+              ],
+              "answer": 1,
+              "why": "A smart contract is a program following «if A — then B». It runs by itself, without a middleman."
+            },
+            {
+              "q": "What is gas on the Ethereum network?",
+              "options": [
+                "Fuel for servers",
+                "The fee for an action on the network",
+                "The name of a wallet",
+                "A type of stablecoin"
+              ],
+              "answer": 1,
+              "why": "Gas is the fee for each action on the network. It goes to those who keep the network running."
+            },
+            {
+              "q": "Which risk of smart contracts is real?",
+              "options": [
+                "A bug in the code through which money is stolen",
+                "The contract does not work at night",
+                "The contract works in one country only",
+                "There is no risk"
+              ],
+              "answer": 0,
+              "why": "Code is written by people and can contain bugs. Large sums have already been stolen through them."
+            }
+          ]
+        },
+        {
+          "id": "l1-fees",
+          "title": "Fees: what a purchase really costs",
+          "minutes": 4,
+          "goal": "After this lesson you will be able to add up every cost of buying and withdrawing crypto.",
+          "cards": [
+            {
+              "title": "The exchange fee",
+              "text": "The exchange takes a percentage of every trade. Often it is 0.1%: buy $100 — pay $100 × 0.1% = $0.10. On small sums it is pennies, but with frequent trades it adds up noticeably.",
+              "example": "In real life: a bank transfer fee. Once it is unnoticeable, every day it is real money.",
+              "art": "calculator",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  0.1,
+                  1,
+                  10,
+                  50
+                ],
+                "labels": [
+                  "1 trade",
+                  "10",
+                  "100",
+                  "500"
+                ],
+                "caption": "What a 0.1% fee costs on $100 trades, $"
+              }
+            },
+            {
+              "title": "The spread",
+              "text": "The buying price and the selling price on an exchange differ slightly. This gap is called the spread. For popular coins it is tiny, for rare ones it is noticeable: buy and sell right away — and you are already down.",
+              "example": "In real life: an exchange booth buys dollars cheaper than it sells them.",
+              "art": "scale"
+            },
+            {
+              "title": "The network fee for withdrawals",
+              "text": "When you withdraw coins from the exchange to your own wallet, you pay a network fee. It is usually a fixed amount, not a percentage: withdrawing $20 or $2,000 costs the same. So withdrawing in small bits does not pay.",
+              "example": "In real life: shipping a parcel costs the same whatever is inside.",
+              "art": "chain"
+            },
+            {
+              "title": "Count honestly",
+              "text": "Before a trade, add everything up: the exchange fee, the spread and the withdrawal fee. Buy $100 and sell right away at 0.1% per trade — that is already −$0.20, plus the spread. Profit is what is left after all costs.",
+              "example": "In real life: a bargain in another city is counted together with the trip.",
+              "art": "calculator"
+            }
+          ],
+          "remember": [
+            "The exchange takes a percentage of every trade.",
+            "The spread is the gap between the buying and the selling price.",
+            "Withdrawals cost a fixed fee: withdraw less often and in bigger amounts."
+          ],
+          "quiz": [
+            {
+              "q": "The fee is 0.1%. You buy $500. How much do you pay?",
+              "options": [
+                "$0.05",
+                "$0.50",
+                "$5",
+                "$50"
+              ],
+              "answer": 1,
+              "why": "$500 × 0.1% = $0.50."
+            },
+            {
+              "q": "What is the spread?",
+              "options": [
+                "A crypto tax",
+                "The gap between the buying price and the selling price",
+                "A withdrawal fee",
+                "The name of a stablecoin"
+              ],
+              "answer": 1,
+              "why": "The spread is the difference between the price you can buy at and the price you can sell at."
+            },
+            {
+              "q": "Why is withdrawing coins in small parts a bad deal?",
+              "options": [
+                "The network fee is fixed and eats a large share of a small amount",
+                "The exchange forbids it",
+                "The coins get lost",
+                "Withdrawals cost nothing"
+              ],
+              "answer": 0,
+              "why": "The withdrawal fee is usually the same. A $5 fee is 25% of $20 but 0.25% of $2,000."
+            }
+          ]
+        },
+        {
+          "id": "l1-2fa",
+          "title": "Protecting your account: password and two-factor check",
+          "minutes": 4,
+          "goal": "After this lesson you will know how to protect an exchange account in 10 minutes.",
+          "cards": [
+            {
+              "title": "One password — one site",
+              "text": "If your email password also opens the exchange, a leak on one site opens them all. The exchange needs its own long password. A password manager makes storing passwords easy.",
+              "example": "In real life: nobody makes one key for the flat, the car and the safe.",
+              "art": "key_lock"
+            },
+            {
+              "title": "Two-factor check (2FA)",
+              "text": "Besides the password you need a code from an authenticator app on your phone. Even if the password is stolen, nobody can log in without the phone. SMS codes are weaker: fraudsters sometimes get a copy of someone else's SIM card.",
+              "example": "In real life: a door with two locks — one key in your pocket, the other in your phone.",
+              "art": "shield"
+            },
+            {
+              "title": "Backup codes",
+              "text": "When you turn on 2FA, the exchange gives you backup codes. Write them on paper and keep them somewhere safe. If you lose your phone, they get you back in.",
+              "example": "In real life: a spare key goes to a relative, not under the doormat.",
+              "art": "books"
+            },
+            {
+              "title": "Who never gets your codes",
+              "text": "Exchange staff and «support» never ask for a 2FA code, a password or a wallet phrase. Whoever asks is a fraudster, even if they write in the exchange's name and with its logo.",
+              "example": "In real life: a bank never calls to ask for your PIN.",
+              "art": "thief"
+            }
+          ],
+          "remember": [
+            "The exchange gets its own long password.",
+            "Turn on 2FA with an authenticator app.",
+            "Codes and passwords go to no one — not even «support»."
+          ],
+          "quiz": [
+            {
+              "q": "What does 2FA give you?",
+              "options": [
+                "Faster trades",
+                "Without the second code from your phone nobody can log in, even with the password",
+                "Lower fees",
+                "Nothing"
+              ],
+              "answer": 1,
+              "why": "2FA is a second lock. A stolen password is not enough: the code from your phone is needed too."
+            },
+            {
+              "q": "«Exchange support» asks for the code from your authenticator. What do you do?",
+              "options": [
+                "Give the code",
+                "Send the password instead",
+                "Give nothing: it is a fraudster",
+                "Send the wallet phrase"
+              ],
+              "answer": 2,
+              "why": "Real support never asks for codes or passwords. Such a request is always fraud."
+            },
+            {
+              "q": "Where should you keep 2FA backup codes?",
+              "options": [
+                "In notes on the same phone",
+                "On paper in a safe place",
+                "In a chat with friends",
+                "Nowhere, they are not needed"
+              ],
+              "answer": 1,
+              "why": "If the phone is lost, the notes on it are lost too. Paper in a safe place is the simplest way."
             }
           ]
         }
@@ -2510,6 +2744,268 @@
               "why": "Every country has its own rules, and they change. It's safer to ask a professional, and your purchase log will help them."
             }
           ]
+        },
+        {
+          "id": "l2-compound",
+          "title": "Compound growth: why time matters more than the sum",
+          "minutes": 4,
+          "goal": "After this lesson you will see why starting early often matters more than a big sum.",
+          "cards": [
+            {
+              "title": "Interest on interest",
+              "text": "Income that stays invested earns income too. That is compound growth. $1,000 at +10% a year becomes $1,100 after a year and $1,210 after two — not $1,200.",
+              "example": "In real life: a snowball — the longer it rolls, the faster it grows.",
+              "art": "chart_up",
+              "chart": {
+                "kind": "line",
+                "points": [
+                  1000,
+                  1611,
+                  2594,
+                  4177,
+                  6727,
+                  10835,
+                  17449
+                ],
+                "labels": [
+                  "0 years",
+                  "5 years",
+                  "10 years",
+                  "15 years",
+                  "20 years",
+                  "25 years",
+                  "30 years"
+                ],
+                "caption": "Illustrative example: $1,000 at a steady +10% a year, $"
+              }
+            },
+            {
+              "title": "Time beats the sum",
+              "text": "The earlier you start, the longer growth works for you. At 7% a year, $10,000 becomes about $19,700 in 10 years and about $76,000 in 30 years. Same money — the only difference is time.",
+              "example": "In real life: a tree planted 20 years earlier gives shade that money cannot buy.",
+              "art": "clock"
+            },
+            {
+              "title": "The rule of 72",
+              "text": "A quick mental check: 72 ÷ the yearly percentage ≈ how many years it takes to double. At 8% a year — about 9 years, at 6% — 12.",
+              "example": "In real life: the «about an hour per 60 km» estimate — not exact, but instantly clear.",
+              "art": "calculator"
+            },
+            {
+              "title": "But growth is not smooth",
+              "text": "In real life returns do not arrive evenly every year. Bitcoin has had years of −60% and +150%. Compounding works over the long run if you do not sell everything in a panic during a drawdown. Growth is not guaranteed.",
+              "example": "In real life: a mountain road — ups and downs, and only at the end do you see how high you climbed.",
+              "art": "rollercoaster"
+            }
+          ],
+          "remember": [
+            "Income on income speeds up growth over time.",
+            "Rule of 72: 72 ÷ % a year ≈ years to double.",
+            "Real growth is uneven and not guaranteed."
+          ],
+          "quiz": [
+            {
+              "q": "$1,000 at +10% a year. How much after 2 years with compounding?",
+              "options": [
+                "$1,200",
+                "$1,210",
+                "$1,100",
+                "$2,000"
+              ],
+              "answer": 1,
+              "why": "$1,000 × 1.1 = $1,100, then $1,100 × 1.1 = $1,210. The second year also added interest on the first year's income."
+            },
+            {
+              "q": "By the rule of 72: in how many years does money double at 6% a year?",
+              "options": [
+                "6",
+                "12",
+                "72",
+                "24"
+              ],
+              "answer": 1,
+              "why": "72 ÷ 6 = 12 years."
+            },
+            {
+              "q": "What hurts compounding most?",
+              "options": [
+                "A long time frame",
+                "Selling everything in a panic during a drawdown",
+                "Regular top-ups",
+                "Patience"
+              ],
+              "answer": 1,
+              "why": "Selling in a drawdown cuts the growth short and locks in the loss. Compounding needs time."
+            }
+          ]
+        },
+        {
+          "id": "l2-rebalance",
+          "title": "Rebalancing: keeping your shares in order",
+          "minutes": 4,
+          "goal": "After this lesson you will be able to bring your portfolio back to its planned shares and see why it matters.",
+          "cards": [
+            {
+              "title": "Shares drift on their own",
+              "text": "You decided to hold 60% in bitcoin and 40% in dollars: $6,000 and $4,000. Bitcoin doubled — now it is $12,000 and $4,000, that is 75% and 25%. The risk grew by itself, without your decision.",
+              "example": "In real life: a garden bed left unweeded — the weeds crowd out everything else.",
+              "art": "scale",
+              "chart": {
+                "kind": "split",
+                "points": [
+                  75,
+                  25
+                ],
+                "labels": [
+                  "bitcoin",
+                  "dollars"
+                ],
+                "caption": "The plan was 60/40 — after bitcoin's rise it is 75/25"
+              }
+            },
+            {
+              "title": "Put it back",
+              "text": "Rebalancing means selling part of what grew and buying more of what lagged. The total is $16,000; the 60/40 target is $9,600 and $6,400. Sell bitcoin worth $12,000 − $9,600 = $2,400.",
+              "example": "In real life: trimming the bushes so one does not block the sun for the rest.",
+              "art": "calculator"
+            },
+            {
+              "title": "When to do it",
+              "text": "Usually on a schedule — say once a quarter — or when a share has drifted far, for example by 10 percentage points. Too often means extra fees; too rarely lets the risk grow.",
+              "example": "In real life: a car gets its service on schedule, not every day.",
+              "art": "calendar"
+            },
+            {
+              "title": "Why bother",
+              "text": "Rebalancing makes you sell a little of what got expensive and buy what got cheap — without emotions. It does not promise higher returns, but it keeps the risk at the level you chose.",
+              "example": "In real life: a rule like «no more than two desserts» works better than deciding anew each time.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "One coin's growth changes the shares and the risk.",
+            "Rebalancing brings back the planned shares.",
+            "Do it on a schedule or when the drift is large."
+          ],
+          "quiz": [
+            {
+              "q": "Plan 50/50. Now $15,000 in bitcoin and $5,000 in dollars. How much bitcoin to sell to get back to 50/50?",
+              "options": [
+                "$5,000",
+                "$10,000",
+                "$2,500",
+                "$7,500"
+              ],
+              "answer": 0,
+              "why": "The total is $20,000, half is $10,000. Sell $15,000 − $10,000 = $5,000 and bring dollars up to $10,000."
+            },
+            {
+              "q": "Why rebalance?",
+              "options": [
+                "It guarantees profit",
+                "It keeps the risk at the chosen level",
+                "It cancels taxes",
+                "It cancels drawdowns"
+              ],
+              "answer": 1,
+              "why": "The main job is to stop one coin from quietly becoming almost the whole portfolio."
+            },
+            {
+              "q": "What is wrong with rebalancing every day?",
+              "options": [
+                "Extra fees",
+                "It is forbidden",
+                "The exchange will block the account",
+                "Nothing"
+              ],
+              "answer": 0,
+              "why": "Every trade costs money. Small daily adjustments eat the returns."
+            }
+          ]
+        },
+        {
+          "id": "l2-emergency",
+          "title": "A safety cushion: before you invest",
+          "minutes": 3,
+          "goal": "After this lesson you will know how much money to set aside before your first investment.",
+          "cards": [
+            {
+              "title": "The cushion comes first",
+              "text": "A safety cushion is money for 3–6 months of usual spending. It sits separately, is available at once and is not put into risky assets.",
+              "example": "In real life: the spare wheel in the boot. You do not need it while all is well, but nobody drives without it.",
+              "art": "umbrella"
+            },
+            {
+              "title": "Why an investor needs it",
+              "text": "Without a cushion any surprise — a repair, an illness, a lost job — forces you to sell your investments. Often right in a drawdown, at a loss.",
+              "example": "In real life: selling the harvest green because you suddenly need cash.",
+              "art": "chart_down"
+            },
+            {
+              "title": "How much and where",
+              "text": "Take a month's spending and multiply by 3–6. If you spend $800 a month, the cushion is $2,400–4,800. Keep it somewhere safe with quick access: a deposit or an account you can withdraw from within a day.",
+              "example": "In real life: the first-aid kit is kept at home, not at the country house.",
+              "art": "bank",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  2400,
+                  4800
+                ],
+                "labels": [
+                  "3 months",
+                  "6 months"
+                ],
+                "caption": "A cushion for $800 of monthly spending, $"
+              }
+            },
+            {
+              "title": "Then — the piggy bank",
+              "text": "Once the cushion is in place, invest only spare money — money you will not need for several years. You can start with a small sum once a week.",
+              "example": "In real life: first a roof over your head, then the garden.",
+              "art": "piggy"
+            }
+          ],
+          "remember": [
+            "A cushion is 3–6 months of spending, kept separate and at hand.",
+            "Without it, a surprise forces you to sell in a drawdown.",
+            "Invest only spare money."
+          ],
+          "quiz": [
+            {
+              "q": "You spend $1,000 a month. What is a 3–6 month cushion?",
+              "options": [
+                "$300–600",
+                "$3,000–6,000",
+                "$10,000–20,000",
+                "$1,000"
+              ],
+              "answer": 1,
+              "why": "$1,000 × 3 = $3,000 and $1,000 × 6 = $6,000."
+            },
+            {
+              "q": "Where should the cushion be kept?",
+              "options": [
+                "In meme coins",
+                "In leveraged futures",
+                "Somewhere safe with quick access",
+                "It does not need to be kept"
+              ],
+              "answer": 2,
+              "why": "The cushion must stay whole and available on any day. Risky assets do not suit it."
+            },
+            {
+              "q": "Why is investing without a cushion dangerous?",
+              "options": [
+                "Unexpected costs force you to sell, perhaps at a loss",
+                "The exchange will not open an account",
+                "Fees will be lower",
+                "Nothing will happen"
+              ],
+              "answer": 0,
+              "why": "The money will be needed at the worst moment — and you will have to sell at any price."
+            }
+          ]
         }
       ]
     },
@@ -3251,12 +3747,242 @@
               "why": "Everyone has losses. The stop limited the loss in advance. Trying to win it back with a big trade is the road to big losses."
             }
           ]
+        },
+        {
+          "id": "l3-risk-reward",
+          "title": "Risk and reward: the R ratio",
+          "minutes": 4,
+          "goal": "After this lesson you will be able to judge a trade before entering: how much you can lose and how much you can gain.",
+          "cards": [
+            {
+              "title": "Two numbers before entering",
+              "text": "Before a trade, work out how much you lose if the stop is hit and how much you gain if the price reaches the target. The ratio of reward to risk is called R. Risk $50, target $100 — that is 1:2.",
+              "example": "In real life: before a trip you weigh what the road costs against what the trip gives.",
+              "art": "scale"
+            },
+            {
+              "title": "You can be wrong more often",
+              "text": "At 1:2 one winning trade covers two losing ones. 10 trades: 4 win $100 each and 6 lose $50 each. Result: $400 − $300 = +$100.",
+              "example": "In real life: a seller whom not everyone buys from, but every sale pays.",
+              "art": "chart_up",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  400,
+                  300,
+                  100
+                ],
+                "labels": [
+                  "gains",
+                  "losses",
+                  "result"
+                ],
+                "caption": "10 trades at 1:2: 4 winners, 6 losers, $"
+              }
+            },
+            {
+              "title": "The target must be realistic",
+              "text": "A pretty 1:5 on paper is useless if the price almost never gets there. The target goes at the nearest strong zone, not where you would like it to be.",
+              "example": "In real life: a plan to «lose 20 kg in a week» looks great but does not work.",
+              "art": "target"
+            },
+            {
+              "title": "Fees count too",
+              "text": "Fees and slippage eat part of R. On very short trades with a small target they can eat the whole profit.",
+              "example": "In real life: driving to another city for a cheap item — and the whole saving goes on petrol.",
+              "art": "calculator"
+            }
+          ],
+          "remember": [
+            "R is the ratio of possible reward to risk.",
+            "At 1:2 you can be wrong more often than right and still be up.",
+            "A realistic target, fees included."
+          ],
+          "quiz": [
+            {
+              "q": "Stop −$40, target +$120. What is the ratio?",
+              "options": [
+                "1:2",
+                "1:3",
+                "3:1",
+                "1:1"
+              ],
+              "answer": 1,
+              "why": "$120 ÷ $40 = 3. Each dollar of risk stands against three dollars of possible gain: 1:3."
+            },
+            {
+              "q": "10 trades at 1:2 with $50 risk. 4 win, 6 lose. Result?",
+              "options": [
+                "+$100",
+                "−$100",
+                "$0",
+                "+$400"
+              ],
+              "answer": 0,
+              "why": "4 × $100 = $400, 6 × $50 = $300. $400 − $300 = +$100."
+            },
+            {
+              "q": "What is wrong with a 1:5 target the price almost never reaches?",
+              "options": [
+                "Nothing",
+                "It looks good on paper but almost never works",
+                "It is too close",
+                "The exchange forbids it"
+              ],
+              "answer": 1,
+              "why": "A ratio only means something if the target is reachable. Otherwise trades close at the stop more often."
+            }
+          ]
+        },
+        {
+          "id": "l3-orders",
+          "title": "Order types: market, limit, stop",
+          "minutes": 4,
+          "goal": "After this lesson you will know which order to pick in which situation.",
+          "cards": [
+            {
+              "title": "Market order",
+              "text": "Buys or sells right away at the best available price. Fast, but the price may turn out slightly worse than expected — this is called slippage.",
+              "example": "In real life: you take an item off the shelf at the price on the tag right now.",
+              "art": "shop"
+            },
+            {
+              "title": "Limit order",
+              "text": "You set the price: «buy bitcoin at no more than $80,000». The order waits for the price to get there and may never fill. Its fee is often lower.",
+              "example": "In real life: you ask the seller to tell you when the item drops to your price.",
+              "art": "clock"
+            },
+            {
+              "title": "Stop order",
+              "text": "It triggers when the price reaches a set level and closes the position. That is how a stop-loss is set in advance, without sitting at the screen. In a sharp move the fill can be worse than the level.",
+              "example": "In real life: you buckle the seat belt before the trip, not during the crash.",
+              "art": "seatbelt"
+            },
+            {
+              "title": "Which to choose",
+              "text": "Not in a hurry — limit. Need to get out right now — market. Protection from a big loss — a stop placed right when you enter the trade.",
+              "example": "In real life: you haggle at the market when you have time, and pay at once when the train leaves in five minutes.",
+              "art": "compass"
+            }
+          ],
+          "remember": [
+            "Market — at once, but with slippage.",
+            "Limit — at your price, but may not fill.",
+            "The stop is set right at entry."
+          ],
+          "quiz": [
+            {
+              "q": "You want to buy only at $80,000 or cheaper. Which order?",
+              "options": [
+                "Market",
+                "Limit",
+                "Stop",
+                "None"
+              ],
+              "answer": 1,
+              "why": "A limit order fills only at your price or better."
+            },
+            {
+              "q": "What is slippage?",
+              "options": [
+                "A withdrawal fee",
+                "A fill at a worse price than expected",
+                "Cancelling an order",
+                "An exchange bonus"
+              ],
+              "answer": 1,
+              "why": "In a fast market or with little volume the order «slips» to the next available price."
+            },
+            {
+              "q": "When should you set a stop-loss?",
+              "options": [
+                "Right when entering the trade",
+                "When the loss gets big",
+                "Never",
+                "A week later"
+              ],
+              "answer": 0,
+              "why": "The maximum loss is decided with a cool head — before the price has gone against you."
+            }
+          ]
+        },
+        {
+          "id": "l3-levels",
+          "title": "Support and resistance levels",
+          "minutes": 4,
+          "goal": "After this lesson you will understand the zones on the chart and how the stop and target are placed from them.",
+          "cards": [
+            {
+              "title": "Where the price turned",
+              "text": "Support is a level below the price where buyers used to stop it from falling. Resistance is a level above where sellers used to stop it from rising. These are zones, not exact lines.",
+              "example": "In real life: the floor and ceiling of a room — a ball bounces off them until it breaks through.",
+              "art": "candles"
+            },
+            {
+              "title": "Why they work",
+              "text": "Many people remember these prices and place orders there. The more often the price turned at a level, the more visible it is. But any level can break.",
+              "example": "In real life: a queue forms at the same checkout where people saw one yesterday.",
+              "art": "magnifier"
+            },
+            {
+              "title": "Breakouts and role reversal",
+              "text": "If the price confidently breaks resistance, it often becomes support — and the other way round. A breakout is confirmed by a candle closing beyond the level, not by one short spike.",
+              "example": "In real life: the ceiling of the ground floor is the floor of the first floor.",
+              "art": "chart_up"
+            },
+            {
+              "title": "How CRYPTO NOVA uses them",
+              "text": "In the app the zones are drawn on the chart. The stop goes beyond a zone, the target at the next zone. That way the risk is known before entering the trade.",
+              "example": "In real life: a route is planned by landmarks, not at random.",
+              "art": "target"
+            }
+          ],
+          "remember": [
+            "Support is below the price, resistance above.",
+            "A level is a zone, and any level can break.",
+            "Broken resistance often becomes support."
+          ],
+          "quiz": [
+            {
+              "q": "Where is support usually found?",
+              "options": [
+                "Above the current price",
+                "Below the current price",
+                "It is trading volume",
+                "It is news"
+              ],
+              "answer": 1,
+              "why": "Support is a zone below the price where buyers used to show up."
+            },
+            {
+              "q": "The price broke resistance confidently and closed above it. What does that level often become?",
+              "options": [
+                "Support",
+                "Nothing",
+                "The exchange's stop",
+                "A target"
+              ],
+              "answer": 0,
+              "why": "Former resistance often turns into support: buyers show up there again."
+            },
+            {
+              "q": "Where is it sensible to put the stop when buying at support?",
+              "options": [
+                "Just below the support zone",
+                "In the middle of the zone",
+                "Above the entry price",
+                "Nowhere"
+              ],
+              "answer": 0,
+              "why": "A stop beyond the zone triggers only if the support really broke."
+            }
+          ]
         }
       ]
     },
     {
       "level": "L4",
-      "level_title": "Pro",
+      "level_title": "Advanced",
       "level_sub": "How to judge a system — and yourself — the way professionals do",
       "lessons": [
         {
@@ -3902,6 +4628,246 @@
               ],
               "answer": 2,
               "why": "Wanting to win it back is an emotion. The pause rule protects your account, and the journal helps you find the mistake."
+            }
+          ]
+        },
+        {
+          "id": "l4-expectancy",
+          "title": "Expectancy: why 40% winners can be profitable",
+          "minutes": 5,
+          "goal": "After this lesson you will be able to work out whether a system earns on average per trade.",
+          "cards": [
+            {
+              "title": "The formula in one line",
+              "text": "Expectancy is the average result of one trade over the long run: win rate × average gain − loss rate × average loss.",
+              "example": "In real life: a fisherman's average catch over many trips, not one lucky Saturday.",
+              "art": "calculator"
+            },
+            {
+              "title": "An example",
+              "text": "40% winners at +$150 and 60% losers at −$50: 0.4 × 150 − 0.6 × 50 = 60 − 30 = +$30 per trade. But 70% winners at +$20 and 30% at −$80: 14 − 24 = −$10.",
+              "example": "In real life: a shop can sell less often but at a better price — and earn more than its neighbour.",
+              "art": "scale",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  30,
+                  -10
+                ],
+                "labels": [
+                  "40% winners: +$150/−$50",
+                  "70% winners: +$20/−$80"
+                ],
+                "caption": "Average result of one trade, $"
+              }
+            },
+            {
+              "title": "You need many trades",
+              "text": "Expectancy shows over dozens and hundreds of trades. Over five, chance decides. That is why a system is judged on a large sample, fees included.",
+              "example": "In real life: one coin toss does not tell you whether the coin is fair.",
+              "art": "books"
+            },
+            {
+              "title": "The win-rate trap",
+              "text": "A high win rate means nothing on its own. If the rare loss is huge, it eats all the small gains. Look at expectancy and the worst drawdown together.",
+              "example": "In real life: picking up coins in front of a steamroller — frequent and pleasant, until it rolls over you.",
+              "art": "warning"
+            }
+          ],
+          "remember": [
+            "Expectancy = win rate × average gain − loss rate × average loss.",
+            "You can win less often and still earn.",
+            "Judge on a large sample, fees included."
+          ],
+          "quiz": [
+            {
+              "q": "50% winners at +$100, 50% losers at −$60. Expectancy?",
+              "options": [
+                "+$20",
+                "+$40",
+                "−$20",
+                "+$80"
+              ],
+              "answer": 0,
+              "why": "0.5 × 100 − 0.5 × 60 = 50 − 30 = +$20 per trade."
+            },
+            {
+              "q": "A system wins 80% of trades. What else do you need to know to judge it?",
+              "options": [
+                "Nothing, it is profitable",
+                "The average gain and the average loss",
+                "The colour of the chart",
+                "The number of followers"
+              ],
+              "answer": 1,
+              "why": "Without the size of gains and losses the win rate does not tell you whether the system earns."
+            },
+            {
+              "q": "Why are 5 trades too few to judge?",
+              "options": [
+                "Over a short stretch chance decides",
+                "The exchange does not count them",
+                "It is too many",
+                "There are no fees"
+              ],
+              "answer": 0,
+              "why": "Chance easily gives 5 wins in a row. You need dozens and hundreds of trades."
+            }
+          ]
+        },
+        {
+          "id": "l4-correlation",
+          "title": "Correlation: when diversification fails",
+          "minutes": 4,
+          "goal": "After this lesson you will see why 10 altcoins are not 10 different risks.",
+          "cards": [
+            {
+              "title": "Moving together",
+              "text": "Correlation shows how much assets move together: from −1 (opposite) to +1 (the same way). Most altcoins are strongly tied to bitcoin.",
+              "example": "In real life: umbrellas and raincoats sell on the same days.",
+              "art": "chain"
+            },
+            {
+              "title": "The illusion of variety",
+              "text": "10 different altcoins are not 10 different risks. When bitcoin falls, nearly everything usually falls. A portfolio of similar coins behaves like one big coin.",
+              "example": "In real life: ten eggs in different baskets, but all the baskets in one car.",
+              "art": "basket_eggs"
+            },
+            {
+              "title": "Ties tighten in a panic",
+              "text": "On normal days coins move differently, but in a sharp fall correlation rises: everything is sold at once. That is exactly when protection is needed.",
+              "example": "In real life: in a fire everyone runs for all the doors at once, not in turn.",
+              "art": "chart_down"
+            },
+            {
+              "title": "What really spreads the risk",
+              "text": "Things of a different nature: dollars, yield-bearing stablecoins, gold, market-neutral strategies. Their returns are lower, but they do not fall together with crypto. There are no guarantees here either.",
+              "example": "In real life: an umbrella and sunscreen — something will come in handy in any weather.",
+              "art": "umbrella"
+            }
+          ],
+          "remember": [
+            "Correlation is how much assets move together.",
+            "Altcoins are usually strongly tied to bitcoin.",
+            "In a panic ties tighten — you need a different type of asset."
+          ],
+          "quiz": [
+            {
+              "q": "A correlation of +1 means the assets…",
+              "options": [
+                "Move the same way",
+                "Move in opposite ways",
+                "Are not related at all",
+                "Are both stablecoins"
+              ],
+              "answer": 0,
+              "why": "+1 is a full match in direction, −1 is the full opposite."
+            },
+            {
+              "q": "Bitcoin is falling. A portfolio of 10 altcoins usually…",
+              "options": [
+                "Rises",
+                "Falls too",
+                "Does not change",
+                "Doubles"
+              ],
+              "answer": 1,
+              "why": "Altcoins are strongly tied to bitcoin and usually lose even more in falls."
+            },
+            {
+              "q": "What spreads the risk of a crypto portfolio better?",
+              "options": [
+                "10 more altcoins",
+                "Dollars and market-neutral strategies",
+                "Meme coins",
+                "Leverage"
+              ],
+              "answer": 1,
+              "why": "Risk is spread by assets of a different nature that do not fall together with crypto."
+            }
+          ]
+        },
+        {
+          "id": "l4-volatility",
+          "title": "Volatility and position size",
+          "minutes": 4,
+          "goal": "After this lesson you will be able to size a trade so that the risk in dollars stays the same.",
+          "cards": [
+            {
+              "title": "What volatility is",
+              "text": "Volatility is how strongly the price swings. Bitcoin's usual daily move is 2–4%; small altcoins can move 10% or more.",
+              "example": "In real life: a calm river and a mountain stream — you can swim in both, but differently.",
+              "art": "rollercoaster"
+            },
+            {
+              "title": "Same risk — different size",
+              "text": "If the stop is set by volatility, a wild coin gets a wider stop. To risk the same $50, the position in the wild coin is smaller: a 2% stop — a $2,500 position, a 10% stop — $500.",
+              "example": "In real life: on ice you take small steps, on asphalt normal ones.",
+              "art": "ruler",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  2500,
+                  500
+                ],
+                "labels": [
+                  "2% stop",
+                  "10% stop"
+                ],
+                "caption": "Position size for a $50 risk, $"
+              }
+            },
+            {
+              "title": "Volatility changes",
+              "text": "Calm weeks give way to stormy ones. A sensible system cuts the size when the market is stormy and does not raise it just because the last trades went well.",
+              "example": "In real life: you do not go to sea in a small boat during a storm, even if yesterday was calm.",
+              "art": "weather"
+            },
+            {
+              "title": "How CRYPTO NOVA does it",
+              "text": "The autopilot sizes each trade to volatility and keeps the total risk within the risk shield's limits. That does not cancel losses, but one wild coin does not decide the fate of the whole account.",
+              "example": "In real life: the load is spread across the whole boat, not put on one side.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "Volatility is the strength of price swings.",
+            "For the same risk in $, the position in a wild coin is smaller.",
+            "In a storm the size is cut."
+          ],
+          "quiz": [
+            {
+              "q": "Risk $30, stop 3%. What position size?",
+              "options": [
+                "$100",
+                "$1,000",
+                "$3,000",
+                "$90"
+              ],
+              "answer": 1,
+              "why": "$30 ÷ 3% = $1,000. If the stop is hit, the loss is $1,000 × 3% = $30."
+            },
+            {
+              "q": "A coin became twice as wild and the stop moved twice as far. What should happen to the size to keep the risk the same?",
+              "options": [
+                "Double it",
+                "Cut it roughly in half",
+                "Leave it",
+                "Remove the stop"
+              ],
+              "answer": 1,
+              "why": "A stop twice as far means a size half as big — and the loss in dollars stays the same."
+            },
+            {
+              "q": "Bitcoin's usual daily move is roughly…",
+              "options": [
+                "0.01%",
+                "2–4%",
+                "50%",
+                "100%"
+              ],
+              "answer": 1,
+              "why": "In calm periods bitcoin usually moves 2–4% a day. Small coins move more."
             }
           ]
         }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-10-20",
+  "updated": "2026-10-21",
   "title": "Aprender con CRYPTO NOVA",
   "note": "No es asesoramiento financiero. Los resultados pasados no garantizan los futuros.",
   "levels": [
@@ -942,28 +942,30 @@
           "cards": [
             {
               "title": "El pan está más caro",
-              "text": "Recuerda cuánto costaba el pan hace 10 años. Lo más probable es que menos que ahora. Con el transporte y las facturas de casa pasa lo mismo. El pan no se volvió más grande ni más rico. Simplemente su precio sube poco a poco, año tras año: lo ves en el gráfico.",
+              "text": "Recuerda cuánto costaba el pan hace 10 años. Lo más probable es que menos que ahora. Con el transporte y las facturas de casa pasa lo mismo. El pan no se volvió más grande ni más rico: simplemente los precios suben poco a poco, año tras año. El gráfico muestra datos reales de EE. UU.: lo que en 2000 costaba $100, en 2024 costaba unos $182.",
               "example": "En la vida real: la abuela dice: «Antes, con este dinero llenaba la bolsa de la compra». Y tiene razón.",
               "art": "shop",
               "chart": {
                 "kind": "line",
                 "points": [
-                  2.0,
-                  2.1,
-                  2.2,
-                  2.3,
-                  2.4,
-                  2.5
+                  100.0,
+                  109.7,
+                  125.0,
+                  133.3,
+                  139.4,
+                  150.3,
+                  182.2
                 ],
                 "labels": [
-                  "año 1",
-                  "año 2",
-                  "año 3",
-                  "año 4",
-                  "año 5",
-                  "año 6"
+                  "2000",
+                  "2004",
+                  "2008",
+                  "2012",
+                  "2016",
+                  "2020",
+                  "2024"
                 ],
-                "caption": "Ejemplo ilustrativo: precio de una barra de pan, $"
+                "caption": "EE. UU., índice de precios al consumo (CPI-U, BLS): lo que en 2000 costaba $100"
               }
             },
             {
@@ -1689,6 +1691,238 @@
               ],
               "answer": 3,
               "why": "Hay 2 señales a la vez: «lo duplicamos» y «un famoso regala». El video es falso, y lo que envíes no volverá."
+            }
+          ]
+        },
+        {
+          "id": "l1-ethereum",
+          "title": "Ether y los contratos inteligentes",
+          "minutes": 4,
+          "goal": "Al terminar entenderás en qué se diferencia ether de bitcoin y qué es un contrato inteligente.",
+          "cards": [
+            {
+              "title": "Ether es más que una moneda",
+              "text": "Ethereum (ether, ETH) se lanzó en 2015. Es la segunda criptomoneda más grande. Bitcoin sobre todo guarda y mueve dinero, mientras que la red de Ethereum además ejecuta programas.",
+              "example": "En la vida real: bitcoin es una caja fuerte fiable; ether, una caja fuerte con automatismo que se abre sola cuando se cumple una condición.",
+              "art": "globe"
+            },
+            {
+              "title": "El contrato inteligente",
+              "text": "Un contrato inteligente es un programa en la blockchain que sigue la regla «si pasa A, haz B». No se puede reescribir a escondidas después y funciona sin intermediario. Los intercambios de monedas, los préstamos y las stablecoins funcionan con contratos inteligentes.",
+              "example": "En la vida real: una máquina expendedora. Echas una moneda y sale el agua. No hace falta dependiente.",
+              "art": "robot"
+            },
+            {
+              "title": "El gas es la tarifa de cada acción",
+              "text": "Cada acción en la red de Ethereum cuesta una pequeña tarifa llamada gas. Se paga en ether a quienes mantienen la red. Cuando mucha gente usa la red, el gas sube; cuando poca, baja.",
+              "example": "En la vida real: el taxi cuesta más en hora punta y menos de noche.",
+              "art": "calculator"
+            },
+            {
+              "title": "Riesgos",
+              "text": "El código de los contratos inteligentes puede tener errores, y por ellos ya se ha robado dinero muchas veces. El precio de ether suele moverse más que el de bitcoin. Por eso se empieza con poco y solo con servicios conocidos.",
+              "example": "En la vida real: hasta una buena cerradura puede venir defectuosa. Por eso las sumas grandes no se guardan donde no estás seguro.",
+              "art": "warning"
+            }
+          ],
+          "remember": [
+            "Ether es una red para programas, no solo una moneda.",
+            "Un contrato inteligente cumple por sí solo una regla «si — entonces», sin intermediario.",
+            "Las acciones en la red cuestan gas; el código puede tener errores."
+          ],
+          "quiz": [
+            {
+              "q": "¿Qué es un contrato inteligente?",
+              "options": [
+                "Un contrato en papel ante notario",
+                "Un programa en la blockchain que cumple una condición por sí solo",
+                "Un préstamo bancario",
+                "Una app de exchange"
+              ],
+              "answer": 1,
+              "why": "Un contrato inteligente es un programa con la regla «si A — entonces B». Se ejecuta solo, sin intermediario."
+            },
+            {
+              "q": "¿Qué es el gas en la red de Ethereum?",
+              "options": [
+                "Combustible para servidores",
+                "La tarifa por una acción en la red",
+                "El nombre de un monedero",
+                "Un tipo de stablecoin"
+              ],
+              "answer": 1,
+              "why": "El gas es la tarifa de cada acción en la red. La cobran quienes mantienen la red funcionando."
+            },
+            {
+              "q": "¿Qué riesgo de los contratos inteligentes es real?",
+              "options": [
+                "Un error en el código por el que se roba dinero",
+                "El contrato no funciona de noche",
+                "El contrato solo funciona en un país",
+                "No hay riesgo"
+              ],
+              "answer": 0,
+              "why": "El código lo escriben personas y puede tener errores. Por ellos ya se han robado grandes sumas."
+            }
+          ]
+        },
+        {
+          "id": "l1-fees",
+          "title": "Comisiones: cuánto cuesta de verdad una compra",
+          "minutes": 4,
+          "goal": "Al terminar podrás sumar todos los costes de comprar y retirar cripto.",
+          "cards": [
+            {
+              "title": "La comisión del exchange",
+              "text": "El exchange se queda un porcentaje de cada operación. A menudo es el 0,1 %: compras $100 y pagas $100 × 0,1 % = $0,10. En sumas pequeñas son céntimos, pero con operaciones frecuentes se nota.",
+              "example": "En la vida real: la comisión de una transferencia bancaria. Una vez no se nota; cada día, ya es dinero.",
+              "art": "calculator",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  0.1,
+                  1,
+                  10,
+                  50
+                ],
+                "labels": [
+                  "1 operación",
+                  "10",
+                  "100",
+                  "500"
+                ],
+                "caption": "Lo que cuesta una comisión del 0,1 % en operaciones de $100, $"
+              }
+            },
+            {
+              "title": "El spread",
+              "text": "El precio de compra y el de venta en un exchange difieren un poco. Esa diferencia se llama spread. En las monedas populares es diminuto; en las raras, se nota: compras y vendes al momento y ya estás en negativo.",
+              "example": "En la vida real: una casa de cambio compra dólares más baratos de lo que los vende.",
+              "art": "scale"
+            },
+            {
+              "title": "La comisión de red al retirar",
+              "text": "Cuando retiras monedas del exchange a tu propio monedero, pagas una comisión de red. Suele ser una cantidad fija, no un porcentaje: retirar $20 o $2.000 cuesta lo mismo. Por eso retirar a poquitos no compensa.",
+              "example": "En la vida real: enviar un paquete cuesta lo mismo lleve lo que lleve dentro.",
+              "art": "chain"
+            },
+            {
+              "title": "Cuenta con honestidad",
+              "text": "Antes de operar, súmalo todo: la comisión del exchange, el spread y la de retiro. Compras $100 y vendes al momento con un 0,1 % por operación: ya son −$0,20, más el spread. Beneficio es lo que queda después de todos los costes.",
+              "example": "En la vida real: una ganga en otra ciudad se cuenta junto con el viaje.",
+              "art": "calculator"
+            }
+          ],
+          "remember": [
+            "El exchange se queda un porcentaje de cada operación.",
+            "El spread es la diferencia entre el precio de compra y el de venta.",
+            "Retirar tiene una comisión fija: compensa retirar menos veces y más cantidad."
+          ],
+          "quiz": [
+            {
+              "q": "La comisión es del 0,1 %. Compras $500. ¿Cuánto pagas?",
+              "options": [
+                "$0,05",
+                "$0,50",
+                "$5",
+                "$50"
+              ],
+              "answer": 1,
+              "why": "$500 × 0,1 % = $0,50."
+            },
+            {
+              "q": "¿Qué es el spread?",
+              "options": [
+                "Un impuesto a las criptos",
+                "La diferencia entre el precio de compra y el de venta",
+                "Una comisión de retiro",
+                "El nombre de una stablecoin"
+              ],
+              "answer": 1,
+              "why": "El spread es la diferencia entre el precio al que puedes comprar y el precio al que puedes vender."
+            },
+            {
+              "q": "¿Por qué no compensa retirar monedas en partes pequeñas?",
+              "options": [
+                "La comisión de red es fija y se come una gran parte de una suma pequeña",
+                "El exchange lo prohíbe",
+                "Las monedas se pierden",
+                "Retirar no cuesta nada"
+              ],
+              "answer": 0,
+              "why": "La comisión de retiro suele ser la misma. $5 son el 25 % de $20, pero el 0,25 % de $2.000."
+            }
+          ]
+        },
+        {
+          "id": "l1-2fa",
+          "title": "Protege tu cuenta: contraseña y verificación en dos pasos",
+          "minutes": 4,
+          "goal": "Al terminar sabrás proteger una cuenta de exchange en 10 minutos.",
+          "cards": [
+            {
+              "title": "Una contraseña, un sitio",
+              "text": "Si la contraseña del correo también abre el exchange, una filtración en un sitio los abre todos. El exchange necesita su propia contraseña larga. Un gestor de contraseñas facilita guardarlas.",
+              "example": "En la vida real: nadie hace una sola llave para la casa, el coche y la caja fuerte.",
+              "art": "key_lock"
+            },
+            {
+              "title": "Verificación en dos pasos (2FA)",
+              "text": "Además de la contraseña hace falta un código de una app de autenticación en el móvil. Aunque roben la contraseña, sin el móvil no pueden entrar. Los códigos por SMS son más débiles: a veces los estafadores consiguen un duplicado de una SIM ajena.",
+              "example": "En la vida real: una puerta con dos cerraduras: una llave en el bolsillo y otra en el móvil.",
+              "art": "shield"
+            },
+            {
+              "title": "Códigos de respaldo",
+              "text": "Al activar el 2FA, el exchange te da códigos de respaldo. Anótalos en papel y guárdalos en un lugar seguro. Si pierdes el móvil, con ellos recuperas el acceso.",
+              "example": "En la vida real: la llave de repuesto se deja a un familiar, no debajo del felpudo.",
+              "art": "books"
+            },
+            {
+              "title": "A quién nunca se le dan los códigos",
+              "text": "El personal del exchange y el «soporte» nunca piden el código 2FA, la contraseña ni la frase del monedero. Quien los pide es un estafador, aunque escriba en nombre del exchange y con su logotipo.",
+              "example": "En la vida real: el banco nunca llama para preguntarte el PIN.",
+              "art": "thief"
+            }
+          ],
+          "remember": [
+            "Para el exchange, una contraseña larga y propia.",
+            "Activa el 2FA con una app de autenticación.",
+            "Códigos y contraseñas, a nadie: ni al «soporte»."
+          ],
+          "quiz": [
+            {
+              "q": "¿Qué te da el 2FA?",
+              "options": [
+                "Operaciones más rápidas",
+                "Sin el segundo código del móvil nadie entra, aunque sepa la contraseña",
+                "Comisiones más bajas",
+                "Nada"
+              ],
+              "answer": 1,
+              "why": "El 2FA es una segunda cerradura. Con una contraseña robada no basta: hace falta el código de tu móvil."
+            },
+            {
+              "q": "El «soporte del exchange» te pide el código de la app de autenticación. ¿Qué haces?",
+              "options": [
+                "Dar el código",
+                "Enviar la contraseña en su lugar",
+                "No dar nada: es un estafador",
+                "Enviar la frase del monedero"
+              ],
+              "answer": 2,
+              "why": "El soporte de verdad nunca pide códigos ni contraseñas. Esa petición siempre es una estafa."
+            },
+            {
+              "q": "¿Dónde guardar los códigos de respaldo del 2FA?",
+              "options": [
+                "En las notas del mismo móvil",
+                "En papel, en un lugar seguro",
+                "En un chat con amigos",
+                "En ningún sitio, no hacen falta"
+              ],
+              "answer": 1,
+              "why": "Si se pierde el móvil, se pierden también sus notas. El papel en un lugar seguro es lo más sencillo."
             }
           ]
         }
@@ -2510,6 +2744,268 @@
               "why": "Cada país tiene sus reglas, y cambian. Lo más seguro es preguntar a un especialista, y tu registro de compras le ayudará."
             }
           ]
+        },
+        {
+          "id": "l2-compound",
+          "title": "Interés compuesto: por qué el tiempo importa más que la cantidad",
+          "minutes": 4,
+          "goal": "Al terminar entenderás por qué empezar pronto suele importar más que una gran suma.",
+          "cards": [
+            {
+              "title": "Interés sobre interés",
+              "text": "Lo que ganas y sigue invertido también genera ganancias. Eso es el interés compuesto. $1.000 al +10 % anual son $1.100 al cabo de un año y $1.210 a los dos, no $1.200.",
+              "example": "En la vida real: una bola de nieve: cuanto más rueda, más rápido crece.",
+              "art": "chart_up",
+              "chart": {
+                "kind": "line",
+                "points": [
+                  1000,
+                  1611,
+                  2594,
+                  4177,
+                  6727,
+                  10835,
+                  17449
+                ],
+                "labels": [
+                  "0 años",
+                  "5 años",
+                  "10 años",
+                  "15 años",
+                  "20 años",
+                  "25 años",
+                  "30 años"
+                ],
+                "caption": "Ejemplo ilustrativo: $1.000 a un +10 % anual constante, $"
+              }
+            },
+            {
+              "title": "El tiempo gana a la cantidad",
+              "text": "Cuanto antes empiezas, más tiempo trabaja el rendimiento. Al 7 % anual, $10.000 se convierten en unos $19.700 en 10 años y en unos $76.000 en 30. La misma suma: la diferencia es solo el tiempo.",
+              "example": "En la vida real: un árbol plantado 20 años antes da una sombra que no se compra con dinero.",
+              "art": "clock"
+            },
+            {
+              "title": "La regla del 72",
+              "text": "Cálculo rápido de cabeza: 72 ÷ el porcentaje anual ≈ cuántos años tarda el dinero en duplicarse. Al 8 % anual, unos 9 años; al 6 %, 12.",
+              "example": "En la vida real: el cálculo de «más o menos una hora por cada 60 km»: no es exacto, pero se entiende al momento.",
+              "art": "calculator"
+            },
+            {
+              "title": "Pero el crecimiento no es uniforme",
+              "text": "En la vida real el rendimiento no llega igual cada año. Bitcoin ha tenido años de −60 % y de +150 %. El interés compuesto funciona a largo plazo si no lo vendes todo con pánico en una caída. El crecimiento no está garantizado.",
+              "example": "En la vida real: una carretera de montaña: subidas y bajadas, y solo al final ves cuánto has subido.",
+              "art": "rollercoaster"
+            }
+          ],
+          "remember": [
+            "Ganar sobre lo ganado acelera el crecimiento con el tiempo.",
+            "Regla del 72: 72 ÷ % anual ≈ años hasta duplicar.",
+            "El crecimiento real es irregular y no está garantizado."
+          ],
+          "quiz": [
+            {
+              "q": "$1.000 al +10 % anual. ¿Cuánto habrá en 2 años con interés compuesto?",
+              "options": [
+                "$1.200",
+                "$1.210",
+                "$1.100",
+                "$2.000"
+              ],
+              "answer": 1,
+              "why": "$1.000 × 1,1 = $1.100, y luego $1.100 × 1,1 = $1.210. El segundo año también sumó interés sobre la ganancia anterior."
+            },
+            {
+              "q": "Según la regla del 72, ¿en cuántos años se duplica el dinero al 6 % anual?",
+              "options": [
+                "6",
+                "12",
+                "72",
+                "24"
+              ],
+              "answer": 1,
+              "why": "72 ÷ 6 = 12 años."
+            },
+            {
+              "q": "¿Qué perjudica más al interés compuesto?",
+              "options": [
+                "Un plazo largo",
+                "Venderlo todo con pánico en una caída",
+                "Las aportaciones periódicas",
+                "La paciencia"
+              ],
+              "answer": 1,
+              "why": "Vender en una caída corta el crecimiento y consolida la pérdida. El interés compuesto necesita tiempo."
+            }
+          ]
+        },
+        {
+          "id": "l2-rebalance",
+          "title": "Rebalanceo: mantener las proporciones en orden",
+          "minutes": 4,
+          "goal": "Al terminar sabrás devolver tu cartera a sus proporciones previstas y entenderás para qué sirve.",
+          "cards": [
+            {
+              "title": "Las proporciones se mueven solas",
+              "text": "Decidiste tener un 60 % en bitcoin y un 40 % en dólares: $6.000 y $4.000. Bitcoin se duplicó: ahora son $12.000 y $4.000, es decir, 75 % y 25 %. El riesgo creció solo, sin que lo decidieras.",
+              "example": "En la vida real: un huerto sin desherbar: las malas hierbas ahogan todo lo demás.",
+              "art": "scale",
+              "chart": {
+                "kind": "split",
+                "points": [
+                  75,
+                  25
+                ],
+                "labels": [
+                  "bitcoin",
+                  "dólares"
+                ],
+                "caption": "El plan era 60/40; tras la subida de bitcoin quedó 75/25"
+              }
+            },
+            {
+              "title": "Volver a como estaba",
+              "text": "Rebalancear es vender parte de lo que subió y comprar más de lo que se quedó atrás. Total $16.000; el objetivo 60/40 son $9.600 y $6.400. Se vende bitcoin por $12.000 − $9.600 = $2.400.",
+              "example": "En la vida real: podar los arbustos del jardín para que uno no les quite el sol a los demás.",
+              "art": "calculator"
+            },
+            {
+              "title": "Cuándo hacerlo",
+              "text": "Normalmente por calendario —por ejemplo, una vez al trimestre— o cuando una proporción se ha alejado mucho, digamos 10 puntos porcentuales. Demasiado a menudo implica comisiones de más; demasiado poco deja crecer el riesgo.",
+              "example": "En la vida real: el coche pasa la revisión según el calendario, no todos los días.",
+              "art": "calendar"
+            },
+            {
+              "title": "Para qué sirve",
+              "text": "El rebalanceo te obliga a vender un poco de lo que se encareció y comprar lo que se abarató, sin emociones. No promete más rentabilidad, pero mantiene el riesgo en el nivel que elegiste.",
+              "example": "En la vida real: una regla como «no más de dos postres» funciona mejor que decidirlo de nuevo cada vez.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "La subida de una moneda cambia las proporciones y el riesgo.",
+            "El rebalanceo devuelve las proporciones previstas.",
+            "Se hace por calendario o cuando la desviación es grande."
+          ],
+          "quiz": [
+            {
+              "q": "Plan 50/50. Ahora hay $15.000 en bitcoin y $5.000 en dólares. ¿Cuánto bitcoin vender para volver al 50/50?",
+              "options": [
+                "$5.000",
+                "$10.000",
+                "$2.500",
+                "$7.500"
+              ],
+              "answer": 0,
+              "why": "El total es $20.000; la mitad, $10.000. Se venden $15.000 − $10.000 = $5.000 y los dólares suben a $10.000."
+            },
+            {
+              "q": "¿Para qué sirve el rebalanceo?",
+              "options": [
+                "Garantiza beneficios",
+                "Mantiene el riesgo en el nivel elegido",
+                "Anula los impuestos",
+                "Anula las caídas"
+              ],
+              "answer": 1,
+              "why": "Su tarea principal es evitar que una moneda se convierta sin darte cuenta en casi toda la cartera."
+            },
+            {
+              "q": "¿Qué tiene de malo rebalancear cada día?",
+              "options": [
+                "Comisiones de más",
+                "Está prohibido",
+                "El exchange bloqueará la cuenta",
+                "Nada"
+              ],
+              "answer": 0,
+              "why": "Cada operación cuesta dinero. Los pequeños ajustes diarios se comen la rentabilidad."
+            }
+          ]
+        },
+        {
+          "id": "l2-emergency",
+          "title": "Un colchón de seguridad: antes de invertir",
+          "minutes": 3,
+          "goal": "Al terminar sabrás cuánto dinero apartar antes de tu primera inversión.",
+          "cards": [
+            {
+              "title": "Primero el colchón",
+              "text": "El colchón de seguridad es dinero para 3–6 meses de gastos habituales. Está aparte, disponible al momento y no se mete en activos de riesgo.",
+              "example": "En la vida real: la rueda de repuesto del maletero. Mientras todo va bien no hace falta, pero nadie viaja sin ella.",
+              "art": "umbrella"
+            },
+            {
+              "title": "Por qué lo necesita un inversor",
+              "text": "Sin colchón, cualquier imprevisto —una reparación, una enfermedad, perder el trabajo— te obliga a vender tus inversiones. A menudo justo en una caída, con pérdidas.",
+              "example": "En la vida real: vender la cosecha verde porque de repente necesitas efectivo.",
+              "art": "chart_down"
+            },
+            {
+              "title": "Cuánto y dónde",
+              "text": "Calcula tus gastos de un mes y multiplícalos por 3–6. Si gastas $800 al mes, el colchón es de $2.400–4.800. Se guarda en un lugar seguro y de acceso rápido: un depósito o una cuenta de la que puedas sacar el dinero en un día.",
+              "example": "En la vida real: el botiquín se tiene en casa, no en la casa del pueblo.",
+              "art": "bank",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  2400,
+                  4800
+                ],
+                "labels": [
+                  "3 meses",
+                  "6 meses"
+                ],
+                "caption": "Colchón para gastos de $800 al mes, $"
+              }
+            },
+            {
+              "title": "Después, la hucha",
+              "text": "Con el colchón hecho, se invierte solo el dinero libre: el que no vas a necesitar en varios años. Puedes empezar con una cantidad pequeña cada semana.",
+              "example": "En la vida real: primero un techo, luego el jardín.",
+              "art": "piggy"
+            }
+          ],
+          "remember": [
+            "El colchón son 3–6 meses de gastos, aparte y a mano.",
+            "Sin él, un imprevisto te obliga a vender en una caída.",
+            "Solo se invierte dinero libre."
+          ],
+          "quiz": [
+            {
+              "q": "Gastas $1.000 al mes. ¿Cuál es un colchón de 3–6 meses?",
+              "options": [
+                "$300–600",
+                "$3.000–6.000",
+                "$10.000–20.000",
+                "$1.000"
+              ],
+              "answer": 1,
+              "why": "$1.000 × 3 = $3.000 y $1.000 × 6 = $6.000."
+            },
+            {
+              "q": "¿Dónde se guarda el colchón?",
+              "options": [
+                "En memecoins",
+                "En futuros con apalancamiento",
+                "En un lugar seguro y de acceso rápido",
+                "No hace falta guardarlo"
+              ],
+              "answer": 2,
+              "why": "El colchón tiene que estar entero y disponible cualquier día. Los activos de riesgo no le sirven."
+            },
+            {
+              "q": "¿Por qué es peligroso invertir sin colchón?",
+              "options": [
+                "Un gasto imprevisto te obliga a vender, quizá con pérdidas",
+                "El exchange no abrirá la cuenta",
+                "Habrá menos comisiones",
+                "No pasará nada"
+              ],
+              "answer": 0,
+              "why": "El dinero hará falta en el peor momento, y habrá que vender a cualquier precio."
+            }
+          ]
         }
       ]
     },
@@ -3251,12 +3747,242 @@
               "why": "Todos tienen pérdidas. El stop limitó la pérdida de antemano. Intentar recuperarse con una operación grande es el camino a perder mucho."
             }
           ]
+        },
+        {
+          "id": "l3-risk-reward",
+          "title": "Riesgo y beneficio: la relación R",
+          "minutes": 4,
+          "goal": "Al terminar sabrás valorar una operación antes de entrar: cuánto puedes perder y cuánto ganar.",
+          "cards": [
+            {
+              "title": "Dos números antes de entrar",
+              "text": "Antes de operar se calcula cuánto pierdes si salta el stop y cuánto ganas si el precio llega al objetivo. La relación entre beneficio y riesgo se llama R. Riesgo $50, objetivo $100: eso es 1:2.",
+              "example": "En la vida real: antes de un viaje se compara lo que cuesta el camino con lo que aporta el viaje.",
+              "art": "scale"
+            },
+            {
+              "title": "Puedes equivocarte más a menudo",
+              "text": "Con 1:2, una operación ganadora cubre dos perdedoras. 10 operaciones: 4 ganan $100 cada una y 6 pierden $50. Resultado: $400 − $300 = +$100.",
+              "example": "En la vida real: un vendedor al que no le compra todo el mundo, pero cada venta le sale a cuenta.",
+              "art": "chart_up",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  400,
+                  300,
+                  100
+                ],
+                "labels": [
+                  "ganancias",
+                  "pérdidas",
+                  "resultado"
+                ],
+                "caption": "10 operaciones con 1:2: 4 ganadoras, 6 perdedoras, $"
+              }
+            },
+            {
+              "title": "El objetivo tiene que ser realista",
+              "text": "Un bonito 1:5 sobre el papel no sirve si el precio casi nunca llega. El objetivo se pone en la zona fuerte más cercana, no donde nos gustaría.",
+              "example": "En la vida real: un plan de «adelgazar 20 kg en una semana» suena genial, pero no funciona.",
+              "art": "target"
+            },
+            {
+              "title": "Las comisiones también cuentan",
+              "text": "Las comisiones y el deslizamiento se comen parte de R. En operaciones muy cortas con un objetivo pequeño pueden comerse todo el beneficio.",
+              "example": "En la vida real: ir a otra ciudad por un producto barato y que todo el ahorro se vaya en gasolina.",
+              "art": "calculator"
+            }
+          ],
+          "remember": [
+            "R es la relación entre el beneficio posible y el riesgo.",
+            "Con 1:2 puedes fallar más de lo que aciertas y seguir en positivo.",
+            "Objetivo realista y comisiones incluidas."
+          ],
+          "quiz": [
+            {
+              "q": "Stop −$40, objetivo +$120. ¿Qué relación es?",
+              "options": [
+                "1:2",
+                "1:3",
+                "3:1",
+                "1:1"
+              ],
+              "answer": 1,
+              "why": "$120 ÷ $40 = 3. Cada dólar de riesgo frente a tres de beneficio posible: 1:3."
+            },
+            {
+              "q": "10 operaciones con 1:2 y riesgo de $50. 4 ganan, 6 pierden. ¿Resultado?",
+              "options": [
+                "+$100",
+                "−$100",
+                "$0",
+                "+$400"
+              ],
+              "answer": 0,
+              "why": "4 × $100 = $400, 6 × $50 = $300. $400 − $300 = +$100."
+            },
+            {
+              "q": "¿Qué falla en un objetivo 1:5 al que el precio casi nunca llega?",
+              "options": [
+                "Nada",
+                "En el papel queda bien, pero casi nunca se cumple",
+                "Está demasiado cerca",
+                "El exchange lo prohíbe"
+              ],
+              "answer": 1,
+              "why": "La relación solo tiene sentido si el objetivo es alcanzable. Si no, las operaciones se cierran más veces en el stop."
+            }
+          ]
+        },
+        {
+          "id": "l3-orders",
+          "title": "Tipos de órdenes: de mercado, limitada y stop",
+          "minutes": 4,
+          "goal": "Al terminar sabrás qué orden elegir en cada situación.",
+          "cards": [
+            {
+              "title": "Orden de mercado",
+              "text": "Compra o vende al momento al mejor precio disponible. Es rápida, pero el precio puede salir algo peor de lo esperado: a eso se le llama deslizamiento.",
+              "example": "En la vida real: coges un producto del estante al precio que marca ahora la etiqueta.",
+              "art": "shop"
+            },
+            {
+              "title": "Orden limitada",
+              "text": "Tú fijas el precio: «comprar bitcoin a no más de $80.000». La orden espera a que el precio llegue y puede no ejecutarse nunca. Su comisión suele ser más baja.",
+              "example": "En la vida real: pides al vendedor que te avise cuando el producto baje a tu precio.",
+              "art": "clock"
+            },
+            {
+              "title": "Orden stop",
+              "text": "Se activa cuando el precio llega a un nivel fijado y cierra la posición. Así se pone el stop loss de antemano, sin estar pegado a la pantalla. En un movimiento brusco la ejecución puede ser peor que el nivel.",
+              "example": "En la vida real: el cinturón se abrocha antes del viaje, no durante el choque.",
+              "art": "seatbelt"
+            },
+            {
+              "title": "Cuál elegir",
+              "text": "Sin prisa: limitada. Hay que salir ya: de mercado. Protección frente a una gran pérdida: un stop puesto en el mismo momento de entrar.",
+              "example": "En la vida real: en el mercadillo se regatea cuando hay tiempo y se paga al momento cuando el tren sale en cinco minutos.",
+              "art": "compass"
+            }
+          ],
+          "remember": [
+            "De mercado: al momento, pero con deslizamiento.",
+            "Limitada: a tu precio, pero puede no ejecutarse.",
+            "El stop se pone al entrar."
+          ],
+          "quiz": [
+            {
+              "q": "Quieres comprar solo a $80.000 o más barato. ¿Qué orden?",
+              "options": [
+                "De mercado",
+                "Limitada",
+                "Stop",
+                "Ninguna"
+              ],
+              "answer": 1,
+              "why": "La orden limitada solo se ejecuta a tu precio o a uno mejor."
+            },
+            {
+              "q": "¿Qué es el deslizamiento?",
+              "options": [
+                "Una comisión de retiro",
+                "Una ejecución a un precio peor del esperado",
+                "Cancelar una orden",
+                "Un bono del exchange"
+              ],
+              "answer": 1,
+              "why": "En un mercado rápido o con poco volumen, la orden «se desliza» al siguiente precio disponible."
+            },
+            {
+              "q": "¿Cuándo se pone el stop loss?",
+              "options": [
+                "Al entrar en la operación",
+                "Cuando la pérdida sea grande",
+                "Nunca",
+                "Una semana después"
+              ],
+              "answer": 0,
+              "why": "La pérdida máxima se decide con la cabeza fría, antes de que el precio vaya en tu contra."
+            }
+          ]
+        },
+        {
+          "id": "l3-levels",
+          "title": "Niveles de soporte y resistencia",
+          "minutes": 4,
+          "goal": "Al terminar entenderás las zonas del gráfico y cómo se colocan a partir de ellas el stop y el objetivo.",
+          "cards": [
+            {
+              "title": "Dónde giraba el precio",
+              "text": "El soporte es un nivel por debajo del precio donde los compradores impedían que cayera. La resistencia es un nivel por encima donde los vendedores impedían que subiera. Son zonas, no líneas exactas.",
+              "example": "En la vida real: el suelo y el techo de una habitación: la pelota rebota en ellos hasta que los atraviesa.",
+              "art": "candles"
+            },
+            {
+              "title": "Por qué funcionan",
+              "text": "Mucha gente recuerda esos precios y pone órdenes allí. Cuantas más veces giró el precio en un nivel, más visible es. Pero cualquier nivel puede romperse.",
+              "example": "En la vida real: la cola se forma en la misma caja donde la vieron ayer.",
+              "art": "magnifier"
+            },
+            {
+              "title": "Ruptura y cambio de papeles",
+              "text": "Si el precio rompe con claridad una resistencia, a menudo se convierte en soporte, y al revés. La ruptura se confirma con el cierre de una vela más allá del nivel, no con un pinchazo breve.",
+              "example": "En la vida real: el techo de la planta baja es el suelo del primer piso.",
+              "art": "chart_up"
+            },
+            {
+              "title": "Cómo las usa CRYPTO NOVA",
+              "text": "En la app las zonas se dibujan en el gráfico. El stop va más allá de una zona y el objetivo, en la siguiente. Así el riesgo se conoce antes de entrar en la operación.",
+              "example": "En la vida real: una ruta se traza por puntos de referencia, no al azar.",
+              "art": "target"
+            }
+          ],
+          "remember": [
+            "Soporte, por debajo del precio; resistencia, por encima.",
+            "Un nivel es una zona, y cualquiera puede romperse.",
+            "Una resistencia rota a menudo se vuelve soporte."
+          ],
+          "quiz": [
+            {
+              "q": "¿Dónde suele estar el soporte?",
+              "options": [
+                "Por encima del precio actual",
+                "Por debajo del precio actual",
+                "Es el volumen de negociación",
+                "Es una noticia"
+              ],
+              "answer": 1,
+              "why": "El soporte es una zona por debajo del precio donde solían aparecer compradores."
+            },
+            {
+              "q": "El precio rompió con claridad una resistencia y cerró por encima. ¿En qué se convierte a menudo ese nivel?",
+              "options": [
+                "En soporte",
+                "En nada",
+                "En el stop del exchange",
+                "En un objetivo"
+              ],
+              "answer": 0,
+              "why": "La antigua resistencia suele convertirse en soporte: allí vuelven a aparecer compradores."
+            },
+            {
+              "q": "¿Dónde es sensato poner el stop al comprar en un soporte?",
+              "options": [
+                "Justo por debajo de la zona de soporte",
+                "En medio de la zona",
+                "Por encima del precio de entrada",
+                "En ningún sitio"
+              ],
+              "answer": 0,
+              "why": "Un stop más allá de la zona solo salta si el soporte se rompió de verdad."
+            }
+          ]
         }
       ]
     },
     {
       "level": "L4",
-      "level_title": "Pro",
+      "level_title": "Avanzado",
       "level_sub": "Cómo evaluar un sistema, y a ti mismo, como lo hacen los profesionales",
       "lessons": [
         {
@@ -3902,6 +4628,246 @@
               ],
               "answer": 2,
               "why": "Las ganas de recuperarse son una emoción. La regla de pausa protege la cuenta, y el registro te ayuda a encontrar el error."
+            }
+          ]
+        },
+        {
+          "id": "l4-expectancy",
+          "title": "Esperanza matemática: por qué un 40 % de aciertos puede ser rentable",
+          "minutes": 5,
+          "goal": "Al terminar sabrás calcular si un sistema gana de media por operación.",
+          "cards": [
+            {
+              "title": "La fórmula en una línea",
+              "text": "La esperanza matemática es el resultado medio de una operación a largo plazo: porcentaje de aciertos × ganancia media − porcentaje de fallos × pérdida media.",
+              "example": "En la vida real: la pesca media de un pescador en muchas salidas, no en un sábado afortunado.",
+              "art": "calculator"
+            },
+            {
+              "title": "Un ejemplo",
+              "text": "40 % de aciertos a +$150 y 60 % de fallos a −$50: 0,4 × 150 − 0,6 × 50 = 60 − 30 = +$30 por operación. Pero 70 % de aciertos a +$20 y 30 % a −$80: 14 − 24 = −$10.",
+              "example": "En la vida real: una tienda puede vender menos veces pero más caro, y ganar más que la de al lado.",
+              "art": "scale",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  30,
+                  -10
+                ],
+                "labels": [
+                  "40 % aciertos: +$150/−$50",
+                  "70 % aciertos: +$20/−$80"
+                ],
+                "caption": "Resultado medio de una operación, $"
+              }
+            },
+            {
+              "title": "Hacen falta muchas operaciones",
+              "text": "La esperanza se ve en decenas y cientos de operaciones. En cinco decide el azar. Por eso un sistema se juzga con una muestra grande y con comisiones.",
+              "example": "En la vida real: con una sola tirada de moneda no se sabe si la moneda está trucada.",
+              "art": "books"
+            },
+            {
+              "title": "La trampa del porcentaje de aciertos",
+              "text": "Un porcentaje alto de aciertos por sí solo no significa nada. Si la pérdida rara es enorme, se come todas las pequeñas ganancias. Hay que mirar juntas la esperanza y la peor caída.",
+              "example": "En la vida real: recoger monedas delante de una apisonadora: frecuente y agradable, hasta que te pasa por encima.",
+              "art": "warning"
+            }
+          ],
+          "remember": [
+            "Esperanza = % de aciertos × ganancia media − % de fallos × pérdida media.",
+            "Puedes acertar menos y aun así ganar dinero.",
+            "Se juzga con una muestra grande y con comisiones."
+          ],
+          "quiz": [
+            {
+              "q": "50 % de aciertos a +$100 y 50 % de fallos a −$60. ¿Esperanza?",
+              "options": [
+                "+$20",
+                "+$40",
+                "−$20",
+                "+$80"
+              ],
+              "answer": 0,
+              "why": "0,5 × 100 − 0,5 × 60 = 50 − 30 = +$20 por operación."
+            },
+            {
+              "q": "Un sistema acierta el 80 % de las operaciones. ¿Qué más necesitas saber para valorarlo?",
+              "options": [
+                "Nada, es rentable",
+                "La ganancia media y la pérdida media",
+                "El color del gráfico",
+                "El número de seguidores"
+              ],
+              "answer": 1,
+              "why": "Sin el tamaño de las ganancias y las pérdidas, el porcentaje de aciertos no dice si el sistema gana dinero."
+            },
+            {
+              "q": "¿Por qué 5 operaciones son pocas para juzgar?",
+              "options": [
+                "En un tramo corto decide el azar",
+                "El exchange no las cuenta",
+                "Son demasiadas",
+                "No hay comisiones"
+              ],
+              "answer": 0,
+              "why": "El azar da fácilmente 5 aciertos seguidos. Hacen falta decenas y cientos de operaciones."
+            }
+          ]
+        },
+        {
+          "id": "l4-correlation",
+          "title": "Correlación: cuando la diversificación no funciona",
+          "minutes": 4,
+          "goal": "Al terminar entenderás por qué 10 altcoins no son 10 riesgos distintos.",
+          "cards": [
+            {
+              "title": "Se mueven juntos",
+              "text": "La correlación muestra cuánto se mueven juntos los activos: de −1 (al revés) a +1 (igual). La mayoría de las altcoins están muy ligadas a bitcoin.",
+              "example": "En la vida real: los paraguas y los chubasqueros se venden los mismos días.",
+              "art": "chain"
+            },
+            {
+              "title": "La ilusión de variedad",
+              "text": "10 altcoins distintas no son 10 riesgos distintos. Cuando bitcoin cae, suele caer casi todo. Una cartera de monedas parecidas se comporta como una sola moneda grande.",
+              "example": "En la vida real: diez huevos en cestas diferentes, pero todas las cestas en el mismo coche.",
+              "art": "basket_eggs"
+            },
+            {
+              "title": "En el pánico los lazos se estrechan",
+              "text": "En días normales las monedas se mueven de forma distinta, pero en una caída fuerte la correlación sube: se vende todo a la vez. Justo entonces hace falta protección.",
+              "example": "En la vida real: en un incendio todos corren a todas las puertas a la vez, no por turnos.",
+              "art": "chart_down"
+            },
+            {
+              "title": "Lo que de verdad reparte el riesgo",
+              "text": "Cosas de distinta naturaleza: dólares, stablecoins con rendimiento, oro, estrategias neutrales al mercado. Rinden menos, pero no caen junto con las criptos. Aquí tampoco hay garantías.",
+              "example": "En la vida real: paraguas y crema solar: con cualquier tiempo, algo te servirá.",
+              "art": "umbrella"
+            }
+          ],
+          "remember": [
+            "La correlación mide cuánto se mueven juntos los activos.",
+            "Las altcoins suelen estar muy ligadas a bitcoin.",
+            "En el pánico los lazos se refuerzan: hace falta otro tipo de activo."
+          ],
+          "quiz": [
+            {
+              "q": "Una correlación de +1 significa que los activos…",
+              "options": [
+                "Se mueven igual",
+                "Se mueven al revés",
+                "No están relacionados",
+                "Ambos son stablecoins"
+              ],
+              "answer": 0,
+              "why": "+1 es coincidencia total de dirección; −1, oposición total."
+            },
+            {
+              "q": "Bitcoin cae. Una cartera de 10 altcoins normalmente…",
+              "options": [
+                "Sube",
+                "También cae",
+                "No cambia",
+                "Se duplica"
+              ],
+              "answer": 1,
+              "why": "Las altcoins están muy ligadas a bitcoin y en las caídas suelen perder aún más."
+            },
+            {
+              "q": "¿Qué reparte mejor el riesgo de una cartera cripto?",
+              "options": [
+                "10 altcoins más",
+                "Dólares y estrategias neutrales al mercado",
+                "Memecoins",
+                "Apalancamiento"
+              ],
+              "answer": 1,
+              "why": "El riesgo lo reparten activos de otra naturaleza, que no caen junto con las criptos."
+            }
+          ]
+        },
+        {
+          "id": "l4-volatility",
+          "title": "Volatilidad y tamaño de la posición",
+          "minutes": 4,
+          "goal": "Al terminar sabrás elegir el tamaño de una operación para que el riesgo en dólares sea el mismo.",
+          "cards": [
+            {
+              "title": "Qué es la volatilidad",
+              "text": "La volatilidad es lo fuerte que oscila el precio. El movimiento diario habitual de bitcoin es del 2–4 %; las altcoins pequeñas pueden moverse un 10 % o más.",
+              "example": "En la vida real: un río tranquilo y un torrente de montaña: puedes nadar en los dos, pero no igual.",
+              "art": "rollercoaster"
+            },
+            {
+              "title": "Mismo riesgo, distinto tamaño",
+              "text": "Si el stop se pone según la volatilidad, una moneda agitada lo tiene más lejos. Para arriesgar los mismos $50, la posición en la moneda agitada es menor: stop del 2 %, posición de $2.500; stop del 10 %, $500.",
+              "example": "En la vida real: sobre el hielo se dan pasos cortos; sobre el asfalto, normales.",
+              "art": "ruler",
+              "chart": {
+                "kind": "bars",
+                "points": [
+                  2500,
+                  500
+                ],
+                "labels": [
+                  "stop 2 %",
+                  "stop 10 %"
+                ],
+                "caption": "Tamaño de la posición con un riesgo de $50, $"
+              }
+            },
+            {
+              "title": "La volatilidad cambia",
+              "text": "Las semanas tranquilas dan paso a otras agitadas. Un sistema sensato reduce el tamaño cuando el mercado está revuelto y no lo aumenta solo porque las últimas operaciones salieron bien.",
+              "example": "En la vida real: con tormenta no se sale al mar en una barca pequeña, aunque ayer hiciera calma.",
+              "art": "weather"
+            },
+            {
+              "title": "Cómo lo hace CRYPTO NOVA",
+              "text": "El piloto automático ajusta el tamaño de cada operación a la volatilidad y mantiene el riesgo total dentro de los límites del escudo de riesgo. Eso no anula las pérdidas, pero una moneda agitada no decide el destino de toda la cuenta.",
+              "example": "En la vida real: la carga se reparte por toda la barca, no se pone en un costado.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "La volatilidad es la fuerza de las oscilaciones del precio.",
+            "Con el mismo riesgo en $, la posición en una moneda agitada es menor.",
+            "Con tormenta, se reduce el tamaño."
+          ],
+          "quiz": [
+            {
+              "q": "Riesgo $30, stop del 3 %. ¿Qué tamaño de posición?",
+              "options": [
+                "$100",
+                "$1.000",
+                "$3.000",
+                "$90"
+              ],
+              "answer": 1,
+              "why": "$30 ÷ 3 % = $1.000. Si salta el stop, la pérdida es $1.000 × 3 % = $30."
+            },
+            {
+              "q": "Una moneda se volvió el doble de agitada y el stop se alejó el doble. ¿Qué hacer con el tamaño para mantener el riesgo?",
+              "options": [
+                "Duplicarlo",
+                "Reducirlo más o menos a la mitad",
+                "No cambiarlo",
+                "Quitar el stop"
+              ],
+              "answer": 1,
+              "why": "Un stop el doble de lejos significa un tamaño la mitad de grande, y la pérdida en dólares es la misma."
+            },
+            {
+              "q": "El movimiento diario habitual de bitcoin es aproximadamente…",
+              "options": [
+                "0,01 %",
+                "2–4 %",
+                "50 %",
+                "100 %"
+              ],
+              "answer": 1,
+              "why": "En periodos tranquilos bitcoin suele moverse un 2–4 % al día. Las monedas pequeñas, más."
             }
           ]
         }

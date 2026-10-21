@@ -3483,7 +3483,7 @@ function bootDataRow(){ let ok=true, n=0; try{ ok=!!live.ok; }catch(e){} try{ n=
   const D={home:bj('app_home.json'),risk:bj('risk.json'),sc:bj('scorecard.json'),conv:bj('conveyor.json'),eng:bj('engine.json')};
   const N=n=>Number(n||0).toLocaleString('ru-RU'); const no={d:'нет данных',s:'warn'};
   const rows=[
-    ['ЯДРО CRYPTO NOVA',()=>({d:'загрузка модулей',s:'ok'})],
+    ['NOVA AI',()=>({d:'анализ рынка 24/7',s:'ok'})],
     ['КАНАЛ СВЯЗИ',()=>location.protocol==='https:'?{d:location.hostname+' · HTTPS',s:'ok'}:(window.isSecureContext?{d:'локальный узел',s:'ok'}:{d:'соединение без шифрования',s:'warn'})],
     ['СЕРВЕР-ДВИЖОК',()=>D.eng.then(e=>{ if(!e) return no; const st=Object.entries(e.steps||{}).filter(([k])=>k[0]!=='_'); const ok=st.filter(([,v])=>v&&v.ok).length; const age=Math.round((Date.now()-(e.asof||0))/60000);
       return {d:`цикл №${N(e.cycle)} · ${Math.round(e.cycle_sec||0)} с из ${e.interval_sec||60} · шагов ${ok}/${st.length}`+(age>15?` · ${N(age)} мин назад`:''),s:ok===st.length&&age<=15?'ok':'warn'}; })],

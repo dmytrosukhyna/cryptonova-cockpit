@@ -10,8 +10,11 @@ import sys
 STRESS = "́"
 NOVA = f"Но{STRESS}ва"
 
-VOICES = {"ru": "ru-RU-SvetlanaNeural", "en": "en-US-AvaNeural", "uk": "uk-UA-PolinaNeural", "el": "el-GR-AthinaNeural",
-          "es": "es-ES-ElviraNeural"}
+# 21.10 owner (app spec §5, §10): one clear MALE voice everywhere the app speaks; the female voice is only a fallback
+VOICES = {"ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural", "uk": "uk-UA-OstapNeural", "el": "el-GR-NestorasNeural",
+          "es": "es-ES-AlvaroNeural"}
+FALLBACK = {"ru": "ru-RU-SvetlanaNeural", "en": "en-US-AvaNeural", "uk": "uk-UA-PolinaNeural", "el": "el-GR-AthinaNeural",
+            "es": "es-ES-ElviraNeural"}
 TEXTS = {
     "ru": (f"Привет! Я {NOVA} — помощник Крипто {NOVA}. "
            "Наша система каждую минуту следит за рынком криптовалют и проверяет каждую идею на истории цен. "
@@ -47,9 +50,17 @@ def out_path(lang: str) -> str:
 
 async def make(lang: str, out: str) -> None:
     import edge_tts
-    voice = os.environ.get("CNQ_WELCOME_VOICE_" + lang.upper(), VOICES[lang])
-    await edge_tts.Communicate(TEXTS[lang], voice, rate="-4%").save(out)
-    print(out, os.path.getsize(out), "bytes")
+    first = os.environ.get("CNQ_WELCOME_VOICE_" + lang.upper(), VOICES[lang])
+    # the male voice sometimes fails once in a run: retry it with a pause before falling back
+    for voice in [first, first, first, FALLBACK[lang]]:
+        try:
+            await edge_tts.Communicate(TEXTS[lang], voice, rate="-4%").save(out)
+            print(out, voice, os.path.getsize(out), "bytes")
+            return
+        except Exception as e:  # noqa: BLE001
+            print("retry", lang, voice, e)
+            await asyncio.sleep(4)
+    raise SystemExit(f"no voice worked for {lang}")
 
 
 if __name__ == "__main__":

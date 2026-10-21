@@ -173,6 +173,9 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
             lines.append(cur)
         bh = 34 + 20 * len(lines)
         by1 = T + ph - 8; by0 = by1 - bh
+        # 21.10: the box hid the «B …%» label when B pointed down — go to the top of the zone if a label sits low
+        if any(t_ > by0 - 40 for t_ in taken) and not any(t_ < T + 34 + bh + 40 for t_ in taken):
+            by0 = T + 34; by1 = by0 + bh
         d.rounded_rectangle([bx0, by0, bx1, by1], radius=10, fill=(8, 16, 30, 225), outline=(124, 196, 255, 120))
         d.text((bx0 + 12, by0 + 8), "ВЫВОД CRYPTO NOVA", font=_font(13, True), fill=(124, 196, 255))
         for k, ln in enumerate(lines):
@@ -184,6 +187,98 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
     if r.get("long"):
         foot.append("режим: " + ("бычий (выше 200-дневной средней)" if r["long"] == "BULL" else "медвежий (ниже 200-дневной средней)"))
     d.text((L, H - 30), " · ".join(foot) + " · сценарии — оценка, не гарантия · не финансовый совет", font=f12, fill=(125, 147, 173))
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    img.save(out_path, "PNG", optimize=True)
+    return out_path
+
+
+# ---------------------------------------------------------------------------------------------------------------- board
+# 21.10 owner: «можно более интересный график в группе показывать или разное совмещать» — the BTC chart with scenarios
+# stays on top; under it a strip of four live tiles: ETH and SOL with their 4-day waves, the fear & greed gauge, and
+# either our day result (evening) or the day's leaders (morning).
+UP, DOWN, ICE, MUTED, TXT = (61, 220, 151), (255, 110, 134), (124, 196, 255), (125, 147, 173), (234, 246, 255)
+
+
+def _tile(d, box, title: str):
+    x0, y0, x1, y1 = box
+    d.rounded_rectangle(box, radius=16, fill=(10, 19, 38), outline=(40, 62, 98))
+    d.text((x0 + 16, y0 + 12), title, font=_font(15, True), fill=(170, 195, 225))
+
+
+def _spark_tile(d, box, name: str, coin: dict | None, chg24: float | None):
+    _tile(d, box, name)
+    x0, y0, x1, y1 = box
+    if not coin or not coin.get("candles"):
+        d.text((x0 + 16, y0 + 50), "нет данных", font=_font(14), fill=MUTED)
+        return
+    bars = _hourly(coin["candles"])[-96:]
+    closes = [b[4] for b in bars]
+    price = coin.get("price") or closes[-1]
+    chg = chg24 if chg24 is not None else coin.get("chg24")
+    col = UP if (chg or 0) >= 0 else DOWN
+    d.text((x0 + 16, y0 + 38), f"${_fmt(price)}", font=_font(26, True), fill=TXT)
+    if chg is not None:
+        d.text((x0 + 16, y0 + 72), f"{chg:+.1f}% за сутки", font=_font(15, True), fill=col)
+    lo, hi = min(closes), max(closes); sp = (hi - lo) or 1
+    gx0, gx1, gy0, gy1 = x0 + 16, x1 - 16, y0 + 104, y1 - 18
+    pts = [(gx0 + (gx1 - gx0) * i / (len(closes) - 1), gy1 - (c - lo) / sp * (gy1 - gy0)) for i, c in enumerate(closes)]
+    d.polygon(pts + [(gx1, gy1), (gx0, gy1)], fill=col + (38,))
+    d.line(pts, fill=col + (255,), width=3, joint="curve")
+    d.ellipse([pts[-1][0] - 5, pts[-1][1] - 5, pts[-1][0] + 5, pts[-1][1] + 5], fill=col)
+
+
+def _fng_tile(d, box, fng: dict | None):
+    import math
+    _tile(d, box, "Страх и жадность")
+    x0, y0, x1, y1 = box
+    if not fng or fng.get("value") is None:
+        d.text((x0 + 16, y0 + 50), "нет данных", font=_font(14), fill=MUTED)
+        return
+    v = max(0, min(100, int(fng["value"])))
+    cx, cy, r = (x0 + x1) / 2, y1 - 74, min((x1 - x0) / 2 - 30, (y1 - y0) - 120)
+    segs = [((239, 90, 90), 0, 25), ((255, 160, 90), 25, 45), ((230, 220, 120), 45, 55), ((150, 220, 120), 55, 75), ((61, 220, 151), 75, 100)]
+    for col, a, b in segs:
+        d.arc([cx - r, cy - r, cx + r, cy + r], 180 + a * 1.8, 180 + b * 1.8, fill=col, width=14)
+    ang = math.radians(180 + v * 1.8)
+    d.line([cx, cy, cx + (r - 22) * math.cos(ang), cy + (r - 22) * math.sin(ang)], fill=TXT, width=4)
+    d.ellipse([cx - 7, cy - 7, cx + 7, cy + 7], fill=TXT)
+    d.text((cx, cy + 12), str(v), font=_font(24, True), fill=TXT, anchor="mt")
+    lab = {"Extreme Fear": "крайний страх", "Fear": "страх", "Neutral": "нейтрально", "Greed": "жадность", "Extreme Greed": "крайняя жадность"}.get(fng.get("label"), fng.get("label") or "")
+    sub = lab + (f" · вчера {fng['yesterday']}" if fng.get("yesterday") is not None else "")
+    d.text((cx, cy + 42), sub, font=_font(13), fill=MUTED, anchor="mt")
+
+
+def _rows_tile(d, box, title: str, rows: list[tuple[str, str, tuple]]):
+    _tile(d, box, title)
+    x0, y0, x1, y1 = box
+    if not rows:
+        d.text((x0 + 16, y0 + 50), "нет данных", font=_font(14), fill=MUTED)
+        return
+    step = min(44, (y1 - y0 - 56) // max(1, len(rows)))
+    for k, (a, b, col) in enumerate(rows):
+        y = y0 + 52 + k * step
+        d.text((x0 + 16, y), a, font=_font(17), fill=(200, 215, 238))
+        d.text((x1 - 16, y), b, font=_font(19, True), fill=col, anchor="ra")
+
+
+def board(chart_png: str, out_path: str, eth: dict | None = None, sol: dict | None = None, eth_chg: float | None = None,
+          sol_chg: float | None = None, fng: dict | None = None, result: list[tuple[str, str, tuple]] | None = None,
+          result_title: str = "Итог дня по счетам") -> str | None:
+    """The post picture: the BTC chart (as rendered by render()) on top, four live tiles under it. 1280 × 1000."""
+    if Image is None or not os.path.exists(chart_png):
+        return None
+    top = Image.open(chart_png).convert("RGB")
+    W = top.width; H = top.height + 280
+    img = Image.new("RGB", (W, H), (6, 11, 22))
+    img.paste(top, (0, 0))
+    d = ImageDraw.Draw(img, "RGBA")
+    y0, y1, g = top.height + 4, H - 20, 16
+    tw = (W - 36 * 2 - g * 3) / 4
+    boxes = [(36 + i * (tw + g), y0, 36 + i * (tw + g) + tw, y1) for i in range(4)]
+    _spark_tile(d, boxes[0], "Эфир · ETH", eth, eth_chg)
+    _spark_tile(d, boxes[1], "Солана · SOL", sol, sol_chg)
+    _fng_tile(d, boxes[2], fng)
+    _rows_tile(d, boxes[3], result_title, result or [])
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     img.save(out_path, "PNG", optimize=True)
     return out_path

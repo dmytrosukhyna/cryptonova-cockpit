@@ -748,8 +748,35 @@ class Channel:
                 concl.append(f"Сценарий A ({pa}%): {'рост к сопротивлению' if a_up else 'снижение к поддержке'} {_fmt(ta)}.")
                 concl.append(f"Сценарий B ({100 - pa}%): {'снижение к поддержке' if a_up else 'рост к сопротивлению'} {_fmt(tb)}.")
                 concl.append("Работаем от зон: вход только после реакции цены, стоп заранее.")
-            return postchart.render(btc, op, None, os.path.join(self.out, "post_chart.png"), title=title,
-                                    chg24=mb.get("chg24") if mb else None, when=when, conclusion=concl)
+            png = postchart.render(btc, op, None, os.path.join(self.out, "post_chart.png"), title=title,
+                                   chg24=mb.get("chg24") if mb else None, when=when, conclusion=concl)
+            if not png:
+                return None
+            # 21.10 owner: «более интересный график … разное совмещать» — the BTC chart on top, live tiles under it
+            try:
+                top = {t.get("symbol"): t for t in x["markets"].get("top", [])}
+                rows = []
+                if slot == "evening":
+                    dr = self.day_result(x) or {}
+                    for k, name in (("futures", "Фьючерсы"), ("spot", "Спот"), ("total", "Всего за день")):
+                        if dr.get(k):
+                            rows.append((name, dr[k], postchart.DOWN if str(dr[k]).startswith(("−", "-")) else postchart.UP))
+                    rtitle = "Итог дня по счетам"
+                else:
+                    skip = {"BTC", "ETH", "SOL", "XAUT", "PAXG", "WBT", "LEO", "WBTC", "WETH", "STETH", "WSTETH", "WEETH", "CBBTC"}
+                    movers = [t for t in x["markets"].get("top", [])[:60] if not t.get("stable") and not t.get("wrapped") and t.get("chg24") is not None
+                              and (t.get("volume") or 0) > 5e7 and t.get("symbol") not in skip and str(t.get("symbol", "")).isalnum()]
+                    movers.sort(key=lambda t: t["chg24"], reverse=True)
+                    for t in movers[:2] + movers[-2:][::-1]:
+                        rows.append((t["symbol"], f"{t['chg24']:+.1f}%", postchart.UP if t["chg24"] >= 0 else postchart.DOWN))
+                    rtitle = "Лидеры и аутсайдеры суток"
+                b = postchart.board(png, os.path.join(self.out, "post_board.png"),
+                                    eth=self.coin(x["terminal"], "ETH"), sol=self.coin(x["terminal"], "SOL"),
+                                    eth_chg=(top.get("ETH") or {}).get("chg24"), sol_chg=(top.get("SOL") or {}).get("chg24"),
+                                    fng=x["markets"].get("fng"), result=rows, result_title=rtitle)
+                return b or png
+            except Exception:  # noqa: BLE001
+                return png
         except Exception:  # noqa: BLE001
             return None
 

@@ -153,3 +153,17 @@ def test_deals_plural_and_caption_fit():
     long = post + "\n\n" + "я" * 400
     out = fit_caption(long)
     assert out == post and out.count("<b>") == out.count("</b>")                       # whole paragraphs dropped, never cut mid-tag
+
+
+def test_post_picture_board_has_the_live_tiles():
+    # 21.10 owner: «более интересный график … разное совмещать» — BTC chart on top, ETH / SOL / fear & greed / result tiles below
+    from cnq.agents import postchart
+    if postchart.Image is None:
+        return
+    tmp = tempfile.mkdtemp()
+    base = os.path.join(tmp, "c.png"); postchart.Image.new("RGB", (1280, 720), (6, 11, 22)).save(base)
+    candles = [[1_760_000_000_000 + i * 900_000, 100 + i % 7, 101 + i % 7, 99 + i % 7, 100 + (i % 9), 10] for i in range(400)]
+    out = postchart.board(base, os.path.join(tmp, "b.png"), eth={"candles": candles, "price": 2447}, sol=None, eth_chg=1.6,
+                          fng={"value": 63, "label": "Greed", "yesterday": 55}, result=[("Спот", "+$230", postchart.UP)])
+    im = postchart.Image.open(out)
+    assert im.size == (1280, 1000)

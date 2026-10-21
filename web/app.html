@@ -451,25 +451,17 @@ body.tab-futures #topCard{order:-5}body.tab-futures #apRadar{order:-4}body.tab-f
  body.tab-spot #spotChart{order:1}body.tab-spot #below{order:2}body.tab-spot #memesCard{order:3}body.tab-spot #ideasCard{order:4}body.tab-spot #qualityCard{order:4}body.tab-spot #coreCard{order:5}body.tab-spot #whCard{order:6}body.tab-spot #fcCard{order:7}body.tab-spot #globeCard{order:8}body.tab-spot #aiCard{order:9}
  body.tab-futures #fdeskBox{order:1}body.tab-futures #ivanCard{order:2}body.tab-futures #topCard{order:3}body.tab-futures #apRadar{order:4}body.tab-futures #battleCard{order:5}body.tab-futures #fcCard{order:6}body.tab-futures #calCard{order:7}body.tab-futures #jrCard{order:8}body.tab-futures #macroCard{order:9}
 }
-/* ---- assistant: the bright spinning atom from the intro, right-centre, draggable */
-#analystBtn.analyst{width:72px!important;height:72px!important;border:0!important;background:radial-gradient(circle,rgba(124,196,255,.20),rgba(6,11,22,0) 70%)!important;box-shadow:none!important;animation:none!important;top:50%;right:10px!important;bottom:auto!important;transform:translateY(-50%);padding:0;cursor:grab;touch-action:none;z-index:40}
+/* ---- assistant: 21.10 owner «слишком размазанный» — one crisp brand sphere (nova-sphere.js), right-centre, draggable */
+#analystBtn.analyst{width:72px!important;height:72px!important;border:0!important;border-radius:50%;background:none!important;box-shadow:none!important;animation:none!important;filter:none!important;top:50%;right:10px!important;bottom:auto!important;transform:translateY(-50%);padding:0;cursor:grab;touch-action:none;z-index:40}
 #analystBtn .ring2,#analystBtn>.ico{display:none!important}
-#analystBtn .atom{display:block!important;position:absolute;inset:5px;transform-style:preserve-3d;animation:bspin 14s linear infinite;pointer-events:none}
-#analystBtn .atom i{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(124,196,255,.85);box-shadow:0 0 10px rgba(124,196,255,.45) inset,0 0 10px rgba(124,196,255,.4)}
-#analystBtn .atom i::after{content:"";position:absolute;top:-3px;left:calc(50% - 3px);width:6px;height:6px;border-radius:50%;background:#eaf6ff;box-shadow:0 0 8px #7cc4ff,0 0 3px #fff}
-#analystBtn .atom i:nth-child(1){animation:r1 3.2s linear infinite}
-#analystBtn .atom i:nth-child(2){animation:r2 4.1s linear infinite;border-color:rgba(111,207,151,.8)}#analystBtn .atom i:nth-child(2)::after{background:#b9f3d2;box-shadow:0 0 8px #6fcf97}
-#analystBtn .atom i:nth-child(3){animation:r3 5s linear infinite;border-color:rgba(234,246,255,.7)}
-#analystBtn .atom b{position:absolute;inset:32%;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#7cc4ff 45%,rgba(124,196,255,.25));box-shadow:0 0 22px rgba(124,196,255,.95),0 0 44px rgba(124,196,255,.5);animation:bcore 1.6s ease-in-out infinite}
-#analystBtn.talking .atom b{animation:bcore .45s ease-in-out infinite}
-#analystBtn .albl{display:block!important;position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);font:700 8px/1 var(--mono);letter-spacing:.14em;color:#cfe6ff;text-shadow:0 0 6px rgba(124,196,255,.8);white-space:nowrap;pointer-events:none}
-/* 19.10: brighter orb — the owner found it dim */
-#analystBtn.analyst{background:radial-gradient(circle,rgba(150,205,255,.48),rgba(108,92,255,.2) 46%,rgba(6,11,22,0) 72%)!important;animation:orbHalo 3s ease-in-out infinite!important}
-@keyframes orbHalo{0%,100%{filter:drop-shadow(0 0 8px rgba(124,196,255,.6))}50%{filter:drop-shadow(0 0 18px rgba(124,196,255,1)) drop-shadow(0 0 32px rgba(140,124,255,.55))}}
-#analystBtn .atom i{border-width:2px;border-color:rgba(170,220,255,1);box-shadow:0 0 14px rgba(124,196,255,.7) inset,0 0 16px rgba(124,196,255,.75)}
-#analystBtn .atom i::after{width:8px;height:8px;top:-4px;left:calc(50% - 4px);box-shadow:0 0 12px #9ed3ff,0 0 4px #fff}
-#analystBtn .atom b{inset:27%;background:radial-gradient(circle at 35% 30%,#fff,#cfe9ff 28%,#7cc4ff 55%,#6c5cff 88%);box-shadow:0 0 30px rgba(124,196,255,1),0 0 64px rgba(124,196,255,.7),0 0 96px rgba(140,124,255,.4)}
-#analystBtn .albl{font-size:9px;color:#fff;text-shadow:0 0 8px rgba(124,196,255,1),0 0 2px #fff}
+#analystBtn .nsph{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;transition:filter .3s}
+#analystBtn:hover .nsph{filter:brightness(1.12)}
+#analystBtn.talking .nsph{filter:brightness(1.22) saturate(1.1);animation:nsphTalk .9s ease-in-out infinite}
+@keyframes nsphTalk{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+#analystBtn .albl{display:block!important;position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);font:700 9px/1 var(--mono);letter-spacing:.14em;color:#fff;text-shadow:0 0 6px rgba(124,196,255,.8);white-space:nowrap;pointer-events:none}
+body.nova-talking .orbcv{filter:brightness(1.2) saturate(1.1)}
+.orbcv{display:block}
+@media (prefers-reduced-motion:reduce){#analystBtn.talking .nsph{animation:none}}
 @media (max-width:760px){#analystBtn.analyst{width:62px!important;height:62px!important;right:6px!important}}
 .ideas .irow{display:grid;grid-template-columns:28px 78px minmax(0,1fr) auto 26px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}.ideas .irow .n{color:var(--muted);font:600 11px var(--mono)}.ideas .irow b{font-family:var(--mono)}.ideas .irow small{display:block;font-size:10.5px;color:var(--muted)}
 .ideas .ibtn{width:22px;height:22px;border-radius:50%;border:1px solid var(--line2);background:transparent;color:#7cc4ff;font:700 12px/1 Georgia,serif;cursor:pointer}
@@ -946,7 +938,7 @@ body:not(.tab-overview) #sigRadar{display:none}
     <div class="card" id="myPortCard" hidden></div>
   </section>
   <aside class="col">
-    <div id="briefWin" class="card" hidden><div class="bh"><canvas class="orbcv" id="briefOrb" width="64" height="64"></canvas><b>Ассистент · доклад</b><span class="lamp"></span></div><div class="bt" id="briefTxt"></div><div class="ba"><button class="ib" id="briefOk">Понял, к работе</button><button class="ib" id="briefTour">Показать, как всё устроено</button><button class="ib sm" id="briefAsk">Спросить</button><button class="ib sm" id="briefMute" title="Остановить голос">тихо</button></div></div>
+    <div id="briefWin" class="card" hidden><div class="bh"><canvas class="orbcv" id="briefOrb" data-sphere="ring" aria-hidden="true"></canvas><b>Ассистент · доклад</b><span class="lamp"></span></div><div class="bt" id="briefTxt"></div><div class="ba"><button class="ib" id="briefOk">Понял, к работе</button><button class="ib" id="briefTour">Показать, как всё устроено</button><button class="ib sm" id="briefAsk">Спросить</button><button class="ib sm" id="briefMute" title="Остановить голос">тихо</button></div></div>
     <div class="dock" id="dock" hidden></div>
     <div class="card" id="aiCard" data-dock="bell|Важное"><h2>Ассистент · важное <span class="r"><span class="proc" id="proc"><i></i><span id="procTxt">работает</span></span></span></h2><div id="aiFeed" class="aifeed"></div></div>
     <div class="card" id="sigRadar"><h2>Радар сигналов</h2><div class="srwrap"><canvas id="srCv" role="img" aria-label="Радар сигналов: монеты по близости к входу, зелёные — открытые сделки"></canvas></div><div class="srleg"><span><i class="d g"></i>сделка открыта</span><span><i class="d a"></i>близко к входу</span><span><i class="d b"></i>ждём условия</span></div><div class="muted srnote">ближе к центру — ближе к входу · зелёные — сделка открыта</div><div class="muted srnote">Нажмите на точку — условия по монете.</div><div class="muted srnote" id="srEmpty" hidden>Данные появятся после следующего запуска сервера.</div><div class="srdet" id="srDet"></div></div>
@@ -997,8 +989,8 @@ body:not(.tab-overview) #sigRadar{display:none}
 <div class="overlay focus" id="focusOv" hidden><div class="ohead"><button class="ib" id="focusClose">← Назад к панели</button><b id="focusTitle"></b><span class="muted" style="margin-left:10px">Esc — назад · ← → — соседнее окно</span><div class="sp"></div><button class="ib" id="focusPrev">‹</button><button class="ib" id="focusNext">›</button></div><div id="focusBody"></div></div>
 <div class="overlay" id="radarOv" hidden><div class="ohead"><button class="ib" id="radarClose">← Назад</button><b>Радар зон</b></div><canvas id="radar2" style="display:block;width:min(80vh,900px);aspect-ratio:1;margin:0 auto"></canvas></div>
 
-<button class="analyst" id="analystBtn" title="Ассистент CRYPTO NOVA — нажмите, чтобы спросить; перетащите, чтобы передвинуть"><span class="atom"><i></i><i></i><i></i><b></b></span><span class="albl">NOVA AI</span></button>
-<div class="chat" id="chat"><div class="h"><canvas class="orbcv" id="chatOrb" width="64" height="64"></canvas>Аналитик CRYPTO NOVΛ <small id="chatMode"></small><button class="ib sm" id="chatClose">✕</button></div><div class="m" id="chatMsgs"></div><div class="q" id="chatQ"></div><form id="chatForm"><input id="chatIn" placeholder="Спросите: что по SOL? где покупать? что с рынком?" autocomplete="off"><button class="ib">→</button></form></div>
+<button class="analyst" id="analystBtn" title="Ассистент CRYPTO NOVA — нажмите, чтобы спросить; перетащите, чтобы передвинуть"><canvas class="nsph" data-sphere aria-hidden="true"></canvas><span class="albl">NOVA AI</span></button>
+<div class="chat" id="chat"><div class="h"><canvas class="orbcv" id="chatOrb" data-sphere aria-hidden="true"></canvas>Аналитик CRYPTO NOVΛ <small id="chatMode"></small><button class="ib sm" id="chatClose">✕</button></div><div class="m" id="chatMsgs"></div><div class="q" id="chatQ"></div><form id="chatForm"><input id="chatIn" placeholder="Спросите: что по SOL? где покупать? что с рынком?" autocomplete="off"><button class="ib">→</button></form></div>
 <div class="toasts" id="toasts"></div>
 <script>
 (async function(){
@@ -2336,7 +2328,7 @@ const USER_NAME=GUEST_FORCE?'':load('cnq_name',IS_GUEST?'':'Дмитрий'); le
 // 21.10 (owner: «голос робота снова, девушка, еле-еле говорящая»): the male neural/enhanced voices first (Dmitry online in Edge, Yuri enhanced on
 // Apple), then any natural voice, Google, and only then Milena/Katya; full volume, normal rate
 function pickVoice(){ const vs=speechSynthesis.getVoices(); const pref=[/dmitr.*(natural|online|neural)/i,/(natural|neural|online)/i,/yuri.*(premium|enhanced)|(premium|enhanced).*yuri/i,/premium|enhanced/i,/google/i,/yuri|aleksei|dmitr/i,/milena|katya/i]; for(const re of pref){ const v=vs.find(v=>/ru/i.test(v.lang)&&re.test(v.name)); if(v) return v; } return vs.find(v=>/ru/i.test(v.lang))||null; }
-function speak(text,opts){ opts=opts||{}; if(!('speechSynthesis' in window)) return false; try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g,'').replace(/[•▲▼]/g,'').replace(/\s+/g,' ').trim()); u.lang='ru-RU'; const v=pickVoice(); if(v) u.voice=v; u.rate=opts.rate||1.0; u.pitch=1.0; u.volume=1; u.onstart=()=>{ speaking=true; $('#analystBtn').classList.add('talking'); }; u.onend=u.onerror=()=>{ speaking=false; $('#analystBtn').classList.remove('talking'); }; speechSynthesis.speak(u); return true; }catch(e){ return false; } }
+function speak(text,opts){ opts=opts||{}; if(!('speechSynthesis' in window)) return false; try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g,'').replace(/[•▲▼]/g,'').replace(/\s+/g,' ').trim()); u.lang='ru-RU'; const v=pickVoice(); if(v) u.voice=v; u.rate=opts.rate||1.0; u.pitch=1.0; u.volume=1; u.onstart=()=>{ speaking=true; $('#analystBtn').classList.add('talking'); document.body.classList.add('nova-talking'); }; u.onend=u.onerror=()=>{ speaking=false; $('#analystBtn').classList.remove('talking'); document.body.classList.remove('nova-talking'); }; speechSynthesis.speak(u); return true; }catch(e){ return false; } }
 function fmtUsd(v){ const a=Math.abs(v); return (v<0?'минус ':'плюс ')+(a>=1000?Math.round(a).toLocaleString('ru-RU'):a.toFixed(0))+' долларов'; }
 function dayPnl(hist,idxNow,scale){ if(!hist||!hist.length) return null; const now=Date.now(); const ref=[...hist].reverse().find(h=>now-h.time>=20*3600000)||hist[0]; const v0=scale(ref); const v1=scale({equity:idxNow,v:idxNow}); return v1-v0; }
 function spokenP(p){ if(p==null) return ''; if(p>=1000){ const k=Math.round(p/1000); const w=k%10===1&&k%100!==11?'тысячи':'тысяч'; return `около ${k} ${w}`; } if(p>=1) return String(Math.round(p)); return p.toFixed(4); }
@@ -2372,7 +2364,7 @@ async function brief(speakIt){ try{ await loadStratData(); }catch(e){} const srv
 // greeting on entry: browsers block speech until the first click → try, otherwise wait for the first gesture
 const BRIEF_SYS='Ты — руководитель офиса торговой системы CRYPTO NOVA, докладываешь владельцу, который только что вошёл. Перепиши доклад живым спокойным русским языком, 5–7 коротких предложений, уверенно и без суеты. Сохрани все факты и числа из текста, ничего не добавляй. Тикеры произноси словами: BTC — биткоин, ETH — эфир, SOL — солана, ADA — кардано, AVAX — аваланч, LINK — чейнлинк, DOGE — дож. Без списков, без эмодзи, без кавычек. Начни с обращения по имени, как в тексте.';
 let BRIEF_SRV=null, BRIEF_AUDIO=null; async function loadServerBrief(){ try{ const r=await fetch('./brief.json?'+Math.floor(Date.now()/300000),{cache:'no-store'}); if(!r.ok) return null; const j=await r.json(); if(j&&j.audio&&Date.now()-j.asof<3*3600000){ BRIEF_SRV=j; return j; } }catch(e){} return null; }
-function playServerBrief(){ if(!BRIEF_SRV||!BRIEF_SRV.audio) return false; try{ if(BRIEF_AUDIO){ BRIEF_AUDIO.pause(); } BRIEF_AUDIO=new Audio('./'+BRIEF_SRV.audio+'?'+BRIEF_SRV.asof); BRIEF_AUDIO.onplay=()=>{ speaking=true; $('#analystBtn').classList.add('talking'); }; BRIEF_AUDIO.onended=BRIEF_AUDIO.onerror=()=>{ speaking=false; $('#analystBtn').classList.remove('talking'); }; const pr=BRIEF_AUDIO.play(); if(pr&&pr.catch) pr.catch(()=>{ speaking=false; const once=()=>{ document.removeEventListener('pointerdown',once); BRIEF_AUDIO.play().catch(()=>{}); }; document.addEventListener('pointerdown',once); toast('Доклад готов — нажмите в любом месте, чтобы услышать'); }); return true; }catch(e){ return false; } }
+function playServerBrief(){ if(!BRIEF_SRV||!BRIEF_SRV.audio) return false; try{ if(BRIEF_AUDIO){ BRIEF_AUDIO.pause(); } BRIEF_AUDIO=new Audio('./'+BRIEF_SRV.audio+'?'+BRIEF_SRV.asof); BRIEF_AUDIO.onplay=()=>{ speaking=true; $('#analystBtn').classList.add('talking'); document.body.classList.add('nova-talking'); }; BRIEF_AUDIO.onended=BRIEF_AUDIO.onerror=()=>{ speaking=false; $('#analystBtn').classList.remove('talking'); document.body.classList.remove('nova-talking'); }; const pr=BRIEF_AUDIO.play(); if(pr&&pr.catch) pr.catch(()=>{ speaking=false; const once=()=>{ document.removeEventListener('pointerdown',once); BRIEF_AUDIO.play().catch(()=>{}); }; document.addEventListener('pointerdown',once); toast('Доклад готов — нажмите в любом месте, чтобы услышать'); }); return true; }catch(e){ return false; } }
 let greeted=false; async function greetOnce(){ if(greeted) return; greeted=true; if(IS_GUEST&&(GUEST_FORCE||load('cnq_welcomed','')!=='1')){ guestWelcome(); return; } try{ await loadStratData(); }catch(e){}   /* funding / arbitrage / triangle are part of «Заработано всего» — the report must count them like the header */ const srv0=IS_GUEST?null:await loadServerBrief(); const srv=srv0&&serverBriefMatches(srv0)?srv0:null; if(srv){ try{ briefWindow(srv.text); }catch(e){} feedAdd('mic','Доклад: '+srv.text.slice(0,90)+'…',{key:'brief'+Math.floor(Date.now()/600000)}); if(VOICE_ON) playServerBrief(); return; } let t=briefText(); if(SET.anth){ try{ const pol=await Promise.race([askLLM(BRIEF_SYS,t,420),new Promise(r=>setTimeout(()=>r(null),6000))]); if(pol&&pol.length>60&&pol.length<t.length*1.4) t=pol.replace(/\s+/g,' ').trim(); }catch(e){} } try{ briefWindow(t); }catch(e){} feedAdd('mic','Доклад: '+t.slice(0,90)+'…',{key:'brief'+Math.floor(Date.now()/600000)}); if(!VOICE_ON) return; const ok=speak(t); if(!ok||(!speechSynthesis.speaking&&!speaking)){ const once=()=>{ document.removeEventListener('pointerdown',once); if(!speaking) speak(t); }; document.addEventListener('pointerdown',once); toast('Доклад готов — нажмите в любом месте, чтобы услышать',()=>speak(t)); } }
 if('speechSynthesis' in window){ speechSynthesis.onvoiceschanged=()=>pickVoice(); }
 // voice commands (push-to-talk)
@@ -3544,31 +3536,7 @@ function guestWelcome(){ const w=$('#welcome'); if(!w) return; WELCOME_ON=true; 
 function welcomeClose(tour){ const w=$('#welcome'); if(!w) return; WELCOME_ON=false; w.hidden=true; if(typing){ clearInterval(typing); typing=null; } try{ speechSynthesis.cancel(); }catch(e){} speaking=false; if(tour) setTimeout(()=>tourStart(0),350); else setTimeout(()=>toast('Обучение можно запустить в любой момент — кнопка «?» вверху.'),400); }
 (function welcomeInit(){ if(!$('#welcome')) return; $('#wTour').addEventListener('click',()=>welcomeClose(true)); $('#wSkip').addEventListener('click',()=>welcomeClose(false)); $('#wVoice').addEventListener('click',()=>{ VOICE_ON=true; speak(guestText()); }); window.guestWelcome=guestWelcome; })();
 
-// ---------------------------------------------------------------- assistant orb: a living core with orbiting spheres; it speeds up while the assistant speaks or types
-// 21.10 (owner: «сфера кружится — чуть-чуть ярче, качественнее»): drawn at the screen's pixel density (crisp on DPR 2–3), a brighter plasma core with
-// a moving inner swirl, three glowing rings and eight orbiting sparks with short trails. Same API: orbRun(canvas).
-function orbRun(c){ if(!c) return; const g=c.getContext('2d'); let t=0; const S=Array.from({length:8},(_,i)=>({a:i*0.8,r:0.6+0.32*Math.sin(i*2.1),sp:0.8+i*0.15,tilt:0.45+i*0.37,sz:1.1+(i%3)*0.55}));
-  function fit(){ const css=c.clientWidth||64, d=Math.min(3,window.devicePixelRatio||1), px=Math.max(64,Math.round(css*d)); if(c.width!==px){ c.width=px; c.height=px; } return px/64; }
-  function f(){ if(c.offsetParent===null){ setTimeout(f,400); return; } const k=fit(); g.setTransform(k,0,0,k,0,0); const W=64,H=64,cx=32,cy=32;
-    const busy=(typing!=null)||(typeof speaking!=='undefined'&&speaking)||(('speechSynthesis' in window)&&speechSynthesis.speaking); t+=busy?0.05:0.017; g.clearRect(0,0,W,H);
-    const R=9.5+1.1*Math.sin(t*2)+(busy?1.6*Math.abs(Math.sin(t*7)):0);
-    let hz=g.createRadialGradient(cx,cy,R*0.3,cx,cy,31); hz.addColorStop(0,'rgba(150,215,255,.55)'); hz.addColorStop(0.45,'rgba(90,170,255,.22)'); hz.addColorStop(1,'rgba(90,170,255,0)'); g.fillStyle=hz; g.fillRect(0,0,W,H);
-    const pts=S.map(s=>{ const a=s.a+t*s.sp; const x=Math.cos(a)*22*s.r, z=Math.sin(a)*22*s.r; return {a,s,x:cx+x,y:cy+z*Math.sin(s.tilt)*0.6,z:Math.cos(s.tilt)*z}; });
-    const spark=p=>{ const q=(p.z+22)/44; for(let j=3;j>=1;j--){ const a2=p.a-j*0.09*p.s.sp; const x2=cx+Math.cos(a2)*22*p.s.r, z2=Math.sin(a2)*22*p.s.r; g.fillStyle=`rgba(150,215,255,${0.10*(4-j)*(0.4+q)})`; g.beginPath(); g.arc(x2,cy+z2*Math.sin(p.s.tilt)*0.6,p.s.sz*(0.5+0.6*q),0,6.2832); g.fill(); }
-      g.fillStyle=`rgba(${q>0.5?'245,251,255':'160,220,255'},${0.5+0.5*q})`; g.shadowColor='rgba(140,210,255,1)'; g.shadowBlur=(5+8*q)*k; g.beginPath(); g.arc(p.x,p.y,p.s.sz*(0.65+0.85*q),0,6.2832); g.fill(); g.shadowBlur=0; };
-    pts.filter(p=>p.z<0).forEach(spark);
-    // rings behind the core (back halves are dimmer)
-    for(let i=0;i<3;i++){ const rx=17+i*5, ry=rx*Math.abs(Math.sin(t*(0.6+i*0.35)+i*1.3)), rot=t*(0.45-i*0.27); g.strokeStyle=`rgba(190,232,255,${0.22+0.12*i})`; g.lineWidth=0.75; g.beginPath(); g.ellipse(cx,cy,rx,Math.max(0.6,ry),rot,Math.PI,2*Math.PI); g.stroke(); }
-    // plasma core: white centre, ice body, glowing rim, a slow inner swirl
-    const cg=g.createRadialGradient(cx-R*0.35,cy-R*0.4,0.5,cx,cy,R); cg.addColorStop(0,'#ffffff'); cg.addColorStop(0.35,'#d6f1ff'); cg.addColorStop(0.7,'#6cc2ff'); cg.addColorStop(1,'rgba(60,150,255,.55)');
-    g.fillStyle=cg; g.shadowColor='#8fd3ff'; g.shadowBlur=(18+(busy?10:0))*k; g.beginPath(); g.arc(cx,cy,R,0,6.2832); g.fill(); g.shadowBlur=0;
-    g.save(); g.beginPath(); g.arc(cx,cy,R*0.92,0,6.2832); g.clip(); for(let i=0;i<3;i++){ g.strokeStyle=`rgba(255,255,255,${0.35-0.08*i})`; g.lineWidth=0.9; g.beginPath(); g.arc(cx+Math.cos(t*1.3+i*2.1)*R*0.25,cy+Math.sin(t*1.1+i*2.1)*R*0.25,R*(0.45+0.15*i),t*(1.6+i*0.4)+i,t*(1.6+i*0.4)+i+2.2); g.stroke(); } g.restore();
-    g.fillStyle='rgba(255,255,255,.85)'; g.beginPath(); g.ellipse(cx-R*0.38,cy-R*0.45,R*0.22,R*0.13,-0.6,0,6.2832); g.fill();
-    for(let i=0;i<3;i++){ const rx=17+i*5, ry=rx*Math.abs(Math.sin(t*(0.6+i*0.35)+i*1.3)), rot=t*(0.45-i*0.27); g.strokeStyle=`rgba(225,245,255,${0.45+0.15*i})`; g.lineWidth=0.85; g.shadowColor='rgba(140,210,255,.9)'; g.shadowBlur=3*k; g.beginPath(); g.ellipse(cx,cy,rx,Math.max(0.6,ry),rot,0,Math.PI); g.stroke(); g.shadowBlur=0; }
-    pts.filter(p=>p.z>=0).forEach(spark);
-    requestAnimationFrame(f); }
-  f(); }
-orbRun($('#briefOrb')); orbRun($('#chatOrb'));
+// assistant sphere: drawn by nova-sphere.js (every <canvas data-sphere> animates itself)
 // ---------------------------------------------------------------- onboarding tour: dims everything, cuts a window around the element, explains, can be finished, resumed, or asked about
 const TOUR={step:+load('cnq_tour_step','0')||0,done:!!load('cnq_tour_done',''),on:false};
 const TOUR_STEPS=[   // 17.10: short, current, switches tabs by itself; on phones the box sits at the bottom
@@ -3679,5 +3647,6 @@ boot();
   a.style.display=g?'none':''; }catch(e){} }
   put(); try{ new MutationObserver(put).observe(document.body,{attributes:true,attributeFilter:['class']}); }catch(e){} })();
 </script>
+<script src="nova-sphere.js?v=20261021"></script>
 </body>
 </html>

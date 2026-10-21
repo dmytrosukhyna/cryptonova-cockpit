@@ -821,6 +821,13 @@ body:not(.tab-overview) #sigRadar{display:none}
 #sigRadar .srdet .ib{margin-top:8px}
 #sigRadar .rbar{grid-template-columns:1fr!important;row-gap:2px;margin:6px 0}#sigRadar .rbar>span{grid-row:1!important;grid-column:1!important;font-size:11.5px;color:var(--muted)}#sigRadar .rbar>b{grid-row:2!important;grid-column:1!important;text-align:left!important;white-space:normal;font-size:11px;color:var(--fg)}#sigRadar .rbar .gb{grid-row:3!important;grid-column:1!important}
 @media (max-width:1150px){ body.tab-overview #sigRadar{order:3} #sigRadar .srwrap{max-width:320px} }
+
+/* «Управление» (owner only): the admin panel inside the system */
+.adminpane{margin-top:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:0 14px 40px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.05);overflow:hidden}
+.adminpane iframe{display:block;width:100%;height:calc(100vh - 140px);min-height:560px;border:0;background:transparent;color-scheme:dark}
+body.tab-admin #totStrip,body.tab-admin .portbtn,body.tab-admin #banner,body.tab-admin .tape,body.tab-admin #pnlCard,body.tab-admin #kpi,body.tab-admin #earn,body.tab-admin main,body.tab-admin #earnBar,body.tab-admin .belowmain{display:none!important}
+#segSub .admtab{display:inline-flex;align-items:center;gap:6px}
+#segSub .admtab .ico{width:15px;height:15px}
 </style>
 </head>
 <body>
@@ -889,6 +896,7 @@ body:not(.tab-overview) #sigRadar{display:none}
 <div class="kpi" id="kpi"></div>
 <section id="earn" class="earn"></section>
 
+<section id="adminPane" class="adminpane" hidden aria-label="Управление"></section>
 <main>
   <aside class="col feedcol">
     <div class="card" id="globeCard"><h2>Сфера рынка <span class="r muted" id="globeMeta"></span></h2><canvas id="globe"></canvas><div class="muted" style="font-size:11px;margin-top:4px">каждая точка — монета: зелёная растёт, красная падает за сутки; размер — объём. Наведи — название, клик — на график.</div></div>
@@ -3636,12 +3644,32 @@ boot();
 })();
 
 </script>
-<script>/* 21.10.2026: owner-only link to the admin panel (users, CRM, pushes, connectors, growth) — web/admin.html; hidden for guests */
-(function(){ function put(){ try{ var a=document.getElementById('adminBtn'), g=document.body.classList.contains('guest');
-  if(!a){ var ref=document.querySelector('header .moremenu')||document.getElementById('loginBtn')||document.getElementById('setBtn'); if(!ref||!ref.parentNode) return; a=document.createElement('a'); a.id='adminBtn'; a.className='ib'; a.href='admin.html';
-    a.title='Админ-панель: пользователи, CRM, рассылки, коннекторы, рост'; a.innerHTML='<svg viewBox="0 0 24 24"><path d="M4 5h16v4H4zM4 11h7v8H4zM13 11h7v3h-7zM13 16h7v3h-7z"/></svg><span>Админ-панель</span>'; ref.parentNode.insertBefore(a,ref); }
-  a.style.display=g?'none':''; }catch(e){} }
-  put(); try{ new MutationObserver(put).observe(document.body,{attributes:true,attributeFilter:['class']}); }catch(e){} })();
+<script>/* 21.10 16:31 owner: the admin panel lives inside the system — an owner-only «Управление» tab next to Обзор/Спот/Фьючерсы/Заработок.
+   It shows admin.html?embed=1 in an iframe created on first open (nothing extra loads for the rest of the panel); guests never see it. */
+(function(){
+  var ICO='<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v4H4zM4 11h7v8H4zM13 11h7v3h-7zM13 16h7v3h-7z"/></svg>';
+  function owner(){ return !document.body.classList.contains('guest'); }
+  function on(){ return document.body.classList.contains('tab-admin'); }
+  function fit(){ var p=document.getElementById('adminPane'), f=document.getElementById('adminFrame'); if(!p||!f||p.hidden) return; var top=p.getBoundingClientRect().top+window.scrollY; f.style.height=Math.max(560,window.innerHeight-Math.max(0,top-window.scrollY)-10)+'px'; }
+  function mark(){ var b=document.getElementById('admTab'); if(b) b.setAttribute('aria-pressed',String(on())); if(on()) document.querySelectorAll('#segSub button[data-s]').forEach(function(x){ x.setAttribute('aria-pressed','false'); }); }
+  function open(){ if(!owner()) return; var p=document.getElementById('adminPane'); if(!p) return; document.body.classList.add('tab-admin'); p.hidden=false;
+    if(!document.getElementById('adminFrame')){ var f=document.createElement('iframe'); f.id='adminFrame'; f.title='Управление: пользователи, CRM, рассылки, коннекторы, рост'; var q=''; try{ var m=new URLSearchParams(location.search).get('api'); if(m&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) q='&api='+encodeURIComponent(m); }catch(e){} f.src='admin.html?embed=1'+q; f.setAttribute('loading','eager'); p.appendChild(f); }
+    mark(); window.scrollTo(0,0); fit(); setTimeout(fit,60); }
+  function close(){ var p=document.getElementById('adminPane'); document.body.classList.remove('tab-admin'); if(p) p.hidden=true; mark(); setTimeout(function(){ dispatchEvent(new Event('resize')); },30); }
+  function put(){ try{
+    var seg=document.getElementById('segSub'); if(seg){ var b=document.getElementById('admTab');
+      if(!b){ b=document.createElement('button'); b.id='admTab'; b.type='button'; b.className='admtab'; b.innerHTML=ICO+' Управление'; b.title='Управление: пользователи, CRM, рассылки, коннекторы, рост'; b.addEventListener('click',open); }
+      if(b.parentNode!==seg) seg.appendChild(b); b.style.display=owner()?'':'none'; }
+    var a=document.getElementById('adminBtn'); if(a) a.style.display='none';   // the «Управление» tab replaces the old header link
+    if(!owner()&&on()) close(); mark();
+  }catch(e){} }
+  // any other section button leaves «Управление»
+  document.addEventListener('click',function(e){ var t=e.target&&e.target.closest&&e.target.closest('#segSub button[data-s],#segMain button'); if(t&&on()) close(); },true);
+  window.addEventListener('resize',fit);
+  put();
+  try{ new MutationObserver(put).observe(document.body,{attributes:true,attributeFilter:['class']}); var sg=document.getElementById('segSub'); if(sg) new MutationObserver(put).observe(sg,{childList:true}); }catch(e){}
+  window.cnqAdminOpen=open;
+})();
 </script>
 <script src="nova-sphere.js?v=20261021b"></script>
 <script>/* 21.10: mount every NOVA sphere with the speaking state (faster and brighter while NOVA talks or types); hidden ones (chat, report) resize when shown */

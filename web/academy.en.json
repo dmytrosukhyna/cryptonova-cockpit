@@ -2980,6 +2980,174 @@
           ]
         },
         {
+          "id": "l2-cold-wallet",
+          "title": "Cold wallet: step by step",
+          "minutes": 5,
+          "goal": "By the end, you'll be able to set up a cold wallet safely and not lose coins through a setup mistake.",
+          "cards": [
+            {
+              "title": "What a cold wallet is",
+              "text": "A cold wallet is a small device that looks like a USB stick. The key to your coins lives inside it and never goes online. Even if your phone or computer catches a virus, stealing the key this way is much harder. “Cold” means “not connected to the internet”.",
+              "example": "In real life: an exchange is the cash in your pocket, and a cold wallet is the safe at home. You don't open the safe every day, but it's more secure.",
+              "art": "wallet"
+            },
+            {
+              "title": "When you need one",
+              "text": "If the amount on the exchange is money you could afford to lose, you can skip the device. If losing it would really hurt, a cold wallet is worth it. It usually costs $60 to $200.",
+              "example": "Example: you hold $3 000 in bitcoin for years. A $100 device is about 3% of that: $100 ÷ $3 000 ≈ 3%.",
+              "art": "scale"
+            },
+            {
+              "title": "Buying it and the box",
+              "text": "Buy only from the maker's official website or its official partners — not second-hand and not on a random marketplace. Check that the seal on the box is intact. If there's already a card with printed words inside, it's a trap: don't use the device and send it back.",
+              "example": "In real life: you don't buy a front-door lock from a stranger who has already handed out its keys.",
+              "art": "shop"
+            },
+            {
+              "title": "Setup: PIN and 24 words",
+              "text": "When you first turn it on, choose a PIN — the device's code. Then the device itself shows 12 or 24 words — the seed phrase. Write them in order on paper or a metal plate and check twice. Don't photograph them or save them in notes, the cloud or a chat.",
+              "example": "Example: 24 words = 24 lines on a card. One wrong word and you can't restore the wallet from that record. That's why checking is a must.",
+              "art": "key_lock"
+            },
+            {
+              "title": "The first transfer is small",
+              "text": "First send a small amount from the exchange, for example $10. Check the receiving address on the device's own screen, not only on the computer: a virus can swap the address. If it arrives, everything is set up right and you can move the rest.",
+              "example": "Example: you sent $10 and $10 minus the network fee arrived. Only then — the main amount.",
+              "art": "coins"
+            },
+            {
+              "title": "A backup copy and scammers",
+              "text": "Keep the seed phrase record somewhere safe and a second copy in another place, in case of fire or flood. Scammers write as “support” and ask for the words “to verify”. Real support never asks: whoever knows the words owns the coins.",
+              "example": "In real life: you keep a spare flat key with your family, not under the doormat.",
+              "art": "thief"
+            }
+          ],
+          "remember": [
+            "Buy the device only from the official maker and check the seal.",
+            "The seed phrase lives only on paper or metal, never in a phone or the cloud.",
+            "First a small transfer, and check the address on the device's screen."
+          ],
+          "quiz": [
+            {
+              "q": "There's a card with 24 printed words in your new wallet's box. What do you do?",
+              "options": [
+                "Use those words — it's faster",
+                "Photograph the card just in case",
+                "Don't use the device and return it to the seller",
+                "Copy the words into your phone's notes"
+              ],
+              "answer": 2,
+              "why": "An honest device creates the words itself during setup. Ready-made words in the box mean a fake: the scammer already knows your key."
+            },
+            {
+              "q": "Where should you keep the seed phrase?",
+              "options": [
+                "In the cloud, so it doesn't get lost",
+                "On paper or metal in a safe place, plus a copy in another place",
+                "In a chat with support",
+                "In a screenshot on your phone"
+              ],
+              "answer": 1,
+              "why": "Anything online can be stolen. Paper or metal in two safe places protects you from both thieves and fire."
+            },
+            {
+              "q": "You're moving $2 000 to a new wallet. What's the right way?",
+              "options": [
+                "Send it all at once",
+                "First $10, check it arrived, and only then the rest",
+                "To the address from a “support” email",
+                "Through a friend"
+              ],
+              "answer": 1,
+              "why": "A small transfer checks that the address and network are right. A mistake costs $10, not $2 000."
+            }
+          ]
+        },
+        {
+          "id": "l2-inheritance",
+          "title": "Digital inheritance: so your crypto isn't lost to your family",
+          "minutes": 5,
+          "goal": "By the end, you'll be able to make a simple plan so your loved ones can find and receive your coins if something happens to you.",
+          "cards": [
+            {
+              "title": "Why crypto gets lost",
+              "text": "Heirs can find a bank deposit through documents. Crypto is different: if nobody knows where your coins are and how to reach them, they can be lost for good. So it's better to think about inheritance in advance — it takes 15 minutes and one sheet of paper.",
+              "example": "In real life: people write a will not because something will happen tomorrow, but to make things easier for the family later.",
+              "art": "magnifier"
+            },
+            {
+              "title": "A plan on one page",
+              "text": "Write down: which exchanges you have accounts on and which email they use, whether you have a cold wallet, the rough amount and who your heir is. No passwords and no seed phrases — only what is where. Keep the plan somewhere safe and tell someone close to you where to find it.",
+              "example": "Example plan: “Exchange: account on ivan@… · Cold wallet: in the safe at home · Words: in an envelope at the notary · Heir: my wife Anna”.",
+              "art": "books"
+            },
+            {
+              "title": "Exchange accounts",
+              "text": "An exchange hands money to heirs only through its support team and with documents. Usually they ask for a death certificate, ID of the owner and the heir, and proof of the right to inherit. Each exchange has its own process, and it depends on your country's law. The key thing is that your family knows the account exists at all.",
+              "example": "Example: the heir submits a request to the exchange's support and uploads the documents. After the check, the coins go to the heir's account. The check can take weeks.",
+              "art": "bank"
+            },
+            {
+              "title": "Cold wallet",
+              "text": "There's no support here: the coins go to whoever has the seed phrase. So keep it where your family will find it but strangers won't: in a sealed envelope in a safe, a bank deposit box or with a notary — whatever is usual in your country.",
+              "example": "In real life: you don't leave the safe key on the table, but you don't hide it so well that nobody ever finds it either.",
+              "art": "key_lock"
+            },
+            {
+              "title": "Legacy Contact on iPhone",
+              "text": "On iPhone you can add a Legacy Contact: Settings → your name → Sign-In & Security → Legacy Contact. With the access key and a death certificate, they get your iCloud photos, notes, files and backups. They don't get Keychain passwords or money on exchanges. But if your plan is in iCloud Notes, your heir will find it.",
+              "example": "Example: you keep your plan in an iCloud note and made your son your Legacy Contact. He'll see what is where, but without passwords.",
+              "art": "phone_app"
+            },
+            {
+              "title": "What to remember",
+              "text": "CRYPTO NOVA never asks for or stores your passwords and seed phrases — and no honest service will ask. Update the plan once a year: a new account — add it. This is not legal advice: for inheritance in your country, talk to a notary or a lawyer.",
+              "example": "In real life: you check your insurance and documents once a year. Same with your inheritance plan.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "Your family must know where your coins are — from a one-page plan, without passwords.",
+            "An exchange pays heirs against documents; a cold wallet opens only with the seed phrase.",
+            "For inheritance law in your country — a notary or a lawyer."
+          ],
+          "quiz": [
+            {
+              "q": "What goes into an inheritance plan?",
+              "options": [
+                "All passwords and seed phrases in one file",
+                "Which accounts and wallets are where and who the heir is — no passwords",
+                "Only the amount in the accounts",
+                "Nothing: the exchange will find the family"
+              ],
+              "answer": 1,
+              "why": "The plan shows what is where. Passwords in one file are a gift for a thief."
+            },
+            {
+              "q": "How does an heir get the money from an exchange account?",
+              "options": [
+                "Only the email password is needed",
+                "Through the exchange's support — with documents on the death and the right to inherit",
+                "Through the iPhone Legacy Contact",
+                "There's no way, the money is gone"
+              ],
+              "answer": 1,
+              "why": "An exchange hands coins to heirs after checking documents. Each exchange has its own process."
+            },
+            {
+              "q": "What does an iPhone Legacy Contact give?",
+              "options": [
+                "Access to the money on an exchange",
+                "Keychain passwords",
+                "iCloud photos, notes and files — for example, your inheritance plan",
+                "Nothing"
+              ],
+              "answer": 2,
+              "why": "A Legacy Contact gets iCloud data, but not passwords or money on exchanges. That's why a plan in iCloud Notes is a handy hint for your family."
+            }
+          ]
+        },
+        {
           "id": "l2-compound",
           "title": "Compound growth: why time matters more than the sum",
           "minutes": 4,

@@ -2980,6 +2980,174 @@
           ]
         },
         {
+          "id": "l2-cold-wallet",
+          "title": "Monedero frío: paso a paso",
+          "minutes": 5,
+          "goal": "Al terminar, podrás configurar un monedero frío con seguridad y no perder monedas por un error en la configuración.",
+          "cards": [
+            {
+              "title": "Qué es un monedero frío",
+              "text": "Un monedero frío es un pequeño dispositivo parecido a un pendrive. La clave de tus monedas vive dentro y nunca sale a internet. Aunque el móvil o el ordenador cojan un virus, robar la clave así es mucho más difícil. «Frío» significa «sin conexión a la red».",
+              "example": "Como en la vida: el exchange es el dinero en el bolsillo, y el monedero frío es la caja fuerte de casa. No la abres cada día, pero es más segura.",
+              "art": "wallet"
+            },
+            {
+              "title": "Cuándo lo necesitas",
+              "text": "Si en el exchange tienes una cantidad que no te importa perder, puedes no comprarlo. Si perderla te haría mucho daño, el monedero frío vale la pena. Suele costar entre $60 y $200.",
+              "example": "Ejemplo: tienes $3 000 en bitcoin para años. Un dispositivo de $100 es cerca del 3% de esa cantidad: $100 ÷ $3 000 ≈ 3%.",
+              "art": "scale"
+            },
+            {
+              "title": "La compra y la caja",
+              "text": "Compra solo en la web oficial del fabricante o a sus socios oficiales, no de segunda mano ni en una plataforma cualquiera. Comprueba que el precinto de la caja esté intacto. Si dentro ya hay una tarjeta con palabras impresas, es una trampa: no uses el dispositivo y devuélvelo.",
+              "example": "Como en la vida: no compras la cerradura de tu puerta a un desconocido que ya ha repartido sus llaves.",
+              "art": "shop"
+            },
+            {
+              "title": "Configuración: PIN y 24 palabras",
+              "text": "Al encenderlo por primera vez, elige un PIN, el código del dispositivo. Después el propio dispositivo te mostrará 12 o 24 palabras: la frase semilla. Escríbelas en orden en papel o en una placa de metal y compruébalas dos veces. No les hagas fotos ni las guardes en notas, la nube o un chat.",
+              "example": "Ejemplo: 24 palabras = 24 líneas en una tarjeta. Un error en una sola palabra y no podrás recuperar el monedero con esa copia. Por eso comprobar es obligatorio.",
+              "art": "key_lock"
+            },
+            {
+              "title": "La primera transferencia, pequeña",
+              "text": "Primero envía desde el exchange una cantidad pequeña, por ejemplo $10. Comprueba la dirección de recepción en la pantalla del propio dispositivo, no solo en el ordenador: un virus puede cambiarla. Si llega, todo está bien configurado y puedes enviar el resto.",
+              "example": "Ejemplo: enviaste $10 y llegaron $10 menos la comisión de la red. Solo entonces, la cantidad principal.",
+              "art": "coins"
+            },
+            {
+              "title": "Copia de seguridad y estafadores",
+              "text": "Guarda la frase semilla en un lugar seguro y una segunda copia en otro sitio, por si hay un incendio o una inundación. Los estafadores escriben como «soporte» y piden las palabras «para verificar». El soporte real nunca las pide: quien conoce las palabras es el dueño de las monedas.",
+              "example": "Como en la vida: la llave de repuesto de casa se deja a la familia, no bajo el felpudo.",
+              "art": "thief"
+            }
+          ],
+          "remember": [
+            "Compra el dispositivo solo al fabricante oficial y revisa el precinto.",
+            "La frase semilla, solo en papel o metal, nunca en el móvil ni en la nube.",
+            "Primero una transferencia pequeña, y comprueba la dirección en la pantalla del dispositivo."
+          ],
+          "quiz": [
+            {
+              "q": "En la caja de tu nuevo monedero hay una tarjeta con 24 palabras impresas. ¿Qué haces?",
+              "options": [
+                "Usar esas palabras, es más rápido",
+                "Hacer una foto a la tarjeta por si acaso",
+                "No usar el dispositivo y devolverlo al vendedor",
+                "Copiar las palabras en las notas del móvil"
+              ],
+              "answer": 2,
+              "why": "Un dispositivo honesto crea las palabras él mismo al configurarlo. Palabras ya impresas en la caja indican una falsificación: el estafador ya conoce tu clave."
+            },
+            {
+              "q": "¿Dónde guardar la frase semilla?",
+              "options": [
+                "En la nube, para no perderla",
+                "En papel o metal en un lugar seguro, y una copia en otro lugar",
+                "En un chat con el soporte",
+                "En una captura de pantalla del móvil"
+              ],
+              "answer": 1,
+              "why": "Todo lo que está en internet se puede robar. Papel o metal en dos lugares seguros protegen de ladrones y de incendios."
+            },
+            {
+              "q": "Vas a pasar $2 000 a un monedero nuevo. ¿Cómo se hace bien?",
+              "options": [
+                "Todo de una vez",
+                "Primero $10, comprobar que llegaron y luego el resto",
+                "A la dirección de un correo del «soporte»",
+                "A través de un conocido"
+              ],
+              "answer": 1,
+              "why": "La transferencia pequeña comprueba que la dirección y la red son correctas. Un error costará $10, no $2 000."
+            }
+          ]
+        },
+        {
+          "id": "l2-inheritance",
+          "title": "Herencia digital: que tus criptos no se pierdan para tu familia",
+          "minutes": 5,
+          "goal": "Al terminar, podrás hacer un plan sencillo para que los tuyos encuentren y reciban tus monedas si te pasa algo.",
+          "cards": [
+            {
+              "title": "Por qué se pierden las criptos",
+              "text": "Un depósito bancario los herederos lo encuentran con documentos. Con las criptos es distinto: si nadie sabe dónde están tus monedas ni cómo llegar a ellas, pueden perderse para siempre. Por eso conviene pensar en la herencia con tiempo: son 15 minutos y una hoja de papel.",
+              "example": "Como en la vida: el testamento no se escribe porque algo vaya a pasar mañana, sino para que luego a la familia le resulte más fácil.",
+              "art": "magnifier"
+            },
+            {
+              "title": "Un plan en una hoja",
+              "text": "Apunta en qué exchanges tienes cuenta y con qué correo, si tienes monedero frío, la cantidad aproximada y quién es tu heredero. Sin contraseñas ni frases semilla: solo qué está dónde. Guarda el plan en un lugar seguro y dile a una persona cercana dónde encontrarlo.",
+              "example": "Ejemplo de plan: «Exchange: cuenta con ivan@… · Monedero frío: en la caja fuerte de casa · Palabras: en un sobre en el notario · Heredera: mi mujer, Ana».",
+              "art": "books"
+            },
+            {
+              "title": "Cuentas en exchanges",
+              "text": "Un exchange entrega el dinero a los herederos solo a través de su soporte y con documentos. Suelen pedir el certificado de defunción, la identificación del titular y del heredero y la prueba del derecho a heredar. Cada exchange tiene su propio proceso, y depende de la ley del país. Lo principal es que la familia sepa que la cuenta existe.",
+              "example": "Ejemplo: el heredero envía una solicitud al soporte del exchange y sube los documentos. Tras la revisión, las monedas pasan a su cuenta. La revisión puede tardar semanas.",
+              "art": "bank"
+            },
+            {
+              "title": "Monedero frío",
+              "text": "Aquí no hay soporte: las monedas son de quien tiene la frase semilla. Así que guárdala donde la encuentre tu familia pero no los extraños: en un sobre cerrado en una caja fuerte, en una caja de seguridad del banco o en el notario, según lo habitual en tu país.",
+              "example": "Como en la vida: la llave de la caja fuerte no se deja en la mesa, pero tampoco se esconde tan bien que nadie la encuentre nunca.",
+              "art": "key_lock"
+            },
+            {
+              "title": "Contacto de legado en el iPhone",
+              "text": "En el iPhone puedes añadir un Contacto de legado: Ajustes → tu nombre → Inicio de sesión y seguridad → Contacto de legado. Con la clave de acceso y el certificado de defunción, recibe tus fotos, notas, archivos y copias de seguridad de iCloud. No recibe las contraseñas del Llavero ni el dinero de los exchanges. Pero si tu plan está en Notas de iCloud, tu heredero lo encontrará.",
+              "example": "Ejemplo: guardas el plan en una nota de iCloud y nombraste a tu hijo Contacto de legado. Verá qué está dónde, pero sin contraseñas.",
+              "art": "phone_app"
+            },
+            {
+              "title": "Qué recordar",
+              "text": "CRYPTO NOVA nunca pide ni guarda tus contraseñas ni frases semilla, y ningún servicio honesto te las pedirá. Actualiza el plan una vez al año: si abres una cuenta nueva, añádela. Esto no es asesoramiento legal: para la herencia en tu país, consulta a un notario o a un abogado.",
+              "example": "Como en la vida: el seguro y los documentos se revisan una vez al año. Con el plan de herencia, igual.",
+              "art": "shield"
+            }
+          ],
+          "remember": [
+            "Tu familia debe saber dónde están tus monedas, con un plan de una hoja y sin contraseñas.",
+            "El exchange paga a los herederos con documentos; el monedero frío solo se abre con la frase semilla.",
+            "Para la ley de herencias de tu país, un notario o un abogado."
+          ],
+          "quiz": [
+            {
+              "q": "¿Qué se apunta en un plan de herencia?",
+              "options": [
+                "Todas las contraseñas y frases semilla en un archivo",
+                "Qué cuentas y monederos hay y dónde, y quién es el heredero, sin contraseñas",
+                "Solo la cantidad en las cuentas",
+                "Nada: el exchange encontrará a la familia"
+              ],
+              "answer": 1,
+              "why": "El plan muestra qué está dónde. Las contraseñas en un solo archivo son un regalo para un ladrón."
+            },
+            {
+              "q": "¿Cómo recibe el heredero el dinero de una cuenta en un exchange?",
+              "options": [
+                "Basta con la contraseña del correo",
+                "A través del soporte del exchange, con documentos de la defunción y del derecho a heredar",
+                "Mediante el Contacto de legado del iPhone",
+                "De ninguna forma, el dinero se pierde"
+              ],
+              "answer": 1,
+              "why": "El exchange entrega las monedas a los herederos después de revisar los documentos. Cada exchange tiene su propio proceso."
+            },
+            {
+              "q": "¿Qué da un Contacto de legado en el iPhone?",
+              "options": [
+                "Acceso al dinero de un exchange",
+                "Las contraseñas del Llavero",
+                "Fotos, notas y archivos de iCloud, por ejemplo, tu plan de herencia",
+                "Nada"
+              ],
+              "answer": 2,
+              "why": "El Contacto de legado recibe datos de iCloud, pero no contraseñas ni dinero en exchanges. Por eso un plan en Notas de iCloud es una pista útil para tu familia."
+            }
+          ]
+        },
+        {
           "id": "l2-compound",
           "title": "Interés compuesto: por qué el tiempo importa más que la cantidad",
           "minutes": 4,

@@ -116,6 +116,11 @@ def test_admin_token_wrong_and_throttled(tmp_path):
         assert call(api, "GET", "/v2/admin/ping", ip="9.9.9.9")[0] == 429      # that address is locked for a while
         assert call(api, "GET", "/v2/admin/ping", ip="1.2.3.4")[0] == 200      # the owner's own address still works
         # the admin token is not a Firebase login, and a Firebase-style token is not the admin token
+        # (the Firebase check needs PyJWT; the light test gate in tests.yml does not install it)
+        try:
+            import jwt  # noqa: F401
+        except ImportError:
+            return
         assert call(api, "POST", "/v2/me", {}, tok=TOKEN)[0] == 401
 
 

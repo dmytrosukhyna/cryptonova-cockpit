@@ -3671,7 +3671,7 @@ boot();
   window.cnqAdminOpen=open;
 })();
 </script>
-<script src="nova-sphere.js?v=20261021atom4"></script>
+<script src="nova-sphere.js?v=20261021atom5"></script>
 <script>/* 21.10: mount every NOVA sphere with the speaking state (faster and brighter while NOVA talks or types); hidden ones (chat, report) resize when shown */
 (function(){ if(!window.NovaSphere) return; const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const busy=()=>{ try{ return speaking||typing!=null||document.body.classList.contains('nova-talking')||(('speechSynthesis' in window)&&speechSynthesis.speaking); }catch(e){ return false; } };

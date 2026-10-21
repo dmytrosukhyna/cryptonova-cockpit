@@ -102,7 +102,7 @@
     var E = [];
     ORB.forEach(function (o, oi) {
       ribbon(g, o, RO, rot, false, t, k, glow, small);
-      o.e.forEach(function (e0, ei) { var th = e0 + t * o.w * (busy ? 2.2 : 1); var p = op(o, th, RO, rot); E.push({ p: p, r: 2.7 * (small ? 1.2 : 1), warm: oi === 2, coin: opt.coins ? ["btc", "eth", null][oi] : null }); });
+      o.e.forEach(function (e0, ei) { var th = e0 + t * o.w; /* busy speeds the clock in mount(), never the angle */ var p = op(o, th, RO, rot); E.push({ p: p, r: 2.7 * (small ? 1.2 : 1), warm: oi === 2, coin: opt.coins ? ["btc", "eth", null][oi] : null }); });
     });
     E.filter(function (e) { return e.p.z < 0; }).forEach(function (e) { var rr = e.r * (0.85 + 0.15 * (1 + e.p.z / RO)); if (e.coin) coin(g, e.p.x, e.p.y, rr * 1.75, e.coin, 0.6); else bead(g, e.p.x, e.p.y, rr, e.warm, 0.55); });
     // the sphere: a small universe in glass

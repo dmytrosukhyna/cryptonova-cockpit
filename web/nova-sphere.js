@@ -63,6 +63,8 @@
     }
     function set() { var want = vis && !document.hidden && !reduce; if (want && !run) { run = true; last = 0; requestAnimationFrame(frame); } else if (!want) { run = false; frame(-1); } }
     size(); w.addEventListener("resize", function () { size(); if (!run) frame(-1); });
+    // a canvas that starts hidden (chat, report window) gets its real size when it is shown
+    if ("ResizeObserver" in w) new ResizeObserver(function () { var d = Math.min(3, w.devicePixelRatio || 1); if (Math.round(cv.clientWidth * d) !== W || Math.round(cv.clientHeight * d) !== H) { size(); if (!run) frame(-1); } }).observe(cv);
     document.addEventListener("visibilitychange", set);
     if ("IntersectionObserver" in w) new IntersectionObserver(function (en) { vis = en[0].isIntersecting; set(); }).observe(cv);
     set(); frame(-1);
@@ -70,7 +72,7 @@
   }
 
   w.NovaSphere = { draw: draw, mount: mount };
-  function auto() { [].forEach.call(document.querySelectorAll("canvas[data-sphere]"), function (c) { if (!c._sph) c._sph = mount(c, {}); }); }
+  function auto() { [].forEach.call(document.querySelectorAll("canvas[data-sphere]"), function (c) { if (!c._sph) try { c._sph = mount(c, {}); } catch (e) { c._sph = true; } }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", auto); else auto();
   w.NovaSphere.auto = auto;
 })(window);

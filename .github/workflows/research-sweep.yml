@@ -1,0 +1,22 @@
+name: research-sweep
+# Manual only. «Стоп-охота или пробой?»: what happens after BTC (and 10 liquid alts) break the 20-day low — sweep & reclaim
+# vs a true breakdown, by the 200-day-average regime (scripts/sweep_study.py, docs/research/sweep.md). Public candles only:
+# no keys, no secrets, no orders.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: python scripts/sweep_study.py --md sweep.json
+      - uses: actions/upload-artifact@v4
+        with: { name: sweep, path: sweep.json }

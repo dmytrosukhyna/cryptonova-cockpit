@@ -2441,12 +2441,13 @@ function renderCal(){ const el=$('#calCard'); if(!el) return; const evs=(MCAL&&M
     <div class="muted enote">${(MCAL&&MCAL.verdict)||''}</div>`; }
 setInterval(()=>{ try{ if(!document.hidden&&MCAL) renderCal(); }catch(e){} },60000);
 /* ---- overview: every strategy account in one table («результат всех стратегий») */
-let FUNDJ=null, ARBJ=null, TRIJ=null, NOVAF=null, APPH=null, SR_T=0;
+let FUNDJ=null, ARBJ=null, TRIJ=null, NOVAF=null, APPH=null, SR_T=0, OKXSIG=null;
 async function loadStratData(){ if(Date.now()-SR_T<5*60000&&FUNDJ) return; SR_T=Date.now();
   try{ FUNDJ=await (await fetch('./funding.json',{cache:'no-store'})).json(); }catch(e){ FUNDJ=null; }
   try{ ARBJ=await (await fetch('./arb.json',{cache:'no-store'})).json(); }catch(e){ ARBJ=null; }
   try{ TRIJ=await (await fetch('./tri.json',{cache:'no-store'})).json(); }catch(e){ TRIJ=null; }
   try{ const r=await fetch('./signals_feed.json',{cache:'no-store'}); NOVAF=r.ok?await r.json():null; }catch(e){ NOVAF=null; }
+  try{ const r=await fetch('./okx_signal.json',{cache:'no-store'}); OKXSIG=r.ok?await r.json():null; }catch(e){ OKXSIG=null; }
   try{ const r=await fetch('./app_home.json',{cache:'no-store'}); APPH=r.ok?await r.json():null; }catch(e){ APPH=null; } }
 function renderStrats(){ const el=$('#stratsCard'); if(!el) return; const rows=[];
   const since=h=>h&&h.length?fmtT(h[0].time||h[0][0]).split(',')[0]:'—';
@@ -3258,6 +3259,12 @@ document.addEventListener('click',e=>{ const b=e.target.closest&&e.target.closes
   pop.textContent=b.dataset.qi; pop.dataset.for=b.dataset.qi; pop.hidden=false; const r=b.getBoundingClientRect(), w=Math.min(300,innerWidth-24);
   pop.style.width=w+'px'; pop.style.left=Math.max(12,Math.min(innerWidth-w-12,r.left+r.width/2-w/2))+'px'; pop.style.top=(r.bottom+8+scrollY)+'px'; },true);
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const p=document.getElementById('qiPop'); if(p) p.hidden=true; } });
+// 22.10: CRYPTO NOVA as a signal on the OKX Signal Marketplace (cnq/agents/okx_signal.py → okx_signal.json; off unless the owner
+// sets CNQ_OKX_SIGNAL=on on the server): one status line. Guests see it only while it is on.
+function okxSigLine(){ const O=OKXSIG; if(!O||(IS_GUEST&&!O.on)) return ''; const L=O.last;
+  const last=L?` · последний ${fmtT(L.t)} ${mypEsc(L.coin||'')} — ${mypEsc(L.action_ru||L.action||'')}`:' · последний —';
+  const more=O.on&&(O.pending||O.failed)?` · в очереди ${O.pending||0}${O.failed?` · не ушло ${O.failed}`:''}`:'';
+  return `<div class="muted okxsig" style="font-size:11.5px;margin:-2px 0 8px" title="${O.on?'сделки «отобранных сигналов» уходят в OKX Signal Marketplace':mypEsc(O.why_off||'')}">Сигнал CRYPTO NOVA на OKX: <b class="${O.on?'pos':''}">${O.on?'включён':'выключен'}</b> · отправлено ${O.sent||0}${last}${more}</div>`; }
 function novaPanel(head){ const N=novaRes(), F=NOVAF, pr=(PAPER&&PAPER.profiles)||{}, mixA=F&&Array.isArray(F.mix)?F.mix:[], key=m=>m.key||m.id||m.profile, info=k=>mixA.find(m=>key(m)===k)||{};
   const inRes=new Set((N?N.comps:[]).map(c=>c.k));
   const desks=[...new Set([...(N?N.comps.map(c=>c.k):[]),...novaMix()])].filter(k=>pr[k]);
@@ -3304,7 +3311,7 @@ function novaPanel(head){ const N=novaRes(), F=NOVAF, pr=(PAPER&&PAPER.profiles)
   const testsBody=IS_GUEST
     ? `<div class="muted fabout">Каждая стратегия торгует на своём демо-счёте $10&nbsp;000. Пользоваться ими не нужно: что докажет себя на живом рынке, система сама переносит в CRYPTO NOVA. Все результаты — с ${ddmm(FUT_D0)}.</div>${rankHtml().replace(/<button class="ib sm" data-connect[^>]*>[^<]*<\/button>/g,'').replace(/<button class="rk"/g,'<button class="rk" disabled')}`
     : `<div class="muted fabout">Твоя кухня: CNPTS учится на тестах и передаёт лучшее в CRYPTO NOVA. Все результаты — с ${ddmm(FUT_D0)}. Нажми, чтобы открыть счёт целиком.</div>${pipeHtml()}<div class="fsys ${TESTS_OK?'':'two'}">${Object.entries(FSYS_META).map(([k,[a,b,t]])=>{ const R=fsysResF(k); return `<button data-sys="${k}" aria-pressed="${FSYS===k}"><b>${a} ${otag(t)}</b><small>${b}</small>${R?resFmt(R.usd,R.base,R.since):''}</button>`; }).join('')}</div>${goalHtml()}`;
-  return `<div class="fdesk"><h2>Фьючерсы · CRYPTO NOVA</h2>
+  return `<div class="fdesk"><h2>Фьючерсы · CRYPTO NOVA</h2>${okxSigLine()}
    <div class="novatop"><div><small>CRYPTO NOVA · демо-счёт $10 000 · с ${N&&N.since?N.since:ddmm(FUT_D0)}</small><b class="num">${N?resFmt(N.usd,N.base,''):'—'}</b><span>${N?`на счёте $${Math.round(10000+N.usd).toLocaleString('ru-RU')} · `:''}закрыто ${clRes.length} ${plur(clRes.length,'сделка','сделки','сделок')}${clRes.length?` · в плюсе ${Math.round(wins/clRes.length*100)}%`:''} · открыто сейчас ${op.length}${op.filter(x=>!inRes.has(x.k)).length?` · из них ${op.filter(x=>!inRes.has(x.k)).length} в проверке и пока не в итоге ${qi(outTip((op.find(x=>!inRes.has(x.k))||{}).k||'own'))}`:''}</span></div><button class="ib" data-connect="cryptonova" data-cname="CRYPTO NOVA">Подключить</button></div>
    <div class="muted fabout fexplain">Как считается: один демо-счёт $10&nbsp;000 по настоящим ценам биржи. Система сама отбирает стратегии и делит счёт между ними поровну (сейчас ${nIn} ${plur(nIn,'часть','части','частей')}). Результат — их общий итог в пересчёте на один счёт $10&nbsp;000, с ${ddmm(FUT_D0)}. Сделки с пометкой «в проверке» — сигналы CRYPTO NOVA из правил, которые ещё набирают живую историю: в итог счёта они войдут после ${FUT_NEED.own} закрытых сделок правила.</div>
    <h3>Открытые сделки${op.length?' · '+op.length:''}</h3>${rows||'<div class="empty">Открытых сделок нет — система ждёт свой вход. Как только сделка откроется, она появится здесь со входом, стопом, целью и причиной.</div>'}${pends?'<h3>Ордера в ожидании</h3>'+pends:''}

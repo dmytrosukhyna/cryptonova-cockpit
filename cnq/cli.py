@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         from .risk import cli as risk_cli
         return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
     ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
     ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
@@ -394,6 +394,13 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs("data", exist_ok=True)
         d = signal_feed.run(sqlite3.connect("data/agents.sqlite"), args.out)
         print(f"signals_feed.json: {d.get('stats')} this run={d.get('this_run')} channel_on={d.get('channel_on')} {d.get('error', '')}")
+    elif args.cmd == "okxsignal":
+        import os, sqlite3
+        from .agents import okx_signal
+        os.makedirs("data", exist_ok=True)
+        d = okx_signal.run(sqlite3.connect("data/agents.sqlite"), args.out)
+        print(f"okx_signal.json: on={d.get('on')} sent={d.get('sent')} pending={d.get('pending')} failed={d.get('failed')} "
+              f"skipped={d.get('skipped')} this run={len(d.get('this_run') or [])} {d.get('why_off') or ''} {d.get('error', '')}")
     elif args.cmd == "appsignals":
         import os, sqlite3
         from .agents import app_signals

@@ -15,7 +15,9 @@ Every 60 (and on cycle 1 after a start): the strategy conveyor (stages LAB → P
 Every SYNC_S: sync with GitHub — pull what the GitHub pipeline makes (news, research, macro …) into run/web and run/data, push
 what the engine owns (OWNED + engine.json). The GitHub pipeline skips the engine's steps while the repository variable
 CNQ_ENGINE = server, so there is only one writer of each file.
-Nothing here sends orders to an exchange: every desk is a demo account. Stdlib only."""
+Nothing here sends orders to an exchange: every desk is a demo account. 22.10: the OKX signal step (okxsignal, OFF unless
+CNQ_OKX_SIGNAL=on in /etc/cnq.env) publishes the header desks' trades as a public OKX Marketplace signal — it places no orders on any
+account of ours; subscribers' own OKX bots trade on their accounts. Stdlib only."""
 from __future__ import annotations
 
 import argparse
@@ -33,7 +35,9 @@ INTERVAL_S = int(os.environ.get("CNQ_ENGINE_INTERVAL", "60"))
 SYNC_S = int(os.environ.get("CNQ_ENGINE_SYNC", "120"))
 # order matters: risk first (20.10 portfolio risk layer, cnq/risk: it judges the fresh candles and the desks' last positions, the
 # desks then ask its gate before every entry), paper rewrites paper.json, the rest add
-FAST = ["risk", "paper", "listings", "own", "lsn", "turbo", "signalfeed", "apphome", "apppush",
+FAST = ["risk", "paper", "listings", "own", "lsn", "turbo", "signalfeed",
+        "okxsignal",       # 22.10: CRYPTO NOVA on the OKX Signal Marketplace (cnq/agents/okx_signal.py) — off unless CNQ_OKX_SIGNAL=on
+        "apphome", "apppush",
         "scorecard"]       # 20.10: last — it records what the steps above (and the GitHub feeds) just published → web/scorecard.json
 SLOW = ["quality", "altport", "buynow"]     # 22.10: «Если покупать сегодня» for the app (cnq/agents/buy_now.py), every 30 minutes
 # 20.10: strategy conveyor LAB → PAPER → READY → RETIRED (cnq/agents/conveyor.py): once an hour (cycle 1 = soon after a restart, then
@@ -45,12 +49,13 @@ OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "al
          "conveyor.json",
          "buy_now.json",                                                   # 22.10: the app's «Если покупать сегодня» (SLOW step)
          "risk.json",                                                      # 20.10: the risk layer's public summary
-         "scorecard.json"]                                                 # 20.10: the public prediction scorecard
+         "scorecard.json",                                                 # 20.10: the public prediction scorecard
+         "okx_signal.json"]                                                # 22.10: the OKX signal sender's public log (no token)
 # the engine's own state — never overwritten by a pull (20.10: + the conveyor's state, the risk layer's kill switch, state, reset
 # request and log)
 DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json", "kill_switch.json", "risk_state.json", "risk_reset.json", "risk_log.jsonl"}
 STEP_TIMEOUT = {"risk": 60, "paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90, "buynow": 150,
-                "conveyor": 120, "scorecard": 60}
+                "conveyor": 120, "scorecard": 60, "okxsignal": 60}
 # 20.10: the public scorecard's append-only, hash-chained ledgers (cnq/agents/scorecard.py) — two active files and the directory of
 # their closed segments. Unlike DB_OWNED they are public: the engine is their only writer, a pull never overwrites them, and every
 # sync commits them (like OWNED, but in data/). A fresh install starts from the repo's copy (prepare).

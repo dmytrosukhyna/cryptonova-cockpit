@@ -50,6 +50,9 @@ def test_public_summary_is_the_sub_account_only_with_exactly_the_agreed_keys():
         assert bad not in text, bad                                                 # no key, IP, UID, order id, personal coin
     assert all(c[0] == "GET" for c in calls) and not any("/trade/order" == c[1] for c in calls)
     assert not pub["stale"]                                                         # the autopilot holds its lease (it just ran)
+    al = pub["alloc"]
+    assert list(al) == list(PR.sub.ALLOC_KEYS) and abs(al["spot_cash_usd"] + al["fut_margin_usd"] + al["fut_reserve_usd"] + al["active_wait_usd"]
+                                                       + al["other_usd"] - pub["usdt_usd"]) <= 1.0
 
 
 def test_stale_when_the_autopilot_does_not_run_and_the_last_numbers_when_okx_is_unreadable():
@@ -105,6 +108,9 @@ def test_app_home_public_real_in_every_language_and_stale_by_age(tmp_path):
     now = T0 + 70 * 3_600_000
     real = {"exchange": "OKX", "since": T0, "start_usd": 10000.0, "equity_usd": 10012.5, "pnl_usd": 12.5, "pnl_pct": 0.13, "today_usd": 2.0,
             "today_pct": 0.02, "spot": [{"sym": "BTC", "share": 19.5, "usd": 1952.4, "extra": "x"}], "usdt_pct": 40.0, "usdt_usd": 4005.0,
+            "alloc": {"spot_coins_usd": 5000.0, "spot_cash_usd": 650.0, "fut_budget_usd": 2500.0, "fut_margin_usd": 300.0, "fut_reserve_usd": 2200.0,
+                      "active_coins_usd": 0.0, "active_wait_usd": 1000.0, "other_usd": -145.0, "spot_pct": 65.0, "fut_pct": 25.0, "active_pct": 10.0,
+                      "secret": "x"},
             "futures": [{"inst": "SOL-USDT-SWAP", "side": "long", "entry": 200.0, "stop": 190.0, "target": 230.0, "upnl_pct": 0.5,
                          "upnl_usd": 1.2, "ordId": "123"}], "closed_n": 3, "curve": [[T0, 0.0], [now - 60_000, 12.5]],
             "asof": now - 60_000, "stale": False, "host": "www.okx.com"}
@@ -113,6 +119,7 @@ def test_app_home_public_real_in_every_language_and_stale_by_age(tmp_path):
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
     r = doc["public"]["real"]
     assert list(r) == list(app_home.REAL_KEYS) and r["equity_usd"] == 10012.5 and not r["stale"]
+    assert list(r["alloc"]) == list(app_home.REAL_ALLOC) and r["alloc"]["fut_margin_usd"] == 300.0
     assert r["spot"] == [{"sym": "BTC", "share": 19.5, "usd": 1952.4}] and "ordId" not in r["futures"][0] and "host" not in r
     for lang in ("en", "uk", "el", "es"):
         other = json.load(open(os.path.join(d, f"app_home.{lang}.json"), encoding="utf-8"))["public"]["real"]
@@ -135,8 +142,10 @@ def test_panel_line_and_the_light_publish():
     js = html[a:b] + "\nconst R=JSON.parse(process.argv[2]);process.stdout.write(line(R,+process.argv[3]));"
     p = os.path.join(tempfile.mkdtemp(), "l.js")
     open(p, "w", encoding="utf-8").write(js)
-    R = {"since": 1792627200000, "equity_usd": 10012.5, "pnl_usd": 12.5, "pnl_pct": 0.13, "asof": 1792630000000, "stale": False}
+    R = {"since": 1792627200000, "equity_usd": 10012.5, "pnl_usd": 12.5, "pnl_pct": 0.13, "asof": 1792630000000, "stale": False,
+         "alloc": {"spot_pct": 65.0, "fut_pct": 25.0, "active_pct": 10.0, "fut_margin_usd": 400.5}}
     out = subprocess.run([node, p, json.dumps(R), str(1792630000000 + 60_000)], capture_output=True, text=True, timeout=30).stdout
     assert "Реальный счёт CRYPTO NOVA на OKX · с 22.10" in out and "+$12,5" in out and "+0,13%" in out and "устарели" not in out
+    assert "распределены: спот 65% · фьючерсы 25% (в позициях 4,0%) · активный спот 10%" in out
     out = subprocess.run([node, p, json.dumps(R), str(1792630000000 + 3 * 3_600_000)], capture_output=True, text=True, timeout=30).stdout
     assert "данные устарели" in out

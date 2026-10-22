@@ -133,6 +133,40 @@ def _stop_tp(algos: list, inst: str, long: bool) -> tuple:
     return sl, tp
 
 
+ALLOC_KEYS = ("spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_usd", "fut_reserve_usd", "active_coins_usd",
+              "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct")
+
+
+def allocate(total: float, usdt: float, spot_coins: float, active_coins: float, positions: list, split: dict, pf_cash: float | None,
+             fut_budget: float | None, targets_pct: float = 0.0) -> dict:
+    """22.10 (owner read «43% USDT» as idle cash): where the account's dollars belong, from the autopilot's own budgets —
+    okx_alloc.shares (spot / futures / active), the portfolio's own cash share (okx_autopilot state pf_cash) × the spot budget,
+    the futures budget (okx_futures.budget), the active budget = total × active share (okx_active). The USDT is handed out in
+    this order: futures margin in positions (real, with its open result) → the spot portfolio's cash → active spot waiting for
+    «Импульс BTC» → the futures reserve for new trades → «прочее» (fees, rounding, coins still to buy). The USDT parts add up to
+    the USDT on the account."""
+    sp, fu_, ac_ = (float(split.get(k) or 0.0) for k in ("spot", "futures", "active"))
+    if pf_cash is None:                              # an older state: the spot share not in coin targets = the portfolio's cash
+        pf_cash = max(0.0, 1 - targets_pct / 100 / sp) if sp else 0.0
+    budget = fut_budget if fut_budget else total * fu_
+    margin = 0.0
+    for p in positions:
+        m = p.get("margin")
+        if m is None and p.get("notional"):
+            m = p["notional"] / (p.get("lev") or 1.0)
+        margin += (m or 0.0) + (p.get("upl") or 0.0)
+    left = max(0.0, usdt)
+    out = {}
+    for k, want in (("fut_margin_usd", margin), ("spot_cash_usd", pf_cash * total * sp), ("active_wait_usd", total * ac_ - active_coins),
+                    ("fut_reserve_usd", budget - margin)):
+        v = min(max(0.0, want), left)
+        out[k], left = round(v, 2), left - v
+    out["other_usd"] = round(usdt - sum(out[k] for k in ("fut_margin_usd", "spot_cash_usd", "active_wait_usd", "fut_reserve_usd")), 2)
+    out.update({"spot_coins_usd": round(spot_coins, 2), "fut_budget_usd": round(budget, 2), "active_coins_usd": round(active_coins, 2),
+                "spot_pct": round(sp * 100, 2), "fut_pct": round(fu_ * 100, 2), "active_pct": round(ac_ * 100, 2)})
+    return {k: out[k] for k in ALLOC_KEYS}
+
+
 def match(env=None, st: dict | None = None) -> dict:
     """The autopilot's own «СОВПАДАЕТ С СИСТЕМОЙ CRYPTO NOVA» line and its differences (okx_autopilot.same_text), from its state."""
     from . import okx_active, okx_futures
@@ -224,4 +258,6 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
                    "share": (out["split"] or {}).get("active")},
         "cash": {"ccy": quote, "rows": cash, "usd": round(sum(x["usd"] for x in cash), 2), "free": free},
     })
+    out["alloc"] = allocate(total, out["cash"]["usd"], out["spot"]["usd"], out["active"]["usd"], futures, out["split"] or {},
+                            ms._f(st.get("pf_cash")), ms._f(fs.get("budget_usd")), sum(targets.values()))
     return out

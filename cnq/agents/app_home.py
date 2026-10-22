@@ -848,7 +848,9 @@ def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, 
 # public.real = web/public_real.json as the mirror publishes it (cnq/execution/public_real.py — the CRYPTO NOVA sub-account only),
 # exactly these keys; numbers only, the same in every language; stale also when its asof is older than 2 hours.
 REAL_KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
-             "futures", "closed_n", "curve", "asof", "stale")
+             "alloc", "futures", "closed_n", "curve", "asof", "stale")
+REAL_ALLOC = ("spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_usd", "fut_reserve_usd", "active_coins_usd",
+              "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct")
 REAL_STALE_MS = 2 * 3_600_000
 
 
@@ -858,12 +860,15 @@ def _public_real(out: str, now: int) -> dict | None:
             d = json.load(f)
     except Exception:  # noqa: BLE001
         return None
-    if not isinstance(d, dict) or not set(REAL_KEYS) <= set(d) or not d.get("asof"):
+    d = d if isinstance(d, dict) else {}
+    d.setdefault("alloc", None)                      # a file from before 22.10 14:00 has no alloc yet
+    if not set(REAL_KEYS) <= set(d) or not d.get("asof"):
         return None
     r = {k: d[k] for k in REAL_KEYS}
     r["spot"] = [{k: x.get(k) for k in ("sym", "share", "usd")} for x in d.get("spot") or [] if isinstance(x, dict)]
     r["futures"] = [{k: x.get(k) for k in ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd")}
                     for x in d.get("futures") or [] if isinstance(x, dict)]
+    r["alloc"] = {k: d["alloc"].get(k) for k in REAL_ALLOC} if isinstance(d.get("alloc"), dict) else None
     r["stale"] = bool(d.get("stale")) or now - int(d["asof"]) > REAL_STALE_MS
     return r
 

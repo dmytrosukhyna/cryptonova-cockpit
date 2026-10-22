@@ -148,3 +148,31 @@ def test_panel_card_renders_the_total_and_both_accounts():
         assert x in body, x
     r = subprocess.run([node, jsf, json.dumps({"ok": False, "error": "ключ привязан к другому IP"})], capture_output=True, text=True, timeout=60)
     assert "Всего: —" in r.stdout and "не прочитался: ключ привязан к другому IP" in r.stdout
+
+
+def test_dollars_are_allocated_to_their_parts_and_add_up_to_the_usdt():
+    """22.10 (owner read «43% USDT» as idle cash): spot cash, futures margin + reserve, active spot waiting, «прочее» = the USDT."""
+    e, fk, log = _setup()
+    s = sub.read(e, _fetch(fk, []), NOW + 60_000)
+    a, T, usdt = s["alloc"], s["total_usd"], s["cash"]["usd"]
+    assert list(a) == list(sub.ALLOC_KEYS) and (a["spot_pct"], a["fut_pct"], a["active_pct"]) == (65.0, 25.0, 10.0)
+    parts = a["spot_cash_usd"] + a["fut_margin_usd"] + a["fut_reserve_usd"] + a["active_wait_usd"] + a["other_usd"]
+    assert abs(parts - usdt) <= 1.0 and min(a[k] for k in ("spot_cash_usd", "fut_margin_usd", "fut_reserve_usd", "active_wait_usd")) >= 0
+    st = ap.load_state(e)
+    assert abs(a["spot_cash_usd"] - st["pf_cash"] * T * 0.65) < 0.02                 # the portfolio's own cash share × the spot budget
+    assert a["fut_budget_usd"] == fu.status(e)["budget_usd"]                         # the futures budget of okx_futures itself
+    assert abs(a["fut_margin_usd"] + a["fut_reserve_usd"] - a["fut_budget_usd"]) < 0.02 and a["fut_margin_usd"] > 0
+    assert abs(a["active_coins_usd"] - 100.0) < 0.01 and abs(a["active_wait_usd"] - (0.10 * T - 100.0)) < 0.02
+    # the order the USDT is handed out in: a short account never shows more than it has
+    x = sub.allocate(1000.0, 50.0, 900.0, 0.0, [{"margin": 30.0, "upl": -2.0}], {"spot": 0.65, "futures": 0.25, "active": 0.1}, 0.1, 250.0)
+    assert x["fut_margin_usd"] == 28.0 and x["spot_cash_usd"] == 22.0 and x["active_wait_usd"] == 0.0 and x["fut_reserve_usd"] == 0.0
+    assert x["other_usd"] == 0.0
+    y = sub.allocate(1000.0, 400.0, 600.0, 0.0, [], {"spot": 0.65, "futures": 0.25, "active": 0.1}, None, None, 55.0)
+    assert y["spot_cash_usd"] == round((1 - 55 / 65) * 650, 2) and y["fut_budget_usd"] == 250.0 and abs(sum(
+        y[k] for k in ("spot_cash_usd", "fut_margin_usd", "fut_reserve_usd", "active_wait_usd", "other_usd")) - 400.0) < 0.01
+    html = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "app.html"), encoding="utf-8").read()
+    card = html[html.index("function subHtml(S,apBox)"):html.index("function okHtml(D)")]
+    for w in ("распределены: спот ${sh(AL.spot_pct)}, фьючерсы ${sh(AL.fut_pct)} (в позициях ${sh(fp)}), активный спот ${sh(AL.active_pct)}",
+              "Кэш спот-портфеля", "в позициях (маржа)", "резерв под новые сделки", "ждёт сигнала «Импульс BTC»", "Прочее"):
+        assert w in card, w
+    assert "свободн" not in card                                                     # never «свободный кэш»

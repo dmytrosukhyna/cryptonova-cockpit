@@ -705,7 +705,7 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
     res = execute(cl, b, st, env, now, sleep, log_path)
     summary = {"t": now, "reason": reason, "mode": mode, **res, "total_usd": b["total_usd"], "quote": b["quote"]}
     st.update({"last_run": now, "last_sig": b["sig"], "last": summary, "mode": mode, "split": b["split"], "same": b["same"],
-               "diffs": b["diffs"][:12], "targets": b["targets"][:20], "drift_t": now})
+               "diffs": b["diffs"][:12], "targets": b["targets"][:20], "drift_t": now, "pf_cash": b["pf_cash"]})
     if enabled(env) and not res["stopped"] and res["failed"] == 0:
         st["armed"] = True
     if save:

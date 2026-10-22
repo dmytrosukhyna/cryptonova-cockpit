@@ -5,6 +5,8 @@ every 15 minutes. The owner's personal (main) account never goes there: this mod
 
   {"exchange": "OKX", "since": ms, "start_usd", "equity_usd", "pnl_usd", "pnl_pct" (percent), "today_usd", "today_pct",
    "spot": [{"sym", "share" (% of the account), "usd"}], "usdt_pct", "usdt_usd",
+   "alloc": where the dollars belong (myspot_sub.allocate) {"spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_usd",
+            "fut_reserve_usd", "active_coins_usd", "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct"},
    "futures": [{"inst", "side": "long" | "short", "entry", "stop", "target", "upnl_pct" (price move, %), "upnl_usd"}],
    "closed_n" (futures positions closed since the start, OKX's own history), "curve": [[ms, $ result since the start]] (≤ 1 point
    per 15 min, compact), "asof": ms, "stale": bool}
@@ -26,7 +28,7 @@ from . import myspot_watch as ms
 
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
-        "futures", "closed_n", "curve", "asof", "stale")
+        "alloc", "futures", "closed_n", "curve", "asof", "stale")
 SPOT_KEYS, FUT_KEYS = ("sym", "share", "usd"), ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd")
 EVERY_S = 15 * 60
 STEP_MS = 15 * 60_000
@@ -137,7 +139,7 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None) -> dict:
             "pnl_pct": _r(pnl / s0 * 100 if s0 else None), "today_usd": _r(today),
             "today_pct": _r(today / (s0 + ref) * 100) if today is not None and (s0 + ref) else None,
             "spot": [{"sym": c, "share": _r(u / eq * 100 if eq else 0.0), "usd": _r(u)} for c, u in sorted(spot.items(), key=lambda x: -x[1])],
-            "usdt_pct": _r(cash / eq * 100 if eq else 0.0), "usdt_usd": _r(cash), "futures": fut,
+            "usdt_pct": _r(cash / eq * 100 if eq else 0.0), "usdt_usd": _r(cash), "alloc": dict(s.get("alloc") or {}), "futures": fut,
             "closed_n": int(closed_n or 0), "curve": [[int(t), _r(v)] for t, v in curve], "asof": now, "stale": not running(s.get("lease"))}
 
 
@@ -148,6 +150,7 @@ def clean(doc: dict) -> dict:
     out = {k: doc[k] for k in KEYS}
     out["spot"] = [{k: x.get(k) for k in SPOT_KEYS} for x in doc.get("spot") or []]
     out["futures"] = [{k: x.get(k) for k in FUT_KEYS} for x in doc.get("futures") or []]
+    out["alloc"] = {k: (doc.get("alloc") or {}).get(k) for k in sub.ALLOC_KEYS}
     return out
 
 

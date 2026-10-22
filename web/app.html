@@ -3987,9 +3987,11 @@ web/public_real.json is published by the Mac mirror (cnq/execution/public_real.p
   const money=v=>(v<0?'−':'')+'$'+Math.abs(v).toLocaleString('ru-RU',{maximumFractionDigits:Math.abs(v)<100?2:0});
   const sig=v=>(v>0?'+':v<0?'−':'')+'$'+Math.abs(v).toLocaleString('ru-RU',{maximumFractionDigits:Math.abs(v)<100?2:0});
   const pct=v=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(2).replace('.',',')+'%';
+  const pp=v=>(+v||0).toFixed(v>0&&v<10?1:0).replace('.',',')+'%';
   function line(R,now){ if(!R||!R.since||R.equity_usd==null) return '';
     const d=new Date(R.since).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'}), old=R.stale||now-(R.asof||0)>2*3600000, c=R.pnl_usd>0?'pos':R.pnl_usd<0?'neg':'';
     return `<span>Реальный счёт CRYPTO NOVA на OKX · с ${d}</span><i>·</i><b>${money(R.equity_usd)}</b><i>·</i><b class="${c}">${sig(R.pnl_usd||0)}${R.pnl_pct!=null?` (${pct(R.pnl_pct)})`:''}</b>`
+      +(R.alloc&&R.equity_usd?`<i>·</i><span>распределены: спот ${pp(R.alloc.spot_pct)} · фьючерсы ${pp(R.alloc.fut_pct)} (в позициях ${pp(R.alloc.fut_margin_usd/R.equity_usd*100)}) · активный спот ${pp(R.alloc.active_pct)}</span>`:'')
       +(old?'<i>·</i><span class="old">данные устарели — автопилот сейчас не обновляет счёт</span>':''); }
   async function load(){ const el=document.getElementById('realLine'); if(!el) return;
     try{ const r=await fetch('./public_real.json?'+Math.floor(Date.now()/60000),{cache:'no-store'}); const h=r.ok?line(await r.json(),Date.now()):''; el.innerHTML=h; el.hidden=!h; }catch(e){ el.hidden=true; } }
@@ -4090,6 +4092,11 @@ as web/myspot.enc.json; only this browser decrypts it (ivanDecrypt, the owner's 
 #msCard .msmatch{border:1px solid var(--line2);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.45;margin:2px 0 4px}
 #msCard .msmatch.yes{border-color:rgba(61,220,151,.45);background:rgba(61,220,151,.06)}#msCard .msmatch.no{border-color:rgba(242,193,78,.45);background:rgba(242,193,78,.06)}
 #msCard .msmatch>b{font:700 12.5px var(--mono);color:#e8f0fa;overflow-wrap:anywhere}#msCard .msmatch ul{margin:4px 0 0 18px;padding:0;color:#dbe9f5;display:grid;gap:2px}#msCard .msmatch .muted{display:block;font-size:11.5px;margin-top:4px}
+#msCard .msal{border:1px solid var(--line2);border-radius:10px;padding:9px 11px;margin:2px 0 10px;display:grid;gap:5px;font-size:12.5px}
+#msCard .msal .hd{font-weight:600;color:#e8f0fa;line-height:1.45}#msCard .msal>.muted{font-size:11.5px;line-height:1.45;margin-top:2px}
+#msCard .msal .ar{display:grid;grid-template-columns:minmax(0,1fr) auto 52px;gap:8px;align-items:baseline}#msCard .msal .ar.sub span{padding-left:18px;color:var(--muted)}
+#msCard .msal .ar i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}#msCard .msal .ar b{font:600 12.5px var(--mono);color:#e8f0fa;white-space:nowrap}
+#msCard .msal .ar em{font:12px var(--mono);font-style:normal;color:var(--muted);text-align:right}
 #msCard .mst{display:grid;font-size:12.5px}
 #msCard .mst .h,#msCard .mst .r{display:grid;gap:8px;align-items:baseline;padding:6px 0}
 #msCard .mst.sp .h,#msCard .mst.sp .r{grid-template-columns:minmax(64px,.8fr) minmax(90px,1fr) minmax(80px,.9fr) minmax(120px,1.3fr) minmax(110px,1.2fr)}
@@ -4167,7 +4174,21 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
     h+=`<div class="mskpi"><div><small>Стоимость</small><b>${usd(S.total_usd)}</b><em class="muted">спот, фьючерсы, USDT · OKX</em></div>
       <div><small>Результат с начала</small><b class="${cls(R.usd)}">${sgn(R.usd||0)}</b><em class="${cls(R.usd)}">${R.pct!=null?pc(R.pct,2):''} <span class="muted">от ${usd(st.usd||0)}${st.t?` · с ${dday(st.t)}`:''}</span></em></div>
       <div><small>Фьючерсы сейчас</small><b class="${pos.length?cls(F.upl):''}">${pos.length?sgn(F.upl||0):'—'}</b><em class="muted">${pos.length} ${plur(pos.length,'позиция','позиции','позиций')}${F.budget_usd?` · бюджет ${usd(F.budget_usd)}`:''}</em></div>
-      <div><small>${esc(C.ccy||'USDT')} на счёте</small><b>${usd(C.usd||0)}</b><em class="muted">${C.free!=null?`свободно ${usd(C.free)}`:'кэш портфеля и маржа'}</em></div></div>`;
+      <div><small>Доллары (${esc(C.ccy||'USDT')})</small><b>${usd(C.usd||0)}</b><em class="muted">${S.alloc?'расписаны по частям ниже':'кэш портфеля, маржа и резервы'}</em></div></div>`;
+    // 22.10 (owner read «43% USDT» as idle cash): where every dollar belongs, from the autopilot's own budgets (myspot_sub.allocate)
+    const AL=S.alloc;
+    if(AL){ const T=S.total_usd||1, p=v=>sh(Math.max(0,v)/T*100), fp=AL.fut_margin_usd/T*100;
+      const parts=[['Спот · монеты',AL.spot_coins_usd,'var(--acc)'],['Кэш спот-портфеля',AL.spot_cash_usd,'#4d7fa8'],['в позициях (маржа)',AL.fut_margin_usd,'#f2c14e'],
+        ['резерв под новые сделки',AL.fut_reserve_usd,'rgba(242,193,78,.4)'],['Активный спот · в монетах',AL.active_coins_usd,'#6fcf97'],
+        ['Активный спот · ждёт сигнала «Импульс BTC»',AL.active_wait_usd,'rgba(111,207,151,.4)'],['Прочее',AL.other_usd,'#8fa1b3']];
+      const row=(n,v,c,sub)=>`<div class="ar${sub?' sub':''}"><span><i style="background:${c}"></i>${n}</span><b>${usd(v||0)}</b><em>${p(v||0)}</em></div>`;
+      h+=`<div class="msal"><div class="hd">Ваши ${usd((S.start||{}).usd||T)} распределены: спот ${sh(AL.spot_pct)}, фьючерсы ${sh(AL.fut_pct)} (в позициях ${sh(fp)}), активный спот ${sh(AL.active_pct)}</div>`
+        +`<i class="mssplit">${parts.filter(x=>x[1]>0).map(x=>`<i style="width:${(x[1]/T*100).toFixed(2)}%;background:${x[2]}"></i>`).join('')}</i>`
+        +row('Спот · монеты',AL.spot_coins_usd,'var(--acc)')+row('Кэш спот-портфеля — по правилу портфеля, в USDT',AL.spot_cash_usd,'#4d7fa8')
+        +row('Бюджет фьючерсов',AL.fut_budget_usd,'#f2c14e')+row('в позициях (маржа)',AL.fut_margin_usd,'#f2c14e',1)+row('резерв под новые сделки',AL.fut_reserve_usd,'rgba(242,193,78,.4)',1)
+        +(AL.active_coins_usd>0?row('Активный спот · в монетах',AL.active_coins_usd,'#6fcf97'):'')+row('Активный спот · ждёт сигнала «Импульс BTC»',AL.active_wait_usd,'rgba(111,207,151,.4)')
+        +(Math.abs(AL.other_usd||0)>=1?row('Прочее — комиссии, округление, монеты к докупке',AL.other_usd,'#8fa1b3'):'')
+        +`<div class="muted">Доллары на счёте ${usd(C.usd||0)} = кэш спот-портфеля + маржа и резерв фьючерсов + активный спот, который ждёт сигнала${Math.abs(AL.other_usd||0)>=1?' + прочее':''}. Лишних денег нет: каждая часть ждёт своего правила системы.</div></div>`; }
     // the autopilot's own «СОВПАДАЕТ С СИСТЕМОЙ» line (okx_autopilot.same_text) and its differences
     h+=`<div class="msmatch ${M.same===true?'yes':M.same===false?'no':''}"><b>${esc(M.line||'')}</b>${(M.diffs||[]).length?`<ul>${M.diffs.slice(0,6).map(d=>`<li>${esc(d)}</li>`).join('')}</ul>`:''}<span class="muted">${M.t?`проверено ${when(M.t)} · `:''}${esc(M.note||'')}</span></div>`;
     // spot coins vs the autopilot's targets

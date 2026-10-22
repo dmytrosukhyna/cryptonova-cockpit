@@ -54,6 +54,19 @@ PROFILES = {
                       "забираем тело, дальше каждые +50 % — половину остатка; откат 35 % от пика при прибыли — выход; держим не дольше 30 дней."},
 }
 DAY = 86400_000
+HIST_ALL_MAX = 240
+
+
+def value_history(conn: sqlite3.Connection, table: str, since: int | None = None, max_points: int = HIST_ALL_MAX) -> list[dict]:
+    """22.10 (owner: «два числа спота не сходятся»): `history` keeps only the last 60 runs (≈ 10 h), but the panel drew it as «с начала
+    ведения» and dated results by its first point. This is the whole value history from the start (`since`), thinned evenly to at
+    most `max_points` points; the first and the last point are always kept, nothing is interpolated."""
+    q = f"SELECT time,index_value FROM {table}" + (" WHERE time >= ?" if since else "") + " ORDER BY time"
+    rows = conn.execute(q, (int(since),) if since else ()).fetchall()
+    if len(rows) > max_points:
+        step = (len(rows) - 1) / (max_points - 1)
+        rows = [rows[round(i * step)] for i in range(max_points)]
+    return [{"time": t, "v": v} for t, v in rows]
 
 
 def _hl_alias(sym: str) -> set[str]:
@@ -302,7 +315,9 @@ class RiskPortfolio:
             out_pos.append(row)
         return {"key": self.key, "name": self.P["name"], "about": self.P["about"],
                 "positions": out_pos,
-                "cash_pct": round(self.cash() / value * 100) if value else 0, "invested_pct": round((value - self.cash()) / value * 100) if value else 0, "index": idx, "history": hist, "actions": actions,
+                "cash_pct": round(self.cash() / value * 100) if value else 0, "invested_pct": round((value - self.cash()) / value * 100) if value else 0, "index": idx, "history": hist,
+                "history_all": value_history(self.conn, self.T_VAL),      # a reset empties the value table, so «all» = since the (re)start
+                "actions": actions,
                 "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in
                                    self.conn.execute(f"SELECT time,symbol,action,weight,price,reason FROM {self.T_ACT} ORDER BY time DESC LIMIT 20").fetchall()]}
 
@@ -805,6 +820,7 @@ class IdeasPortfolio:
         return {"key": P["key"], "name": P["name"], "about": IDEAS_ABOUT, "status": P["status"], "experiment": False, "ours": True,
                 "positions": out, "cash_pct": round(cash * 100), "invested_pct": round((1 - cash) * 100), "index": idx,
                 "equity_usd": round(10_000 * V, 2), "start_usd": 10_000, "history": hist, "actions": actions,
+                "history_all": value_history(self.conn, rp.T_VAL, int(started) if started else None),
                 "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in
                                    self.conn.execute(f"SELECT time,symbol,action,weight,price,reason FROM {rp.T_ACT} ORDER BY time DESC LIMIT 20").fetchall()],
                 "sleeves": {"buy": {"label": "ядро и «можно брать / добрать»", "target_pct": round((sum(P["core_w"].values()) + (P["buy_n"] - 3) * P["buy_w"]) * 100, 1), "now_pct": round(sl["buy"] * 100, 1)},

@@ -708,8 +708,29 @@ def sol_holders(conn, rows: list[dict], now: int, holders_fn, deadline: float, n
         r["holders"] = h if h is not None else meme_spot._cache_any(conn, k)[1]
 
 
+DEEPEST_SEED = (-15.38, "USELESS", 1792354127165)    # 462 snapshots 17.10 12:59 → 22.10 07:14 UTC: no liquid HL meme closed lower
+
+
+def dip_watch(conn, rows: list[dict], now: int) -> dict:
+    """22.10 (owner: «мем-портфель не рабочий»): what the dip rule waits for, in numbers — the liquid HL meme closest to the signal now
+    and the deepest 4h-close drop below the 24 h high seen since the desk started (kept in meme_meta; the rule's own metric)."""
+    liq = [r for r in rows if r.get("vol24", 0) >= MIN_VOL24 and r.get("dip_dd_pct") is not None]
+    close = min(liq, key=lambda r: r["dip_dd_pct"]) if liq else None
+    if _meta(conn, "deepest_dd") is None:      # seeded once with the deepest value in the committed web/memes.json snapshots 17.10 → 22.10
+        _set(conn, "deepest_dd", DEEPEST_SEED[0]); _set(conn, "deepest_coin", DEEPEST_SEED[1]); _set(conn, "deepest_t", DEEPEST_SEED[2])
+    deep = _meta(conn, "deepest_dd")
+    if close is not None and (deep is None or close["dip_dd_pct"] < float(deep)):
+        _set(conn, "deepest_dd", close["dip_dd_pct"]); _set(conn, "deepest_coin", close["coin"]); _set(conn, "deepest_t", now)
+        deep = close["dip_dd_pct"]
+    first = conn.execute("SELECT MIN(time) FROM meme_equity").fetchone()[0]
+    return {"need_pct": DIP * 100, "rule_ru": f"4-часовая свеча мема закрылась на {-DIP * 100:.0f}% и больше ниже максимума суток",
+            "closest": {"coin": close["coin"], "dd_pct": close["dip_dd_pct"]} if close else None,
+            "deepest": {"coin": _meta(conn, "deepest_coin"), "dd_pct": float(deep), "t": int(_meta(conn, "deepest_t", 0) or 0) or None} if deep is not None else None,
+            "since": first or now, "signals_2026": 8, "months_2026": 9.5}
+
+
 def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_candles_fn=hl_candles, sol_fn=sol_fetch,
-        btc_fn=btc_context, spot_fn=_spot_default, holders_fn=_holders_default, deadline_s: float = 50.0) -> dict:
+        btc_fn=btc_context, spot_fn=_spot_default, holders_fn=_holders_default, deadline_s: float = 50.0, nm_price_fn=None) -> dict:
     t_start = time.time()
     now = now or int(time.time() * 1000)
     _ensure(conn)
@@ -784,6 +805,13 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
         sol_note = "Пропущено: не хватило времени в этом запуске."
     for k in ("geckoterminal", "dexscreener", "solana_rpc", "rugcheck"):
         sources.setdefault(k, False)
+    new_memes_doc = None
+    try:      # 22.10: «Новые мемы дня» — the daily new-meme filter on the same Solana rows + its paper book (cnq/agents/new_memes.py)
+        from . import new_memes
+        pf = nm_price_fn or (new_memes.ds_prices if time.time() - t_start < deadline_s - 8 else (lambda mints: {}))
+        new_memes_doc = new_memes.step(conn, sol_rows, now, pf)
+    except Exception as e:  # noqa: BLE001
+        new_memes_doc = {"error": f"{type(e).__name__}: {str(e)[:120]}"}
     spot = {"rows": [], "sources": {}, "note": "Пропущено: не хватило времени в этом запуске."}
     if candles:     # daily highs of the HL candles we already have → better 30-day high for the spot status (meme_spot.high30)
         from . import meme_spot
@@ -798,7 +826,12 @@ def run(conn: sqlite3.Connection, now: int | None = None, hl_ctx_fn=hl_ctx, hl_c
     conn.executemany("INSERT INTO meme_events VALUES(?,?)", ev)
     conn.execute("DELETE FROM meme_events WHERE time < ?", (now - 60 * DAY,))
     conn.commit()
+    watch = _safe(dip_watch, conn, rows, now) if rows else None
+    conn.commit()
     out = snapshot(conn, now, ctx, candles, rows, sol_rows, warnings, sources)
+    if watch:
+        out["account"]["watch"] = watch
+    out["new_memes"] = new_memes_doc
     out["market"] = market
     out["spot_memes"] = spot["rows"]
     out["spot_note"] = spot["note"]

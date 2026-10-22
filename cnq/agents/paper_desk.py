@@ -828,7 +828,45 @@ class PaperDesk:
                 "stats": {"trades": n, "winrate": round(len(wins) / n, 3) if n else None, "avg_r": round(sum(t["pnl_r"] for t in closed) / n, 3) if n else None,
                           "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0), "max_dd_pct": round(dd * 100, 2),
                           "by_grade": by_grade},
-                "equity_history": thin(eqh, now), "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, правила: {', '.join(RULE_RU[g] for g in sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02% против сделки, фандинг каждые 8 ч, стоп первым внутри свечи, без заглядывания вперёд"}
+                "equity_history": thin(eqh, now), "events": events, "rules": rules_text(self.P)}
+
+
+def max_positions(P: dict) -> int:
+    """The position cap the rules line names: `max_open` (risk-sized rules) — or, for a desk that trades only share-sized rules
+    (max_open 0), the sum of their own caps (`<rule>_open`). 22.10: the line said «до 0 позиций» for «Импульс BTC», «Активный спот»,
+    «Пробой», «Свинг» — it read like a desk that cannot trade."""
+    return int(P.get("max_open") or 0) or sum(int(P.get(g.lower() + "_open") or 0) for g in P["classes"] if g in SHARE_RULES)
+
+
+def rules_text(P: dict) -> str:
+    fee = P.get("fee", FEE) * 100
+    return (f"риск {P['risk'] * 100:g}% на сделку, правила: {', '.join(RULE_RU[g] for g in sorted(P['classes']))}, до {max_positions(P)} позиций, "
+            f"комиссия {fee:g}%/сторона + проскальзывание 0.02% против сделки, "
+            + ("спот без плеча и без фандинга, " if P.get("spot") else "фандинг каждые 8 ч, ")
+            + "стоп первым внутри свечи, без заглядывания вперёд")
+
+
+def btc_impulse_watch(candles: list, now: int, need: float = K_BTC, week_days: int = 7) -> dict | None:
+    """22.10 (owner: «Импульс показывает 0 и не работает»): what the K desks («Импульс BTC», «Активный спот») wait for, in numbers.
+    `candles` = BTC 15m bars [t, o, h, l, c, …] (closed ones; the forming bar is ignored if it is younger than 15 min), oldest first.
+    The trigger is the desk's own: close of a bar vs the close 4 bars (1 h) earlier ≥ +need. Returns the 1 h change now, the best 1 h
+    change of the last `week_days` days, and the last bar that met the condition in the loaded history (None if never) — no guessing."""
+    bars = [b for b in candles or [] if b and b[0] + 15 * 60_000 <= now]
+    if len(bars) < 5:
+        return None
+    rets = [(bars[j][0] + 15 * 60_000, bars[j][4] / bars[j - 4][4] - 1) for j in range(4, len(bars)) if bars[j - 4][4]]
+    t_now, r_now = rets[-1]
+    week = [x for x in rets if x[0] >= now - week_days * 86_400_000]
+    best = max(week, key=lambda x: x[1]) if week else None
+    fired = [x for x in rets if x[1] >= need]
+    last = fired[-1] if fired else None
+    days = (bars[-1][0] - bars[0][0]) / 86_400_000
+    n_30 = len({x[0] // (4 * 3_600_000) for x in fired if x[0] >= now - 30 * 86_400_000})
+    return {"need_pct": round(need * 100, 2), "now_pct": round(r_now * 100, 2), "now_t": t_now,
+            "best_week_pct": round(best[1] * 100, 2) if best else None, "best_week_t": best[0] if best else None, "week_days": week_days,
+            "last_fire_t": last[0] if last else None, "last_fire_pct": round(last[1] * 100, 2) if last else None,
+            "fires_30d": n_30, "history_days": round(days, 1),
+            "rule_ru": f"BTC за час вырос на {need * 100:g}% и больше"}
 
 
 # ── one-time correction (22.10.2026, audit 20.10 §4): two defects flattered the demo record. Market shorts were filled with the
@@ -1100,6 +1138,16 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
             snaps[k]["events"].insert(0, corr["note_ru"])
         if k in just_reset:
             snaps[k]["events"].insert(0, just_reset[k]["note_ru"])
+    imp_w = report.get("btc_impulse")         # 22.10: what the K desks wait for (cli.py computes it from the stored BTC 15m candles)
+    if imp_w is None and btc and btc.get("candles"):
+        try:
+            imp_w = btc_impulse_watch(btc.get("candles_long") or btc["candles"], now)
+        except Exception:  # noqa: BLE001
+            imp_w = None
+    if imp_w:
+        for k, v in snaps.items():
+            if "K" in PROFILES[k]["classes"]:
+                v["watch"] = imp_w
     out_scan = scan(report["coins"])
     out = dict(snaps[DEFAULT_PROFILE])
     out["profiles"] = {k: {kk: vv for kk, vv in v.items() if kk != "equity_history"} | {"equity_history": v["equity_history"]} for k, v in snaps.items()}

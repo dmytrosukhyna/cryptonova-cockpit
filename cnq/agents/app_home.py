@@ -789,7 +789,7 @@ def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, 
     if not H or not H["fut"] or not H["spot"]:
         return None
     F, S = H["fut"], H["spot"]
-    s0, idx = S["s0"], float(ideas.get("index") or 0)
+    s0 = S["s0"]
     pos = ideas.get("positions") or []
     coins = []
     for p in pos:
@@ -799,7 +799,7 @@ def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, 
         kind = _coin_kind(p)
         entry, price = p.get("entry"), p.get("price")
         plan = p.get("target_weight")
-        coins.append({"sym": p["symbol"], "name": p.get("name"), "weight": _r(w * 100, 2), "usd": _r(s0 * idx / 100.0 * w),
+        coins.append({"sym": p["symbol"], "name": p.get("name"), "weight": _r(w * 100, 2), "usd": _r(S["sp"] * w),   # shares of the one spot value (22.10)
                       "pct": _r((price / entry - 1) * 100, 1) if entry and price else None, "kind": kind,
                       "plan": None if plan is None else _r(float(plan) * 100, 1), "stop": (p.get("levels") or {}).get("stop"),
                       "why": _coin_why(p, kind, rows.get(p["symbol"]) or {}, lang)})
@@ -815,7 +815,7 @@ def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, 
                         "since": since, "desks": F["keys"], "open_n": len(fut.get("open") or []), "in_result_n": len(in_res),
                         "closed_n": fut.get("closed_n"), "wins": fut.get("wins")},
             "spot": {"usd": _r(S["sr"]), "pct": _r(S["sr"] / s0 * 100), "value_usd": _r(S["sp"]), "start_usd": _r(s0),
-                     "since": S["since"], "cash_pct": _r(cash * 100, 2), "cash_usd": _r(s0 * idx / 100.0 * cash), "coins": coins},
+                     "since": S["since"], "cash_pct": _r(cash * 100, 2), "cash_usd": _r(S["sp"] * cash), "coins": coins},
             "curve": _public_curve(fut_curve, pf_app, s0, since, now, H["tot"]),
             "calc": {**CALC_SPLIT, "spot_why": t(lang, "pub.why.spot"), "cash_why": t(lang, "pub.why.cash"),
                      "active_why": t(lang, "pub.why.active"),

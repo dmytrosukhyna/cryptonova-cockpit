@@ -26,7 +26,7 @@ def _panel_js() -> str:
     return "\n".join([
         line("function ddmm(t){"),
         line("const pSince=P=>"),
-        line("const pxNow=sym=>"), line("const futEq=P=>"), line("const spotEq=S=>"),
+        line("const PXT={}, PX_FRESH_MS"), line("const pxNow=sym=>"), line("const futEq=P=>"), line("const spotEq=S=>"),
         line("function hdrExtras(){"),
         _cut(s, "function hdrVals(){", "const hdrFLabel="),
         _cut(s, "const FUT_D0=", "// 21.10 (owner: «фьючерсы CRYPTO NOVA"),
@@ -40,8 +40,8 @@ let PAPER=null, PF=null; const PP=()=>PAPER.profiles[PROF], SP=()=>PF.portfolios
 __PANEL__
 const cases=JSON.parse(process.argv[1]), out=[];
 for(const c of cases){ PAPER=c.paper; PF={available:true,portfolios:{ideas:c.ideas}};
-  for(const k of Object.keys(K)) delete K[k];
-  for(const [s,p] of Object.entries(c.px||{})) K[s]={'15m':[{c:p*0.9},{c:p}]};
+  for(const k of Object.keys(PXT)) delete PXT[k];
+  for(const [s,p] of Object.entries(c.px||{})) pxMark(s,p);                     // a fresh live price for that symbol (22.10: PXT)
   const H=hdrVals(); out.push({f:H.f,f0:H.f0,fr:H.fr,sp:H.sp,s0:H.s0,sr:H.sr,tot:H.tot,fsince:H.fsince,ssince:sSince(H.S),
     keys:H.N?H.N.comps.map(x=>x.k):null, fo:H.fo, so:H.so}); }
 console.log(JSON.stringify(out));
@@ -65,7 +65,7 @@ def _cases() -> list[dict]:
     own = _desk(10000.0, [(T0 + 50 * h, 10000.0), (T0 + 60 * h, 10104.05)], 10104.05,
                 [{"symbol": "AVAX", "side": "LONG", "entry": 9.772, "price": 9.348, "qty_left": 34.11, "pnl_usd": 0.0}],
                 {"trades": 9, "avg_trade_pct": 3.51})
-    ideas = {"start_usd": 10000, "index": 102.1, "started": T0 + 22 * h,
+    ideas = {"start_usd": 10000, "index": 102.1, "equity_usd": 10209.79, "started": T0 + 22 * h,
              "positions": [{"symbol": "BTC", "weight": 0.2476, "price": 108000.0, "status": "OPEN"},
                            {"symbol": "ZEC", "weight": 0.0835, "price": 1264.88, "status": "OPEN"},
                            {"symbol": "PENGU", "weight": 0.0255, "price": 0.0301, "status": "OPEN"}]}
@@ -100,7 +100,8 @@ def test_server_header_equals_the_panel_formula():
             assert abs(a - b) < 1e-6, (a, b)
         assert _kyiv_ddmm(F["since"]) == J["fsince"] and _kyiv_ddmm(S["since"]) == J["ssince"]
     assert js[0]["keys"] == ["bal", "imp"] and js[2]["keys"] == ["bal", "imp", "own"]
-    assert abs(js[1]["sp"] - js[0]["sp"]) > 1 and abs(js[1]["f"] - js[0]["f"]) > 1     # the live prices really moved both parts
+    assert abs(js[1]["f"] - js[0]["f"]) > 1                                               # the live prices really moved the futures part
+    assert js[0]["sp"] == js[1]["sp"] == 10209.79                                           # 22.10: spot = the server's measurement, one number
 
 
 def test_app_home_public_block_is_the_panel_header(tmp_path):
@@ -126,7 +127,7 @@ def test_app_home_public_block_is_the_panel_header(tmp_path):
     p, H = doc["public"], ph.header(paper["profiles"], ideas)
     assert p["total_usd"] == round(H["tot"], 2) == round(p["futures"]["usd"] + p["spot"]["usd"], 2)
     assert p["futures"]["usd"] == round(H["fut"]["fr"], 2) == doc["futures"]["usd"]       # Home and the Futures tab agree
-    assert p["spot"]["value_usd"] == 10210.0 and p["spot"]["usd"] == 210.0 and p["base_usd"] == 20000.0
+    assert p["spot"]["value_usd"] == 10209.79 and p["spot"]["usd"] == 209.79 and p["base_usd"] == 20000.0   # equity_usd, as the panel
     assert p["since"] == H["fut"]["since"] and _kyiv_ddmm(p["since"]) == "17.10" and p["spot"]["since"] == ideas["started"]
     assert p["curve"][-1] == [now, p["total_usd"]] and all(x[0] >= p["since"] for x in p["curve"])
     coins = {x["sym"]: x for x in p["spot"]["coins"]}

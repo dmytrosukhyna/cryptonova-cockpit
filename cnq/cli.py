@@ -486,6 +486,13 @@ def main(argv: list[str] | None = None) -> int:
                     rep["btc_ema50d"] = {"ema": e_, "close": bcs[-1].close, "bull": bcs[-1].close > e_, "bars": len(bcs)}
             except Exception as e:  # noqa: BLE001
                 print("btc ema50d:", e)
+            try:   # 22.10: what «Импульс BTC» waits for — BTC +2.5 % in an hour; the last time it happened in the stored 400 days
+                bcs = next((v for k, v in universe.items() if k.startswith("BTC")), None)
+                if bcs:
+                    rep["btc_impulse"] = paper_desk.btc_impulse_watch([[k.open_time, k.open, k.high, k.low, k.close] for k in bcs],
+                                                                      int(_t.time() * 1000))
+            except Exception as e:  # noqa: BLE001
+                print("btc impulse watch:", e)
             for bx in cfg.b_extra:   # lab-only alt coins (docs/research/alt100.md): candles only, excluded from breadth and the main accounts
                 cs = store.candles(bx, "15m", start=int(_t.time() * 1000) - 33 * 86_400_000)
                 if len(cs) >= 96 * 31:

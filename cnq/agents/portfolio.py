@@ -39,6 +39,12 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 
+
+def _hist_all(conn: sqlite3.Connection, table: str, since: int | None = None) -> list[dict]:
+    """The whole value history since the start, thinned to ≤ 240 points (spot_profiles.value_history) — `history` is the last 60 runs."""
+    from .spot_profiles import value_history
+    return value_history(conn, table, since)
+
 CG = "https://api.coingecko.com/api/v3"
 HL = "https://api.hyperliquid.xyz/info"
 STABLE = {"USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDE", "USDS", "PYUSD", "USD1", "BUSD", "USDD", "FRAX", "LUSD", "GUSD", "USDP", "EURC", "USDL", "RLUSD"}
@@ -502,6 +508,7 @@ class SpotPortfolio:
         return {"positions": [dict(p, price=price.get(p["symbol"]), pnl_pct=round((price.get(p["symbol"], p["entry"]) / p["entry"] - 1) * 100, 2) if p["entry"] else None,
                                    score=score.get(p["symbol"]), name=names.get(p["symbol"], p["symbol"]), why=whys.get(p["symbol"])) for p in pos],
                 "cash_pct": round(cash * 100), "invested_pct": round(invested * 100), "index": idx, "history": hist,
+                "history_all": _hist_all(self.conn, "spot_value"),
                 "actions": actions, "rebalance_day": rebalance,
                 "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in
                                    self.conn.execute("SELECT time,symbol,action,weight,price,reason FROM spot_actions ORDER BY time DESC LIMIT 20").fetchall()]}
@@ -958,6 +965,7 @@ class BalancedPortfolio:
         return {"key": BAL["key"], "name": BAL["name"], "about": BAL_ABOUT, "status": BAL["status"], "experiment": True,
                 "positions": out_pos, "cash_pct": round(rp.cash() / V * 100), "invested_pct": round((V - rp.cash()) / V * 100),
                 "index": idx, "equity_usd": round(10_000 * V, 2), "start_usd": 10_000, "history": hist, "actions": actions,
+                "history_all": _hist_all(rp.conn, rp.T_VAL, int(self._m("started")) if self._m("started") else None),
                 "recent_actions": [dict(zip(("time", "symbol", "action", "weight", "price", "reason"), r)) for r in
                                    rp.conn.execute(f"SELECT time,symbol,action,weight,price,reason FROM {rp.T_ACT} ORDER BY time DESC LIMIT 20").fetchall()],
                 "mode": mode_s, "mode_ru": "рост рынка — полные доли" if mode_s == "bull" else "защита — BTC в медвежьем режиме",
@@ -1065,11 +1073,15 @@ def meme_profile(m: dict | None, now: int | None = None) -> dict:
             acts.append({"time": e["time"], "symbol": sym, "action": "TRIM", "weight": None, "price": px, "reason": e["text"]})
     acts = sorted([x for x in acts if x.get("time")], key=lambda x: -x["time"])[:20]
     asof = (m or {}).get("asof") or now
-    hist = [{"time": t, "v": round(100 * v / start, 2)} for t, v in (a.get("history") or [])][-60:]
+    hist_all = [{"time": t, "v": round(100 * v / start, 2)} for t, v in (a.get("history") or [])]
+    hist = hist_all[-60:]
+    if len(hist_all) > 240:                         # the meme desk keeps ≤ 500 points since its start; the panel's long view needs ≤ 240
+        k = (len(hist_all) - 1) / 239
+        hist_all = [hist_all[round(i * k)] for i in range(240)]
     cash = a.get("cash", eq)
     return {**base, "asof": asof, "stale": now - asof > 3 * 3_600_000, "positions": pos,
             "cash_pct": round(cash / eq * 100) if eq else 100, "invested_pct": round((eq - cash) / eq * 100) if eq else 0,
-            "index": round(100 * eq / start, 2), "equity_usd": round(eq, 2), "history": hist,
+            "index": round(100 * eq / start, 2), "equity_usd": round(eq, 2), "history": hist, "history_all": hist_all,
             "actions": [x for x in acts if x["time"] >= asof], "recent_actions": acts,
             "stats": a.get("stats"), "rules_ru": [a.get("rules")] if a.get("rules") else [], "limits": lim}
 

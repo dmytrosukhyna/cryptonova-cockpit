@@ -131,6 +131,8 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None, can
         d["stats"].update({"trades": bs.get("trades", 0), "winrate": bs.get("winrate"), "avg_trade_pct": bs.get("avg_trade_pct")})
         d["closed"] = [{**t, "net_usd": round((t.get("net_usd") or 0) * LST_K, 2)} for t in base.get("closed") or []]
         d["equity"] = round(eq_closed, 2)
+        if base.get("watch"):
+            d["watch"] = base["watch"]      # 22.10: the same listings feed the ×4 mirror — the same «ждёт листинг» status
         docs["lstx"] = d
     # ---- btcx: BTC ×2 while the regime says «рост» ----
     px, bull = btc_state(out, candles_db)

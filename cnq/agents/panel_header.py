@@ -8,9 +8,9 @@ Owner 22.10 (build 44): the app's public portfolio is exactly «наша сис�
 
 Every function here is the panel's own JavaScript, line for line (the names in brackets), so the app shows the same numbers as
 the owner's screen — tests/test_public_home.py runs the panel's real functions in node on the same data and compares.
-`px` stands for the panel's live prices (pxNow: the last 15-minute close it holds for «XXXUSDT»). The server passes none: the
-panel's own fallbacks then apply — a futures trade at its desk's last price (o.price), a spot coin at the portfolio's price
-(no correction). Stdlib only."""
+`px` stands for the panel's live prices (pxNow: a fresh price — ≤ 10 min — it holds for that very «XXXUSDT», since 22.10). The
+server passes none: the panel's own fallback then applies — a futures trade at its desk's last price (o.price). The spot part is
+the server's measurement in the panel too (spotEq, 22.10). Stdlib only."""
 from __future__ import annotations
 
 import datetime as dt
@@ -102,15 +102,14 @@ def nova_res(prof: dict, px: dict | None = None) -> dict | None:
 
 
 def spot_eq(s: dict | None, px: dict | None = None) -> float:
-    """[spotEq] a spot portfolio at live prices: start × index ÷ 100 × (1 + Σ weight × (live ÷ its price − 1))"""
+    """[spotEq] a spot portfolio = the server's own measurement (equity_usd; start × index ÷ 100 for older files). 22.10 (owner:
+    «шапка спота +$387…+$519, а «наша стратегия» +$229»): the panel no longer re-marks spot with its live prices (they were frozen
+    candles for every coin but the one on the chart) — one number in every place. `px` is accepted and ignored here."""
     if not s:
         return START
-    k = 1.0
-    for p in s.get("positions") or []:
-        live = px_now(px, p.get("symbol"))
-        if live and p.get("price"):
-            k += _num(p.get("weight")) * (live / float(p["price"]) - 1)
-    return (_num(s.get("start_usd"), 0.0) or START) * _num(s.get("index")) / 100.0 * k
+    if s.get("equity_usd") is not None:
+        return _num(s.get("equity_usd"), START)
+    return (_num(s.get("start_usd"), 0.0) or START) * _num(s.get("index")) / 100.0
 
 
 def spot_since(s: dict) -> int | None:

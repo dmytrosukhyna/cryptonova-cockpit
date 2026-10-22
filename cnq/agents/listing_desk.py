@@ -94,6 +94,8 @@ def _db(conn: sqlite3.Connection):
         conn.execute("ALTER TABLE lst_known ADD COLUMN first_px REAL")
     if "facts" not in cols:                   # 20.10: what the desk saw at the short's entry (JSON) — the app's «why we entered»
         conn.execute("ALTER TABLE lst_known ADD COLUMN facts TEXT")
+    if "note" not in cols:                    # 22.10: why a listing was not shorted (the panel's «ждёт листинг · последний …»)
+        conn.execute("ALTER TABLE lst_known ADD COLUMN note TEXT")
 
 
 def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -> dict:
@@ -164,7 +166,8 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
         if age < DELAY_H * H or not px:
             continue
         if age > MAX_AGE_H * H:
-            conn.execute("UPDATE lst_known SET seeded = 2 WHERE symbol = ?", (s,))      # missed the window (server was down) — skip
+            conn.execute("UPDATE lst_known SET seeded = 2, note = ? WHERE symbol = ?",       # missed the window (server was down) — skip
+                         (f"окно входа пропущено (листинг {age / H:.0f} ч назад)", s))
             events.append(f"{s.replace('-USDT', '')}: окно входа пропущено (листинг {age / H:.0f} ч назад) — не шортим.")
             continue
         if not first_px:                                # first price comes with the first run that sees a price
@@ -176,7 +179,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
                     if mv >= SKIP_PUMP else
                     f"оборот ${qv / 1e6:.1f}M — тонкий рынок (на истории нижняя треть по обороту ≈ 0)" if qv is not None and qv < MIN_QVOL else None)
         if why_skip:
-            conn.execute("UPDATE lst_known SET seeded = 3 WHERE symbol = ?", (s,))
+            conn.execute("UPDATE lst_known SET seeded = 3, note = ? WHERE symbol = ?", (why_skip, s))
             events.append(f"{s.replace('-USDT', '')}: не шортим — {why_skip}.")
             continue
         qty = equity_closed * SHARE / px
@@ -184,7 +187,7 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
         bs = s.replace("-USDT", "")
         ok, why = risk_gate.allow_entry("lst", bs, "SHORT", qty * px, now)     # 20.10: portfolio risk layer (also checks the ×4 mirror lstx)
         if not ok:
-            conn.execute("UPDATE lst_known SET seeded = 5 WHERE symbol = ?", (s,))    # 5 = refused by the risk layer: final, not retried
+            conn.execute("UPDATE lst_known SET seeded = 5, note = ? WHERE symbol = ?", (f"риск-слой: {why}", s))    # 5 = refused by the risk layer: final, not retried
             if risk_gate.record_skip(conn, "lst", f"LST-{s}", bs, "SHORT", qty * px, why, now):
                 events.append(f"{bs}: не шортим — риск-слой: {why}.")
             continue
@@ -232,9 +235,31 @@ def step(conn: sqlite3.Connection, now: int | None = None, fetch=fetch_market) -
             "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "max_dd_pct": round(dd * 100, 2),
                       "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0),
                       "avg_trade_pct": round(avg_trade * 100, 2) if avg_trade is not None else None},
-            "equity_history": thin(eqh), "events": events, "error": err, "watching": len(mk),
+            "equity_history": thin(eqh), "events": events, "error": err, "watching": len(mk), "watch": listing_watch(conn, first, now),
             "rules": f"шорт через {DELAY_H} ч после листинга, {int(SHARE * 100)}% счёта, стоп +{int(STOP * 100)}%, выход через {HOLD_D} дней, "
                      f"до {MAX_OPEN} позиций, комиссия 0.05%/сторона, фандинг учитывается"}
+
+
+OUTCOME_RU = {0: "ждём 4 ч после листинга", 2: "окно входа пропущено", 3: "пропуск по правилу", 5: "отказ риск-слоя"}
+
+
+def listing_watch(conn: sqlite3.Connection, since: int, now: int) -> dict:
+    """22.10 (owner: «шорт новых листингов не видно»): what the desk has seen since it started — new TOKEN listings on BingX
+    (the first run's list, long-launched contracts and BingX's synthetic FX/commodity/stock pairs are not listings), how many were
+    shorted, skipped by the rule, missed or refused, and the latest one with its outcome. Only stored rows — nothing estimated."""
+    traded = {r[0] for r in conn.execute("SELECT symbol FROM lst_trades")}
+    rows = conn.execute("SELECT symbol, listed, first_seen, seeded, note FROM lst_known WHERE seeded IN (0, 2, 3, 5) OR symbol IN "
+                        "(SELECT symbol FROM lst_trades) ORDER BY COALESCE(listed, first_seen)").fetchall()
+    cnt = {"tokens": len(rows), "shorted": 0, "skipped": 0, "missed": 0, "refused": 0, "waiting": 0}
+    for s, listed, fs, seeded, note in rows:
+        k = "shorted" if s in traded else {2: "missed", 3: "skipped", 5: "refused"}.get(seeded, "waiting")
+        cnt[k] += 1
+    last = None
+    if rows:
+        s, listed, fs, seeded, note = rows[-1]
+        out = "зашортили" if s in traded else OUTCOME_RU.get(seeded, "")
+        last = {"symbol": s.replace("-USDT", ""), "listed": listed or fs, "outcome_ru": out + (f": {note}" if note and s not in traded else "")}
+    return {"since": since, "asof": now, **cnt, "last": last, "rule_ru": f"новый фьючерс токена на BingX → шорт через {DELAY_H} ч"}
 
 
 def entry_facts(t: dict, known: tuple | None) -> dict | None:

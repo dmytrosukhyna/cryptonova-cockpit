@@ -252,8 +252,13 @@ def _date(ms) -> str:
 def _named(q: str, home: dict) -> set[str]:
     """the open trades' coins the question names («Почему вошли в AVAX?» → {"AVAX"})"""
     words = set(_norm(q).split())
-    return {str(o.get("sym")) for o in ((home or {}).get("futures") or {}).get("open") or []
-            if isinstance(o, dict) and str(o.get("sym") or "").lower() in words}
+    opened = [o for o in ((home or {}).get("futures") or {}).get("open") or [] if isinstance(o, dict)]
+    out = {str(o.get("sym")) for o in opened if str(o.get("sym") or "").lower() in words}
+    if opened and not out:                  # 22.10: the coin by its spoken name («почему вошли в авакс?» → AVAX)
+        from .coins import resolve
+        named = set(resolve(q).coins)
+        out = {str(o.get("sym")) for o in opened if str(o.get("sym") or "").upper() in named}
+    return out
 
 
 # words that make a question about the system's trades, in the five languages (matched at a word start, without accents)

@@ -41,10 +41,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from xml.etree import ElementTree as ET
 from urllib.parse import parse_qs, urlsplit
 
-from cnq.agents.i18n import DEFAULT, file_name, norm_lang
+from cnq.agents.i18n import DEFAULT, LANGS, file_name, norm_lang
 from cnq.agents.llm import LLM, PROVIDERS
 
-from . import access as access_codes, bingx, console as admin_console, home_news, nova, pf_parse, pf_review, spot_top
+from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, pf_parse, pf_review, spot_top
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -465,6 +465,10 @@ class Api:
           (no error)      the model answered; agent.left is the new allowance
           source: "faq"   the model failed, but the question matched a FAQ item (data/nova_faq[.<lang>].json) — its answer, not
                           counted
+          source: "coin"  22.10: a question about a coin («что думаешь о монете Саи», «стоит ли брать биток») — the system's own
+                          verdict built from its data (cnq/api/coin_verdict.py) without the model's words, not counted; when the
+                          model phrased it (every number checked against the data) there is no "source" and it is counted
+          source: "clarify"  two coins it could be — one short question back («Вы про WLD (Worldcoin) или про WLFI …?»), not counted
           error: "busy"   the model failed, timed out, answered empty or is not configured, or any server error — not counted
           error: "limit"  no questions left today (free 5, VIP 100) — not counted
           error: "bad_question"  empty or unreadable question — not counted
@@ -481,6 +485,14 @@ class Api:
         ctx = nova.clean_text(data.get("ctx"), nova.CTX_MAX)
         t0, answer, result = time.time(), "", "not_configured"
         llm = copy.copy(self.llm) if isinstance(self.llm, LLM) else self.llm   # its own last_finish per request (threads)
+        cv = self._coin(q, lang, llm)          # 22.10: «что думаешь о монете Саи» → the system's own verdict on SUI
+        if cv:
+            self.agent_last = {"result": "coin_llm" if cv["llm"] else "coin_" + cv["source"], "ms": round((time.time() - t0) * 1000),
+                               "at": int(time.time()), "lang": lang, "coins": cv["coins"]}
+            if cv["llm"]:                      # the model phrased it: counted like any model answer
+                self.store.use(uid, _day())
+                return 200, {"answer": cv["answer"], "agent": self._allowance(uid, tier)}
+            return 200, {"answer": cv["answer"], "source": cv["source"], "agent": al}
         if self._llm_ready():
             try:
                 raw = llm.complete(self.nova.system(lang), self.nova.user_message(q, self._feed("app_home", lang) or {}, ctx, lang),
@@ -504,7 +516,24 @@ class Api:
             return 200, {"answer": hit["a"], "source": "faq", "agent": al}
         return 200, {"error": "busy", "answer": nova.busy(lang), "agent": al}
 
+    def _coin(self, q: str, lang: str, llm) -> dict | None:
+        """22.10 (owner: «что думаешь о монете Саи» — a vague answer): a question about a coin gets the system's own verdict
+        (cnq/api/coin_verdict.py): {"answer", "source": coin | clarify, "llm": phrased by the model?, "coins"}; None — not a
+        coin question. Never raises: a failure here leaves NOVA's normal answer."""
+        try:
+            nq = nova._norm(q)
+            if any(self.nova._same(nq, it) for lg in LANGS for it in self.nova.faq(lg)):
+                return None                                # the app's own chip («Не поздно ли покупать биткоин?»): its FAQ answer
+            with self.listings._lock:
+                lists = dict(self.listings.lists)          # the OKX / BingX lists already cached — never a fetch from here
+            return coin_verdict.answer(q, lang, self.pf_data, self._feed("app_home", lang) or {}, lists,
+                                       llm if self._llm_ready() else None)
+        except Exception as e:  # noqa: BLE001
+            print(f"agent coin: {type(e).__name__}: {str(e)[:200]}", file=sys.stderr, flush=True)
+            return None
+
     PANEL_SYS_MAX, PANEL_USER_MAX = 4000, 40000
+    PANEL_Q = re.compile(r"\n\nВопрос(?: зрителя)?:\s*(.+)\Z", re.S)
 
     def _panel_nova(self, body: bytes) -> tuple[int, dict]:
         """POST /v2/admin/nova (owner only, CNQ_ADMIN_TOKEN) — 21.10, owner: «в закрытой системе AI-помощник не отвечает».
@@ -523,7 +552,14 @@ class Api:
         if len(user) < 2:
             return 400, {"error": "bad_question"}
         t0, out = time.time(), {}
-        if not self._llm_ready():
+        m = self.PANEL_Q.search(user)                   # the panel's chat: «Контекст панели (JSON): … Вопрос: <q>»
+        cv = None
+        if m:
+            llm = copy.copy(self.llm) if isinstance(self.llm, LLM) else self.llm
+            cv = self._coin(nova.clean_text(m.group(1), nova.Q_MAX), DEFAULT, llm)
+        if cv:                                          # 22.10: a coin question → the system's own verdict, as in the app
+            out = {"answer": cv["answer"], "source": cv["source"]}
+        elif not self._llm_ready():
             out = {"error": "not_configured"}
         else:
             llm = copy.copy(self.llm) if isinstance(self.llm, LLM) else self.llm

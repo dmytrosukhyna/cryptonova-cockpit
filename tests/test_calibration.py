@@ -23,3 +23,23 @@ def test_forecast_recorded_then_resolved_by_first_touch():
     assert d2["resolved"] == 1 and d2["stats"]["n"] == 1 and d2["stats"]["hit_rate"] == 1.0 and d2["stats"]["brier"] < 0.25
     # no look-ahead: a forecast made now is not resolved by candles that are not closed yet
     assert d2["recorded"] == 1 and d2["stats"]["pending"] == 1
+
+
+def test_shadow_forecast_uses_geometry_and_drops_slow_terms():
+    comp = {"mid": 0.0, "short": 0.05, "long": 0.03, "btc": 0.03, "stress": 0.0, "mr": 0.0, "mom7": 0.0, "news": 0.0}
+    # upper edge 3 away, lower edge 1 away → random walk touches the lower edge first 3 times in 4 → geometry 0.25
+    assert abs(cal.shadow_p(100.0, 103.0, 99.0, comp) - 0.30) < 1e-9    # 0.25 + short 0.05, slow +0.06 ignored
+    assert cal.shadow_p(100.0, 101.0, 90.0, {"news": 0.06}) == 0.78   # clipped like the live forecast
+    assert cal.shadow_p(100.0, None, None, {}) == 0.5                  # no targets → neutral
+
+
+def test_stats_report_shadow_next_to_live():
+    conn = sqlite3.connect(":memory:")
+    c = cal.Calibration(conn)
+    comp = json.dumps({"long": 0.03, "btc": 0.03})
+    for i, o in enumerate(["DOWN", "DOWN", "UP"]):
+        conn.execute("INSERT INTO forecasts VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (f"x{i}", cal.SHADOW_SINCE + i, "BTC-USDT", 0.56, 100.0, 103.0, 99.0, 86_400_000, o, 1, 100.0, comp))
+    conn.commit()
+    s = c.stats()["shadow"]["forward"]
+    assert s["n"] == 3 and s["hit_rate"] == round(2 / 3, 3) and s["live_hit_rate"] == round(1 / 3, 3) and s["brier"] < s["live_brier"]

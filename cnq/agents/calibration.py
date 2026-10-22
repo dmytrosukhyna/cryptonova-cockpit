@@ -69,6 +69,20 @@ def p_up(coin: dict, btc_bull: bool, stress: int, news: list[dict], now: int) ->
     return max(.22, min(.78, p)), comp
 
 
+SLOW = ("long", "btc")
+SHADOW_SINCE = 1_792_569_600_000   # 21.10.2026 08:00 UTC — forecasts made after this are the shadow's forward test
+
+
+def shadow_p(price: float, up: float, dn: float, comp: dict) -> float:
+    """Shadow forecast (docs/research/calibration.md, backlog #11): start from the first-touch geometry instead of 50 %
+    (random walk: P(upper edge first) = distance to the lower edge / both distances) and drop the two slow terms
+    (long regime, BTC regime) — they were on (+0.06) in ~93 % of forecasts and carry no 24 h information
+    (docs/research/forecast.md: 1-day AUC 0.51). Recorded next to the live forecast only; the panel is unchanged."""
+    du, dd = (up or 0) - price, price - (dn or 0)
+    g = dd / (du + dd) if du > 0 and dd > 0 else 0.5
+    return max(.22, min(.78, g + sum(v for k, v in (comp or {}).items() if k not in SLOW)))
+
+
 def targets(coin: dict) -> tuple[float | None, float | None]:
     price = coin["price"]
     lv = [l for l in coin.get("levels", []) if l.get("status") in (None, "ACTIVE")]
@@ -156,7 +170,17 @@ class Calibration:
             d = per.setdefault(s.replace("-USDT", ""), {"n": 0, "hits": 0})
             d["n"] += 1; d["hits"] += 1 if (p >= 0.5) == (o == "UP") else 0
         base_up = sum(1 for _, _, o, _ in rows if o == "UP") / n
-        return {"n": n, "pending": self.conn.execute("SELECT count(*) FROM forecasts WHERE outcome IS NULL").fetchone()[0],
+        shadow = {}
+        for name, cond in (("study", "time < ?"), ("forward", "time >= ?")):
+            sr = self.conn.execute(f"SELECT p_up, price, up_target, dn_target, components, outcome FROM forecasts WHERE outcome IS NOT NULL AND {cond}",
+                                   (SHADOW_SINCE,)).fetchall()
+            if sr:
+                ps = [(shadow_p(pr, u, d, json.loads(cm or "{}")), p, 1.0 if o == "UP" else 0.0) for p, pr, u, d, cm, o in sr]
+                shadow[name] = {"n": len(ps), "hit_rate": round(sum((s >= .5) == (y == 1) for s, _, y in ps) / len(ps), 3),
+                                "brier": round(sum((s - y) ** 2 for s, _, y in ps) / len(ps), 4),
+                                "live_hit_rate": round(sum((p >= .5) == (y == 1) for _, p, y in ps) / len(ps), 3),
+                                "live_brier": round(sum((p - y) ** 2 for _, p, y in ps) / len(ps), 4)}
+        return {"shadow": shadow, "shadow_since": SHADOW_SINCE,"n": n, "pending": self.conn.execute("SELECT count(*) FROM forecasts WHERE outcome IS NULL").fetchone()[0],
                 "hit_rate": round(hits / n, 3), "confident_n": len(conf), "confident_hit_rate": round(conf_hits / len(conf), 3) if conf else None,
                 "brier": round(brier, 4), "brier_coin_flip": 0.25, "base_rate_up": round(base_up, 3), "bins": bins,
                 "per_coin": {k: {"n": v["n"], "hit_rate": round(v["hits"] / v["n"], 2)} for k, v in sorted(per.items())},

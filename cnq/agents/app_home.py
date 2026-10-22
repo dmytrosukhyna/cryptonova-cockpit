@@ -624,13 +624,33 @@ def _config(out: str) -> dict:
     # build 44: the countries where BingX does not serve people (ISO alpha-2); the app names no exchange there. Null = the app's own list
     barred = c.get("bingx_barred")
     barred = sorted({str(x).strip().upper() for x in barred if len(str(x).strip()) == 2}) if isinstance(barred, list) else None
+    links = c.get("app_links")
     return {"exchange_name": c.get("exchange_name") or "BingX",
             "exchange_ref": ref if isinstance(ref, str) and ref.startswith("https://") else None,
             # build 44: the OKX link for the EU/EEA (OKX Europe, MiCA); a referral only once the owner joins OKX's programme
             "okx_ref": okx if isinstance(okx, str) and okx.startswith("https://") else None,
             "bingx_barred": barred,
             "exchange_trade_url": c.get("exchange_trade_url"),
+            # build 44 «Подключить»: our lead-trader copy pages (empty until the exchange approves the profile) and the exchanges'
+            # own pages for the 6 steps — https only; app_links = optional app deep links (scheme://…, never http / javascript)
+            **{k: _https(c.get(k)) for k in CONNECT_KEYS},
+            "app_links": {str(k): v.strip() for k, v in (links if isinstance(links, dict) else {}).items() if isinstance(v, str) and _deep(v)},
             "portfolio": {k: v for k, v in pf.items() if v}}
+
+
+CONNECT_KEYS = ("okx_copy_url", "bingx_copy_url", "okx_app_ios", "okx_app_android", "okx_kyc_url", "okx_deposit_url",
+                "bingx_app_ios", "bingx_app_android", "bingx_kyc_url", "bingx_deposit_url")
+
+
+def _https(v) -> str | None:
+    return v.strip() if isinstance(v, str) and v.strip().startswith("https://") else None
+
+
+def _deep(v: str) -> bool:
+    """an app deep link: «scheme://…» of letters / digits / + . -, not a web or script link"""
+    v = v.strip()
+    scheme = v.split("://", 1)[0].lower() if "://" in v else ""
+    return bool(scheme) and scheme not in ("http", "https", "javascript", "data", "file") and scheme.replace("-", "").replace(".", "").replace("+", "").isalnum()
 
 
 def btc_daily(conn: sqlite3.Connection | None, out: str) -> dict:

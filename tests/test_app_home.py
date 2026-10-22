@@ -224,6 +224,22 @@ def test_app_home_config_link(tmp_path):
     _w(d, "app_config.json", {"okx_ref": "https://www.okx.com/eu/join/X", "bingx_barred": ["us", "GB", "xyz", "ca"]})
     cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
     assert cfg["okx_ref"] == "https://www.okx.com/eu/join/X" and cfg["bingx_barred"] == ["CA", "GB", "US"]
+    # build 44 «Подключить»: copy pages and the exchanges' pages pass only as https; deep links only as scheme://
+    _w(d, "app_config.json", {"okx_copy_url": "https://www.okx.com/en-eu/copy-trading/account/X", "bingx_copy_url": "",
+                              "bingx_kyc_url": "http://bingx.com/account/kyc/", "okx_kyc_url": " https://www.okx.com/en-eu/account/kyc ",
+                              "app_links": {"okx_copy_url": "okx://copy", "bingx_kyc_url": "javascript:alert(1)", "x": "https://a.b"}})
+    cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
+    assert cfg["okx_copy_url"] == "https://www.okx.com/en-eu/copy-trading/account/X" and cfg["bingx_copy_url"] is None
+    assert cfg["bingx_kyc_url"] is None and cfg["okx_kyc_url"] == "https://www.okx.com/en-eu/account/kyc"
+    assert cfg["app_links"] == {"okx_copy_url": "okx://copy"} and cfg["okx_deposit_url"] is None
+
+
+def test_app_config_in_git_is_valid():
+    # the real web/app_config.json: every connect link is https (or empty) and the copy pages stay empty until approved
+    here = os.path.join(os.path.dirname(__file__), "..", "web", "app_config.json")
+    c = json.load(open(here, encoding="utf-8"))
+    for k in app_home.CONNECT_KEYS:
+        assert c.get(k) is None or str(c[k]).startswith("https://"), k
 
 
 def test_spot_coins_explain_themselves_in_russian_only(tmp_path):

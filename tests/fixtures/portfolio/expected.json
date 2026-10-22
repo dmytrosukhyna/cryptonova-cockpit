@@ -1,0 +1,91 @@
+{
+ "okx_bills.csv": {
+  "BTC": 0.0412,
+  "USDT": 1250.4,
+  "SOL": 16.5,
+  "LINK": 60,
+  "ETH": 1.35,
+  "PEPE": 25000000
+ },
+ "bingx_spot_assets.csv": {
+  "BTC": 0.02134,
+  "ETH": 0.8,
+  "XRP": 540,
+  "DOGE": 12500,
+  "USDT": 312.44,
+  "ADA": 1800,
+  "SUI": 210.5,
+  "HYPE": 3.2,
+  "TON": 45,
+  "WIF": 650
+ },
+ "binance_transactions.csv": {
+  "USDT": 837.15,
+  "BTC": 0.02997,
+  "ETH": 0.4,
+  "BNB": 0.4988,
+  "LINK": 24.85,
+  "FET": 1069.0,
+  "ENA": 155.2
+ },
+ "okx_assets.xlsx": {
+  "BTC": 0.125,
+  "ETH": 2.4,
+  "SOL": 30,
+  "USDC": 3500,
+  "ZEC": 1.2,
+  "AAVE": 5,
+  "OP": 4000,
+  "NEAR": 150
+ },
+ "bingx_assets_30.xlsx": {
+  "BTC": 0.05,
+  "ETH": 1.2,
+  "SOL": 15,
+  "LINK": 80,
+  "NEAR": 300,
+  "AAVE": 3,
+  "ZEC": 0.8,
+  "XMR": 1.5,
+  "DOGE": 9000,
+  "PEPE": 40000000,
+  "ADA": 2500,
+  "XRP": 700,
+  "BNB": 0.6,
+  "TRX": 2000,
+  "AVAX": 30,
+  "DOT": 250,
+  "ARB": 1500,
+  "SUI": 400,
+  "LTC": 4,
+  "UNI": 40,
+  "ATOM": 90,
+  "INJ": 25,
+  "SHIB": 30000000,
+  "PENGU": 25000,
+  "ENA": 1200,
+  "JUP": 800,
+  "TAO": 1.1,
+  "HYPE": 4,
+  "ONDO": 900,
+  "USDT": 1800
+ },
+ "binance_balances.xlsx": {
+  "BTC": 0.0561,
+  "ETH": 0.92,
+  "USDT": 770.75,
+  "BNB": 1.1,
+  "SOL": 8.25,
+  "SHIB": 1e-08,
+  "LDO": 300,
+  "TAO": 0.5
+ },
+ "statement.pdf": {
+  "BTC": 0.0835,
+  "ETH": 1.75,
+  "USDT": 2310,
+  "LINK": 45,
+  "ARB": 2200,
+  "PENGU": 60000
+ }
+}

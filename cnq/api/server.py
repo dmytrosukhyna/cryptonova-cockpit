@@ -16,6 +16,10 @@ With the Firebase ID token («Authorization: Bearer …»):
   POST /v2/agent     a question to NOVA (free: 5 a day, real account connected: 100) — {"q", "ctx"?, "lang"?}; always 200 with
                      an answer in that language, see Api._agent
   POST /v2/vip/check BingX UID → invited by our link and deposited → VIP
+  POST /v2/portfolio/parse   build 45 «Разбор портфеля»: the raw file (≤ 10 MB: CSV / XLSX / PDF / screenshot) → the coins found
+                             (cnq/api/pf_parse.py); POST /v2/portfolio/review {"holdings", "lang"} → the review by the system's
+                             rules (cnq/api/pf_review.py). In memory only: no file, no row, no log line with the content.
+                             GET /v2/portfolio/caps (public) → which inputs work (screenshots only with a vision model)
   DELETE /v2/me      delete the account: every row on our server + the Firebase login (Apple 5.1.1(v))
 The owner's admin panel (web/admin.html), its own token CNQ_ADMIN_TOKEN, not Firebase: /v2/admin/* — see cnq/api/console.py.
 Demo only until 2.1; nothing here places orders or holds money."""
@@ -30,13 +34,15 @@ import re
 import sys
 import threading
 import time
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from xml.etree import ElementTree as ET
 from urllib.parse import parse_qs, urlsplit
 
 from cnq.agents.i18n import DEFAULT, file_name, norm_lang
 from cnq.agents.llm import LLM, PROVIDERS
 
-from . import access as access_codes, bingx, console as admin_console, home_news, nova
+from . import access as access_codes, bingx, console as admin_console, home_news, nova, pf_parse, pf_review
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -66,6 +72,25 @@ def agent_llm() -> LLM:
     return LLM(api_key=key, provider=prov, model=os.environ.get("CNQ_NOVA_LLM_MODEL") or PROVIDERS[prov]["model"], **AGENT_LLM)
 
 
+def vision_config(llm=None) -> dict | None:
+    """build 45: the model that reads a screenshot. CNQ_VISION_LLM_KEY (+ CNQ_VISION_LLM_PROVIDER, default gemini, and
+    CNQ_VISION_LLM_MODEL) gives it its own key; without it NOVA's own model is used when it can see images (Gemini, Claude,
+    Llama 4 …). NOVA's model on 22.10 is openai/gpt-oss-120b — text only, so screenshots are off until a key is set."""
+    key = os.environ.get("CNQ_VISION_LLM_KEY")
+    if key:
+        prov = (os.environ.get("CNQ_VISION_LLM_PROVIDER") or "gemini").lower()
+        if prov not in PROVIDERS:
+            return None
+        model = os.environ.get("CNQ_VISION_LLM_MODEL") or PROVIDERS[prov]["model"]
+    elif isinstance(llm, LLM) and llm.key:
+        prov, model, key = llm.provider, llm.model, llm.key
+    else:
+        return None
+    if not pf_parse.VISION_RE.search(model or ""):
+        return None
+    return {"provider": prov, "model": model, "key": key, "url": PROVIDERS[prov]["url"], "style": PROVIDERS[prov]["style"]}
+
+
 def _day() -> str:
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
 
@@ -87,6 +112,13 @@ class Api:
         self.selftest: dict | None = None        # GET /v2/agent/selftest: the last real model call on a fixed question
         self.panel_last: dict | None = None      # the last closed-system NOVA call (POST /v2/admin/nova): result + time
         self._selftest_lock = threading.Lock()
+        # build 45 «Разбор портфеля»: the system's data, per-user limits (memory only), the screenshot model, the last call's pulse
+        self.pf_data = pf_review.Data(web_dir)
+        self.pf_parse_limit = pf_review.Limiter(per_window=6, window_s=600, per_day=30)
+        self.pf_review_limit = pf_review.Limiter(per_window=10, window_s=600, per_day=40)
+        self.vision = vision_config(llm)
+        self.vision_reader = pf_parse.vision_holdings    # tests put a fake here
+        self.pf_last: dict | None = None         # counts and timing only — never a coin or an amount
 
     # ---------------------------------------------------------------- helpers
     def _read(self, path: str) -> dict | None:
@@ -227,7 +259,8 @@ class Api:
                      "firebase_admin": bool(getattr(self.admin, "ready", False)),
                      "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last,
-                         "panel_last": self.panel_last, "news_last": self.news.last}
+                         "panel_last": self.panel_last, "news_last": self.news.last,
+                         "portfolio": {"vision": bool(self.vision), "last": self.pf_last}}
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()
         if method == "GET" and path == "/v2/agent/selftest":
@@ -256,6 +289,9 @@ class Api:
                 return 404, {"error": "unknown_feed"}
             d = self._feed(m.group(1), lang)
             return (200, d) if d is not None else (503, {"error": "feed_unavailable"})
+        if method == "GET" and path == "/v2/portfolio/caps":            # build 45: which files «Разбор портфеля» reads now
+            return 200, {"image": bool(self.vision), "csv": True, "xlsx": True, "pdf": True,
+                         "max_mb": pf_parse.MAX_FILE // (1024 * 1024), "exchanges": ["okx", "bingx", "binance"]}
         if method == "POST" and path == "/v2/access/verify":             # 22.10: a guest's access code for cryptonova.vip
             try:
                 data = json.loads(body.decode() or "{}") if body else {}
@@ -274,6 +310,8 @@ class Api:
         except AuthError as e:
             return 401, {"error": "unauthorized", "detail": str(e)[:120]}
         uid = who["uid"]
+        if method == "POST" and path == "/v2/portfolio/parse":          # the raw file, not JSON
+            return self._pf_guard("parse", lang, lambda: self._pf_parse(uid, body, lang))
         if method == "DELETE" and path == "/v2/me":
             rows = self.store.delete_user(uid)
             auth = self.admin.delete_user(uid) if self.admin is not None else "dry"
@@ -325,7 +363,84 @@ class Api:
                 return 200, {"error": "busy", "answer": nova.busy(lang)}
         if method == "POST" and path == "/v2/vip/check":
             return self._vip(uid, str(data.get("bingx_uid") or "").strip())
+        if method == "POST" and path == "/v2/portfolio/review":
+            lang = norm_lang(data.get("lang") or lang)
+            return self._pf_guard("review", lang, lambda: self._pf_review(uid, data, lang))
         return 404, {"error": "not_found"}
+
+    # ---------------------------------------------------------------- build 45: «Разбор портфеля»
+    def _pf_guard(self, what: str, lang: str, fn) -> tuple[int, dict]:
+        """never a bare 500, and never the file's content in a log line: only the error's type is printed"""
+        t0 = time.time()
+        try:
+            code, doc = fn()
+        except Exception as e:  # noqa: BLE001
+            print(f"portfolio {what}: {type(e).__name__}", file=sys.stderr, flush=True)
+            code, doc = 200, {"error": "server", "message": pf_review.message("server", lang)}
+        self.pf_last = {"what": what, "at": int(t0), "ms": round((time.time() - t0) * 1000), "code": code,
+                        "result": doc.get("error") or "ok", "kind": doc.get("kind"), "coins": len(doc.get("holdings") or doc.get("rows") or [])}
+        return code, doc
+
+    def _pf_parse(self, uid: str, data: bytes, lang: str) -> tuple[int, dict]:
+        """POST /v2/portfolio/parse?lang=… — the body is the file itself (≤ 10 MB). → 200 {"holdings": [{"sym", "amount",
+        "value_usd"?}], "kind": csv|xlsx|pdf|image, "exchange", "mode", "note"} or {"error", "message"} (the sentence to show).
+        413 too_large · 429 rate (per user: 6 in 10 min, 30 a day). The file lives only in this call's memory."""
+        def err(code, http=200, **kw):
+            return http, {"error": code, "message": pf_review.message(code, lang, **kw)}
+        if len(data) > pf_parse.MAX_FILE:
+            return err("too_large", 413)
+        wait = self.pf_parse_limit.hit(uid)
+        if wait:
+            return err("rate", 429, m=wait)
+        kind = pf_parse.sniff(data)
+        if kind is None:
+            return err("bad_type")
+        if kind == "xls":
+            return err("xls")
+        known = self.pf_data.known()
+        note = None
+        try:
+            if kind == "csv":
+                res = pf_parse.parse_table(pf_parse.read_csv(data), known)
+            elif kind == "xlsx":
+                res = pf_parse.best_table(pf_parse.read_xlsx(data), known)
+            elif kind == "pdf":
+                text = pf_parse.pdf_text(data)
+                res = pf_parse.parse_text(text, known)
+                if not res["holdings"] and text.strip() and self._llm_ready():
+                    llm = copy.copy(self.llm) if isinstance(self.llm, LLM) else self.llm
+                    if isinstance(llm, LLM):
+                        llm.max_tokens, llm.timeout, llm.max_wait_429 = 2000, 25.0, 3.0
+                    res = {"holdings": pf_parse.llm_text_holdings(llm, text, known), "mode": "model", "exchange": res.get("exchange")}
+                    note = "note_model"
+                del text
+            else:
+                if not self.vision:
+                    return err("image_unsupported")
+                res = {"holdings": self.vision_reader(self.vision, data, known), "mode": "model", "exchange": None}
+                note = "note_model"
+        except pf_parse.ParseError as e:
+            return err(str(e) if str(e) in pf_review.MSG else "read_failed")
+        except (ET.ParseError, ValueError, KeyError, IndexError, zlib.error, EOFError):
+            return err("read_failed")
+        if not res["holdings"]:
+            return err("no_rows")
+        if note is None:
+            note = "note_ledger" if res.get("mode") == "ledger" else "note_check"
+        return 200, {"holdings": res["holdings"], "kind": kind, "exchange": res.get("exchange"), "mode": res.get("mode"),
+                     "note": pf_review.message(note, lang), "max": pf_parse.MAX_HOLDINGS}
+
+    def _pf_review(self, uid: str, data: dict, lang: str) -> tuple[int, dict]:
+        """POST /v2/portfolio/review {"holdings": [{"sym", "amount", "value_usd"?}] (≤ 100, as the user confirmed them), "lang"}
+        → the review (cnq/api/pf_review.review) or {"error", "message"}. 429 rate (10 in 10 min, 40 a day)."""
+        hs = pf_review.clean_holdings(data.get("holdings"), pf_parse.MAX_HOLDINGS)
+        if not hs:
+            return 200, {"error": "bad_holdings", "message": pf_review.message("bad_holdings", lang)}
+        wait = self.pf_review_limit.hit(uid)
+        if wait:
+            return 429, {"error": "rate", "message": pf_review.message("rate", lang, m=wait)}
+        out = pf_review.review(hs, self.pf_data, lang)
+        return 200, out
 
     def _agent(self, uid: str, data: dict, lang: str = DEFAULT) -> tuple[int, dict]:
         """NOVA. Request {"q": question (≤ 500 chars, longer is cut), "ctx": optional plain-text summary of the user's own demo
@@ -475,8 +590,11 @@ def make_handler(api: Api):
 
         def _go(self, method: str) -> None:
             n = int(self.headers.get("Content-Length") or 0)
-            if n > MAX_BODY:
-                return self._send(413, {"error": "too_large"})
+            p = self.path.split("?", 1)[0].rstrip("/")
+            limit = pf_parse.MAX_FILE if p == "/v2/portfolio/parse" else MAX_BODY     # build 45: a portfolio file ≤ 10 MB
+            if n > limit:
+                q = parse_qs(urlsplit(self.path).query)
+                return self._send(413, {"error": "too_large", "message": pf_review.message("too_large", norm_lang((q.get("lang") or [""])[0]))})
             body = self.rfile.read(n) if n else b""
             hdrs = {k.lower(): v for k, v in self.headers.items()}
             try:

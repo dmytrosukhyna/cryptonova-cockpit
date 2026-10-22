@@ -32,6 +32,16 @@ Settings in `/etc/cnq.env`:
   21.10: the same token also switches on NOVA in the closed system's chat (`POST /v2/admin/nova`, the server's model key) —
   sign in once in «Управление» with «Запомнить на этом устройстве»; Settings → «Проверить ИИ» shows the time or the exact error.
 
+- Build 45 «Разбор портфеля» (`/v2/portfolio/*`, `cnq/api/pf_parse.py`, `cnq/api/pf_review.py`): CSV / XLSX / PDF work with
+  no settings. Two one-time steps on the server (root):
+  1. nginx must let a file of up to 10 MB through (the old snippet allows 32 KB):
+     `install -m 644 /opt/cnq/repo/deploy/api/cnq-v2.nginx.conf /etc/nginx/snippets/cnq-v2.conf && nginx -t && systemctl reload nginx`
+  2. Screenshots need a model that sees images. NOVA's model (openai/gpt-oss-120b) is text only, so they are off until
+     `CNQ_VISION_LLM_KEY` (+ optional `CNQ_VISION_LLM_PROVIDER`, default `gemini`, and `CNQ_VISION_LLM_MODEL`) is in
+     `/etc/cnq.env` and `systemctl restart cnq-api`; `GET /v2/portfolio/caps` then says `"image": true` and the app offers them.
+  Optional: `/opt/cnq/venv/bin/pip install pypdf` reads unusual PDF fonts better (without it a small built-in reader is used).
+  Nothing is stored: the file and the coins live only in the request's memory; `/v2/health` "portfolio" shows counts only.
+
 Endpoints: see the docstring of `cnq/api/server.py`. Data: `/opt/cnq/run/data/api.sqlite` (not in git).
 
 Legal pages for the stores (published with the site): https://cryptonova.vip/privacy.html · terms.html · delete.html

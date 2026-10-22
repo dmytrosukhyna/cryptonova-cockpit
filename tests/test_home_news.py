@@ -144,7 +144,13 @@ def test_background_worker_fills_the_cache(tmp_path):
             break
         time.sleep(0.02)
     got = news.feed("es", NOW, background=False)[0]["meaning"]
-    assert got == ANSWER["es"]["meaning"], (got, llm.calls, news.last, news._busy)
+    if got != ANSWER["es"]["meaning"]:                           # say where the worker thread is stuck
+        import sys
+        import threading
+        import traceback
+        stacks = [" / ".join(f"{fr.name}:{fr.lineno}" for fr in traceback.extract_stack(f)[-6:])
+                  for tid, f in sys._current_frames().items() if tid != threading.get_ident()]
+        raise AssertionError((got, llm.calls, news.last, news._busy, stacks))
     assert llm.calls == 1, llm.calls
 
 

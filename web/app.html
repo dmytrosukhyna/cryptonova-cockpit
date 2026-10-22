@@ -4178,17 +4178,17 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
     // 22.10 (owner read «43% USDT» as idle cash): where every dollar belongs, from the autopilot's own budgets (myspot_sub.allocate)
     const AL=S.alloc;
     if(AL){ const T=S.total_usd||1, p=v=>sh(Math.max(0,v)/T*100), fp=AL.fut_margin_usd/T*100;
-      const parts=[['Спот · монеты',AL.spot_coins_usd,'var(--acc)'],['Кэш спот-портфеля',AL.spot_cash_usd,'#4d7fa8'],['в позициях (маржа)',AL.fut_margin_usd,'#f2c14e'],
+      const parts=[['Спот · монеты',AL.spot_coins_usd,'var(--acc)'],['Спот · запас под новые монеты',AL.spot_cash_usd,'#4d7fa8'],['в позициях (маржа)',AL.fut_margin_usd,'#f2c14e'],
         ['резерв под новые сделки',AL.fut_reserve_usd,'rgba(242,193,78,.4)'],['Активный спот · в монетах',AL.active_coins_usd,'#6fcf97'],
         ['Активный спот · ждёт сигнала «Импульс BTC»',AL.active_wait_usd,'rgba(111,207,151,.4)'],['Прочее',AL.other_usd,'#8fa1b3']];
       const row=(n,v,c,sub)=>`<div class="ar${sub?' sub':''}"><span><i style="background:${c}"></i>${n}</span><b>${usd(v||0)}</b><em>${p(v||0)}</em></div>`;
       h+=`<div class="msal"><div class="hd">Ваши ${usd((S.start||{}).usd||T)} распределены: спот ${sh(AL.spot_pct)}, фьючерсы ${sh(AL.fut_pct)} (в позициях ${sh(fp)}), активный спот ${sh(AL.active_pct)}</div>`
         +`<i class="mssplit">${parts.filter(x=>x[1]>0).map(x=>`<i style="width:${(x[1]/T*100).toFixed(2)}%;background:${x[2]}"></i>`).join('')}</i>`
-        +row('Спот · монеты',AL.spot_coins_usd,'var(--acc)')+row('Кэш спот-портфеля — по правилу портфеля, в USDT',AL.spot_cash_usd,'#4d7fa8')
+        +row('Спот · монеты',AL.spot_coins_usd,'var(--acc)')+row('Спот · запас под новые монеты (правило портфеля: не меньше 10%)',AL.spot_cash_usd,'#4d7fa8')
         +row('Бюджет фьючерсов',AL.fut_budget_usd,'#f2c14e')+row('в позициях (маржа)',AL.fut_margin_usd,'#f2c14e',1)+row('резерв под новые сделки',AL.fut_reserve_usd,'rgba(242,193,78,.4)',1)
         +(AL.active_coins_usd>0?row('Активный спот · в монетах',AL.active_coins_usd,'#6fcf97'):'')+row('Активный спот · ждёт сигнала «Импульс BTC»',AL.active_wait_usd,'rgba(111,207,151,.4)')
         +(Math.abs(AL.other_usd||0)>=1?row('Прочее — комиссии, округление, монеты к докупке',AL.other_usd,'#8fa1b3'):'')
-        +`<div class="muted">Доллары на счёте ${usd(C.usd||0)} = кэш спот-портфеля + маржа и резерв фьючерсов + активный спот, который ждёт сигнала${Math.abs(AL.other_usd||0)>=1?' + прочее':''}. Лишних денег нет: каждая часть ждёт своего правила системы.</div></div>`; }
+        +`<div class="muted">Доллары на счёте ${usd(C.usd||0)} = запас спот-портфеля под новые монеты + маржа и резерв фьючерсов + активный спот, который ждёт сигнала${Math.abs(AL.other_usd||0)>=1?' + прочее':''}. Лишних денег нет: каждая часть ждёт своего правила системы.</div></div>`; }
     // the autopilot's own «СОВПАДАЕТ С СИСТЕМОЙ» line (okx_autopilot.same_text) and its differences
     h+=`<div class="msmatch ${M.same===true?'yes':M.same===false?'no':''}"><b>${esc(M.line||'')}</b>${(M.diffs||[]).length?`<ul>${M.diffs.slice(0,6).map(d=>`<li>${esc(d)}</li>`).join('')}</ul>`:''}<span class="muted">${M.t?`проверено ${when(M.t)} · `:''}${esc(M.note||'')}</span></div>`;
     // spot coins vs the autopilot's targets

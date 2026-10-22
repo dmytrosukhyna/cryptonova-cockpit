@@ -173,6 +173,6 @@ def test_dollars_are_allocated_to_their_parts_and_add_up_to_the_usdt():
     html = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "app.html"), encoding="utf-8").read()
     card = html[html.index("function subHtml(S,apBox)"):html.index("function okHtml(D)")]
     for w in ("распределены: спот ${sh(AL.spot_pct)}, фьючерсы ${sh(AL.fut_pct)} (в позициях ${sh(fp)}), активный спот ${sh(AL.active_pct)}",
-              "Кэш спот-портфеля", "в позициях (маржа)", "резерв под новые сделки", "ждёт сигнала «Импульс BTC»", "Прочее"):
+              "Спот · запас под новые монеты", "в позициях (маржа)", "резерв под новые сделки", "ждёт сигнала «Импульс BTC»", "Прочее"):
         assert w in card, w
     assert "свободн" not in card                                                     # never «свободный кэш»

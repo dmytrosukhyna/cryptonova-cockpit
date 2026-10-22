@@ -163,49 +163,60 @@ def context(get, cfg: dict | None, env=None, raw: dict | None = None) -> dict:
 
 
 def want(ctx: dict, coins, quote: str = "USDT") -> set:
-    """The lead instruments the autopilot sets: the portfolio's coins (direct pair) OKX supports + every open lead position's."""
-    d = {f"{c}-{quote}" for c in coins if f"{c}-{quote}" in ctx["supported"]}
+    """The lead instruments the account should have: everything already set (never shrunk — 22.10 live: OKX had all 245 supported
+    coins enabled) + the portfolio's coins (direct USDT pair) OKX supports + every open lead position's instrument."""
+    d = set(ctx.get("enabled") or set()) | {f"{c}-{quote}" for c in coins if f"{c}-{quote}" in ctx["supported"]}
     for h in (ctx.get("held") or {}).values():
         d |= set(h["insts"])
     return d
 
 
-def sync(cl, ctx: dict, desired: set, st: dict, now: int, log=None) -> set:
-    """POST set-instruments (instType SPOT) when the lead instruments differ from `desired`, or the last refresh is a day old.
-    Refused as a whole → added one by one. Returns (and keeps in ctx) the instruments OKX has set now. Never an empty list."""
-    if not ctx["active"] or not desired:
-        return ctx["enabled"]
-    if desired == ctx["enabled"] and now - int(st.get("lead_t") or 0) < DAY_MS:
-        return ctx["enabled"]
+def add_insts(cl, inst_type: str, cur: set, missing: set) -> tuple[set, dict]:
+    """POST set-instruments with the FULL list (what is set + the missing ones) — never removes one. Refused as a whole → the
+    missing ones one by one. Returns (the instruments OKX reports enabled afterwards, {instId: why refused})."""
     fails = {}
 
     def put(insts):
-        cl.call("POST", SET, body={"instType": "SPOT", "instId": ",".join(sorted(insts))})
+        cl.call("POST", SET, body={"instType": inst_type, "instId": ",".join(sorted(insts))})
     try:
-        put(desired)
+        put(cur | missing)
     except ms.OkxError as e:
-        have = set()
-        for i in sorted(desired):
+        have = set(cur)
+        for i in sorted(missing):
             try:
                 put(have | {i})
                 have.add(i)
             except ms.OkxError as e2:
                 fails[i] = (e2.msg or e2.code or str(e))[:120]
     try:
-        d = cl.call("GET", INSTS, {"instType": "SPOT"}) or []
+        d = cl.call("GET", INSTS, {"instType": inst_type}) or []
         en = {str(x.get("instId")) for x in d if str(x.get("enabled")).lower() == "true"}
     except ms.OkxError:
-        en = desired - set(fails)
+        en = (cur | missing) - set(fails)
+    return en, fails
+
+
+def sync(cl, ctx: dict, desired: set, st: dict, now: int, log=None) -> set:
+    """Spot: add the wanted instruments that are missing (add_insts, instType SPOT); nothing missing → no call. Returns (and keeps
+    in ctx) the instruments OKX has now."""
+    cur = set(ctx["enabled"])
+    missing = set(desired) - cur
+    if not ctx["active"]:
+        return ctx["enabled"]
+    st["lead_t"] = now
+    if not missing:
+        return ctx["enabled"]
+    en, fails = add_insts(cl, "SPOT", cur, missing)
     ctx["enabled"], ctx["fails"] = en, {**{k: v for k, v in ctx["fails"].items() if k == "*"}, **fails}
-    st.update({"lead_t": now, "lead_set": sorted(en), "lead_fail": fails})
+    st.update({"lead_added": sorted(missing - set(fails)), "lead_fail": fails})
     if log:
-        log({"ev": "lead_instruments", "set": sorted(en), "failed": fails})
+        log({"ev": "lead_instruments", "type": "SPOT", "added": sorted(missing - set(fails)), "failed": fails, "n": len(en)})
     return en
 
 
 def _why_not(c: str, via, inst: str, ctx: dict, en: set) -> str | None:
     if via:
-        return "через USDC"
+        return "через USDC — OKX копирует только пары к USDT"
     if inst in en:
         return None
     if inst not in ctx["supported"]:

@@ -147,7 +147,7 @@ def test_usdc_route_coin_is_not_copied():
     fk = fake(spot_role="1", usdc_only=("UUU",))
     r = ap.run_once(live(tmp), fk, pf, NOW, F.nosleep)
     assert r["ok"] and all(o["tdMode"] == "cash" for o in spot_orders(fk) if o["instId"] in ("UUU-USDC", "USDC-USDT"))
-    assert "UUU — через USDC" in ap.plan_text(r["plan"], r["mode"])
+    assert "UUU — через USDC — OKX копирует только пары к USDT" in ap.plan_text(r["plan"], r["mode"])
 
 
 def test_coins_bought_before_the_switch_stay_and_the_plan_names_them_and_migrate_only_plans():
@@ -188,8 +188,25 @@ def test_lead_instruments_are_refreshed_daily_by_the_window_without_a_rebalance(
     st = ap.load_state(e)
     st["drift_t"] = 0
     ap.save_state(st, e)
-    ap.tick(e, fk, F.portfolio(), NOW + ld.DAY_MS + 60_000, F.nosleep)       # a day later → set again (OKX's list refreshed)
-    assert len(fk.set_calls) == n + 1
+    ap.tick(e, fk, F.portfolio(), NOW + ld.DAY_MS + 60_000, F.nosleep)       # a day later, nothing missing → no call
+    assert len(fk.set_calls) == n
+    fk.spot_enabled.discard("ETH-USDT")                                    # OKX dropped a portfolio coin → added back, rest kept
+    st = ap.load_state(e)
+    st["drift_t"] = 0
+    ap.save_state(st, e)
+    ap.tick(e, fk, F.portfolio(), NOW + 2 * ld.DAY_MS + 120_000, F.nosleep)
+    assert len(fk.set_calls) == n + 1 and "ETH-USDT" in fk.spot_enabled
+
+
+def test_spot_lead_instruments_are_never_shrunk_only_missing_portfolio_coins_are_added():
+    tmp = tempfile.mkdtemp()
+    many = {f"{c}-USDT" for c in ("BTC", "ETH", "AAA", "DOGE", "XRP", "LINK", "AVAX", "ADA", "DOT", "APT")}   # OKX: all enabled
+    fk = fake(spot_role="1", spot_enabled=set(many))
+    assert ap.run_once(live(tmp), fk, F.portfolio(), NOW, F.nosleep)["ok"]
+    assert len(fk.set_calls) == 1 and set(fk.set_calls[0]["instId"].split(",")) == many | {"SOL-USDT", "BBB-USDT"}
+    assert fk.spot_enabled == many | {"SOL-USDT", "BBB-USDT"}
+    fk2 = fake(spot_role="1", spot_enabled=many | {"SOL-USDT", "BBB-USDT"})
+    assert ap.run_once(live(tempfile.mkdtemp()), fk2, F.portfolio(), NOW, F.nosleep)["ok"] and not fk2.set_calls
 
 
 def test_unreadable_lead_positions_mean_no_spot_orders():

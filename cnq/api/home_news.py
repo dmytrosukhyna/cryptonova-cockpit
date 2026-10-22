@@ -13,9 +13,10 @@ Item: {"id", "time" (ms), "asset" (a coin; absent = the whole market), "directio
        "link" (the source article, when the data has one), "source" (the site's name)}
 Words: NOVA's model (the API's LLM: CNQ_NOVA_LLM_KEY, else the engine's key — see server.agent_llm) translates each story ONCE,
 into all 5 languages in one call, with its one-line meaning. The result is kept on disk by id + language (data/news_i18n.json,
-git-ignored, 7 days), so it costs a few small calls a day. The request never waits for the model: a story not in the cache yet
-goes out as it is — Russian: the desk's Russian headline, other languages: the original headline — with an empty meaning, and one
-background worker translates it for the next request. Without a model that fallback simply stays.
+git-ignored, 7 days; a story translated by an older prompt — PROMPT_V — is served and asked again once), so it costs a few
+small calls a day; after the provider's «429» nobody asks the model for 2 minutes. The request never waits for the model: a story
+not in the cache yet goes out as it is — Russian: the desk's Russian headline, other languages: the original headline — with an
+empty meaning, and one background worker translates it for the next request. Without a model that fallback simply stays.
 Never invented: the stories come only from the desk; the model only translates and explains the headline it is given, and an
 answer that brings a number not in the input, or the wrong alphabet for its language, is not used."""
 from __future__ import annotations
@@ -38,6 +39,8 @@ MIN_MAG = 2
 KEEP_DAYS = 7                      # the translation cache forgets stories older than this
 RETRY_S = 15 * 60                  # a story the model failed on is asked again after 15 min …
 MAX_TRIES = 3                      # … at most 3 times per server run
+RATE_RETRY_S = 120                 # the provider's «429, too many tokens per minute»: not the story's fault — again in 2 min
+PROMPT_V = 2                       # the prompt's version: a story translated by an older prompt is served and asked again once
 DIRECTION = {"bull": "up", "bear": "down", "up": "up", "down": "down"}
 PERSONAL = {"trump_truth"}         # cnq/agents/news.py PERSONAL: posts, not news
 SOURCES = {"coindesk": "CoinDesk", "cointelegraph": "Cointelegraph", "theblock": "The Block", "decrypt": "Decrypt",
@@ -56,10 +59,11 @@ SYSTEM = """You translate and explain ONE crypto-market news headline for a calm
 The input is JSON: the original headline ("original"), the news desk's Russian headline ("ru_title"), the desk's short Russian note
 on why it matters ("note"), the coin it is about ("asset", MARKET = the whole market) and the desk's direction for it ("direction").
 Answer with ONLY a JSON object, keys exactly ru, en, uk, el, es, each {"title": "...", "meaning": "..."}:
-- title: the same news, faithfully, in that language, at most 12 words. Keep names, companies and tickers (BTC, ETF, SEC) as they
-  are. Numbers in digits. No quotes around it, no clickbait, no exclamation marks.
-- meaning: ONE short plain sentence, at most 16 words, «what this means» for a beginner — what the news can mean for the coin or the
-  market. Calm. No advice to buy or sell, no promises, no price forecasts, no emoji.
+- title: the same news, faithfully, as a clear natural headline in that language (rewrite the desk's Russian one when it is clumsy),
+  at most 70 characters. Keep names, companies and tickers (BTC, ETF, SEC) as they are. Numbers in digits. No quotes around it, no
+  clickbait, no exclamation marks.
+- meaning: ONE short plain sentence, at most 100 characters, «what this means» for a beginner: why the news matters for the coin
+  or the market. It must follow from the headline itself. Calm. No advice to buy or sell, no promises, no price predictions, no emoji.
 - Use ONLY facts from the input. Never add numbers, dates, names or events that are not in it.
 - ru = Russian, en = English, uk = Ukrainian (not Russian), el = Greek, es = Spanish."""
 
@@ -197,6 +201,7 @@ class HomeNews:
         self._cache: dict | None = None
         self._tries: dict[str, tuple[int, float]] = {}         # story id → (failed calls, time of the last one)
         self._busy = False
+        self._pause_until = 0.0                                # after a «429»: no model call for everyone until then
         self.last: dict | None = None                          # the last model call: result + time (for a look in tests / logs)
 
     # ------------------------------------------------------------ data
@@ -254,7 +259,7 @@ class HomeNews:
             for s in stories:
                 c = cache.get(s["id"]) or {}
                 tr = c.get(lang) if isinstance(c.get(lang), dict) else None
-                if not all(isinstance(c.get(x), dict) for x in LANGS):
+                if c.get("pv") != PROMPT_V or not all(isinstance(c.get(x), dict) for x in LANGS):
                     missing.append(s)
                 if tr:
                     title, meaning = tr.get("title") or "", tr.get("meaning") or ""
@@ -293,13 +298,13 @@ class HomeNews:
     def translate(self, stories: list[dict], now_ms: int | None = None) -> int:
         """one model call per story that is not in the cache in every language yet; returns the number of calls"""
         now_ms = now_ms or int(time.time() * 1000)
-        if not self._ready():
+        if not self._ready() or time.time() < self._pause_until:
             return 0
         calls = 0
         for s in stories:
             with self._lock:
                 c = self._load_cache().get(s["id"]) or {}
-                done = all(isinstance(c.get(x), dict) for x in LANGS)
+                done = c.get("pv") == PROMPT_V and all(isinstance(c.get(x), dict) for x in LANGS)
             n, last = self._tries.get(s["id"], (0, 0.0))
             if done or n >= MAX_TRIES or (n and time.time() - last < RETRY_S):
                 continue
@@ -323,15 +328,18 @@ class HomeNews:
                 if got:
                     cache = self._load_cache()
                     entry = cache.get(s["id"]) if isinstance(cache.get(s["id"]), dict) else {}
+                    if entry.get("pv") != PROMPT_V:          # an older prompt's words: replaced, not mixed
+                        entry = {}
                     entry.update(got)
-                    entry["t"] = s["time"]
+                    entry["t"], entry["pv"] = s["time"], PROMPT_V
                     cache[s["id"]] = entry
                     try:
                         self._save_cache(now_ms)
                     except OSError as e:
                         print("home news: cache not written:", repr(e)[:160], file=sys.stderr, flush=True)
+            if result == "rate_limit":                   # not the story's fault: not counted, every story again in 2 minutes
+                self._pause_until = time.time() + RATE_RETRY_S
+                break
             if len(got) < len(LANGS):
                 self._tries[s["id"]] = (n + 1, time.time())
-            if result == "rate_limit":
-                break
         return calls

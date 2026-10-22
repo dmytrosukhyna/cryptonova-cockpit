@@ -3,6 +3,7 @@ import json
 import os
 import time
 
+from cnq.api import home_news
 from cnq.api.home_news import HomeNews, check_answer, pick
 
 H = 3_600_000
@@ -93,6 +94,7 @@ class FakeLLM:
     """the API copies its model per call (its own max_tokens / last_finish): the list of questions is shared by the copies"""
     def __init__(self, answer=None, fail=False):
         self.asked, self.answer, self.fail, self.max_tokens, self.timeout = [], answer or ANSWER, fail, 800, 20.0
+        self.error = "HTTP 500: provider down"
 
     @property
     def calls(self):
@@ -105,7 +107,7 @@ class FakeLLM:
         self.asked.append(user)
         assert self.max_tokens >= 2000                       # room for 5 languages
         if self.fail:
-            raise RuntimeError("HTTP 500: provider down")
+            raise RuntimeError(self.error)
         assert "ONLY facts from the input" in system and json.loads(user)["original"]
         return "```json\n" + json.dumps(self.answer, ensure_ascii=False) + "\n```"
 
@@ -123,7 +125,7 @@ def test_translated_once_per_story_and_cached_by_id_and_lang(tmp_path):
         assert x["title"] == ANSWER[lang]["title"] and x["meaning"] == ANSWER[lang]["meaning"]
     assert news.translate(pick(sample()[:2], NOW), NOW) == 0 and llm.calls == 1   # nothing left to translate
     saved = json.load(open(cache, encoding="utf-8"))["items"]["a"]
-    assert set(saved) == {"ru", "en", "uk", "el", "es", "t"} and saved["uk"]["title"] == ANSWER["uk"]["title"]
+    assert set(saved) == {"ru", "en", "uk", "el", "es", "t", "pv"} and saved["uk"]["title"] == ANSWER["uk"]["title"]
     # a restart reads the cache from disk: no model call
     llm2 = FakeLLM()
     again = HomeNews(web, cache, llm2)
@@ -191,3 +193,32 @@ def test_home_route_carries_news_in_the_request_language(tmp_path):
         f.write("{not json")
     os.utime(os.path.join(web, "decision.json"), (time.time() + 5, time.time() + 5))
     assert api.handle("GET", "/v2/home", {}, b"")[0] == 200
+
+
+def test_rate_limit_pauses_every_call_for_two_minutes(tmp_path):
+    web, cache = str(tmp_path / "web"), str(tmp_path / "data" / "news_i18n.json")
+    write_decision(web, sample())
+    llm = FakeLLM(fail=True)
+    llm.error = "HTTP 429: Rate limit reached, try again in 7s"
+    news = HomeNews(web, cache, llm)
+    stories = pick(sample(), NOW)
+    assert news.translate(stories, NOW) == 1 and news.last["result"] == "rate_limit"     # stops at the first «429»
+    assert news.translate(stories, NOW) == 0                                              # nobody asks during the pause
+    news._pause_until = 0                                                                 # 2 minutes later
+    llm.fail = False
+    assert news.translate(stories, NOW) == len(stories)                                   # not counted as the story's failure
+
+
+def test_an_older_prompts_words_are_served_and_asked_again_once(tmp_path):
+    web, cache = str(tmp_path / "web"), str(tmp_path / "data" / "news_i18n.json")
+    write_decision(web, sample()[:2])
+    os.makedirs(tmp_path / "data")
+    old = {lang: {"title": f"old {lang} words", "meaning": "old"} for lang in ("ru", "en", "uk", "el", "es")}
+    with open(cache, "w", encoding="utf-8") as f:
+        json.dump({"v": 1, "items": {"a": {**old, "t": NOW - H, "pv": home_news.PROMPT_V - 1}}}, f)
+    llm = FakeLLM()
+    news = HomeNews(web, cache, llm)
+    assert news.feed("en", NOW, background=False)[0]["title"] == "old en words"           # served meanwhile
+    assert news.translate(pick(sample()[:2], NOW), NOW) == 1
+    assert news.feed("en", NOW, background=False)[0]["title"] == ANSWER["en"]["title"]
+    assert news.translate(pick(sample()[:2], NOW), NOW) == 0 and llm.calls == 1

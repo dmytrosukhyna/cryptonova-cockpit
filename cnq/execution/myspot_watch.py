@@ -10,6 +10,9 @@ Runs on the owner's Mac inside the mirror (scripts/mirror_mac.sh), like «Ива
      and published as web/myspot.enc.json. The repo is public: only the encrypted blob ever leaves the Mac; the publisher
      refuses anything else. The panel decrypts it in the browser (ivanDecrypt) — no plaintext anywhere.
 
+22.10: with the autopilot's key in the env (OKX_API_*), the CRYPTO NOVA sub-account is added to the same encrypted blob
+(cnq/execution/myspot_sub.py — read-only as well): the card shows «Всего = личный + CRYPTO NOVA» and both accounts.
+
 No trading here at all: the OKX client below has GET methods only. The plan is the model's rebalancing plan, written from real
 data (live prices, the model's target shares, the quality screen); a missing score is shown as missing, never invented.
 Not financial advice.
@@ -479,7 +482,7 @@ def futures_on(env=None) -> bool:
     return str(env.get("MYSPOT_FUTURES") or "off").strip().lower() in ("on", "1", "yes", "true")
 
 
-def snapshot(fetch, state: dict, now: int, model=None, futures: bool = False) -> dict:
+def snapshot(fetch, state: dict, now: int, model=None, futures: bool = False, env=None, sub_fetch=None) -> dict:
     host, bal = probe(fetch, state.get("host"))
     state["host"] = host
     raw = read_raw(fetch, host, bal)
@@ -498,16 +501,31 @@ def snapshot(fetch, state: dict, now: int, model=None, futures: bool = False) ->
            "hist": state["hist"]}
     try:                       # «Автопилот OKX» state for the card (local file on this Mac; no keys, no network) — okx_autopilot.py
         from . import okx_autopilot
-        ap = okx_autopilot.status()
+        ap = okx_autopilot.status(env)
         if ap:
             out["autopilot"] = ap
     except Exception:  # noqa: BLE001
         pass
+    # 22.10: the CRYPTO NOVA sub-account next to the personal one (myspot_sub.py: read-only, GET only, the autopilot's key).
+    # Without OKX_API_* nothing is added and the card stays as it was.
+    try:
+        from . import myspot_sub
+        sub = myspot_sub.read(env, sub_fetch, now)
+    except Exception as e:  # noqa: BLE001
+        sub = {"asof": now, "ok": False, "error": f"раздел не собрался: {str(e)[:120]}"} if _has_sub(env) else None
+    if sub:
+        out["sub"] = sub
     return out
 
 
-def run(state: dict | None = None, now: int | None = None, fetch=None, put=None, env=None, save=None, model=None):
-    """read → plan → encrypt → publish. Returns the plaintext dict (None when MYSPOT_* env is missing)."""
+def _has_sub(env=None) -> bool:
+    env = os.environ if env is None else env
+    return all((env.get(k) or "").strip() for k in ("OKX_API_KEY", "OKX_API_SECRET", "OKX_API_PASSPHRASE"))
+
+
+def run(state: dict | None = None, now: int | None = None, fetch=None, put=None, env=None, save=None, model=None, sub_fetch=None):
+    """read → plan → encrypt → publish. Returns the plaintext dict (None when MYSPOT_* env is missing).
+    22.10: with OKX_API_* the CRYPTO NOVA sub-account is added inside the same encrypted blob (myspot_sub.py; sub_fetch for tests)."""
     c = creds(env)
     if not c:
         return None
@@ -517,7 +535,7 @@ def run(state: dict | None = None, now: int | None = None, fetch=None, put=None,
     if state is None:
         state = load_state(env)
         save = save or (lambda s: save_state(s, env))
-    out = snapshot(fetch or make_fetch(key, secret, passphrase), state, now, model, futures=futures_on(env))
+    out = snapshot(fetch or make_fetch(key, secret, passphrase), state, now, model, futures=futures_on(env), env=env, sub_fetch=sub_fetch)
     if save:
         save(state)
     blob = ivan_watch.encrypt(out, pw, asof=now)

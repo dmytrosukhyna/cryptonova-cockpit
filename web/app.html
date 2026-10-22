@@ -4062,10 +4062,31 @@ as web/myspot.enc.json; only this browser decrypts it (ivanDecrypt, the owner's 
 #msCard .msap b{color:#e8f0fa}#msCard .msap .muted{font-size:11.5px}
 #msCard .msset ol{margin:6px 0 0 18px;padding:0;display:grid;gap:7px;font-size:12.5px;line-height:1.5}#msCard .msset code,#msCard .msset pre{font:11.5px/1.5 var(--mono);color:#cfdcec}
 #msCard .msset pre{background:rgba(6,11,22,.6);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+#msCard .mstotal{border:1px solid rgba(127,211,255,.3);background:rgba(127,211,255,.05);border-radius:12px;padding:10px 12px;margin:4px 0 6px;display:grid;gap:7px}
+#msCard .mstotal .tl{font-size:13.5px;line-height:1.5;color:#dbe9f5}#msCard .mstotal .tl b{font:700 14.5px var(--mono);color:#e8f0fa;white-space:nowrap}#msCard .mstotal .tl b.big{font-size:19px}
+#msCard .mssplit{display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(160,190,230,.14)}#msCard .mssplit i{display:block;height:100%}
+#msCard .mslg{display:flex;gap:4px 14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}#msCard .mslg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+#msCard .mssec{display:flex;gap:4px 12px;align-items:baseline;flex-wrap:wrap;margin:18px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line2)}
+#msCard .mssec b{font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:#e8f0fa}#msCard .mssec span{font-size:12px;color:var(--muted)}#msCard .mssec em{font:700 14px var(--mono);font-style:normal;color:#e8f0fa;margin-left:auto}
+#msCard .msmatch{border:1px solid var(--line2);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.45;margin:2px 0 4px}
+#msCard .msmatch.yes{border-color:rgba(61,220,151,.45);background:rgba(61,220,151,.06)}#msCard .msmatch.no{border-color:rgba(242,193,78,.45);background:rgba(242,193,78,.06)}
+#msCard .msmatch>b{font:700 12.5px var(--mono);color:#e8f0fa;overflow-wrap:anywhere}#msCard .msmatch ul{margin:4px 0 0 18px;padding:0;color:#dbe9f5;display:grid;gap:2px}#msCard .msmatch .muted{display:block;font-size:11.5px;margin-top:4px}
+#msCard .mst{display:grid;font-size:12.5px}
+#msCard .mst .h,#msCard .mst .r{display:grid;gap:8px;align-items:baseline;padding:6px 0}
+#msCard .mst.sp .h,#msCard .mst.sp .r{grid-template-columns:minmax(64px,.8fr) minmax(90px,1fr) minmax(80px,.9fr) minmax(120px,1.3fr) minmax(110px,1.2fr)}
+#msCard .mst.fu .h,#msCard .mst.fu .r{grid-template-columns:minmax(118px,1.3fr) minmax(62px,.7fr) minmax(104px,1.1fr) repeat(2,minmax(68px,.9fr)) minmax(72px,.9fr) repeat(2,minmax(64px,.8fr))}
+#msCard .mst .h{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line2)}
+#msCard .mst .h>span,#msCard .mst .r>span{text-align:right;min-width:0}#msCard .mst .h>span:first-child,#msCard .mst .r>span:first-child{text-align:left}
+#msCard .mst .r{border-bottom:1px solid var(--line)}#msCard .mst .r>span{font-family:var(--mono);overflow-wrap:anywhere;white-space:normal}#msCard .mst .r>span *{white-space:normal}#msCard .mst .r b{font-size:13.5px}
+#msCard .mst .r small{display:block;color:var(--muted);font:11px var(--body,inherit)}#msCard .mst em{display:none;font:10.5px var(--body,inherit);font-style:normal;color:var(--muted)}
+#msCard .mst .r .neg small{color:inherit}
 body:not(.tab-spot) #msCard,body.guest #msCard{display:none!important}
 body.tab-spot #msCard{order:-13}body.myspot-on.tab-spot #myPortCard{display:none!important}
 @media (max-width:1150px){body.tab-spot #msCard{order:0}}
 @media (max-width:760px){#msCard .mskpi{grid-template-columns:1fr 1fr}#msCard .mstop{grid-template-columns:1fr;justify-items:center}#msCard .mstop>div{width:100%}
+ #msCard .mst .h{display:none}#msCard .mst.sp .r{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px}#msCard .mst.fu .r{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 10px}
+ #msCard .mst .r>span{text-align:left}#msCard .mst .r>span:first-child{grid-column:1/-1}#msCard .mst em{display:block}
+ #msCard .mst.sp .r{grid-template-columns:repeat(3,minmax(0,1fr))}#msCard .mst.sp .r>span:first-child{grid-column:auto;align-self:end}#msCard .mst.sp .r>span:nth-child(4){grid-column:span 2}#msCard .mstotal .tl b.big{font-size:17px}
  #msCard .msrh{display:none}#msCard .msr{grid-template-columns:minmax(0,1fr) auto;gap:2px 10px}#msCard .msr>span{text-align:left}
  #msCard .msr>span:nth-child(2),#msCard .msr>span:nth-child(3){display:none}#msCard .msr>span:nth-child(4){text-align:right}
  #msCard .msr>span:nth-child(5){grid-column:1/-1}#msCard .msr>span:nth-child(6),#msCard .msr>span:nth-child(7){font-size:12px}#msCard .msr>span:nth-child(7){text-align:right}
@@ -4111,37 +4132,87 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
     ring(70,16,'now'); ctx.globalAlpha=.55; ring(50,9,'tgt'); ctx.globalAlpha=1;
     ctx.fillStyle='#e8f0fa'; ctx.font='700 14px ui-monospace,monospace'; ctx.textAlign='center'; ctx.fillText('сейчас',W/2,W/2-2); ctx.fillStyle='#7d93ad'; ctx.font='11px system-ui,sans-serif'; ctx.fillText('внутри — цель',W/2,W/2+14); }
 
+  /* 22.10 (owner: see the whole process — the total together and the breakdown): the CRYPTO NOVA sub-account next to the personal
+     account, from the same encrypted blob (D.sub — cnq/execution/myspot_sub.py, read-only). Without D.sub the card is as before. */
+  const fnum=v=>v==null?'—':(+v).toLocaleString('ru-RU',{maximumFractionDigits:Math.abs(v)>=1000?1:Math.abs(v)>=1?3:6});
+  const dday=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit'});
+  function totalHtml(A,S){ const B=S&&S.ok?S.total_usd:null, X=B!=null?A+B:null, pa=X?A/X*100:0;
+    return `<div class="mstotal"><div class="tl">${X!=null?`Всего: <b class="big">${usd(X)}</b> = личный <b>${usd(A)}</b> + CRYPTO NOVA <b>${usd(B)}</b>`
+      :`Всего: — · личный <b>${usd(A)}</b> + CRYPTO NOVA <b>не прочитался</b>`}</div>`
+      +(X!=null?`<i class="mssplit"><i style="width:${pa.toFixed(1)}%;background:#8fa1b3"></i><i style="width:${(100-pa).toFixed(1)}%;background:var(--acc)"></i></i>
+        <div class="mslg"><span><i style="background:#8fa1b3"></i>Личный счёт ${sh(pa)}</span><span><i style="background:var(--acc)"></i>CRYPTO NOVA · автопилот ${sh(100-pa)}</span></div>`:'')+`</div>`; }
+  function subHtml(S,apBox){ const st=S.start||{}, R=S.result||{}, F=S.futures||{}, SP=S.spot||{}, AC=S.active||{}, C=S.cash||{}, M=S.match||{};
+    let h=`<div class="mssec"><b>CRYPTO NOVA · субаккаунт OKX</b><span>автопилот ведёт счёт как система</span>${S.ok?`<em>${usd(S.total_usd)}</em>`:''}</div>`+apBox;
+    if(!S.ok) return h+`<div class="mswarn">Субаккаунт CRYPTO NOVA не прочитался: ${esc(S.error||'нет данных')}. Личный счёт ниже — как обычно.</div>`;
+    const pos=F.positions||[], rows=SP.rows||[], ar=AC.rows||[];
+    h+=`<div class="mskpi"><div><small>Стоимость</small><b>${usd(S.total_usd)}</b><em class="muted">спот, фьючерсы, USDT · OKX</em></div>
+      <div><small>Результат с начала</small><b class="${cls(R.usd)}">${sgn(R.usd||0)}</b><em class="${cls(R.usd)}">${R.pct!=null?pc(R.pct,2):''} <span class="muted">от ${usd(st.usd||0)}${st.t?` · с ${dday(st.t)}`:''}</span></em></div>
+      <div><small>Фьючерсы сейчас</small><b class="${pos.length?cls(F.upl):''}">${pos.length?sgn(F.upl||0):'—'}</b><em class="muted">${pos.length} ${plur(pos.length,'позиция','позиции','позиций')}${F.budget_usd?` · бюджет ${usd(F.budget_usd)}`:''}</em></div>
+      <div><small>${esc(C.ccy||'USDT')} на счёте</small><b>${usd(C.usd||0)}</b><em class="muted">${C.free!=null?`свободно ${usd(C.free)}`:'кэш портфеля и маржа'}</em></div></div>`;
+    // the autopilot's own «СОВПАДАЕТ С СИСТЕМОЙ» line (okx_autopilot.same_text) and its differences
+    h+=`<div class="msmatch ${M.same===true?'yes':M.same===false?'no':''}"><b>${esc(M.line||'')}</b>${(M.diffs||[]).length?`<ul>${M.diffs.slice(0,6).map(d=>`<li>${esc(d)}</li>`).join('')}</ul>`:''}<span class="muted">${M.t?`проверено ${when(M.t)} · `:''}${esc(M.note||'')}</span></div>`;
+    // spot coins vs the autopilot's targets
+    const word={ok:'в цели',under:'ниже цели',over:'выше цели',out:'нет в портфеле CRYPTO NOVA',keep:'OKX_KEEP — не трогает'};
+    h+=`<div class="mss">Спот · CRYPTO NOVA портфель${SP.share!=null?` — ${sh(SP.share*100)} счёта`:''}: в монетах ${usd(SP.usd||0)}${SP.target_pct?`, цель ${sh(SP.target_pct)} счёта`:''}</div>`;
+    h+=rows.length?`<div class="mst sp"><div class="h"><span>Монета</span><span>Количество</span><span>Стоимость</span><span>Сейчас → цель</span><span>До цели</span></div>`
+      +rows.map(r=>`<div class="r"><span><b>${esc(r.ccy)}</b></span><span><em>Количество</em>${r.qty?qty(r.qty):'—'}</span><span><em>Стоимость</em>${usd(r.usd)}</span>
+        <span><em>Сейчас → цель</em>${sh(r.now_pct)} → ${sh(r.target_pct)}<i class="msbar"><i style="width:${Math.min(100,r.now_pct*2).toFixed(1)}%"></i><u style="left:${Math.min(99,r.target_pct*2).toFixed(1)}%"></u></i></span>
+        <span class="${r.state==='under'||r.state==='over'||r.state==='out'?cls(r.gap_usd):''}"><em>До цели</em>${r.state==='ok'||r.state==='keep'?'—':sgn(r.gap_usd)}<small>${esc(word[r.state]||'')}</small></span></div>`).join('')+`</div>`
+      :`<div class="muted" style="font-size:12.5px">Монет пока нет — цели появятся после первого запуска автопилота.</div>`;
+    // futures positions with their stops and targets on OKX
+    h+=`<div class="mss">Фьючерсы · CRYPTO NOVA${F.share!=null?` — ${sh(F.share*100)} счёта`:''}${F.lev?` · плечо до ${F.lev}`:''}${F.risk_pct!=null?` · риск до ${String(F.risk_pct).replace('.',',')}% бюджета на сделку`:''}${F.day_pnl!=null?` · за день ${sgn(F.day_pnl)}`:''}${F.day_stop?' · дневной стоп':''}</div>`;
+    h+=pos.length?`<div class="mst fu"><div class="h"><span>Инструмент</span><span>Сторона</span><span>Размер</span><span>Вход</span><span>Марк</span><span>P&amp;L</span><span>Стоп</span><span>Цель</span></div>`
+      +pos.map(p=>`<div class="r"><span><b>${esc(p.inst)}</b>${p.ours?'':'<small>открыта не автопилотом</small>'}</span><span><em>Сторона</em>${p.side==='LONG'?'лонг':'шорт'}${p.lev?` ×${fnum(p.lev)}`:''}</span>
+        <span><em>Размер</em>${fnum(p.sz)} контр.<small>${usd(p.notional||0)}</small></span><span><em>Вход</em>${fnum(p.entry)}</span><span><em>Марк</em>${fnum(p.mark)}</span>
+        <span class="${cls(p.upl)}"><em>P&amp;L</em>${p.upl!=null?sgn(p.upl):'—'}${p.upl_pct!=null?`<small>${pc(p.upl_pct)}</small>`:''}</span>
+        <span class="${p.stop==null?'neg':''}"><em>Стоп</em>${p.stop!=null?fnum(p.stop):'нет на OKX'}</span><span><em>Цель</em>${fnum(p.tp)}</span></div>`).join('')+`</div>`
+      :`<div class="muted" style="font-size:12.5px">Открытых позиций нет. Новый сигнал CRYPTO NOVA окно автопилота повторит в течение минуты.</div>`;
+    // active spot («Импульс BTC») and the dollars
+    h+=`<div class="mss">Активный спот · Импульс BTC${AC.share!=null?` — ${sh(AC.share*100)} счёта`:''}</div>`
+      +(ar.length?`<div class="msidea">${ar.map(a=>`<div><b>${esc(a.ccy)}</b> ${qty(a.qty)}${a.usd!=null?` · ${usd(a.usd)}`:''}</div>`).join('')}</div>`
+        :`<div class="muted" style="font-size:12.5px">${AC.enabled===false?'Выключен (OKX_ACTIVE=off): эта доля лежит в USDT.':'Ждёт сигнала «Импульс BTC»: эта доля лежит в USDT.'}</div>`);
+    h+=`<div class="msfoot">CRYPTO NOVA: балансы, позиции и стопы читаются ключом автопилота, только запросами на чтение (${esc(S.host||'okx.com')}). Цели и строка «совпадает» — из состояния автопилота. Результат считается от первого реального запуска${st.src==='env'?' (сумма из строки OKX_START_USD)':st.src==='default'?' (запуска в журнале нет — от $10 000)':''}.</div>`;
+    return h; }
+
   function okHtml(D){ const P=D.plan||{}, A=D.assets||[], T=P.total_usd||A.reduce((s,a)=>s+a.usd,0), rows=P.rows||[], byP={}; rows.forEach(r=>byP[r.ccy]=r);
     const ch=A.reduce((s,a)=>s+(a.ch24!=null?a.usd-a.usd/(1+a.ch24/100):0),0), pnlA=A.filter(a=>a.pnl_usd!=null), pnl=pnlA.reduce((s,a)=>s+a.pnl_usd,0);
     const old=Date.now()-(D.asof||MS.asof)>60*60000;
     // 22.10 «Автопилот OKX» (cnq/execution/okx_autopilot.py): its state comes inside this encrypted blob — on / off / stop, last rebalance
-    const AP=D.autopilot, apOn=!!(AP&&AP.armed&&AP.enabled&&!AP.stopped), APL=(AP&&AP.last)||{};
-    const apHtml=AP?`<div class="msap ${AP.stopped?'stop':apOn?'on':''}"><b>Автопилот OKX: ${AP.stopped?'остановлен (стоп)':apOn?'включён — держит счёт как система CRYPTO NOVA':'выключен'}</b> · ${esc(AP.mode||'')}`
+    const AP=D.autopilot, apOn=!!(AP&&AP.armed&&AP.enabled&&!AP.stopped), APL=(AP&&AP.last)||{}, SUB=D.sub;
+    const apTop=AP?`<div class="msap ${AP.stopped?'stop':apOn?'on':''}"><b>Автопилот OKX: ${AP.stopped?'остановлен (стоп)':apOn?'включён — держит счёт как система CRYPTO NOVA':'выключен'}</b> · ${esc(AP.mode||'')}`
       +(AP.last_run?` · последняя ребалансировка ${when(AP.last_run)}${APL.reason?` (${esc(APL.reason)})`:''}: продано ${usd(APL.sold_usd||0)}, куплено ${usd(APL.bought_usd||0)}, ордеров ${APL.orders||0}${APL.partial?`, частично ${APL.partial}`:''}${APL.failed?`, ошибок ${APL.failed}`:''}${APL.limit?' · дневной лимит':''}`:' · ребалансировок ещё не было')
-      +`<div class="muted">${esc(AP.rule||'')}${AP.stopped?' · снять стоп: bash scripts/okx_autopilot_mac.sh resume':''}</div>`
+      +`<div class="muted">${esc(AP.rule||'')}${AP.stopped?' · снять стоп: bash scripts/okx_autopilot_mac.sh resume':''}</div>`:'';
+    // 22.10: with the sub-account section the banner keeps its first lines + where the autopilot runs (okx_lease); the rest is below
+    const LS=SUB&&SUB.lease, leaseTxt=!LS?'':LS.error?'замок автопилота не читается — ордера не пойдут, пока не прочитается'
+      :`Работает на ${LS.node==='server'?'сервере (24/7)':'Маке'}${LS.stop?' · <b>включён общий стоп</b>':LS.holder?` · окно ведёт счёт, замок до ${new Date(LS.until).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}`:' · сейчас ни одно окно не ведёт счёт'}`;
+    const apHtml=!AP?'':SUB?apTop+(leaseTxt?`<div class="muted">${leaseTxt}</div>`:'')+`</div>`:apTop
       // 22.10: the account = the CRYPTO NOVA system — the split, whether it matches, the futures positions (okx_futures.status)
       +(AP.split?`<div style="margin-top:6px">Счёт как система CRYPTO NOVA: спот ${sh(AP.split.spot*100)} · фьючерсы ${sh(AP.split.futures*100)} · активный спот ${sh(AP.split.active*100)}${AP.same!=null?` · совпадает: <b>${AP.same?'да':'нет'}</b>`:''}</div>`
         +((AP.diffs||[]).length?`<div class="muted">${AP.diffs.slice(0,4).map(esc).join('<br>')}</div>`:'')
         +((AP.targets||[]).length?`<div class="muted">Цель автопилота — «CRYPTO NOVA портфель»: ${AP.targets.slice(0,10).map(r=>`${esc(r.ccy)} ${sh(r.target_pct)}`).join(' · ')} (план ниже — модель «ядро + альтсезон», для сравнения)</div>`:''):'')
       +(AP.futures?(F=>`<div style="margin-top:6px">Фьючерсы: ${F.enabled?(F.day_stop?'<b>дневной стоп</b> — новых входов до завтра':'включены'):'выключены'}${F.budget_usd?` · бюджет ${usd(F.budget_usd)}`:''} · плечо ≤ ${F.lev} · риск ≤ ${String(F.risk_pct).replace('.',',')}% на сделку${F.day_pnl!=null?` · за день ${usd(F.day_pnl)}`:''}</div>`
         +((F.open||[]).length?`<div class="muted">${F.open.map(o=>`${esc(o.sym)} ${o.side==='LONG'?'лонг':'шорт'} ${o.sz} контр., стоп ${o.stop}${o.tp?`, цель ${o.tp}`:''}`).join(' · ')}</div>`:'<div class="muted">открытых фьючерсных позиций нет</div>'))(AP.futures):'')
-      +(AP.active&&(AP.active.open||[]).length?`<div class="muted">Активный спот: ${AP.active.open.map(o=>`${esc(o.ccy)} ${o.qty}`).join(' · ')}</div>`:'')+`</div>`:'';
-    let h=head(D)+(old?`<div class="mswarn">Данные старше часа — проверь, что зеркало на Маке запущено.</div>`:'')+apHtml
+      +(AP.active&&(AP.active.open||[]).length?`<div class="muted">Активный спот: ${AP.active.open.map(o=>`${esc(o.ccy)} ${o.qty}`).join(' · ')}</div>`:'')+`</div>`;
+    let h=head(D)+(old?`<div class="mswarn">Данные старше часа — проверь, что зеркало на Маке запущено.</div>`:'')
+      // 22.10: «Всего = личный + CRYPTO NOVA», then the sub-account, then the personal account as before (no sub → exactly as before)
+      +(SUB?totalHtml(T,SUB)+subHtml(SUB,apHtml)+`<div class="mssec"><b>Личный счёт · OKX</b><span>ведёте сами · ключ только для чтения</span><em>${usd(T)}</em></div>`:apHtml)
       +`<div class="mskpi"><div><small>Стоимость</small><b>${usd(T)}</b><em class="muted">${A.length} ${plur(A.length,'актив','актива','активов')} · OKX</em></div>
         <div><small>За 24 часа</small><b class="${cls(ch)}">${sgn(ch)}</b><em class="${cls(ch)}">${T?pc(ch/(T-ch)*100):''}</em></div>
         <div><small>Прибыль по средней цене</small>${pnlA.length?`<b class="${cls(pnl)}">${sgn(pnl)}</b><em class="muted">по ${pnlA.length} ${plur(pnlA.length,'монете','монетам','монетам')} торгового счёта</em>`:`<b>—</b><em class="muted">OKX не дал средних цен</em>`}</div>
-        <div><small>Режим рынка</small><b>${esc(P.regime||'—')}</b><em class="muted">альтсезон: ${P.altseason?'включён':'выключен'}</em></div></div>`;
+        ${SUB&&SUB.ok?`<div><small>Доля в общем</small><b>${sh(T/(T+SUB.total_usd)*100)}</b><em class="muted">личный счёт от всего на OKX</em></div>`
+          :`<div><small>Режим рынка</small><b>${esc(P.regime||'—')}</b><em class="muted">альтсезон: ${P.altseason?'включён':'выключен'}</em></div>`}</div>`;
     // donut: current shares (outer) vs the model (inner)
     const items=rows.filter(r=>r.now_pct>=3||r.target_pct>=3).sort((a,b)=>Math.max(b.now_pct,b.target_pct)-Math.max(a.now_pct,a.target_pct)).slice(0,7);
     const rest={n:'Остальные монеты',now:Math.max(0,rows.reduce((s,r)=>s+r.now_pct,0)-items.reduce((s,r)=>s+r.now_pct,0)),tgt:Math.max(0,rows.reduce((s,r)=>s+r.target_pct,0)-items.reduce((s,r)=>s+r.target_pct,0))};
     const C=P.cash||{now_pct:0,target_pct:0}; const seg=items.map((r,i)=>({n:r.ccy,now:r.now_pct,tgt:r.target_pct,c:COL[i%COL.length]})).concat(rest.now+rest.tgt>0.05?[{n:rest.n,now:rest.now,tgt:rest.tgt,c:'#8fa1b3'}]:[]).concat([{n:'Доллары',now:C.now_pct||0,tgt:C.target_pct||0,c:'#3a5577'}]);
-    h+=`<div class="mstop"><canvas class="msdn" id="msDn" width="170" height="170" role="img" aria-label="Доли портфеля сейчас и по модели"></canvas><div class="msleg">${seg.map(s=>`<div><i style="background:${s.c}"></i><b style="font-weight:600">${esc(s.n)}</b><span>${sh(s.now)} → ${sh(s.tgt)}</span></div>`).join('')}<small class="muted" style="grid-column:1/-1;margin-top:4px">Сейчас → цель по модели «ядро + альтсезон». ${P.fut_pct===0?`Только спот: ${esc((P.moved||[]).join('; '))}${(P.moved||[]).length?'. ':''}${sh(P.earn_pct||0)} в USDT Earn.`:`Цель включает ${sh(P.fut_pct!=null?P.fut_pct:15)} под фьючерсы и ${sh(P.earn_pct!=null?P.earn_pct:10)} в USDT Earn.`}</small></div></div>`;
+    // 22.10 (owner): with the sub-account the personal account is shown as it is — holdings and totals, no model plan or advice
+    if(!SUB) h+=`<div class="mstop"><canvas class="msdn" id="msDn" width="170" height="170" role="img" aria-label="Доли портфеля сейчас и по модели"></canvas><div class="msleg">${seg.map(s=>`<div><i style="background:${s.c}"></i><b style="font-weight:600">${esc(s.n)}</b><span>${sh(s.now)} → ${sh(s.tgt)}</span></div>`).join('')}<small class="muted" style="grid-column:1/-1;margin-top:4px">Сейчас → цель по модели «ядро + альтсезон». ${P.fut_pct===0?`Только спот: ${esc((P.moved||[]).join('; '))}${(P.moved||[]).length?'. ':''}${sh(P.earn_pct||0)} в USDT Earn.`:`Цель включает ${sh(P.fut_pct!=null?P.fut_pct:15)} под фьючерсы и ${sh(P.earn_pct!=null?P.earn_pct:10)} в USDT Earn.`}</small></div></div>`;
     // the plan
     const buy=P.buy||[], trim=P.trim||[], keep=rows.filter(r=>r.act==='keep');
     const tag=r=>r.tag?`<span class="mstag ${r.tag==='не перегрета'?'calm':/обогнала/.test(r.tag)?'hot':''}">${esc(r.tag)}</span>`:'';
     const line=(r,kind)=>`<div class="msa"><b>${esc(r.ccy)}</b><div>${kind==='buy'?`докупить до ${sh(r.target_pct)}`:kind==='keep'?'можно держать':r.target_pct>0?`урезать до ${sh(r.target_pct)}`:'продать — нет в модели'}${tag(r)}</div><span class="amt ${kind==='buy'?'buy':kind==='keep'?'keep':'sell'}">${kind==='keep'?usd(r.now_usd):sgn(r.gap_usd)}</span>
       <div class="d">${esc(r.why)}</div>${r.quality?`<div class="f">Анкета качества: ${esc(r.quality.text)}.</div>`:(r.core||r.ccy==='BTC'?'':`<div class="f">Оценки анкеты качества по этой монете нет.</div>`)}</div>`;
-    h+=`<div class="mss">Что сделать по модели</div>${P.alt_note&&rows.some(r=>r.basket)?`<div class="muted" style="font-size:12px;line-height:1.45;margin-bottom:4px">${esc(P.alt_note)}</div>`:''}<div class="msact">`;
+    if(!SUB){ h+=`<div class="mss">Что сделать по модели</div>${P.alt_note&&rows.some(r=>r.basket)?`<div class="muted" style="font-size:12px;line-height:1.45;margin-bottom:4px">${esc(P.alt_note)}</div>`:''}<div class="msact">`;
     if(!buy.length&&!trim.length) h+=`<div class="muted" style="font-size:12.5px;padding:6px 0">Портфель совпадает с моделью: отличия меньше 1% доли — ордера не нужны.</div>`;
     // the alts the owner does not hold yet come as one row (the same reason for all), with the list and the screen inside
     const fresh=buy.filter(r=>r.basket&&!r.held&&!r.core), grp=fresh.length>=3?fresh:[];
@@ -4155,20 +4226,20 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
     if(C.target_pct!=null&&Math.abs(C.gap_usd||0)>=10) h+=`<div class="msa"><b>USDT</b><div>${C.gap_usd>0?'отложить в доллары':'лишние доллары — на покупки'}: ${sh(C.now_pct)} → ${sh(C.target_pct)}</div><span class="amt ${C.gap_usd>0?'buy':'sell'}">${sgn(C.gap_usd)}</span><div class="d">${esc(C.why||'')}</div></div>`;
     h+=`</div>`;
     const tb=buy.reduce((s,r)=>s+r.gap_usd,0), ts=trim.reduce((s,r)=>s-r.gap_usd,0);
-    if(tb||ts) h+=`<div class="mstot"><span>Докупить: <b>${usd(tb)}</b></span><span>Продать и урезать: <b>${usd(ts)}</b></span><span>Сначала продажи, потом покупки — лимитными ордерами.</span></div>`;
+    if(tb||ts) h+=`<div class="mstot"><span>Докупить: <b>${usd(tb)}</b></span><span>Продать и урезать: <b>${usd(ts)}</b></span><span>Сначала продажи, потом покупки — лимитными ордерами.</span></div>`; }
     // assets, exchange-like
-    h+=`<div class="mss">Активы</div><div class="mstab"><div class="msrh"><span>Монета</span><span>Количество</span><span>Цена</span><span>Стоимость</span><span>Доля → цель</span><span>24 ч</span><span>Прибыль</span></div>`;
-    h+=A.map(a=>{ const r=byP[a.ccy], t=a.cash?(C.target_pct||0):(r?r.target_pct:0), why=a.cash?(C.why||''):(r?r.why:''), q=r&&r.quality;
+    h+=`<div class="mss">Активы</div><div class="mstab"><div class="msrh"><span>Монета</span><span>Количество</span><span>Цена</span><span>Стоимость</span><span>${SUB?'Доля':'Доля → цель'}</span><span>24 ч</span><span>Прибыль</span></div>`;
+    h+=A.map(a=>{ const r=SUB?null:byP[a.ccy], t=SUB?null:a.cash?(C.target_pct||0):(r?r.target_pct:0), why=SUB?'':a.cash?(C.why||''):(r?r.why:''), q=r&&r.quality;
       return `<div class="msr"><span><b>${esc(a.ccy)}</b><small>${esc((a.where||[]).join(' · '))}</small></span><span>${qty(a.qty)}</span><span>${px(a.px)}</span><span>${usd(a.usd)}</span>
-        <span>${sh(a.share)} → ${sh(t)}<i class="msbar"><i style="width:${Math.min(100,a.share*2).toFixed(1)}%"></i><u style="left:${Math.min(99,t*2).toFixed(1)}%"></u></i></span>
+        <span>${sh(a.share)}${t==null?'':` → ${sh(t)}`}<i class="msbar"><i style="width:${Math.min(100,a.share*2).toFixed(1)}%"></i>${t==null?'':`<u style="left:${Math.min(99,t*2).toFixed(1)}%"></u>`}</i></span>
         <span class="${cls(a.ch24)}">${a.ch24!=null?pc(a.ch24):'—'}</span><span class="${cls(a.pnl_usd)}">${a.pnl_usd!=null?`${sgn(a.pnl_usd)}<small>${pc(a.pnl_pct)}${a.pnl_part?' · торговый счёт':''}</small>`:'—'}</span>
         ${why?`<span class="msw">${esc(why)}${q?`<span class="f">Анкета качества: ${esc(q.text)}.</span>`:''}</span>`:''}</div>`; }).join('')+`</div>`;
     const missing=rows.filter(r=>r.now_usd===0&&r.target_pct>0);
-    if(missing.length) h+=`<div class="muted" style="font-size:11.5px;margin-top:6px">В модели есть, у тебя пока нет: ${missing.map(r=>`<b style="font-family:var(--mono)">${esc(r.ccy)}</b> ${sh(r.target_pct)}`).join(' · ')}.</div>`;
+    if(missing.length&&!SUB) h+=`<div class="muted" style="font-size:11.5px;margin-top:6px">В модели есть, у тебя пока нет: ${missing.map(r=>`<b style="font-family:var(--mono)">${esc(r.ccy)}</b> ${sh(r.target_pct)}`).join(' · ')}.</div>`;
     // ideas: calm quality alts with revenue that neither the owner nor the model holds
-    if((P.ideas||[]).length) h+=`<div class="mss">На заметку — недооценённые по анкете качества</div><div class="msidea">${P.ideas.map(i=>`<div><b>${esc(i.ccy)}</b> · ${esc(i.quality.text)}</div>`).join('')}</div><div class="muted" style="font-size:11px;margin-top:6px">Их нет ни у тебя, ни в модели: не обгоняли BTC за 3 месяца, объём не раздут, у проекта есть выручка. Это кандидаты для альт-части, а не сигнал купить.</div>`;
-    h+=`<div class="msfoot">${esc(apOn?(P.note||'').replace('Ордеров система не ставит: решаете вы.','Ордера ставит автопилот OKX на твоём Маке: спот — лимитными ордерами, фьючерсы — изолированная маржа, плечо не выше 3, стоп-лосс у каждой позиции; без вывода.'):(P.note||''))} Данные с OKX через ключ только для чтения (${esc(D.host||'okx.com')}); файл в репозитории зашифрован, открывается только твоим паролем.${D.perm&&/trade|withdraw/.test(D.perm)?' <b style="color:#ffe2a8">У ключа есть право торговли или вывода — пересоздай ключ только с правом «Чтение».</b>':''}</div>`;
-    return {h,seg}; }
+    if((P.ideas||[]).length&&!SUB) h+=`<div class="mss">На заметку — недооценённые по анкете качества</div><div class="msidea">${P.ideas.map(i=>`<div><b>${esc(i.ccy)}</b> · ${esc(i.quality.text)}</div>`).join('')}</div><div class="muted" style="font-size:11px;margin-top:6px">Их нет ни у тебя, ни в модели: не обгоняли BTC за 3 месяца, объём не раздут, у проекта есть выручка. Это кандидаты для альт-части, а не сигнал купить.</div>`;
+    h+=`<div class="msfoot">${SUB?'Личный счёт ведёте вы сами: здесь только активы и суммы, без советов.':esc(apOn?(P.note||'').replace('Ордеров система не ставит: решаете вы.','Ордера ставит автопилот OKX на твоём Маке: спот — лимитными ордерами, фьючерсы — изолированная маржа, плечо не выше 3, стоп-лосс у каждой позиции; без вывода.'):(P.note||''))} Данные с OKX через ключ только для чтения (${esc(D.host||'okx.com')}); файл в репозитории зашифрован, открывается только твоим паролем.${D.perm&&/trade|withdraw/.test(D.perm)?' <b style="color:#ffe2a8">У ключа есть право торговли или вывода — пересоздай ключ только с правом «Чтение».</b>':''}</div>`;
+    return {h,seg:SUB?null:seg}; }
 
   function render(){ const el=card(); if(!el) return; if(!owner()){ el.hidden=true; return; } el.hidden=false;
     const a=document.activeElement; if(a&&el.contains(a)&&a.id==='msPass') return;

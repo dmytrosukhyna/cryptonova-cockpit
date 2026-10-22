@@ -283,7 +283,7 @@
             },
             {
               "title": "Las pestañas de abajo y NOVA",
-              "text": "Abajo del todo están las pestañas: Inicio, Futuros, Spot y Aprender. En el centro está la esfera luminosa de NOVA. Es el asistente de IA: pregúntale con palabras sencillas, por ejemplo «¿Por qué el sistema entró en esta operación?». También puedes hablarle: toca el micrófono, di tu pregunta y vuelve a tocarlo.",
+              "text": "Abajo del todo están las pestañas: Inicio, Futuros, Spot y Aprender. En el centro está la esfera luminosa de NOVA. Es el asistente de IA: pregúntale con palabras sencillas, por ejemplo «¿Por qué el sistema entró en esta operación?». O elige una de las preguntas sugeridas.",
               "example": "En la vida real: NOVA es como un vendedor en una tienda. Te orienta y te explica. Pero un vendedor también se equivoca a veces.",
               "art": "robot",
               "screen": "Main",
@@ -296,7 +296,7 @@
                 {
                   "n": 2,
                   "target": "orb",
-                  "text": "NOVA: pregunta por texto o por voz"
+                  "text": "NOVA: pregunta con tus palabras"
                 }
               ]
             }

@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": "2026-10-20",
+  "updated": "2026-10-22",
   "lang": "es",
   "about": "NOVA's FAQ in Spanish — the same ids as data/nova_faq.json (Russian, the source). cnq/api/nova.py: the closest items go to the model as reference; when the model is down, a near-exact match (q or alt) is answered from here. Change an answer in every language.",
   "items": [
@@ -43,7 +43,7 @@
       "id": "where_money",
       "topic": "money",
       "q": "¿Dónde está mi dinero?",
-      "a": "En la demo el dinero es virtual: solo existe dentro de la app. Si operas de verdad, tu dinero está en tu cuenta personal del exchange (OKX en la UE, BingX en otros países), no con nosotros. CRYPTO NOVA no recibe, no guarda ni retira dinero: solo tú lo manejas.",
+      "a": "En la demo el dinero es de práctica: solo existe en la app. Si operas de verdad, tu dinero está en tu propia cuenta del exchange: OKX o, donde OKX no opera, BingX. Incluso al copiar, el exchange solo repite las operaciones de CRYPTO NOVA en tu cuenta. No aceptamos, no guardamos ni retiramos dinero: solo tú lo controlas.",
       "tags": [
         "dinero",
         "guardado",
@@ -131,7 +131,7 @@
       "id": "referral",
       "topic": "money",
       "q": "¿Para qué el exchange y el enlace de referido?",
-      "a": "Te lo decimos con sinceridad: si abres una cuenta en un exchange con nuestro enlace (BingX fuera de la UE; para OKX en la UE aún no hay enlace de socio), el exchange le da a CRYPTO NOVA una parte de su propia comisión. Así ganamos dinero, y por eso la app no tiene suscripción. Tus comisiones y las condiciones del exchange no cambian. Y con el enlace podemos comprobar tu UID y conectar el sistema a tu cuenta real.",
+      "a": "Te lo decimos claro: si abres una cuenta en OKX con nuestro enlace (o en BingX donde OKX no opera), el exchange le da a CRYPTO NOVA parte de su propia comisión. Tus comisiones y las condiciones del exchange no cambian. Si copias a CRYPTO NOVA, OKX retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA; el porcentaje aparece en el perfil antes de empezar. Y el exchange hace falta porque tu dinero siempre está en tu propia cuenta, no con nosotros.",
       "tags": [
         "referido",
         "referidos",
@@ -147,7 +147,7 @@
       "id": "price",
       "topic": "money",
       "q": "¿Cuánto cuesta?",
-      "a": "La demo, la hucha, 52 lecciones y yo, NOVA, sin suscripciones ni compras dentro de la app. No nos quedamos con un porcentaje de tus ganancias. Conectar una cuenta real tampoco tiene coste, para quien abrió su cuenta en el exchange con nuestro enlace. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
+      "a": "La demo, la hucha, 52 lecciones y yo, NOVA, sin suscripciones ni compras dentro de la app. Si copias a CRYPTO NOVA en OKX, el exchange retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA: el porcentaje aparece en el perfil antes de empezar, y sin ganancia no hay pago. Por una cuenta abierta con nuestro enlace, el exchange nos da parte de su comisión; tus comisiones no cambian. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
       "tags": [
         "cuesta",
         "precio",
@@ -231,7 +231,7 @@
       "id": "vip",
       "topic": "how",
       "q": "¿Qué es la cuenta real?",
-      "a": "La «Cuenta real» es para quien está listo para usar dinero de verdad. Los pasos: abrir una cuenta en un exchange que funcione en tu país (OKX en la UE, BingX en otros países con nuestro enlace de socio), depositar fondos e introducir en la app tu UID, el número de tu cuenta en el exchange. La app lo comprueba y conecta el sistema a tu cuenta. Las operaciones del sistema las repites tú. Solo para mayores de 18 años.",
+      "a": "La «Cuenta real» es el copy trading de OKX: la cuenta de CRYPTO NOVA allí es trader líder y el exchange repite sus operaciones en tu cuenta. Los pasos: regístrate en OKX con nuestro enlace, verifica tu identidad, deposita USDT y pulsa «Copiar CRYPTO NOVA» en la app. Tú eliges el importe, puedes parar en OKX cuando quieras, puede haber pérdidas y es solo para mayores de 18 años. En la UE y el EEE la copia automática aún no está disponible; donde OKX no opera está BingX, con copia más adelante.",
       "tags": [
         "cuenta real",
         "real",
@@ -248,21 +248,24 @@
     {
       "id": "uid",
       "topic": "how",
-      "q": "¿Qué es el UID y dónde lo encuentro?",
-      "a": "El UID es el número de tu cuenta en el exchange, como el número de cliente en un banco. En la app del exchange (OKX o BingX) está en tu perfil y lo puedes copiar. Solo lo necesitamos para comprobar que la cuenta se abrió con nuestro enlace: no nos da ni dinero ni acceso a tu cuenta.",
+      "q": "¿Hace falta el UID?",
+      "a": "No, no hace falta. El UID es el número de tu cuenta en el exchange, pero para copiar a CRYPTO NOVA no tienes que introducirlo: basta una cuenta en OKX abierta con nuestro enlace y el botón «Copiar CRYPTO NOVA» de la app. Tampoco hacen falta claves API, y nunca pedimos contraseñas, códigos SMS ni tu frase semilla.",
       "tags": [
         "uid",
         "número",
         "cuenta",
         "id",
         "identificador"
+      ],
+      "alt": [
+        "¿Qué es el UID y dónde lo encuentro?"
       ]
     },
     {
       "id": "copy",
       "topic": "how",
       "q": "¿Habrá copia automática de operaciones?",
-      "a": "En la app no hay copia automática. Ves cada operación del sistema (entrada, stop, objetivo y por qué) y decides tú si repetirla en tu cuenta. Tu dinero siempre se queda en tu cuenta del exchange.",
+      "a": "Sí, ya existe, con el copy trading de OKX. Pulsas «Copiar CRYPTO NOVA» en la app, eliges el importe y OKX repite las operaciones del sistema en tu cuenta; puedes pararlo en OKX cuando quieras. Es un producto de OKX: retiene una parte de la ganancia para el trader líder, el porcentaje aparece en el perfil antes de empezar y puede haber pérdidas. En la UE, el EEE y el Reino Unido aún no está disponible, y en BingX se abrirá más adelante; mientras tanto, puedes repetir las operaciones tú mismo.",
       "tags": [
         "automático",
         "automática",
@@ -271,6 +274,9 @@
         "piloto automático",
         "bot",
         "operar solo"
+      ],
+      "alt": [
+        "¿Hay copia automática de operaciones?"
       ]
     },
     {
@@ -364,7 +370,7 @@
       "id": "eu",
       "topic": "how",
       "q": "¿Por qué no veo el enlace al exchange?",
-      "a": "Si estás en la UE o el EEE, la app no muestra enlaces a exchanges: así funcionan las normas europeas para los servicios cripto. Todo lo demás funciona por completo: las lecciones, la demo, la hucha y yo, NOVA.",
+      "a": "Si OKX y BingX no operan en tu país, por ejemplo en Estados Unidos, la app no muestra enlace a ningún exchange: no ofrecemos lo que allí no está permitido. Las lecciones, la demo, la hucha y yo, NOVA, funcionan por completo, y las operaciones del sistema se ven en la app. En la UE y el EEE sí hay enlace a OKX, pero la copia automática aún no está disponible: puedes repetir las operaciones tú mismo.",
       "tags": [
         "ue",
         "europa",

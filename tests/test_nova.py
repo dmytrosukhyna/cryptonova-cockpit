@@ -251,10 +251,13 @@ def test_knowledge_files():
     system = k.system()
     for f in facts:
         assert f["fact"] in system
-    for must in ("$10 000", "52 урока", "BingX", "UID", "копирования сделок в приложении пока нет", "по заявке", "юридической проверки", "Публичный портфель", "ЕС", "«бесплатно» не используй",
+    # 22.10 (build 45): the real way in is OKX copy trading (no UID, no application form); the EEA gets no automatic copying
+    for must in ("$10 000", "52 урока", "BingX", "копитрейдинг OKX", "Ключи API не нужны", "автоматическое копирование пока недоступно",
+                 "долю для ведущего трейдера", "Публичный портфель", "реальный счёт CRYPTO NOVA на OKX", "ЕС", "«бесплатно» не используй",
                  "не храним", "5 вопросов",
                  "не финансовый совет", "120 слов", "без эмодзи", "«•»"):
         assert must in system, must
+    assert "UID" not in system and "Оставить заявку" not in system
 
 
 def test_tidy_plain_text_for_voice():

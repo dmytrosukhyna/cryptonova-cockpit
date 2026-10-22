@@ -35,7 +35,7 @@ from urllib.parse import parse_qs, urlsplit
 from cnq.agents.i18n import DEFAULT, file_name, norm_lang
 from cnq.agents.llm import LLM, PROVIDERS
 
-from . import bingx, console as admin_console, nova
+from . import access as access_codes, bingx, console as admin_console, nova
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -75,6 +75,8 @@ class Api:
         self.store, self.verifier, self.web, self.llm, self.bingx_fetch = store, verifier, web_dir, llm, bingx_fetch
         self.admin = admin                       # Firebase Admin (deletes the login with the account)
         self.console = console or admin_console.Console(store, web_dir)   # the owner's admin panel, /v2/admin/*
+        self.access = access_codes.AccessCodes(store)          # 22.10: guest access codes, checked here (no public hash file)
+        self.console.access = self.access
         self.nova = knowledge or nova.Knowledge()
         self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
         self.selftest: dict | None = None        # GET /v2/agent/selftest: the last real model call on a fixed question
@@ -241,6 +243,13 @@ class Api:
                 return 404, {"error": "unknown_feed"}
             d = self._feed(m.group(1), lang)
             return (200, d) if d is not None else (503, {"error": "feed_unavailable"})
+        if method == "POST" and path == "/v2/access/verify":             # 22.10: a guest's access code for cryptonova.vip
+            try:
+                data = json.loads(body.decode() or "{}") if body else {}
+            except ValueError:
+                return 400, {"error": "bad_json"}
+            ip = str(headers.get("x-real-ip") or headers.get("x-forwarded-for") or "local").split(",")[0].strip()[:64]
+            return self.access.verify(str((data or {}).get("code") or "")[:64], ip)
         if method == "POST" and path == "/v2/admin/nova":                # the closed system's NOVA chat through the server's key
             deny = self.console.check(headers)
             return deny if deny else self._panel_nova(body)
@@ -466,9 +475,9 @@ def make_handler(api: Api):
                     code, doc = 200, {"error": "busy", "answer": nova.busy(_body_lang(body))}
             self._send(code, doc)
 
-        def _is_admin(self) -> bool:
+        def _is_admin(self) -> bool:          # the pages on cryptonova.vip call these from the browser → CORS for that origin only
             p = self.path.split("?", 1)[0].rstrip("/")
-            return p == "/v2/admin" or p.startswith("/v2/admin/")
+            return p == "/v2/admin" or p.startswith("/v2/admin/") or p == "/v2/access/verify"
 
         def _cors(self) -> None:          # the admin page lives on cryptonova.vip and calls this API from the owner's browser
             self.send_header("Access-Control-Allow-Origin", admin_console.origin())

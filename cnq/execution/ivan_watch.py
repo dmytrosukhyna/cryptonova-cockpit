@@ -537,8 +537,10 @@ def check(env=None, fetch=None, save: bool = True) -> str | None:
     c = creds(env)
     if not c:
         return None
-    key, secret, _ = c
+    key, secret, pw = c
     fetch = fetch or make_fetch(key, secret)
+    weak = (f" · совет: IVAN_PASS короткий ({len(pw)} симв.) — файл ivan.enc.json лежит в открытом репозитории, нужна фраза из 12+ символов"
+            if len(pw or "") < 12 else "")                                          # 22.10 (audit): the passphrase is the only protection
     try:
         st = load_state(env)
         host, w = probe(fetch, st.get("host"))
@@ -554,6 +556,6 @@ def check(env=None, fetch=None, save: bool = True) -> str | None:
                 msg += f" · ключ действует до {str(info['expiredAt'])[:10]}"
         except Exception:  # noqa: BLE001
             pass
-        return msg
+        return msg + weak
     except Exception as e:  # noqa: BLE001
         return describe_error(e)

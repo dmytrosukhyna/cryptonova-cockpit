@@ -18,7 +18,7 @@ import time
 from . import ivan_watch
 
 PATH = "web/owner.enc.json"
-MIN_LEN = 10
+MIN_LEN = 12          # 22.10 (audit): owner.enc.json is public — offline guessing is the threat, so 12+ characters
 
 
 def make_blob(login: str, pw: str, now: int | None = None) -> dict:

@@ -1,3 +1,4 @@
+import json
 from cnq.execution import ivan_watch, owner_setup
 
 
@@ -31,29 +32,39 @@ def test_owner_setup_cli_publishes_only_on_match():
     assert rc == 1 and not got
 
 
-def test_access_codes_add_list_remove_with_fake_github():
-    import base64, json
+def test_access_codes_tool_talks_to_the_server_api():
+    """22.10: no hash file in the public repo — the Mac tool calls the owner-only API, the server keeps salted PBKDF2 hashes."""
+    import os
+    from cnq.api import access as AC, console as C
+    from cnq.api.store import Store
     from cnq.execution import access_codes as A
-    store = {"doc": None, "sha": None}
-
-    def http(method, url, hdr, data):
-        if method == "GET":
-            if store["doc"] is None:
-                raise RuntimeError("404")
-            return 200, {"sha": store["sha"], "content": base64.b64encode(json.dumps(store["doc"]).encode()).decode()}
-        body = json.loads(data)
-        store["doc"] = json.loads(base64.b64decode(body["content"]).decode()); store["sha"] = "s" + str(len(store["doc"]["codes"]))
-        return 201, {}
-    lines = []
-    assert A.main(["add", "Роман"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0
-    code = lines[-1].split(":")[1].split()[0]
-    assert code.startswith("NOVA-") and store["doc"]["codes"][0]["h"] == A.code_hash(code.lower()) and code not in json.dumps(store["doc"])
-    assert A.main(["remove", "роман"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0 and store["doc"]["codes"] == []
-    assert A.main(["remove", "нет такого"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 1
-    # 18.10: monthly paid access — a 31-day code; a new month replaces the person's old code
-    assert A.main(["month", "Клиент"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0 and "31 день" in lines[-1]
-    c1 = store["doc"]["codes"][0]
-    assert c1["label"] == "Клиент" and abs(c1["until"] - c1["created"] - 31 * 86_400_000) < 1000
-    assert A.main(["month", "Клиент"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0
-    assert len(store["doc"]["codes"]) == 1 and store["doc"]["codes"][0]["h"] != c1["h"]
-    assert A.main(["list"], env={"CNQ_GH_TOKEN": "t"}, http=http, out=lines.append) == 0 and " · до " in lines[-1]
+    st = Store(":memory:")
+    con = C.Console(st, "web")
+    con.access = AC.AccessCodes(st, legacy=[])
+    tok = "t" * 40
+    old = os.environ.get("CNQ_ADMIN_TOKEN")
+    os.environ["CNQ_ADMIN_TOKEN"] = tok
+    try:
+        http = lambda method, url, hdr, data: con.handle(method, "/v2/admin/access", "", {k.lower(): v for k, v in hdr.items()}, data or b"")
+        env = {"CNQ_ADMIN_TOKEN": tok}
+        lines = []
+        assert A.main(["add", "Роман"], env=env, http=http, out=lines.append) == 0
+        code = lines[-1].split(":", 1)[1].split()[0]
+        assert code.startswith("NOVA-") and len(code) == 19
+        assert code not in json.dumps(st._q("SELECT * FROM access_codes"))                      # only a salted hash is kept
+        assert con.access.verify(code)[1]["ok"] and con.access.verify(code.lower())[1]["ok"]
+        assert A.main(["remove", "роман"], env=env, http=http, out=lines.append) == 0 and not con.access.verify(code)[1]["ok"]
+        assert A.main(["remove", "нет такого"], env=env, http=http, out=lines.append) == 1
+        assert A.main(["month", "Клиент"], env=env, http=http, out=lines.append) == 0 and "31 день" in lines[-1]
+        c1 = lines[-1].split(":", 1)[1].split()[0]
+        assert A.main(["month", "Клиент"], env=env, http=http, out=lines.append) == 0
+        c2 = lines[-1].split(":", 1)[1].split()[0]
+        assert not con.access.verify(c1)[1]["ok"] and con.access.verify(c2)[1]["ok"]          # a new month replaces the old code
+        assert A.main(["list"], env=env, http=http, out=lines.append) == 0 and " · до " in lines[-1]
+        assert A.main(["list"], env={"CNQ_ADMIN_TOKEN": "wrong" * 8}, http=http, out=lines.append) == 1
+        assert A.main(["list"], env={}, http=http, out=lines.append) == 1 and "CNQ_ADMIN_TOKEN" in lines[-1]
+    finally:
+        if old is None:
+            os.environ.pop("CNQ_ADMIN_TOKEN", None)
+        else:
+            os.environ["CNQ_ADMIN_TOKEN"] = old

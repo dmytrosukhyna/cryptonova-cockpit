@@ -117,6 +117,7 @@ class Console:
         self.lock = threading.Lock()
         self.sending = threading.Lock()
         self.last_push: dict | None = None
+        self.access = None                      # 22.10: guest access codes (cnq/api/access.py), set by the API
 
     # ------------------------------------------------------------ access
     def check(self, headers: dict) -> tuple[int, dict] | None:
@@ -164,6 +165,8 @@ class Console:
                 return 200, self.push_state()
             if path == "/v2/admin/plan":
                 return 200, {"plan": self._kv("plan") or {}}
+            if path == "/v2/admin/access" and self.access is not None:
+                return 200, {"codes": self.access.list()}
             return 404, {"error": "not_found"}
         if method != "POST":
             return 405, {"error": "method"}
@@ -179,6 +182,18 @@ class Console:
             return 400, {"error": "confirm_required"}
         if path == "/v2/admin/crm":
             return self.crm(data)
+        if path == "/v2/admin/access" and self.access is not None:    # {op: add|remove, label, days?, level?, confirm}
+            op, label = str(data.get("op") or ""), _clean(data.get("label"), 60)
+            if op == "add":
+                days = _num(data.get("days"))
+                code = self.access.add(label or "гость", str(data.get("level") or "tests"), days or None)
+                self._log("access_add", {"label": label, "days": days})
+                return 200, {"code": code, "label": label or "гость", "days": days}      # shown once, never stored in plain text
+            if op == "remove" and label:
+                n = self.access.remove(label)
+                self._log("access_remove", {"label": label, "n": n})
+                return 200, {"removed": n}
+            return 400, {"error": "bad_op"}
         if path == "/v2/admin/plan":
             plan = data.get("data")
             if not isinstance(plan, dict) or len(json.dumps(plan, ensure_ascii=False)) > PLAN_MAX:

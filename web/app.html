@@ -1131,6 +1131,7 @@ function llmErrText(j,status){ if(Array.isArray(j)) j=j[0]; const e=j&&j.error; 
 /* 21.10: in the owner's browser there was no AI key at all (cnq_anth empty) — the chat could only answer by rules. With the
    «Управление» token (the same one the admin tab uses) the chat now asks NOVA through the server's own key. */
 const ADMIN_API='https://app.crypto-capital.app/v2/admin';
+const ACCESS_API='https://app.crypto-capital.app/v2/access/verify';   // 22.10: guest access codes are checked on the server
 function adminTok(){ try{ return sessionStorage.getItem('cnq_admin_token')||localStorage.getItem('cnq_admin_token')||''; }catch(e){ return ''; } }
 let AI_KEY_BAD=null;   // 21.10 owner: an invalid browser key made every chat question fail → rule answers only, the server was never asked
 function aiRoute(){ if(SET.anth&&!(AI_KEY_BAD&&adminTok())) return 'key'; return adminTok()?'server':''; }
@@ -2602,7 +2603,7 @@ async function gateInit(){ const g=$('#gate'); if(!g) return;
   $('#gcLogin').addEventListener('click',()=>gateShow('login')); $('#gcCode').addEventListener('click',()=>gateShow('code')); $('#gcGuest').addEventListener('click',asGuest);
   $('#gateBack').addEventListener('click',e=>{ e.preventDefault(); gateShow(IS_GUEST&&!entryDone()?'choose':'login'); });
   const codeGo=async()=>{ const c=($('#gateCode').value||'').trim().toUpperCase(); if(c.length<6){ $('#gateMsg').textContent='Введите код полностью.'; return; } $('#gateMsg').textContent='Проверяю…';
-    try{ const h=await sha(c), hl=await sha(c.toLowerCase()); const doc=await getFresh('access.json'); const hit=((doc&&doc.codes)||[]).find(x=>x.h===h)||(hl===TESTS_HASH?{label:'',level:'tests'}:null);
+    try{ const r=await fetch(ACCESS_API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:c})}); const j=await r.json().catch(()=>({})); if(r.status===429){ $('#gateMsg').textContent='Слишком много попыток. Подождите 10 минут и попробуйте снова.'; return; } if(j.error==='expired'){ $('#gateMsg').textContent=ACCESS_EXPIRED_MSG+'.'; return; } const hit=j.ok?{label:j.label||'',level:j.level||'tests',until:j.until||null}:null;   /* 22.10: checked on the server (salted, throttled) — no hash file in public web/ */
       if(!hit){ gateState('deny','Код не найден или отключён. Проверьте буквы и цифры.'); bootLog('ДОСТУП ЗАПРЕЩЁН · код не найден','deny'); return; }
       if(hit.until&&+hit.until<Date.now()){ $('#gateMsg').textContent=ACCESS_EXPIRED_MSG+'.'; return; }   // the person stays a guest
       store('cnq_access',{label:hit.label||'',level:hit.level||'tests',t:Date.now(),until:hit.until?+hit.until:null}); store('cnq_tests','1'); try{ sessionStorage.setItem('cnq_entry','1'); }catch(e){} location.replace(location.pathname); }
@@ -2977,9 +2978,8 @@ function tradesPanel(){ fsysBody(); const head=`<h2>Фьючерсы</h2>${FSYS!
    <h3>Открытые сделки</h3>${rows||'<div class="empty">Открытых сделок нет — автопилот ждёт свой сигнал.</div>'}${pend?'<h3>Ордера</h3>'+pend:''}<h3>Последние закрытые</h3>${closed||'<div class="empty">Пока нет.</div>'}<div class="muted" style="font-size:11px;margin-top:6px">Клик по сделке — график монеты со входом, стопом и целью.</div></div>`; }
 // 18.10: Futures = three windows: CRYPTO NOVA (the finished product), CNPTS (the self-learning engine), «Тесты стратегий»;
 // «Тесты стратегий» — Ivan, Roman, memes, swing, new ideas, whales. What proves itself in tests moves into CNPTS.
-const TESTS_HASH='ROdIZ334R2yDxsFY7tmgo85pp104R5jz__T9uHqMAW4';   // sha('cnq:'+invite code); the owner shares cryptonova.vip/?tests=CODE
 let TESTS_OK=!IS_GUEST;   // 18.10 (owner): users (code holders and guests) see ONE futures window — CRYPTO NOVA; CNPTS and the tests are the owner's
-(async()=>{ const m=location.search.match(/[?&]tests=([a-z0-9]+)/i); if(!m) return; try{ if(await sha(m[1].toLowerCase())===TESTS_HASH){ store('cnq_tests','1'); if(IS_GUEST&&!GUEST_FORCE&&!load('cnq_access',null)) store('cnq_access',{label:'',level:'tests',t:Date.now()}); TESTS_OK=true; FULL_ACCESS=true; try{ renderBelow(); }catch(e){} try{ renderMyPort(true); }catch(e){} } }catch(e){} })();   // the invite link = the same code as in the entry window
+(async()=>{ const m=location.search.match(/[?&]tests=([a-z0-9]+)/i); if(!m) return; try{ const r=await fetch(ACCESS_API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:m[1]})}); const j=await r.json().catch(()=>({})); if(j&&j.ok){ store('cnq_tests','1'); if(IS_GUEST&&!GUEST_FORCE&&!load('cnq_access',null)) store('cnq_access',{label:'',level:'tests',t:Date.now()}); TESTS_OK=true; FULL_ACCESS=true; try{ renderBelow(); }catch(e){} try{ renderMyPort(true); }catch(e){} } }catch(e){} })();   // the invite link = the same code as in the entry window
 let FSYS=load('cnq_fsys','nova'); if(FSYS==='app') FSYS='nova'; if(!['nova','cn','tests'].includes(FSYS)||IS_GUEST) FSYS='nova';
 let TSEL=load('cnq_tsel','research'); if(!['research','ivan','roman','memes','exp','lab','brk','imp','imps','lst','lstx','btcx','own','lsn','chan','whales'].includes(TSEL)) TSEL='research';
 let CNPROF=load('cnq_cnprof',''); if(!['cons','bal','aggr'].includes(CNPROF)) CNPROF=['cons','bal','aggr'].includes(PROF)?PROF:'bal';
@@ -3971,13 +3971,18 @@ body.tab-spot #msCard{order:-13}body.myspot-on.tab-spot #myPortCard{display:none
     anchor.insertAdjacentHTML('beforebegin','<div class="card" id="msCard" hidden></div>'); return document.getElementById('msCard'); }
   const owner=()=>!document.body.classList.contains('guest')&&!/[?&]guest\b/.test(location.search);
   const passes=()=>[ld('cnq_myspot_pass'),ld('cnq_ivan_pass')].filter((v,i,a)=>v&&a.indexOf(v)===i);
+  /* 22.10 (audit): myspot.enc.json lies in a PUBLIC repository — anyone can try passwords offline, so the password is the only
+     protection. Short or reused → a warning (the convenience of one password stays the owner's choice). */
+  const passWarn=p=>{ const w=[]; if((p||'').length<12) w.push(`пароль шифрования короткий (${(p||'').length} симв.) — нужно 12+`);
+    if(p&&p===ld('cnq_ivan_pass')) w.push('тот же пароль открывает «Иван тест» и вход в панель');
+    return w.length?'Совет по безопасности: '+w.join('; ')+'. Файл с портфелем лежит в открытом репозитории — смени MYSPOT_PASS на Маке на отдельную фразу из 12+ символов и введи её здесь.':''; };
 
   async function loadMySpot(force){ const el=card(); if(!el) return; if(!owner()){ el.hidden=true; document.body.classList.remove('myspot-on'); return; }
     if(!force&&MS.state==='ok'&&Date.now()-MS.t<2*60000) return render(); MS.t=Date.now();
     let blob=null; try{ const r=await fetch('./myspot.enc.json?'+Math.floor(Date.now()/60000),{cache:'no-store'}); if(r.ok) blob=await r.json(); }catch(e){}
     if(!blob){ MS.d=null; MS.state='setup'; return render(); }
     MS.asof=blob.asof||0; const ps=passes(); if(!ps.length){ MS.state='pass'; MS.err=''; return render(); }
-    for(const p of ps){ try{ MS.d=await msDecrypt(blob,p); MS.state='ok'; MS.err=''; if(p!==ld('cnq_myspot_pass')) st('cnq_myspot_pass',p); return render(); }
+    for(const p of ps){ try{ MS.d=await msDecrypt(blob,p); MS.state='ok'; MS.err=''; MS.weak=passWarn(p); if(p!==ld('cnq_myspot_pass')) st('cnq_myspot_pass',p); return render(); }
       catch(e){ if(!(e&&e.message==='Неверный пароль')){ MS.state='err'; MS.err='Не удалось прочитать данные: '+(e.message||e); return render(); } } }
     st('cnq_myspot_pass',null); MS.d=null; MS.state='pass'; MS.err='Пароль не подошёл — введи тот же, что в строке MYSPOT_PASS на Маке.'; render(); }
   window.loadMySpot=loadMySpot;
@@ -3989,9 +3994,9 @@ body.tab-spot #msCard{order:-13}body.myspot-on.tab-spot #myPortCard{display:none
     <li>На Маке в Терминале: <code>open -e ~/.cryptonova.env</code> и добавь 4 строки:<pre>export MYSPOT_OKX_KEY=...
 export MYSPOT_OKX_SECRET=...
 export MYSPOT_OKX_PASSPHRASE=...
-export MYSPOT_PASS=пароль входа в эту панель</pre></li>
+export MYSPOT_PASS=отдельная фраза из 12+ символов</pre></li>
     <li>В окне зеркала: <b>Ctrl+C</b>, затем <b>стрелка вверх</b> и <b>Enter</b>. В окне появится строка «Мой портфель OKX: ключ работает».</li>
-    <li>Через минуту карточка откроется здесь сама.</li></ol>
+    <li>Через минуту карточка один раз попросит эту фразу. Файл лежит в открытом репозитории, поэтому фраза — единственная защита: 12+ символов, не пароль входа.</li></ol>
     <div class="msfoot">Ключи и пароль не присылай никому, в том числе в чат.</div></div>`; }
 
   function passHtml(){ return head()+`<div class="muted" style="font-size:12.5px;margin-bottom:8px">Данные портфеля зашифрованы. Введи пароль — тот же, что в строке MYSPOT_PASS на Маке.</div>${MS.err?`<div class="mswarn">${esc(MS.err)}</div>`:''}<div class="eact"><input id="msPass" type="password" autocomplete="off" placeholder="пароль" style="flex:1;min-width:0"><button class="ib sm" id="msGo">Открыть</button></div>`; }
@@ -4057,7 +4062,7 @@ export MYSPOT_PASS=пароль входа в эту панель</pre></li>
     const a=document.activeElement; if(a&&el.contains(a)&&a.id==='msPass') return;
     const ctl=el.querySelector(':scope>.cctl');
     let html, seg=null;
-    if(MS.state==='ok'&&MS.d){ const r=okHtml(MS.d); html=r.h; seg=r.seg; document.body.classList.add('myspot-on'); }
+    if(MS.state==='ok'&&MS.d){ const r=okHtml(MS.d); html=r.h+(MS.weak?`<div class="msfoot" style="color:var(--warn,#ffb547)">${esc(MS.weak)}</div>`:''); seg=r.seg; document.body.classList.add('myspot-on'); }
     else { document.body.classList.remove('myspot-on'); html=MS.state==='pass'?passHtml():MS.state==='err'?head()+`<div class="mswarn">${esc(MS.err)}</div>`:MS.state==='setup'?setupHtml():head()+'<div class="muted" style="font-size:12.5px">Загружаю…</div>'; }
     el.innerHTML=html; if(ctl) el.prepend(ctl);
     if(seg){ const cv=el.querySelector('#msDn'); if(cv) donut(cv,seg); }

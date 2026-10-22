@@ -16,7 +16,8 @@ Not financial advice.
 
 Env (~/.cryptonova.env on the Mac, never in the repo or in a chat):
   MYSPOT_OKX_KEY, MYSPOT_OKX_SECRET, MYSPOT_OKX_PASSPHRASE — an OKX API key with the «Read» permission only;
-  MYSPOT_PASS — the passphrase (best: the same password as the panel login, then the panel opens the card by itself).
+  MYSPOT_PASS — the passphrase. The encrypted file is in a PUBLIC repository, so it is the only protection: 12+ characters,
+    ideally its own phrase (22.10 audit; reusing the panel login still works — the card then opens by itself — but `--check` warns).
   Optional: MYSPOT_OKX_HOST (www.okx.com / eea.okx.com / my.okx.com — found by itself), MYSPOT_STATE, MYSPOT_EVERY (minutes, 15),
   MYSPOT_MODEL_SRC (where the public model JSON is read from), CNQ_GH_TOKEN / CNQ_GH_REPO (publishing).
   Any of the four MYSPOT_* missing → run() / check() return None and do nothing.
@@ -520,8 +521,9 @@ def check(env=None, fetch=None, save: bool = True) -> str | None:
     c = creds(env)
     if not c:
         return None
-    key, secret, passphrase, _ = c
+    key, secret, passphrase, pw = c
     fetch = fetch or make_fetch(key, secret, passphrase)
+    weak = f" · совет: MYSPOT_PASS короткий ({len(pw)} симв.) — файл лежит в открытом репозитории, нужна фраза из 12+ символов" if len(pw) < 12 else ""
     try:
         st = load_state(env)
         host, bal = probe(fetch, st.get("host"))
@@ -537,6 +539,6 @@ def check(env=None, fetch=None, save: bool = True) -> str | None:
                 msg += " · внимание: у ключа есть право торговли или вывода — для этой карточки нужен ключ только с правом «Чтение»"
         except Exception:  # noqa: BLE001
             pass
-        return msg
+        return msg + weak
     except Exception as e:  # noqa: BLE001
         return describe_error(e)

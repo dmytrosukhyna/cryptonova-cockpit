@@ -14,6 +14,8 @@ set, every 15 min a read-only snapshot of that account is encrypted and publishe
 Optional «Мой портфель · OKX» (cnq/execution/myspot_watch.py): with MYSPOT_OKX_KEY / MYSPOT_OKX_SECRET / MYSPOT_OKX_PASSPHRASE
 (a READ-ONLY OKX key) and MYSPOT_PASS, every 15 min the owner's OKX spot portfolio + the model's plan are encrypted and published
 to web/myspot.enc.json (nothing is traded).
+«Реальный счёт CRYPTO NOVA на OKX» (cnq/execution/public_real.py): with OKX_API_* (the autopilot's key, read here with GET only)
+and CNQ_GH_TOKEN, every 15 min a public summary of the SUB-ACCOUNT only → web/public_real.json (OKX_PUBLIC=off — never).
 «Автопилот OKX» (cnq/execution/okx_autopilot.py) runs in its OWN window (okx_autopilot --loop), not here: CNQ_LIVE_TRADING=yes
 for it must never reach this Bybit futures mirror. `--check` here also prints the autopilot's key, host and state.
 Log: data/mirror.jsonl, state: data/mirror_state.json. Stdlib only."""
@@ -25,7 +27,7 @@ import sys
 import time
 import urllib.request
 
-from . import ivan_watch, myspot_watch, okx_autopilot
+from . import ivan_watch, myspot_watch, okx_autopilot, public_real
 from .bybit_trade import BybitTrader
 
 SRC = os.environ.get("CNQ_MIRROR_SRC", "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/paper.json")
@@ -96,6 +98,16 @@ def myspot_tick() -> bool:
         return myspot_watch.run() is not None
     except Exception as e:  # noqa: BLE001
         print(myspot_watch.describe_error(e), flush=True)
+        return False
+
+
+def public_real_tick() -> bool:
+    """22.10 «Реальный счёт CRYPTO NOVA на OKX»: the sub-account only → web/public_real.json (unencrypted, public_real.py). A failure
+    prints one line and never stops the mirror."""
+    try:
+        return public_real.run() is not None
+    except Exception as e:  # noqa: BLE001
+        print("Реальный счёт OKX: " + okx_autopilot.describe_error(e).replace("Автопилот OKX: ", ""), flush=True)
         return False
 
 
@@ -191,6 +203,7 @@ def main() -> int:
     last_pulse = time.time() - 25 * 60
     ivan_on, last_ivan, ivan_said = bool(GH_TOKEN and ivan_watch.creds()), 0.0, False
     my_on, last_my, my_said = bool(GH_TOKEN and myspot_watch.creds()), 0.0, False
+    real_on, last_real, real_said = bool(GH_TOKEN and public_real.enabled()), 0.0, False
     while True:
         try:
             r = step(bx, st, fetch_desk())
@@ -218,6 +231,10 @@ def main() -> int:
             last_my = time.time()
             if myspot_tick() and not my_said:
                 my_said = True; print(f"Мой портфель OKX: карточка обновляется каждые {myspot_watch.EVERY_S / 60:g} мин (данные зашифрованы)", flush=True)
+        if real_on and time.time() - last_real >= public_real.EVERY_S:   # once at start, then every 15 min
+            last_real = time.time()
+            if public_real_tick() and not real_said:
+                real_said = True; print("Реальный счёт CRYPTO NOVA на OKX: web/public_real.json обновляется каждые 15 мин (только субаккаунт)", flush=True)
         time.sleep(60)
 
 

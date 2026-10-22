@@ -844,6 +844,30 @@ def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, 
                                       n=int(fut.get("closed_n") or 0), w=int(fut.get("wins") or 0))}}
 
 
+# 22.10 (owner): «Публичный портфель» = the REAL OKX account since 22.10 on top (public.real), the system since 17.10 (demo) below.
+# public.real = web/public_real.json as the mirror publishes it (cnq/execution/public_real.py — the CRYPTO NOVA sub-account only),
+# exactly these keys; numbers only, the same in every language; stale also when its asof is older than 2 hours.
+REAL_KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
+             "futures", "closed_n", "curve", "asof", "stale")
+REAL_STALE_MS = 2 * 3_600_000
+
+
+def _public_real(out: str, now: int) -> dict | None:
+    try:
+        with open(os.path.join(out, "public_real.json"), encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(d, dict) or not set(REAL_KEYS) <= set(d) or not d.get("asof"):
+        return None
+    r = {k: d[k] for k in REAL_KEYS}
+    r["spot"] = [{k: x.get(k) for k in ("sym", "share", "usd")} for x in d.get("spot") or [] if isinstance(x, dict)]
+    r["futures"] = [{k: x.get(k) for k in ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd")}
+                    for x in d.get("futures") or [] if isinstance(x, dict)]
+    r["stale"] = bool(d.get("stale")) or now - int(d["asof"]) > REAL_STALE_MS
+    return r
+
+
 def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT, ex: dict | None = None) -> dict:
     """app_home in one language — the same numbers in every language, only the words differ"""
     ex = ex or {}
@@ -851,6 +875,9 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
     pub = _public_portfolio(out)
     total = pub["pnl_usd"] if pub else round((fut["usd"] or 0) + (spot["usd"] or 0), 2)
     public = _public(paper, ex.get("ideas_pf") or {}, pf, fut, ex.get("fut_curve") or [], ex.get("rows") or {}, now, lang)
+    real = _public_real(out, now)
+    if public is not None and real is not None:
+        public["real"] = real
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
             "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub, "public": public,
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},

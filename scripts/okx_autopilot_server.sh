@@ -97,6 +97,12 @@ case "$cmd" in
     $SYSTEMCTL status "$UNIT" --no-pager -n 0 2>/dev/null || echo "Служба $UNIT не работает или не установлена."
     [ -f "$ENVF" ] && run_py -m cnq.execution.okx_lease --status
     command -v journalctl >/dev/null && journalctl -u "$UNIT" -n 15 --no-pager 2>/dev/null ;;
+  check)        # 22.10: the same --check as on the Mac, with the service's own environment (keys, lead role, profile link) — places nothing
+    [ -f "$ENVF" ] || die "Нет файла $ENVF."
+    run_py -m cnq.execution.okx_autopilot --check ;;
+  plan)         # every order the next pass would place — places nothing
+    [ -f "$ENVF" ] || die "Нет файла $ENVF."
+    run_py -m cnq.execution.okx_autopilot --plan ;;
   uninstall)
     need_root
     $SYSTEMCTL disable --now "$UNIT" 2>/dev/null
@@ -104,5 +110,5 @@ case "$cmd" in
     [ -f "$ENVF" ] && run_py -m cnq.execution.okx_lease --switch mac
     echo "Служба убрана, автопилот снова на Маке. Состояние осталось в $STATE. Перенести его на Мак (на Маке):"
     echo "  scp 'root@91.99.193.20:$STATE/.cryptonova_*.json' ~/   — потом двойной щелчок «CRYPTO NOVA»." ;;
-  *) echo "Команды: install | status | stop | start | uninstall" ;;
+  *) echo "Команды: install | status | check | plan | stop | start | uninstall" ;;
 esac

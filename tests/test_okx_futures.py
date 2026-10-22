@@ -1,0 +1,228 @@
+"""«Автопилот OKX · фьючерсы» (cnq/execution/okx_futures.py) and the active spot (okx_active.py) with a fake OKX (tests/okx_fake.py):
+sizing from the desk's risk scaled to the budget (25 % of the account, split between the CRYPTO NOVA desks), the caps (leverage,
+0.5 % risk, 5 positions, 3 % daily loss stop), a stop attached to every entry and re-placed when missing (or the position closed),
+reduce-only exits, partial exits, moved stops, the kill switch, refusal without live mode / with a withdraw key / in the spot account
+mode / on a copy-trader account, the lead-trader path. Every coin, key and amount here is made-up test data; no real API is called."""
+import os
+import tempfile
+
+import okx_fake as F
+from cnq.execution import okx_active as ac
+from cnq.execution import okx_autopilot as ap
+from cnq.execution import okx_futures as fu
+
+fu.LOG = os.path.join(tempfile.mkdtemp(), "okx_futures.jsonl")
+ac.LOG = os.path.join(tempfile.mkdtemp(), "okx_active.jsonl")
+ap.LOG = os.path.join(tempfile.mkdtemp(), "okx_autopilot.jsonl")
+NOW = F.NOW
+
+
+def run(fk, e, d, now=NOW):
+    cl = ap.connect(e, fk, {}, F.nosleep)
+    return fu.step(e, desks=d, now=now, sleep=F.nosleep, cl=cl)
+
+
+def swap_orders(fk):
+    return [o for o in fk.orders if o["instId"].endswith("-SWAP")]
+
+
+def test_desks_are_the_headers_crypto_nova_set():
+    paper = {"profiles": {"bal": {"open": []}, "imp": {"open": []}, "own": {"open": [], "stats": {"trades": 12, "avg_trade_pct": 1.0}},
+                          "imps": {"open": []}}}
+    assert [k for k, _ in fu.pick_desks(paper)] == ["bal", "imp"]           # «Сигналы» join only after their gate
+    paper["profiles"]["own"]["stats"] = {"trades": 31, "avg_trade_pct": 0.4}
+    assert [k for k, _ in fu.pick_desks(paper)] == ["bal", "imp", "own"]
+    assert [k for k, _ in fu.pick_desks(paper, ["bal"])] == ["bal"]
+
+
+def test_size_from_desk_risk_scaled_to_budget_with_stop_attached_isolated_ioc():
+    fk = F.FakeOkx()
+    e = F.env()
+    r = run(fk, e, F.desks(F.trade(risk=50.0)))                             # desk risk 0.5 % of its $10 000
+    assert r["opened"] == 1 and not r["errors"]
+    o = swap_orders(fk)[0]
+    budget = 10000 * 0.25
+    part = budget / 2                                                        # two desks (bal + imp) share the budget
+    worst = float(o["px"])
+    risk = float(o["sz"]) * 1 * (worst - 190.0)                              # SOL ctVal 1
+    assert abs(risk - part * 0.005) <= 2.0 and risk <= budget * 0.005 + 1e-6
+    assert o["tdMode"] == "isolated" and o["ordType"] == "ioc" and o["side"] == "buy" and o["clOrdId"].startswith("cnqf")
+    assert worst <= 200 * 1.001 * 1.0041                                     # never more than OKX_SLIP above the ask
+    a = o["attachAlgoOrds"][0]
+    assert a["slTriggerPx"] == "190.000" and a["slOrdPx"] == "-1" and a["slTriggerPxType"] == "last"
+    assert a["tpTriggerPx"] == "230.000" and a["tpTriggerPxType"] == "last"
+    assert fk.levers == [{"instId": "SOL-USDT-SWAP", "lever": "2", "mgnMode": "isolated"}]
+    st = fu.load_state(e)
+    assert list(st["trades"]) == ["bal:T1"] and st["trades"]["bal:T1"]["stop"] == 190.0
+
+
+def test_risk_cap_half_percent_and_leverage_never_above_three():
+    fk = F.FakeOkx()
+    e = F.env(OKX_FUT_MAX_LEV="10", OKX_FUT_RISK="0.05")                   # env can't loosen the hard caps
+    assert fu.caps(e) == {"lev": 3, "risk": 0.005, "max_pos": 5, "day_loss": 0.03}
+    run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 0.5 % of the budget
+    o = swap_orders(fk)[0]
+    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 2500 * 0.005 + 1e-6
+    assert fk.levers[0]["lever"] == "3"
+    fk = F.FakeOkx()                                                         # a 0.3 % stop: the leverage room is the limit
+    run(fk, F.env(), F.desks(F.trade(entry=200.0, stop=199.0, tp=210.0, risk=500.0)))
+    o = swap_orders(fk)[0]
+    assert float(o["sz"]) * float(o["px"]) <= 2500 * 2 + 1e-6
+
+
+def test_desk_close_is_a_reduce_only_market_exit_and_stops_are_cancelled():
+    fk = F.FakeOkx()
+    e = F.env()
+    run(fk, e, F.desks(F.trade(), F.trade("T2", "BTC", "SHORT", 100000.0, 102000.0, 90000.0)))
+    assert fk.pos == {"SOL-USDT-SWAP": 1.13, "BTC-USDT-SWAP": -0.49} or len(fk.pos) == 2
+    r = run(fk, e, F.desks(F.trade()), NOW + 60_000)                         # the desk closed BTC
+    assert r["closed"] == 1
+    ex = swap_orders(fk)[-1]
+    assert ex["instId"] == "BTC-USDT-SWAP" and ex["side"] == "buy" and ex["ordType"] == "market" and ex["reduceOnly"] is True
+    assert "BTC-USDT-SWAP" not in fk.pos and not [a for a in fk.algos if a["instId"] == "BTC-USDT-SWAP"]
+    assert list(fu.load_state(e)["trades"]) == ["bal:T1"]
+
+
+def test_moved_stop_is_amended_partial_exit_is_reduce_only_and_exchange_close_is_forgotten():
+    fk = F.FakeOkx()
+    e = F.env()
+    t = F.trade(qty=10.0, risk=100.0)
+    run(fk, e, F.desks(t))
+    c0 = fk.pos["SOL-USDT-SWAP"]
+    t2 = dict(t, stop_now=195.0)
+    r = run(fk, e, F.desks(t2), NOW + 60_000)
+    assert r["stops"] == 1 and fk.amends[-1]["newSlTriggerPx"] == "195.000" and fk.amends[-1]["newSlTriggerPxType"] == "last"
+    t3 = dict(t2, qty_left=5.0)                                              # the desk took half off
+    r = run(fk, e, F.desks(t3), NOW + 120_000)
+    assert r["reduced"] == 1
+    cut = swap_orders(fk)[-1]
+    assert cut["reduceOnly"] is True and cut["side"] == "sell" and abs(float(cut["sz"]) - (c0 - round(c0 * 0.5 - 0.005, 2))) < 0.02
+    assert any(a.get("newSz") for a in fk.amends)                            # the stop now covers the smaller position exactly
+    fk.pos.clear()                                                           # OKX hit the stop
+    r = run(fk, e, F.desks(t3), NOW + 180_000)
+    assert r["gone"] == 1 and not fu.load_state(e)["trades"] and not fk.pos   # and never re-opened while the desk holds it
+
+
+def test_missing_stop_is_placed_for_the_whole_position_or_the_position_is_closed():
+    fk = F.FakeOkx(attach=False)                                             # OKX did not keep the attached stop
+    e = F.env()
+    r = run(fk, e, F.desks(F.trade()))
+    assert r["opened"] == 1 and fk.algo_posts
+    p = fk.algo_posts[0]
+    assert p["closeFraction"] == "1" and p["reduceOnly"] is True and p["slTriggerPx"] == "190.000" and p["slTriggerPxType"] == "last"
+    fk = F.FakeOkx(attach=False, algo_ok=False)                             # and OKX refuses a new stop too → closed at once
+    e = F.env()
+    r = run(fk, e, F.desks(F.trade()))
+    assert r["opened"] == 0 and r["errors"] == 1 and not fk.pos and swap_orders(fk)[-1]["reduceOnly"] is True
+    assert not fu.load_state(e)["trades"]
+
+
+def test_max_five_positions_one_per_instrument_and_old_signals_not_chased():
+    fk = F.FakeOkx(balances={"USDT": 100000.0})
+    e = F.env()
+    coins = ["SOL", "APT", "XRP", "LINK", "AVAX", "ADA", "DOT"]
+    ts = [F.trade(f"T{i}", c, entry=F.PX[c], stop=F.PX[c] * 0.95, tp=F.PX[c] * 1.2, risk=50.0) for i, c in enumerate(coins)]
+    ts.append(F.trade("TOLD", "BTC", entry=100000.0, stop=95000.0, tp=120000.0, opened=NOW - 3 * 3600_000))
+    r = run(fk, e, F.desks(*ts, imp=[F.trade("I1", "SOL", entry=200.0, stop=190.0, opened=NOW - 180_000)]))
+    assert r["opened"] == 5 and len(fk.pos) == 5 and "BTC-USDT-SWAP" not in fk.pos
+    why = " ".join(x["why"] for x in r["skipped"])
+    assert "предел 5" in why and "уже есть позиция" in why
+
+
+def test_daily_loss_stop_blocks_new_entries_for_the_day():
+    budget = 10000 * 0.25
+    fk = F.FakeOkx(hist=[{"instId": "SOL-USDT-SWAP", "realizedPnl": str(-(budget * 0.03 + 1)), "uTime": str(NOW - 3600_000)}])
+    e = F.env()
+    r = run(fk, e, F.desks(F.trade()))
+    assert r["opened"] == 0 and not swap_orders(fk) and "дневной стоп" in r["skipped"][0]["why"]
+    st = fu.load_state(e)
+    assert st["day_stop"] == "2027-01-15" and fu.status(e)["day_stop"] is False or st["day_stop"] == "2027-01-15"
+    fk2 = F.FakeOkx(hist=[{"instId": "SOL-USDT-SWAP", "realizedPnl": "-10", "uTime": str(NOW - 86_400_000 * 2)}])   # yesterday's loss
+    assert run(fk2, F.env(), F.desks(F.trade()))["opened"] == 1
+
+
+def test_kill_switch_and_refusals_place_nothing():
+    tmp = tempfile.mkdtemp()
+    e = F.env(tmp)
+    open(e["OKX_STOP_FILE"], "w").close()
+    fk = F.FakeOkx()
+    r = fu.step(e, desks=F.desks(F.trade()), now=NOW, sleep=F.nosleep, cl=ap.connect(e, fk, {}, F.nosleep))
+    assert r["opened"] == 0 and "стоп" in r["why"] and not swap_orders(fk)
+    os.remove(e["OKX_STOP_FILE"])
+    cases = [(F.FakeOkx(demo_key=False), F.env(), "РЕАЛЬНОГО"),                        # a real key without CNQ_LIVE_TRADING=yes
+             (F.FakeOkx(perm="read_only,trade,withdraw"), F.env(), "ВЫВОДА"),
+             (F.FakeOkx(acct_lv="1"), F.env(), "«Спот»"),
+             (F.FakeOkx(role="2"), F.env(), "копирование")]
+    for fk, e, word in cases:
+        r = run(fk, e, F.desks(F.trade()))
+        assert r["opened"] == 0 and word in r["why"] and not swap_orders(fk) and not fk.levers, word
+    assert fu.step(F.env(OKX_FUTURES="off"), desks=F.desks(F.trade()))["why"].startswith("фьючерсы выключены")
+
+
+def test_live_mode_trades_with_a_real_key_only_inside_the_window():
+    fk = F.FakeOkx(demo_key=False)
+    r = run(fk, F.env(CNQ_LIVE_TRADING="yes"), F.desks(F.trade()))
+    assert r["opened"] == 1 and all("x-simulated-trading" not in c[5] for c in fk.calls)
+    fk = F.FakeOkx()
+    run(fk, F.env(), F.desks(F.trade()))
+    assert all(c[5].get("x-simulated-trading") == "1" for c in fk.calls)   # demo by default
+
+
+def test_lead_trader_stops_and_exits_go_through_the_lead_positions():
+    fk = F.FakeOkx(role="1", lead_insts=["SOL-USDT-SWAP"])
+    e = F.env()
+    r = run(fk, e, F.desks(F.trade(), F.trade("T2", "APT", entry=1.0, stop=0.95, tp=1.2)))
+    assert r["opened"] == 1 and "списке ведущего" in " ".join(x["why"] for x in r["skipped"])
+    assert ("stop", {"instType": "SWAP", "subPosId": "s-SOL-USDT-SWAP", "slTriggerPx": "190.000", "slTriggerPxType": "last",
+                     "tpTriggerPx": "230.000", "tpTriggerPxType": "last"}) in fk.lead_calls
+    r = run(fk, e, F.desks(), NOW + 60_000)
+    assert r["closed"] == 1 and fk.lead_calls[-1] == ("close", {"instType": "SWAP", "subPosId": "s-SOL-USDT-SWAP", "ordType": "market"})
+
+
+def test_hedge_mode_exits_close_the_same_side_never_open_the_other():
+    fk = F.FakeOkx(pos_mode="long_short_mode")
+    e = F.env()
+    run(fk, e, F.desks(F.trade()))
+    o = swap_orders(fk)[0]
+    assert o["posSide"] == "long" and fk.levers[0]["posSide"] == "long"
+    run(fk, e, F.desks(), NOW + 60_000)
+    ex = swap_orders(fk)[-1]
+    assert ex["side"] == "sell" and ex["posSide"] == "long" and "reduceOnly" not in ex and not fk.pos
+
+
+def test_fut_close_closes_everything_even_with_the_kill_switch():
+    fk = F.FakeOkx()
+    e = F.env()
+    run(fk, e, F.desks(F.trade(), F.trade("T2", "BTC", "SHORT", 100000.0, 102000.0, 90000.0)))
+    open(e["OKX_STOP_FILE"], "w").close()
+    msg = fu.close_all(e, now=NOW + 60_000, sleep=F.nosleep, cl=ap.connect(e, fk, {}, F.nosleep))
+    assert "закрыто позиций 2" in msg and not fk.pos and all(o["reduceOnly"] for o in swap_orders(fk)[2:])
+    os.remove(e["OKX_STOP_FILE"])
+    r = run(fk, e, F.desks(F.trade(), F.trade("T2", "BTC", "SHORT", 100000.0, 102000.0, 90000.0)), NOW + 120_000)
+    assert r["opened"] == 0 and not fk.pos                                   # the desk still holds them: not opened again
+
+
+def test_plan_shows_the_same_order_the_step_places():
+    fk = F.FakeOkx()
+    e = F.env()
+    cl = ap.connect(e, fk, {}, F.nosleep)
+    text = "\n".join(fu.plan_lines(cl, cl.config(), e, F.desks(F.trade()), NOW))
+    assert not fk.orders
+    run(fk, e, F.desks(F.trade()))
+    o = swap_orders(fk)[0]
+    assert f"купить {o['sz']} контр. SOL-USDT-SWAP" in text and f"не хуже {float(o['px']):.6g}" in text and "стоп-лосс 190" in text
+
+
+def test_active_spot_follows_the_impulse_desk():
+    fk = F.FakeOkx(balances={"USDT": 10000.0})
+    e = F.env()
+    cl = ap.connect(e, fk, {}, F.nosleep)
+    t = {"id": "I1", "symbol": "XRP", "side": "LONG", "entry": 2.0, "stop": 1.6, "qty": 1000.0, "qty_left": 1000.0, "opened": NOW - 60_000}
+    r = ac.step(e, desk={"equity": 10000.0, "open": [t]}, now=NOW, sleep=F.nosleep, cl=cl, total=10000.0)
+    assert r["bought"] == 1
+    o = fk.orders[-1]
+    assert o["instId"] == "XRP-USDT" and o["side"] == "buy" and o["ordType"] == "ioc" and abs(float(o["sz"]) * 2.0 - 200.0) < 2.0   # 20 % of $1 000
+    assert ac.held(e) == {"XRP": float(o["sz"])}
+    r = ac.step(e, desk={"equity": 10000.0, "open": []}, now=NOW + 60_000, sleep=F.nosleep, cl=cl)
+    assert r["sold"] == 1 and fk.orders[-1]["side"] == "sell" and ac.held(e) == {}
+    assert "ждёт сигнала" in "\n".join(ac.plan_lines(e, {"open": []}, NOW, 10000.0))

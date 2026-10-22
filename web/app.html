@@ -4011,9 +4011,16 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
     const old=Date.now()-(D.asof||MS.asof)>60*60000;
     // 22.10 «Автопилот OKX» (cnq/execution/okx_autopilot.py): its state comes inside this encrypted blob — on / off / stop, last rebalance
     const AP=D.autopilot, apOn=!!(AP&&AP.armed&&AP.enabled&&!AP.stopped), APL=(AP&&AP.last)||{};
-    const apHtml=AP?`<div class="msap ${AP.stopped?'stop':apOn?'on':''}"><b>Автопилот OKX: ${AP.stopped?'остановлен (стоп)':apOn?'включён — держит портфель по модели сам':'выключен'}</b> · ${esc(AP.mode||'')}`
+    const apHtml=AP?`<div class="msap ${AP.stopped?'stop':apOn?'on':''}"><b>Автопилот OKX: ${AP.stopped?'остановлен (стоп)':apOn?'включён — держит счёт как система CRYPTO NOVA':'выключен'}</b> · ${esc(AP.mode||'')}`
       +(AP.last_run?` · последняя ребалансировка ${when(AP.last_run)}${APL.reason?` (${esc(APL.reason)})`:''}: продано ${usd(APL.sold_usd||0)}, куплено ${usd(APL.bought_usd||0)}, ордеров ${APL.orders||0}${APL.partial?`, частично ${APL.partial}`:''}${APL.failed?`, ошибок ${APL.failed}`:''}${APL.limit?' · дневной лимит':''}`:' · ребалансировок ещё не было')
-      +`<div class="muted">${esc(AP.rule||'')}${AP.stopped?' · снять стоп: bash scripts/okx_autopilot_mac.sh resume':''}</div></div>`:'';
+      +`<div class="muted">${esc(AP.rule||'')}${AP.stopped?' · снять стоп: bash scripts/okx_autopilot_mac.sh resume':''}</div>`
+      // 22.10: the account = the CRYPTO NOVA system — the split, whether it matches, the futures positions (okx_futures.status)
+      +(AP.split?`<div style="margin-top:6px">Счёт как система CRYPTO NOVA: спот ${sh(AP.split.spot*100)} · фьючерсы ${sh(AP.split.futures*100)} · активный спот ${sh(AP.split.active*100)}${AP.same!=null?` · совпадает: <b>${AP.same?'да':'нет'}</b>`:''}</div>`
+        +((AP.diffs||[]).length?`<div class="muted">${AP.diffs.slice(0,4).map(esc).join('<br>')}</div>`:'')
+        +((AP.targets||[]).length?`<div class="muted">Цель автопилота — «CRYPTO NOVA портфель»: ${AP.targets.slice(0,10).map(r=>`${esc(r.ccy)} ${sh(r.target_pct)}`).join(' · ')} (план ниже — модель «ядро + альтсезон», для сравнения)</div>`:''):'')
+      +(AP.futures?(F=>`<div style="margin-top:6px">Фьючерсы: ${F.enabled?(F.day_stop?'<b>дневной стоп</b> — новых входов до завтра':'включены'):'выключены'}${F.budget_usd?` · бюджет ${usd(F.budget_usd)}`:''} · плечо ≤ ${F.lev} · риск ≤ ${String(F.risk_pct).replace('.',',')}% на сделку${F.day_pnl!=null?` · за день ${usd(F.day_pnl)}`:''}</div>`
+        +((F.open||[]).length?`<div class="muted">${F.open.map(o=>`${esc(o.sym)} ${o.side==='LONG'?'лонг':'шорт'} ${o.sz} контр., стоп ${o.stop}${o.tp?`, цель ${o.tp}`:''}`).join(' · ')}</div>`:'<div class="muted">открытых фьючерсных позиций нет</div>'))(AP.futures):'')
+      +(AP.active&&(AP.active.open||[]).length?`<div class="muted">Активный спот: ${AP.active.open.map(o=>`${esc(o.ccy)} ${o.qty}`).join(' · ')}</div>`:'')+`</div>`:'';
     let h=head(D)+(old?`<div class="mswarn">Данные старше часа — проверь, что зеркало на Маке запущено.</div>`:'')+apHtml
       +`<div class="mskpi"><div><small>Стоимость</small><b>${usd(T)}</b><em class="muted">${A.length} ${plur(A.length,'актив','актива','активов')} · OKX</em></div>
         <div><small>За 24 часа</small><b class="${cls(ch)}">${sgn(ch)}</b><em class="${cls(ch)}">${T?pc(ch/(T-ch)*100):''}</em></div>
@@ -4055,7 +4062,7 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
     if(missing.length) h+=`<div class="muted" style="font-size:11.5px;margin-top:6px">В модели есть, у тебя пока нет: ${missing.map(r=>`<b style="font-family:var(--mono)">${esc(r.ccy)}</b> ${sh(r.target_pct)}`).join(' · ')}.</div>`;
     // ideas: calm quality alts with revenue that neither the owner nor the model holds
     if((P.ideas||[]).length) h+=`<div class="mss">На заметку — недооценённые по анкете качества</div><div class="msidea">${P.ideas.map(i=>`<div><b>${esc(i.ccy)}</b> · ${esc(i.quality.text)}</div>`).join('')}</div><div class="muted" style="font-size:11px;margin-top:6px">Их нет ни у тебя, ни в модели: не обгоняли BTC за 3 месяца, объём не раздут, у проекта есть выручка. Это кандидаты для альт-части, а не сигнал купить.</div>`;
-    h+=`<div class="msfoot">${esc(apOn?(P.note||'').replace('Ордеров система не ставит: решаете вы.','Ордера ставит автопилот OKX на твоём Маке: только спот, лимитные ордера, без вывода и без плеча.'):(P.note||''))} Данные с OKX через ключ только для чтения (${esc(D.host||'okx.com')}); файл в репозитории зашифрован, открывается только твоим паролем.${D.perm&&/trade|withdraw/.test(D.perm)?' <b style="color:#ffe2a8">У ключа есть право торговли или вывода — пересоздай ключ только с правом «Чтение».</b>':''}</div>`;
+    h+=`<div class="msfoot">${esc(apOn?(P.note||'').replace('Ордеров система не ставит: решаете вы.','Ордера ставит автопилот OKX на твоём Маке: спот — лимитными ордерами, фьючерсы — изолированная маржа, плечо не выше 3, стоп-лосс у каждой позиции; без вывода.'):(P.note||''))} Данные с OKX через ключ только для чтения (${esc(D.host||'okx.com')}); файл в репозитории зашифрован, открывается только твоим паролем.${D.perm&&/trade|withdraw/.test(D.perm)?' <b style="color:#ffe2a8">У ключа есть право торговли или вывода — пересоздай ключ только с правом «Чтение».</b>':''}</div>`;
     return {h,seg}; }
 
   function render(){ const el=card(); if(!el) return; if(!owner()){ el.hidden=true; return; } el.hidden=false;

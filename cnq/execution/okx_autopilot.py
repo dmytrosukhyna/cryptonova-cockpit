@@ -1,26 +1,33 @@
-"""«Автопилот OKX» — the owner's OWN OKX spot account follows the CRYPTO NOVA model «ядро + альтсезон» (22.10.2026, owner: «чтобы
-уже через нашу систему … я смог бы подключить на своём OKX эту систему … не вручную … завести там 10 тысяч долларов, и чтобы она
-уже функционировала»).
+"""«Автопилот OKX» — the owner's OWN OKX sub-account follows the CRYPTO NOVA system by itself (22.10.2026, owner: «чтобы уже через
+нашу систему … я смог бы подключить на своём OKX эту систему … не вручную … завести там 10 тысяч долларов»; 09:56: «наша система» =
+the closed system's header — FUTURES · CRYPTO NOVA and SPOT · CRYPTO NOVA портфель; no DeFi or yield sleeves on this account).
 
-The same plan as the «Мой портфель · OKX» card (cnq/execution/myspot_watch.py: web/altseason.json targets, the quality screen,
-undervalued alts first) — the autopilot just places it. Runs on the owner's Mac; keys never leave it.
+The account is split (okx_alloc.shares; env OKX_SPOT_SHARE / OKX_FUT_SHARE / OKX_ACT_SHARE):
+  spot 65 %     — mirrors «Наш портфель CRYPTO NOVA» (web/portfolio.json → portfolios.ideas): every coin at its weight there, its
+                  cash rule (≥ 10 %), its stops / take-profits / sells — they arrive as the portfolio's own changes (this file);
+  futures 25 %  — the CRYPTO NOVA futures desks, swaps with a stop on every position (okx_futures.py);
+  active 10 %   — the «Импульс BTC» spot desk; USDT while it has no trade (okx_active.py).
+Runs on the owner's Mac; keys never leave it.
 
-  python3 -m cnq.execution.okx_autopilot --check    keys (this one and the card's read-only one), host, permissions, balances
-  python3 -m cnq.execution.okx_autopilot --plan     every sell and buy with $ and the target shares; places nothing
-  python3 -m cnq.execution.okx_autopilot --run      one rebalance now: sells first, then buys (limit IOC orders, price capped)
-  python3 -m cnq.execution.okx_autopilot --stop     kill switch: no more orders until --resume; open autopilot orders cancelled
-  python3 -m cnq.execution.okx_autopilot --resume   removes the kill switch
+  python3 -m cnq.execution.okx_autopilot --check     keys, host, permissions, account mode, money, the futures readiness
+  python3 -m cnq.execution.okx_autopilot --plan      EVERY order it would place now (spot, active, futures) with sizes, stops and
+                                                     reasons, and whether the account matches the system; places nothing
+  python3 -m cnq.execution.okx_autopilot --run       one pass now: spot rebalance (sells first), active spot, futures
+  python3 -m cnq.execution.okx_autopilot --loop      the window: futures and active spot every minute, the spot portfolio checked
+                                                     every 5 minutes (scripts/okx_autopilot_mac.sh loop)
+  python3 -m cnq.execution.okx_autopilot --stop      kill switch: no more orders until --resume (futures keep their stops on OKX)
+  python3 -m cnq.execution.okx_autopilot --resume    removes the kill switch
+  python3 -m cnq.execution.okx_autopilot --fut-close closes every futures position the autopilot opened (reduce-only), now
 
-  python3 -m cnq.execution.okx_autopilot --loop     once an hour: rebalance when it is due (below); scripts/okx_autopilot_mac.sh
-
-After a --run with OKX_AUTOPILOT=on the autopilot is «armed»: its own window (scripts/okx_autopilot_mac.sh → --loop) checks once an
-hour and rebalances when the model changes (altseason gauge, market regime, the alt basket, the target shares) and on Mondays (the
-model's weekly check of shares), at most once in 20 hours unless the model changed. Small drifts (under 1 point of share or $10)
-are left alone. It runs apart from the Bybit futures mirror on purpose: CNQ_LIVE_TRADING=yes is given to THIS process only.
+After a --run with OKX_AUTOPILOT=on the autopilot is «armed» and the window keeps the account on the system: the spot part is
+rebalanced when the public portfolio changes (a buy, a sell, a stop, a trim — its coins or its last action) and when the account
+drifted away from it (checked hourly); small differences (under $10 or 0.3 % of the account) are left alone. It runs apart from the
+Bybit futures mirror on purpose: CNQ_LIVE_TRADING=yes is given to THIS process only.
 
 Safety:
-  • spot only (tdMode «cash», instType SPOT): no futures, no leverage, no borrowing; never a withdrawal or a transfer — the client
-    has no such call. A key with the «Withdraw» permission is refused outright (nothing is traded with it).
+  • spot orders are tdMode «cash» (no borrowing); futures are isolated-margin swaps with the caps of okx_futures.py (leverage ≤ 3,
+    0.5 % risk a trade, 5 positions, 3 % daily loss stop); never a withdrawal or a transfer — the client has no such call. A key
+    with the «Withdraw» permission is refused outright (nothing is traded with it).
   • real money only with CNQ_LIVE_TRADING=yes, given on the autopilot's own command line (scripts/okx_autopilot_mac.sh --live asks
     to type «ДА»), never in ~/.cryptonova.env (the Bybit futures mirror reads that file). Otherwise OKX demo trading (header
     x-simulated-trading: 1, needs a demo key).
@@ -33,13 +40,14 @@ Safety:
   • coins outside the trading account (Funding, Simple Earn) are counted but never moved: the owner moves them.
   • OKX_KEEP=SOL,LINK — coins the autopilot never touches (not sold, not bought, not counted).
 Log: data/okx_autopilot.jsonl (local, ignored by git). State: ~/.cryptonova_okx_autopilot.json (outside the repo). The card shows
-the state (on / off / stopped, last rebalance) inside the encrypted web/myspot.enc.json — nothing in plaintext.
+the state (on / off / stopped, last rebalance, the split, the futures positions) inside the encrypted web/myspot.enc.json.
 
 Env (~/.cryptonova.env on the Mac, never in the repo or in a chat):
   OKX_API_KEY, OKX_API_SECRET, OKX_API_PASSPHRASE — an OKX API key with «Read» + «Trade», WITHOUT «Withdraw», bound to the Mac's IP;
   OKX_AUTOPILOT=on — the autopilot window may rebalance by itself (after the first --run).
-  Optional: OKX_HOST, OKX_QUOTE (USDC / EUR / USDT — found by itself), OKX_KEEP, OKX_MAX_ORDER_USD, OKX_MAX_DAY_USD, OKX_SLIP,
-  OKX_TAKER_FEE (0.002 on OKX Europe since 25.09.2026, 0.001 elsewhere), OKX_AUTOPILOT_STATE, OKX_STOP_FILE.
+  Optional: OKX_SPOT_SHARE / OKX_FUT_SHARE / OKX_ACT_SHARE (0.65 / 0.25 / 0.10), OKX_FUTURES=off, OKX_ACTIVE=off,
+  OKX_FUT_MAX_LEV (2, at most 3), OKX_IS_LEAD=1, OKX_HOST, OKX_QUOTE (found by itself), OKX_KEEP, OKX_MAX_ORDER_USD,
+  OKX_MAX_DAY_USD, OKX_SLIP, OKX_TAKER_FEE (0.002 on OKX Europe since 25.09.2026, 0.001 elsewhere), OKX_AUTOPILOT_STATE, OKX_STOP_FILE.
 Not financial advice. Stdlib only."""
 from __future__ import annotations
 
@@ -54,6 +62,7 @@ import urllib.parse
 import urllib.request
 
 from . import myspot_watch as ms
+from . import okx_alloc as al
 
 LOG = "data/okx_autopilot.jsonl"
 HOSTS = ms.HOSTS
@@ -62,7 +71,9 @@ QUOTES = ["USDT", "USDC", "EUR"]            # global account
 QUOTES_EEA = ["USDC", "EUR", "USDT"]        # OKX Europe: USDT is not tradeable in the EEA under MiCA
 TAKER = {"eea": 0.002, "global": 0.001}     # spot taker fee (IOC orders take liquidity): OKX Europe 0.20 % since 25.09.2026
 MIN_ORDER = ms.MIN_ORDER             # $10 — smaller moves are not worth an order
-MIN_GAP_H = 20                        # hours between two rebalances when the model did not change
+BAND = 0.003                          # a coin within 0.3 % of the account of its target is left alone
+DRIFT_EVERY_MS = 3_600_000            # the account is compared with the public portfolio at least hourly
+SPOT_EVERY_S = 300                    # the public portfolio is read every 5 minutes in the window
 DAY = 86_400
 
 
@@ -357,85 +368,137 @@ def trading_avail(raw: dict) -> dict:
     return out
 
 
+def _active_held(env=None) -> dict:
+    try:
+        from . import okx_active
+        return okx_active.held(env)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def build(cl: Okx, env=None, model=None) -> dict:
-    """Read the account, compute the card's plan (myspot_watch.plan) and turn it into exact orders. Places nothing."""
+    """Read the account and turn «Наш портфель CRYPTO NOVA» (× the spot share) into exact orders. Places nothing.
+    model = web/portfolio.json (default: fetched)."""
     keep = keep_set(env)
     quote = pick_quote(cl, env)
     if not quote:
         raise RuntimeError("на этом OKX нет пары BTC в нужной валюте (USDC / EUR" + ("" if is_eea(cl) else " / USDT") + ") — укажи OKX_QUOTE")
+    pf = model if model is not None else al.fetch_portfolio()
+    pos = al.ideas(pf)
+    if not pos:
+        raise RuntimeError("публичный портфель CRYPTO NOVA (web/portfolio.json) не загрузился — ничего не меняю")
+    meta = al.meta(pf)
+    w = al.shares(env)
     raw = ms.read_raw(cl.fetch, cl.host)
-    rows = [r for r in ms.assets(raw) if r["ccy"] not in keep]
-    alt, qual, prof = model if model is not None else ms.fetch_model()
-    if not (alt.get("targets_pct") or {}):
-        raise RuntimeError("модель CRYPTO NOVA (web/altseason.json) не загрузилась — ничего не меняю")
-    alt = {**alt, "targets_pct": {k: v for k, v in (alt.get("targets_pct") or {}).items() if k.upper() not in keep}}
-    p = ms.plan(rows, alt, qual, prof)
+    act = _active_held(env)                            # coins of the active-spot sleeve: never counted or sold here
     avail = trading_avail(raw)
+    rows_all = ms.assets(raw)
+    total = sum(r["usd"] for r in rows_all)
+    rows = []
+    for r in rows_all:
+        q = act.get(r["ccy"], 0.0)
+        if q and r["qty"]:
+            k = max(0.0, 1 - q / r["qty"])
+            r = {**r, "qty": r["qty"] * k, "usd": round(r["usd"] * k, 2)}
+            avail[r["ccy"]] = max(0.0, avail.get(r["ccy"], 0.0) - q)
+        if r["ccy"] not in keep and r["usd"] >= 0.01:
+            rows.append(r)
     held = {r["ccy"]: r for r in rows}
     lim = limits(env)
-    sells, buys, notes = [], [], []
+    sells, buys, notes, diffs = [], [], [], []
+    insts, tks = {}, {}
+
+    def look(base: str):
+        iid = f"{base}-{quote}"
+        if iid not in insts:
+            insts[iid], tks[iid] = cl.instrument(iid), cl.ticker(iid)
+        last = ms._f((tks[iid] or {}).get("last"))
+        return (iid, last) if insts[iid] and last else None
+
+    tgt_share = al.targets(w, pos)
+    targets, mapped = {}, {}
+    for sym, t in sorted(pos.items(), key=lambda x: -x[1]["w"]):
+        m = al.resolve(sym, t.get("price"), look)
+        if not m["ok"]:
+            diffs.append(f"{sym} ({al._p(tgt_share[sym])} счёта): {m['why']} — эта доля остаётся в {quote}")
+            continue
+        if m["base"] in keep:
+            diffs.append(f"{sym}: монета в OKX_KEEP — автопилот её не трогает (у портфеля {al._p(tgt_share[sym])} счёта)")
+            continue
+        targets[m["base"]] = targets.get(m["base"], 0.0) + tgt_share[sym]
+        mapped[m["base"]] = {**t, "sym": sym, "mult": m["mult"]}
     outside = [r["ccy"] for r in rows if not r["cash"] and set(r.get("where") or []) - {"торговый счёт"}]
     if outside:
-        notes.append("Монеты вне торгового счёта (Funding / Earn) учтены в долях, но автопилот их не продаёт и не переводит: "
-                     + ", ".join(sorted(outside)) + ". Переведи их на торговый счёт, если хочешь, чтобы автопилот ими управлял.")
+        diffs.append("Монеты вне торгового счёта (Funding / Earn) учтены, но автопилот их не продаёт и не переводит: "
+                     + ", ".join(sorted(outside)) + ". Переведи их на торговый счёт.")
     other_cash = [r["ccy"] for r in rows if r["cash"] and r["ccy"] != quote and r["usd"] >= MIN_ORDER]
     if other_cash:
-        notes.append(f"Доллары в другой валюте ({', '.join(other_cash)}) считаются долларами модели, автопилот их не меняет.")
+        notes.append(f"Доллары в другой валюте ({', '.join(other_cash)}) считаются долларами, автопилот их не меняет.")
+    band = max(MIN_ORDER, BAND * total)
 
-    def chunks(qty: float, usd: float, lot: float) -> list:
-        n = max(1, math.ceil(usd / lim["max_order"]))
+    def chunks(qty: float, usd_: float, lot: float) -> list:
+        n = max(1, math.ceil(usd_ / lim["max_order"]))
         part = floor_to(qty / n, lot)
         out = [part] * (n - 1)
         out.append(floor_to(qty - part * (n - 1), lot))
         return [q for q in out if q > 0]
 
-    for r in p["trim"]:                                # «урезать» and «продать»: sell from the trading account only
-        c = r["ccy"]
+    for c in sorted(set(targets) | {c for c, r in held.items() if not r["cash"]}):
+        r = held.get(c)
+        now_usd = r["usd"] if r else 0.0
+        tgt = targets.get(c, 0.0)
+        gap = tgt * total - now_usd
+        now_pct, t_pct = (now_usd / total * 100 if total else 0.0), tgt * 100
+        why = al.reason(mapped[c]) if c in mapped else al.sell_reason(c, meta)
         inst_id = f"{c}-{quote}"
-        inst, tk = cl.instrument(inst_id), cl.ticker(inst_id)
-        bid = ms._f((tk or {}).get("bidPx")) or ms._f((tk or {}).get("last"))
-        if not inst or not bid:
-            notes.append(f"{c}: на OKX нет пары {inst_id} — продать не могу, монета остаётся.")
-            continue
-        lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
-        have = avail.get(c, 0.0)
-        want = have if r["act"] == "sell" else min(have, -r["gap_usd"] / bid)
-        qty = floor_to(want, lot)
-        if qty < mn or qty * bid < (1.0 if r["act"] == "sell" else MIN_ORDER):
-            if have * bid >= MIN_ORDER and qty < mn:
-                notes.append(f"{c}: остаток меньше минимального ордера OKX — пропускаю.")
-            continue
-        if r["act"] == "trim" and have < -r["gap_usd"] / bid * 0.98:
-            notes.append(f"{c}: на торговом счёте меньше, чем надо продать по плану — продаю что есть.")
-        px = fmt(floor_to(bid * (1 - lim["slip"]), tick), inst["tickSz"])
-        for q in chunks(qty, qty * bid, lot):
-            if q >= mn:
-                sells.append({"ccy": c, "inst": inst_id, "side": "sell", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * bid, 2),
-                              "act": r["act"], "target_pct": r["target_pct"], "now_pct": r["now_pct"]})
-
-    for r in p["buy"]:                                 # in the card's order: undervalued alts first, then the core, then the rest
-        c = r["ccy"]
-        inst_id = f"{c}-{quote}"
-        inst, tk = cl.instrument(inst_id), cl.ticker(inst_id)
-        ask = ms._f((tk or {}).get("askPx")) or ms._f((tk or {}).get("last"))
-        if not inst or not ask:
-            notes.append(f"{c}: на OKX нет пары {inst_id} — эта доля ({ms._p(r['target_pct'])}%) остаётся в долларах.")
-            continue
-        lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
-        qty = floor_to(r["gap_usd"] / ask, lot)
-        if qty < mn or qty * ask < MIN_ORDER:
-            continue
-        px = fmt(ceil_to(ask * (1 + lim["slip"]), tick), inst["tickSz"])
-        for q in chunks(qty, qty * ask, lot):
-            if q >= mn:
-                buys.append({"ccy": c, "inst": inst_id, "side": "buy", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * ask, 2),
-                             "lot": inst["lotSz"], "min": mn, "ask": ask, "act": "buy", "target_pct": r["target_pct"],
-                             "now_pct": r["now_pct"], "tag": r.get("tag")})
+        if inst_id not in insts:
+            insts[inst_id], tks[inst_id] = cl.instrument(inst_id), cl.ticker(inst_id)
+        inst, tk = insts.get(inst_id), tks.get(inst_id)
+        if gap < 0 and (tgt == 0 or -gap >= band):                    # sell: not in the portfolio, or over its share
+            bid = ms._f((tk or {}).get("bidPx")) or ms._f((tk or {}).get("last"))
+            if not inst or not bid:
+                diffs.append(f"{c}: на OKX нет пары {inst_id} — продать не могу, монета остаётся.")
+                continue
+            lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
+            have = avail.get(c, 0.0)
+            qty = floor_to(have if tgt == 0 else min(have, -gap / bid), lot)
+            if qty < mn or qty * bid < (1.0 if tgt == 0 else MIN_ORDER):
+                if tgt == 0 and have * bid >= MIN_ORDER:
+                    diffs.append(f"{c}: остаток меньше минимального ордера OKX — остаётся.")
+                continue
+            if tgt > 0 and have < -gap / bid * 0.98:
+                notes.append(f"{c}: на торговом счёте меньше, чем надо продать по плану — продаю что есть.")
+            px = fmt(floor_to(bid * (1 - lim["slip"]), tick), inst["tickSz"])
+            for q in chunks(qty, qty * bid, lot):
+                if q >= mn:
+                    sells.append({"ccy": c, "inst": inst_id, "side": "sell", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * bid, 2),
+                                  "act": "sell" if tgt == 0 else "trim", "target_pct": round(t_pct, 2), "now_pct": round(now_pct, 2), "why": why})
+        elif gap > 0 and gap >= (MIN_ORDER if now_usd < MIN_ORDER else band):   # buy: a new coin, or under its share
+            ask = ms._f((tk or {}).get("askPx")) or ms._f((tk or {}).get("last"))
+            if not inst or not ask:
+                diffs.append(f"{c}: на OKX нет пары {inst_id} — доля остаётся в {quote}.")
+                continue
+            lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
+            qty = floor_to(gap / ask, lot)
+            if qty < mn or qty * ask < MIN_ORDER:
+                diffs.append(f"{c}: покупка {usd(gap)} меньше минимального ордера OKX — пропускаю.")
+                continue
+            px = fmt(ceil_to(ask * (1 + lim["slip"]), tick), inst["tickSz"])
+            for q in chunks(qty, qty * ask, lot):
+                if q >= mn:
+                    buys.append({"ccy": c, "inst": inst_id, "side": "buy", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * ask, 2),
+                                 "lot": inst["lotSz"], "min": mn, "ask": ask, "act": "buy", "target_pct": round(t_pct, 2),
+                                 "now_pct": round(now_pct, 2), "why": why, "core": c in al.CORE})
+    buys.sort(key=lambda o: (not o["core"], -o["usd"]))           # the core first, then the bigger gaps
     fee = taker_fee(cl, env)
     turnover = sum(o["usd"] for o in sells) + sum(o["usd"] for o in buys)
-    return {"quote": quote, "host": cl.host, "total_usd": p["total_usd"], "plan": p, "sells": sells, "buys": buys, "notes": notes,
-            "keep": sorted(keep), "sig": model_sig(alt), "held": sorted(held), "fee_rate": fee, "fee_usd": round(turnover * fee, 2),
-            "eea": is_eea(cl)}
+    spot_now = sum(r["usd"] for r in rows if not r["cash"])
+    rows_t = [{"ccy": c, "target_pct": round(targets[c] * 100, 2), "now_pct": round((held[c]["usd"] if c in held else 0) / total * 100, 2) if total else 0.0,
+               "sym": mapped[c]["sym"], "pf_w": mapped[c]["w"]} for c in sorted(targets, key=lambda x: -targets[x])]
+    return {"quote": quote, "host": cl.host, "total_usd": round(total, 2), "split": w, "pf_name": meta["name"], "pf_cash": meta["cash"],
+            "sells": sells, "buys": buys, "notes": notes, "diffs": diffs, "keep": sorted(keep), "sig": al.signature(pf, w),
+            "targets": rows_t, "spot_now_usd": round(spot_now, 2), "active_held": act, "fee_rate": fee, "fee_usd": round(turnover * fee, 2),
+            "eea": is_eea(cl), "same": not diffs}
 
 
 def usd(v: float) -> str:
@@ -443,41 +506,54 @@ def usd(v: float) -> str:
     return f"${v:,.2f}".replace(",", " ")
 
 
-def model_sig(model: dict) -> str:
-    g = model.get("gauge") or {}
-    t = {k: round(float(v), 1) for k, v in sorted((model.get("targets_pct") or {}).items())}
-    return json.dumps({"t": t, "b": sorted(model.get("basket") or []), "on": bool(g.get("on")), "bull": bool(g.get("bull"))},
-                      ensure_ascii=False, sort_keys=True)
+def model_sig(pf: dict, env=None) -> str:
+    return al.signature(pf, al.shares(env))
 
 
 def plan_text(b: dict, mode: str) -> str:
-    """The plan for the owner's eyes (Russian, digits)."""
-    L = [f"Автопилот OKX · {mode} · {b['host'].replace('https://', '')} · валюта {b['quote']} · портфель {usd(b['total_usd'])}"]
-    p = b["plan"]
-    L.append(p.get("alt_note") or "")
+    """The spot part for the owner's eyes (Russian, digits): the split, every order with its reason, the differences."""
+    T = b["total_usd"]
+    L = [f"Автопилот OKX · {mode} · {b['host'].replace('https://', '')} · валюта {b['quote']} · счёт {usd(T)}", "ДЕЛЕНИЕ СЧЁТА:"]
+    L += ["  " + x for x in al.split_text(b["split"], T)]
+    L.append(f"СПОТ · {b['pf_name']} — {al._p(b['split']['spot'])} счёта ≈ {usd(T * b['split']['spot'])}; в монетах сейчас {usd(b['spot_now_usd'])}."
+             f" Кэш портфеля {al._p(b['pf_cash'])} (правило: не меньше 10%) — остаётся в {b['quote']}.")
+    L.append("  Цель по монетам (доля счёта = доля спота × вес в портфеле): "
+             + ", ".join(f"{r['ccy']} {ms._p(r['target_pct'])}% (сейчас {ms._p(r['now_pct'])}%)" for r in b["targets"]))
     if b["sells"]:
-        L.append("Сначала продажи:")
+        L.append("  Сначала продажи:")
         for o in b["sells"]:
-            what = "нет в модели" if o["act"] == "sell" else f"урезать до {ms._p(o['target_pct'])}%"
-            L.append(f"  продать {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · {what} · цена не ниже {o['px']}")
+            what = "продать всё" if o["act"] == "sell" else f"урезать до {ms._p(o['target_pct'])}%"
+            L.append(f"    ПРОДАТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · {what} · лимит не ниже {o['px']} · почему: {o['why']}")
     if b["buys"]:
-        L.append("Потом покупки (сначала недооценённые):")
+        L.append("  Потом покупки (сначала ядро):")
         for o in b["buys"]:
-            tag = f" · {o['tag']}" if o.get("tag") else ""
-            L.append(f"  купить {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · до {ms._p(o['target_pct'])}%{tag} · цена не выше {o['px']}")
+            L.append(f"    КУПИТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · до {ms._p(o['target_pct'])}% счёта · лимит не выше {o['px']} · почему: {o['why']}")
     if not b["sells"] and not b["buys"]:
-        L.append("Портфель уже совпадает с моделью (отличия меньше 1% доли или $10) — ордера не нужны.")
-    c = p.get("cash") or {}
-    L.append(f"Доллары: сейчас {ms._p(c.get('now_pct', 0))}% → цель {ms._p(c.get('target_pct', 0))}% "
-             f"(10% Earn + 15% резерв под фьючерсы; держим в {b['quote']}).")
+        L.append("  Спот уже совпадает с портфелем (отличия меньше $10 или 0,3% счёта) — ордеров нет.")
+    if b.get("active_held"):
+        L.append("  Монеты активного спота (не трогаю): " + ", ".join(f"{c} {q:g}" for c, q in b["active_held"].items()))
     if b["keep"]:
-        L.append("Не трогаю: " + ", ".join(b["keep"]))
-    L += b["notes"]
-    L.append(f"Итого: продать ≈ {usd(sum(o['usd'] for o in b['sells']))}, купить ≈ {usd(sum(o['usd'] for o in b['buys']))}, "
-             f"комиссия OKX ≈ {usd(b.get('fee_usd', 0))} ({ms._p(round(b.get('fee_rate', 0) * 100, 2))}% с каждой сделки"
-             f"{', OKX Europe' if b.get('eea') else ''}). "
+        L.append("  Не трогаю (OKX_KEEP): " + ", ".join(b["keep"]))
+    L += ["  " + n for n in b["notes"]]
+    L.append(f"  Итого спот: продать ≈ {usd(sum(o['usd'] for o in b['sells']))}, купить ≈ {usd(sum(o['usd'] for o in b['buys']))}, "
+             f"комиссия OKX ≈ {usd(b.get('fee_usd', 0))} ({ms._p(round(b.get('fee_rate', 0) * 100, 2))}% с каждой сделки). "
              "Ордера лимитные (IOC): исполняется то, что есть по цене не хуже указанной, остаток — при следующей проверке.")
     return "\n".join(x for x in L if x)
+
+
+def same_text(b: dict, fut_on: bool, act_on: bool) -> str:
+    """«Совпадает с системой CRYPTO NOVA: да / нет» and every difference."""
+    d = list(b["diffs"])
+    if not fut_on:
+        d.append(f"фьючерсы выключены (OKX_FUTURES=off) — их {al._p(b['split']['futures'])} лежат в {b['quote']}")
+    if not act_on:
+        d.append(f"активный спот выключен (OKX_ACTIVE=off) — его {al._p(b['split']['active'])} лежат в {b['quote']}")
+    L = ["СОВПАДАЕТ С СИСТЕМОЙ CRYPTO NOVA: " + ("ДА" if not d else "НЕТ")]
+    L += ["  отличие: " + x for x in d]
+    L.append("  по устройству: фьючерсы повторяют сигналы с лимитами (риск ≤ 0,5% бюджета на сделку, плечо ≤ 3, до 5 позиций) — "
+             "размер может быть меньше, чем у демо-счёта системы; сигналы старше 45 минут не догоняем; продажи и стопы спот-портфеля "
+             "приходят с его обновлением (проверка каждые 5 минут).")
+    return "\n".join(L)
 
 
 # ── execution ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -568,7 +644,7 @@ def execute(cl: Okx, b: dict, st: dict, env=None, now: int | None = None, sleep=
 
 def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=time.sleep, reason: str = "вручную",
              log_path: str | None = None, save: bool = True) -> dict:
-    """One full rebalance (used by --run and by the mirror). Returns the summary; refuses unsafe keys and the kill switch."""
+    """One spot rebalance (used by --run and by the window). Returns the summary; refuses unsafe keys and the kill switch."""
     now = int(now or time.time() * 1000)
     st = load_state(env)
     if stopped(env):
@@ -588,47 +664,53 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
     log({"ev": "plan", "mode": mode, "reason": reason, "total_usd": b["total_usd"], "sells": len(b["sells"]), "buys": len(b["buys"])}, log_path)
     res = execute(cl, b, st, env, now, sleep, log_path)
     summary = {"t": now, "reason": reason, "mode": mode, **res, "total_usd": b["total_usd"], "quote": b["quote"]}
-    st.update({"last_run": now, "last_sig": b["sig"], "last": summary, "mode": mode})
+    st.update({"last_run": now, "last_sig": b["sig"], "last": summary, "mode": mode, "split": b["split"], "same": b["same"],
+               "diffs": b["diffs"][:12], "targets": b["targets"][:20], "drift_t": now})
     if enabled(env) and not res["stopped"] and res["failed"] == 0:
         st["armed"] = True
     if save:
         save_state(st, env)
     log({"ev": "done", **summary}, log_path)
-    return {"ok": True, **summary, "plan": b}
+    return {"ok": True, **summary, "plan": b, "cl": cl}
 
 
-def due(st: dict, model: dict, now: int, env=None) -> str | None:
-    """Why a rebalance is due now (None = not due). Only for an armed, not stopped autopilot."""
+def due(st: dict, pf: dict, now: int, env=None) -> str | None:
+    """Why a spot rebalance is due now (None = not due): the public portfolio changed. Only for an armed, not stopped autopilot."""
     if not st.get("armed") or not enabled(env) or stopped(env):
         return None
-    last = int(st.get("last_run") or 0)
-    if model_sig(model) != st.get("last_sig"):
-        return "модель изменилась"
-    if now - last < MIN_GAP_H * 3600 * 1000:
-        return None
-    d = dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc)
-    if d.weekday() == 0 and now - last > 5 * DAY * 1000:
-        return "понедельник — сверка долей"
+    sig = model_sig(pf, env)
+    if sig and sig != st.get("last_sig"):
+        return "портфель CRYPTO NOVA изменился"
     return None
 
 
+def drifted(b: dict) -> bool:
+    """After partial / missed fills or a big move of one coin: any order of the plan bigger than max($25, 1 % of the account)."""
+    lim = max(25.0, 0.01 * (b.get("total_usd") or 0))
+    return any(o["usd"] >= lim for o in b["sells"] + b["buys"])
+
+
 def tick(env=None, opener=None, model=None, now: int | None = None, sleep=time.sleep) -> str | None:
-    """Called by the mirror once an hour. Returns one Russian line when something happened (None = nothing to do)."""
+    """The window's spot check (every 5 minutes). Returns one Russian line when something happened (None = nothing to do)."""
     if not (enabled(env) and creds(env)):
         return None
     st = load_state(env)
     if not st.get("armed") or stopped(env):
         return None
     now = int(now or time.time() * 1000)
-    m = model if model is not None else ms.fetch_model()
-    if not (m[0].get("targets_pct") or {}):
+    pf = model if model is not None else al.fetch_portfolio()
+    if not al.ideas(pf):
         return None
-    k = keep_set(env)
-    alt = {**m[0], "targets_pct": {c: v for c, v in (m[0].get("targets_pct") or {}).items() if c.upper() not in k}}
-    why = due(st, alt, now, env)
+    why = due(st, pf, now, env)
+    if not why and now - int(st.get("drift_t") or 0) >= DRIFT_EVERY_MS:
+        st["drift_t"] = now
+        save_state(st, env)
+        cl = connect(env, opener, st, sleep)
+        if drifted(build(cl, env, pf)):
+            why = "счёт разошёлся с портфелем"
     if not why:
         return None
-    r = run_once(env, opener, m, now, sleep, reason=why)
+    r = run_once(env, opener, pf, now, sleep, reason=why)
     if not r.get("ok"):
         return f"Автопилот OKX: {r.get('why')}"
     return (f"Автопилот OKX ({why}): продано {usd(r['sold_usd'])}, куплено {usd(r['bought_usd'])}, ордеров {r['orders']}"
@@ -637,16 +719,24 @@ def tick(env=None, opener=None, model=None, now: int | None = None, sleep=time.s
 
 
 def status(env=None) -> dict | None:
-    """For the encrypted card (myspot_watch): on / off / stopped, the last rebalance. No network, no keys inside."""
+    """For the encrypted card (myspot_watch): on / off / stopped, the last rebalance, the split, futures and active spot. No network."""
     if not creds(env):
         return None
     st = load_state(env)
     last = st.get("last") or {}
-    return {"configured": True, "enabled": enabled(env), "armed": bool(st.get("armed")), "stopped": stopped(env),
-            "live": live(env), "mode": "РЕАЛЬНЫЕ ДЕНЬГИ" if live(env) else "демо-торговля OKX",
-            "last_run": st.get("last_run"), "last": {k: last.get(k) for k in ("reason", "sold_usd", "bought_usd", "orders", "partial",
-                                                                              "failed", "skipped", "limit", "stopped")} if last else None,
-            "rule": "окно автопилота на Маке проверяет раз в час; ребалансировка, когда меняется модель, и по понедельникам"}
+    out = {"configured": True, "enabled": enabled(env), "armed": bool(st.get("armed")), "stopped": stopped(env),
+           "live": live(env), "mode": "РЕАЛЬНЫЕ ДЕНЬГИ" if live(env) else "демо-торговля OKX",
+           "last_run": st.get("last_run"), "last": {k: last.get(k) for k in ("reason", "sold_usd", "bought_usd", "orders", "partial",
+                                                                             "failed", "skipped", "limit", "stopped")} if last else None,
+           "split": al.shares(env), "same": st.get("same"), "diffs": st.get("diffs") or [], "targets": st.get("targets") or [],
+           "rule": "окно автопилота на Маке: спот — как «CRYPTO NOVA портфель» (проверка каждые 5 минут), фьючерсы и активный спот — каждую минуту"}
+    try:
+        from . import okx_active, okx_futures
+        out["futures"] = okx_futures.status(env)
+        out["active"] = okx_active.status(env)
+    except Exception:  # noqa: BLE001
+        pass
+    return out
 
 
 def stop(env=None, opener=None) -> str:
@@ -672,7 +762,17 @@ def stop(env=None, opener=None) -> str:
         except Exception:  # noqa: BLE001
             pass
     log({"ev": "stop", "cancelled": n})
-    return f"Автопилот OKX остановлен: новых ордеров не будет{f', отменено открытых: {n}' if n else ''}. Включить снова: --resume, затем --run."
+    fut = ""
+    try:
+        from . import okx_futures
+        k = len(okx_futures.load_state(env).get("trades") or {})
+        if k:
+            fut = (f" Фьючерсных позиций открыто: {k} — они остаются со своими стоп-лоссами на OKX; закрыть их сейчас: "
+                   "bash scripts/okx_autopilot_mac.sh fut-close.")
+    except Exception:  # noqa: BLE001
+        pass
+    cancelled = f", отменено открытых ордеров: {n}" if n else ""
+    return f"Автопилот OKX остановлен: новых ордеров не будет{cancelled}.{fut} Включить снова: --resume, затем --run."
 
 
 def resume(env=None) -> str:
@@ -714,8 +814,11 @@ def check(env=None, opener=None) -> list[str]:
             rows = ms.assets(raw)
             tot = sum(r["usd"] for r in rows)
             outside = sorted(r["ccy"] for r in rows if set(r.get("where") or []) - {"торговый счёт"})
-            out.append(f"  портфель ≈ {usd(tot)} · активов {len(rows)}"
+            out.append(f"  счёт ≈ {usd(tot)} · активов {len(rows)}"
                        + (f" · вне торгового счёта: {', '.join(outside)} (автопилот их не трогает)" if outside else ""))
+            out.append("  деление: " + " · ".join(al.split_text(al.shares(env), tot)))
+            from . import okx_futures
+            out += okx_futures.check_lines(cl, cfg, env)
             st = load_state(env)
             out.append("  автопилот: " + ("СТОП (--resume, чтобы снять)" if stopped(env) else
                                           "включён — ребалансирует сам" if st.get("armed") and enabled(env) else
@@ -735,6 +838,31 @@ def describe_error(e: Exception) -> str:
     return s.replace("пересоздай ключ «только чтение»", "пересоздай ключ «Чтение» + «Торговля» без «Вывода»")
 
 
+def plan_all(env=None, opener=None, model=None, desks=None, act_desk=None, now: int | None = None) -> tuple[str, bool]:
+    """--plan: the whole picture — split, every spot order with its reason, active spot, every futures order with size and stop,
+    and «совпадает с системой: да / нет». Places nothing. Returns (text, orders would go out)."""
+    from . import okx_active, okx_futures
+    st = load_state(env)
+    cl = connect(env, opener, st)
+    save_state(st, env)
+    cfg = cl.config()
+    perm = perm_of(cfg)
+    real_in_demo = not cl.demo and not live(env)          # the usual case: plan without --live, then run --live
+    bad = ("У ключа есть право ВЫВОДА — с таким ключом автопилот работать не будет." if "withdraw" in perm else
+           "У ключа нет права «Торговля»." if "trade" not in perm else None if real_in_demo else world_ok(cl, env))
+    if stopped(env):
+        bad = "включён стоп (--stop) — ордера не пойдут, пока не снят (--resume)"
+    b = build(cl, env, model)
+    mode = ("РЕАЛЬНЫЙ счёт (реальные деньги)" if not cl.demo else "ДЕМО-счёт OKX") + (
+        " · ордера: НЕТ — " + bad if bad else " · ордера пойдут только после run --live и ответа ДА" if real_in_demo else " · ордера пойдут после run")
+    L = [plan_text(b, mode), ""]
+    L += okx_active.plan_lines(env, act_desk, now, b["total_usd"])
+    L.append("")
+    L += okx_futures.plan_lines(cl, cfg, ({**(os.environ if env is None else env), "CNQ_LIVE_TRADING": "yes"} if real_in_demo else env), desks, now)
+    L += ["", same_text(b, okx_futures.enabled(env), okx_active.enabled(env))]
+    return "\n".join(L), not bad
+
+
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if "--stop" in argv:
@@ -746,20 +874,44 @@ def main(argv=None) -> int:
     if "--check" in argv:
         print("\n".join(check()))
         return 0
+    if "--fut-close" in argv:
+        from . import okx_futures
+        try:
+            print(okx_futures.close_all())
+        except Exception as e:  # noqa: BLE001
+            print(describe_error(e))
+            return 1
+        return 0
     if "--loop" in argv:
-        print(f"Автопилот OKX: окно проверки запущено ({'РЕАЛЬНЫЕ ДЕНЬГИ' if live() else 'демо-торговля OKX'}). "
-              "Раз в час смотрю, нужна ли ребалансировка. Остановить окно: Ctrl+C; остановить автопилот совсем: --stop.", flush=True)
+        from . import okx_active, okx_futures
+        print(f"Автопилот OKX: окно запущено ({'РЕАЛЬНЫЕ ДЕНЬГИ' if live() else 'демо-торговля OKX'}). Фьючерсы и активный спот — каждую "
+              "минуту, спот-портфель — каждые 5 минут. Остановить окно: Ctrl+C; остановить автопилот: --stop.", flush=True)
+        last_spot = 0.0
         while True:
-            try:
-                msg = tick()
-                if msg:
-                    print(time.strftime("%H:%M ") + msg, flush=True)
-            except Exception as e:  # noqa: BLE001
-                print(time.strftime("%H:%M ") + describe_error(e), flush=True)
-            time.sleep(3600)
+            armed = load_state().get("armed") and enabled() and not stopped()
+            if armed:
+                for name, fn in (("Фьючерсы OKX", lambda: okx_futures.summary(okx_futures.step())),
+                                 ("Активный спот OKX", lambda: (lambda r: (f"Активный спот OKX: куплено {r['bought']}, продано {r['sold']}"
+                                                                           if r["bought"] or r["sold"] else None))(okx_active.step()))):
+                    try:
+                        msg = fn()
+                        if msg:
+                            print(time.strftime("%H:%M ") + msg, flush=True)
+                    except Exception as e:  # noqa: BLE001
+                        print(time.strftime("%H:%M ") + name + ": " + describe_error(e).replace("Автопилот OKX: ", ""), flush=True)
+            if time.time() - last_spot >= SPOT_EVERY_S:
+                last_spot = time.time()
+                try:
+                    msg = tick()
+                    if msg:
+                        print(time.strftime("%H:%M ") + msg, flush=True)
+                except Exception as e:  # noqa: BLE001
+                    print(time.strftime("%H:%M ") + describe_error(e), flush=True)
+            time.sleep(60)
     if "--plan" in argv or "--run" in argv:
         try:
             if "--run" in argv:
+                from . import okx_active, okx_futures
                 if stopped():
                     print("Включён стоп — ордера не ставлю. Снять: python3 -m cnq.execution.okx_autopilot --resume")
                     return 1
@@ -768,22 +920,34 @@ def main(argv=None) -> int:
                     print("Автопилот OKX: " + r["why"])
                     return 1
                 print(plan_text(r["plan"], r["mode"]))
-                print(f"\nГотово ({r['mode']}): продано {usd(r['sold_usd'])}, куплено {usd(r['bought_usd'])}, ордеров {r['orders']}, "
+                print(f"\nСпот готов ({r['mode']}): продано {usd(r['sold_usd'])}, куплено {usd(r['bought_usd'])}, ордеров {r['orders']}, "
                       f"частично {r['partial']}, не исполнено {r['skipped']}, ошибок {r['failed']}.")
                 if r["limit"]:
                     print("Дневной лимит оборота достигнут — остальное автопилот сделает завтра.")
-                print("Автопилот включён: дальше зеркало само держит портфель по модели." if load_state().get("armed")
-                      else "Автопилот НЕ включён для автоматической работы (нужна строка OKX_AUTOPILOT=on).")
+                if not load_state().get("armed"):
+                    print("Фьючерсы и активный спот: позиции открывает и ведёт только окно loop, а автопилот не включён "
+                          "(нужна строка OKX_AUTOPILOT=on в ~/.cryptonova.env) — сейчас не открываю.")
+                else:
+                    try:
+                        a = okx_active.step(cl=r["cl"], total=r["total_usd"])
+                        done = "куплено {}, продано {}".format(a["bought"], a["sold"]) if (a["bought"] or a["sold"]) else "ждёт сигнала «Импульс BTC»"
+                        print("Активный спот: " + (a["why"] or done))
+                    except Exception as e:  # noqa: BLE001
+                        print("Активный спот: " + describe_error(e).replace("Автопилот OKX: ", ""))
+                    try:
+                        f = okx_futures.step(cl=r["cl"])
+                        print("Фьючерсы: " + (f["why"] or (okx_futures.summary(f) or "новых сигналов нет — позиций не открыто")
+                                              .replace("Фьючерсы OKX: ", "")))
+                        for x in f["skipped"]:
+                            print(f"  пропущен {x['id']}: {x['why']}")
+                    except Exception as e:  # noqa: BLE001
+                        print("Фьючерсы: " + describe_error(e).replace("Автопилот OKX: ", ""))
+                print("Автопилот включён: дальше держи открытым окно loop — оно ведёт фьючерсы каждую минуту и спот по портфелю."
+                      if load_state().get("armed") else "Автопилот НЕ включён для автоматической работы (нужна строка OKX_AUTOPILOT=on).")
                 return 0
-            st = load_state()
-            cl = connect(state=st)
-            save_state(st)
-            perm = perm_of(cl.config())
-            b = build(cl)
-            print(plan_text(b, ("реальный счёт" if not cl.demo else "демо-счёт OKX") + (" · ордера: да" if not world_ok(cl) else " · ордера: нет (только план)")))
-            if "withdraw" in perm:
-                print("\n!!! У ключа есть право ВЫВОДА — с таким ключом --run откажется работать.")
-            print("\nЭто только план, ордеров нет. Выполнить: python3 -m cnq.execution.okx_autopilot --run")
+            text, go = plan_all()
+            print(text)
+            print("\nЭто только план, ордеров нет." + (" Выполнить: bash scripts/okx_autopilot_mac.sh run --live (спросит ДА)." if go else ""))
             return 0
         except Exception as e:  # noqa: BLE001
             print(describe_error(e))

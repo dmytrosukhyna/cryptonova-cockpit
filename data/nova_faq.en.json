@@ -41,7 +41,7 @@
       "id": "where_money",
       "topic": "money",
       "q": "Where is my money?",
-      "a": "In demo the money is virtual — it exists only in the app. If you trade for real, your money sits in your own exchange account — OKX, or BingX where OKX doesn't operate. Even when you copy, the exchange only repeats CRYPTO NOVA's trades in your account. We don't accept, hold or withdraw money — only you control it.",
+      "a": "In demo the money is virtual — it exists only in the app. If you trade for real, your money sits in your own exchange account (OKX, or BingX where OKX doesn't operate), not with us. Even when you copy, the exchange only repeats CRYPTO NOVA's trades in your account. We don't accept, hold or withdraw money — only you control it.",
       "tags": [
         "money",
         "kept",

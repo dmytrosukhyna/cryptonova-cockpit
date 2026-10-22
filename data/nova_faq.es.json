@@ -43,7 +43,7 @@
       "id": "where_money",
       "topic": "money",
       "q": "¿Dónde está mi dinero?",
-      "a": "En la demo el dinero es de práctica: solo existe en la app. Si operas de verdad, tu dinero está en tu propia cuenta del exchange: OKX o, donde OKX no opera, BingX. Incluso al copiar, el exchange solo repite las operaciones de CRYPTO NOVA en tu cuenta. No aceptamos, no guardamos ni retiramos dinero: solo tú lo controlas.",
+      "a": "En la demo el dinero es de práctica: solo existe en la app. Si operas de verdad, tu dinero está en tu propia cuenta del exchange (OKX o, donde OKX no opera, BingX), no con nosotros. Incluso al copiar, el exchange solo repite las operaciones de CRYPTO NOVA en tu cuenta. No aceptamos, no guardamos ni retiramos dinero: solo tú lo controlas.",
       "tags": [
         "dinero",
         "guardado",

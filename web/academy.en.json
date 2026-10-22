@@ -112,8 +112,8 @@
               "art": "target"
             },
             {
-              "title": "You repeat the trades yourself",
-              "text": "The system runs its trades on a demo account and shows them to you. If you want, you can repeat a trade on your own exchange account. An exchange is a marketplace where people buy and sell coins. Whether to repeat a trade is entirely up to you. Full automation is available on request: leave a request — it launches only after a legal check, and we don't promise dates.",
+              "title": "Repeat or copy: you decide",
+              "text": "The system runs its own trades and shows them to you. You can repeat a trade in your own exchange account yourself, or turn on copying: OKX will then repeat CRYPTO NOVA's trades in your account automatically. An exchange is a marketplace where coins are bought and sold. Whether to repeat, copy or just watch is only your decision.",
               "example": "In real life: an experienced gardener shows you how to prune an apple tree. You watch and do the same in your own garden — or decide to wait.",
               "art": "handshake"
             },
@@ -127,7 +127,7 @@
           "remember": [
             "The calm path is the Piggy bank and Spot: a little at a time, for the long run.",
             "The active path is Futures: trades on prices rising or falling, with higher risk.",
-            "You repeat the system's trades yourself. Start with the lessons and the Piggy bank."
+            "You can repeat the system's trades yourself or copy them through OKX. Start with the lessons and the Piggy bank."
           ],
           "quiz": [
             {
@@ -161,7 +161,7 @@
                 "NOVA, the AI assistant"
               ],
               "answer": 0,
-              "why": "The system shows trades, but whether to repeat them is only your decision. Automatic copying is still in the works."
+              "why": "The system shows trades, but whether to repeat them, copy them or neither is only your decision."
             }
           ]
         },
@@ -708,7 +708,7 @@
             },
             {
               "title": "A real account is your own",
-              "text": "A real account is your own account on the BingX exchange, our partner. You open it through the CRYPTO NOVA link and repeat the system's trades on it. The money stays with you on the exchange the whole time. We don't accept it, hold it or have any way to withdraw it. Real money only from age 18.",
+              "text": "A real account is your own account on the OKX exchange. You open it through the CRYPTO NOVA link and turn on copying: OKX itself repeats the system's trades in it. The money stays with you on the exchange the whole time. We don't accept it, hold it or have any way to withdraw it. Real money is for adults 18+ only.",
               "example": "In real life: you hire a decorator to hang wallpaper. He works in your apartment, but the apartment is still yours, and so are the keys.",
               "art": "bank",
               "screen": "Live",
@@ -722,15 +722,15 @@
             },
             {
               "title": "Connecting in 4 steps",
-              "text": "Step 1: open a BingX account using the link in the app. Step 2: verify your identity (KYC) in the exchange app: an ID document and a selfie, usually 5–15 minutes. Step 3: deposit USDT, starting with an amount you could afford to lose. Step 4: enter your account number (UID) from your exchange profile and tap “Check”. We'll check that the account was opened via our link and switch on REAL mode.",
-              "example": "In real life: a UID is like a library card number. The library knows you by it, but no one can borrow your books with just the number.",
+              "text": "Step 1: sign up on OKX through the link in the app. Step 2: verify your identity (KYC) in the exchange app — a document and a selfie, usually a few minutes. Step 3: deposit USDT — start with an amount you could lose without real harm. Step 4: tap «Copy CRYPTO NOVA» in the app and choose the amount — from then on OKX repeats the trades itself. No UID or API keys are needed.",
+              "example": "In real life: an automatic payment at your bank. You choose the amount and can switch it off at any time.",
               "art": "key_lock",
               "screen": "Live",
               "callouts": [
                 {
                   "n": 1,
                   "target": "step1",
-                  "text": "Open an account via the CRYPTO NOVA link"
+                  "text": "Sign up on OKX via the CRYPTO NOVA link"
                 },
                 {
                   "n": 2,
@@ -745,14 +745,14 @@
                 {
                   "n": 4,
                   "target": "step4",
-                  "text": "Enter your UID and tap “Check”"
+                  "text": "Tap «Copy CRYPTO NOVA»"
                 }
               ]
             },
             {
               "title": "What connecting gives you",
-              "text": "Right now you see the system's trades and repeat them on your account yourself. Full automation is available on request: leave a request — it launches only after a legal check, and we don't promise dates. With a connected account, NOVA also answers 100 questions a day instead of 5, your support requests get priority, and you get new features first.",
-              "example": "In real life: a neighbor who gardens tells you when to plant, and you do the planting yourself. You can sign up for automatic watering, but the garden is still yours.",
+              "text": "Once connected, CRYPTO NOVA's trades open and close in your account on their own: OKX repeats them for the amount you choose. You can stop copying in OKX at any time, and losses are possible. With a connected account, NOVA also answers 100 questions a day instead of 5.",
+              "example": "In real life: automatic watering in your garden. You choose how much water and can switch it off whenever you like, and the garden is still yours.",
               "art": "target",
               "screen": "Live",
               "callouts": [
@@ -764,7 +764,7 @@
                 {
                   "n": 2,
                   "target": "auto",
-                  "text": "Automation: on request"
+                  "text": "Stop it in OKX at any time"
                 },
                 {
                   "n": 3,
@@ -775,7 +775,7 @@
             },
             {
               "title": "How CRYPTO NOVA makes money",
-              "text": "When you open an account through our link, the exchange pays CRYPTO NOVA a reward out of its own fees. Your fees and exchange terms don't change: you don't pay any more.",
+              "text": "When you open an account through our link, the exchange pays CRYPTO NOVA a reward out of its own fee — your fees don't change. If you copy CRYPTO NOVA, OKX keeps a share of your profit for the lead trader, that is CRYPTO NOVA, under its own rules. The percentage is shown in the profile before you start, and no profit means no fee.",
               "example": "In real life: a shop pays a blogger for bringing in a customer. The price stays the same for the customer.",
               "art": "handshake",
               "screen": "Live",
@@ -783,13 +783,13 @@
                 {
                   "n": 1,
                   "target": "earn",
-                  "text": "A reward from the exchange; your terms stay the same"
+                  "text": "A reward from the exchange and a share of profit"
                 }
               ]
             },
             {
               "title": "If you live in the EU",
-              "text": "In the EU and EEA, the MiCA rules have applied in full since 1 July 2026: only companies with an EU licence may provide crypto services there. That's why in the EU, the EEA and some other countries the app doesn't show exchange links, and a real account through the app isn't available yet. Lessons, the demo, the Piggy bank and NOVA work fully there.",
+              "text": "In the EU and EEA, the MiCA rules have applied in full since 1 July 2026: only companies with an EU licence, such as OKX Europe, may provide crypto services there. Automatic copying isn't available there yet: every CRYPTO NOVA trade is visible in the app, and you can repeat them yourself. Lessons, demo, the Piggy bank and NOVA work fully there.",
               "example": "In real life: every country has its own traffic rules. It's the same car, but in some places certain roads are still closed to you.",
               "art": "globe",
               "screen": "Live",
@@ -797,15 +797,15 @@
                 {
                   "n": 1,
                   "target": "region",
-                  "text": "Connection in your country — coming later"
+                  "text": "Copying in your country: later"
                 }
               ]
             }
           ],
           "remember": [
             "Demo: virtual money, real prices, and every trade in plain sight.",
-            "A real account is your own BingX account: the money stays with you, and we don't hold it.",
-            "CRYPTO NOVA gets a reward from the exchange. Your terms stay the same."
+            "A real account is your own OKX account: the money is yours, and OKX repeats CRYPTO NOVA's trades itself.",
+            "CRYPTO NOVA gets a reward from the exchange and, when you copy, a share of the profit."
           ],
           "quiz": [
             {
@@ -823,23 +823,23 @@
               "q": "How does CRYPTO NOVA make money?",
               "options": [
                 "It charges a subscription fee",
-                "The exchange pays it a reward, and your terms don't change",
+                "The exchange pays it out of its own fee, and when you copy, it gets a share of the profit",
                 "It takes a cut of your money when you withdraw",
                 "It sells your data"
               ],
               "answer": 1,
-              "why": "The exchange pays CRYPTO NOVA out of its own fees, and your fees don't go up."
+              "why": "The exchange pays CRYPTO NOVA out of its own fee, and when you copy, OKX keeps a share of the profit for the lead trader. There are no subscriptions, and we never take your money."
             },
             {
               "q": "What do you need to connect a real account?",
               "options": [
-                "A BingX account opened via the CRYPTO NOVA link, identity verification, a deposit and your account number (UID)",
+                "An OKX account via the CRYPTO NOVA link, identity verification, a deposit and the «Copy CRYPTO NOVA» button",
                 "Your exchange password and an SMS code",
                 "Your wallet's secret phrase",
                 "A photo of your bank card"
               ],
               "answer": 0,
-              "why": "It takes 4 steps: an account via our link, identity verification on the exchange, a deposit and your UID. We will never ask for passwords, codes or your secret phrase."
+              "why": "It takes 4 steps: an account through our link, identity verification, a deposit and copying. We never ask for a UID, passwords, codes or your seed phrase."
             }
           ]
         },
@@ -857,7 +857,7 @@
             },
             {
               "title": "We don't need your exchange keys",
-              "text": "Right now, the app needs neither your exchange password nor an API key. An API key is a special pass that lets a program connect to an exchange. If one is ever needed for auto-copying, it will be for trading only. It won't have permission to withdraw money.",
+              "text": "Right now, the app needs neither your exchange password nor an API key. An API key is a special pass that lets a program connect to an exchange. Copying CRYPTO NOVA doesn't need one either: you turn copying on in OKX itself. Never give anyone a key that can withdraw money.",
               "example": "In real life: a mailbox key. You can use it to get your letters, but it won't open your front door.",
               "art": "key_lock"
             },

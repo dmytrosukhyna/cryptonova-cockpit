@@ -16,7 +16,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 Manrope,syste
 .wrap{max-width:760px;margin:0 auto;padding:28px 16px 64px}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
 .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:1px;color:var(--text);text-decoration:none}
-.lang{display:flex;gap:6px}
+.lang{display:flex;flex-wrap:wrap;gap:6px}
 .lang a{padding:6px 12px;border-radius:999px;background:var(--card);color:var(--soft);text-decoration:none;font-size:14px;font-weight:600}
 .lang a:hover{color:var(--text)}
 h1{font-family:'Space Grotesk',sans-serif;font-size:30px;line-height:1.2;margin:8px 0 6px}
@@ -40,133 +40,423 @@ footer{color:var(--muted);font-size:13px;margin-top:40px}
 </head>
 <body>
 <div class="wrap">
-<header><a class="brand" href="https://cryptonova.vip">CRYPTO NOVΛ</a><nav class="lang"><a href="#ru">RU</a><a href="#en">EN</a></nav></header>
+<header><a class="brand" href="https://cryptonova.vip">CRYPTO NOVΛ</a><nav class="lang"><a href="#ru">RU</a><a href="#en">EN</a><a href="#uk">UK</a><a href="#el">EL</a><a href="#es">ES</a></nav></header>
 <section id="ru" lang="ru">
 <h1>Политика конфиденциальности</h1>
-<p class="meta">Действует с 20 октября 2026 г. · Приложение CRYPTO NOVΛ 2.0 для iOS и Android (com.cryptonova) и сайт cryptonova.vip</p>
-<div class="box"><p><b>Коротко.</b> Мы храним только то, что нужно приложению: ваш вход, настройки копилки, пройденные уроки и настройки уведомлений. Денег, карт, паролей и ключей от бирж в CRYPTO NOVA 2.0 нет. Аккаунт удаляется в приложении одной кнопкой: Кабинет → «Удалить аккаунт».</p></div>
-<p>Оператор приложения — Дмитрий Сухина («мы»). Контакт: <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>.</p>
+<p class="meta">Обновлено 22.10.2026. Относится к приложению CRYPTO NOVA AI для iPhone, iPad и Android (com.cryptonova, com.cryptonova.app) и к сайтам cryptonova.pro и cryptonova.vip.</p>
+<div class="box"><p><b>Коротко.</b> Мы храним только то, что нужно приложению: ваш вход, настройки Копилки, пройденные уроки и настройки уведомлений. Денег, карт, паролей и ключей от бирж в CRYPTO NOVA нет. Файлы для «Разбора портфеля» обрабатываются в памяти и не сохраняются. Аккаунт удаляется в приложении одной кнопкой: Кабинет → «Удалить аккаунт». Сайт не ставит cookie и не использует трекеры.</p></div>
+<p>Приложение и сайты создаёт и ведёт Дмитрий Сухина («мы») — основатель и разработчик; он же отвечает за обработку данных. Контакт: <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>.</p>
 
-<h2>1. Какие данные мы собираем</h2>
+<h2>1. Какие данные мы собираем в приложении</h2>
 <div class="tablewrap"><table>
 <tr><th>Данные</th><th>Когда</th><th>Зачем</th></tr>
-<tr><td>E-mail, имя и ID аккаунта от входа через Apple или Google</td><td>Если вы вошли</td><td>Сохранить ваш демо-счёт, копилку и уроки на всех устройствах</td></tr>
-<tr><td>Настройки копилки: сумма, как часто, цель, режим, дата начала</td><td>Если вы настроили копилку</td><td>Показать, сколько бы накопилось, и напомнить в день покупки</td></tr>
+<tr><td>E-mail, имя и ID аккаунта от входа через Apple или Google</td><td>Если вы вошли</td><td>Сохранить Копилку, уроки и настройки на всех устройствах</td></tr>
+<tr><td>Настройки Копилки: сумма, как часто, цель, режим, дата начала</td><td>Если вы настроили Копилку</td><td>Показать, сколько бы накопилось, и напомнить в день покупки</td></tr>
 <tr><td>Прогресс обучения: пройденные уроки, баллы тестов, XP</td><td>Когда вы проходите уроки</td><td>Сохранить прогресс</td></tr>
 <tr><td>Настройки уведомлений и токен для push-уведомлений</td><td>Если вы разрешили уведомления</td><td>Присылать только то, что вы включили</td></tr>
 <tr><td>Вопросы к AI-помощнику NOVA и счётчик вопросов за день</td><td>Когда вы спрашиваете NOVA</td><td>Получить ответ и соблюдать дневной лимит</td></tr>
-<tr><td>UID счёта на бирже BingX и ответ биржи: открыт ли счёт по нашей ссылке и пополнен ли он</td><td>Только если вы сами ввели UID на экране «Стать VIP»</td><td>Подтвердить статус VIP</td></tr>
-<tr><td>Рекламный идентификатор (IDFA) — только с вашего согласия</td><td>Если вы разрешили отслеживание в системном запросе iOS</td><td>Оценить эффективность нашей рекламы (Meta)</td></tr>
+<tr><td>Файл или скриншот для «Разбора портфеля»</td><td>Только если вы сами его прислали</td><td>Сделать разбор; файл не сохраняется (раздел 3)</td></tr>
+<tr><td>Рекламный идентификатор (IDFA), только с вашего согласия</td><td>Если вы разрешили отслеживание в системном запросе iOS</td><td>Оценить эффективность нашей рекламы (Meta)</td></tr>
 <tr><td>Данные об использовании и журналы сбоев</td><td>Во время работы приложения</td><td>Аналитика и исправление ошибок</td></tr>
 </table></div>
-<p>Демо-сумма и выбор языка хранятся только на вашем телефоне. Мы не собираем геолокацию, контакты, фото, данные о здоровье, данные карт и банковских счетов, пароли и API-ключи бирж.</p>
+<p>Демо-сумма и выбор языка хранятся только на вашем телефоне. Мы не собираем геолокацию, контакты, фото, данные о здоровье, данные карт и банковских счетов, пароли и API-ключи бирж. Живые цены монет приложение загружает прямо с okx.com, поэтому OKX видит IP-адрес вашего устройства.</p>
+<p><b>Подключение к бирже.</b> Реальные сделки идут через копи-трейдинг OKX: вы регистрируетесь на OKX по нашей партнёрской ссылке, проходите там проверку личности, пополняете счёт в USDT и нажимаете в приложении «Копировать CRYPTO NOVA» — OKX повторяет сделки CRYPTO NOVA на вашем счёте на выбранную вами сумму. UID, ключи API и пароли от биржи для этого не нужны, и мы их не собираем. Регистрацию, проверку личности, ваши деньги и копирование обрабатывает OKX по своей политике конфиденциальности; ваши документы мы не получаем. По своим правилам партнёрской программы и копи-трейдинга OKX может показывать нам ID аккаунтов, открытых по нашей ссылке, их объём торговли и результат копирования. Где OKX не работает, то же относится к BingX по нашей ссылке.</p>
 
 <h2>2. AI-помощник NOVA</h2>
-<p>Текст вашего вопроса вместе с общими демо-цифрами CRYPTO NOVA отправляется поставщику AI-модели (Groq или Google Gemini API), чтобы получить ответ. Ваше имя и e-mail туда не передаются. Мы не храним тексты вопросов и ответов — только число вопросов за день, чтобы соблюдать лимит. Не пишите в вопросах личные данные.</p>
-<p><b>Голосом.</b> Если вы нажали микрофон, речь превращает в текст встроенный распознаватель телефона (Apple или Google, по их правилам). В CRYPTO NOVA уходит только текст вопроса — аудио мы не получаем и не храним. Ответ NOVA может прочитать вслух синтезатор речи самого телефона.</p>
+<p>Текст вашего вопроса вместе с общими демо-цифрами CRYPTO NOVA отправляется поставщику AI-модели (Groq или Google Gemini API), чтобы получить ответ. Ваше имя и e-mail туда не передаются. Мы не храним тексты вопросов и ответов, только число вопросов за день, чтобы соблюдать лимит. Не пишите в вопросах личные данные.</p>
+<p><b>Голосом.</b> Ответы NOVA может прочитать вслух синтезатор речи самого телефона. Микрофон и распознавание речи приложение не использует.</p>
 
-<h2>3. Отслеживание и реклама</h2>
-<p>В приложении есть Meta (Facebook) SDK. iOS спрашивает, разрешаете ли вы отслеживание. Если разрешите — рекламный идентификатор и события приложения (установка, запуск, вход) передаются Meta Platforms для измерения рекламы. Если откажете — идентификатор не передаётся, Meta получает только обезличенную статистику через Apple SKAdNetwork. Изменить выбор: Настройки iOS → Конфиденциальность и безопасность → Отслеживание. Чужой рекламы в приложении нет. Мы не продаём персональные данные.</p>
+<h2>3. Разбор портфеля</h2>
+<p>В NOVA AI можно прислать выгрузку или выписку портфеля — файл CSV, XLSX или PDF — или скриншот, до 10 МБ, и получить разбор. Файл обрабатывается в памяти нашего сервера и не сохраняется: ни файл, ни его содержимое мы не храним и не записываем в журналы. Скриншот или текст PDF может быть отправлен поставщику AI-модели (Groq или Google Gemini API, если он подключён) только для распознавания, без вашего имени и e-mail. Не загружайте файлы с паролями, ключами API, секретными фразами и документами, удостоверяющими личность.</p>
 
-<h2>4. Сторонние сервисы</h2>
+<h2>4. Отслеживание и реклама</h2>
+<p>В приложении есть Meta (Facebook) SDK. iOS спрашивает, разрешаете ли вы отслеживание. Если разрешите, рекламный идентификатор и события приложения (установка, запуск, вход) передаются Meta Platforms для измерения рекламы. Если откажете, идентификатор не передаётся, а Meta получает только обезличенную статистику через Apple SKAdNetwork. Изменить выбор: Настройки iOS → Конфиденциальность и безопасность → Отслеживание. Чужой рекламы в приложении нет. Мы не продаём персональные данные.</p>
+
+<h2>5. Сайт</h2>
+<p>cryptonova.pro не ставит cookie и не использует аналитику, рекламные пиксели и трекеры. Выбранный язык сохраняется в вашем браузере (локальное хранилище) и к нам не отправляется. Живые цифры на странице — публичные демо-данные с cryptonova.vip, персональных данных в них нет. Шрифты загружаются с самого cryptonova.pro. Некоторые публичные страницы с данными на cryptonova.vip, например таблица прогнозов, загружают шрифты из Google Fonts, и когда вы их открываете, Google Fonts получает ваш IP-адрес.</p>
+<p>Оба сайта размещены на GitHub Pages. Как любой хостинг, GitHub обрабатывает ваш IP-адрес и технические данные запроса, чтобы показать страницы и защитить сервис, по своим правилам — <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>. Эти журналы мы не получаем.</p>
+
+<h2>6. Сторонние сервисы</h2>
 <div class="tablewrap"><table>
 <tr><th>Сервис</th><th>Для чего</th></tr>
 <tr><td>Google Firebase (Authentication, Cloud Messaging, Analytics, Crashlytics)</td><td>Вход, уведомления, аналитика, отчёты о сбоях</td></tr>
 <tr><td>Sign in with Apple / Google Sign-In</td><td>Вход</td></tr>
-<tr><td>Groq / Google Gemini API</td><td>Ответы AI-помощника NOVA</td></tr>
-<tr><td>BingX (партнёрский API)</td><td>Проверка VIP по UID, который вы ввели</td></tr>
-<tr><td>Meta Platforms (Facebook SDK)</td><td>Измерение рекламы — только с вашего согласия</td></tr>
-<tr><td>Наш сервер (app.crypto-capital.app, ЕС)</td><td>Хранение аккаунта, копилки, прогресса и настроек</td></tr>
-<tr><td>GitHub Pages (cryptonova.vip)</td><td>Публичные демо-данные и обучение — без персональных данных</td></tr>
+<tr><td>Groq / Google Gemini API</td><td>Ответы AI-помощника NOVA; распознавание скриншотов и PDF для «Разбора портфеля»</td></tr>
+<tr><td>OKX (okx.com)</td><td>Регистрация по нашей ссылке, проверка личности, ваш счёт и копи-трейдинг — по правилам OKX; живые цены монет, которые приложение загружает прямо с okx.com (OKX видит ваш IP-адрес)</td></tr>
+<tr><td>BingX</td><td>То же для счетов BingX, открытых по нашей ссылке там, где OKX не работает</td></tr>
+<tr><td>Meta Platforms (Facebook SDK)</td><td>Измерение рекламы, только с вашего согласия</td></tr>
+<tr><td>Наш сервер (app.crypto-capital.app, ЕС)</td><td>Хранение аккаунта, Копилки, прогресса и настроек</td></tr>
+<tr><td>GitHub Pages (cryptonova.pro, cryptonova.vip)</td><td>Размещение сайтов, публичные демо-данные и уроки; персональных данных из приложения там нет</td></tr>
+<tr><td>Telegram (@crypto_nova_support)</td><td>Чаты поддержки, только если вы сами нам там напишете</td></tr>
 </table></div>
 
-<h2>5. Сколько храним и как удалить</h2>
+<h2>7. Правовые основания</h2>
 <ul>
-<li>Данные хранятся, пока существует аккаунт.</li>
-<li><b>Удаление аккаунта:</b> в приложении Кабинет → «Удалить аккаунт». С сервера сразу удаляются вход, копилка, уроки, настройки, токены уведомлений, счётчик вопросов и привязка VIP. Подробно: <a href="delete.html">delete.html</a>.</li>
-<li>Если нет доступа к приложению — напишите на <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a> с адреса, которым входили. Удалим в течение 30 дней.</li>
-<li>Аналитику и отчёты о сбоях Firebase хранит до 14 месяцев по своим правилам.</li>
+<li><b>Работа приложения</b> (вход, Копилка, уроки, уведомления, NOVA, «Разбор портфеля»): исполнение договора с вами.</li>
+<li><b>Аналитика и отчёты о сбоях</b>: наш законный интерес — чтобы приложение работало и становилось лучше.</li>
+<li><b>Рекламный идентификатор</b>: ваше согласие, его можно отозвать в любой момент в настройках iOS.</li>
+<li><b>Ответы на ваши письма</b> и требования закона: законный интерес и обязанность по закону.</li>
 </ul>
 
-<h2>6. Ваши права</h2>
-<p>Вы можете запросить копию своих данных, исправление или удаление — пишите на <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>, ответим в течение 30 дней. Жители ЕС/ЕЭЗ и Великобритании имеют права по GDPR (доступ, исправление, удаление, ограничение, переносимость, возражение) и могут подать жалобу в надзорный орган. Жители Калифорнии имеют права по CCPA/CPRA; передача рекламного идентификатора Meta может считаться «sharing» — от неё можно отказаться, запретив отслеживание.</p>
+<h2>8. Сколько храним и как удалить</h2>
+<ul>
+<li>Данные хранятся, пока существует аккаунт.</li>
+<li><b>Удаление аккаунта</b> в приложении: Кабинет → «Удалить аккаунт». С сервера сразу удаляются вход, Копилка, уроки, настройки, токены уведомлений, счётчик вопросов и привязка UID биржи, если вы вводили его в прошлой версии приложения. Подробно: <a href="delete.html">как удалить аккаунт</a>.</li>
+<li>Нет доступа к приложению? Напишите на <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a> с адреса, которым входили. Удалим в течение 30 дней.</li>
+<li>Аналитику и отчёты о сбоях Firebase хранит до 14 месяцев по своим правилам.</li>
+<li>Письма в поддержку и чаты в Telegram мы храним до 12 месяцев после последнего сообщения, затем удаляем.</li>
+</ul>
 
-<h2>7. Безопасность</h2>
-<p>Связь приложения с сервером шифруется (HTTPS/TLS). Вход проверяется по токену Firebase. Доступ к серверу есть только у оператора. Абсолютной защиты не бывает — включите двухфакторную защиту на бирже.</p>
+<h2>9. Ваши права</h2>
+<p>Вы можете запросить копию своих данных, исправление или удаление — пишите на <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>, ответим в течение 30 дней. Жители ЕС/ЕЭЗ и Великобритании имеют права по GDPR (доступ, исправление, удаление, ограничение, переносимость, возражение, отзыв согласия) и могут подать жалобу в орган по защите данных своей страны. Жители Калифорнии имеют права по CCPA/CPRA; передача рекламного идентификатора Meta может считаться «sharing», от неё можно отказаться, запретив отслеживание.</p>
 
-<h2>8. Дети</h2>
-<p>Приложение предназначено для взрослых (18+). Мы сознательно не собираем данные детей. Если ребёнок передал нам данные — напишите нам, мы их удалим.</p>
+<h2>10. Безопасность</h2>
+<p>Связь приложения с сервером шифруется (HTTPS/TLS). Каждый запрос проверяется по токену Firebase. Доступ к серверу есть только у основателя. Абсолютной защиты не бывает, поэтому включите двухфакторную защиту на бирже.</p>
 
-<h2>9. Передача данных между странами</h2>
-<p>Наш сервер находится в Европейском союзе. Сервисы из раздела 4 могут обрабатывать данные в США и других странах на условиях своих политик (например, стандартных договорных условий ЕС).</p>
+<h2>11. Дети</h2>
+<p>Приложение предназначено для взрослых (18+). Мы сознательно не собираем данные детей. Если ребёнок передал нам данные, напишите нам, и мы их удалим.</p>
 
-<h2>10. Изменения</h2>
+<h2>12. Передача данных между странами</h2>
+<p>Наш сервер находится в Европейском союзе. Сервисы из раздела 6 могут обрабатывать данные в США и других странах на условиях своих гарантий, например стандартных договорных условий ЕС.</p>
+
+<h2>13. Изменения</h2>
 <p>Если политика изменится, мы обновим дату вверху, а о важных изменениях сообщим в приложении.</p>
 </section>
 
 <hr>
 
 <section id="en" lang="en">
-<h1>Privacy Policy</h1>
-<p class="meta">Effective October 20, 2026 · CRYPTO NOVΛ 2.0 app for iOS and Android (com.cryptonova) and the cryptonova.vip website</p>
-<div class="box"><p><b>In short.</b> We keep only what the app needs: your sign-in, piggy-bank settings, completed lessons and notification settings. CRYPTO NOVA 2.0 holds no money, cards, passwords or exchange keys. You can delete your account in the app with one button: Account → “Delete account”.</p></div>
-<p>The app is operated by Dmytro Sukhyna (“we”). Contact: <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>.</p>
+<h1>Privacy policy</h1>
+<p class="meta">Updated 22.10.2026. Applies to the CRYPTO NOVA AI app for iPhone, iPad and Android (bundle com.cryptonova, package com.cryptonova.app) and to the websites cryptonova.pro and cryptonova.vip.</p>
+<div class="box"><p><b>In short.</b> We keep only what the app needs: your sign-in, Piggy bank settings, completed lessons and notification settings. CRYPTO NOVA holds no money, cards, passwords or exchange keys. Files for “Portfolio review” are processed in memory and not stored. You can delete your account in the app with one button: Account → “Delete account”. The website sets no cookies and runs no trackers.</p></div>
+<p>The app and the websites are built and run by Dmytro Sukhyna (“we”), founder and developer, who is the data controller. Contact: <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>.</p>
 
-<h2>1. Information we collect</h2>
+<h2>1. Information we collect in the app</h2>
 <div class="tablewrap"><table>
 <tr><th>Data</th><th>When</th><th>Purpose</th></tr>
-<tr><td>Email, name and account ID from Sign in with Apple or Google</td><td>If you sign in</td><td>Keep your demo account, piggy bank and lessons across devices</td></tr>
-<tr><td>Piggy-bank settings: amount, frequency, goal, mode, start date</td><td>If you set up the piggy bank</td><td>Show what it would have grown to and remind you on the buy day</td></tr>
+<tr><td>Email, name and account ID from Sign in with Apple or Google</td><td>If you sign in</td><td>Keep your Piggy bank, lessons and settings across devices</td></tr>
+<tr><td>Piggy bank settings: amount, frequency, goal, mode, start date</td><td>If you set up the Piggy bank</td><td>Show what it would have grown to and remind you on the buy day</td></tr>
 <tr><td>Learning progress: lessons completed, quiz scores, XP</td><td>When you take lessons</td><td>Save your progress</td></tr>
 <tr><td>Notification settings and the push token</td><td>If you allow notifications</td><td>Send only what you switched on</td></tr>
 <tr><td>Questions to the NOVA AI assistant and the daily question count</td><td>When you ask NOVA</td><td>Get an answer and apply the daily limit</td></tr>
-<tr><td>Your BingX account UID and the exchange’s answer: opened via our link or not, funded or not</td><td>Only if you enter the UID on the “Become VIP” screen</td><td>Confirm VIP status</td></tr>
-<tr><td>Advertising identifier (IDFA) — only with your consent</td><td>If you allow tracking in the iOS prompt</td><td>Measure our advertising (Meta)</td></tr>
+<tr><td>A file or screenshot for “Portfolio review”</td><td>Only if you send it yourself</td><td>Produce the review; the file is not stored (section 3)</td></tr>
+<tr><td>Advertising identifier (IDFA), only with your consent</td><td>If you allow tracking in the iOS prompt</td><td>Measure our advertising (Meta)</td></tr>
 <tr><td>Usage data and crash logs</td><td>While you use the app</td><td>Analytics and bug fixing</td></tr>
 </table></div>
-<p>Your demo amount and language stay on your phone only. We do not collect location, contacts, photos, health data, card or bank account data, passwords or exchange API keys.</p>
+<p>Your demo amount and language stay on your phone only. We do not collect location, contacts, photos, health data, card or bank account data, passwords or exchange API keys. The app loads live coin prices directly from okx.com, so OKX sees your device’s IP address.</p>
+<p><b>Connecting an exchange.</b> Real trades go through OKX copy trading: you sign up on OKX through our partner link, verify your identity there, deposit USDT and tap «Copy CRYPTO NOVA» in the app — OKX then repeats CRYPTO NOVA’s trades in your account for the amount you choose. No UID, API keys or exchange passwords are needed for this, and we do not collect them. OKX handles sign-up, identity verification, your money and copying under its own privacy policy; we do not receive your documents. Under its own affiliate and copy-trading rules, OKX may show us the IDs of accounts opened through our link, their trading volume and copying results. Where OKX does not operate, the same applies to BingX through our link.</p>
 
 <h2>2. NOVA AI assistant</h2>
-<p>The text of your question, together with general CRYPTO NOVA demo figures, is sent to an AI model provider (Groq or the Google Gemini API) to produce the answer. Your name and email are not sent. We do not store question or answer texts — only the number of questions per day to apply the limit. Please don’t include personal data in questions.</p>
-<p><b>By voice.</b> When you tap the microphone, your phone’s built-in speech recognizer (Apple or Google, under their terms) turns speech into text. Only the text of the question reaches CRYPTO NOVA — we never receive or store audio. NOVA’s answer may be read aloud by the phone’s own speech synthesizer.</p>
+<p>The text of your question, together with general CRYPTO NOVA demo figures, is sent to an AI model provider (Groq or the Google Gemini API) to produce the answer. Your name and email are not sent. We do not store question or answer texts, only the number of questions per day to apply the limit. Please don’t include personal data in questions.</p>
+<p><b>By voice.</b> NOVA’s answers may be read aloud by the phone’s own speech synthesizer. The app does not use the microphone or speech recognition.</p>
 
-<h2>3. Tracking and advertising</h2>
-<p>The app includes the Meta (Facebook) SDK. iOS asks whether you allow tracking. If you allow it, the advertising identifier and app events (install, launch, sign-in) are shared with Meta Platforms to measure ads. If you decline, no identifier is shared and Meta receives only aggregated data via Apple SKAdNetwork. Change it in iOS Settings → Privacy &amp; Security → Tracking. There are no third-party ads in the app. We do not sell personal information.</p>
+<h2>3. Portfolio review</h2>
+<p>In NOVA AI you can send a portfolio export or statement — a CSV, XLSX or PDF file — or a screenshot, up to 10 MB, and get a review. The file is processed in our server’s memory and is not saved: we neither store nor log the file or its contents. A screenshot or the text of a PDF may be sent to an AI model provider (Groq, or the Google Gemini API if enabled) only for recognition, without your name or email. Do not upload files containing passwords, API keys, seed phrases or identity documents.</p>
 
-<h2>4. Third-party services</h2>
+<h2>4. Tracking and advertising</h2>
+<p>The app includes the Meta (Facebook) SDK. iOS asks whether you allow tracking. If you allow it, the advertising identifier and app events (install, launch, sign-in) are shared with Meta Platforms to measure ads. If you decline, no identifier is shared and Meta receives only aggregated data via Apple SKAdNetwork. You can change this in iOS Settings → Privacy &amp; Security → Tracking. There are no third-party ads in the app. We do not sell personal information.</p>
+
+<h2>5. The website</h2>
+<p>cryptonova.pro sets no cookies and uses no analytics, advertising pixels or trackers. Your language choice is saved in your own browser (local storage) and never sent to us. The live figures on the page are public demo data loaded from cryptonova.vip; they contain no personal data. Fonts are served from cryptonova.pro itself. Some public data pages on cryptonova.vip, such as the forecast table, load fonts from Google Fonts, which receives your IP address when you open them.</p>
+<p>Both websites are hosted on GitHub Pages. Like any web host, GitHub processes your IP address and technical request data to deliver the pages and protect the service, under the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub privacy statement</a>. We do not receive these logs.</p>
+
+<h2>6. Third-party services</h2>
 <div class="tablewrap"><table>
 <tr><th>Service</th><th>What for</th></tr>
 <tr><td>Google Firebase (Authentication, Cloud Messaging, Analytics, Crashlytics)</td><td>Sign-in, notifications, analytics, crash reports</td></tr>
 <tr><td>Sign in with Apple / Google Sign-In</td><td>Sign-in</td></tr>
-<tr><td>Groq / Google Gemini API</td><td>NOVA AI answers</td></tr>
-<tr><td>BingX (partner API)</td><td>VIP check of the UID you entered</td></tr>
-<tr><td>Meta Platforms (Facebook SDK)</td><td>Ad measurement — only with your consent</td></tr>
-<tr><td>Our server (app.crypto-capital.app, EU)</td><td>Storing the account, piggy bank, progress and settings</td></tr>
-<tr><td>GitHub Pages (cryptonova.vip)</td><td>Public demo data and lessons — no personal data</td></tr>
+<tr><td>Groq / Google Gemini API</td><td>NOVA AI answers; recognising screenshots and PDFs for “Portfolio review”</td></tr>
+<tr><td>OKX (okx.com)</td><td>Sign-up through our link, identity verification, your account and copy trading — under OKX’s rules; live coin prices the app loads directly from okx.com (OKX sees your IP address)</td></tr>
+<tr><td>BingX</td><td>The same for BingX accounts opened through our link where OKX does not operate</td></tr>
+<tr><td>Meta Platforms (Facebook SDK)</td><td>Ad measurement, only with your consent</td></tr>
+<tr><td>Our server (app.crypto-capital.app, EU)</td><td>Storing the account, Piggy bank, progress and settings</td></tr>
+<tr><td>GitHub Pages (cryptonova.pro, cryptonova.vip)</td><td>Hosting the websites, public demo data and lessons; no personal data from the app</td></tr>
+<tr><td>Telegram (@crypto_nova_support)</td><td>Support chats, only if you write to us there</td></tr>
 </table></div>
 
-<h2>5. Retention and deletion</h2>
+<h2>7. Legal basis</h2>
 <ul>
-<li>Data is kept while your account exists.</li>
-<li><b>Delete your account</b> in the app: Account → “Delete account”. Your sign-in, piggy bank, lessons, settings, push tokens, question count and VIP link are deleted from our server at once. Details: <a href="delete.html">delete.html</a>.</li>
-<li>No access to the app? Email <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a> from the address you signed in with. We delete within 30 days.</li>
-<li>Firebase keeps analytics and crash data for up to 14 months under its own policy.</li>
+<li><b>Providing the app</b> (sign-in, Piggy bank, lessons, notifications, NOVA, Portfolio review): performance of our agreement with you.</li>
+<li><b>Analytics and crash reports</b>: our legitimate interest in keeping the app working and improving it.</li>
+<li><b>Advertising identifier</b>: your consent, which you can withdraw at any time in iOS settings.</li>
+<li><b>Answering your emails</b> and legal obligations: legitimate interest and legal duty.</li>
 </ul>
 
-<h2>6. Your rights</h2>
-<p>You can ask for a copy of your data, a correction or deletion at <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>; we reply within 30 days. EU/EEA and UK residents have GDPR rights (access, rectification, erasure, restriction, portability, objection) and may complain to a supervisory authority. California residents have CCPA/CPRA rights; sharing the advertising identifier with Meta may count as “sharing” — opt out by declining tracking.</p>
+<h2>8. Retention and deletion</h2>
+<ul>
+<li>Data is kept while your account exists.</li>
+<li><b>Delete your account</b> in the app: Account → “Delete account”. Your sign-in, Piggy bank, lessons, settings, push tokens, question count and the link to your exchange UID, if you entered one in an earlier version of the app, are deleted from our server at once. Details: <a href="delete.html">how to delete an account</a>.</li>
+<li>No access to the app? Email <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a> from the address you signed in with. We delete within 30 days.</li>
+<li>Firebase keeps analytics and crash data for up to 14 months under its own policy.</li>
+<li>We keep support emails and Telegram chats for up to 12 months after the last message, then delete them.</li>
+</ul>
 
-<h2>7. Security</h2>
-<p>Traffic between the app and our server is encrypted (HTTPS/TLS). Every request is checked with a Firebase token. Only the operator has server access. No system is perfectly secure — please enable two-factor authentication on your exchange.</p>
+<h2>9. Your rights</h2>
+<p>You can ask for a copy of your data, a correction or deletion at <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>; we reply within 30 days. EU/EEA and UK residents have rights under the GDPR (access, rectification, erasure, restriction, portability, objection, withdrawing consent) and may complain to the data protection authority of their country. California residents have rights under the CCPA/CPRA; sharing the advertising identifier with Meta may count as “sharing”, and you can opt out by declining tracking.</p>
 
-<h2>8. Children</h2>
+<h2>10. Security</h2>
+<p>Traffic between the app and our server is encrypted (HTTPS/TLS). Every request is checked with a Firebase token. Only the founder has server access. No system is perfectly secure, so please enable two-factor authentication on your exchange.</p>
+
+<h2>11. Children</h2>
 <p>The app is intended for adults (18+). We do not knowingly collect children’s data. If a child has sent us data, contact us and we will delete it.</p>
 
-<h2>9. International transfers</h2>
-<p>Our server is in the European Union. Services listed in section 4 may process data in the United States and other countries under their own safeguards (e.g. EU standard contractual clauses).</p>
+<h2>12. International transfers</h2>
+<p>Our server is in the European Union. The services in section 6 may process data in the United States and other countries under their own safeguards, such as the EU standard contractual clauses.</p>
 
-<h2>10. Changes</h2>
-<p>If this policy changes we will update the date above and announce material changes in the app.</p>
+<h2>13. Changes</h2>
+<p>If this policy changes, we will update the date above and announce material changes in the app.</p>
+</section>
+
+<hr>
+
+<section id="uk" lang="uk">
+<h1>Політика конфіденційності</h1>
+<p class="meta">Оновлено 22.10.2026. Стосується застосунку CRYPTO NOVA AI для iPhone, iPad і Android (com.cryptonova, com.cryptonova.app) та сайтів cryptonova.pro і cryptonova.vip.</p>
+<div class="box"><p><b>Коротко.</b> Ми зберігаємо лише те, що потрібно застосунку: дані для входу, налаштування Скарбнички, пройдені уроки й налаштування сповіщень. Грошей, карток, паролів і ключів від бірж у CRYPTO NOVA немає. Файли для «Розбору портфеля» обробляються в пам'яті й не зберігаються. Акаунт видаляється в застосунку однією кнопкою: Кабінет → «Видалити акаунт». Сайт не встановлює cookie і не використовує трекерів.</p></div>
+<p>Застосунок і сайти створює й веде Дмитро Сухина («ми») — засновник і розробник; він же є контролером даних, тобто відповідає за їх обробку. Контакт: <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>.</p>
+
+<h2>1. Які дані ми збираємо в застосунку</h2>
+<div class="tablewrap"><table>
+<tr><th>Дані</th><th>Коли</th><th>Навіщо</th></tr>
+<tr><td>Адреса електронної пошти, ім'я та ID акаунта з входу через Apple або Google</td><td>Якщо ви увійшли</td><td>Зберегти Скарбничку, уроки й налаштування на всіх пристроях</td></tr>
+<tr><td>Налаштування Скарбнички: сума, частота, ціль, режим, дата початку</td><td>Якщо ви налаштували Скарбничку</td><td>Показати, скільки б накопичилося, і нагадати в день купівлі</td></tr>
+<tr><td>Прогрес навчання: пройдені уроки, бали тестів, XP</td><td>Коли ви проходите уроки</td><td>Зберегти прогрес</td></tr>
+<tr><td>Налаштування сповіщень і токен для push-сповіщень</td><td>Якщо ви дозволили сповіщення</td><td>Надсилати лише те, що ви ввімкнули</td></tr>
+<tr><td>Запитання до AI-помічниці NOVA і лічильник запитань за день</td><td>Коли ви запитуєте NOVA</td><td>Отримати відповідь і застосувати денний ліміт</td></tr>
+<tr><td>Файл або скриншот для «Розбору портфеля»</td><td>Лише якщо ви самі його надіслали</td><td>Зробити розбір; файл не зберігається (розділ 3)</td></tr>
+<tr><td>Рекламний ідентифікатор (IDFA), лише з вашої згоди</td><td>Якщо ви дозволили відстеження в системному запиті iOS</td><td>Оцінити ефективність нашої реклами (Meta)</td></tr>
+<tr><td>Дані про використання та журнали збоїв</td><td>Під час роботи застосунку</td><td>Аналітика й виправлення помилок</td></tr>
+</table></div>
+<p>Демо-сума та вибір мови зберігаються лише на вашому телефоні. Ми не збираємо геолокацію, контакти, фото, дані про здоров'я, дані карток і банківських рахунків, паролі та API-ключі бірж. Живі ціни монет застосунок завантажує напряму з okx.com, тому OKX бачить IP-адресу вашого пристрою.</p>
+<p><b>Підключення до біржі.</b> Реальні угоди йдуть через копі-трейдинг OKX: ви реєструєтеся на OKX за нашим партнерським посиланням, проходите там перевірку особи, поповнюєте рахунок у USDT і натискаєте в застосунку «Копіювати CRYPTO NOVA» — OKX повторює угоди CRYPTO NOVA на вашому рахунку на обрану вами суму. UID, ключі API та паролі від біржі для цього не потрібні, і ми їх не збираємо. Реєстрацію, перевірку особи, ваші гроші й копіювання обробляє OKX за своєю політикою конфіденційності; ваших документів ми не отримуємо. За своїми правилами партнерської програми й копі-трейдингу OKX може показувати нам ID акаунтів, відкритих за нашим посиланням, їхній обсяг торгівлі та результат копіювання. Де OKX не працює, те саме стосується BingX за нашим посиланням.</p>
+
+<h2>2. AI-помічниця NOVA</h2>
+<p>Текст вашого запитання разом із загальними демо-цифрами CRYPTO NOVA надсилається постачальнику AI-моделі (Groq або Google Gemini API), щоб отримати відповідь. Ваше ім'я та адреса пошти туди не передаються. Ми не зберігаємо тексти запитань і відповідей, лише кількість запитань за день, щоб застосувати ліміт. Не пишіть у запитаннях особистих даних.</p>
+<p><b>Голосом.</b> Відповіді NOVA може прочитати вголос синтезатор мовлення самого телефона. Мікрофон і розпізнавання мовлення застосунок не використовує.</p>
+
+<h2>3. Розбір портфеля</h2>
+<p>У NOVA AI можна надіслати вивантаження або виписку портфеля — файл CSV, XLSX чи PDF — або скриншот, до 10 МБ, і отримати розбір. Файл обробляється в пам'яті нашого сервера й не зберігається: ні файл, ні його вміст ми не зберігаємо й не записуємо в журнали. Скриншот або текст PDF може бути надіслано постачальнику AI-моделі (Groq або Google Gemini API, якщо його підключено) лише для розпізнавання, без вашого імені та e-mail. Не завантажуйте файли з паролями, ключами API, секретними фразами й документами, що посвідчують особу.</p>
+
+<h2>4. Відстеження та реклама</h2>
+<p>У застосунку є Meta (Facebook) SDK. iOS запитує, чи дозволяєте ви відстеження. Якщо дозволите, рекламний ідентифікатор і події застосунку (встановлення, запуск, вхід) передаються Meta Platforms для вимірювання реклами. Якщо відмовитеся, ідентифікатор не передається, а Meta отримує лише агреговані дані через Apple SKAdNetwork. Змінити вибір можна в iOS: Параметри → Приватність і безпека → Відстеження. Сторонньої реклами в застосунку немає. Ми не продаємо персональні дані.</p>
+
+<h2>5. Сайт</h2>
+<p>cryptonova.pro не встановлює cookie і не використовує аналітики, рекламних пікселів чи трекерів. Вибрана мова зберігається у вашому браузері (локальне сховище) і нам не надсилається. Живі цифри на сторінці — публічні демо-дані з cryptonova.vip, персональних даних у них немає. Шрифти завантажуються з самого cryptonova.pro. Деякі публічні сторінки з даними на cryptonova.vip, наприклад таблиця прогнозів, завантажують шрифти з Google Fonts, і коли ви їх відкриваєте, Google Fonts отримує вашу IP-адресу.</p>
+<p>Обидва сайти розміщено на GitHub Pages. Як і будь-який хостинг, GitHub обробляє вашу IP-адресу й технічні дані запиту, щоб показати сторінки та захистити сервіс, за своїми правилами — <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>. Ці журнали ми не отримуємо.</p>
+
+<h2>6. Сторонні сервіси</h2>
+<div class="tablewrap"><table>
+<tr><th>Сервіс</th><th>Для чого</th></tr>
+<tr><td>Google Firebase (Authentication, Cloud Messaging, Analytics, Crashlytics)</td><td>Вхід, сповіщення, аналітика, звіти про збої</td></tr>
+<tr><td>Sign in with Apple / Google Sign-In</td><td>Вхід</td></tr>
+<tr><td>Groq / Google Gemini API</td><td>Відповіді AI-помічника NOVA; розпізнавання скриншотів і PDF для «Розбору портфеля»</td></tr>
+<tr><td>OKX (okx.com)</td><td>Реєстрація за нашим посиланням, перевірка особи, ваш рахунок і копі-трейдинг — за правилами OKX; живі ціни монет, які застосунок завантажує напряму з okx.com (OKX бачить вашу IP-адресу)</td></tr>
+<tr><td>BingX</td><td>Те саме для рахунків BingX, відкритих за нашим посиланням там, де OKX не працює</td></tr>
+<tr><td>Meta Platforms (Facebook SDK)</td><td>Вимірювання реклами, лише з вашої згоди</td></tr>
+<tr><td>Наш сервер (app.crypto-capital.app, ЄС)</td><td>Зберігання акаунта, Скарбнички, прогресу й налаштувань</td></tr>
+<tr><td>GitHub Pages (cryptonova.pro, cryptonova.vip)</td><td>Розміщення сайтів, публічних демо-даних і уроків; персональних даних із застосунку там немає</td></tr>
+<tr><td>Telegram (@crypto_nova_support)</td><td>Чати підтримки, лише якщо ви самі нам там напишете</td></tr>
+</table></div>
+
+<h2>7. Правові підстави</h2>
+<ul>
+<li><b>Робота застосунку</b> (вхід, Скарбничка, уроки, сповіщення, NOVA, «Розбір портфеля»): виконання договору з вами.</li>
+<li><b>Аналітика та звіти про збої</b>: наш законний інтерес — щоб застосунок працював і ставав кращим.</li>
+<li><b>Рекламний ідентифікатор</b>: ваша згода, яку можна відкликати будь-коли в Параметрах iOS.</li>
+<li><b>Відповіді на ваші листи</b> та вимоги закону: законний інтерес і обов'язок за законом.</li>
+</ul>
+
+<h2>8. Скільки зберігаємо і як видалити</h2>
+<ul>
+<li>Дані зберігаються, доки існує акаунт.</li>
+<li><b>Видалення акаунта</b> в застосунку: Кабінет → «Видалити акаунт». Із сервера одразу видаляються дані для входу, Скарбничка, уроки, налаштування, токени сповіщень, лічильник запитань і прив'язка UID біржі, якщо ви вводили його в попередній версії застосунку. Детально: <a href="delete.html">як видалити акаунт</a>.</li>
+<li>Немає доступу до застосунку? Напишіть на <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a> з адреси, якою входили. Видалимо протягом 30 днів.</li>
+<li>Аналітику та звіти про збої Firebase зберігає до 14 місяців за своїми правилами.</li>
+<li>Листи до підтримки та чати в Telegram ми зберігаємо до 12 місяців після останнього повідомлення, потім видаляємо.</li>
+</ul>
+
+<h2>9. Ваші права</h2>
+<p>Ви можете запросити копію своїх даних, їх виправлення чи видалення — пишіть на <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>, відповімо протягом 30 днів. Мешканці ЄС/ЄЕЗ і Великої Британії мають права за GDPR (доступ, виправлення, видалення, обмеження обробки, перенесення даних, заперечення, відкликання згоди) і можуть подати скаргу до органу із захисту даних своєї країни. Мешканці Каліфорнії мають права за CCPA/CPRA; передавання рекламного ідентифікатора Meta може вважатися «sharing», і від нього можна відмовитися, заборонивши відстеження.</p>
+
+<h2>10. Безпека</h2>
+<p>Зв'язок застосунку із сервером шифрується (HTTPS/TLS). Кожен запит перевіряється за токеном Firebase. Доступ до сервера має лише засновник. Абсолютного захисту не буває, тому ввімкніть двофакторну автентифікацію на біржі.</p>
+
+<h2>11. Діти</h2>
+<p>Застосунок призначений для дорослих (18+). Ми свідомо не збираємо дані дітей. Якщо дитина передала нам дані, напишіть нам, і ми їх видалимо.</p>
+
+<h2>12. Передавання даних між країнами</h2>
+<p>Наш сервер розташований у Європейському Союзі. Сервіси з розділу 6 можуть обробляти дані у США та інших країнах на умовах власних гарантій, наприклад стандартних договірних умов ЄС.</p>
+
+<h2>13. Зміни</h2>
+<p>Якщо політика зміниться, ми оновимо дату вгорі, а про важливі зміни повідомимо в застосунку.</p>
+</section>
+
+<hr>
+
+<section id="el" lang="el">
+<h1>Πολιτική απορρήτου</h1>
+<p class="meta">Ενημερώθηκε 22.10.2026. Αφορά την εφαρμογή CRYPTO NOVA AI για iPhone, iPad και Android (bundle com.cryptonova, package com.cryptonova.app) και τους ιστότοπους cryptonova.pro και cryptonova.vip.</p>
+<div class="box"><p><b>Με λίγα λόγια.</b> Κρατάμε μόνο ό,τι χρειάζεται η εφαρμογή: τα στοιχεία σύνδεσής σας, τις ρυθμίσεις του Κουμπαρά, τα ολοκληρωμένα μαθήματα και τις ρυθμίσεις ειδοποιήσεων. Το CRYPTO NOVA δεν κρατά χρήματα, κάρτες, κωδικούς πρόσβασης ή κλειδιά ανταλλακτηρίων. Τα αρχεία για την «Ανάλυση χαρτοφυλακίου» επεξεργάζονται στη μνήμη και δεν αποθηκεύονται. Μπορείτε να διαγράψετε τον λογαριασμό σας στην εφαρμογή με ένα κουμπί: Προφίλ → «Διαγραφή λογαριασμού». Ο ιστότοπος δεν χρησιμοποιεί cookies ούτε εργαλεία παρακολούθησης.</p></div>
+<p>Την εφαρμογή και τους ιστότοπους δημιουργεί και διαχειρίζεται ο Dmytro Sukhyna («εμείς»), ιδρυτής και προγραμματιστής, ο οποίος είναι ο υπεύθυνος επεξεργασίας των δεδομένων. Επικοινωνία: <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>.</p>
+
+<h2>1. Ποια δεδομένα συλλέγουμε στην εφαρμογή</h2>
+<div class="tablewrap"><table>
+<tr><th>Δεδομένα</th><th>Πότε</th><th>Σκοπός</th></tr>
+<tr><td>Διεύθυνση email, όνομα και αναγνωριστικό λογαριασμού από τη σύνδεση μέσω Apple ή Google</td><td>Αν συνδεθείτε</td><td>Διατήρηση του Κουμπαρά, των μαθημάτων και των ρυθμίσεών σας σε όλες τις συσκευές</td></tr>
+<tr><td>Ρυθμίσεις Κουμπαρά: ποσό, συχνότητα, στόχος, λειτουργία, ημερομηνία έναρξης</td><td>Αν ρυθμίσετε τον Κουμπαρά</td><td>Εμφάνιση του ποσού που θα είχε συγκεντρωθεί και υπενθύμιση την ημέρα αγοράς</td></tr>
+<tr><td>Πρόοδος μάθησης: ολοκληρωμένα μαθήματα, βαθμολογίες τεστ, XP</td><td>Όταν κάνετε τα μαθήματα</td><td>Αποθήκευση της προόδου σας</td></tr>
+<tr><td>Ρυθμίσεις ειδοποιήσεων και το token ειδοποιήσεων push</td><td>Αν επιτρέψετε τις ειδοποιήσεις</td><td>Αποστολή μόνο όσων έχετε ενεργοποιήσει</td></tr>
+<tr><td>Ερωτήσεις προς τη βοηθό AI NOVA και ο αριθμός ερωτήσεων της ημέρας</td><td>Όταν ρωτάτε τη NOVA</td><td>Λήψη απάντησης και εφαρμογή του ημερήσιου ορίου</td></tr>
+<tr><td>Αρχείο ή στιγμιότυπο οθόνης για την «Ανάλυση χαρτοφυλακίου»</td><td>Μόνο αν το στείλετε εσείς</td><td>Εκπόνηση της ανάλυσης· το αρχείο δεν αποθηκεύεται (ενότητα 3)</td></tr>
+<tr><td>Διαφημιστικό αναγνωριστικό (IDFA), μόνο με τη συγκατάθεσή σας</td><td>Αν επιτρέψετε την παρακολούθηση στο σχετικό ερώτημα του iOS</td><td>Μέτρηση της διαφήμισής μας (Meta)</td></tr>
+<tr><td>Δεδομένα χρήσης και αρχεία καταγραφής κατάρρευσης</td><td>Όσο χρησιμοποιείτε την εφαρμογή</td><td>Ανάλυση χρήσης και διόρθωση σφαλμάτων</td></tr>
+</table></div>
+<p>Το ποσό demo και η γλώσσα σας μένουν μόνο στο τηλέφωνό σας. Δεν συλλέγουμε τοποθεσία, επαφές, φωτογραφίες, δεδομένα υγείας, στοιχεία καρτών ή τραπεζικών λογαριασμών, κωδικούς πρόσβασης ή κλειδιά API ανταλλακτηρίων. Η εφαρμογή φορτώνει τις τρέχουσες τιμές νομισμάτων απευθείας από το okx.com, οπότε το OKX βλέπει τη διεύθυνση IP της συσκευής σας.</p>
+<p><b>Σύνδεση με ανταλλακτήριο.</b> Οι πραγματικές συναλλαγές γίνονται μέσω του copy trading του OKX: εγγράφεστε στο OKX μέσω του συνεργατικού μας συνδέσμου, επαληθεύετε εκεί την ταυτότητά σας, καταθέτετε USDT και πατάτε «Αντιγραφή CRYPTO NOVA» στην εφαρμογή — το OKX επαναλαμβάνει τις συναλλαγές της CRYPTO NOVA στον λογαριασμό σας για το ποσό που επιλέγετε. Γι' αυτό δεν χρειάζονται UID, κλειδιά API ή κωδικοί του ανταλλακτηρίου, και δεν τα συλλέγουμε. Την εγγραφή, την επαλήθευση ταυτότητας, τα χρήματά σας και την αντιγραφή τα χειρίζεται το OKX σύμφωνα με τη δική του πολιτική απορρήτου· τα έγγραφά σας δεν τα λαμβάνουμε. Σύμφωνα με τους δικούς του κανόνες συνεργατών και copy trading, το OKX μπορεί να μας δείχνει τα ID των λογαριασμών που άνοιξαν μέσω του συνδέσμου μας, τον όγκο συναλλαγών τους και τα αποτελέσματα της αντιγραφής. Όπου δεν λειτουργεί το OKX, τα ίδια ισχύουν για το BingX μέσω του συνδέσμου μας.</p>
+
+<h2>2. Η βοηθός AI NOVA</h2>
+<p>Το κείμενο της ερώτησής σας, μαζί με γενικά στοιχεία demo του CRYPTO NOVA, αποστέλλεται σε πάροχο μοντέλου AI (Groq ή Google Gemini API) για να δημιουργηθεί η απάντηση. Το όνομα και το email σας δεν αποστέλλονται. Δεν αποθηκεύουμε τα κείμενα των ερωτήσεων και των απαντήσεων, μόνο τον αριθμό ερωτήσεων ανά ημέρα για την εφαρμογή του ορίου. Παρακαλούμε μη συμπεριλαμβάνετε προσωπικά δεδομένα στις ερωτήσεις σας.</p>
+<p><b>Με φωνή.</b> Οι απαντήσεις του NOVA μπορούν να εκφωνηθούν από τη λειτουργία σύνθεσης ομιλίας του ίδιου του τηλεφώνου. Η εφαρμογή δεν χρησιμοποιεί το μικρόφωνο ούτε αναγνώριση ομιλίας.</p>
+
+<h2>3. Ανάλυση χαρτοφυλακίου</h2>
+<p>Στο NOVA AI μπορείτε να στείλετε εξαγωγή ή αντίγραφο κίνησης του χαρτοφυλακίου σας — αρχείο CSV, XLSX ή PDF — ή στιγμιότυπο οθόνης, έως 10 MB, και να λάβετε ανάλυση. Το αρχείο επεξεργάζεται στη μνήμη του διακομιστή μας και δεν αποθηκεύεται: ούτε το αρχείο ούτε το περιεχόμενό του αποθηκεύουμε ή καταγράφουμε. Ένα στιγμιότυπο οθόνης ή το κείμενο ενός PDF μπορεί να σταλεί σε πάροχο μοντέλου AI (Groq ή Google Gemini API, αν είναι ενεργό) μόνο για αναγνώριση, χωρίς το όνομα ή το email σας. Μην ανεβάζετε αρχεία με κωδικούς πρόσβασης, κλειδιά API, φράσεις ανάκτησης ή έγγραφα ταυτότητας.</p>
+
+<h2>4. Παρακολούθηση και διαφήμιση</h2>
+<p>Η εφαρμογή περιλαμβάνει το Meta (Facebook) SDK. Το iOS σάς ρωτά αν επιτρέπετε την παρακολούθηση. Αν την επιτρέψετε, το διαφημιστικό αναγνωριστικό και συμβάντα της εφαρμογής (εγκατάσταση, εκκίνηση, σύνδεση) κοινοποιούνται στη Meta Platforms για τη μέτρηση διαφημίσεων. Αν αρνηθείτε, δεν κοινοποιείται κανένα αναγνωριστικό και η Meta λαμβάνει μόνο συγκεντρωτικά δεδομένα μέσω του Apple SKAdNetwork. Μπορείτε να το αλλάξετε στις Ρυθμίσεις iOS → Απόρρητο και ασφάλεια → Παρακολούθηση. Η εφαρμογή δεν εμφανίζει διαφημίσεις τρίτων. Δεν πουλάμε προσωπικά δεδομένα.</p>
+
+<h2>5. Ο ιστότοπος</h2>
+<p>Το cryptonova.pro δεν χρησιμοποιεί cookies ούτε εργαλεία ανάλυσης, διαφημιστικά pixel ή εργαλεία παρακολούθησης. Η επιλογή γλώσσας σας αποθηκεύεται στο δικό σας πρόγραμμα περιήγησης (τοπικός αποθηκευτικός χώρος) και δεν μας αποστέλλεται ποτέ. Τα ζωντανά στοιχεία στη σελίδα είναι δημόσια δεδομένα demo που φορτώνονται από το cryptonova.vip και δεν περιέχουν προσωπικά δεδομένα. Οι γραμματοσειρές φορτώνονται από το ίδιο το cryptonova.pro. Ορισμένες δημόσιες σελίδες δεδομένων στο cryptonova.vip, όπως ο πίνακας προβλέψεων, φορτώνουν γραμματοσειρές από το Google Fonts, το οποίο λαμβάνει τη διεύθυνση IP σας όταν τις ανοίγετε.</p>
+<p>Και οι δύο ιστότοποι φιλοξενούνται στο GitHub Pages. Όπως κάθε πάροχος φιλοξενίας, το GitHub επεξεργάζεται τη διεύθυνση IP σας και τεχνικά δεδομένα του αιτήματος για να παραδώσει τις σελίδες και να προστατεύσει την υπηρεσία, σύμφωνα με τη <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">δήλωση απορρήτου του GitHub</a>. Εμείς δεν λαμβάνουμε αυτά τα αρχεία καταγραφής.</p>
+
+<h2>6. Υπηρεσίες τρίτων</h2>
+<div class="tablewrap"><table>
+<tr><th>Υπηρεσία</th><th>Για ποιο σκοπό</th></tr>
+<tr><td>Google Firebase (Authentication, Cloud Messaging, Analytics, Crashlytics)</td><td>Σύνδεση, ειδοποιήσεις, ανάλυση χρήσης, αναφορές κατάρρευσης</td></tr>
+<tr><td>Sign in with Apple / Google Sign-In</td><td>Σύνδεση</td></tr>
+<tr><td>Groq / Google Gemini API</td><td>Απαντήσεις του βοηθού AI NOVA· αναγνώριση στιγμιοτύπων οθόνης και PDF για την «Ανάλυση χαρτοφυλακίου»</td></tr>
+<tr><td>OKX (okx.com)</td><td>Εγγραφή μέσω του συνδέσμου μας, επαλήθευση ταυτότητας, ο λογαριασμός σας και το copy trading — με τους κανόνες του OKX· τρέχουσες τιμές νομισμάτων, που η εφαρμογή φορτώνει απευθείας από το okx.com (το OKX βλέπει τη διεύθυνση IP σας)</td></tr>
+<tr><td>BingX</td><td>Τα ίδια για λογαριασμούς BingX που άνοιξαν μέσω του συνδέσμου μας, όπου δεν λειτουργεί το OKX</td></tr>
+<tr><td>Meta Platforms (Facebook SDK)</td><td>Μέτρηση διαφημίσεων, μόνο με τη συγκατάθεσή σας</td></tr>
+<tr><td>Ο διακομιστής μας (app.crypto-capital.app, ΕΕ)</td><td>Αποθήκευση του λογαριασμού, του Κουμπαρά, της προόδου και των ρυθμίσεων</td></tr>
+<tr><td>GitHub Pages (cryptonova.pro, cryptonova.vip)</td><td>Φιλοξενία των ιστοτόπων, των δημόσιων δεδομένων demo και των μαθημάτων, χωρίς προσωπικά δεδομένα από την εφαρμογή</td></tr>
+<tr><td>Telegram (@crypto_nova_support)</td><td>Συνομιλίες υποστήριξης, μόνο αν μας γράψετε εκεί</td></tr>
+</table></div>
+
+<h2>7. Νομική βάση</h2>
+<ul>
+<li><b>Παροχή της εφαρμογής</b> (σύνδεση, Κουμπαράς, μαθήματα, ειδοποιήσεις, NOVA, «Ανάλυση χαρτοφυλακίου»): εκτέλεση της σύμβασής μας μαζί σας.</li>
+<li><b>Ανάλυση χρήσης και αναφορές κατάρρευσης</b>: το έννομο συμφέρον μας να διατηρούμε την εφαρμογή σε λειτουργία και να τη βελτιώνουμε.</li>
+<li><b>Διαφημιστικό αναγνωριστικό</b>: η συγκατάθεσή σας, την οποία μπορείτε να ανακαλέσετε ανά πάσα στιγμή στις ρυθμίσεις του iOS.</li>
+<li><b>Απαντήσεις στα email σας</b> και νομικές υποχρεώσεις: έννομο συμφέρον και συμμόρφωση με έννομη υποχρέωση.</li>
+</ul>
+
+<h2>8. Διατήρηση και διαγραφή</h2>
+<ul>
+<li>Τα δεδομένα διατηρούνται όσο υπάρχει ο λογαριασμός σας.</li>
+<li><b>Διαγράψτε τον λογαριασμό σας</b> στην εφαρμογή: Προφίλ → «Διαγραφή λογαριασμού». Τα στοιχεία σύνδεσης, ο Κουμπαράς, τα μαθήματα, οι ρυθμίσεις, τα tokens ειδοποιήσεων push, ο αριθμός ερωτήσεων και η αντιστοίχιση με το UID σας στο ανταλλακτήριο, αν το είχατε εισαγάγει σε προηγούμενη έκδοση της εφαρμογής, διαγράφονται αμέσως από τον διακομιστή μας. Λεπτομέρειες: <a href="delete.html">πώς διαγράφεται ένας λογαριασμός</a>.</li>
+<li>Δεν έχετε πρόσβαση στην εφαρμογή; Στείλτε email στο <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a> από τη διεύθυνση με την οποία συνδεθήκατε. Διαγράφουμε εντός 30 ημερών.</li>
+<li>Το Firebase διατηρεί δεδομένα ανάλυσης χρήσης και κατάρρευσης έως 14 μήνες, σύμφωνα με τη δική του πολιτική.</li>
+<li>Διατηρούμε τα email υποστήριξης και τις συνομιλίες στο Telegram έως 12 μήνες μετά το τελευταίο μήνυμα και έπειτα τα διαγράφουμε.</li>
+</ul>
+
+<h2>9. Τα δικαιώματά σας</h2>
+<p>Μπορείτε να ζητήσετε αντίγραφο των δεδομένων σας, διόρθωση ή διαγραφή στο <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>. Απαντάμε εντός 30 ημερών. Οι κάτοικοι ΕΕ/ΕΟΧ και Ηνωμένου Βασιλείου έχουν δικαιώματα βάσει του GDPR (ΓΚΠΔ): πρόσβαση, διόρθωση, διαγραφή, περιορισμό της επεξεργασίας, φορητότητα, εναντίωση και ανάκληση της συγκατάθεσης. Μπορούν επίσης να υποβάλουν καταγγελία στην αρχή προστασίας δεδομένων της χώρας τους. Οι κάτοικοι Καλιφόρνιας έχουν δικαιώματα βάσει του CCPA/CPRA. Η διαβίβαση του διαφημιστικού αναγνωριστικού στη Meta μπορεί να θεωρείται «sharing», και μπορείτε να την αρνηθείτε απορρίπτοντας την παρακολούθηση.</p>
+
+<h2>10. Ασφάλεια</h2>
+<p>Η επικοινωνία μεταξύ της εφαρμογής και του διακομιστή μας είναι κρυπτογραφημένη (HTTPS/TLS). Κάθε αίτημα ελέγχεται με token του Firebase. Πρόσβαση στον διακομιστή έχει μόνο ο ιδρυτής. Κανένα σύστημα δεν είναι απόλυτα ασφαλές, γι’ αυτό σας συνιστούμε να ενεργοποιήσετε τον έλεγχο ταυτότητας δύο παραγόντων στο ανταλλακτήριό σας.</p>
+
+<h2>11. Παιδιά</h2>
+<p>Η εφαρμογή απευθύνεται σε ενήλικες (18+). Δεν συλλέγουμε εν γνώσει μας δεδομένα παιδιών. Αν ένα παιδί μάς έχει στείλει δεδομένα, επικοινωνήστε μαζί μας και θα τα διαγράψουμε.</p>
+
+<h2>12. Διεθνείς διαβιβάσεις</h2>
+<p>Ο διακομιστής μας βρίσκεται στην Ευρωπαϊκή Ένωση. Οι υπηρεσίες της ενότητας 6 ενδέχεται να επεξεργάζονται δεδομένα στις Ηνωμένες Πολιτείες και σε άλλες χώρες με τις δικές τους εγγυήσεις, όπως οι τυποποιημένες συμβατικές ρήτρες της ΕΕ.</p>
+
+<h2>13. Αλλαγές</h2>
+<p>Αν αυτή η πολιτική αλλάξει, θα ενημερώσουμε την ημερομηνία παραπάνω και θα ανακοινώσουμε τις ουσιώδεις αλλαγές στην εφαρμογή.</p>
+</section>
+
+<hr>
+
+<section id="es" lang="es">
+<h1>Política de privacidad</h1>
+<p class="meta">Actualizado el 22.10.2026. Se aplica a la app CRYPTO NOVA AI para iPhone, iPad y Android (bundle com.cryptonova, paquete com.cryptonova.app) y a los sitios web cryptonova.pro y cryptonova.vip.</p>
+<div class="box"><p><b>En resumen.</b> Solo guardamos lo que la app necesita: tus datos de acceso, los ajustes de la Hucha, las lecciones completadas y los ajustes de notificaciones. CRYPTO NOVA no guarda dinero, tarjetas, contraseñas ni claves de exchanges. Los archivos del «Análisis de cartera» se procesan en memoria y no se guardan. Puedes eliminar tu cuenta en la app con un solo botón: Mi cuenta → «Eliminar cuenta». El sitio web no instala cookies ni usa rastreadores.</p></div>
+<p>La app y los sitios web los crea y gestiona Dmytro Sukhyna («nosotros»), fundador y desarrollador, que es el responsable del tratamiento de los datos. Contacto: <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>.</p>
+
+<h2>1. Información que recopilamos en la app</h2>
+<div class="tablewrap"><table>
+<tr><th>Datos</th><th>Cuándo</th><th>Para qué</th></tr>
+<tr><td>Correo electrónico, nombre e ID de cuenta al iniciar sesión con Apple o Google</td><td>Si inicias sesión</td><td>Conservar tu Hucha, tus lecciones y tus ajustes en todos tus dispositivos</td></tr>
+<tr><td>Ajustes de la Hucha: cantidad, frecuencia, meta, modo, fecha de inicio</td><td>Si configuras la Hucha</td><td>Mostrar cuánto habría crecido y recordarte el día de compra</td></tr>
+<tr><td>Progreso de aprendizaje: lecciones completadas, puntuaciones de los tests, XP</td><td>Cuando haces lecciones</td><td>Guardar tu progreso</td></tr>
+<tr><td>Ajustes de notificaciones y el token push</td><td>Si permites las notificaciones</td><td>Enviarte solo lo que hayas activado</td></tr>
+<tr><td>Preguntas al asistente de IA NOVA y el número de preguntas del día</td><td>Cuando preguntas a NOVA</td><td>Obtener una respuesta y aplicar el límite diario</td></tr>
+<tr><td>Un archivo o captura de pantalla para el «Análisis de cartera»</td><td>Solo si lo envías tú</td><td>Hacer el análisis; el archivo no se guarda (apartado 3)</td></tr>
+<tr><td>Identificador de publicidad (IDFA), solo con tu consentimiento</td><td>Si permites el rastreo en el aviso de iOS</td><td>Medir nuestra publicidad (Meta)</td></tr>
+<tr><td>Datos de uso y registros de fallos</td><td>Mientras usas la app</td><td>Analítica y corrección de errores</td></tr>
+</table></div>
+<p>Tu cantidad demo y tu idioma se quedan solo en tu teléfono. No recopilamos ubicación, contactos, fotos, datos de salud, datos de tarjetas o cuentas bancarias, contraseñas ni claves API de exchanges. La app carga los precios en vivo de las monedas directamente desde okx.com, por lo que OKX ve la dirección IP de tu dispositivo.</p>
+<p><b>Conexión con un exchange.</b> Las operaciones reales se hacen con el copy trading de OKX: te registras en OKX con nuestro enlace de afiliado, verificas allí tu identidad, depositas USDT y pulsas «Copiar CRYPTO NOVA» en la app; OKX repite entonces las operaciones de CRYPTO NOVA en tu cuenta por el importe que elijas. Para ello no hacen falta UID, claves API ni contraseñas del exchange, y no los recopilamos. OKX gestiona el registro, la verificación de identidad, tu dinero y la copia según su propia política de privacidad; no recibimos tus documentos. Según sus propias reglas de afiliados y de copy trading, OKX puede mostrarnos los ID de las cuentas abiertas con nuestro enlace, su volumen de operaciones y los resultados de la copia. Donde OKX no opera, lo mismo se aplica a BingX con nuestro enlace.</p>
+
+<h2>2. Asistente de IA NOVA</h2>
+<p>El texto de tu pregunta, junto con cifras demo generales de CRYPTO NOVA, se envía a un proveedor de modelos de IA (Groq o Google Gemini API) para generar la respuesta. Tu nombre y tu correo electrónico no se envían. No guardamos los textos de las preguntas ni de las respuestas, solo el número de preguntas por día para aplicar el límite. Por favor, no incluyas datos personales en tus preguntas.</p>
+<p><b>Por voz.</b> Las respuestas de NOVA pueden leerse en voz alta con el sintetizador de voz del propio teléfono. La app no usa el micrófono ni el reconocimiento de voz.</p>
+
+<h2>3. Análisis de cartera</h2>
+<p>En NOVA AI puedes enviar una exportación o un extracto de tu cartera —un archivo CSV, XLSX o PDF— o una captura de pantalla, de hasta 10 MB, y recibir un análisis. El archivo se procesa en la memoria de nuestro servidor y no se guarda: no almacenamos ni registramos el archivo ni su contenido. Una captura o el texto de un PDF puede enviarse a un proveedor de modelos de IA (Groq, o Google Gemini API si está activado) solo para reconocerlo, sin tu nombre ni tu correo electrónico. No subas archivos con contraseñas, claves API, frases semilla ni documentos de identidad.</p>
+
+<h2>4. Rastreo y publicidad</h2>
+<p>La app incluye el SDK de Meta (Facebook). iOS te pregunta si permites el rastreo. Si lo permites, el identificador de publicidad y los eventos de la app (instalación, apertura, inicio de sesión) se comparten con Meta Platforms para medir los anuncios. Si lo rechazas, no se comparte ningún identificador y Meta solo recibe datos agregados a través de Apple SKAdNetwork. Puedes cambiarlo en Ajustes de iOS → Privacidad y seguridad → Rastreo. La app no muestra anuncios de terceros. No vendemos información personal.</p>
+
+<h2>5. El sitio web</h2>
+<p>cryptonova.pro no instala cookies ni usa analítica, píxeles publicitarios ni rastreadores. El idioma que eliges se guarda en tu propio navegador (almacenamiento local) y nunca se nos envía. Las cifras en vivo de la página son datos demo públicos que se cargan desde cryptonova.vip; no contienen datos personales. Las fuentes tipográficas se sirven desde el propio cryptonova.pro. Algunas páginas públicas de datos de cryptonova.vip, como la tabla de pronósticos, cargan fuentes desde Google Fonts, que recibe tu dirección IP cuando las abres.</p>
+<p>Ambos sitios web están alojados en GitHub Pages. Como cualquier servicio de alojamiento, GitHub trata tu dirección IP y los datos técnicos de la solicitud para servir las páginas y proteger el servicio, según la <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">declaración de privacidad de GitHub</a>. Nosotros no recibimos esos registros.</p>
+
+<h2>6. Servicios de terceros</h2>
+<div class="tablewrap"><table>
+<tr><th>Servicio</th><th>Para qué</th></tr>
+<tr><td>Google Firebase (Authentication, Cloud Messaging, Analytics, Crashlytics)</td><td>Inicio de sesión, notificaciones, analítica, informes de fallos</td></tr>
+<tr><td>Sign in with Apple / Google Sign-In</td><td>Inicio de sesión</td></tr>
+<tr><td>Groq / Google Gemini API</td><td>Respuestas de NOVA; reconocimiento de capturas y PDF para el «Análisis de cartera»</td></tr>
+<tr><td>OKX (okx.com)</td><td>Registro con nuestro enlace, verificación de identidad, tu cuenta y el copy trading, según las reglas de OKX; precios en vivo de las monedas, que la app carga directamente desde okx.com (OKX ve tu dirección IP)</td></tr>
+<tr><td>BingX</td><td>Lo mismo para las cuentas de BingX abiertas con nuestro enlace donde OKX no opera</td></tr>
+<tr><td>Meta Platforms (Facebook SDK)</td><td>Medición de anuncios, solo con tu consentimiento</td></tr>
+<tr><td>Nuestro servidor (app.crypto-capital.app, UE)</td><td>Almacenar la cuenta, la Hucha, el progreso y los ajustes</td></tr>
+<tr><td>GitHub Pages (cryptonova.pro, cryptonova.vip)</td><td>Alojamiento de los sitios web, datos demo públicos y lecciones; ningún dato personal de la app</td></tr>
+<tr><td>Telegram (@crypto_nova_support)</td><td>Chats de soporte, solo si nos escribes allí</td></tr>
+</table></div>
+
+<h2>7. Base jurídica</h2>
+<ul>
+<li><b>Prestación de la app</b> (inicio de sesión, Hucha, lecciones, notificaciones, NOVA, Análisis de cartera): ejecución de nuestro contrato contigo.</li>
+<li><b>Analítica e informes de fallos</b>: nuestro interés legítimo en que la app funcione y en mejorarla.</li>
+<li><b>Identificador de publicidad</b>: tu consentimiento, que puedes retirar en cualquier momento en los ajustes de iOS.</li>
+<li><b>Respuesta a tus correos</b> y obligaciones legales: interés legítimo y cumplimiento de obligaciones legales.</li>
+</ul>
+
+<h2>8. Conservación y eliminación</h2>
+<ul>
+<li>Los datos se conservan mientras exista tu cuenta.</li>
+<li><b>Elimina tu cuenta</b> en la app: Mi cuenta → «Eliminar cuenta». Tus datos de acceso, la Hucha, las lecciones, los ajustes, los tokens push, el número de preguntas y el vínculo con tu UID del exchange, si lo introdujiste en una versión anterior de la app, se eliminan de nuestro servidor de inmediato. Más detalles: <a href="delete.html">cómo eliminar una cuenta</a>.</li>
+<li>¿No tienes acceso a la app? Escribe a <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a> desde la dirección con la que iniciaste sesión. Eliminamos los datos en un plazo de 30 días.</li>
+<li>Firebase conserva los datos de analítica y de fallos hasta 14 meses según su propia política.</li>
+<li>Conservamos los correos de soporte y los chats de Telegram hasta 12 meses después del último mensaje y luego los eliminamos.</li>
+</ul>
+
+<h2>9. Tus derechos</h2>
+<p>Puedes pedir una copia de tus datos, su rectificación o su eliminación en <a href="mailto:cryptonova.app@gmail.com">cryptonova.app@gmail.com</a>; respondemos en un plazo de 30 días. Los residentes en la UE/EEE y en el Reino Unido tienen derechos según el RGPD (GDPR) —acceso, rectificación, supresión, limitación, portabilidad, oposición y retirada del consentimiento— y pueden presentar una reclamación ante la autoridad de protección de datos de su país. Los residentes en California tienen derechos según la CCPA/CPRA; compartir el identificador de publicidad con Meta puede considerarse «sharing» (compartir datos), y puedes negarte rechazando el rastreo.</p>
+
+<h2>10. Seguridad</h2>
+<p>El tráfico entre la app y nuestro servidor está cifrado (HTTPS/TLS). Cada solicitud se verifica con un token de Firebase. Solo el fundador tiene acceso al servidor. Ningún sistema es totalmente seguro, así que activa la autenticación de dos factores en tu exchange.</p>
+
+<h2>11. Menores de edad</h2>
+<p>La app está dirigida a adultos (18+). No recopilamos a sabiendas datos de menores. Si un menor nos ha enviado datos, contáctanos y los eliminaremos.</p>
+
+<h2>12. Transferencias internacionales</h2>
+<p>Nuestro servidor está en la Unión Europea. Los servicios del apartado 6 pueden tratar datos en Estados Unidos y en otros países con sus propias garantías, como las cláusulas contractuales tipo de la UE.</p>
+
+<h2>13. Cambios</h2>
+<p>Si esta política cambia, actualizaremos la fecha de arriba y anunciaremos los cambios importantes en la app.</p>
 </section>
 
 <footer><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="delete.html">Delete account</a><br>© 2026 CRYPTO NOVΛ · Dmytro Sukhyna · cryptonova.app@gmail.com</footer>

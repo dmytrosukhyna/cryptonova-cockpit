@@ -112,8 +112,8 @@
               "art": "target"
             },
             {
-              "title": "Las operaciones las replicas tú",
-              "text": "El sistema hace sus operaciones en una cuenta demo y te las muestra. Si quieres, replicas la operación en tu cuenta del exchange. Un exchange es una plataforma donde se compran y venden monedas. Replicarla o no lo decides solo tú. La automatización completa se puede pedir: deja una solicitud; solo se pondrá en marcha tras una revisión legal y no prometemos fechas.",
+              "title": "Replicar o copiar: decides tú",
+              "text": "El sistema hace sus propias operaciones y te las muestra. Puedes replicar una operación en tu cuenta del exchange tú mismo o activar la copia: así OKX repetirá automáticamente las operaciones de CRYPTO NOVA en tu cuenta. Un exchange es un mercado donde se compran y venden monedas. Replicar, copiar o solo mirar es únicamente decisión tuya.",
               "example": "En la vida real: un jardinero con experiencia te enseña a podar un manzano. Tú miras y lo repites en tu jardín, o decides esperar.",
               "art": "handshake"
             },
@@ -127,7 +127,7 @@
           "remember": [
             "Camino tranquilo: hucha y spot, poco a poco y a largo plazo.",
             "Camino activo: futuros, operaciones al alza y a la baja, con más riesgo.",
-            "Las operaciones del sistema las replicas tú. Empieza por las lecciones y la hucha."
+            "Puedes replicar tú mismo las operaciones del sistema o copiarlas con OKX. Empieza por las lecciones y la hucha."
           ],
           "quiz": [
             {
@@ -161,7 +161,7 @@
                 "NOVA, el asistente de IA"
               ],
               "answer": 0,
-              "why": "El sistema muestra las operaciones, pero replicarlas o no es solo decisión tuya. La copia automática todavía está en desarrollo."
+              "why": "El sistema muestra las operaciones, pero replicarlas, copiarlas o no es solo decisión tuya."
             }
           ]
         },
@@ -708,7 +708,7 @@
             },
             {
               "title": "La cuenta real es tuya",
-              "text": "La cuenta real es tu propia cuenta en el exchange BingX, nuestro socio. La abres con el enlace de CRYPTO NOVA y replicas en ella las operaciones del sistema. El dinero está siempre contigo, en el exchange. Nosotros no lo recibimos, no lo guardamos y no podemos retirarlo. Dinero real, solo a partir de 18 años.",
+              "text": "La cuenta real es tu propia cuenta en el exchange OKX. La abres con el enlace de CRYPTO NOVA y activas la copia: el propio OKX repite en ella las operaciones del sistema. El dinero se queda contigo en el exchange todo el tiempo. Nosotros no lo recibimos, no lo guardamos y no podemos retirarlo. El dinero real es solo para mayores de 18 años.",
               "example": "En la vida real: llamas a alguien para que te pinte la casa. Trabaja en tu casa, pero la casa sigue siendo tuya, y las llaves también.",
               "art": "bank",
               "screen": "Live",
@@ -722,15 +722,15 @@
             },
             {
               "title": "Conexión en 4 pasos",
-              "text": "Paso 1: abre una cuenta en BingX con el enlace de la app. Paso 2: verifica tu identidad (KYC) en la app del exchange: documento y selfie, normalmente 5–15 minutos. Paso 3: deposita USDT; empieza con una cantidad que podrías perder sin problemas. Paso 4: escribe tu número de cuenta (UID) del perfil del exchange y toca «Comprobar». Comprobaremos que la cuenta se abrió con nuestro enlace y activaremos el modo REAL.",
-              "example": "En la vida real: el UID es como el número de tu carné de biblioteca. Con él te reconocen en la biblioteca, pero nadie puede llevarse tus libros solo con ese número.",
+              "text": "Paso 1: regístrate en OKX con el enlace de la app. Paso 2: verifica tu identidad (KYC) en la app del exchange: un documento y un selfie, normalmente unos minutos. Paso 3: deposita USDT; empieza con una cantidad que puedas perder sin problema. Paso 4: pulsa «Copiar CRYPTO NOVA» en la app y elige el importe; a partir de ahí, OKX repite las operaciones sola. No hacen falta UID ni claves API.",
+              "example": "En la vida real: una domiciliación en el banco. Tú eliges el importe y puedes cancelarla cuando quieras.",
               "art": "key_lock",
               "screen": "Live",
               "callouts": [
                 {
                   "n": 1,
                   "target": "step1",
-                  "text": "Abrir cuenta con el enlace de CRYPTO NOVA"
+                  "text": "Regístrate en OKX con el enlace de CRYPTO NOVA"
                 },
                 {
                   "n": 2,
@@ -745,14 +745,14 @@
                 {
                   "n": 4,
                   "target": "step4",
-                  "text": "Escribir el UID y tocar «Comprobar»"
+                  "text": "Pulsa «Copiar CRYPTO NOVA»"
                 }
               ]
             },
             {
               "title": "Qué te da la conexión",
-              "text": "Ahora ves las operaciones del sistema y las replicas tú mismo en tu cuenta. La automatización completa se puede pedir: deja una solicitud; solo se pondrá en marcha tras una revisión legal y no prometemos fechas. Además, con la cuenta conectada, NOVA responde 100 preguntas al día en lugar de 5, el soporte te atiende con prioridad y recibes las novedades antes que nadie.",
-              "example": "En la vida real: un vecino que sabe de huertos te dice cuándo plantar, y tú plantas. Puedes apuntarte al riego automático, pero el huerto seguirá siendo tuyo.",
+              "text": "Una vez conectada, las operaciones de CRYPTO NOVA se abren y se cierran solas en tu cuenta: OKX las repite por el importe que elijas. Puedes dejar de copiar en OKX en cualquier momento, y puede haber pérdidas. Además, con una cuenta conectada NOVA responde 100 preguntas al día en lugar de 5.",
+              "example": "En la vida real: el riego automático del huerto. Tú eliges cuánta agua y lo apagas cuando quieras, y el huerto sigue siendo tuyo.",
               "art": "target",
               "screen": "Live",
               "callouts": [
@@ -764,7 +764,7 @@
                 {
                   "n": 2,
                   "target": "auto",
-                  "text": "Automatización: bajo solicitud"
+                  "text": "Para la copia en OKX cuando quieras"
                 },
                 {
                   "n": 3,
@@ -775,7 +775,7 @@
             },
             {
               "title": "Cómo gana dinero CRYPTO NOVA",
-              "text": "Cuando abres una cuenta con nuestro enlace, el exchange paga a CRYPTO NOVA una recompensa de su propia comisión. Tus comisiones y las condiciones del exchange no cambian: no pagas más.",
+              "text": "Cuando abres una cuenta con nuestro enlace, el exchange paga a CRYPTO NOVA una recompensa de su propia comisión; tus comisiones no cambian. Si copias a CRYPTO NOVA, OKX, según sus reglas, retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA. El porcentaje aparece en el perfil antes de empezar, y sin ganancia no hay pago.",
               "example": "En la vida real: una tienda le paga a un influencer por traerle un cliente. El precio del producto para el cliente no cambia.",
               "art": "handshake",
               "screen": "Live",
@@ -783,13 +783,13 @@
                 {
                   "n": 1,
                   "target": "earn",
-                  "text": "Recompensa del exchange; para ti, las mismas condiciones"
+                  "text": "Recompensa del exchange y parte de la ganancia"
                 }
               ]
             },
             {
               "title": "Si vives en la UE",
-              "text": "En la UE y el EEE, desde el 1 de julio de 2026 las reglas MiCA se aplican por completo: allí solo prestan servicios cripto las empresas con licencia de la UE. Por eso, en la UE, el EEE y algunos otros países la app no muestra enlaces al exchange y la cuenta real desde la app aún no está disponible. Las lecciones, la demo, la hucha y NOVA funcionan allí por completo.",
+              "text": "En la UE y el EEE, las normas MiCA se aplican por completo desde el 1 de julio de 2026: allí solo pueden prestar servicios cripto las empresas con licencia de la UE, como OKX Europe. La copia automática aún no está disponible allí: todas las operaciones de CRYPTO NOVA se ven en la app y puedes repetirlas tú mismo. Las lecciones, la demo, la hucha y NOVA funcionan allí por completo.",
               "example": "En la vida real: cada país tiene sus normas de tráfico. El auto es el mismo, pero por algunas carreteras todavía no se puede pasar.",
               "art": "globe",
               "screen": "Live",
@@ -797,15 +797,15 @@
                 {
                   "n": 1,
                   "target": "region",
-                  "text": "La conexión en tu país llegará más adelante"
+                  "text": "Copia en tu país: más adelante"
                 }
               ]
             }
           ],
           "remember": [
             "Demo: dinero virtual, precios reales y todas las operaciones a la vista.",
-            "Cuenta real: tu cuenta en BingX. El dinero es tuyo; nosotros no lo guardamos.",
-            "CRYPTO NOVA recibe una recompensa del exchange. Para ti, las condiciones son las mismas."
+            "La cuenta real es tu propia cuenta de OKX: el dinero es tuyo y OKX repite sola las operaciones de CRYPTO NOVA.",
+            "CRYPTO NOVA recibe una recompensa del exchange y, si copias, una parte de la ganancia."
           ],
           "quiz": [
             {
@@ -823,23 +823,23 @@
               "q": "¿Cómo gana dinero CRYPTO NOVA?",
               "options": [
                 "Cobra una suscripción",
-                "El exchange le paga una recompensa, y tus condiciones no cambian",
+                "El exchange le paga de su propia comisión y, si copias, recibe una parte de la ganancia",
                 "Se queda con parte de tu dinero cuando retiras",
                 "Vende tus datos"
               ],
               "answer": 1,
-              "why": "El exchange paga a CRYPTO NOVA de su propia comisión, y tus comisiones no suben."
+              "why": "El exchange paga a CRYPTO NOVA de su propia comisión y, si copias, OKX retiene una parte de la ganancia para el trader líder. No hay suscripciones y no tomamos tu dinero."
             },
             {
               "q": "¿Qué necesitas para conectar la cuenta real?",
               "options": [
-                "Una cuenta en BingX con el enlace de CRYPTO NOVA, la verificación de identidad, fondos y tu número de cuenta (UID)",
+                "Una cuenta en OKX con el enlace de CRYPTO NOVA, verificación de identidad, un depósito y el botón «Copiar CRYPTO NOVA»",
                 "La contraseña del exchange y el código del SMS",
                 "La frase secreta de tu billetera",
                 "Una foto de tu tarjeta bancaria"
               ],
               "answer": 0,
-              "why": "Hacen falta 4 pasos: cuenta con nuestro enlace, verificación de identidad en el exchange, depósito y UID. Nunca pedimos contraseñas, códigos ni la frase secreta."
+              "why": "Son 4 pasos: una cuenta con nuestro enlace, verificación de identidad, un depósito y la copia. Nunca pedimos UID, contraseñas, códigos ni tu frase semilla."
             }
           ]
         },
@@ -857,7 +857,7 @@
             },
             {
               "title": "No necesitamos las llaves de tu exchange",
-              "text": "Ahora la app no necesita ni la contraseña del exchange ni una clave API. Una clave API es un pase especial con el que un programa se conecta al exchange. Si hace falta para la copia automática, la clave será solo para operar. No tendrá permiso para retirar dinero.",
+              "text": "Ahora la app no necesita ni la contraseña del exchange ni una clave API. Una clave API es un pase especial con el que un programa se conecta al exchange. Tampoco hace falta para copiar a CRYPTO NOVA: la copia se activa en el propio OKX. No le des a nadie una clave con permiso para retirar dinero.",
               "example": "En la vida real: la llave del buzón. Con ella sacas las cartas, pero no abres tu casa.",
               "art": "key_lock"
             },

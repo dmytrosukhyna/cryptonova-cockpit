@@ -243,6 +243,9 @@ def test_app_config_okx_regions(tmp_path):
     _w(d, "app_config.json", {"okx_regions": ["gr", "ES", "xyz"], "okx_barred": ["us", "CA", "Crimea"]})
     cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
     assert cfg["okx_regions"] == ["ES", "GR"] and cfg["okx_barred"] == ["CA", "US"]
+    _w(d, "app_config.json", {"okx_copy_barred": ["gr", "DE", "x"], "okx_signal_url": "https://www.okx.com/x/signal", "okx_regions": "ALL"})
+    cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
+    assert cfg["okx_copy_barred"] == ["DE", "GR"] and cfg["okx_signal_url"] == "https://www.okx.com/x/signal"
     _w(d, "app_config.json", {"okx_regions": "all", "okx_barred": "US"})
     cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
     assert cfg["okx_regions"] == "ALL" and cfg["okx_barred"] is None
@@ -258,6 +261,7 @@ def test_app_config_in_git_is_valid():
     assert c["okx_regions"] == "ALL"
     assert "US" in c["okx_barred"] and not {"UA", "GR", "RU"} & set(c["okx_barred"])
     assert "US" in c["bingx_barred"] and not {"UA", "RU"} & set(c["bingx_barred"])
+    assert "GR" in c["okx_copy_barred"] and "UA" not in c["okx_copy_barred"] and c.get("okx_signal_url") is None
 
 
 def test_spot_coins_explain_themselves_in_russian_only(tmp_path):

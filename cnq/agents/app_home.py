@@ -632,6 +632,9 @@ def _config(out: str) -> dict:
         sorted({str(x).strip().upper() for x in regions if len(str(x).strip()) == 2}) if isinstance(regions, list) else "ALL")
     okx_barred = c.get("okx_barred")
     okx_barred = sorted({str(x).strip().upper() for x in okx_barred if len(str(x).strip()) == 2}) if isinstance(okx_barred, list) else None
+    # 22.10: where OKX serves no copy-trading pages (the EEA by default, null = the app's own list) — no «Копировать» there
+    copy_barred = c.get("okx_copy_barred")
+    copy_barred = sorted({str(x).strip().upper() for x in copy_barred if len(str(x).strip()) == 2}) if isinstance(copy_barred, list) else None
     return {"exchange_name": c.get("exchange_name") or "BingX",
             "exchange_ref": ref if isinstance(ref, str) and ref.startswith("https://") else None,
             # build 44: the OKX link for the EU/EEA (OKX Europe, MiCA); a referral only once the owner joins OKX's programme
@@ -639,6 +642,7 @@ def _config(out: str) -> dict:
             "bingx_barred": barred,
             "okx_regions": regions,
             "okx_barred": okx_barred,
+            "okx_copy_barred": copy_barred,
             "exchange_trade_url": c.get("exchange_trade_url"),
             # build 44 «Подключить»: our lead-trader copy pages (empty until the exchange approves the profile) and the exchanges'
             # own pages for the 6 steps — https only; app_links = optional app deep links (scheme://…, never http / javascript)
@@ -649,7 +653,7 @@ def _config(out: str) -> dict:
             "portfolio": {k: v for k, v in pf.items() if v}}
 
 
-CONNECT_KEYS = ("okx_copy_url", "bingx_copy_url", "okx_app_ios", "okx_app_android", "okx_kyc_url", "okx_deposit_url",
+CONNECT_KEYS = ("okx_copy_url", "bingx_copy_url", "okx_signal_url", "okx_app_ios", "okx_app_android", "okx_kyc_url", "okx_deposit_url",
                 "bingx_app_ios", "bingx_app_android", "bingx_kyc_url", "bingx_deposit_url")
 
 

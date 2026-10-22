@@ -751,6 +751,7 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
     n_c, n_t, max_o, opened_m = 0, 0, 0, {}
     for d in days:
         cand = [k for k in by_o.get(d, []) if (C[k]["sym"], C[k]["fam"]) not in keys
+                and (C[k].get("parent") is None or C[k]["parent"] in opn)
                 and (min_surge is None or C[k][surge_key] >= min_surge) and (fam_only is None or C[k]["fam"] == fam_only)
                 and (top is None or C[k].get("vrank", 0) < top)]
         if cand:
@@ -781,7 +782,7 @@ def flow_account(C, D, days, cap=None, score="order", risk=0.5, budget=None, hea
                     continue
                 if heat is not None and h_now + r_each > heat + 1e-9:
                     break
-                size = E * min(0.25, r_each / x["stop"])
+                size = E * min(0.25, r_each / x["stop"]) if x.get("parent") is None else opn[x["parent"]][0] * x["addx"]
                 if g_now + size > gross * E:
                     continue
                 opn[k] = (size, x["e"], r_each)
@@ -1246,6 +1247,76 @@ def _safe_call(fn, *a):
         return fn(*a)
     except Exception:  # noqa: BLE001
         return None
+
+
+def _adds(D, C, trig, addx, ctrl=False):
+    """Pyramid add-ons for backlog #9: for each parent trade, the first close (before the parent's exit day) at least `trig`
+    ATR(signal day) above the parent's entry → add at the next open, notional = addx × the parent's, own stop at the parent's
+    entry (break-even of the first unit; a gap below it exits at the open), otherwise out with the parent (same day, same
+    price rule). ctrl=True: the control — the same add on day 2 of every parent trade, NO profit condition (pure extra size)."""
+    out = []
+    for k, x in enumerate(C):
+        K = D[x["sym"]]
+        i, j, e = x["i"], x["j"], x["e"]
+        a = float(K["atr"][i])
+        o, l, c = K["o"], K["l"], K["c"]
+        if ctrl:
+            q = i + 1 if i + 2 <= j - 1 else None
+        else:
+            q = next((m for m in range(i + 1, j) if c[m] >= e + trig * a), None)
+        if q is None or q + 1 > j:
+            continue
+        ea = float(o[q + 1])
+        m, px = q + 1, None
+        stop = e if not ctrl else e - min(max(2.5 * a, 0.03 * e), 0.15 * e)
+        while m <= j:
+            if o[m] <= stop and m > q + 1:
+                px = float(o[m]); break
+            if l[m] <= stop:
+                px = float(stop) if ea > stop else ea; break
+            m += 1
+        if px is None:
+            m = j
+            # the parent's exit price on day j: stop (below e → our stop hit first) or the rule exit at the close
+            px = float(c[j])
+        days = max(1, m - q)
+        net = (px / ea - 1) * 100 - COST - FUND_D * days
+        y = dict(x)
+        y.update(o=int(K["t"][q + 1]), c=int(K["t"][m]), net=float(net), e=ea, fam=x["fam"] + "+", parent=k, addx=addx,
+                 stop=max(1e-4, (ea - stop) / ea), j=m)
+        out.append(y)
+    return out
+
+
+def pyramid():
+    """22.10, backlog #9 — add to a winning position (pyramid) in «Сигналы CRYPTO NOVA», on the honest set (every Binance perp,
+    delisted included, point-in-time top 40 by 30-day dollar volume, the live volume mark 1.5×, ≤ 40 open, gross ≤ 2×).
+    Variants fixed in advance (4 + 1 control): trigger +1 / +2 ATR at a close, add 0.5× / 1.0× the parent's notional, add's stop at
+    the parent's entry; control = the same add on day 2 with no profit condition (extra size only). Extra size raises the
+    drawdown, so the fair comparison is the monthly result at the SAME drawdown −25 % (risk scaled). Rows:
+    [m @dd −25 %, m, dd, worst m, avg trade, a day, 2023…2026 %]; plus the add trades alone: n, mean %, t, 2022-24 / 2025-26 mean."""
+    D, C, days = _wide_data()
+    t25 = int(dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    kw = dict(min_surge=1.5, surge_key="surge_vc30", score="surge_vc30", max_open=40, top=40)
+    res, adds_stat = {}, {}
+    a = flow_account(C, D, days, **kw)
+    res["base (live rule)"] = [_at25(C, D, days, **kw), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"]] + a["y"][1:]
+    for name, trig, addx, ctrl in (("add +1ATR ×0.5", 1.0, 0.5, False), ("add +1ATR ×1", 1.0, 1.0, False),
+                                    ("add +2ATR ×0.5", 2.0, 0.5, False), ("add +2ATR ×1", 2.0, 1.0, False),
+                                    ("control day2 ×1", 0.0, 1.0, True)):
+        A = _adds(D, C, trig, addx, ctrl)
+        CC = C + A
+        _IDX.clear()
+        a = flow_account(CC, D, days, **kw)
+        res[name] = [_at25(CC, D, days, **kw), a["m"], a["dd"], a["wm"], a["avg"], a["tpd"]] + a["y"][1:]
+        z = [y for y in A if y["vrank"] < 40 and y["surge_vc30"] >= 1.5]
+        v = np.array([y["net"] for y in z]) if z else np.array([0.0])
+        early = np.array([y["net"] for y in z if y["o"] < t25] or [0.0])
+        late = np.array([y["net"] for y in z if y["o"] >= t25] or [0.0])
+        adds_stat[name] = [len(z), round(float(v.mean()), 2), round(float(v.mean() / (v.std(ddof=1) / np.sqrt(len(v)))) if len(v) > 2 else 0, 2),
+                           round(float(early.mean()), 2), round(float(late.mean()), 2)]
+    note("own pyramid · accounts [m@dd25, m, dd, worst m, avg, a day, 2023…2026]", json.dumps(res, ensure_ascii=False))
+    note("own pyramid · add trades alone [n, mean %, t, 2022-24 mean, 2025-26 mean]", json.dumps(adds_stat, ensure_ascii=False))
 
 
 def own_bear():
@@ -2127,4 +2198,4 @@ def ls_robust():
 
 
 if __name__ == "__main__":
-    (ls_robust() if "--lsrob" in sys.argv else ls_neutral() if "--ls" in sys.argv else quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (pyramid() if "--pyramid" in sys.argv else ls_robust() if "--lsrob" in sys.argv else ls_neutral() if "--ls" in sys.argv else quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

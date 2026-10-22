@@ -1,0 +1,41 @@
+# «Автопилот OKX» on the server, 24/7 without the Mac — REAL money on the owner's OKX sub-account.
+# Installed ONLY by hand: `bash /opt/cnq/repo/scripts/okx_autopilot_server.sh install` (root; checks, then asks to type ДА).
+# The repository's auto-update (cnq/engine.py: git pull every 2 minutes) never installs, enables or starts it — a file in the
+# repository does nothing until that script copies it to /etc/systemd/system.
+# One autopilot per account: the service trades only while the lease (cnq/execution/okx_lease.py) says «server» and no other
+# live process holds it; `stop` on the Mac (global stop) stops it too.
+[Unit]
+Description=CRYPTO NOVA OKX autopilot (real money on the owner's OKX sub-account; one autopilot per account via okx_lease)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+User=cnq
+Group=cnq
+# its OWN env file: OKX keys, OKX_AUTOPILOT=on, CNQ_LIVE_TRADING=yes, CNQ_GH_TOKEN. CNQ_LIVE_TRADING lives only there, never in
+# /etc/cnq.env (the engine and the API read that one). The install script refuses OKX_NODE / OKX_LEASE_* / HOME / *_STATE there.
+EnvironmentFile=/etc/cnq-okx.env
+Environment=HOME=/var/lib/cnq-okx
+Environment=PYTHONPATH=/opt/cnq/repo
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Environment=OKX_NODE=server
+Environment=OKX_LEASE_ID=server
+WorkingDirectory=/var/lib/cnq-okx
+StateDirectory=cnq-okx
+StateDirectoryMode=0700
+ExecStart=/opt/cnq/venv/bin/python -m cnq.execution.okx_autopilot --loop
+Restart=always
+RestartSec=60
+# SIGTERM → the autopilot gives the lease back at once (okx_autopilot.main)
+KillSignal=SIGTERM
+TimeoutStopSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

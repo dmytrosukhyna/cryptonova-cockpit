@@ -15,8 +15,8 @@ NOVA = f"Но{STRESS}ва"
 # 21.10 owner (app spec §5, §10): one clear MALE voice everywhere the app speaks; the female voice is only a fallback
 VOICES = {"ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural", "uk": "uk-UA-OstapNeural", "el": "el-GR-NestorasNeural",
           "es": "es-ES-AlvaroNeural"}
-FALLBACK = {"ru": "ru-RU-SvetlanaNeural", "en": "en-US-AvaNeural", "uk": "uk-UA-PolinaNeural", "el": "el-GR-AthinaNeural",
-            "es": "es-ES-ElviraNeural"}
+# build 45 (owner 22.10): only the male NOVA AI voice — no female fallback; if the male voice fails, the run fails and the
+# greeting already on the server stays as it is
 TEXTS = {
     "ru": (f"Привет! Я {NOVA} — помощник Крипто {NOVA}. "
            "Наша система каждую минуту следит за рынком криптовалют и проверяет каждую идею на истории цен. "
@@ -53,8 +53,8 @@ def out_path(lang: str) -> str:
 async def make(lang: str, out: str) -> None:
     import edge_tts
     first = os.environ.get("CNQ_WELCOME_VOICE_" + lang.upper(), VOICES[lang])
-    # the male voice sometimes fails once in a run: retry it with a pause before falling back
-    for voice in [first, first, first, FALLBACK[lang]]:
+    # the male voice sometimes fails once in a run: retry it with a pause (never another voice)
+    for voice in [first, first, first, first]:
         try:
             await edge_tts.Communicate(TEXTS[lang], voice, rate="-4%").save(out)
             print(out, voice, os.path.getsize(out), "bytes")

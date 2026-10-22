@@ -346,3 +346,45 @@ def test_pdf_reader_without_pypdf(monkeypatch):
     assert "Coin Total Available" in text, text
     got = {h["sym"]: h["amount"] for h in P.parse_text(text, known)["holdings"]}
     assert got == {"BTC": 0.42, "SOL": 12.5, "USDC": 950.0}, got
+
+
+# ------------------------------------------------------------------------------------------------ «Топ-10 монет на заметку»
+def test_spot_top_ten(tmp_path):
+    from cnq.api import spot_top
+    data = R.Data(WEB)
+    ideas = data.get("ideas")
+    lists = {"okx": {"BTC", "ETH", "SOL", "LINK"}, "bingx": {"BTC", "ETH", "NEAR"}}
+    for lang in LANGS:
+        d = spot_top.top(data, lang, lists)
+        assert 0 < len(d["rows"]) <= 10 and d["prices"]
+        assert all(r["status"] in ("buy", "add", "small") and r["reason"] and r["status_label"] for r in d["rows"])
+        if lang in ("en", "el", "es"):
+            assert not [r["reason"] for r in d["rows"] if CYR.search(r["reason"] + r["status_label"])]
+    d = spot_top.top(data, "ru", lists)
+    order = [r["symbol"] for r in ideas["rows"] if r["status"] in ("buy", "add", "small")]
+    assert [r["sym"] for r in d["rows"]][:len(order[:10])] == order[:10]                 # the table's own order
+    btc = [r for r in d["rows"] if r["sym"] == "BTC"]
+    if btc:
+        assert btc[0]["okx"] is True and btc[0]["bingx"] is True
+    held = {p["symbol"] for p in ((data.get("portfolio").get("portfolios") or {}).get("ideas") or {}).get("positions") or []}
+    assert all((r["held"] is not None) == (r["sym"] in held) for r in d["rows"])
+    assert all(r["okx"] is None for r in spot_top.top(data, "ru", {})["rows"])            # lists not loaded yet → unknown
+    # the «Поддержка проекта» score is passed on only when the table has it
+    assert spot_top._support({"support": {"score": 72, "why_ru": "x"}}) == {"score": 72.0}
+    assert spot_top._support({"support": 55}) == {"score": 55.0} and spot_top._support({}) is None
+    api = make_api(tmp_path)
+    api.listings = spot_top.Listings({"okx": lambda: {"BTC"}, "bingx": lambda: {"ETH"}})
+    api.listings.get(background=False)
+    c, d = api.handle("GET", "/v2/spot/top?lang=el", {}, b"")
+    assert c == 200 and d["lang"] == "el" and d["rows"]
+
+
+def test_exchange_lists_parse():
+    from cnq.api import spot_top
+    okx = {"data": [{"baseCcy": "BTC", "quoteCcy": "USDT", "state": "live"}, {"baseCcy": "XYZ", "quoteCcy": "EUR"},
+                    {"baseCcy": "ETH", "quoteCcy": "USDC", "state": "suspend"}]}
+    bx = {"code": 0, "data": {"symbols": [{"symbol": "BTC-USDT", "status": 1}, {"symbol": "OLD-USDT", "status": 0}, {"symbol": "SOL-USDC", "status": 1}]}}
+    assert spot_top.okx_bases(lambda u: okx) == {"BTC"}
+    assert spot_top.bingx_bases(lambda u: bx) == {"BTC", "SOL"}
+    L = spot_top.Listings({"okx": lambda: (_ for _ in ()).throw(RuntimeError("down")), "bingx": lambda: {"BTC"}})
+    assert L.get(background=False) == {"bingx": {"BTC"}}

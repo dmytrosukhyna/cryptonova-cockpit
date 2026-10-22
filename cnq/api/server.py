@@ -20,6 +20,8 @@ With the Firebase ID token («Authorization: Bearer …»):
                              (cnq/api/pf_parse.py); POST /v2/portfolio/review {"holdings", "lang"} → the review by the system's
                              rules (cnq/api/pf_review.py). In memory only: no file, no row, no log line with the content.
                              GET /v2/portfolio/caps (public) → which inputs work (screenshots only with a vision model)
+  GET  /v2/spot/top          build 45 «Топ-10 монет на заметку» (public): web/ideas.json's first 10 «можно брать / добрать / на
+                             небольшую сумму», a reason each in ?lang=, held by «CRYPTO NOVA портфель», on OKX / BingX spot (cnq/api/spot_top.py)
   DELETE /v2/me      delete the account: every row on our server + the Firebase login (Apple 5.1.1(v))
 The owner's admin panel (web/admin.html), its own token CNQ_ADMIN_TOKEN, not Firebase: /v2/admin/* — see cnq/api/console.py.
 Demo only until 2.1; nothing here places orders or holds money."""
@@ -42,7 +44,7 @@ from urllib.parse import parse_qs, urlsplit
 from cnq.agents.i18n import DEFAULT, file_name, norm_lang
 from cnq.agents.llm import LLM, PROVIDERS
 
-from . import access as access_codes, bingx, console as admin_console, home_news, nova, pf_parse, pf_review
+from . import access as access_codes, bingx, console as admin_console, home_news, nova, pf_parse, pf_review, spot_top
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -119,6 +121,7 @@ class Api:
         self.vision = vision_config(llm)
         self.vision_reader = pf_parse.vision_holdings    # tests put a fake here
         self.pf_last: dict | None = None         # counts and timing only — never a coin or an amount
+        self.listings = spot_top.Listings()      # build 45 «Топ-10 монет на заметку»: OKX / BingX spot coins (background, 12 h)
 
     # ---------------------------------------------------------------- helpers
     def _read(self, path: str) -> dict | None:
@@ -292,6 +295,9 @@ class Api:
         if method == "GET" and path == "/v2/portfolio/caps":            # build 45: which files «Разбор портфеля» reads now
             return 200, {"image": bool(self.vision), "csv": True, "xlsx": True, "pdf": True,
                          "max_mb": pf_parse.MAX_FILE // (1024 * 1024), "exchanges": ["okx", "bingx", "binance"]}
+        if method == "GET" and path == "/v2/spot/top":                  # build 45: «Топ-10 монет на заметку» (Spot tab)
+            d = spot_top.top(self.pf_data, lang, self.listings.get())
+            return (200, d) if d["rows"] or self.pf_data.get("ideas") else (503, {"error": "feed_unavailable"})
         if method == "POST" and path == "/v2/access/verify":             # 22.10: a guest's access code for cryptonova.vip
             try:
                 data = json.loads(body.decode() or "{}") if body else {}

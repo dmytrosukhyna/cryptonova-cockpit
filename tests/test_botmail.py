@@ -205,7 +205,7 @@ def test_eu_resident_gets_okx_never_bingx_and_the_uid_goes_to_okx():
     mb.poll("t"); mb.poll("t")
     okx = [d for m, d in calls if m == "sendMessage"][-1]
     assert "OKX" in okx["text"] and "USDC" in okx["text"] and "X-Perps" in okx["text"] and "bingx" not in okx["text"].lower()
-    assert "okx.com/eu" in okx["text"] and okx["reply_markup"] == {"remove_keyboard": True}
+    assert ("okx.com/eu" in okx["text"] or "okx.com/join/" in okx["text"]) and okx["reply_markup"] == {"remove_keyboard": True}  # 22.10: our OKX link once set
     assert mb.region(31) == "eu"
     mb.poll("t")
     uid_reply = [d for m, d in calls if m == "sendMessage"][-1]["text"]

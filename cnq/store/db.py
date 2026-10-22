@@ -115,6 +115,11 @@ class Store:
             self.conn.executemany("INSERT OR REPLACE INTO funding VALUES (?,?,?)",
                                   [(symbol, r["time"], r["rate"]) for r in rows])
 
+    def funding(self, symbol: str, start: int = 0) -> list[list]:
+        """Settled funding rows [[time_ms, rate], …] for one perpetual since start (oldest first)."""
+        return [[int(t), float(r)] for t, r in self.conn.execute(
+            "SELECT time, rate FROM funding WHERE symbol=? AND time>=? AND rate IS NOT NULL ORDER BY time", (symbol, start)).fetchall()]
+
     def log_quality(self, time_ms: int, symbol: str, kind: str, detail: str) -> None:
         with self.conn:
             self.conn.execute("INSERT INTO quality_log VALUES (?,?,?,?)",

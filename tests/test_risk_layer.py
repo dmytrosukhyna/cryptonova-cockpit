@@ -340,7 +340,9 @@ def test_paper_desk_records_the_skip_and_never_reopens_that_signal():
         G.set_kill(False, "", "test", now=now)
         res = pd.PaperDesk(conn, "bal").step([c], True, now + 60_000)                    # the same signal: refused once = final
         assert not res["open"] and not [ev for ev in res["events"] if "риск-слой" in ev]
-        res = pd.PaperDesk(conn, "bal").step([c], True, now + 3_600_000)                 # the next hour's signal opens
+        c2 = _coin("SOL-USDT", now + 3_600_000)                                           # an hour later the candles are an hour newer
+        c2["basis_1h"] = -0.003                                                          # (22.10: a market entry needs a fresh bar)
+        res = pd.PaperDesk(conn, "bal").step([c2], True, now + 3_600_000)                # the next hour's signal opens
         assert [t["grade"] for t in res["open"]] == ["D"]
 
 

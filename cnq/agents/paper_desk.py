@@ -23,6 +23,7 @@ import math
 import sqlite3
 import time
 
+from . import funding_accrual
 from .history import thin
 from ..risk import gate as risk_gate
 
@@ -86,6 +87,7 @@ GENERATED = {"C", "R", "E", "F", "S", "T", "K", "L", "N", "Q", "W", "X", "Y", "J
 DEFAULT_PROFILE = "bal"
 FEE = 0.0005
 SLIP = 0.0002
+STALE_MS = 30 * 60_000      # 22.10 (audit): a market entry needs a 15m bar younger than 30 min — a lagging store must not fill at an old price
 HOLD_C_H = 48
 HOLD_B_H = 8
 HOLD_R_H = 192
@@ -246,6 +248,7 @@ class PaperDesk:
         CREATE TABLE IF NOT EXISTS {self.T_EQ}(time INTEGER PRIMARY KEY, equity REAL);
         
         CREATE TABLE IF NOT EXISTS paper_meta(k TEXT PRIMARY KEY, v TEXT);
+        CREATE TABLE IF NOT EXISTS paper_adjustments(profile TEXT, id TEXT, time INTEGER, usd REAL, kind TEXT, detail TEXT, PRIMARY KEY(profile, id));
         CREATE TABLE IF NOT EXISTS paper_facts(id TEXT PRIMARY KEY, facts TEXT);""")
         conn.commit()
 
@@ -354,7 +357,7 @@ class PaperDesk:
             vavg = sum(k[5] for k in c15[-98:-2]) / 96 if len(c15[-98:-2]) == 96 else 0
             ret_oc = last[4] / last[1] - 1 if last[1] else 0
             if vavg and ret_oc <= E_DROP and last[5] >= E_VOL * vavg:
-                entry = c15[-1][1]
+                entry = c15[-1][4]            # 22.10 (audit): the freshest price, not the open of a bar that may be minutes old
                 out.append({"id": f"E-{base}-{last[0]}", "symbol": base, "side": "LONG", "grade": "E", "kind": "CLIMAX_LONG",
                             "entry": entry, "stop": entry * (1 - E_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
                             "order": "MARKET", "hold_h": HOLD_E_H,
@@ -469,7 +472,7 @@ class PaperDesk:
             vavg = sum(k[5] for k in c15[-98:-2]) / 96 if len(c15[-98:-2]) == 96 else 0
             ret_oc = last[4] / last[1] - 1 if last[1] else 0
             if vavg and ret_oc <= E_DROP and last[5] >= E_VOL * vavg:
-                entry = c15[-1][1]
+                entry = c15[-1][4]            # 22.10 (audit): the freshest price, not the open of a bar that may be minutes old
                 out.append({"id": f"X-{base}-{last[0]}", "symbol": base, "side": "LONG", "grade": "X", "kind": "ALT_PANIC",
                             "entry": entry, "stop": entry * (1 - E_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0], "order": "MARKET", "hold_h": HOLD_E_H,
                             "reason": f"Тест новых идей: откуп паники на альткоине — свеча {ret_oc*100:.1f}% на объёме {last[5]/vavg:.1f}×, пока падает {getattr(self, '_stress', 0)*100:.0f}% крупных монет. "
@@ -511,13 +514,13 @@ class PaperDesk:
         ret = last[4] / c15[-3][4] - 1
         rng = last[2] - last[3]
         if "G" in self.P["classes"] and sig and rng > 0 and ret <= -G_SIG * sig and (min(last[1], last[4]) - last[3]) / rng >= 0.5:
-            entry = c15[-1][1]
+            entry = c15[-1][4]            # 22.10 (audit): the freshest price, not the open of a bar that may be minutes old
             out.append({"id": f"G-{base}-{last[0]}", "symbol": base, "side": "LONG", "grade": "G", "kind": "FAST_BUYBACK",
                         "entry": entry, "stop": entry * (1 - G_STOP), "tps": [entry * 1.5] * 3, "parts": [1.0, 0.0, 0.0],
                         "order": "MARKET", "hold_h": HOLD_G_H,
                         "reason": f"Быстрый откуп: свеча {ret*100:.1f}% ({ret/sig:.1f}σ) с длинным хвостом снизу — покупатели выкупили. Выход через 8 ч, стоп −{G_STOP*100:.0f}%."})
         if sig and rng > 0 and ret <= -3.5 * sig and (min(last[1], last[4]) - last[3]) / rng >= 0.5:
-            entry = c15[-1][1]
+            entry = c15[-1][4]            # 22.10 (audit): the freshest price, not the open of a bar that may be minutes old
             stop = last[3] - 0.5 * a
             r = entry - stop
             if r > 0:
@@ -581,6 +584,7 @@ class PaperDesk:
         known = {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_ORD}")} | {r[0] for r in self.conn.execute(f"SELECT id FROM {self.T_TR}")} | self._archived_ids()
         known |= risk_gate.skipped_ids(self.conn, self.profile)      # 20.10: a signal the risk layer refused is final, never opened later
         open_syms = {t["symbol"] for t in self._open()} | {o["symbol"] for o in self._pending()}
+        stale_skips = 0
         for base, coin in by_sym.items():
             for s in sigs[base]:
                 if s["id"] in known or base in open_syms or s["grade"] not in self.P["classes"]:
@@ -623,6 +627,9 @@ class PaperDesk:
                     cap_qty = eq * self.P.get("max_notional", 3.0) / s["entry"]   # 17.10: tight stops must not mean 60 % of the account in one trade
                     if qty > cap_qty:
                         qty = cap_qty; risk_usd = qty * (r + s["entry"] * (2 * self.fee + SLIP))
+                if s["order"] == "MARKET" and now - coin["candles"][-1][0] > STALE_MS:   # 22.10 (audit): the store lags → no fill at an old price
+                    stale_skips += 1
+                    continue
                 ok, why = risk_gate.allow_entry(self.profile, base, s["side"], qty * s["entry"], now)   # 20.10: portfolio risk layer
                 if not ok:
                     if risk_gate.record_skip(self.conn, self.profile, s["id"], base, s["side"], qty * s["entry"], why, now):
@@ -637,7 +644,7 @@ class PaperDesk:
                         f["scan"] = {"coins": n_core, "rules": n_rules, "fired": fired.get(s["grade"], 0)}
                     self.conn.execute("INSERT OR IGNORE INTO paper_facts VALUES(?, ?)", (s["id"], json.dumps(f)))
                 if s["order"] == "MARKET":
-                    fill = s["entry"] * (1 + SLIP)
+                    fill = s["entry"] * (1 + (SLIP if s["side"] == "LONG" else -SLIP))   # 22.10 (audit): a short sells lower, never higher
                     self.conn.execute(f"INSERT INTO {self.T_TR} VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                       (s["id"], base, s["side"], s["grade"], s["kind"], fill, s["stop"], s["stop"], json.dumps(s["tps"]), json.dumps(s["parts"]),
                                        qty, qty, risk_usd, now, now + s["hold_h"] * 3_600_000, None, None, 0.0, 0.0, 0, s["reason"], coin["candles"][-1][0]))
@@ -648,6 +655,8 @@ class PaperDesk:
                                        qty, risk_usd, now, now + s.get("ttl_h", ORDER_TTL_H) * 3_600_000, "PENDING", s["reason"]))
                     events.append(f"лимитка {s['side']} {base} @ {s['entry']:.6g} ({RULE_RU.get(s['grade'], s['grade'])})")
                 open_syms.add(base)
+        if stale_skips:
+            events.append(f"пропуск входов по рынку: данные свечей отстают больше чем на {STALE_MS // 60_000} мин ({stale_skips})")
         self.conn.commit()
         # 2. pending limits: fill on candles that closed after creation
         for o in self._pending():
@@ -687,6 +696,15 @@ class PaperDesk:
                 self.conn.execute(f"UPDATE {self.T_ORD} SET status='EXPIRED' WHERE id=?", (o["id"],))
                 events.append(f"лимитка {o['symbol']} истекла без исполнения")
         self.conn.commit()
+        # 2b. funding on perpetual desks (22.10, audit): every 8 h settlement an open long pays rate × notional, a short receives it
+        if not self.P.get("spot"):
+            recent = [dict(zip(("id", "symbol", "side", "opened", "closed", "qty", "qty_left", "entry"), r)) for r in self.conn.execute(
+                f"SELECT id, symbol, side, opened, closed, qty, qty_left, entry FROM {self.T_TR} WHERE closed IS NOT NULL AND closed >= ?",
+                (now - 3 * 3_600_000,)).fetchall()]            # a trade closed inside the 70-min wait still owes its last settlement
+            for tid, usd in funding_accrual.accrue(self.conn, self.profile, self._open() + recent, by_sym, now).items():
+                if usd:
+                    self.conn.execute(f"UPDATE {self.T_TR} SET pnl_usd = COALESCE(pnl_usd, 0) + ? WHERE id=?", (usd, tid))
+            self.conn.commit()
         # 3. manage open trades bar by bar (stop first)
         realized = 0.0
         for t in self._open():
@@ -699,7 +717,17 @@ class PaperDesk:
             qty_left, stop_now, hit, pnl = t["qty_left"], t["stop_now"], t["tps_hit"], t["pnl_usd"]
             closed, exit_kind, last_bar = None, None, t["last_bar"]
             cands = (coin.get("candles_long") or coin["candles"]) if t["grade"] == "S" else coin["candles"]
-            for ci, c in enumerate(cands):
+            # 22.10 (audit): the entry bar was never risk-checked. While it is still the newest bar, the stop is tested against the
+            # live price each run (the bar's own high/low also holds the minutes before the entry, so it is not used).
+            live = coin["candles"][-1]
+            if t["last_bar"] >= live[0] and qty_left > 0:
+                p_now = live[4]
+                if (sgn == 1 and p_now <= stop_now) or (sgn == -1 and p_now >= stop_now):
+                    fill = min(p_now, stop_now) if sgn == 1 else max(p_now, stop_now)      # a jump through the stop fills worse
+                    px = fill * (1 - sgn * SLIP)
+                    pnl += sgn * (px - t["entry"]) * qty_left - px * qty_left * self.fee
+                    qty_left = 0; closed = now; exit_kind = "STOP" if hit == 0 else "BREAKEVEN"
+            for ci, c in enumerate(cands if not closed else []):
                 if c[0] <= t["last_bar"] or c[0] + 900_000 > now:
                     continue
                 last_bar = c[0]
@@ -743,7 +771,8 @@ class PaperDesk:
         # 4. equity = start + realized (closed) ; open P&L marked separately
         realized_total = sum((r[0] or 0) - (r[1] or 0) * (r[2] or 0) * self.fee for r in
                              self.conn.execute(f"SELECT pnl_usd, entry, qty FROM {self.T_TR} WHERE closed IS NOT NULL").fetchall())
-        equity = round(START_EQUITY + realized_total, 2)
+        adj = self.conn.execute("SELECT COALESCE(SUM(usd), 0) FROM paper_adjustments WHERE profile=?", (self.profile,)).fetchone()[0] or 0.0
+        equity = round(START_EQUITY + realized_total + adj, 2)
         # the curve is mark-to-market (open P&L included) — drawdowns are visible, not hidden until the stop
         price_now = {k: v["candles"][-1][4] for k, v in by_sym.items()}
         open_pnl = 0.0
@@ -790,13 +819,60 @@ class PaperDesk:
                                "usd": round(sum(t["net_usd"] for t in ts), 2)}
         eq = self.equity()
         reset = self.reset_info()
-        return {"asof": now, "profile": self.profile, "name": self.P["name"], "about": self.P["about"], "start_equity": START_EQUITY,
+        adjustments = [{"id": i, "time": t_, "usd": round(u, 2), "kind": k, "detail": d} for i, t_, u, k, d in self.conn.execute(
+            "SELECT id, time, usd, kind, detail FROM paper_adjustments WHERE profile=? ORDER BY time", (self.profile,)).fetchall()]
+        return {"asof": now, "profile": self.profile,
+                "funding": None if self.P.get("spot") else funding_accrual.summary(self.conn, self.profile), "adjustments": adjustments, "name": self.P["name"], "about": self.P["about"], "start_equity": START_EQUITY,
                 "since": reset["time"] if reset else (eqh[0]["time"] if eqh else now), "reset": reset, "risk_off":self.stress(list(by_sym.values())) >= 0.7, "stress": round(self.stress(list(by_sym.values())), 3), "equity": eq, "pnl_usd": round(eq - START_EQUITY, 2), "pnl_pct": round((eq / START_EQUITY - 1) * 100, 2),
                 "open_pnl_usd": round(sum(o["open_pnl_usd"] for o in opens), 2), "open": opens, "pending": self._pending(), "closed": closed[:50],
                 "stats": {"trades": n, "winrate": round(len(wins) / n, 3) if n else None, "avg_r": round(sum(t["pnl_r"] for t in closed) / n, 3) if n else None,
                           "best": max((t["net_usd"] for t in closed), default=0), "worst": min((t["net_usd"] for t in closed), default=0), "max_dd_pct": round(dd * 100, 2),
                           "by_grade": by_grade},
-                "equity_history": thin(eqh, now), "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, правила: {', '.join(RULE_RU[g] for g in sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02%, стоп первым внутри свечи, без заглядывания вперёд"}
+                "equity_history": thin(eqh, now), "events": events, "rules": f"риск {self.P['risk']*100:g}% на сделку, правила: {', '.join(RULE_RU[g] for g in sorted(self.P['classes']))}, до {self.P['max_open']} позиций, комиссия 0.05%/сторона + проскальзывание 0.02% против сделки, фандинг каждые 8 ч, стоп первым внутри свечи, без заглядывания вперёд"}
+
+
+# ── one-time correction (22.10.2026, audit 20.10 §4): two defects flattered the demo record. Market shorts were filled with the
+# slippage on the wrong side (higher instead of lower), and funding was never charged. From 22.10 both are handled in step();
+# for trades taken before, ONE adjustment row per desk is appended to paper_adjustments with the exact amounts and a note. The
+# trades themselves are not edited (their history stays as it was recorded); the funding of the closed ones is written to
+# funding_ledger like any other settlement, so it is never charged twice. Settlements the store has no number for are counted as
+# missing (0 $), never guessed.
+CORR_ID = "fix-2026-10-22"
+
+
+def correct_once(conn: sqlite3.Connection, desk: "PaperDesk", coins: list[dict], now: int) -> dict | None:
+    if desk.P.get("spot"):
+        return None
+    if conn.execute("SELECT 1 FROM paper_adjustments WHERE profile=? AND id=?", (desk.profile, CORR_ID)).fetchone():
+        return None
+    by_base = {c["symbol"].replace("-USDT", "").replace("USDT", ""): c for c in coins}
+    limit_ids = {r[0] for r in conn.execute(f"SELECT id FROM {desk.T_ORD}")}
+    slip_usd, n_short = 0.0, 0
+    for tid, entry, qty in conn.execute(f"SELECT id, entry, qty FROM {desk.T_TR} WHERE side='SHORT' AND opened < ?", (now,)).fetchall():
+        if tid in limit_ids or not entry or not qty:
+            continue                                   # limit fills were booked at the limit price, no slippage either way
+        signal = entry / (1 + SLIP)                    # stored fill = signal × (1 + SLIP); the honest fill is signal × (1 − SLIP)
+        slip_usd -= 2 * SLIP * signal * qty            # a short earns (entry − exit) × qty → the entry was 2 × SLIP too high
+        n_short += 1
+    keys = ("id", "symbol", "side", "opened", "closed", "qty", "qty_left", "entry")
+    closed = [dict(zip(keys, r)) for r in conn.execute(
+        f"SELECT id, symbol, side, opened, closed, qty, qty_left, entry FROM {desk.T_TR} WHERE closed IS NOT NULL").fetchall()]
+    ids = [t["id"] for t in closed]
+    fund = funding_accrual.accrue(conn, desk.profile, closed, by_base, now, wait=False)
+    fund_usd = sum(fund.values())
+    miss = conn.execute(f"SELECT COUNT(*) FROM funding_ledger WHERE desk=? AND src='missing' AND trade_id IN ({','.join('?' * len(ids)) or 'NULL'})",
+                        (desk.profile, *ids)).fetchone()[0] if ids else 0
+    n_set = conn.execute(f"SELECT COUNT(*) FROM funding_ledger WHERE desk=? AND src!='missing' AND trade_id IN ({','.join('?' * len(ids)) or 'NULL'})",
+                         (desk.profile, *ids)).fetchone()[0] if ids else 0
+    total = round(slip_usd + fund_usd, 6)
+    detail = {"short_slippage_usd": round(slip_usd, 2), "short_trades": n_short, "funding_usd": round(fund_usd, 2),
+              "funding_settlements": n_set, "funding_missing": miss, "closed_trades": len(closed),
+              "note_ru": (f"Поправка 22.10: проскальзывание у шортов теперь против сделки ({n_short} сделок, {slip_usd:+.2f}$) и учтён фандинг "
+                          f"закрытых сделок ({n_set} расчётов, {fund_usd:+.2f}$" + (f"; нет данных по {miss}" if miss else "") + f"). Итого {total:+.2f}$. "
+                          "Сделки не переписаны — поправка отдельной строкой.")}
+    conn.execute("INSERT INTO paper_adjustments VALUES(?,?,?,?,?,?)", (desk.profile, CORR_ID, now, total, "correction", json.dumps(detail, ensure_ascii=False)))
+    conn.commit()
+    return detail
 
 
 def scan(coins: list[dict]) -> dict:
@@ -994,10 +1070,34 @@ def run(conn: sqlite3.Connection, report: dict, now: int | None = None) -> dict:
     except Exception:  # noqa: BLE001
         pass
     btc50 = report.get("btc_ema50d")       # class T: BTC vs its 50-day EMA (computed from the full 15m store in cli.py)
+    try:   # 22.10: the live last-settled funding rate, fetched once per settlement and only in its first 2 hours (stored history first)
+        b = now // funding_accrual.PERIOD_MS * funding_accrual.PERIOD_MS
+        if not report.get("_no_network") and now - b <= funding_accrual.LIVE_MAX_AGE_MS:
+            conn.execute("CREATE TABLE IF NOT EXISTS paper_meta(k TEXT PRIMARY KEY, v TEXT)")
+            row = conn.execute("SELECT v FROM paper_meta WHERE k=?", (f"funding_live:{b}",)).fetchone()
+            live = json.loads(row[0]) if row else None
+            if live is None and now - b >= funding_accrual.WAIT_MS:
+                live = funding_accrual.fetch_live()
+                if live:
+                    conn.execute("INSERT OR REPLACE INTO paper_meta VALUES(?, ?)", (f"funding_live:{b}", json.dumps(live)))
+                    conn.commit()
+            for c in report["coins"]:
+                base = c["symbol"].replace("-USDT", "").replace("USDT", "")
+                if live and base in live and c.get("funding_now") is None:
+                    c["funding_now"] = live[base]
+    except Exception as e:  # noqa: BLE001
+        print("funding live:", e)
     snaps = {}
     for k in PROFILES:
         d = PaperDesk(conn, k); d._nikkei = nikkei; d._btc50 = btc50
+        corr = None
+        try:
+            corr = correct_once(conn, d, report["coins"], now)
+        except Exception as e:  # noqa: BLE001
+            print("paper correction failed (will retry next run):", k, e)
         snaps[k] = d.step(report["coins"], btc_bull, now)
+        if corr and (corr["short_trades"] or corr["closed_trades"]):
+            snaps[k]["events"].insert(0, corr["note_ru"])
         if k in just_reset:
             snaps[k]["events"].insert(0, just_reset[k]["note_ru"])
     out_scan = scan(report["coins"])

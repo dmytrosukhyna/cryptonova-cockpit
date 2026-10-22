@@ -56,6 +56,7 @@ import os
 import sqlite3
 import time
 
+from . import funding_accrual
 from .history import thin
 from ..risk import gate as risk_gate
 import urllib.request
@@ -283,12 +284,14 @@ def ensure(conn: sqlite3.Connection) -> None:
                     opened_day INTEGER, entry REAL, stop REAL, qty REAL, best REAL, closed INTEGER, exit REAL, exit_kind TEXT,
                     pnl_usd REAL)""")
     for col in ("vol REAL",            # 19.10: the signal day's volume ÷ its 30-day average
-                "facts TEXT"):         # 20.10: what the rule saw at entry (entry_facts), JSON — the app's «why we entered»
+                "facts TEXT",          # 20.10: what the rule saw at entry (entry_facts), JSON — the app's «why we entered»
+                "fund_usd REAL"):      # 22.10 (audit): funding paid (−) or received (+) while open — part of the trade's result         # 20.10: what the rule saw at entry (entry_facts), JSON — the app's «why we entered»
         try:
             conn.execute(f"ALTER TABLE own_trades ADD COLUMN {col}")
         except sqlite3.OperationalError:
             pass
     conn.execute("CREATE TABLE IF NOT EXISTS own_equity(time INTEGER PRIMARY KEY, equity REAL)")
+    conn.execute("CREATE TABLE IF NOT EXISTS own_adjustments(id TEXT PRIMARY KEY, time INTEGER, usd REAL, kind TEXT, detail TEXT)")
     conn.execute("CREATE TABLE IF NOT EXISTS own_closes(symbol TEXT, day INTEGER, close REAL, PRIMARY KEY(symbol, day))")
     conn.commit()
 
@@ -304,18 +307,100 @@ def _set(conn, k, v):
 
 def _close(conn, t: dict, px: float, kind: str, now: int) -> float:
     sg = 1 if t["side"] == "LONG" else -1
-    pnl = sg * (px - t["entry"]) * t["qty"] - (t["entry"] + px) * t["qty"] * FEE
+    fund = t.get("fund_usd")
+    if fund is None:
+        r = conn.execute("SELECT fund_usd FROM own_trades WHERE id=?", (t["id"],)).fetchone()
+        fund = r[0] if r else 0.0
+    pnl = sg * (px - t["entry"]) * t["qty"] - (t["entry"] + px) * t["qty"] * FEE + (fund or 0.0)      # 22.10: funding included
     conn.execute("UPDATE own_trades SET closed=?, exit=?, exit_kind=?, pnl_usd=? WHERE id=?", (now, px, kind, pnl, t["id"]))
     return pnl
 
 
 def _open_rows(conn) -> list[dict]:
-    keys = ("id", "symbol", "rule", "side", "opened", "opened_day", "entry", "stop", "qty", "best", "vol", "facts")
+    keys = ("id", "symbol", "rule", "side", "opened", "opened_day", "entry", "stop", "qty", "best", "vol", "facts", "fund_usd")
     return [dict(zip(keys, r)) for r in conn.execute(f"SELECT {', '.join(keys)} FROM own_trades WHERE closed IS NULL ORDER BY opened")]
 
 
 def equity_closed(conn) -> float:
-    return START + (conn.execute("SELECT COALESCE(SUM(pnl_usd), 0) FROM own_trades WHERE closed IS NOT NULL").fetchone()[0] or 0.0)
+    adj = conn.execute("SELECT COALESCE(SUM(usd), 0) FROM own_adjustments").fetchone()[0] or 0.0       # 22.10: appended corrections
+    return START + (conn.execute("SELECT COALESCE(SUM(pnl_usd), 0) FROM own_trades WHERE closed IS NOT NULL").fetchone()[0] or 0.0) + adj
+
+
+def fetch_funding(sym: str, start_ms: int, end_ms: int) -> list[list]:
+    """BingX settled funding for one perpetual → [[time_ms, rate], …]."""
+    from ..bingx.rest import BingXRest
+    return [[r["time"], r["rate"]] for r in BingXRest().funding_history(f"{sym}-USDT", start_ms=start_ms, end_ms=end_ms)]
+
+
+def _funding_rows(conn, now: int, since: int) -> list[dict]:
+    keys = ("id", "symbol", "side", "opened", "closed", "qty", "entry")
+    return [dict(zip(keys, r)) for r in conn.execute(
+        f"SELECT {', '.join(keys)} FROM own_trades WHERE closed IS NULL OR closed >= ?", (since,)).fetchall()]
+
+
+def accrue_funding(conn, now: int, px: dict, history=fetch_funding) -> list[str]:
+    """22.10 (audit): every 8 h settlement an open long pays rate × notional (a short receives it). Rates are the exchange's
+    settled history, fetched only when a settlement is at least 70 min old and not yet charged; a failed fetch retries next
+    run, and only a settlement older than 6 h without any number is recorded as missing (0 $)."""
+    funding_accrual.ensure(conn)
+    trades = _funding_rows(conn, now, now - 3 * 3_600_000)
+    due = {}
+    for t in trades:
+        last = conn.execute("SELECT MAX(ts) FROM funding_ledger WHERE desk='own' AND trade_id=?", (t["id"],)).fetchone()[0]
+        end = min(now, t["closed"]) if t["closed"] else now
+        b = [ts for ts in funding_accrual.boundaries(max(t["opened"], last or 0), end) if now - ts >= funding_accrual.WAIT_MS]
+        if b:
+            due[t["symbol"]] = min(due.get(t["symbol"], b[0]), b[0])
+    if not due:
+        return []
+    coins, failed = {}, set()
+    for sym, first in due.items():
+        try:
+            coins[sym] = {"funding": history(sym, first - 3_600_000, now), "price_now": px.get(sym)}
+        except Exception:  # noqa: BLE001
+            failed.add(sym)
+    use = [t for t in trades if t["symbol"] not in failed or now - due.get(t["symbol"], now) > 6 * 3_600_000]
+    events = []
+    for tid, usd in funding_accrual.accrue(conn, "own", use, coins, now, wait=False).items():
+        if not usd:
+            continue
+        conn.execute("UPDATE own_trades SET fund_usd = COALESCE(fund_usd, 0) + ? WHERE id=?", (usd, tid))
+        conn.execute("UPDATE own_trades SET pnl_usd = COALESCE(pnl_usd, 0) + ? WHERE id=? AND closed IS NOT NULL", (usd, tid))
+    conn.commit()
+    return events
+
+
+CORR_ID = "fix-2026-10-22"
+
+
+def correct_once(conn, now: int, history=fetch_funding) -> dict | None:
+    """22.10 (audit): funding was never charged. The trades closed before this moment get their settled funding written to the
+    ledger and ONE appended adjustment row (the trades themselves are not edited). Runs once per database."""
+    ensure(conn)
+    if conn.execute("SELECT 1 FROM own_adjustments WHERE id=?", (CORR_ID,)).fetchone():
+        return None
+    keys = ("id", "symbol", "side", "opened", "closed", "qty", "entry")
+    closed = [dict(zip(keys, r)) for r in conn.execute(f"SELECT {', '.join(keys)} FROM own_trades WHERE closed IS NOT NULL").fetchall()]
+    coins, failed = {}, []
+    for sym in {t["symbol"] for t in closed}:
+        first = min(t["opened"] for t in closed if t["symbol"] == sym)
+        try:
+            coins[sym] = {"funding": history(sym, first - 3_600_000, now)}
+        except Exception:  # noqa: BLE001
+            failed.append(sym)
+    if failed:
+        return None                                   # no guessing: try again next run
+    funding_accrual.ensure(conn)
+    fund = funding_accrual.accrue(conn, "own", closed, coins, now, wait=False)
+    usd = sum(fund.values())
+    miss = conn.execute("SELECT COUNT(*) FROM funding_ledger WHERE desk='own' AND src='missing'").fetchone()[0]
+    n = conn.execute("SELECT COUNT(*) FROM funding_ledger WHERE desk='own' AND src!='missing'").fetchone()[0]
+    detail = {"funding_usd": round(usd, 2), "funding_settlements": n, "funding_missing": miss, "closed_trades": len(closed),
+              "note_ru": f"Поправка 22.10: учтён фандинг закрытых сделок ({n} расчётов, {usd:+.2f}$"
+                         + (f"; нет данных по {miss}" if miss else "") + "). Сделки не переписаны — поправка отдельной строкой."}
+    conn.execute("INSERT INTO own_adjustments VALUES(?,?,?,?,?)", (CORR_ID, now, round(usd, 6), "correction", json.dumps(detail, ensure_ascii=False)))
+    conn.commit()
+    return detail
 
 
 def _pool_candles(conn, day: int, daily, volumes) -> dict:
@@ -365,7 +450,7 @@ def pick_basket(K: dict) -> list:
     return sorted((s for s in dv180 if dv180[s] > 0), key=lambda s: -dv180[s])[:10]
 
 
-def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, prices=fetch_prices, volumes=None) -> dict:
+def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, prices=fetch_prices, volumes=None, funding=None) -> dict:
     now = now or int(time.time() * 1000)
     ensure(conn)
     events = []
@@ -375,6 +460,11 @@ def step(conn: sqlite3.Connection, now: int | None = None, daily=fetch_daily, pr
         px = prices() or {}
     except Exception as e:  # noqa: BLE001
         px, events = {}, [f"цены: {str(e)[:80]}"]
+    if funding is not None:
+        try:
+            accrue_funding(conn, now, px, funding)
+        except Exception as e:  # noqa: BLE001
+            events.append(f"фандинг: {str(e)[:80]}")
     for t in _open_rows(conn):
         p = px.get(t["symbol"])
         if p and ((t["side"] == "LONG" and p <= t["stop"]) or (t["side"] == "SHORT" and p >= t["stop"])):
@@ -516,7 +606,7 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
     for t in _open_rows(conn):
         p = px.get(t["symbol"]) or t["entry"]
         sg = 1 if t["side"] == "LONG" else -1
-        u = sg * (p - t["entry"]) * t["qty"] - t["entry"] * t["qty"] * FEE
+        u = sg * (p - t["entry"]) * t["qty"] - t["entry"] * t["qty"] * FEE + (t.get("fund_usd") or 0.0)
         open_pnl += u
         facts = _trade_facts(conn, t)
         if facts is not None and scans.get(str(t["opened_day"])):
@@ -547,20 +637,33 @@ def doc(conn: sqlite3.Connection, now: int, px: dict, events: list) -> dict:
     last_scan = scans[max(scans, key=int)] if scans else None
     return {"asof": now, "profile": "own", "name": NAME, "about": ABOUT, "start_equity": START, "since": first, "reset": None,
             "scan": last_scan, "live_by_rule": live_by_rule(conn),
+            "funding": funding_accrual.summary(conn, "own"),
+            "adjustments": [{"id": i, "time": t_, "usd": round(u_, 2), "kind": k_, "detail": d_} for i, t_, u_, k_, d_ in
+                            conn.execute("SELECT id, time, usd, kind, detail FROM own_adjustments ORDER BY time").fetchall()],
             "equity": round(eqc, 2), "equity_mtm": round(eq, 2), "pnl_usd": round(eq - START, 2), "pnl_pct": round((eq / START - 1) * 100, 2),
             "open_pnl_usd": round(open_pnl, 2), "open": out_open, "pending": [], "closed": closed,
             "stats": {"trades": n, "winrate": round(wins / n, 3) if n else None, "avg_trade_pct": round(avg * 100, 2) if avg is not None else None,
                       "max_dd_pct": round(dd * 100, 2), "best": 0, "worst": 0},
             "equity_history": thin(eqh), "events": events[:20], "error": None,
             "regime_ru": None if bull is None else ("рост: покупаем" if bull else "не рост: ждём в долларах"),
-            "rules": "откат в тренде и пробой 20 дней на 40 самых торгуемых монетах, только покупки в режиме «рост» и только при объёме дня от 1.5× к среднему за 30 дней; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 40 открытых"}
+            "rules": "откат в тренде и пробой 20 дней на 40 самых торгуемых монетах, только покупки в режиме «рост» и только при объёме дня от 1.5× к среднему за 30 дней; стоп 2.5 ATR (3–15%), риск 0.5% счёта, до 40 открытых; комиссия и проскальзывание 0.07% на сторону, фандинг каждые 8 ч"}
 
 
 def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, daily=fetch_daily, prices=fetch_prices, volumes=None) -> dict:
     now = now or int(time.time() * 1000)
+    funding = None
     if volumes is None and daily is fetch_daily:      # live: the BingX 24-hour volumes; tests inject candles → the core list only
         volumes = fetch_volumes
-    r = step(conn, now, daily, prices, volumes)
+        funding = fetch_funding                       # live: settled funding from BingX (tests inject their own or none)
+    corr = None
+    if funding is not None:
+        try:
+            corr = correct_once(conn, now, funding)
+        except Exception as e:  # noqa: BLE001
+            print("own correction failed (will retry next run):", e)
+    r = step(conn, now, daily, prices, volumes, funding)
+    if corr and corr["closed_trades"]:
+        r["events"].insert(0, corr["note_ru"])
     d = doc(conn, now, r["prices"], r["events"])
     p = os.path.join(out, "paper.json")
     try:

@@ -473,6 +473,10 @@ def main(argv: list[str] | None = None) -> int:
                 cs = universe.get(c["symbol"])
                 if cs:
                     c["candles_long"] = [[k.open_time, k.open, k.high, k.low, k.close, k.volume] for k in cs[-96 * 22:]]
+                try:   # 22.10 (audit): settled funding for the demo perpetual desks — 16 days covers the longest hold (14 d)
+                    c["funding"] = store.funding(c["symbol"], int(_t.time() * 1000) - 16 * 86_400_000)
+                except Exception:  # noqa: BLE001
+                    pass
             try:   # class T (lab, 18.10): BTC vs the EMA of its 15m closes over 4 800 bars (≈ 50 days), as in scripts/lab/fam_trend.py
                 bcs = next((v for k, v in universe.items() if k.startswith("BTC")), None)
                 if bcs and len(bcs) >= 96 * 30:

@@ -88,6 +88,30 @@ def creds(env=None):
     return c if all(c) else None
 
 
+def ipv4_only(env=None) -> bool:
+    """22.10: the trade key is bound to the Mac's IP. A home Mac usually has IPv6 too, with a temporary address that changes every
+    day, and OKX sees whichever protocol the connection used — so the bound address would stop matching. This process talks over
+    IPv4 only (a name without an IPv4 address still resolves as before), so the IPv4 address bound to the key (`curl -4 -s
+    https://ifconfig.me`) is the one OKX sees. OKX_IPV6=on turns it off."""
+    if (_env(env).get("OKX_IPV6") or "").strip().lower() in ("on", "1", "yes", "true"):
+        return False
+    import socket
+    if getattr(socket.getaddrinfo, "_cnq_v4", False):
+        return True
+    orig = socket.getaddrinfo
+
+    def v4(host, port, family=0, type=0, proto=0, flags=0):  # noqa: A002 — the stdlib's own parameter names
+        if family in (0, socket.AF_UNSPEC):
+            try:
+                return orig(host, port, socket.AF_INET, type, proto, flags)
+            except socket.gaierror:
+                pass
+        return orig(host, port, family, type, proto, flags)
+    v4._cnq_v4 = True
+    socket.getaddrinfo = v4
+    return True
+
+
 def live(env=None) -> bool:
     return (_env(env).get("CNQ_LIVE_TRADING") or "no").strip().lower() == "yes"
 
@@ -788,6 +812,7 @@ def check(env=None, opener=None) -> list[str]:
     """Lines for `--check` and `mirror --check`: which key does what, host, permissions, money. Places nothing."""
     out = []
     if creds(env):
+        ipv4_only(env)
         try:
             st = load_state(env)
             cl = connect(env, opener, st)
@@ -866,6 +891,7 @@ def plan_all(env=None, opener=None, model=None, desks=None, act_desk=None, now: 
 
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    ipv4_only()
     if "--stop" in argv:
         print(stop())
         return 0

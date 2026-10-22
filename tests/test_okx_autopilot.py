@@ -248,3 +248,27 @@ def test_autopilot_global_account_uses_www_usdt_and_global_fee():
     text = "\n".join(ap.check(e, live_fake()))
     assert "www.okx.com · глобальный счёт OKX" in text and "валюта торговли: USDT" in text and "комиссия 0,1%" in text
     assert "OKX Europe" not in text
+
+
+def test_okx_autopilot_talks_ipv4_only_so_the_bound_ip_matches():
+    """22.10: a home Mac's temporary IPv6 changes daily — the key is bound to the IPv4 address, so the process resolves IPv4 only."""
+    import socket
+    from cnq.execution import okx_autopilot as ap
+    orig = socket.getaddrinfo
+    seen = []
+
+    def fake(host, port, family=0, type=0, proto=0, flags=0):  # noqa: A002
+        seen.append(family)
+        if host == "v6only.example" and family == socket.AF_INET:
+            raise socket.gaierror("no A record")
+        return [(family or socket.AF_INET6, type, proto, "", (host, port))]
+    try:
+        socket.getaddrinfo = fake
+        assert ap.ipv4_only({"OKX_IPV6": "on"}) is False and socket.getaddrinfo is fake
+        assert ap.ipv4_only({}) is True and ap.ipv4_only({}) is True          # installed once
+        assert socket.getaddrinfo("www.okx.com", 443)[0][0] == socket.AF_INET and seen[-1] == socket.AF_INET
+        socket.getaddrinfo("v6only.example", 443)                              # no IPv4 address → resolves as before
+        assert seen[-2:] == [socket.AF_INET, 0]
+        assert socket.getaddrinfo("x", 1, socket.AF_INET6)[0][0] == socket.AF_INET6   # an explicit family is left alone
+    finally:
+        socket.getaddrinfo = orig

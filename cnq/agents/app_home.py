@@ -646,10 +646,14 @@ def _config(out: str) -> dict:
     pf = {lang: {k: str(v) for k, v in t.items() if k in ("title", "sub", "note") and v}
           for lang, t in pf.items() if isinstance(lang, str) and isinstance(t, dict)}
     okx = c.get("okx_ref")
+    # build 44: the countries where BingX does not serve people (ISO alpha-2); the app names no exchange there. Null = the app's own list
+    barred = c.get("bingx_barred")
+    barred = sorted({str(x).strip().upper() for x in barred if len(str(x).strip()) == 2}) if isinstance(barred, list) else None
     return {"exchange_name": c.get("exchange_name") or "BingX",
             "exchange_ref": ref if isinstance(ref, str) and ref.startswith("https://") else None,
             # build 44: the OKX link for the EU/EEA (OKX Europe, MiCA); a referral only once the owner joins OKX's programme
             "okx_ref": okx if isinstance(okx, str) and okx.startswith("https://") else None,
+            "bingx_barred": barred,
             "exchange_trade_url": c.get("exchange_trade_url"),
             "portfolio": {k: v for k, v in pf.items() if v}}
 

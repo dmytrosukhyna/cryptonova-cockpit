@@ -1041,24 +1041,31 @@ const fmtT=ms=>new Date(ms).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit
 function ddmm(t){ if(!t) return ''; const d=new Date(t<1e12?t*1000:t); return isNaN(d)?'':d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'}); }
 function resFmt(usd,base,since){ if(usd==null||!isFinite(usd)) return ''; const c=usd>0.5?'pos':usd<-0.5?'neg':'', pc=base?usd/base*100:null; return `<span class="rf ${c}">${usd>=0?'+':'−'}$${Math.abs(Math.round(usd)).toLocaleString('ru-RU')}${pc!=null?` (${pc>=0?'+':'−'}${Math.abs(pc).toFixed(1)}%)`:''}${since?`<small> с ${since}</small>`:''}</span>`; }
 const OTAG={our:'НАША',engine:'ДВИЖОК',test:'НА ПРОВЕРКЕ',pick:'НА ВЫБОР',your:'ВАШ',mix:'в CRYPTO NOVA'}, otag=k=>`<i class="otag ${k}">${OTAG[k]}</i>`;
-// 18.10: «Подключить» opens a short sheet; the bot (t.me/cryptonova_core_ai_bot) explains the terms and alerts the owner. Keys: cryptonova, portfolio, exp/brk/imp/lab/memes/whales, cons/mod/high/meme/bal
-const CONN_BOT='https://t.me/cryptonova_core_ai_bot?start=connect_';
+// 18.10: «Подключить» opens a short step guide. 22.10 (owner): no Telegram bot or channel in it and no UID — the build-45 flow
+// (data/nova_faq.json copy / uid, web/academy.json l0-demo-live): sign up on OKX by our link → identity check → USDT → «Копировать
+// CRYPTO NOVA» (the lead-trader profile). Keys: cryptonova, portfolio, exp/brk/imp/lab/memes/whales, cons/mod/high/meme/bal
 // 21.10 owner: no paid connection, no administrator, no exchange keys — referral only. The CRYPTO NOVA system is free; the person trades
 // on their own exchange account by our portfolio / signals; we earn from the exchange's partner programme (web/app_config.json → exchange_ref).
 let APPCFG=null, ACAD=null;
 async function connCfg(){ if(APPCFG) return APPCFG; try{ const r=await fetch('./app_config.json',{cache:'no-store'}); APPCFG=r.ok?await r.json():{}; }catch(e){ APPCFG={}; } return APPCFG; }
 async function connLesson(id){ if(!ACAD){ try{ const r=await fetch('./academy.json',{cache:'no-store'}); ACAD=r.ok?await r.json():{levels:[]}; }catch(e){ ACAD={levels:[]}; } } for(const lv of (ACAD.levels||[])) for(const l of (lv.lessons||[])) if(l.id===id) return l; return null; }
-// 22.10 decision B (claude/cryptonova-okx-vs-bingx-2026-10-22.md): people in the EU/EEA are pointed to OKX (OKX Europe: MiCA + MiFID;
-// USDC/EUR, no USDT; futures = X-Perps, up to 10x, ~20 pairs); everyone else to BingX. BingX links are never shown under the EU choice.
-// Default from the browser's time zone; the person can switch («Я живу в ЕС / в другой стране»), remembered on this device.
+// 22.10 (owner, build 45): OKX for everyone (web/app_config.json okx_ref); in the EEA and the UK (okx_copy_barred) OKX has no copy
+// trading yet — no copy button there, the trades are on the panel to repeat by hand; BingX (exchange_ref) only where OKX does not
+// work (okx_barred: the US, Canada, Singapore …), copying opens there later. Three choices: eu · world · nookx — the default from the
+// browser's time zone, the person can switch, remembered on this device.
 const EEA_TZ=new Set(['Europe/Amsterdam','Europe/Athens','Europe/Berlin','Europe/Bratislava','Europe/Brussels','Europe/Bucharest','Europe/Budapest','Europe/Copenhagen','Europe/Dublin','Europe/Helsinki','Europe/Lisbon','Europe/Ljubljana','Europe/Luxembourg','Europe/Madrid','Europe/Malta','Europe/Oslo','Europe/Paris','Europe/Prague','Europe/Riga','Europe/Rome','Europe/Sofia','Europe/Stockholm','Europe/Tallinn','Europe/Vaduz','Europe/Vienna','Europe/Vilnius','Europe/Warsaw','Europe/Zagreb','Europe/Mariehamn','Europe/Busingen','Atlantic/Reykjavik','Atlantic/Canary','Atlantic/Madeira','Atlantic/Azores','Asia/Nicosia','Asia/Famagusta','Africa/Ceuta']);
-function tzIsEEA(){ try{ return EEA_TZ.has(Intl.DateTimeFormat().resolvedOptions().timeZone||''); }catch(e){ return false; } }
-function connRegion(){ let v=''; try{ v=localStorage.getItem('cnq_region')||''; }catch(e){} return v==='eu'||v==='world'?v:(tzIsEEA()?'eu':'world'); }
-function setConnRegion(r){ try{ localStorage.setItem('cnq_region',r==='eu'?'eu':'world'); }catch(e){} }
-/* the exchange for the person's region: name, sign-up link, referral (null until the owner has one), trade-pair link (null in the EU:
-   no reliable OKX X-Perps pair URL), the quote currency */
-function connEx(C){ C=C||{}; if(connRegion()==='eu'){ const ref=C.okx_ref?String(C.okx_ref):''; return {eu:true,name:'OKX',ref,reg:ref||'https://www.okx.com/eu',pair:null,cur:'USDC или евро'}; }
-  const ref=C.exchange_ref?String(C.exchange_ref):''; return {eu:false,name:C.exchange_name||'BingX',ref,reg:ref||'https://bingx.com/',pair:s=>`https://bingx.com/en/perpetual/${encodeURIComponent(s)}-USDT`,cur:'USDT'}; }
+const NOOKX_TZ=/^(America\/(New_York|Chicago|Denver|Phoenix|Los_Angeles|Anchorage|Detroit|Boise|Indiana\/.+|Kentucky\/.+|Toronto|Vancouver|Edmonton|Winnipeg|Regina|Halifax|St_Johns|Puerto_Rico|Havana|La_Paz)|Pacific\/Honolulu|Asia\/(Singapore|Hong_Kong|Macau|Tehran|Pyongyang|Damascus|Dhaka))$/;
+function tzZone(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone||''; }catch(e){ return ''; } }
+function tzIsEEA(){ const z=tzZone(); return EEA_TZ.has(z)||z==='Europe/London'||z==='Europe/Guernsey'||z==='Europe/Jersey'||z==='Europe/Isle_of_Man'; }
+function connRegion(){ let v=''; try{ v=localStorage.getItem('cnq_region')||''; }catch(e){} return ['eu','world','nookx'].includes(v)?v:(tzIsEEA()?'eu':NOOKX_TZ.test(tzZone())?'nookx':'world'); }
+function setConnRegion(r){ try{ localStorage.setItem('cnq_region',['eu','world','nookx'].includes(r)?r:'world'); }catch(e){} }
+const CONN_REGN={eu:'OKX · в ЕЭЗ и Великобритании копирование пока недоступно',world:'OKX · копирование CRYPTO NOVA в один клик',nookx:'BingX — OKX в вашей стране не работает'};
+/* the exchange for the person's region: name, sign-up link (our referral), identity-check link, whether one-click copying exists there */
+function connEx(C){ C=C||{}; const R=connRegion();
+  if(R==='nookx'){ const ref=C.exchange_ref?String(C.exchange_ref):''; return {eu:false,okx:false,copy:false,name:C.exchange_name||'BingX',ref,reg:ref||'https://bingx.com/',kyc:C.bingx_kyc_url||'',pair:s=>`https://bingx.com/en/perpetual/${encodeURIComponent(s)}-USDT`,cur:'USDT'}; }
+  const ref=C.okx_ref?String(C.okx_ref):''; return {eu:R==='eu',okx:true,copy:R!=='eu',name:'OKX',ref,reg:ref||'https://www.okx.com/',kyc:C.okx_kyc_url||'',pair:null,cur:R==='eu'?'USDC или евро':'USDT'}; }
+// the lead-trader profile: app_config okx_copy_url, or public_real.json copy_url while that is empty; none → no button
+async function connCopyUrl(C){ if(C&&C.okx_copy_url) return String(C.okx_copy_url); try{ const r=await fetch('./public_real.json',{cache:'no-store'}); const j=r.ok?await r.json():null; return j&&j.copy_url?String(j.copy_url):''; }catch(e){ return ''; } }
 const CONN_SPOT=new Set(['portfolio','capital','altport','ideas','cons','mod','high','meme','bal','spot']);
 const APPSTORE_URL='https://apps.apple.com/app/id6754893343';
 // 21.10 15:27 owner: «суховато … документ красивый, пошагово, со стрелочками, отрисовать; подготовьте документы заранее; про проверку
@@ -1068,59 +1075,50 @@ function connOpen(key,name){ key=String(key||'cryptonova').toLowerCase().replace
   const spot=CONN_SPOT.has(key), what=spot?'портфель CRYPTO NOVA: какие монеты и в каких долях держать':'сделки CRYPTO NOVA: вход, стоп и цель каждой сделки';
   ov.innerHTML=`<div class="connbox wide" role="dialog" aria-modal="true" aria-label="Подключить"><button class="ib sm connx" data-connclose aria-label="Закрыть">✕</button>${!IS_GUEST?'<div class="connprev">Предпросмотр: так окно увидит клиент</div>':''}
    <div class="connhero"><small>Пошаговая инструкция · около 15 минут</small><h3>Подключить ${mypEsc(name||'CRYPTO NOVA')}</h3>
-   <div class="connlead">Счёт открывается на бирже на ваше имя — деньги всегда у вас, пароли и ключи от биржи нам не нужны. Приложение показывает ${what}, а вы повторяете на своём счёте. Пять шагов, около 15 минут.</div></div>
-   <div class="connreg" role="group" aria-label="Где вы живёте"><span class="muted">Где вы живёте:</span><button class="ib sm" data-reg="eu" aria-pressed="${connRegion()==='eu'}">В ЕС</button><button class="ib sm" data-reg="world" aria-pressed="${connRegion()==='world'}">В другой стране</button><span class="muted connregn">${connRegion()==='eu'?'в ЕС — биржа OKX (лицензия ЕС)':'биржа BingX'}</span></div>
+   <div class="connlead">Счёт открывается на бирже на ваше имя — деньги всегда у вас. UID, пароли и API-ключи нам не нужны. Четыре шага, около 15 минут: счёт на OKX, проверка личности, пополнение и «Копировать CRYPTO NOVA».</div></div>
+   <div class="connreg" role="group" aria-label="Где вы живёте"><span class="muted">Где вы живёте:</span><button class="ib sm" data-reg="world" aria-pressed="${connRegion()==='world'}">В большинстве стран</button><button class="ib sm" data-reg="eu" aria-pressed="${connRegion()==='eu'}">ЕЭЗ или Великобритания</button><button class="ib sm" data-reg="nookx" aria-pressed="${connRegion()==='nookx'}">США, Канада, Сингапур и др.</button><span class="muted connregn">${CONN_REGN[connRegion()]}</span></div>
    <div class="connq" id="connQ"><b>Нужна пошаговая инструкция по подключению?</b><div class="connqa"><button class="ib" id="connYes">Да, покажите</button><button class="ib" id="connNo">Нет, спасибо</button></div></div>
    <div id="connSteps" hidden></div>
    <div class="muted connrisk">Торговля связана с риском; прошлый результат не гарантирует будущий. Начинайте с демо в приложении, потом — с небольшой суммы.</div></div>`;
   ov.hidden=false;
   ov.querySelector('#connNo').addEventListener('click',()=>{ ov.querySelector('#connQ').innerHTML='<b>Хорошо.</b> <span class="muted">Инструкция всегда здесь — кнопка «Подключить».</span>'; setTimeout(()=>{ ov.hidden=true; },1400); });
-  ov.querySelectorAll('[data-reg]').forEach(b=>b.addEventListener('click',()=>{ setConnRegion(b.dataset.reg); ov.querySelectorAll('[data-reg]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.reg===connRegion()))); const n=ov.querySelector('.connregn'); if(n) n.textContent=connRegion()==='eu'?'в ЕС — биржа OKX (лицензия ЕС)':'биржа BingX'; if(!ov.querySelector('#connSteps').hidden) showSteps(); }));
-  const showSteps=async()=>{ const C=await connCfg(); const X=connEx(C), ref=X.ref, ex=X.name, reg=X.reg, EU=X.eu;
+  ov.querySelectorAll('[data-reg]').forEach(b=>b.addEventListener('click',()=>{ setConnRegion(b.dataset.reg); ov.querySelectorAll('[data-reg]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.reg===connRegion()))); const n=ov.querySelector('.connregn'); if(n) n.textContent=CONN_REGN[connRegion()]; if(!ov.querySelector('#connSteps').hidden) showSteps(); }));
+  const showSteps=async()=>{ const C=await connCfg(); const X=connEx(C), ref=X.ref, ex=X.name, reg=X.reg, EU=X.eu, cu=X.copy?await connCopyUrl(C):'';
     ov.querySelector('#connQ').hidden=true; const box=ov.querySelector('#connSteps'); box.hidden=false;
-    // 21.10 22:52 owner: «стрелочки лишние; экраны непонятные; расписать что, зачем, как; автоматизация — напишите в поддержку, это бот?
-    // бот перепроверит UID и подключит?». Each step: what to do · why · (where to find it). The drawn phone screens are gone; the bot
-    // part says exactly what the bot does with a UID; automation is stated honestly (spot: BingX recurring buy; futures: one-click copy
-    // needs BingX's written confirmation first — see claude/cryptonova-copytrading-2026-10-20.md).
+    // 22.10 (owner): what to do · why, four steps; no Telegram bot, no UID, no API keys (data/nova_faq.json copy / uid)
     const stp=(n,t,what,why,extra)=>`<li class="cstep"><div class="cnum">${n}</div><div class="cbody"><h4>${t}</h4><div class="cwhat"><small>Что сделать</small>${what}</div><div class="cwhy"><small>Зачем</small>${why}</div>${extra||''}</div></li>`;
+    const byHand='Все сделки CRYPTO NOVA видны в панели — вход, стоп и цель каждой; их можно повторять самому.';
     box.innerHTML=`<div class="cprep"><h4>Понадобится</h4><ul>
         <li>паспорт или ID-карта и телефон с камерой — для проверки личности на бирже;</li>
         <li>почта или номер телефона и 10–15 минут.</li></ul>
         <div class="muted">Документов сейчас нет рядом — откройте счёт, а проверку пройдите позже: аккаунт подождёт.</div></div>
       <ol class="csteps">
-      ${stp(1,`Откройте счёт на ${mypEsc(ex)}${ref?' по ссылке CRYPTO NOVA':''}`,
-          `<p>Нажмите кнопку ниже, укажите почту или телефон и придумайте пароль.${ref?' Код приглашения CRYPTO NOVA подставится сам.':''} Затем включите двухфакторную защиту (код из приложения-аутентификатора).</p>`,
-          `<p>Счёт открывается на ваше имя: деньги всегда у вас, у CRYPTO NOVA к ним доступа нет. С вас за подключение ничего не берут${ref?': по партнёрской программе биржа делится с нами частью своей комиссии, ваша комиссия от этого не меняется':''}.</p>`,
-          `<a class="ib sm conna" href="${mypEsc(reg)}" target="_blank" rel="noopener">${ref?'Открыть счёт по ссылке CRYPTO NOVA':'Открыть '+mypEsc(ex)}</a>`)}
+      ${stp(1,`Откройте счёт на ${mypEsc(ex)} по ссылке CRYPTO NOVA`,
+          `<p>Нажмите кнопку ниже, укажите почту или телефон и придумайте пароль. Код приглашения CRYPTO NOVA подставится сам. Затем включите двухфакторную защиту.</p>`,
+          `<p>Счёт открывается на ваше имя: деньги всегда у вас, у CRYPTO NOVA к ним доступа нет. По партнёрской программе биржа делится с нами частью своей комиссии — ваша комиссия от этого не меняется.</p>`,
+          `<a class="ib sm conna" href="${mypEsc(reg)}" target="_blank" rel="noopener">Открыть счёт на ${mypEsc(ex)}</a>`)}
       ${stp(2,'Пройдите проверку личности',
-          `<p>В приложении биржи: профиль → верификация. Сфотографируйте документ и сделайте селфи. Это 5–10 минут, проверка — обычно от нескольких минут до суток.</p>`,
-          `<p>Так требуют закон и биржа: без проверки нельзя пополнить счёт и вывести деньги. Это и ваша защита: вывести деньги сможете только вы. Документы видит только биржа — CRYPTO NOVA их не получает и никогда не попросит.</p>`)}
-      ${EU?stp(3,'Пополните счёт в USDC или евро',
-          `<p>Активы → Пополнить: банковский перевод или карта в евро, либо купите USDC прямо в приложении OKX. Если переводите крипту с другой биржи, выберите <b>одинаковую сеть</b> на обеих сторонах и сверьте адрес.</p>`,
-          `<p>В ЕС на OKX торгуют в USDC и евро — USDT там недоступен. Начните с суммы, которую не страшно потерять; сначала можно потренироваться на демо в приложении.</p>`)
-        :stp(3,'Пополните счёт в USDT',
-          `<p>Активы → Пополнить → USDT. Проще всего купить USDT картой прямо в приложении биржи. Если переводите с другой биржи, выберите <b>одинаковую сеть</b> на обеих сторонах (например, TRC20) и сверьте адрес: перевод в другой сети может потеряться.</p>`,
-          `<p>Сделки и портфель CRYPTO NOVA работают в USDT. Начните с суммы, которую не страшно потерять; сначала можно потренироваться на демо в приложении.</p>`)}
-      ${stp(4,'Пришлите UID боту CRYPTO NOVA',
-          `<p>UID — номер вашего счёта на ${mypEsc(ex)}. В приложении биржи нажмите на аватар (профиль): UID рядом с ним, рядом значок «копировать». Отправьте этот номер боту.</p>`,
-          `<p>Бот проверит, что счёт открыт по ссылке CRYPTO NOVA и пополнен, и ответит. Если автоматическая проверка недоступна, проверим вручную в течение 24 часов. Так мы видим ваше подключение и сможем помогать; когда запустим копирование в один клик, вы узнаете первым. UID — не пароль: по нему нельзя войти в счёт или вывести деньги.</p>`,
-          `<a class="ib sm conna" href="${CONN_BOT}${key}" target="_blank" rel="noopener">Открыть бота и отправить UID</a>`)}
-      ${spot?stp(5,'Соберите портфель по долям CRYPTO NOVA',
-          `<p>В приложении CRYPTO NOVA → «Спот»: какие монеты и в каких долях держать. На ${mypEsc(ex)} купите эти монеты на спот-счёте в тех же долях. Когда система меняет доли, это видно в приложении.</p>`,
-          `<p>Монеты лежат на вашем счёте, а решения о составе и долях принимает система по своим правилам — вам не нужно разбираться в каждой монете.</p>`,
-          `<a class="ib sm conna" href="${APPSTORE_URL}" target="_blank" rel="noopener">CRYPTO NOVA AI в App Store</a>`)
-        :stp(5,'Повторяйте сделки CRYPTO NOVA',
-          `<p>В приложении CRYPTO NOVA → «Фьючерсы»: у каждой сделки вход, стоп, цель и почему система вошла. На ${mypEsc(ex)}: Фьючерсы → нужная пара → лимитный ордер по цене входа; в том же окне включите TP/SL и впишите цель и стоп. Размер позиции выбирайте так, чтобы при стопе терять не больше 0,5–1% счёта.</p>${EU?'<p>В ЕС фьючерсы на OKX называются X-Perps: плечо до 10x, около 20 пар, перед первой сделкой биржа задаёт несколько вопросов. Часть монет CRYPTO NOVA там может быть недоступна — спот и портфель работают полностью.</p>':''}`,
-          `<p>Стоп и цель ставятся сразу, вместе с ордером: сделка закроется сама, даже если вы не у телефона.</p>`,
-          `<a class="ib sm conna" href="${APPSTORE_URL}" target="_blank" rel="noopener">CRYPTO NOVA AI в App Store</a>`)}
+          `<p>В приложении биржи: профиль → верификация. Сфотографируйте документ и сделайте селфи — 5–10 минут; проверка обычно от нескольких минут до суток.</p>`,
+          `<p>Так требуют закон и биржа: без проверки нельзя пополнить счёт и вывести деньги. Документы видит только биржа — CRYPTO NOVA их не получает.</p>`,
+          X.kyc?`<a class="ib sm conna" href="${mypEsc(X.kyc)}" target="_blank" rel="noopener">Проверка личности на ${mypEsc(ex)}</a>`:'')}
+      ${stp(3,EU?'Пополните счёт: USDC или евро':'Пополните счёт в USDT',
+          EU?`<p>Активы → Пополнить: банковский перевод или карта в евро, либо USDC прямо в приложении OKX. Если переводите крипту с другой биржи, выберите <b>одинаковую сеть</b> на обеих сторонах и сверьте адрес.</p>`
+            :`<p>Активы → Пополнить → USDT. Проще всего купить USDT картой прямо в приложении биржи. Если переводите с другой биржи, выберите <b>одинаковую сеть</b> на обеих сторонах и сверьте адрес.</p>`,
+          `<p>Начните с суммы, которую не страшно потерять. Сначала можно потренироваться на демо в приложении CRYPTO NOVA.</p>`)}
+      ${X.copy?stp(4,'Нажмите «Копировать CRYPTO NOVA»',
+          `<p>Кнопка открывает профиль ведущего трейдера CRYPTO NOVA на OKX. Там нажмите «Копировать» и укажите сумму — дальше биржа сама повторяет каждую сделку CRYPTO NOVA на вашем счёте.${cu?'':' Кнопка появится здесь, как только профиль откроется на OKX; до тех пор — '+byHand.charAt(0).toLowerCase()+byHand.slice(1)}</p>`,
+          `<p>UID и API-ключи не нужны: копирование включается в самой OKX, деньги остаются на вашем счёте. За это OKX отдаёт ведущему трейдеру часть прибыли копирующего — только с прибыли. Убытки возможны.</p>`,
+          cu?`<a class="ib sm conna" href="${mypEsc(cu)}" target="_blank" rel="noopener">Копировать CRYPTO NOVA</a>`:'')
+        :stp(4,EU?'Повторяйте сделки сами':'Повторяйте сделки сами — копирование откроется позже',
+          `<p>${EU?'В ЕЭЗ и Великобритании автоматическое копирование на OKX пока недоступно.':'Копирование CRYPTO NOVA на '+mypEsc(ex)+' откроется позже.'} ${byHand}</p>`,
+          `<p>Ставьте стоп и цель сразу, вместе с ордером: сделка закроется сама, даже если вы не у телефона. Убытки возможны.</p>`)}
+      ${spot?stp(5,'Портфель: доли CRYPTO NOVA',
+          `<p>В приложении CRYPTO NOVA → «Спот»: какие монеты и в каких долях держать. На ${mypEsc(ex)} купите эти монеты на спот-счёте в тех же долях; когда система меняет доли, это видно в приложении.</p>`,
+          `<p>Монеты лежат на вашем счёте, а состав и доли система выбирает по своим правилам.</p>`,
+          `<a class="ib sm conna" href="${APPSTORE_URL}" target="_blank" rel="noopener">CRYPTO NOVA AI в App Store</a>`):''}
       </ol>
-      <div class="cauto"><b>Автоматизация</b>${spot
-        ?`<p>На ${mypEsc(ex)} есть регулярная автопокупка (Recurring Buy${EU?'':', от 1 USDT'}): вы задаёте монету, сумму и расписание, а биржа покупает сама. Напишите боту — подскажем, как настроить её под доли портфеля CRYPTO NOVA. Деньги при этом остаются на вашем счёте.</p>`
-        :EU?`<p>Копирование сделок в один клик для счетов OKX в ЕС биржа пока не подтвердила. До тех пор сделки повторяются вручную по шагу 5 — у каждой сделки уже есть вход, стоп и цель. Оставьте UID боту — сообщим, если появится.</p>`
-        :`<p>Копирование сделок CRYPTO NOVA в один клик на ${mypEsc(ex)} готовим. Запустим его, когда биржа письменно подтвердит нам программу копи-трейдинга. Оставьте UID боту — сообщим первым. До тех пор сделки повторяются вручную по шагу 5.</p>`}
-        <a class="ib sm conna" href="${CONN_BOT}${key}" target="_blank" rel="noopener">Написать боту в Telegram</a></div>
-      <div class="connles"><span class="muted">Подробнее — уроки из приложения:</span> <button class="ib sm" data-les="l1-exchange">Где покупают крипту: биржа</button> <button class="ib sm" data-les="l0-safety">Безопасность: деньги остаются у вас</button></div><div id="connLes"></div>
-      ${ref?`<div class="muted connhon">Честно: если вы открываете счёт по нашей ссылке, ${mypEsc(ex)} платит нам часть своей комиссии по партнёрской программе. Для вас комиссия и условия не меняются.</div>`:''}`;
+      <div class="connles"><span class="muted">Подробнее — уроки из приложения:</span> <button class="ib sm" data-les="l0-demo-live">Демо и реальный счёт</button> <button class="ib sm" data-les="l0-safety">Безопасность: деньги остаются у вас</button></div><div id="connLes"></div>
+      <div class="muted connhon">Честно: если вы открываете счёт по нашей ссылке, ${mypEsc(ex)} платит нам часть своей комиссии по партнёрской программе. Для вас комиссия и условия не меняются.</div>`;
     box.querySelectorAll('[data-les]').forEach(b=>b.addEventListener('click',async()=>{ const L=await connLesson(b.dataset.les), out=box.querySelector('#connLes'); if(!L){ out.innerHTML='<div class="muted">Урок есть в приложении: раздел «Уроки».</div>'; return; } if(out.dataset.id===L.id){ out.innerHTML=''; out.dataset.id=''; return; } out.dataset.id=L.id; out.innerHTML=`<div class="connlesb"><b>${mypEsc(L.title)}</b>${(L.cards||[]).map(c=>`<div><b>${mypEsc(c.title)}.</b> ${mypEsc(c.text)}</div>`).join('')}<div class="muted">Весь курс — в приложении CRYPTO NOVA AI, раздел «Уроки».</div></div>`; }));
   };
   ov.querySelector('#connYes').addEventListener('click',showSteps);

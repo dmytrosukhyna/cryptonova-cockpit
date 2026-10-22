@@ -303,3 +303,26 @@ def test_turbo_mirror_copies_the_listing_watch(tmp_path):
     out = turbo_desk.step(sqlite3.connect(":memory:"), str(tmp_path), 1_792_000_000_000, candles_db=str(tmp_path / "none.sqlite"))
     lstx = out.get("lstx") or out.get("profiles", {}).get("lstx") or json.load(open(tmp_path / "paper.json"))["profiles"]["lstx"]
     assert lstx["watch"] == w
+
+
+def test_connect_guide_is_the_build_45_flow_without_bot_or_uid():
+    """22.10 (owner): no Telegram bot or channel in «Подключить», no UID — OKX by our link → identity check → USDT → «Копировать
+    CRYPTO NOVA» (lead-trader profile); EEA / UK: no copy button, the trades to repeat by hand; BingX only where OKX does not work."""
+    html = _app()
+    g = _slice(html, "// 18.10: «Подключить» opens a short step guide.", "ov.querySelector('#connYes').addEventListener('click',showSteps);")
+    for bad in ("t.me", "CONN_BOT", "UID боту", "Открыть бота", "Написать боту", "Оставьте UID", "готовим"):
+        assert bad not in g, bad
+    for good in ("UID и API-ключи не нужны", "Копировать CRYPTO NOVA", "часть прибыли копирующего", "Убытки возможны", "okx_copy_url",
+                 "j.copy_url", "В ЕЭЗ и Великобритании автоматическое копирование на OKX пока недоступно", "откроется позже",
+                 "Пройдите проверку личности", "Пополните счёт в USDT", "Все сделки CRYPTO NOVA видны в панели"):
+        assert good in g, good
+    js = (_slice(html, "const EEA_TZ=", "// the lead-trader profile") +
+          "\nconst C={okx_ref:'https://www.okx.com/join/X',exchange_ref:'https://bingx.com/r/Y',okx_kyc_url:'k'};const out={};"
+          "for(const r of ['eu','world','nookx']){ STORE.cnq_region=r; const x=connEx(C); out[r]=[x.name,x.copy,x.reg,connRegion()]; }"
+          "console.log(JSON.stringify(out));")
+    js = "const STORE={};const localStorage={getItem:k=>STORE[k]||null,setItem:(k,v)=>{STORE[k]=v;}};" + js
+    out = _node(js)
+    if out:
+        assert out["eu"] == ["OKX", False, "https://www.okx.com/join/X", "eu"]
+        assert out["world"] == ["OKX", True, "https://www.okx.com/join/X", "world"]
+        assert out["nookx"] == ["BingX", False, "https://bingx.com/r/Y", "nookx"]

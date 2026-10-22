@@ -935,3 +935,23 @@ def test_okx_spot_list_uses_the_daily_cache_and_never_guesses():
     assert "C1" in got and "EURX" not in got and len(got) == 80
     assert pf.okx_spot_list(conn, T0 + 60_000, get=lambda u: (_ for _ in ()).throw(AssertionError("cached"))) == got
     assert pf.okx_spot_list(sqlite3.connect(":memory:"), T0, get=lambda u: {"data": [{"baseCcy": "BTC", "quoteCcy": "USDT"}]}) is None
+
+
+def test_ideas_money_of_a_coin_okx_does_not_list_goes_to_the_core():
+    """22.10 (owner): «нет на бирже — заменить тем, что приносит деньги»: the sale's money buys BTC / ETH / SOL (30 / 10 / 5)."""
+    rows, src = ideas_world()
+    src["cg"]["SOL"] = 150.0
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows, T0 - 1_800_000), T0)
+    okx = {"BTC", "ETH", "SOL", "A2", "A3", "A4", "A5", "A6", "M2", "M3", "M4", "M5"} | {f"Z{i}" for i in range(60)}
+    cash0 = port.rp.cash()
+    st = port.step(src, _ideas(rows, T0), T0 + 1_800_000, tradeable=okx)
+    adds = {a["symbol"]: a for a in st["actions"] if a["action"] in ("ADD", "BUY") and "Замена" in a["reason"]}
+    assert set(adds) == {"BTC", "ETH", "SOL"}
+    by = {p["symbol"]: p for p in st["positions"]}
+    assert by["SOL"]["bucket"] == "core" and st["cash_pct"] >= 10
+    assert port.rp.cash() < cash0 + 0.075 + 0.025                               # the A1 + M1 money did not stay in cash
+    assert not port.rp._meta("okx_swap")                                         # the table's ADD1 took part of it, the core the rest
+    st2 = port.step(src, _ideas(rows, T0), T0 + 3_600_000, tradeable=okx)       # nothing left to swap → no more core buys
+    assert not [a for a in st2["actions"] if "Замена" in a["reason"]]

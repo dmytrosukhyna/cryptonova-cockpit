@@ -623,8 +623,10 @@ class IdeasPortfolio:
             st = r.get("status")
             res = f"{_pc(ret)} от входа" + ("" if s in live else f", цена — {IDEAS_SRC_RU[psrc[s]]}")
             if okx is not None and s not in okx and kind != "core":
+                rp._set_meta("okx_swap", (rp._meta("okx_swap") or 0.0) + self._mv(p, px))
                 self._sell(now, s, p, px, f"Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный "
-                           f"счёт CRYPTO NOVA. {s} на споте OKX нет — продаём, итог {res}.", actions)
+                           f"счёт CRYPTO NOVA. {s} на споте OKX нет — продаём, итог {res}; деньги — в ядро, пока таблица не "
+                           "предложит монету с OKX.", actions)
             elif st == "avoid":
                 self._sell(now, s, p, px, f"Таблица поставила «не брать»: {r.get('why_ru') or 'проверки не пройдены'}. Продаём, итог {res}.", actions)
             elif est == "small" and not fixes and ret <= P["stop_small"]:
@@ -741,8 +743,53 @@ class IdeasPortfolio:
             # above its 200-day average) gets + 1/3 of its plan; ≤ 2 per 30 days, ≤ 1.5 × plan, cash ≥ 10 %. Alts are NEVER averaged
             # down here («одна покупка на монету»): on 2023–2026 averaging alts gave +17 % vs +39 %, drawdown −68 % vs −58 %.
             actions += self._topups(now, price, smap, sma200 or {}, live)
+            actions += self._okx_swap(now, price, okx, src)
         self.conn.commit()
         return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
+
+    def _okx_swap(self, now: int, price: dict, okx: set | None, src: dict | None = None) -> list[dict]:
+        """22.10 (owner: «если монеты нет на бирже — заменить тем, что приносит деньги»): the money of a coin sold because OKX has no
+        spot pair for it does not wait in cash — it goes to the core BTC / ETH / SOL in the plan's proportion (30 / 10 / 5), above the
+        10 % cash floor, after this run's table buys (a coin the table offers and OKX lists comes first). Once, for the sales made
+        before this step existed: the cash above the 15 % it held before the rule."""
+        rp, P = self.rp, IDEAS
+        if okx is None:
+            return []
+        V = self.value(price)
+        if not V:
+            return []
+        if rp._meta("okx_swap_v1") is None:
+            rp._set_meta("okx_swap_v1", now)
+            sold = self.conn.execute(f"SELECT COUNT(*) FROM {rp.T_ACT} WHERE action='SELL' AND reason LIKE '%спот-парой на OKX%'").fetchone()[0]
+            if sold and not rp._meta("okx_swap"):
+                rp._set_meta("okx_swap", max(0.0, rp.cash() - 0.15 * V))
+        left = rp._meta("okx_swap") or 0.0
+        room = rp.cash() - P["min_cash"] * V
+        amt = min(left, room)
+        rp._set_meta("okx_swap", 0.0)       # what the table's buys took this run is already replaced; nothing waits for later runs
+        if amt < 0.005 * V:
+            return []
+        core = {c: core_target(c) for c in ("BTC", "ETH", "SOL")}
+        tot = sum(core.values())
+        held = {p["symbol"]: p for p in rp.positions()}
+        out = []
+        used = 0.0
+        for c, t in core.items():
+            px = price.get(c) or ((src or {}).get("cg") or {}).get(c)
+            if not px:
+                continue
+            add = amt * t / tot / (1 + P["fee"])
+            p = held.get(c)
+            why = (f"Замена: монет без спот-пары на OKX в портфеле больше нет — их деньги в ядро по плану BTC 30 / ETH 10 / SOL 5, "
+                   f"{c} +{add / V * 100:.1f}% счёта. Монету с OKX из таблицы портфель купит по своим правилам.")
+            if p and p.get("entry"):
+                out.append(rp._act(now, c, "ADD", p["weight"] + add, px, why, p["bucket"]))
+            else:
+                out.append(rp._act(now, c, "BUY", add, px, why, "core:buy"))
+                rp._set_meta(f"px:{c}", px)
+            rp._set_cash(rp.cash() - add * P["fee"])
+            used += add * (1 + P["fee"])
+        return out
 
     def _topup_housekeeping(self, price: dict, btc_bull) -> None:
         """The raised plan of a topped-up core coin ends when its price is back at the average entry or the BTC regime flips."""

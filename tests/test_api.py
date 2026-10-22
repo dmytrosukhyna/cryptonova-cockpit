@@ -58,6 +58,17 @@ def test_public_and_auth(tmp_path):
     assert call(api, "POST", "/v2/me", {}, token(exp=-120))[0] == 401
     c, d = call(api, "POST", "/v2/me", {"lang": "ru"}, token())
     assert c == 200 and d["user"]["uid"] == "u1" and d["user"]["tier"] == "free" and d["agent"] == {"limit": 5, "left": 5}
+    assert d["user"]["is_owner"] is False                       # CNQ_OWNER_EMAIL unset → nobody is the owner
+
+
+def test_me_is_owner(tmp_path, monkeypatch):
+    # build 45: owner mode — only the signed-in email equal to CNQ_OWNER_EMAIL (case and spaces ignored)
+    api, _ = make(tmp_path)
+    monkeypatch.setenv("CNQ_OWNER_EMAIL", " Owner@X.io ")
+    assert call(api, "POST", "/v2/me", {}, token(uid="owner"))[1]["user"]["is_owner"] is True
+    assert call(api, "POST", "/v2/me", {}, token(uid="u2"))[1]["user"]["is_owner"] is False
+    monkeypatch.setenv("CNQ_OWNER_EMAIL", "")
+    assert call(api, "POST", "/v2/me", {}, token(uid="owner"))[1]["user"]["is_owner"] is False
 
 
 def test_home_geo_country(tmp_path):

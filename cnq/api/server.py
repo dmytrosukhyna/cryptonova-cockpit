@@ -244,9 +244,17 @@ class Api:
         used = self.store.used_today(uid, _day())
         return {"limit": lim, "left": max(0, lim - used)}
 
+    @staticmethod
+    def _is_owner(email: str | None) -> bool:
+        """build 45 (owner 22.10): the signed-in user is the owner when their email equals CNQ_OWNER_EMAIL (/etc/cnq.env).
+        Empty / unset = nobody is the owner. The email itself is never in the repo or the app."""
+        owner = (os.environ.get("CNQ_OWNER_EMAIL") or "").strip().lower()
+        return bool(owner) and (email or "").strip().lower() == owner
+
     def _profile(self, uid: str) -> dict:
         u = self.store.user(uid)
-        return {"user": {k: u.get(k) for k in ("uid", "email", "name", "tier", "vip_since", "bingx_uid", "created")},
+        return {"user": {**{k: u.get(k) for k in ("uid", "email", "name", "tier", "vip_since", "bingx_uid", "created")},
+                         "is_owner": self._is_owner(u.get("email"))},
                 "prefs": self.store.prefs(uid), "piggy": self.store.piggy(uid), "progress": self.store.progress(uid),
                 "agent": self._allowance(uid, u.get("tier") or "free")}
 

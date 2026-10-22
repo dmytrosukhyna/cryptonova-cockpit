@@ -27,8 +27,15 @@ def portfolio():
 
 class FakeOkx:
     def __init__(self, perm="read_only,trade", demo_key=True, balances=None, funding=None, fill=1.0, host=WWW, quote="USDT",
-                 acct_lv="2", pos_mode="net_mode", role="0", attach=True, algo_ok=True, hist=None, lead_insts=None):
+                 acct_lv="2", pos_mode="net_mode", role="0", attach=True, algo_ok=True, hist=None, lead_insts=None,
+                 usdc_only=(), usdc_swaps=(), no_fill=(), strict=False):
         self.perm, self.demo_key, self.fill, self.host, self.quote = perm, demo_key, fill, host, quote
+        # 22.10 USDC route: coins with only a {C}-USDC spot pair / only a {C}-USDC-SWAP (made-up «UUU» at $4), instIds whose IOC
+        # orders never fill, and strict = OKX's own balance / isolated-margin checks (51008)
+        self.usdc_only, self.usdc_swaps, self.no_fill, self.strict = set(usdc_only), set(usdc_swaps), set(no_fill), strict
+        self._extra = {c: 4.0 for c in self.usdc_only | self.usdc_swaps if c not in PX}
+        self.ct = {**SWAP_CT, **{c: "1" for c in self.usdc_swaps if c not in SWAP_CT}}
+        self.margin = {}
         self.acct_lv, self.pos_mode, self.role, self.attach, self.algo_ok = acct_lv, pos_mode, role, attach, algo_ok
         self.bal = dict(balances or {"USDT": 10000.0})
         self.funding = funding or {}
@@ -40,9 +47,13 @@ class FakeOkx:
         self.pend = []
         self.n = 0
 
+    @property
+    def px(self):                       # tests move PX during a test — always the current prices
+        return {**PX, "USDC": 1.0, **self._extra}
+
     # ── helpers
     def _px(self, inst):
-        return PX[inst.split("-")[0]]
+        return self.px[inst.split("-")[0]]
 
     def _swap(self, inst):
         return inst.endswith("-SWAP")
@@ -59,9 +70,9 @@ class FakeOkx:
             return {"code": "50101", "msg": "APIKey does not match current environment", "data": []}
         ok = lambda d: {"code": "0", "data": d}  # noqa: E731
         if path == "/api/v5/account/balance":
-            det = [{"ccy": c, "eq": str(v), "availBal": str(v), "cashBal": str(v), "eqUsd": str(v * (PX.get(c) or 1.0))}
+            det = [{"ccy": c, "eq": str(v), "availBal": str(v), "cashBal": str(v), "eqUsd": str(v * (self.px.get(c) or 1.0))}
                    for c, v in self.bal.items() if not q.get("ccy") or q["ccy"] == c]
-            return ok([{"totalEq": str(sum(v * (PX.get(c) or 1.0) for c, v in self.bal.items())), "details": det}])
+            return ok([{"totalEq": str(sum(v * (self.px.get(c) or 1.0) for c, v in self.bal.items())), "details": det}])
         if path == "/api/v5/asset/balances":
             return ok([{"ccy": c, "bal": str(v)} for c, v in self.funding.items()])
         if path == "/api/v5/finance/savings/balance":
@@ -70,39 +81,59 @@ class FakeOkx:
             return ok([{"perm": self.perm, "ip": "203.0.113.7", "acctLv": self.acct_lv, "posMode": self.pos_mode, "roleType": self.role,
                         "traderInsts": self.lead_insts}])
         if path == "/api/v5/market/tickers":
-            return ok([{"instId": f"{c}-{self.quote}", "last": str(p), "open24h": str(p)} for c, p in PX.items()])
+            return ok([{"instId": f"{c}-{'USDC' if c in self.usdc_only else self.quote}", "last": str(p), "open24h": str(p)}
+                       for c, p in self.px.items() if c != self.quote])
         if path == "/api/v5/public/instruments":
             inst = q.get("instId", "")
             if q.get("instType") == "SWAP":
-                base = inst.split("-")[0]
-                if not self._swap(inst) or base not in SWAP_CT:
+                base, settle = (inst.split("-") + ["", ""])[:2]
+                if not self._swap(inst) or base not in self.ct or settle != ("USDC" if base in self.usdc_swaps else "USDT"):
                     return ok([])
-                tick = "0.1" if PX[base] >= 1000 else "0.001" if PX[base] >= 1 else "0.00001"
-                return ok([{"instId": inst, "state": "live", "ctVal": SWAP_CT[base], "ctValCcy": base, "lotSz": "0.01", "minSz": "0.01",
-                            "tickSz": tick, "settleCcy": "USDT", "ctType": "linear", "lever": "50"}])
+                tick = "0.1" if self.px[base] >= 1000 else "0.001" if self.px[base] >= 1 else "0.00001"
+                return ok([{"instId": inst, "state": "live", "ctVal": self.ct[base], "ctValCcy": base, "lotSz": "0.01", "minSz": "0.01",
+                            "tickSz": tick, "settleCcy": settle, "ctType": "linear", "lever": "50"}])
             base, quote = inst.split("-")[:2]
-            if quote != self.quote or base not in PX or base == "ZZZ":
+            if inst == "USDC-USDT" and self.quote == "USDT":
+                return ok([{"instId": inst, "state": "live", "lotSz": "0.0001", "minSz": "1", "tickSz": "0.0001"}])
+            if base in self.usdc_only:
+                if quote != "USDC":
+                    return ok([])
+            elif quote != self.quote or base not in PX or base == "ZZZ":
                 return ok([])
-            tick = "0.01" if PX[base] >= 1000 else "0.001" if PX[base] >= 1 else "0.0000001"
-            return ok([{"instId": inst, "state": "live", "lotSz": "0.0001" if PX[base] >= 1 else "1", "minSz": "0.0001" if PX[base] >= 1 else "1",
-                        "tickSz": tick}])
+            tick = "0.01" if self.px[base] >= 1000 else "0.001" if self.px[base] >= 1 else "0.0000001"
+            return ok([{"instId": inst, "state": "live", "lotSz": "0.0001" if self.px[base] >= 1 else "1",
+                        "minSz": "0.0001" if self.px[base] >= 1 else "1", "tickSz": tick}])
         if path == "/api/v5/market/ticker":
             base = q["instId"].split("-")[0]
-            if base not in PX:
+            if base not in self.px or (base in self.usdc_only and "-USDT" in q["instId"]):
                 return ok([])
-            p = PX[base]
+            p = self.px[base]
             return ok([{"instId": q["instId"], "last": str(p), "bidPx": str(p * 0.999), "askPx": str(p * 1.001)}])
         if path == "/api/v5/trade/order" and method == "POST":
             self.orders.append(b)
             oid = f"o{len(self.orders)}"
             inst = b["instId"]
             want = float(b["sz"])
-            filled = want if b.get("ordType") == "market" else want * self.fill
+            filled = 0.0 if inst in self.no_fill else want if b.get("ordType") == "market" else want * self.fill
             if self._swap(inst):
                 cur = self.pos.get(inst, 0.0)
                 sgn = 1 if b["side"] == "buy" else -1
                 if b.get("reduceOnly") or (b.get("posSide") and ((b["posSide"] == "long") != (b["side"] == "buy"))):
                     filled = min(filled, abs(cur))
+                if filled and inst.split("-")[1] == "USDC":       # isolated USDC margin leaves / returns to the free USDC
+                    px_ = float(b.get("px") or self._px(inst))
+                    if cur == 0 or (cur > 0) == (sgn > 0):
+                        lev = float(next((x["lever"] for x in reversed(self.levers) if x["instId"] == inst), 1))
+                        need = filled * float(self.ct[inst.split("-")[0]]) * px_ / lev
+                        if self.bal.get("USDC", 0.0) < need - 1e-9:
+                            self.orders.pop()
+                            return {"code": "1", "msg": "", "data": [{"sCode": "51008", "sMsg": "Insufficient USDC margin"}]}
+                        self.bal["USDC"] = self.bal.get("USDC", 0.0) - need
+                        self.margin[inst] = self.margin.get(inst, 0.0) + need
+                    else:
+                        back = self.margin.get(inst, 0.0) * min(1.0, filled / abs(cur))
+                        self.margin[inst] = self.margin.get(inst, 0.0) - back
+                        self.bal["USDC"] = self.bal.get("USDC", 0.0) + back
                 if filled:
                     self.pos[inst] = round(cur + sgn * filled, 10)
                     if abs(self.pos[inst]) < 1e-12:
@@ -116,6 +147,10 @@ class FakeOkx:
                                        "slTriggerPxType": a.get("slTriggerPxType"), "closeFraction": ""})
             else:
                 base, quote = inst.split("-")
+                cost = filled * float(b["px"])
+                if self.strict and (cost > self.bal.get(quote, 0.0) + 1e-9 if b["side"] == "buy" else filled > self.bal.get(base, 0.0) + 1e-9):
+                    self.orders.pop()
+                    return {"code": "1", "msg": "", "data": [{"sCode": "51008", "sMsg": "Order failed. Insufficient balance"}]}
                 if b["side"] == "buy":
                     self.bal[base] = self.bal.get(base, 0) + filled
                     self.bal[quote] = self.bal.get(quote, 0) - filled * float(b["px"])
@@ -139,7 +174,7 @@ class FakeOkx:
             return ok([{"lever": b["lever"]}])
         if path == "/api/v5/account/positions":
             return ok([{"instId": i, "pos": str(v), "posSide": "net", "avgPx": str(self._px(i)), "upl": "0",
-                        "notionalUsd": str(abs(v) * float(SWAP_CT[i.split("-")[0]]) * self._px(i)), "mgnMode": "isolated"}
+                        "notionalUsd": str(abs(v) * float(self.ct[i.split("-")[0]]) * self._px(i)), "mgnMode": "isolated"}
                        for i, v in self.pos.items()])
         if path == "/api/v5/account/positions-history":
             return ok(self.hist)

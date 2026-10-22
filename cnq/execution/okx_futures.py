@@ -34,6 +34,11 @@ Lead trader («Копировать CRYPTO NOVA», later): detected from the acc
 the lead's instruments (traderInsts), stops are set on the lead sub-positions (/api/v5/copytrading/algo-order) and exits close the
 lead sub-positions (/api/v5/copytrading/close-subposition). Every stop triggers on the last price. One position per instrument and
 reduce-only exits: an order in the opposite direction is never used to exit.
+Through USDC (22.10, owner: «если по USDT ничего нету, то надо через USDC»): a coin with no <COIN>-USDT-SWAP but a live
+<COIN>-USDC-SWAP — OKX: settleCcy «Settlement and margin currency» = USDC, a linear contract whose ctVal is counted in ctValCcy =
+the coin — is traded there with the same isolated sizing, risk, stop and exits. The margin (+ fee room) is bought as USDC on the
+spot pair USDC-USDT just before the entry; after a close the freed USDC goes back to USDT (okx_autopilot.sweep, at the end of every
+pass). Not for a lead trader (its instruments are USDT swaps). Off with OKX_FUT_USDC=off.
 On unless OKX_FUTURES=off. Log: data/okx_futures.jsonl. State: ~/.cryptonova_okx_futures.json.
 Not financial advice: futures with leverage can lose money fast. Stdlib only."""
 from __future__ import annotations
@@ -107,6 +112,10 @@ def join_gap(env=None) -> float:
 def start_key(cl: ap.Okx, env=None) -> str:
     """The first LIVE start counts for the real account; the first start for the demo one."""
     return "first_live" if ap.live(env) and not cl.demo else "started"
+
+
+def usdc_on(env=None) -> bool:
+    return (_env(env).get("OKX_FUT_USDC") or "on").strip().lower() not in ("off", "no", "0", "false")
 
 
 def lead_forced(env=None) -> bool:
@@ -198,7 +207,11 @@ class Ctx:
             except ms.OkxError:
                 d = []
             x = d[0] if d else None
-            ok = x and x.get("state") == "live" and (x.get("settleCcy") or "USDT") == "USDT" and (x.get("ctType") or "linear") == "linear"
+            ok = x and x.get("state") == "live" and (x.get("ctType") or "linear") == "linear"
+            if inst_id.endswith("-USDC-SWAP"):        # margin and P/L in USDC; the contract counted in the coin itself
+                ok = ok and x.get("settleCcy") == "USDC" and x.get("ctValCcy") == inst_id.split("-")[0] and ms._f(x.get("ctVal"))
+            else:
+                ok = ok and (x.get("settleCcy") or "USDT") == "USDT"
             self._inst[inst_id] = x if ok else None
         return self._inst[inst_id]
 
@@ -247,8 +260,11 @@ class Ctx:
             return []
 
     def avail_usdt(self) -> float:
+        return self.avail_ccy("USDT")
+
+    def avail_ccy(self, ccy: str) -> float:
         try:
-            return self.cl.avail("USDT")
+            return self.cl.avail(ccy)
         except ms.OkxError:
             return 0.0
 
@@ -537,6 +553,21 @@ def ensure_stop(ctx: Ctx, m: dict, size_now: float, log_path=None) -> str:
     return "placed"
 
 
+def fund_usdc(ctx: Ctx, s: dict, cl_id: str, sleep, log_path=None) -> str | None:
+    """The isolated margin of a USDC swap entry (+ fee room) as free USDC: what is missing is bought on USDC-USDT (limit IOC within
+    OKX_SLIP). None = enough USDC now; otherwise why not (the entry waits for the next cycle; unused USDC goes back by the sweep)."""
+    need = s["margin"] * 1.01 + s["notional"] * 0.002
+    have = ctx.avail_ccy("USDC")
+    if have < need:
+        fee = ap.taker_fee(ctx.cl, ctx.env)
+        c = ap.convert(ctx.cl, "buy", (need - have) / (1 - fee), cl_id, sleep, ap.limits(ctx.env)["slip"])
+        log({"ev": "usdc_in", "need": round(need - have, 2), **c, "note": "купил USDC на USDC-USDT под маржу свопа в USDC"}, log_path)
+        have = ctx.avail_ccy("USDC")
+    if have < need * 0.999:
+        return f"USDC под маржу не докупился ({ap.usd(have)} из {ap.usd(need)}) — вход на следующем цикле"
+    return None
+
+
 # ── one pass ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 def connect(env=None, opener=None, sleep=time.sleep) -> ap.Okx:
     return ap.connect(env, opener, ap.load_state(env), sleep)
@@ -583,8 +614,17 @@ def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict
     if ctx.lead and ctx.lead_insts and inst_id not in ctx.lead_insts:
         return {**base, "skip": "инструмента нет в списке ведущего трейдера на OKX", "final": True}
     inst = ctx.inst(inst_id)
+    alt = inst_id[:-len("-USDT-SWAP")] + "-USDC-SWAP"
+    if not inst and not ctx.lead and usdc_on(ctx.env) and ap.usdt_account(ctx.cl, ctx.env):
+        ainst = ctx.inst(alt)                       # no USDT swap of this coin → its USDC-margined swap (22.10)
+        if ainst:
+            if alt in pos:
+                return {**base, "inst": alt, "skip": "по этому инструменту уже есть позиция — вторую не открываю", "final": True}
+            inst_id, inst = alt, ainst
+            base = {**base, "inst": alt, "settle": "USDC"}
+            avail = avail + ctx.avail_ccy("USDC")   # USDT turns into USDC margin right before the entry
     if not inst:
-        return {**base, "skip": f"на OKX нет свопа {inst_id}", "final": True}
+        return {**base, "skip": f"на OKX нет свопа {inst_id}" + (f" (и {alt})" if not ctx.lead and usdc_on(ctx.env) else ""), "final": True}
     tk = ctx.ticker(inst_id) or {}
     bid, ask = ms._f(tk.get("bidPx")) or ms._f(tk.get("last")), ms._f(tk.get("askPx")) or ms._f(tk.get("last"))
     px = ask if long else bid
@@ -640,6 +680,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     want = want_map(ds)
     slip = ap.limits(env)["slip"]
     seq = 0
+    via_used = any(m.get("settle") == "USDC" for m in st["trades"].values())     # a USDC swap now or this pass → sweep at its end
     ctx.positions()
 
     # 1. the desk closed it → close here (reduce-only); or OKX already closed it (stop / target)
@@ -745,6 +786,16 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
                 continue
             inst_id, inst, s, long = dcs["inst"], dcs["inst_info"], dcs["s"], dcs["long"]
             seq += 1
+            if dcs.get("settle") == "USDC":
+                via_used = True
+                why = fund_usdc(ctx, s, _cid("cnqfu", now, seq), sleep, log_path)
+                if why:
+                    st["tries"][tid] = st["tries"].get(tid, 0) + 1
+                    res["skipped"].append({"id": tid, "inst": inst_id, "why": why})
+                    log({"ev": "usdc_margin_short", "id": tid, "inst": inst_id, "note": why}, log_path)
+                    if st["tries"][tid] >= MAX_TRIES:
+                        st["skip"][tid] = why
+                    continue
             try:
                 set_leverage(ctx, inst_id, s["lev"], long)
                 body = entry_body(ctx, inst_id, inst, long, s, slip, _cid("cnqf", now, seq), _cid("cnqfs", now, seq), dcs["bid"], dcs["ask"])
@@ -764,6 +815,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
                 continue
             real_risk = f["filled"] * float(inst["ctVal"]) * abs((f["avg_px"] or s["worst"]) - s["stop"])
             m = {"inst": inst_id, "sym": str(t["symbol"]), "desk": dk, "side": "LONG" if long else "SHORT", "c0": f["filled"],
+                 **({"settle": "USDC"} if dcs.get("settle") == "USDC" else {}),
                  "stop": s["stop"], "tp": s.get("tp"), "mult": dcs["mult"], "lot": inst["lotSz"], "min": inst["minSz"],
                  "tick": inst["tickSz"], "ct": inst["ctVal"], "opened": now, "lev": s["lev"], "entry": f["avg_px"] or s["px"]}
             st["trades"][tid] = m
@@ -786,6 +838,8 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             res["opened"] += 1
             pos = ctx.positions(fresh=True)
             avail = ctx.avail_usdt()
+    if via_used:
+        ap.sweep(cl, env, _cid("cnqfb", now, seq + 1), sleep, log_path)      # freed / unused USDC back to USDT at the end of the pass
     st["last"] = {k: res[k] for k in ("t", "opened", "closed", "reduced", "stops", "gone", "errors")}
     st["last"]["skipped"] = len(res["skipped"])
     if save:
@@ -912,7 +966,8 @@ def plan_lines(cl: ap.Okx, cfg: dict, env=None, desks: list | None = None, now: 
         L.append(f"{head} → ОРДЕР: {'купить' if long else 'продать'} {s['sz']} контр. {dcs['inst']} ≈ {ap.usd(s['notional'])}, "
                  f"лимит IOC не хуже {s['worst']:.6g}, плечо {s['lev']}, маржа {ap.usd(s['margin'])}, стоп-лосс {s['stop']:.6g}"
                  + (f", цель {s['tp']:.6g}" if s.get("tp") else "") + f" · риск {ap.usd(s['risk_usd'])} ({s['risk_pct']:g}% бюджета; "
-                 f"у стола {s['desk_risk_pct']:g}%)" + (f" · урезано: {s['capped']}" if s.get("capped") else ""))
+                 f"у стола {s['desk_risk_pct']:g}%)" + (f" · урезано: {s['capped']}" if s.get("capped") else "")
+                 + (" · через USDC: маржа USDT → USDC перед входом, после закрытия USDC → USDT" if dcs.get("settle") == "USDC" else ""))
     return L
 
 

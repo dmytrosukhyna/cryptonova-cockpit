@@ -43,6 +43,14 @@ Safety:
     this client refuses any order once its lease ran out mid-cycle. When in doubt — no orders.
   • coins outside the trading account (Funding, Simple Earn) are counted but never moved: the owner moves them.
   • OKX_KEEP=SOL,LINK — coins the autopilot never touches (not sold, not bought, not counted).
+  • a coin with no {COIN}-USDT pair but a {COIN}-USDC one goes through USDC (22.10, owner: «если по USDT ничего нету, то надо через
+    USDC конвертировать»; route()): buy = USDC bought on USDC-USDT first (the coin order + fee and slippage room), then COIN-USDC;
+    sell = COIN-USDC, then the USDC sold back on USDC-USDT. Both legs are limit IOC within OKX_SLIP; the per-order and per-day caps
+    count the coin leg. A leg that did not fill never leaves a half: free USDC (≥ $5) goes back to USDT at the end of every pass
+    (sweep()) and the coin leg is retried on the next cycle. USDC is cash (≈ $1) in every share, budget and «СОВПАДАЕТ».
+  • new code reaches the running window safely (Updater): at a cycle boundary, when the repository's code changed and the new code
+    passes `--selfcheck` in a fresh process, the loop exits cleanly and systemd / the Mac window's bash loop starts it again; the
+    lease is kept across that planned restart (the same OKX_LEASE_ID resumes at once). OKX_SELF_UPDATE=off turns it off.
 Log: data/okx_autopilot.jsonl (local, ignored by git). State: ~/.cryptonova_okx_autopilot.json (outside the repo). The card shows
 the state (on / off / stopped, last rebalance, the split, the futures positions) inside the encrypted web/myspot.enc.json.
 
@@ -56,6 +64,7 @@ Not financial advice. Stdlib only."""
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import math
 import os
@@ -81,6 +90,12 @@ DRIFT_EVERY_MS = 3_600_000            # the account is compared with the public 
 SPOT_EVERY_S = 300                    # the public portfolio is read every 5 minutes in the window
 PUBLIC_EVERY_S = 15 * 60              # server mode: web/public_real.json once at start, then every 15 minutes (public_real.py)
 DAY = 86_400
+VIA = "USDC"                          # a coin without a USDT pair is traded through USDC on the global account
+PAIR = "USDC-USDT"                    # where the USDC is bought and sold back
+VIA_PAD = 0.002                       # USDC bought above the coin order (on top of the fee): price ticks, rounding
+SWEEP_MIN = 5.0                       # free USDC below $5 stays (not worth an order)
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_PLANNED = {"restart": False}         # a planned restart onto new code keeps the lease (main)
 
 
 # ── env / state ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -372,6 +387,130 @@ def taker_fee(cl: Okx, env=None) -> float:
     return TAKER["eea" if is_eea(cl) else "global"]
 
 
+# ── through USDC: a coin OKX lists only against USDC (22.10) ─────────────────────────────────────────────────────────────
+def usdt_account(cl: Okx, env=None) -> bool:
+    """The global account trading in USDT — the only one where a coin may go through USDC (OKX Europe trades in USDC itself and
+    has no USDT). No network."""
+    return not is_eea(cl) and ((_env(env).get("OKX_QUOTE") or "USDT").strip().upper() == "USDT")
+
+
+def route(cl: Okx, base: str, quote: str, memo: dict | None = None) -> dict:
+    """Where one coin trades: {"inst", "via", "info", "tk"}. {COIN}-{quote} first; on the USDT account a coin with no USDT pair goes
+    through USDC — {COIN}-USDC (via «USDC») when both it and USDC-USDT are live. info None = no pair at all ("none" names both)."""
+    memo = {} if memo is None else memo
+
+    def get(iid):
+        if iid not in memo:
+            memo[iid] = (cl.instrument(iid), cl.ticker(iid))
+        return memo[iid]
+    iid = f"{base}-{quote}"
+    info, tk = get(iid)
+    if info or quote != "USDT" or base in (VIA, quote):
+        return {"inst": iid, "via": None, "info": info, "tk": tk, "none": iid}
+    viid = f"{base}-{VIA}"
+    vinfo, vtk = get(viid)
+    if vinfo and get(PAIR)[0]:
+        return {"inst": viid, "via": VIA, "info": vinfo, "tk": vtk}
+    return {"inst": iid, "via": None, "info": None, "tk": None, "none": f"{iid} и {viid}"}
+
+
+def route_text(o: dict) -> str:
+    """«через USDC: USDT → USDC → COIN» (a buy) / «через USDC: COIN → USDC → USDT» (a sale); '' for a direct pair."""
+    if not o.get("via"):
+        return ""
+    return (f"через {VIA}: USDT → {VIA} → {o['ccy']}" if o["side"] == "buy" else f"через {VIA}: {o['ccy']} → {VIA} → USDT")
+
+
+def via_rate(cl: Okx, memo: dict | None = None) -> float:
+    """Dollars per USDC (the USDC-USDT price; ≈ 1)."""
+    memo = {} if memo is None else memo
+    if PAIR not in memo:
+        memo[PAIR] = (cl.instrument(PAIR), cl.ticker(PAIR))
+    v = ms._f((memo[PAIR][1] or {}).get("last"))
+    return v if v and 0.9 < v < 1.1 else 1.0
+
+
+def convert(cl: Okx, side: str, qty: float, cl_id: str, sleep, slip: float) -> dict:
+    """USDT → USDC (side «buy», qty USDC) or USDC → USDT («sell») on USDC-USDT: a limit IOC at most OKX_SLIP from the best price,
+    never more than the money that is there."""
+    inst, tk = cl.instrument(PAIR), cl.ticker(PAIR)
+    ref = ms._f((tk or {}).get("askPx" if side == "buy" else "bidPx")) or ms._f((tk or {}).get("last"))
+    if not inst or not ref:
+        return {"filled": 0.0, "usd": 0.0, "why": f"нет пары {PAIR}"}
+    lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
+    px = ceil_to(ref * (1 + slip), tick) if side == "buy" else floor_to(ref * (1 - slip), tick)
+    if side == "buy":
+        q = min(max(ceil_to(qty, lot), mn), floor_to(cl.avail("USDT") / px, lot))
+    else:
+        q = floor_to(min(qty, cl.avail(VIA)), lot)
+    if q < mn or q <= 0:
+        return {"filled": 0.0, "usd": 0.0, "why": f"меньше минимума {PAIR} или нет денег"}
+    return _fill(cl, {"inst": PAIR, "side": side, "px": fmt(px, inst["tickSz"]), "sz": fmt(q, inst["lotSz"])}, cl_id, sleep)
+
+
+def fill_via(cl: Okx, o: dict, cl_id: str, sleep, env=None, log_path: str | None = None) -> dict:
+    """One coin order through USDC (o["via"] == "USDC", o["inst"] = COIN-USDC, px in USDC). Buy: USDC on USDC-USDT first (only what is
+    missing), then COIN-USDC for what that USDC covers. Sell: COIN-USDC, then the USDC back to USDT. Returns the COIN leg's fill
+    (_fill) + "half" — a plain line when one leg did not complete. A half is never left: the unused USDC goes back to USDT
+    (here after a sale, at the end of the pass after a buy — sweep()) and the coin leg is retried on the next cycle."""
+    slip, fee = limits(env)["slip"], taker_fee(cl, env)
+    lot, mn = float(o["lot"]), float(o["min"])
+    if o["side"] == "buy":
+        px, want = float(o["px"]), float(o["sz"])
+        have = cl.avail(VIA)
+        need = want * px * (1 + fee + VIA_PAD)
+        if have < need:
+            c = convert(cl, "buy", (need - have) / (1 - fee), cl_id + "u", sleep, slip)
+            log({"ev": "usdc_in", "for": o["ccy"], "need": round(need - have, 2), **c,
+                 "note": f"купил {VIA} на USDC-USDT для покупки {o['ccy']}"}, log_path)
+            have = cl.avail(VIA)
+        q = min(want, floor_to(have / px, lot))
+        if q < mn or q * px < 1.0:
+            why = f"{VIA} не докупился — {o['ccy']} не куплен; {VIA} вернётся в USDT в конце прохода, покупка — на следующем цикле"
+            log({"ev": "via_half", "ccy": o["ccy"], "side": "buy", "note": why}, log_path)
+            return {"ordId": None, "state": "not_sent", "filled": 0.0, "avg_px": 0.0, "usd": 0.0, "fee": 0.0, "full": False, "half": why}
+        if stopped(env):
+            why = f"стоп между ногами: {VIA} куплен, {o['ccy']} нет — {VIA} остаётся (это доллары)"
+            log({"ev": "via_half", "ccy": o["ccy"], "side": "buy", "note": why}, log_path)
+            return {"ordId": None, "state": "stopped", "filled": 0.0, "avg_px": 0.0, "usd": 0.0, "fee": 0.0, "full": False, "half": why}
+        f = _fill(cl, {**o, "sz": fmt(q, o["lot"])}, cl_id, sleep)
+        f["full"] = bool(f["filled"]) and f["filled"] >= want * 0.999
+        if not f["full"]:
+            got = f"куплен не весь ({f['filled']:g} из {want:g})" if f["filled"] > 0 else "не куплен (IOC не исполнился)"
+            f["half"] = f"{o['ccy']} {got} — лишние {VIA} вернутся в USDT в конце прохода, остальное — на следующем цикле"
+            log({"ev": "via_half", "ccy": o["ccy"], "side": "buy", "note": f["half"]}, log_path)
+        return f
+    f = _fill(cl, o, cl_id, sleep)
+    if f["filled"] > 0:
+        try:
+            c = convert(cl, "sell", cl.avail(VIA), cl_id + "t", sleep, slip)
+            log({"ev": "usdc_out", "for": o["ccy"], **c, "note": f"продал {VIA} обратно в USDT после продажи {o['ccy']}"}, log_path)
+            ok = c.get("filled", 0) > 0
+        except Exception as e:  # noqa: BLE001
+            ok, c = False, {"why": str(e)[:160]}
+        if not ok:
+            f["half"] = f"{o['ccy']} продан, а {VIA} в USDT не вернулся ({c.get('why') or 'не исполнилось'}) — повторю в конце прохода"
+            log({"ev": "via_half", "ccy": o["ccy"], "side": "sell", "note": f["half"]}, log_path)
+    return f
+
+
+def sweep(cl: Okx, env=None, cl_id: str = "", sleep=time.sleep, log_path: str | None = None, floor: float = SWEEP_MIN) -> dict | None:
+    """Free USDC (≥ $5) back to USDT — at the end of every pass on the USDT account. Not with the kill switch, not when USDC is
+    in OKX_KEEP. Margin of an open USDC swap is not free (isolated), so it is never touched. Errors are logged, retried next pass."""
+    if not usdt_account(cl, env) or VIA in keep_set(env) or stopped(env):
+        return None
+    try:
+        a = cl.avail(VIA)
+        if a < floor:
+            return None
+        c = convert(cl, "sell", a, cl_id or f"cnqau{int(time.time())}", sleep, limits(env)["slip"])
+    except Exception as e:  # noqa: BLE001
+        log({"ev": "usdc_back_error", "error": str(e)[:200], "note": f"свободные {VIA} не вернулись в USDT — повторю на следующем проходе"}, log_path)
+        return {"filled": 0.0, "error": str(e)[:200]}
+    log({"ev": "usdc_back", "avail": round(a, 2), **c, "note": f"свободные {VIA} ≈ {usd(a)} → USDT"}, log_path)
+    return c
+
+
 # ── the plan → orders ────────────────────────────────────────────────────────────────────────────────────────────────
 def _dec(step: str) -> int:
     s = str(step)
@@ -440,14 +579,12 @@ def build(cl: Okx, env=None, model=None) -> dict:
     held = {r["ccy"]: r for r in rows}
     lim = limits(env)
     sells, buys, notes, diffs = [], [], [], []
-    insts, tks = {}, {}
+    memo = {}                                          # instId → (instrument, ticker) for this plan
 
     def look(base: str):
-        iid = f"{base}-{quote}"
-        if iid not in insts:
-            insts[iid], tks[iid] = cl.instrument(iid), cl.ticker(iid)
-        last = ms._f((tks[iid] or {}).get("last"))
-        return (iid, last) if insts[iid] and last else None
+        r = route(cl, base, quote, memo)
+        last = ms._f((r["tk"] or {}).get("last"))
+        return (r["inst"], last * (via_rate(cl, memo) if r["via"] else 1.0)) if r["info"] and last else None
 
     tgt_share = al.targets(w, pos)
     targets, mapped = {}, {}
@@ -465,9 +602,12 @@ def build(cl: Okx, env=None, model=None) -> dict:
     if outside:
         diffs.append("Монеты вне торгового счёта (Funding / Earn) учтены, но автопилот их не продаёт и не переводит: "
                      + ", ".join(sorted(outside)) + ". Переведи их на торговый счёт.")
-    other_cash = [r["ccy"] for r in rows if r["cash"] and r["ccy"] != quote and r["usd"] >= MIN_ORDER]
+    sweeps = usdt_account(cl, env) and VIA not in keep
+    other_cash = [r["ccy"] for r in rows if r["cash"] and r["ccy"] != quote and r["usd"] >= MIN_ORDER and not (sweeps and r["ccy"] == VIA)]
     if other_cash:
         notes.append(f"Доллары в другой валюте ({', '.join(other_cash)}) считаются долларами, автопилот их не меняет.")
+    if sweeps and held.get(VIA, {}).get("usd", 0) >= SWEEP_MIN:
+        notes.append(f"{VIA} ≈ {usd(held[VIA]['usd'])} считаются долларами; свободные {VIA} автопилот вернёт в USDT в конце прохода.")
     band = max(MIN_ORDER, BAND * total)
 
     def chunks(qty: float, usd_: float, lot: float) -> list:
@@ -484,45 +624,45 @@ def build(cl: Okx, env=None, model=None) -> dict:
         gap = tgt * total - now_usd
         now_pct, t_pct = (now_usd / total * 100 if total else 0.0), tgt * 100
         why = al.reason(mapped[c]) if c in mapped else al.sell_reason(c, meta)
-        inst_id = f"{c}-{quote}"
-        if inst_id not in insts:
-            insts[inst_id], tks[inst_id] = cl.instrument(inst_id), cl.ticker(inst_id)
-        inst, tk = insts.get(inst_id), tks.get(inst_id)
+        rt = route(cl, c, quote, memo)                                  # {c}-{quote}, or {c}-USDC through USDC (22.10)
+        inst_id, inst, tk, via = rt["inst"], rt["info"], rt["tk"], rt["via"]
+        k = via_rate(cl, memo) if via else 1.0                         # dollars per unit of the pair's quote (USDC ≈ $1)
         if gap < 0 and (tgt == 0 or -gap >= band):                    # sell: not in the portfolio, or over its share
             bid = ms._f((tk or {}).get("bidPx")) or ms._f((tk or {}).get("last"))
             if not inst or not bid:
-                diffs.append(f"{c}: на OKX нет пары {inst_id} — продать не могу, монета остаётся.")
+                diffs.append(f"{c}: на OKX нет пары {rt['none']} — продать не могу, монета остаётся.")
                 continue
             lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
             have = avail.get(c, 0.0)
-            qty = floor_to(have if tgt == 0 else min(have, -gap / bid), lot)
-            if qty < mn or qty * bid < (1.0 if tgt == 0 else MIN_ORDER):
-                if tgt == 0 and have * bid >= MIN_ORDER:
+            qty = floor_to(have if tgt == 0 else min(have, -gap / (bid * k)), lot)
+            if qty < mn or qty * bid * k < (1.0 if tgt == 0 else MIN_ORDER):
+                if tgt == 0 and have * bid * k >= MIN_ORDER:
                     diffs.append(f"{c}: остаток меньше минимального ордера OKX — остаётся.")
                 continue
-            if tgt > 0 and have < -gap / bid * 0.98:
+            if tgt > 0 and have < -gap / (bid * k) * 0.98:
                 notes.append(f"{c}: на торговом счёте меньше, чем надо продать по плану — продаю что есть.")
             px = fmt(floor_to(bid * (1 - lim["slip"]), tick), inst["tickSz"])
-            for q in chunks(qty, qty * bid, lot):
+            for q in chunks(qty, qty * bid * k, lot):
                 if q >= mn:
-                    sells.append({"ccy": c, "inst": inst_id, "side": "sell", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * bid, 2),
+                    sells.append({"ccy": c, "inst": inst_id, "side": "sell", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * bid * k, 2),
+                                  "lot": inst["lotSz"], "min": mn, "via": via, "pxq": inst_id.split("-")[1],
                                   "act": "sell" if tgt == 0 else "trim", "target_pct": round(t_pct, 2), "now_pct": round(now_pct, 2), "why": why})
         elif gap > 0 and gap >= (MIN_ORDER if now_usd < MIN_ORDER else band):   # buy: a new coin, or under its share
             ask = ms._f((tk or {}).get("askPx")) or ms._f((tk or {}).get("last"))
             if not inst or not ask:
-                diffs.append(f"{c}: на OKX нет пары {inst_id} — доля остаётся в {quote}.")
+                diffs.append(f"{c}: на OKX нет пары {rt['none']} — доля остаётся в {quote}.")
                 continue
             lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
-            qty = floor_to(gap / ask, lot)
-            if qty < mn or qty * ask < MIN_ORDER:
+            qty = floor_to(gap / (ask * k), lot)
+            if qty < mn or qty * ask * k < MIN_ORDER:
                 diffs.append(f"{c}: покупка {usd(gap)} меньше минимального ордера OKX — пропускаю.")
                 continue
             px = fmt(ceil_to(ask * (1 + lim["slip"]), tick), inst["tickSz"])
-            for q in chunks(qty, qty * ask, lot):
+            for q in chunks(qty, qty * ask * k, lot):
                 if q >= mn:
-                    buys.append({"ccy": c, "inst": inst_id, "side": "buy", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * ask, 2),
-                                 "lot": inst["lotSz"], "min": mn, "ask": ask, "act": "buy", "target_pct": round(t_pct, 2),
-                                 "now_pct": round(now_pct, 2), "why": why, "core": c in al.CORE})
+                    buys.append({"ccy": c, "inst": inst_id, "side": "buy", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * ask * k, 2),
+                                 "lot": inst["lotSz"], "min": mn, "ask": ask * k, "via": via, "pxq": inst_id.split("-")[1], "act": "buy",
+                                 "target_pct": round(t_pct, 2), "now_pct": round(now_pct, 2), "why": why, "core": c in al.CORE})
     buys.sort(key=lambda o: (not o["core"], -o["usd"]))           # the core first, then the bigger gaps
     fee = taker_fee(cl, env)
     turnover = sum(o["usd"] for o in sells) + sum(o["usd"] for o in buys)
@@ -544,6 +684,14 @@ def model_sig(pf: dict, env=None) -> str:
     return al.signature(pf, al.shares(env))
 
 
+def _q(o: dict) -> str:
+    return f" {o['pxq']}" if o.get("via") else ""
+
+
+def _r(o: dict) -> str:
+    return f" · {route_text(o)}" if o.get("via") else ""
+
+
 def plan_text(b: dict, mode: str) -> str:
     """The spot part for the owner's eyes (Russian, digits): the split, every order with its reason, the differences."""
     T = b["total_usd"]
@@ -557,11 +705,12 @@ def plan_text(b: dict, mode: str) -> str:
         L.append("  Сначала продажи:")
         for o in b["sells"]:
             what = "продать всё" if o["act"] == "sell" else f"урезать до {ms._p(o['target_pct'])}%"
-            L.append(f"    ПРОДАТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · {what} · лимит не ниже {o['px']} · почему: {o['why']}")
+            L.append(f"    ПРОДАТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · {what} · лимит не ниже {o['px']}{_q(o)}{_r(o)} · почему: {o['why']}")
     if b["buys"]:
         L.append("  Потом покупки (сначала ядро):")
         for o in b["buys"]:
-            L.append(f"    КУПИТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · до {ms._p(o['target_pct'])}% счёта · лимит не выше {o['px']} · почему: {o['why']}")
+            L.append(f"    КУПИТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · до {ms._p(o['target_pct'])}% счёта · лимит не выше {o['px']}{_q(o)}{_r(o)}"
+                     f" · почему: {o['why']}")
     if not b["sells"] and not b["buys"]:
         L.append("  Спот уже совпадает с портфелем (отличия меньше $10 или 0,3% счёта) — ордеров нет.")
     if b.get("active_held"):
@@ -572,6 +721,10 @@ def plan_text(b: dict, mode: str) -> str:
     L.append(f"  Итого спот: продать ≈ {usd(sum(o['usd'] for o in b['sells']))}, купить ≈ {usd(sum(o['usd'] for o in b['buys']))}, "
              f"комиссия OKX ≈ {usd(b.get('fee_usd', 0))} ({ms._p(round(b.get('fee_rate', 0) * 100, 2))}% с каждой сделки). "
              "Ордера лимитные (IOC): исполняется то, что есть по цене не хуже указанной, остаток — при следующей проверке.")
+    if any(o.get("via") for o in b["sells"] + b["buys"]):
+        L.append(f"  Через {VIA}: у этих монет на OKX нет пары с USDT. Покупка — сначала {VIA} на паре {PAIR} (сумма ордера + комиссия и "
+                 f"запас), потом монета за {VIA}; продажа — монета за {VIA}, потом {VIA} обратно в USDT. Обе части — лимит IOC; "
+                 f"лишние {VIA} возвращаются в USDT в конце прохода.")
     return "\n".join(x for x in L if x)
 
 
@@ -621,8 +774,10 @@ def execute(cl: Okx, b: dict, st: dict, env=None, now: int | None = None, sleep=
     day = time.strftime("%Y-%m-%d", time.gmtime(now / 1000))
     if st.get("day") != day:
         st["day"], st["day_usd"] = day, 0.0
-    res = {"sold_usd": 0.0, "bought_usd": 0.0, "orders": 0, "partial": 0, "failed": 0, "skipped": 0, "stopped": False, "limit": False}
+    res = {"sold_usd": 0.0, "bought_usd": 0.0, "orders": 0, "partial": 0, "failed": 0, "skipped": 0, "stopped": False, "limit": False,
+           "half": [], "usdc_back": 0.0}
     seq = 0
+    rate = via_rate(cl) if any(o.get("via") for o in b["sells"] + b["buys"]) else 1.0
 
     def go(o: dict) -> None:
         nonlocal seq
@@ -637,19 +792,23 @@ def execute(cl: Okx, b: dict, st: dict, env=None, now: int | None = None, sleep=
         seq += 1
         cl_id = f"cnqap{now // 1000}{seq:03d}"
         try:
-            f = _fill(cl, o, cl_id, sleep)
+            f = fill_via(cl, o, cl_id, sleep, env, log_path) if o.get("via") else _fill(cl, o, cl_id, sleep)
         except Exception as e:  # noqa: BLE001
             res["failed"] += 1
             log({"ev": "order_failed", "ccy": o["ccy"], "side": o["side"], "sz": o["sz"], "px": o["px"], "error": str(e)[:200]}, log_path)
             return
         res["orders"] += 1
+        if f.get("half"):
+            res["half"].append(f"{o['ccy']}: {f['half']}")
         if f["filled"] <= 0:
             res["skipped"] += 1
         elif not f["full"]:
             res["partial"] += 1
-        st["day_usd"] = round(st["day_usd"] + f["usd"], 2)
-        res["sold_usd" if o["side"] == "sell" else "bought_usd"] += f["usd"]
-        log({"ev": "order", "ccy": o["ccy"], "side": o["side"], "sz": o["sz"], "px": o["px"], **f}, log_path)
+        k = rate if o.get("via") else 1.0
+        st["day_usd"] = round(st["day_usd"] + f["usd"] * k, 2)                # the day's cap counts the coin leg (not the USDC legs)
+        res["sold_usd" if o["side"] == "sell" else "bought_usd"] += f["usd"] * k
+        log({"ev": "order", "ccy": o["ccy"], "side": o["side"], "sz": o["sz"], "px": o["px"], "inst": o["inst"],
+             **({"route": route_text(o)} if o.get("via") else {}), **f}, log_path)
         sleep(0.15)
 
     for o in b["sells"]:
@@ -657,7 +816,10 @@ def execute(cl: Okx, b: dict, st: dict, env=None, now: int | None = None, sleep=
         if res["stopped"]:
             break
     if not res["stopped"] and b["buys"]:
-        money = cl.avail(b["quote"]) * 0.995                     # a little room for fees and price moves
+        money = cl.avail(b["quote"])
+        if usdt_account(cl, env) and any(o.get("via") for o in b["buys"]):
+            money += cl.avail(VIA) * rate                         # USDC is dollars too (left from a sale, used first)
+        money *= 0.995                                            # a little room for fees and price moves
         need = sum(o["usd"] for o in b["buys"])
         k = min(1.0, money / need) if need else 1.0
         if k < 1.0:
@@ -673,6 +835,9 @@ def execute(cl: Okx, b: dict, st: dict, env=None, now: int | None = None, sleep=
             go(o)
             if res["stopped"]:
                 break
+    if not res["stopped"]:
+        sw = sweep(cl, env, f"cnqap{now // 1000}usdc", sleep, log_path)        # free USDC (≥ $5) back to USDT at the end of the pass
+        res["usdc_back"] = round((sw or {}).get("usd") or 0.0, 2)
     res["sold_usd"], res["bought_usd"] = round(res["sold_usd"], 2), round(res["bought_usd"], 2)
     return res
 
@@ -756,7 +921,8 @@ def tick(env=None, opener=None, model=None, now: int | None = None, sleep=time.s
         return f"Автопилот OKX: {r.get('why')}"
     return (f"Автопилот OKX ({why}): продано {usd(r['sold_usd'])}, куплено {usd(r['bought_usd'])}, ордеров {r['orders']}"
             + (f", частично {r['partial']}" if r["partial"] else "") + (f", ошибок {r['failed']}" if r["failed"] else "")
-            + (" · дневной лимит достигнут" if r["limit"] else ""))
+            + (" · дневной лимит достигнут" if r["limit"] else "")
+            + (f" · через USDC не завершено: {len(r['half'])} (USDC вернётся в USDT, монета — на следующем цикле)" if r.get("half") else ""))
 
 
 def status(env=None) -> dict | None:
@@ -858,6 +1024,9 @@ def check(env=None, opener=None) -> list[str]:
             out.append(f"  валюта торговли: {q or 'не найдена'}{' (на OKX Europe USDT не торгуется)' if is_eea(cl) else ''}"
                        f" · комиссия {ms._p(round(taker_fee(cl, env) * 100, 2))}% за сделку"
                        + (f" · доступно {usd(cl.avail(q))[1:]} {q}" if q else ""))
+            if q == "USDT" and usdt_account(cl, env):
+                out.append(f"  монеты без пары с USDT: через {VIA} (USDT → {VIA} → монета и обратно, обе части — лимит IOC); "
+                           f"свободные {VIA} от $5 автопилот возвращает в USDT в конце прохода")
             raw = ms.read_raw(cl.fetch, cl.host)
             rows = ms.assets(raw)
             tot = sum(r["usd"] for r in rows)
@@ -912,8 +1081,122 @@ def plan_all(env=None, opener=None, model=None, desks=None, act_desk=None, now: 
     return "\n".join(L), not bad
 
 
+# ── a planned restart onto new code (22.10) ─────────────────────────────────────────────────────────────────────────────
+def repo_head(root: str = ROOT) -> str | None:
+    """The repository's HEAD commit, read from .git directly (no git binary: the service user does not own the checkout and git
+    would refuse it as «dubious ownership»). None when it can not be read — then there is no self-update."""
+    try:
+        g = os.path.join(root, ".git")
+        if os.path.isfile(g):                                   # a worktree: «gitdir: <path>»
+            with open(g, encoding="utf-8") as f:
+                line = f.read().strip()
+            g = os.path.join(root, line[7:].strip()) if line.startswith("gitdir:") else g
+        with open(os.path.join(g, "HEAD"), encoding="utf-8") as f:
+            h = f.read().strip()
+        if not h.startswith("ref:"):
+            return h or None
+        ref = h[4:].strip()
+        if os.path.isfile(os.path.join(g, ref)):
+            with open(os.path.join(g, ref), encoding="utf-8") as f:
+                return f.read().strip() or None
+        with open(os.path.join(g, "packed-refs"), encoding="utf-8") as f:
+            for line in f:
+                x = line.split()
+                if len(x) == 2 and x[1] == ref:
+                    return x[0]
+    except OSError:
+        return None
+    return None
+
+
+def code_print(root: str = ROOT) -> str:
+    """sha256 of every cnq/**/*.py (path + content). The bots' data commits (every few minutes) do not change it."""
+    h = hashlib.sha256()
+    for dp, dn, fn in os.walk(os.path.join(root, "cnq")):
+        dn[:] = sorted(d for d in dn if d != "__pycache__")
+        for n in sorted(fn):
+            if n.endswith(".py"):
+                fp = os.path.join(dp, n)
+                h.update(os.path.relpath(fp, root).encode())
+                try:
+                    with open(fp, "rb") as f:
+                        h.update(f.read())
+                except OSError:
+                    h.update(b"?")
+    return h.hexdigest()
+
+
+def selfcheck() -> list[str]:
+    """`--selfcheck`: the code on disk imports and its pure parts answer (no network, no keys, no lease, no orders). [] = OK."""
+    errs = []
+    try:
+        from . import myspot_watch, okx_active, okx_futures, okx_lease, public_real  # noqa: F401 — the import itself is the check
+        w = al.shares({})
+        if abs(sum(w.values()) - 1) > 1e-6 or not 0 < limits({})["slip"] <= 0.02 or okx_futures.caps({})["lev"] > 3:
+            errs.append("доли / лимиты / плечо не сходятся")
+        for name, fn in (("run_once", run_once), ("tick", tick), ("route", route), ("sweep", sweep), ("futures.step", okx_futures.step),
+                         ("active.step", okx_active.step), ("lease.gate", okx_lease.gate), ("Updater", Updater)):
+            if not callable(fn):
+                errs.append(f"нет {name}")
+        if route_text({"via": VIA, "side": "buy", "ccy": "X"}) != "через USDC: USDT → USDC → X":
+            errs.append("route_text")
+    except Exception as e:  # noqa: BLE001
+        errs.append(f"{type(e).__name__}: {str(e)[:200]}")
+    return errs
+
+
+def _selfcheck_proc(root: str = ROOT) -> tuple[bool, str]:
+    """The new code's --selfcheck in a FRESH process (this one keeps the old code in memory)."""
+    import subprocess
+    pp = os.environ.get("PYTHONPATH")
+    env = {**os.environ, "PYTHONPATH": root + (os.pathsep + pp if pp else "")}
+    try:
+        r = subprocess.run([sys.executable, "-m", "cnq.execution.okx_autopilot", "--selfcheck"], env=env, capture_output=True,
+                           text=True, timeout=120)
+    except Exception as e:  # noqa: BLE001
+        return False, str(e)[:200]
+    out = (r.stdout or "") + (r.stderr or "")
+    return r.returncode == 0 and "САМОПРОВЕРКА: OK" in out, out.strip()[-300:]
+
+
+class Updater:
+    """At a cycle boundary of --loop: the repository's HEAD moved (the server pulls main every 2 minutes) → the code fingerprint
+    (cnq/**/*.py) differs from the one this process started on → the new code's --selfcheck in a fresh process → passed: the loop
+    exits cleanly and systemd (Restart=always) / the Mac window's bash loop starts it on the new code; failed: the old code keeps
+    running and that version is not tried again. Data-only commits never restart anything. OKX_SELF_UPDATE=off turns it off."""
+
+    def __init__(self, root: str = ROOT, run=None, env=None):
+        self.root, self.run, self.env = root, run or _selfcheck_proc, env
+        self.head = repo_head(root)
+        self.code = code_print(root) if self.head else None
+        self.bad = None
+
+    def check(self) -> tuple[bool, str | None]:
+        """(restart now, a line for the window or None)."""
+        if not self.head or (_env(self.env).get("OKX_SELF_UPDATE") or "on").strip().lower() in ("off", "0", "no", "false"):
+            return False, None
+        h = repo_head(self.root)
+        if not h or h == self.head:
+            return False, None
+        prev, self.head = self.head, h
+        c = code_print(self.root)
+        if c in (self.code, self.bad):
+            return False, None
+        ok, out = self.run(self.root)
+        if repo_head(self.root) != h or code_print(self.root) != c:
+            self.head = prev
+            return False, None                                    # moved again during the check — looked at next cycle
+        if not ok:
+            self.bad = c
+            log({"ev": "self_update_refused", "head": h[:12], "out": out[-200:]})
+            return False, f"новый код ({h[:7]}) не прошёл самопроверку — работаю на прежнем: {out[-160:]}"
+        log({"ev": "self_update", "head": h[:12]})
+        return True, f"новый код ({h[:7]}) прошёл самопроверку — перезапуск окна на нём (замок сохраняется)"
+
+
 def main(argv=None) -> int:
-    """22.10: a clean exit (Ctrl+C, a closed Terminal window = SIGHUP, systemctl stop = SIGTERM) gives the lease back at once."""
+    """22.10: a clean exit (Ctrl+C, a closed Terminal window = SIGHUP, systemctl stop = SIGTERM) gives the lease back at once; a
+    planned restart onto new code (Updater) keeps it — the same holder id resumes right after the restart."""
     import signal
 
     def bye(_signum, _frame):
@@ -928,12 +1211,16 @@ def main(argv=None) -> int:
     except KeyboardInterrupt:
         return 130
     finally:
-        if lease._CACHE:                        # this process held the lease
+        if lease._CACHE and not _PLANNED["restart"]:     # this process held the lease (kept on a planned restart)
             lease.release()
 
 
 def _main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    if "--selfcheck" in argv:
+        errs = selfcheck()
+        print("САМОПРОВЕРКА: OK" if not errs else "САМОПРОВЕРКА: ОШИБКА — " + "; ".join(errs))
+        return 0 if not errs else 1
     ipv4_only()
     if "--stop" in argv:
         print(stop())
@@ -957,6 +1244,7 @@ def _main(argv=None) -> int:
         print(f"Автопилот OKX: окно запущено ({'РЕАЛЬНЫЕ ДЕНЬГИ' if live() else 'демо-торговля OKX'}). Фьючерсы и активный спот — каждую "
               "минуту, спот-портфель — каждые 5 минут. Остановить окно: Ctrl+C; остановить автопилот: --stop.", flush=True)
         last_spot, said, last_pub, pub_said = 0.0, None, 0.0, False
+        upd = Updater()
         while True:
             # 22.10: on the server the service also publishes «Реальный счёт CRYPTO NOVA на OKX» (public_real.py) — the Mac mirror
             # does it while the autopilot runs on the Mac; public_real.writer() lets only the lease's machine write
@@ -996,6 +1284,15 @@ def _main(argv=None) -> int:
                             print(time.strftime("%H:%M ") + msg, flush=True)
                     except Exception as e:  # noqa: BLE001
                         print(time.strftime("%H:%M ") + describe_error(e), flush=True)
+            try:                                       # the cycle is over: a planned restart onto new code, if there is one
+                restart, msg = upd.check()
+            except Exception:  # noqa: BLE001
+                restart, msg = False, None
+            if msg:
+                print(time.strftime("%H:%M ") + "Обновление: " + msg, flush=True)
+            if restart:
+                _PLANNED["restart"] = True
+                return 0
             time.sleep(60)
     if "--plan" in argv or "--run" in argv:
         try:

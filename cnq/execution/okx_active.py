@@ -7,7 +7,8 @@ positions × 20 % of its account, exits after 12 h or at its wide stop). While t
     best price) for the same share of the sleeve as the desk's position is of its account;
   • the desk closed it (time exit, stop, target) or cut it (qty_left) → the bought coins are sold (limit IOC, at most OKX_SLIP below
     the best price); a part left unsold is tried again a minute later.
-Spot only: no leverage, no borrowing, nothing moved between accounts. The coins bought here are remembered in
+A coin with no USDT pair but a USDC one goes through USDC (okx_autopilot.route / fill_via: USDT → USDC → COIN and back; unused USDC
+returns to USDT at the end of the pass). Spot only: no leverage, no borrowing, nothing moved between accounts. The coins bought here are remembered in
 ~/.cryptonova_okx_active.json and the spot rebalance (okx_autopilot) never counts or sells them. Kill switch, live / demo and the
 key checks are the spot autopilot's. Off with OKX_ACTIVE=off. Not financial advice. Stdlib only."""
 from __future__ import annotations
@@ -76,17 +77,18 @@ def fetch_desk(env=None) -> dict:
     return (p.get("profiles") or {}).get("imps") or {}
 
 
-def _sell(cl: ap.Okx, ccy: str, quote: str, qty: float, slip: float, cl_id: str, sleep) -> dict:
-    inst_id = f"{ccy}-{quote}"
-    inst, tk = cl.instrument(inst_id), cl.ticker(inst_id)
+def _sell(cl: ap.Okx, ccy: str, quote: str, qty: float, slip: float, cl_id: str, sleep, env=None, log_path=None) -> dict:
+    rt = ap.route(cl, ccy, quote)
+    inst_id, inst, tk = rt["inst"], rt["info"], rt["tk"]
     bid = ms._f((tk or {}).get("bidPx")) or ms._f((tk or {}).get("last"))
     if not inst or not bid:
-        return {"filled": 0.0, "why": f"нет пары {inst_id}"}
+        return {"filled": 0.0, "why": f"нет пары {rt['none']}"}
     q = ap.floor_to(min(qty, cl.avail(ccy)), float(inst["lotSz"]))
     if q < float(inst["minSz"]):
         return {"filled": qty, "why": "остаток меньше минимума OKX — считаю проданным", "dust": True}
-    o = {"inst": inst_id, "side": "sell", "sz": ap.fmt(q, inst["lotSz"]), "px": ap.fmt(ap.floor_to(bid * (1 - slip), float(inst["tickSz"])), inst["tickSz"])}
-    return ap._fill(cl, o, cl_id, sleep)
+    o = {"ccy": ccy, "inst": inst_id, "side": "sell", "sz": ap.fmt(q, inst["lotSz"]), "lot": inst["lotSz"], "min": inst["minSz"],
+         "via": rt["via"], "px": ap.fmt(ap.floor_to(bid * (1 - slip), float(inst["tickSz"])), inst["tickSz"])}
+    return ap.fill_via(cl, o, cl_id, sleep, env, log_path) if rt["via"] else ap._fill(cl, o, cl_id, sleep)
 
 
 def step(env=None, opener=None, desk: dict | None = None, now: int | None = None, sleep=time.sleep, cl: ap.Okx | None = None,
@@ -124,6 +126,7 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
     quote = ap.pick_quote(cl, env) or "USDT"
     slip = ap.limits(env)["slip"]
     seq = 0
+    via = False                                  # a USDC leg happened this pass → free USDC back to USDT at its end
     # exits and cuts
     for tid, m in list(st["trades"].items()):
         t = want.get(tid)
@@ -133,7 +136,8 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
             continue
         seq += 1
         try:
-            f = _sell(cl, m["ccy"], quote, sell_q, slip, f"cnqas{now // 1000}{seq:03d}", sleep)
+            f = _sell(cl, m["ccy"], quote, sell_q, slip, f"cnqas{now // 1000}{seq:03d}", sleep, env, lp)
+            via = via or bool(m.get("via")) or bool(f.get("half"))
         except Exception as e:  # noqa: BLE001
             res["errors"] += 1
             ap.log({"ev": "sell_error", "id": tid, "ccy": m["ccy"], "error": str(e)[:200]}, lp)
@@ -159,11 +163,12 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
                 res["skipped"].append({"id": tid, "why": "уже 5 позиций активного спота"})
                 continue
             base, mult = al.okx_base(str(t["symbol"]))
-            inst_id = f"{base}-{quote}"
-            inst, tk = cl.instrument(inst_id), cl.ticker(inst_id)
-            ask = ms._f((tk or {}).get("askPx")) or ms._f((tk or {}).get("last"))
+            rt = ap.route(cl, base, quote)                       # {base}-{quote}, or {base}-USDC through USDC (22.10)
+            inst_id, inst, tk = rt["inst"], rt["info"], rt["tk"]
+            k = ap.via_rate(cl) if rt["via"] else 1.0
+            ask = (ms._f((tk or {}).get("askPx")) or ms._f((tk or {}).get("last")) or 0.0) * k
             if not inst or not ask:
-                st["skip"][tid] = f"на OKX нет спот-пары {inst_id}"
+                st["skip"][tid] = f"на OKX нет спот-пары {rt['none']}"
                 res["skipped"].append({"id": tid, "why": st["skip"][tid]})
                 continue
             if abs(ask * mult / float(t["entry"]) - 1) > 0.15:
@@ -171,24 +176,32 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
                 res["skipped"].append({"id": tid, "why": st["skip"][tid]})
                 continue
             usd = float(t.get("qty_left") or t["qty"]) * float(t["entry"]) / deq * bud
-            usd = min(usd, cl.avail(quote) * 0.98)
+            usd = min(usd, (cl.avail(quote) + (cl.avail(ap.VIA) * k if rt["via"] else 0.0)) * 0.98)
             q = ap.floor_to(usd / ask, float(inst["lotSz"]))
             if q < float(inst["minSz"]) or q * ask < ap.MIN_ORDER:
                 st["skip"][tid] = f"меньше минимального ордера (≈ {ap.usd(q * ask)})"
                 res["skipped"].append({"id": tid, "why": st["skip"][tid]})
                 continue
             seq += 1
-            o = {"inst": inst_id, "side": "buy", "sz": ap.fmt(q, inst["lotSz"]), "px": ap.fmt(ap.ceil_to(ask * (1 + slip), float(inst["tickSz"])), inst["tickSz"])}
+            o = {"ccy": base, "inst": inst_id, "side": "buy", "sz": ap.fmt(q, inst["lotSz"]), "lot": inst["lotSz"], "min": inst["minSz"],
+                 "via": rt["via"], "px": ap.fmt(ap.ceil_to(ask / k * (1 + slip), float(inst["tickSz"])), inst["tickSz"])}
+            via = via or bool(rt["via"])
             try:
-                f = ap._fill(cl, o, f"cnqab{now // 1000}{seq:03d}", sleep)
+                cid = f"cnqab{now // 1000}{seq:03d}"
+                f = ap.fill_via(cl, o, cid, sleep, env, lp) if rt["via"] else ap._fill(cl, o, cid, sleep)
             except Exception as e:  # noqa: BLE001
                 res["errors"] += 1
                 ap.log({"ev": "buy_error", "id": tid, "inst": inst_id, "error": str(e)[:200]}, lp)
                 continue
-            ap.log({"ev": "buy", "id": tid, "inst": inst_id, **f}, lp)
+            ap.log({"ev": "buy", "id": tid, "inst": inst_id, **({"route": ap.route_text(o)} if rt["via"] else {}), **f}, lp)
             if f["filled"] > 0:
-                st["trades"][tid] = {"ccy": base, "q0": f["filled"], "qty": f["filled"], "opened": now, "px": f["avg_px"]}
+                st["trades"][tid] = {"ccy": base, "q0": f["filled"], "qty": f["filled"], "opened": now, "px": f["avg_px"],
+                                     **({"via": rt["via"]} if rt["via"] else {})}
                 res["bought"] += 1
+            elif f.get("half"):
+                res["skipped"].append({"id": tid, "why": f["half"]})          # not «skip» for good: tried again next minute
+    if via:
+        ap.sweep(cl, env, f"cnqau{now // 1000}", sleep, lp)                  # unused USDC back to USDT at the end of the pass
     if save:
         save_state(st, env)
     return res

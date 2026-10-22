@@ -234,12 +234,30 @@ def test_app_home_config_link(tmp_path):
     assert cfg["app_links"] == {"okx_copy_url": "okx://copy"} and cfg["okx_deposit_url"] is None
 
 
+def test_app_config_okx_regions(tmp_path):
+    # build 44: OKX for everyone by default; okx_barred / okx_regions pass through cleaned (the app decides UA/GR/RU/US by them)
+    d = str(tmp_path)
+    _w(d, "app_config.json", {})
+    cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
+    assert cfg["okx_regions"] == "ALL" and cfg["okx_barred"] is None
+    _w(d, "app_config.json", {"okx_regions": ["gr", "ES", "xyz"], "okx_barred": ["us", "CA", "Crimea"]})
+    cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
+    assert cfg["okx_regions"] == ["ES", "GR"] and cfg["okx_barred"] == ["CA", "US"]
+    _w(d, "app_config.json", {"okx_regions": "all", "okx_barred": "US"})
+    cfg = app_home.run(sqlite3.connect(":memory:"), d, now=1792300000000)["config"]
+    assert cfg["okx_regions"] == "ALL" and cfg["okx_barred"] is None
+
+
 def test_app_config_in_git_is_valid():
     # the real web/app_config.json: every connect link is https (or empty) and the copy pages stay empty until approved
     here = os.path.join(os.path.dirname(__file__), "..", "web", "app_config.json")
     c = json.load(open(here, encoding="utf-8"))
     for k in app_home.CONNECT_KEYS:
         assert c.get(k) is None or str(c[k]).startswith("https://"), k
+    # OKX is the main exchange (owner 22.10): every country unless OKX serves no one there; UA, GR, RU → OKX, US → not OKX
+    assert c["okx_regions"] == "ALL"
+    assert "US" in c["okx_barred"] and not {"UA", "GR", "RU"} & set(c["okx_barred"])
+    assert "US" in c["bingx_barred"] and not {"UA", "RU"} & set(c["bingx_barred"])
 
 
 def test_spot_coins_explain_themselves_in_russian_only(tmp_path):

@@ -625,11 +625,20 @@ def _config(out: str) -> dict:
     barred = c.get("bingx_barred")
     barred = sorted({str(x).strip().upper() for x in barred if len(str(x).strip()) == 2}) if isinstance(barred, list) else None
     links = c.get("app_links")
+    # build 44 (owner 22.10): OKX is the main exchange — okx_regions "ALL" or a list of ISO codes, okx_barred = where OKX
+    # serves no one (null = the app's own list)
+    regions = c.get("okx_regions")
+    regions = "ALL" if regions is None or (isinstance(regions, str) and regions.strip().upper() == "ALL") else (
+        sorted({str(x).strip().upper() for x in regions if len(str(x).strip()) == 2}) if isinstance(regions, list) else "ALL")
+    okx_barred = c.get("okx_barred")
+    okx_barred = sorted({str(x).strip().upper() for x in okx_barred if len(str(x).strip()) == 2}) if isinstance(okx_barred, list) else None
     return {"exchange_name": c.get("exchange_name") or "BingX",
             "exchange_ref": ref if isinstance(ref, str) and ref.startswith("https://") else None,
             # build 44: the OKX link for the EU/EEA (OKX Europe, MiCA); a referral only once the owner joins OKX's programme
             "okx_ref": okx if isinstance(okx, str) and okx.startswith("https://") else None,
             "bingx_barred": barred,
+            "okx_regions": regions,
+            "okx_barred": okx_barred,
             "exchange_trade_url": c.get("exchange_trade_url"),
             # build 44 «Подключить»: our lead-trader copy pages (empty until the exchange approves the profile) and the exchanges'
             # own pages for the 6 steps — https only; app_links = optional app deep links (scheme://…, never http / javascript)

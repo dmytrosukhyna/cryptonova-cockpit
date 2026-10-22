@@ -4,3 +4,6 @@ test_owner_dm_without_a_channel_gets_the_forward_instruction_and_the_poll_is_rec
 test_poll_connects_the_channel_from_the_owners_forward
 test_mirror_is_neutral_to_a_desk_reset
 test_mirror_open_close
+# 22.10 (researcher): fails on CI only (main too), passes locally on 3.12/3.13 — the worker finishes ('ok', 5 languages) but the
+# feed still shows no meaning; another HomeNews worker thread from an earlier test is alive in check_answer. See backlog item 43.
+test_background_worker_fills_the_cache

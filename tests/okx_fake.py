@@ -29,7 +29,8 @@ class FakeOkx:
     def __init__(self, perm="read_only,trade", demo_key=True, balances=None, funding=None, fill=1.0, host=WWW, quote="USDT",
                  acct_lv="2", pos_mode="net_mode", role="0", attach=True, algo_ok=True, hist=None, lead_insts=None,
                  usdc_only=(), usdc_swaps=(), no_fill=(), strict=False, spot_role="0", spot_enabled=(), spot_supported=None,
-                 copiers=0, lead_subs=None, iso_in_eq=False, iso_field=True, lead_sell_reject=False, set_reject=(), unique_code="TESTLEAD01"):
+                 copiers=0, lead_subs=None, iso_in_eq=False, iso_field=True, lead_sell_reject=False, set_reject=(), unique_code="TESTLEAD01",
+                 swap_set_reject=()):
         self.perm, self.demo_key, self.fill, self.host, self.quote = perm, demo_key, fill, host, quote
         # 22.10 USDC route: coins with only a {C}-USDC spot pair / only a {C}-USDC-SWAP (made-up «UUU» at $4), instIds whose IOC
         # orders never fill, and strict = OKX's own balance / isolated-margin checks (51008)
@@ -57,6 +58,7 @@ class FakeOkx:
         self.lead_subs = [dict(x) for x in (lead_subs or [])]
         self.iso_in_eq, self.iso_field, self.lead_sell_reject, self.set_reject = iso_in_eq, iso_field, lead_sell_reject, set(set_reject)
         self.set_calls = []
+        self.swap_lead, self.swap_set_reject, self.track_swap_lead = set(), set(swap_set_reject), True   # swaps opened as lead positions; swaps OKX refuses to add
 
     @property
     def px(self):                       # tests move PX during a test — always the current prices
@@ -122,6 +124,12 @@ class FakeOkx:
         if path == "/api/v5/copytrading/set-instruments":
             self.set_calls.append(b)
             want = [x for x in b["instId"].split(",") if x]
+            if b.get("instType") == "SWAP":
+                new = set(want) - set(self.lead_insts)
+                if self.role != "1" or not want or new & self.swap_set_reject or new & set(self.pos) or set(self.lead_insts) - set(want):
+                    return {"code": "59255", "msg": "made-up refusal (swap lead instruments)", "data": []}
+                self.lead_insts = sorted(want)
+                return ok([{"instId": i, "enabled": True} for i in want])
             bad = [i for i in want if i in self.set_reject or i not in self.spot_supported]
             held = {s_["instId"] for s_ in self.lead_subs}
             if b.get("instType") != "SPOT" or bad or not want or held - set(want):
@@ -183,9 +191,12 @@ class FakeOkx:
                         self.margin[inst] = self.margin.get(inst, 0.0) - back
                         self.bal["USDC"] = self.bal.get("USDC", 0.0) + back
                 if filled:
+                    if cur == 0 and self.role == "1" and inst in self.lead_insts:
+                        self.swap_lead.add(inst)                  # a lead trader's order on a lead instrument opens a lead position
                     self.pos[inst] = round(cur + sgn * filled, 10)
                     if abs(self.pos[inst]) < 1e-12:
                         self.pos.pop(inst)
+                        self.swap_lead.discard(inst)
                 if filled and self.attach and b.get("attachAlgoOrds"):
                     a = b["attachAlgoOrds"][0]
                     self.n += 1
@@ -204,7 +215,8 @@ class FakeOkx:
                         return {"code": "1", "msg": "", "data": [{"sCode": "51008", "sMsg": "Order failed. Insufficient balance"}]}
                     self.bal[quote] = self.bal.get(quote, 0) - filled * float(b["px"])
                     self.n += 1
-                    self.lead_subs.append({"subPosId": f"sp{self.n}", "instId": inst, "subPos": filled, "openAvgPx": float(b["px"])})
+                    self.lead_subs.append({"subPosId": f"sp{self.n}", "instId": inst, "subPos": filled, "openAvgPx": float(b["px"]),
+                                           "openOrdId": f"o{len(self.orders)}"})
                 else:
                     have = sum(x["subPos"] for x in self.lead_subs if x["instId"] == inst)
                     if filled > have + 1e-9:
@@ -278,7 +290,7 @@ class FakeOkx:
             return ok([{"sCode": "0"}])
         if path == "/api/v5/copytrading/current-subpositions" and q.get("instType") == "SPOT":
             return ok([{"subPosId": x["subPosId"], "instId": x["instId"], "instType": "SPOT", "subPos": str(x["subPos"]),
-                        "availSubPos": str(x["subPos"]), "openAvgPx": str(x["openAvgPx"])}
+                        "availSubPos": str(x["subPos"]), "openAvgPx": str(x["openAvgPx"]), "openOrdId": x.get("openOrdId", "")}
                        for x in self.lead_subs if not q.get("instId") or x["instId"] == q["instId"]])
         if path == "/api/v5/copytrading/close-subposition" and b.get("instType") == "SPOT":
             self.lead_calls.append(("close", b))
@@ -292,7 +304,7 @@ class FakeOkx:
             i = q.get("instId")
             return ok([{"subPosId": f"s-{i}", "instId": i, "subPos": str(abs(self.pos[i])),
                         "slTriggerPx": next((a["slTriggerPx"] for a in self.algos if a["instId"] == i and a.get("lead")), "")}]
-                      if i in self.pos else [])
+                      if i in self.pos and (i in self.swap_lead or not self.track_swap_lead) else [])
         if path == "/api/v5/copytrading/algo-order":
             self.lead_calls.append(("stop", b))
             i = b["subPosId"][2:]
@@ -302,6 +314,7 @@ class FakeOkx:
         if path == "/api/v5/copytrading/close-subposition":
             self.lead_calls.append(("close", b))
             self.pos.pop(b["subPosId"][2:], None)
+            self.swap_lead.discard(b["subPosId"][2:])
             return ok([{"subPosId": b["subPosId"], "sCode": "0"}])
         return {"code": "51000", "msg": f"unexpected {path}", "data": []}
 

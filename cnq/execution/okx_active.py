@@ -7,6 +7,10 @@ positions × 20 % of its account, exits after 12 h or at its wide stop). While t
     best price) for the same share of the sleeve as the desk's position is of its account;
   • the desk closed it (time exit, stop, target) or cut it (qty_left) → the bought coins are sold (limit IOC, at most OKX_SLIP below
     the best price); a part left unsold is tried again a minute later.
+Spot lead trader (22.10, owner: everything the account trades copyable; okx_lead.py): a buy on a {COIN}-USDT pair that OKX supports
+for spot copy goes as a lead order (tdMode spot_isolated; the coin is added to the lead instruments first when missing) and its exit
+sells the lead positions (spot_isolated); a full exit OKX refuses as a lead order closes this sleeve's own lead positions
+(close-subposition, matched by the buy's order id). A coin OKX does not copy, or one through USDC, stays an ordinary trade.
 A coin with no USDT pair but a USDC one goes through USDC (okx_autopilot.route / fill_via: USDT → USDC → COIN and back; unused USDC
 returns to USDT at the end of the pass). Spot only: no leverage, no borrowing, nothing moved between accounts. The coins bought here are remembered in
 ~/.cryptonova_okx_active.json and the spot rebalance (okx_autopilot) never counts or sells them. Kill switch, live / demo and the
@@ -21,6 +25,7 @@ import urllib.request
 from . import myspot_watch as ms
 from . import okx_alloc as al
 from . import okx_autopilot as ap
+from . import okx_lead as ld
 
 LOG = "data/okx_active.jsonl"
 FRESH_MS = 45 * 60_000
@@ -61,10 +66,13 @@ def save_state(st: dict, env=None) -> None:
     os.replace(p + ".tmp", p)
 
 
-def held(env=None) -> dict:
-    """{COIN: quantity} bought by this sleeve and not sold yet — the spot rebalance leaves these alone."""
+def held(env=None, lead: bool | None = None) -> dict:
+    """{COIN: quantity} bought by this sleeve and not sold yet — the spot rebalance leaves these alone. lead=True: only the ones
+    held as lead positions (spot lead trader), lead=False: only the ordinary ones."""
     out = {}
     for m in (load_state(env).get("trades") or {}).values():
+        if lead is not None and bool(m.get("lead")) != lead:
+            continue
         out[m["ccy"]] = out.get(m["ccy"], 0.0) + float(m.get("qty") or 0)
     return out
 
@@ -77,17 +85,28 @@ def fetch_desk(env=None) -> dict:
     return (p.get("profiles") or {}).get("imps") or {}
 
 
-def _sell(cl: ap.Okx, ccy: str, quote: str, qty: float, slip: float, cl_id: str, sleep, env=None, log_path=None) -> dict:
+def _sell(cl: ap.Okx, ccy: str, quote: str, qty: float, slip: float, cl_id: str, sleep, env=None, log_path=None, m: dict | None = None,
+          full: bool = False) -> dict:
+    lead = bool((m or {}).get("lead"))
     rt = ap.route(cl, ccy, quote)
     inst_id, inst, tk = rt["inst"], rt["info"], rt["tk"]
     bid = ms._f((tk or {}).get("bidPx")) or ms._f((tk or {}).get("last"))
     if not inst or not bid:
         return {"filled": 0.0, "why": f"нет пары {rt['none']}"}
-    q = ap.floor_to(min(qty, cl.avail(ccy)), float(inst["lotSz"]))
+    have = ld.lead_avail(cl, inst_id) if lead and not rt["via"] else cl.avail(ccy)   # lead coins are not in the ordinary balance
+    q = ap.floor_to(min(qty, have), float(inst["lotSz"]))
     if q < float(inst["minSz"]):
         return {"filled": qty, "why": "остаток меньше минимума OKX — считаю проданным", "dust": True}
     o = {"ccy": ccy, "inst": inst_id, "side": "sell", "sz": ap.fmt(q, inst["lotSz"]), "lot": inst["lotSz"], "min": inst["minSz"],
          "via": rt["via"], "px": ap.fmt(ap.floor_to(bid * (1 - slip), float(inst["tickSz"])), inst["tickSz"])}
+    if lead and not rt["via"]:
+        o.update(td=ld.TD, lead=True)
+        try:
+            return ap._fill(cl, o, cl_id, sleep)
+        except ms.OkxError as e:
+            if not full:
+                raise
+            return ld.close_out(cl, o, e, lambda ev: ap.log(ev, log_path), only=set((m or {}).get("ords") or []))
     return ap.fill_via(cl, o, cl_id, sleep, env, log_path) if rt["via"] else ap._fill(cl, o, cl_id, sleep)
 
 
@@ -118,7 +137,14 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
         return res
     cl = cl or ap.connect(env, opener, ap.load_state(env), sleep)
     cl.lease_deadline = ap.lease.deadline(g, now)
-    perm = ap.perm_of(cl.config())
+    cfg = cl.config()
+    perm = ap.perm_of(cfg)
+    lead = {}
+
+    def lctx():                                  # the spot lead context, read once and only when a trade needs it
+        if "c" not in lead:
+            lead["c"] = ld.context(lambda p, q=None: cl.call("GET", p, q), cfg, env)
+        return lead["c"]
     bad = ("ключ с правом ВЫВОДА" if "withdraw" in perm else "у ключа нет права «Торговля»" if "trade" not in perm else ap.world_ok(cl, env))
     if bad:
         res["why"] = bad
@@ -136,7 +162,7 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
             continue
         seq += 1
         try:
-            f = _sell(cl, m["ccy"], quote, sell_q, slip, f"cnqas{now // 1000}{seq:03d}", sleep, env, lp)
+            f = _sell(cl, m["ccy"], quote, sell_q, slip, f"cnqas{now // 1000}{seq:03d}", sleep, env, lp, m, t is None)
             via = via or bool(m.get("via")) or bool(f.get("half"))
         except Exception as e:  # noqa: BLE001
             res["errors"] += 1
@@ -186,6 +212,12 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
             o = {"ccy": base, "inst": inst_id, "side": "buy", "sz": ap.fmt(q, inst["lotSz"]), "lot": inst["lotSz"], "min": inst["minSz"],
                  "via": rt["via"], "px": ap.fmt(ap.ceil_to(ask / k * (1 + slip), float(inst["tickSz"])), inst["tickSz"])}
             via = via or bool(rt["via"])
+            lc = lctx() if not rt["via"] and quote == "USDT" else None
+            if lc and lc["active"]:                  # 22.10: a copyable coin → a lead buy (added to the lead instruments first)
+                if inst_id not in lc["enabled"] and inst_id in lc["supported"] and lc["enabled"]:   # never from an unread list
+                    lc["enabled"], _fails = ld.add_insts(cl, "SPOT", set(lc["enabled"]), {inst_id})
+                if inst_id in lc["enabled"]:
+                    o.update(td=ld.TD, lead=True)
             try:
                 cid = f"cnqab{now // 1000}{seq:03d}"
                 f = ap.fill_via(cl, o, cid, sleep, env, lp) if rt["via"] else ap._fill(cl, o, cid, sleep)
@@ -193,10 +225,12 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
                 res["errors"] += 1
                 ap.log({"ev": "buy_error", "id": tid, "inst": inst_id, "error": str(e)[:200]}, lp)
                 continue
-            ap.log({"ev": "buy", "id": tid, "inst": inst_id, **({"route": ap.route_text(o)} if rt["via"] else {}), **f}, lp)
+            ap.log({"ev": "buy", "id": tid, "inst": inst_id, **({"route": ap.route_text(o)} if rt["via"] else {}),
+                    **({"copy": bool(o.get("lead"))} if lc and lc["active"] else {}), **f}, lp)
             if f["filled"] > 0:
                 st["trades"][tid] = {"ccy": base, "q0": f["filled"], "qty": f["filled"], "opened": now, "px": f["avg_px"],
-                                     **({"via": rt["via"]} if rt["via"] else {})}
+                                     **({"via": rt["via"]} if rt["via"] else {}),
+                                     **({"lead": True, "ords": [f["ordId"]]} if o.get("lead") else {})}
                 res["bought"] += 1
             elif f.get("half"):
                 res["skipped"].append({"id": tid, "why": f["half"]})          # not «skip» for good: tried again next minute

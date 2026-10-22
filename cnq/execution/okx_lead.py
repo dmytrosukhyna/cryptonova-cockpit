@@ -205,7 +205,7 @@ def sync(cl, ctx: dict, desired: set, st: dict, now: int, log=None) -> set:
     st["lead_t"] = now
     cur = set(ctx["enabled"])
     every = (set(ctx["supported"]) | set(desired)) - cur
-    if not every:
+    if not every or (not cur and "*" in ctx["fails"]):     # nothing missing, or OKX's lists unreadable → no POST that could shrink
         return ctx["enabled"]
     en, fails, added = cur, {}, set()
     if every - set(desired) and now - int(st.get("lead_full_t") or 0) >= DAY_MS:
@@ -339,6 +339,8 @@ def plan_lines(b: dict) -> list[str]:
     if ld.get("lead_qty"):
         L.append("  лидерские позиции сейчас: " + ", ".join(f"{c} {q:g}" for c, q in ld["lead_qty"].items())
                  + " — считаются в долях, бюджетах и «СОВПАДАЕТ» как обычные монеты")
+    if ld.get("active"):
+        L.append("  Импульс BTC (активный спот) тоже лидерский: покупки и выходы на монетах к USDT, которые OKX даёт копировать")
     if ld.get("url"):
         L.append(f"  профиль ведущего трейдера: {ld['url']}")
     return L
@@ -378,14 +380,22 @@ def check_lines(cl, cfg: dict, env=None) -> list[str]:
     return out
 
 
-def close_out(cl, o: dict, err: Exception, log=None) -> dict:
-    """A full exit OKX refused as a lead order: close every lead position of that instrument (close-subposition, SPOT, limit at
-    the order's price — never below it). Returns _fill's shape (filled = the closed quantity)."""
+def lead_avail(cl, inst_id: str) -> float:
+    """The lead quantity of one spot instrument that can be sold now (its open lead positions)."""
+    d = cl.call("GET", SUBS, {"instType": "SPOT", "instId": inst_id}) or []
+    return sum((ms._f(s.get("availSubPos")) if ms._f(s.get("availSubPos")) is not None else ms._f(s.get("subPos")) or 0.0)
+               for s in d if s.get("instId") == inst_id)
+
+
+def close_out(cl, o: dict, err: Exception, log=None, only: set | None = None) -> dict:
+    """A full exit OKX refused as a lead order: close the lead positions of that instrument (close-subposition, SPOT, limit at
+    the order's price — never below it); only = just the ones opened by these order ids (the active spot's own). Returns _fill's
+    shape (filled = the closed quantity)."""
     d = cl.call("GET", SUBS, {"instType": "SPOT", "instId": o["inst"]}) or []
     q, ids = 0.0, []
     for s in d:
         sid, sq = str(s.get("subPosId") or ""), ms._f(s.get("availSubPos")) or ms._f(s.get("subPos")) or 0.0
-        if not sid or sq <= 0:
+        if not sid or sq <= 0 or (only is not None and str(s.get("openOrdId") or "") not in only):
             continue
         cl.call("POST", CLOSE, body={"instType": "SPOT", "subPosId": sid, "ordType": "limit", "px": o["px"]})
         q += sq

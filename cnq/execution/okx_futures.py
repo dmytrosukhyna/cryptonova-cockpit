@@ -30,9 +30,12 @@ Money: real only with CNQ_LIVE_TRADING=yes given in the autopilot window («--li
 x-simulated-trading: 1, a demo key). A key with «Withdraw» is refused; the account must be in the «Фьючерсы» mode (acctLv 2, the
 API's «Spot and futures mode»); in the «Спот» mode (acctLv 1) OKX has no swaps and this part does nothing. A copy trader account
 (roleType 2) is refused: a lead must not copy anyone.
-Lead trader («Копировать CRYPTO NOVA», later): detected from the account config (roleType 1) or OKX_IS_LEAD=1. Then entries stay on
-the lead's instruments (traderInsts), stops are set on the lead sub-positions (/api/v5/copytrading/algo-order) and exits close the
-lead sub-positions (/api/v5/copytrading/close-subposition). Every stop triggers on the last price. One position per instrument and
+Lead trader («Копировать CRYPTO NOVA»): detected from the account config (roleType 1) or OKX_IS_LEAD=1. 22.10 (owner: everything
+the account trades must be copyable): an entry on a swap that is not yet a lead instrument (traderInsts) first adds it —
+POST /api/v5/copytrading/set-instruments, instType SWAP, the full list (current + new) — and enters in the same pass; when OKX
+refuses, the entry goes as an ordinary order («не копируется»; the refusal is remembered for a day). Stops are set on the lead
+sub-positions (/api/v5/copytrading/algo-order) and exits close the lead sub-positions (/api/v5/copytrading/close-subposition); a
+position without lead sub-positions (opened before, or refused) keeps the ordinary stop, partial exits and reduce-only close. Every stop triggers on the last price. One position per instrument and
 reduce-only exits: an order in the opposite direction is never used to exit.
 Through USDC (22.10, owner: «если по USDT ничего нету, то надо через USDC»): a coin with no <COIN>-USDT-SWAP but a live
 <COIN>-USDC-SWAP — OKX: settleCcy «Settlement and margin currency» = USDC, a linear contract whose ctVal is counted in ctValCcy =
@@ -53,6 +56,7 @@ import urllib.request
 from . import myspot_watch as ms
 from . import okx_alloc as al
 from . import okx_autopilot as ap
+from . import okx_lead as ld
 
 LOG = "data/okx_futures.jsonl"
 FRESH_MS = 45 * 60_000
@@ -189,6 +193,12 @@ class Ctx:
         ti = cfg.get("traderInsts") or []
         self.lead_insts = set(ti if isinstance(ti, list) else [x for x in str(ti).split(",") if x])
         self._inst, self._pos, self._algos = {}, None, {}
+        if self.lead and not self.lead_insts:          # no traderInsts in the config → the lead's own list
+            try:
+                self.lead_insts = {str(x.get("instId")) for x in self.get(ld.INSTS, {"instType": "SWAP"}) or []
+                                   if str(x.get("enabled")).lower() == "true"}
+            except ms.OkxError:
+                pass
 
     def get(self, path, params=None, signed=True):
         return self.cl.call("GET", path, params, signed=signed)
@@ -611,8 +621,8 @@ def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict
         return {**base, "skip": f"уже {len(pos)} открытых позиций — предел {cap['max_pos']}", "final": False}
     if inst_id in pos:
         return {**base, "skip": "по этому инструменту уже есть позиция — вторую не открываю", "final": True}
-    if ctx.lead and ctx.lead_insts and inst_id not in ctx.lead_insts:
-        return {**base, "skip": "инструмента нет в списке ведущего трейдера на OKX", "final": True}
+    if ctx.lead:
+        base["copy"] = inst_id in ctx.lead_insts      # not yet a lead instrument → step() adds it before the entry (add_lead)
     inst = ctx.inst(inst_id)
     alt = inst_id[:-len("-USDT-SWAP")] + "-USDC-SWAP"
     if not inst and not ctx.lead and usdc_on(ctx.env) and ap.usdt_account(ctx.cl, ctx.env):
@@ -718,7 +728,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             q = float(t.get("qty") or 0)
             ql = float(t["qty_left"]) if t.get("qty_left") is not None else q
             ratio = ql / q if q > 0 else 1.0
-            if ratio < 0.999 and not ctx.lead:
+            if ratio < 0.999 and not (ctx.lead and ctx.subs(m["inst"])):    # a lead position closes whole; an ordinary one in parts
                 tgt = ap.floor_to(m["c0"] * ratio, float(m["lot"]))
                 cut = size_now if tgt < float(m["min"]) else size_now - tgt
                 if cut >= float(m["min"]) - 1e-12:
@@ -796,6 +806,8 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
                     if st["tries"][tid] >= MAX_TRIES:
                         st["skip"][tid] = why
                     continue
+            if ctx.lead and not dcs.get("copy"):
+                dcs["copy"] = add_lead(ctx, st, inst_id, now, log_path)   # 22.10: make it copyable first; refused → ordinary
             try:
                 set_leverage(ctx, inst_id, s["lev"], long)
                 body = entry_body(ctx, inst_id, inst, long, s, slip, _cid("cnqf", now, seq), _cid("cnqfs", now, seq), dcs["bid"], dcs["ask"])
@@ -815,12 +827,14 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
                 continue
             real_risk = f["filled"] * float(inst["ctVal"]) * abs((f["avg_px"] or s["worst"]) - s["stop"])
             m = {"inst": inst_id, "sym": str(t["symbol"]), "desk": dk, "side": "LONG" if long else "SHORT", "c0": f["filled"],
+                 **({"copy": bool(dcs.get("copy"))} if ctx.lead else {}),
                  **({"settle": "USDC"} if dcs.get("settle") == "USDC" else {}),
                  "stop": s["stop"], "tp": s.get("tp"), "mult": dcs["mult"], "lot": inst["lotSz"], "min": inst["minSz"],
                  "tick": inst["tickSz"], "ct": inst["ctVal"], "opened": now, "lev": s["lev"], "entry": f["avg_px"] or s["px"]}
             st["trades"][tid] = m
             ctx.forget(inst_id)
             log({"ev": "open", "id": tid, "inst": inst_id, "side": m["side"], "sz": f["filled"], "avg_px": f["avg_px"], "stop": s["stop"],
+                 **({"copy": m["copy"]} if ctx.lead else {}),
                  "tp": s.get("tp"), "lev": s["lev"], "risk_usd": round(real_risk, 2), "risk_cap": round(bud["usd"] * cap["risk"], 2),
                  "budget": bud["usd"]}, log_path)
             pos = ctx.positions(fresh=True)
@@ -845,6 +859,34 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     if save:
         save_state(st, env)
     return res
+
+
+def add_lead(ctx: Ctx, st: dict, inst_id: str, now: int, log_path=None) -> bool:
+    """Add one swap to the lead instruments (set-instruments, instType SWAP, the full list: current + this one) right before its
+    entry. True = now a lead instrument (the entry is copied). A refusal is remembered for a day — the entry goes ordinary."""
+    ref = st.setdefault("lead_refused", {})
+    if now - int(ref.get(inst_id) or 0) < ld.DAY_MS:
+        return False
+    try:                                        # the list OKX has right now — the POST replaces it, so nothing may be missing
+        cur = {str(x.get("instId")) for x in ctx.get(ld.INSTS, {"instType": "SWAP"}) or [] if str(x.get("enabled")).lower() == "true"}
+    except ms.OkxError:
+        cur = set()
+    cur = cur or set(ctx.lead_insts)
+    if not cur:                                 # the lead list is unreadable: a POST could replace it with one swap — never
+        log({"ev": "lead_add", "inst": inst_id, "ok": False, "note": "список ведущего не прочитался — вход обычный, не копируется"}, log_path)
+        return False
+    if inst_id in cur:
+        ctx.lead_insts = cur
+        return True
+    en, fails = ld.add_insts(ctx.cl, "SWAP", cur, {inst_id})
+    ctx.lead_insts = en or ctx.lead_insts
+    ok = inst_id in en and inst_id not in fails
+    if not ok:
+        ref[inst_id] = now
+    log({"ev": "lead_add", "inst": inst_id, "ok": ok, **({"why": fails.get(inst_id)} if not ok else {}),
+         "note": "инструмент добавлен в список ведущего — вход копируется" if ok else "OKX не добавил инструмент — вход обычный, не копируется"},
+        log_path)
+    return ok
 
 
 def close_all(env=None, opener=None, now: int | None = None, sleep=time.sleep, cl=None, log_path=None) -> str:
@@ -889,7 +931,8 @@ def check_lines(cl: ap.Okx, cfg: dict, env=None) -> list[str]:
         out.append("  !!! Нужен режим «Фьючерсы»: OKX → войти в субаккаунт → Настройки → Режим счёта → «Фьючерсы». Переключается, "
                    "только когда нет открытых ордеров и позиций; первый раз OKX может попросить пройти короткий тест.")
     role = str(cfg.get("roleType") or "0")
-    out.append("  ведущий трейдер: " + {"1": "да (roleType 1) — стопы и выходы через позиции ведущего", "2": "НЕТ — на счёте включено "
+    out.append("  ведущий трейдер: " + {"1": "да (roleType 1) — стопы и выходы через позиции ведущего; своп не из списка ведущего добавляется "
+               "в список перед входом (OKX откажет — обычный вход, не копируется)", "2": "НЕТ — на счёте включено "
                "копирование чужих сделок; автопилот фьючерсов здесь работать не будет"}.get(role, "нет")
                + (" · OKX_IS_LEAD=1 — режим ведущего включён вручную" if lead_forced(env) and role != "1" else ""))
     bad = refuse(cfg, cl, env)
@@ -950,7 +993,8 @@ def plan_lines(cl: ap.Okx, cfg: dict, env=None, desks: list | None = None, now: 
         head = f"  [{dk}] {t['symbol']} {'ЛОНГ' if long else 'ШОРТ'} · сигнал открыт {age:.0f} мин назад по {float(t['entry']):.6g}"
         if tid in (st.get("trades") or {}):
             m = st["trades"][tid]
-            L.append(f"{head} → уже ведём: {m['c0']:g} контр. {m['inst']}, стоп {m['stop']:g}" + (f", цель {m['tp']:g}" if m.get("tp") else ""))
+            L.append(f"{head} → уже ведём: {m['c0']:g} контр. {m['inst']}, стоп {m['stop']:g}" + (f", цель {m['tp']:g}" if m.get("tp") else "")
+                     + ((" · копируется" if ctx.subs(m["inst"]) else " · не копируется (обычная позиция)") if ctx.lead else ""))
             continue
         if tid in (st.get("skip") or {}):
             L.append(f"{head} → пропущен: {st['skip'][tid]}")
@@ -967,7 +1011,9 @@ def plan_lines(cl: ap.Okx, cfg: dict, env=None, desks: list | None = None, now: 
                  f"лимит IOC не хуже {s['worst']:.6g}, плечо {s['lev']}, маржа {ap.usd(s['margin'])}, стоп-лосс {s['stop']:.6g}"
                  + (f", цель {s['tp']:.6g}" if s.get("tp") else "") + f" · риск {ap.usd(s['risk_usd'])} ({s['risk_pct']:g}% бюджета; "
                  f"у стола {s['desk_risk_pct']:g}%)" + (f" · урезано: {s['capped']}" if s.get("capped") else "")
-                 + (" · через USDC: маржа USDT → USDC перед входом, после закрытия USDC → USDT" if dcs.get("settle") == "USDC" else ""))
+                 + (" · через USDC: маржа USDT → USDC перед входом, после закрытия USDC → USDT" if dcs.get("settle") == "USDC" else "")
+                 + ((" · копируется" if dcs.get("copy") else " · копируется после добавления инструмента в список ведущего "
+                     "(если OKX откажет — обычный вход, не копируется)") if ctx.lead else ""))
     return L
 
 

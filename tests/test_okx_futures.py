@@ -205,11 +205,42 @@ def test_lead_trader_stops_and_exits_go_through_the_lead_positions():
     fk = F.FakeOkx(role="1", lead_insts=["SOL-USDT-SWAP"])
     e = F.env()
     r = run(fk, e, F.desks(F.trade(), F.trade("T2", "APT", entry=1.0, stop=0.95, tp=1.2)))
-    assert r["opened"] == 1 and "списке ведущего" in " ".join(x["why"] for x in r["skipped"])
+    # 22.10: APT was not a lead instrument → added first (SWAP, the full list), entered in the same pass, copied
+    assert r["opened"] == 2 and not r["skipped"]
+    assert fk.set_calls == [{"instType": "SWAP", "instId": "APT-USDT-SWAP,SOL-USDT-SWAP"}] and fk.swap_lead == {"SOL-USDT-SWAP", "APT-USDT-SWAP"}
+    assert fu.load_state(e)["trades"]["bal:T2"]["copy"] is True
     assert ("stop", {"instType": "SWAP", "subPosId": "s-SOL-USDT-SWAP", "slTriggerPx": "190.000", "slTriggerPxType": "last",
                      "tpTriggerPx": "230.000", "tpTriggerPxType": "last"}) in fk.lead_calls
     r = run(fk, e, F.desks(), NOW + 60_000)
-    assert r["closed"] == 1 and fk.lead_calls[-1] == ("close", {"instType": "SWAP", "subPosId": "s-SOL-USDT-SWAP", "ordType": "market"})
+    assert r["closed"] == 2 and ("close", {"instType": "SWAP", "subPosId": "s-SOL-USDT-SWAP", "ordType": "market"}) in fk.lead_calls
+
+
+def test_lead_swap_refused_by_okx_is_entered_as_an_ordinary_position_and_managed_ordinarily():
+    fk = F.FakeOkx(role="1", lead_insts=["SOL-USDT-SWAP"], swap_set_reject={"APT-USDT-SWAP"})
+    e = F.env()
+    t = F.trade("T2", "APT", entry=1.0, stop=0.95, tp=1.2, qty=2000.0, risk=100.0)
+    r = run(fk, e, F.desks(t))
+    m = fu.load_state(e)["trades"]["bal:T2"]
+    assert r["opened"] == 1 and m["copy"] is False and "APT-USDT-SWAP" in fk.pos and "APT-USDT-SWAP" not in fk.swap_lead
+    assert fu.load_state(e)["lead_refused"].keys() == {"APT-USDT-SWAP"}
+    n = len(fk.set_calls)
+    r = run(fk, e, F.desks(dict(t, qty_left=1000.0)), NOW + 60_000)        # partial exit: an ordinary reduce-only order
+    assert r["reduced"] == 1 and swap_orders(fk)[-1]["reduceOnly"] is True and len(fk.set_calls) == n
+    r = run(fk, e, F.desks(), NOW + 120_000)                                  # the desk closed it: reduce-only market, no lead call
+    assert r["closed"] == 1 and swap_orders(fk)[-1]["reduceOnly"] is True and "APT-USDT-SWAP" not in fk.pos
+    assert not [c for c in fk.lead_calls if c[0] == "close"]
+
+
+def test_a_position_opened_before_the_lead_role_keeps_its_ordinary_stop_and_reduce_only_close():
+    fk = F.FakeOkx(lead_insts=["SOL-USDT-SWAP"])
+    e = F.env()
+    t = F.trade("T2", "APT", entry=1.0, stop=0.95, tp=1.2)
+    assert run(fk, e, F.desks(t))["opened"] == 1 and fk.algos                  # an ordinary APT position, its stop attached
+    fk.role = "1"                                                             # the account became a futures lead trader
+    r = run(fk, e, F.desks(dict(t, stop_now=0.97)), NOW + 60_000)
+    assert r["stops"] == 1 and fk.amends[-1]["newSlTriggerPx"] == "0.970" and not fk.lead_calls and not fk.set_calls
+    r = run(fk, e, F.desks(), NOW + 120_000)
+    assert r["closed"] == 1 and swap_orders(fk)[-1]["reduceOnly"] is True and not fk.pos and not fk.lead_calls
 
 
 def test_hedge_mode_exits_close_the_same_side_never_open_the_other():

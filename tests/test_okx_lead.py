@@ -266,3 +266,51 @@ def test_selfcheck_and_cash_is_the_default_order_mode():
         raise AssertionError("cross must be refused")
     except ValueError:
         pass
+
+
+def imp(tid="I1", sym="XRP", entry=2.0):
+    return {"id": tid, "symbol": sym, "side": "LONG", "entry": entry, "stop": entry * 0.8, "qty": 1000.0, "qty_left": 1000.0,
+            "opened": NOW - 60_000}
+
+
+def test_impulse_active_spot_buys_as_lead_and_its_exit_sells_the_lead_positions():
+    fk = fake(spot_role="1", spot_enabled={"BTC-USDT"})                    # XRP supported but not set yet → added first
+    e = F.env(CNQ_LIVE_TRADING="yes")
+    cl = ap.connect(e, fk, {}, F.nosleep)
+    r = ac.step(e, desk={"equity": 10000.0, "open": [imp()]}, now=NOW, sleep=F.nosleep, cl=cl, total=10000.0)
+    o = fk.orders[-1]
+    assert r["bought"] == 1 and o["instId"] == "XRP-USDT" and o["tdMode"] == "spot_isolated" and "XRP-USDT" in fk.spot_enabled
+    assert "BTC-USDT" in fk.spot_enabled                                    # the full list was sent: nothing removed
+    m = ac.load_state(e)["trades"]["I1"]
+    assert m["lead"] is True and m["ords"] == ["o1"] and ac.held(e, True) == {"XRP": float(o["sz"])}
+    # the spot rebalance counts the sleeve's lead XRP and never sells it
+    b = ap.build(cl, e, F.portfolio())
+    assert not [x for x in b["sells"] if x["ccy"] == "XRP"] and b["lead"]["lead_qty"]["XRP"] == float(o["sz"])
+    # the 12-hour exit (the desk closed it): a lead sell of the sleeve's coins
+    r = ac.step(e, desk={"equity": 10000.0, "open": []}, now=NOW + 12 * 3_600_000, sleep=F.nosleep, cl=cl)
+    s = fk.orders[-1]
+    assert r["sold"] == 1 and s["side"] == "sell" and s["tdMode"] == "spot_isolated" and not fk.lead_subs and ac.held(e) == {}
+
+
+def test_impulse_exit_refused_as_a_lead_order_closes_only_the_sleeves_own_lead_positions():
+    fk = fake(spot_role="1", spot_enabled={"XRP-USDT"}, lead_sell_reject=True,
+              lead_subs=[{"subPosId": "pf1", "instId": "XRP-USDT", "subPos": 50.0, "openAvgPx": 2.0, "openOrdId": "old"}])
+    e = F.env(CNQ_LIVE_TRADING="yes")
+    cl = ap.connect(e, fk, {}, F.nosleep)
+    ac.step(e, desk={"equity": 10000.0, "open": [imp()]}, now=NOW, sleep=F.nosleep, cl=cl, total=10000.0)
+    r = ac.step(e, desk={"equity": 10000.0, "open": []}, now=NOW + 12 * 3_600_000, sleep=F.nosleep, cl=cl)
+    closes = [b for k, b in fk.lead_calls if k == "close"]
+    assert r["sold"] == 1 and len(closes) == 1 and closes[0]["subPosId"] != "pf1" and closes[0]["instType"] == "SPOT"
+    assert [x["subPosId"] for x in fk.lead_subs] == ["pf1"] and ac.held(e) == {}
+
+
+def test_impulse_on_a_coin_okx_does_not_copy_or_without_the_lead_role_stays_ordinary():
+    for kw in ({"spot_role": "1", "spot_supported": {"BTC-USDT"}}, {"spot_role": "0"}, {"spot_role": "1", "env": {"OKX_SPOT_LEAD": "off"}}):
+        extra = kw.pop("env", {})
+        fk = fake(**kw)
+        e = F.env(CNQ_LIVE_TRADING="yes", **extra)
+        cl = ap.connect(e, fk, {}, F.nosleep)
+        assert ac.step(e, desk={"equity": 10000.0, "open": [imp()]}, now=NOW, sleep=F.nosleep, cl=cl, total=10000.0)["bought"] == 1
+        assert fk.orders[-1]["tdMode"] == "cash" and not fk.set_calls and "lead" not in ac.load_state(e)["trades"]["I1"]
+        ac.step(e, desk={"equity": 10000.0, "open": []}, now=NOW + 60_000, sleep=F.nosleep, cl=cl)
+        assert fk.orders[-1]["side"] == "sell" and fk.orders[-1]["tdMode"] == "cash" and ac.held(e) == {}

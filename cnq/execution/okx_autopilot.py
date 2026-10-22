@@ -544,10 +544,10 @@ def trading_avail(raw: dict) -> dict:
     return out
 
 
-def _active_held(env=None) -> dict:
+def _active_held(env=None, lead: bool | None = None) -> dict:
     try:
         from . import okx_active
-        return okx_active.held(env)
+        return okx_active.held(env, lead)
     except Exception:  # noqa: BLE001
         return {}
 
@@ -571,6 +571,10 @@ def build(cl: Okx, env=None, model=None) -> dict:
     if lctx.get("fresh") and lctx["held"]:
         raw["trading"] = ld.merge(raw.get("trading") or [], lctx["held"])
     act = _active_held(env)                            # coins of the active-spot sleeve: never counted or sold here
+    act_lead = _active_held(env, True) if lctx["held"] else {}     # … of them held as lead positions (okx_active, spot lead)
+    for c, q in act_lead.items():
+        if c in lctx["held"]:
+            lctx["held"][c] = {**lctx["held"][c], "avail": max(0.0, lctx["held"][c]["avail"] - q)}
     avail = trading_avail(raw)
     rows_all = ms.assets(raw)
     total = sum(r["usd"] for r in rows_all)
@@ -580,7 +584,7 @@ def build(cl: Okx, env=None, model=None) -> dict:
         if q and r["qty"]:
             k = max(0.0, 1 - q / r["qty"])
             r = {**r, "qty": r["qty"] * k, "usd": round(r["usd"] * k, 2)}
-            avail[r["ccy"]] = max(0.0, avail.get(r["ccy"], 0.0) - q)
+            avail[r["ccy"]] = max(0.0, avail.get(r["ccy"], 0.0) - (q - min(q, act_lead.get(r["ccy"], 0.0))))
         if r["ccy"] not in keep and r["usd"] >= 0.01:
             rows.append(r)
     held = {r["ccy"]: r for r in rows}

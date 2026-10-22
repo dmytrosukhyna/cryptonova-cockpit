@@ -25,7 +25,7 @@ drifted away from it (checked hourly); small differences (under $10 or 0.3 % of 
 Bybit futures mirror on purpose: CNQ_LIVE_TRADING=yes is given to THIS process only.
 
 Safety:
-  • spot orders are tdMode «cash» (no borrowing); futures are isolated-margin swaps with the caps of okx_futures.py (leverage ≤ 3,
+  • spot orders are tdMode «cash» (no borrowing) — on a spot lead trader «spot_isolated» for the copied coins (okx_lead.py); futures are isolated-margin swaps with the caps of okx_futures.py (leverage ≤ 3,
     the desk's own risk a trade, ≤ 1 %, 5 positions, 3 % daily loss stop); never a withdrawal or a transfer — the client has no such call. A key
     with the «Withdraw» permission is refused outright (nothing is traded with it).
   • real money only with CNQ_LIVE_TRADING=yes, given on the autopilot's own command line (scripts/okx_autopilot_mac.sh --live asks
@@ -58,7 +58,7 @@ Env (~/.cryptonova.env on the Mac, never in the repo or in a chat):
   OKX_API_KEY, OKX_API_SECRET, OKX_API_PASSPHRASE — an OKX API key with «Read» + «Trade», WITHOUT «Withdraw», bound to the Mac's IP;
   OKX_AUTOPILOT=on — the autopilot window may rebalance by itself (after the first --run).
   Optional: OKX_SPOT_SHARE / OKX_FUT_SHARE / OKX_ACT_SHARE (0.65 / 0.25 / 0.10), OKX_FUTURES=off, OKX_ACTIVE=off,
-  OKX_FUT_MAX_LEV (2, at most 3), OKX_IS_LEAD=1, OKX_HOST, OKX_QUOTE (found by itself), OKX_KEEP, OKX_MAX_ORDER_USD,
+  OKX_FUT_MAX_LEV (2, at most 3), OKX_IS_LEAD=1, OKX_SPOT_LEAD=off (okx_lead.py), OKX_HOST, OKX_QUOTE (found by itself), OKX_KEEP, OKX_MAX_ORDER_USD,
   OKX_MAX_DAY_USD, OKX_SLIP, OKX_TAKER_FEE (0.002 on OKX Europe since 25.09.2026, 0.001 elsewhere), OKX_AUTOPILOT_STATE, OKX_STOP_FILE.
 Not financial advice. Stdlib only."""
 from __future__ import annotations
@@ -76,6 +76,7 @@ import urllib.request
 
 from . import myspot_watch as ms
 from . import okx_alloc as al
+from . import okx_lead as ld
 from . import okx_lease as lease
 
 LOG = "data/okx_autopilot.jsonl"
@@ -296,8 +297,10 @@ class Okx:
                 return float(c.get("availBal") or c.get("cashBal") or 0)
         return 0.0
 
-    def order(self, inst_id: str, side: str, px: str, sz: str, cl_id: str) -> dict:
-        body = {"instId": inst_id, "tdMode": "cash", "side": side, "ordType": "ioc", "px": px, "sz": sz, "clOrdId": cl_id}
+    def order(self, inst_id: str, side: str, px: str, sz: str, cl_id: str, td: str = "cash") -> dict:
+        if td not in ("cash", ld.TD):
+            raise ValueError(f"tdMode {td}")
+        body = {"instId": inst_id, "tdMode": td, "side": side, "ordType": "ioc", "px": px, "sz": sz, "clOrdId": cl_id}
         d = self.call("POST", "/api/v5/trade/order", body=body)
         o = d[0] if d else {}
         if str(o.get("sCode", "0")) != "0":
@@ -551,7 +554,8 @@ def _active_held(env=None) -> dict:
 
 def build(cl: Okx, env=None, model=None) -> dict:
     """Read the account and turn «Наш портфель CRYPTO NOVA» (× the spot share) into exact orders. Places nothing.
-    model = web/portfolio.json (default: fetched)."""
+    model = web/portfolio.json (default: fetched). A spot lead trader (okx_lead.py): lead positions are counted like ordinary coins,
+    sales may take them (lead first), and the orders are marked lead / ordinary with the instruments the next sync would set."""
     keep = keep_set(env)
     quote = pick_quote(cl, env)
     if not quote:
@@ -562,7 +566,10 @@ def build(cl: Okx, env=None, model=None) -> dict:
         raise RuntimeError("публичный портфель CRYPTO NOVA (web/portfolio.json) не загрузился — ничего не меняю")
     meta = al.meta(pf)
     w = al.shares(env)
-    raw = ms.read_raw(cl.fetch, cl.host)
+    raw = ms.read_raw(cl.fetch, cl.host)               # lead spot positions already merged in (okx_lead.merge)
+    lctx = ld.context(lambda p, q=None: cl.call("GET", p, q), raw.get("cfg") or {}, env, raw)
+    if lctx.get("fresh") and lctx["held"]:
+        raw["trading"] = ld.merge(raw.get("trading") or [], lctx["held"])
     act = _active_held(env)                            # coins of the active-spot sleeve: never counted or sold here
     avail = trading_avail(raw)
     rows_all = ms.assets(raw)
@@ -580,6 +587,7 @@ def build(cl: Okx, env=None, model=None) -> dict:
     lim = limits(env)
     sells, buys, notes, diffs = [], [], [], []
     memo = {}                                          # instId → (instrument, ticker) for this plan
+    routes = {}                                        # coin → (via, instId) for the lead marks
 
     def look(base: str):
         r = route(cl, base, quote, memo)
@@ -626,6 +634,7 @@ def build(cl: Okx, env=None, model=None) -> dict:
         why = al.reason(mapped[c]) if c in mapped else al.sell_reason(c, meta)
         rt = route(cl, c, quote, memo)                                  # {c}-{quote}, or {c}-USDC through USDC (22.10)
         inst_id, inst, tk, via = rt["inst"], rt["info"], rt["tk"], rt["via"]
+        routes[c] = (via, inst_id)
         k = via_rate(cl, memo) if via else 1.0                         # dollars per unit of the pair's quote (USDC ≈ $1)
         if gap < 0 and (tgt == 0 or -gap >= band):                    # sell: not in the portfolio, or over its share
             bid = ms._f((tk or {}).get("bidPx")) or ms._f((tk or {}).get("last"))
@@ -633,7 +642,7 @@ def build(cl: Okx, env=None, model=None) -> dict:
                 diffs.append(f"{c}: на OKX нет пары {rt['none']} — продать не могу, монета остаётся.")
                 continue
             lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
-            have = avail.get(c, 0.0)
+            have = avail.get(c, 0.0) + (((lctx["held"].get(c) or {}).get("avail") or 0.0) if lctx["active"] and not via else 0.0)
             qty = floor_to(have if tgt == 0 else min(have, -gap / (bid * k)), lot)
             if qty < mn or qty * bid * k < (1.0 if tgt == 0 else MIN_ORDER):
                 if tgt == 0 and have * bid * k >= MIN_ORDER:
@@ -669,10 +678,15 @@ def build(cl: Okx, env=None, model=None) -> dict:
     spot_now = sum(r["usd"] for r in rows if not r["cash"])
     rows_t = [{"ccy": c, "target_pct": round(targets[c] * 100, 2), "now_pct": round((held[c]["usd"] if c in held else 0) / total * 100, 2) if total else 0.0,
                "sym": mapped[c]["sym"], "pf_w": mapped[c]["w"]} for c in sorted(targets, key=lambda x: -targets[x])]
-    return {"quote": quote, "host": cl.host, "total_usd": round(total, 2), "split": w, "pf_name": meta["name"], "pf_cash": meta["cash"],
-            "sells": sells, "buys": buys, "notes": notes, "diffs": diffs, "keep": sorted(keep), "sig": al.signature(pf, w),
-            "targets": rows_t, "spot_now_usd": round(spot_now, 2), "active_held": act, "fee_rate": fee, "fee_usd": round(turnover * fee, 2),
-            "eea": is_eea(cl), "same": not diffs}
+    b = {"quote": quote, "host": cl.host, "total_usd": round(total, 2), "split": w, "pf_name": meta["name"], "pf_cash": meta["cash"],
+         "sells": sells, "buys": buys, "notes": notes, "diffs": diffs, "keep": sorted(keep), "sig": al.signature(pf, w),
+         "targets": rows_t, "spot_now_usd": round(spot_now, 2), "active_held": act, "fee_rate": fee, "fee_usd": round(turnover * fee, 2),
+         "eea": is_eea(cl), "same": not diffs,
+         # 22.10 spot lead (okx_lead.py): the unsplit orders, the ordinary coins that can be sold, the routes, prices, the context
+         "sells0": sells, "buys0": buys, "_avail": {c: q for c, q in avail.items() if c not in keep}, "_routes": routes,
+         "_px": {r["ccy"]: r["usd"] / r["qty"] for r in rows if r.get("qty")}, "_ctx": lctx,
+         "_want": ld.want(lctx, [c for c in targets if not routes.get(c, (None,))[0]], quote) if lctx["active"] else set()}
+    return ld.mark(b, lctx, b["_want"] if lctx["active"] else set())
 
 
 def usd(v: float) -> str:
@@ -701,16 +715,20 @@ def plan_text(b: dict, mode: str) -> str:
              f" Кэш портфеля {al._p(b['pf_cash'])} (правило: не меньше 10%) — остаётся в {b['quote']}.")
     L.append("  Цель по монетам (доля счёта = доля спота × вес в портфеле): "
              + ", ".join(f"{r['ccy']} {ms._p(r['target_pct'])}% (сейчас {ms._p(r['now_pct'])}%)" for r in b["targets"]))
+    L += ld.plan_lines(b)
+    on = (b.get("lead") or {}).get("active")
+    cp = (lambda o: (" · копируется" if o.get("lead") else " · не копируется (монеты, купленные до включения)" if o.get("legacy")
+                     else " · не копируется") if on else "")
     if b["sells"]:
         L.append("  Сначала продажи:")
         for o in b["sells"]:
             what = "продать всё" if o["act"] == "sell" else f"урезать до {ms._p(o['target_pct'])}%"
-            L.append(f"    ПРОДАТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · {what} · лимит не ниже {o['px']}{_q(o)}{_r(o)} · почему: {o['why']}")
+            L.append(f"    ПРОДАТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · {what} · лимит не ниже {o['px']}{_q(o)}{_r(o)}{cp(o)} · почему: {o['why']}")
     if b["buys"]:
         L.append("  Потом покупки (сначала ядро):")
         for o in b["buys"]:
             L.append(f"    КУПИТЬ {o['sz']} {o['ccy']} ≈ {usd(o['usd'])} · до {ms._p(o['target_pct'])}% счёта · лимит не выше {o['px']}{_q(o)}{_r(o)}"
-                     f" · почему: {o['why']}")
+                     f"{cp(o)} · почему: {o['why']}")
     if not b["sells"] and not b["buys"]:
         L.append("  Спот уже совпадает с портфелем (отличия меньше $10 или 0,3% счёта) — ордеров нет.")
     if b.get("active_held"):
@@ -748,7 +766,7 @@ def same_text(b: dict, fut_on: bool, act_on: bool) -> str:
 def _fill(cl: Okx, o: dict, cl_id: str, sleep) -> dict:
     """Place one IOC order and read its final state. A network error after sending is resolved by the client order id."""
     try:
-        oid = cl.order(o["inst"], o["side"], o["px"], o["sz"], cl_id).get("ordId")
+        oid = cl.order(o["inst"], o["side"], o["px"], o["sz"], cl_id, o.get("td") or "cash").get("ordId")
     except (urllib.error.URLError, TimeoutError, OSError):
         sleep(1.0)
         s = cl.order_state(o["inst"], cl_id=cl_id)
@@ -792,7 +810,12 @@ def execute(cl: Okx, b: dict, st: dict, env=None, now: int | None = None, sleep=
         seq += 1
         cl_id = f"cnqap{now // 1000}{seq:03d}"
         try:
-            f = fill_via(cl, o, cl_id, sleep, env, log_path) if o.get("via") else _fill(cl, o, cl_id, sleep)
+            try:
+                f = fill_via(cl, o, cl_id, sleep, env, log_path) if o.get("via") else _fill(cl, o, cl_id, sleep)
+            except ms.OkxError as e:
+                if not (o.get("lead") and o["side"] == "sell" and o.get("act") == "sell"):
+                    raise
+                f = ld.close_out(cl, o, e, lambda ev: log(ev, log_path))      # a full exit: close the lead positions instead
         except Exception as e:  # noqa: BLE001
             res["failed"] += 1
             log({"ev": "order_failed", "ccy": o["ccy"], "side": o["side"], "sz": o["sz"], "px": o["px"], "error": str(e)[:200]}, log_path)
@@ -808,6 +831,7 @@ def execute(cl: Okx, b: dict, st: dict, env=None, now: int | None = None, sleep=
         st["day_usd"] = round(st["day_usd"] + f["usd"] * k, 2)                # the day's cap counts the coin leg (not the USDC legs)
         res["sold_usd" if o["side"] == "sell" else "bought_usd"] += f["usd"] * k
         log({"ev": "order", "ccy": o["ccy"], "side": o["side"], "sz": o["sz"], "px": o["px"], "inst": o["inst"],
+             **({"td": o["td"]} if o.get("td") else {}),
              **({"route": route_text(o)} if o.get("via") else {}), **f}, log_path)
         sleep(0.15)
 
@@ -864,6 +888,11 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
     if bad:
         return {"ok": False, "why": bad}
     b = build(cl, env, model)
+    if (b.get("lead") or {}).get("err"):
+        log({"ev": "refused", "why": "lead positions unreadable", "error": b["lead"]["err"]}, log_path)
+        return {"ok": False, "why": f"лидерские спот-позиции не прочитались ({b['lead']['err']}) — без них доли посчитать нельзя, ордеров нет"}
+    if b["_ctx"]["active"]:                     # 22.10: the lead instruments = the portfolio's copyable coins (okx_lead.sync)
+        ld.mark(b, b["_ctx"], ld.sync(cl, b["_ctx"], b["_want"], st, now, lambda ev: log(ev, log_path)))
     mode = "РЕАЛЬНЫЕ ДЕНЬГИ" if live(env) else "демо-торговля OKX"
     if live(env) and not cl.demo and not st.get("first_live"):
         st["first_live"] = {"t": now, "usd": b["total_usd"]}       # the start of «результат с начала» on the owner's card
@@ -912,8 +941,12 @@ def tick(env=None, opener=None, model=None, now: int | None = None, sleep=time.s
         st["drift_t"] = now
         save_state(st, env)
         cl = connect(env, opener, st, sleep)
-        if drifted(build(cl, env, pf)):
+        b = build(cl, env, pf)
+        if drifted(b):
             why = "счёт разошёлся с портфелем"
+        elif b["_ctx"]["active"] and now - int(st.get("lead_t") or 0) >= ld.DAY_MS:
+            ld.sync(cl, b["_ctx"], b["_want"], st, now, log)           # the lead instruments at least once a day
+            save_state(st, env)
     if not why:
         return None
     r = run_once(env, opener, pf, now, sleep, reason=why)
@@ -1036,6 +1069,7 @@ def check(env=None, opener=None) -> list[str]:
             out.append("  деление: " + " · ".join(al.split_text(al.shares(env), tot)))
             from . import okx_futures
             out += okx_futures.check_lines(cl, cfg, env)
+            out += ld.check_lines(cl, cfg, env)
             st = load_state(env)
             out.append("  автопилот: " + ("СТОП (--resume, чтобы снять)" if stopped(env) else
                                           "включён — ребалансирует сам" if st.get("armed") and enabled(env) else
@@ -1140,6 +1174,9 @@ def selfcheck() -> list[str]:
                 errs.append(f"нет {name}")
         if route_text({"via": VIA, "side": "buy", "ccy": "X"}) != "через USDC: USDT → USDC → X":
             errs.append("route_text")
+        m = ld.merge([{"ccy": "X", "eq": "1", "cashBal": "1", "availBal": "1"}], {"X": {"qty": 0.5, "avail": 0.5, "insts": [], "subs": []}})
+        if abs(float(m[0]["eq"]) - 1.5) > 1e-9 or abs(float(m[0]["availBal"]) - 1) > 1e-9 or ld.TD != "spot_isolated":
+            errs.append("okx_lead.merge")
     except Exception as e:  # noqa: BLE001
         errs.append(f"{type(e).__name__}: {str(e)[:200]}")
     return errs
@@ -1230,6 +1267,21 @@ def _main(argv=None) -> int:
         return 0
     if "--check" in argv:
         print("\n".join(check()))
+        return 0
+    if "--spot-lead-migrate" in argv:            # 22.10: the one-time move into lead positions — a plan; --live asks ДА
+        try:
+            if "--live" not in argv:
+                print(ld.migrate())
+                return 0
+            env = {**os.environ, "CNQ_LIVE_TRADING": "yes"}
+
+            def ask(text):
+                print(text)
+                return input("Это реальные деньги. Напишите ДА, чтобы выполнить: ").strip() == "ДА"
+            print(ld.migrate(env, confirm=ask))
+        except Exception as e:  # noqa: BLE001
+            print(describe_error(e))
+            return 1
         return 0
     if "--fut-close" in argv:
         from . import okx_futures

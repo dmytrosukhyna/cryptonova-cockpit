@@ -4023,6 +4023,7 @@ web/public_real.json is published by the Mac mirror (cnq/execution/public_real.p
     const d=new Date(R.since).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'}), old=R.stale||now-(R.asof||0)>2*3600000, c=R.pnl_usd>0?'pos':R.pnl_usd<0?'neg':'';
     return `<span>Реальный счёт CRYPTO NOVA на OKX · с ${d}</span><i>·</i><b>${money(R.equity_usd)}</b><i>·</i><b class="${c}">${sig(R.pnl_usd||0)}${R.pnl_pct!=null?` (${pct(R.pnl_pct)})`:''}</b>`
       +(R.alloc&&R.equity_usd?`<i>·</i><span>распределены: спот ${pp(R.alloc.spot_pct)} · фьючерсы ${pp(R.alloc.fut_pct)} (в позициях ${pp(R.alloc.fut_margin_usd/R.equity_usd*100)}) · активный спот ${pp(R.alloc.active_pct)}</span>`:'')
+      +(R.copiers!=null?`<i>·</i><span>копируют: <b>${+R.copiers||0}</b>${/^https:\/\/www\.okx\.com\/copy-trading\/account\/[A-Za-z0-9]+$/.test(R.copy_url||'')?` · <a href="${R.copy_url}" target="_blank" rel="noopener">профиль на OKX</a>`:''}</span>`:'')
       +(old?'<i>·</i><span class="old">данные устарели — автопилот сейчас не обновляет счёт</span>':''); }
   async function load(){ const el=document.getElementById('realLine'); if(!el) return;
     try{ const r=await fetch('./public_real.json?'+Math.floor(Date.now()/60000),{cache:'no-store'}); const h=r.ok?line(await r.json(),Date.now()):''; el.innerHTML=h; el.hidden=!h; }catch(e){ el.hidden=true; } }
@@ -4221,6 +4222,7 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
         +(Math.abs(AL.other_usd||0)>=1?row('Прочее — комиссии, округление, монеты к докупке',AL.other_usd,'#8fa1b3'):'')
         +`<div class="muted">Доллары на счёте ${usd(C.usd||0)} = запас спот-портфеля под новые монеты + маржа и резерв фьючерсов + активный спот, который ждёт сигнала${Math.abs(AL.other_usd||0)>=1?' + прочее':''}. Лишних денег нет: каждая часть ждёт своего правила системы.</div></div>`; }
     // the autopilot's own «СОВПАДАЕТ С СИСТЕМОЙ» line (okx_autopilot.same_text) and its differences
+    if(S.lead&&(S.lead.spot||S.lead.fut)) h+=`<div class="muted" style="font-size:12px;margin:4px 0">${esc(S.lead.line||'')}${/^https:\/\/www\.okx\.com\/copy-trading\/account\/[A-Za-z0-9]+$/.test(S.lead.url||'')?` · <a href="${S.lead.url}" target="_blank" rel="noopener">профиль ведущего трейдера</a>`:''}</div>`;   // 22.10 spot lead (okx_lead.py)
     h+=`<div class="msmatch ${M.same===true?'yes':M.same===false?'no':''}"><b>${esc(M.line||'')}</b>${(M.diffs||[]).length?`<ul>${M.diffs.slice(0,6).map(d=>`<li>${esc(d)}</li>`).join('')}</ul>`:''}<span class="muted">${M.t?`проверено ${when(M.t)} · `:''}${esc(M.note||'')}</span></div>`;
     // spot coins vs the autopilot's targets
     const word={ok:'в цели',under:'ниже цели',over:'выше цели',out:'нет в портфеле CRYPTO NOVA',keep:'OKX_KEEP — не трогает'};

@@ -643,12 +643,21 @@ def _config(out: str) -> dict:
             # build 44 «Подключить»: our lead-trader copy pages (empty until the exchange approves the profile) and the exchanges'
             # own pages for the 6 steps — https only; app_links = optional app deep links (scheme://…, never http / javascript)
             **{k: _https(c.get(k)) for k in CONNECT_KEYS},
+            # 22.10: no okx_copy_url in app_config → the lead trader's public OKX profile the autopilot publishes (public_real.json)
+            **({} if _https(c.get("okx_copy_url")) else {"okx_copy_url": _copy_url(out)}),
             "app_links": {str(k): v.strip() for k, v in (links if isinstance(links, dict) else {}).items() if isinstance(v, str) and _deep(v)},
             "portfolio": {k: v for k, v in pf.items() if v}}
 
 
 CONNECT_KEYS = ("okx_copy_url", "bingx_copy_url", "okx_app_ios", "okx_app_android", "okx_kyc_url", "okx_deposit_url",
                 "bingx_app_ios", "bingx_app_android", "bingx_kyc_url", "bingx_deposit_url")
+
+
+def _copy_url(out: str) -> str | None:
+    """web/public_real.json → copy_url (cnq/execution/public_real.py), only an OKX copy-trading profile link."""
+    u = _https(_load(out, "public_real.json").get("copy_url"))
+    tail = (u or "").removeprefix("https://www.okx.com/copy-trading/account/")
+    return u if u and tail != u and tail.isalnum() else None
 
 
 def _https(v) -> str | None:

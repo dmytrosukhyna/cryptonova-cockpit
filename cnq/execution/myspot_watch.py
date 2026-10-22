@@ -169,9 +169,15 @@ def read_raw(fetch, host: str, bal: list | None = None) -> dict:
     raw["tickers"] = _call(fetch, host, "/api/v5/market/tickers", {"instType": "SPOT"}, signed=False)
     try:
         cfg = _call(fetch, host, "/api/v5/account/config")
+        raw["cfg"] = cfg[0] if cfg and isinstance(cfg[0], dict) else {}
         raw["perm"] = (cfg[0].get("perm") if cfg else "") or ""
     except OkxError:
-        raw["perm"] = ""
+        raw["perm"], raw["cfg"] = "", {}
+    # 22.10 spot lead trader (okx_lead.py): lead positions are counted like ordinary coins — once (a personal account: no calls)
+    from . import okx_lead
+    raw["lead"], raw["lead_err"] = okx_lead.raw_lead(lambda p, q=None: _call(fetch, host, p, q), raw["cfg"], raw["trading"])
+    if raw["lead"] or any((_f(d.get("spotIsoBal")) or 0) > 0 for d in raw["trading"]):
+        raw["trading"] = okx_lead.merge(raw["trading"], raw["lead"])
     return raw
 
 

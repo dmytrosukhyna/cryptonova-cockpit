@@ -28,7 +28,8 @@ def portfolio():
 class FakeOkx:
     def __init__(self, perm="read_only,trade", demo_key=True, balances=None, funding=None, fill=1.0, host=WWW, quote="USDT",
                  acct_lv="2", pos_mode="net_mode", role="0", attach=True, algo_ok=True, hist=None, lead_insts=None,
-                 usdc_only=(), usdc_swaps=(), no_fill=(), strict=False):
+                 usdc_only=(), usdc_swaps=(), no_fill=(), strict=False, spot_role="0", spot_enabled=(), spot_supported=None,
+                 copiers=0, lead_subs=None, iso_in_eq=False, iso_field=True, lead_sell_reject=False, set_reject=(), unique_code="TESTLEAD01"):
         self.perm, self.demo_key, self.fill, self.host, self.quote = perm, demo_key, fill, host, quote
         # 22.10 USDC route: coins with only a {C}-USDC spot pair / only a {C}-USDC-SWAP (made-up «UUU» at $4), instIds whose IOC
         # orders never fill, and strict = OKX's own balance / isolated-margin checks (51008)
@@ -46,6 +47,16 @@ class FakeOkx:
         self.lead_insts = lead_insts or []
         self.pend = []
         self.n = 0
+        # 22.10 spot lead trading (made-up): the lead role, the instruments OKX supports for spot copy («CCC» is not one), the
+        # lead instruments set, the open lead positions (sub-positions) and how the balance shows them: iso_in_eq = eq / cashBal
+        # include the lead coins (availBal never does), iso_field = the balance names them in spotIsoBal
+        self.spot_role, self.copiers, self.unique_code = spot_role, copiers, unique_code
+        self.spot_supported = set(spot_supported if spot_supported is not None else
+                                  [f"{c}-USDT" for c in ("BTC", "ETH", "SOL", "AAA", "BBB", "DOGE", "XRP", "LINK", "AVAX", "ADA", "DOT", "APT")])
+        self.spot_enabled = set(spot_enabled)
+        self.lead_subs = [dict(x) for x in (lead_subs or [])]
+        self.iso_in_eq, self.iso_field, self.lead_sell_reject, self.set_reject = iso_in_eq, iso_field, lead_sell_reject, set(set_reject)
+        self.set_calls = []
 
     @property
     def px(self):                       # tests move PX during a test — always the current prices
@@ -54,6 +65,13 @@ class FakeOkx:
     # ── helpers
     def _px(self, inst):
         return self.px[inst.split("-")[0]]
+
+    def lead_qty(self) -> dict:
+        out = {}
+        for x in self.lead_subs:
+            c = x["instId"].split("-")[0]
+            out[c] = out.get(c, 0.0) + x["subPos"]
+        return out
 
     def _swap(self, inst):
         return inst.endswith("-SWAP")
@@ -70,16 +88,46 @@ class FakeOkx:
             return {"code": "50101", "msg": "APIKey does not match current environment", "data": []}
         ok = lambda d: {"code": "0", "data": d}  # noqa: E731
         if path == "/api/v5/account/balance":
-            det = [{"ccy": c, "eq": str(v), "availBal": str(v), "cashBal": str(v), "eqUsd": str(v * (self.px.get(c) or 1.0))}
-                   for c, v in self.bal.items() if not q.get("ccy") or q["ccy"] == c]
-            return ok([{"totalEq": str(sum(v * (self.px.get(c) or 1.0) for c, v in self.bal.items())), "details": det}])
+            lq = self.lead_qty()
+            det = []
+            for c in sorted(set(self.bal) | set(lq)):
+                if q.get("ccy") and q["ccy"] != c:
+                    continue
+                v, L = self.bal.get(c, 0.0), lq.get(c, 0.0)
+                if c not in self.bal and not self.iso_in_eq and not self.iso_field:
+                    continue                                    # a coin held only as lead positions may be absent from the balance
+                e_ = v + L if self.iso_in_eq else v
+                d = {"ccy": c, "eq": str(e_), "availBal": str(v), "cashBal": str(e_), "eqUsd": str(e_ * (self.px.get(c) or 1.0))}
+                if self.iso_field:
+                    d["spotIsoBal"] = str(L)
+                det.append(d)
+            return ok([{"totalEq": str(sum(v * (self.px.get(c) or 1.0) for c, v in self.bal.items())
+                                       + sum(v * (self.px.get(c) or 1.0) for c, v in lq.items())), "details": det}])
         if path == "/api/v5/asset/balances":
             return ok([{"ccy": c, "bal": str(v)} for c, v in self.funding.items()])
         if path == "/api/v5/finance/savings/balance":
             return ok([])
         if path == "/api/v5/account/config":
             return ok([{"perm": self.perm, "ip": "203.0.113.7", "acctLv": self.acct_lv, "posMode": self.pos_mode, "roleType": self.role,
-                        "traderInsts": self.lead_insts}])
+                        "traderInsts": self.lead_insts, "spotRoleType": self.spot_role, "spotTraderInsts": sorted(self.spot_enabled)}])
+        if path == "/api/v5/copytrading/config":
+            return ok([{"uniqueCode": self.unique_code, "nickName": "test", "portLink": "", "details": [
+                {"instType": "SPOT", "roleType": self.spot_role, "copyTraderNum": str(self.copiers), "maxCopyTraderNum": "100",
+                 "profitSharingRatio": "0.1"},
+                {"instType": "SWAP", "roleType": self.role, "copyTraderNum": "0", "maxCopyTraderNum": "100", "profitSharingRatio": "0.1"}]}])
+        if path == "/api/v5/copytrading/instruments":
+            if q.get("instType") != "SPOT":
+                return ok([{"instId": i, "enabled": True} for i in self.lead_insts])
+            return ok([{"instId": i, "enabled": i in self.spot_enabled} for i in sorted(self.spot_supported)])
+        if path == "/api/v5/copytrading/set-instruments":
+            self.set_calls.append(b)
+            want = [x for x in b["instId"].split(",") if x]
+            bad = [i for i in want if i in self.set_reject or i not in self.spot_supported]
+            held = {s_["instId"] for s_ in self.lead_subs}
+            if b.get("instType") != "SPOT" or bad or not want or held - set(want):
+                return {"code": "59255", "msg": f"made-up refusal {bad or sorted(held - set(want))}", "data": []}
+            self.spot_enabled = set(want)
+            return ok([{"instId": i, "enabled": True} for i in want])
         if path == "/api/v5/market/tickers":
             return ok([{"instId": f"{c}-{'USDC' if c in self.usdc_only else self.quote}", "last": str(p), "open24h": str(p)}
                        for c, p in self.px.items() if c != self.quote])
@@ -145,6 +193,30 @@ class FakeOkx:
                                        "ordType": "oco" if a.get("tpTriggerPx") else "conditional", "sz": str(filled),
                                        "slTriggerPx": a.get("slTriggerPx"), "tpTriggerPx": a.get("tpTriggerPx", ""),
                                        "slTriggerPxType": a.get("slTriggerPxType"), "closeFraction": ""})
+            elif b.get("tdMode") == "spot_isolated":
+                base, quote = inst.split("-")
+                if self.spot_role != "1" or inst not in self.spot_enabled or (b["side"] == "sell" and self.lead_sell_reject):
+                    self.orders.pop()
+                    return {"code": "1", "msg": "", "data": [{"sCode": "59263", "sMsg": "made-up: not a lead instrument / lead sell refused"}]}
+                if b["side"] == "buy":
+                    if self.strict and filled * float(b["px"]) > self.bal.get(quote, 0.0) + 1e-9:
+                        self.orders.pop()
+                        return {"code": "1", "msg": "", "data": [{"sCode": "51008", "sMsg": "Order failed. Insufficient balance"}]}
+                    self.bal[quote] = self.bal.get(quote, 0) - filled * float(b["px"])
+                    self.n += 1
+                    self.lead_subs.append({"subPosId": f"sp{self.n}", "instId": inst, "subPos": filled, "openAvgPx": float(b["px"])})
+                else:
+                    have = sum(x["subPos"] for x in self.lead_subs if x["instId"] == inst)
+                    if filled > have + 1e-9:
+                        self.orders.pop()
+                        return {"code": "1", "msg": "", "data": [{"sCode": "51008", "sMsg": "Insufficient lead position"}]}
+                    left = filled
+                    for x in self.lead_subs:                    # oldest lead position first
+                        if x["instId"] == inst and left > 0:
+                            t = min(left, x["subPos"])
+                            x["subPos"], left = x["subPos"] - t, left - t
+                    self.lead_subs = [x for x in self.lead_subs if x["subPos"] > 1e-12]
+                    self.bal[quote] = self.bal.get(quote, 0) + filled * float(b["px"])
             else:
                 base, quote = inst.split("-")
                 cost = filled * float(b["px"])
@@ -204,6 +276,18 @@ class FakeOkx:
             self.cancels += b
             self.algos = [a for a in self.algos if a["algoId"] not in ids]
             return ok([{"sCode": "0"}])
+        if path == "/api/v5/copytrading/current-subpositions" and q.get("instType") == "SPOT":
+            return ok([{"subPosId": x["subPosId"], "instId": x["instId"], "instType": "SPOT", "subPos": str(x["subPos"]),
+                        "availSubPos": str(x["subPos"]), "openAvgPx": str(x["openAvgPx"])}
+                       for x in self.lead_subs if not q.get("instId") or x["instId"] == q["instId"]])
+        if path == "/api/v5/copytrading/close-subposition" and b.get("instType") == "SPOT":
+            self.lead_calls.append(("close", b))
+            x = next((x for x in self.lead_subs if x["subPosId"] == b["subPosId"]), None)
+            if x:
+                self.lead_subs.remove(x)
+                base, quote = x["instId"].split("-")
+                self.bal[quote] = self.bal.get(quote, 0) + x["subPos"] * float(b.get("px") or self.px[base])
+            return ok([{"subPosId": b["subPosId"], "tag": ""}])
         if path == "/api/v5/copytrading/current-subpositions":
             i = q.get("instId")
             return ok([{"subPosId": f"s-{i}", "instId": i, "subPos": str(abs(self.pos[i])),

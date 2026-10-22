@@ -9,7 +9,9 @@ source and every request. The autopilot's own facts (its targets, its «совп
 coins, the start) come from its local state files and log — no network for those.
 
 Requests (all GET): /api/v5/account/balance, /api/v5/asset/balances, /api/v5/finance/savings/balance, /api/v5/market/tickers,
-/api/v5/account/config, /api/v5/account/positions (SWAP), /api/v5/trade/orders-algo-pending (SWAP stops and targets).
+/api/v5/account/config, /api/v5/account/positions (SWAP), /api/v5/trade/orders-algo-pending (SWAP stops and targets), and for a
+lead trader (okx_lead.py) /api/v5/copytrading/config, /api/v5/copytrading/instruments, /api/v5/copytrading/current-subpositions —
+the lead spot positions are counted like ordinary coins; «lead» = the role line, the copiers and the public profile link.
 «Результат с начала»: the start is the autopilot's first live run — its state (first_live) or its log (the first live «plan»
 event in data/okx_autopilot.jsonl), whichever is earlier; else OKX_START_USD / OKX_START_AT; else $10 000.
 Without OKX_API_* → None: the card works exactly as before. Not financial advice. Stdlib only."""
@@ -23,11 +25,12 @@ import time
 from . import myspot_watch as ms
 from . import okx_alloc as al
 from . import okx_autopilot as ap
+from . import okx_lead as ld
 
 START_USD = 10_000.0
 LIVE_MODE = "РЕАЛЬНЫЕ ДЕНЬГИ"
 READS = ("/api/v5/account/balance", "/api/v5/asset/balances", "/api/v5/finance/savings/balance", "/api/v5/market/tickers",
-         "/api/v5/account/config", "/api/v5/account/positions", "/api/v5/trade/orders-algo-pending")
+         "/api/v5/account/config", "/api/v5/account/positions", "/api/v5/trade/orders-algo-pending") + ld.READS
 
 
 def _env(env=None) -> dict:
@@ -202,6 +205,12 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
     try:
         host, bal = ms.probe(fetch, st.get("host"))
         raw = ms.read_raw(fetch, host, bal)
+        lctx = ld.context(lambda p, q=None: ms._call(fetch, host, p, q), raw.get("cfg") or {}, env, raw)
+        if lctx.get("err"):
+            raise RuntimeError(f"лидерские спот-позиции не прочитались: {lctx['err']}")
+        if lctx.get("fresh") and lctx["held"]:
+            raw["trading"] = ld.merge(raw.get("trading") or [], lctx["held"])
+        out["lead"] = ld.card(lctx)
         pos = _positions(fetch, host)
         algos = _algos(fetch, host) if pos else []
     except Exception as e:  # noqa: BLE001

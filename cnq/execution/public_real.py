@@ -9,7 +9,9 @@ every 15 minutes. The owner's personal (main) account never goes there: this mod
             "fut_reserve_usd", "active_coins_usd", "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct"},
    "futures": [{"inst", "side": "long" | "short", "entry", "stop", "target", "upnl_pct" (price move, %), "upnl_usd"}],
    "closed_n" (futures positions closed since the start, OKX's own history), "curve": [[ms, $ result since the start]] (≤ 1 point
-   per 15 min, compact), "asof": ms, "stale": bool}
+   per 15 min, compact), "asof": ms, "stale": bool,
+   "copiers": how many people copy the account on OKX (lead trader; null otherwise), "copy_url": the lead trader's public OKX
+   profile https://www.okx.com/copy-trading/account/{uniqueCode} (public by design; null when not a lead trader)}
 USDT = trading + funding (no Earn: the account is the system 1:1). No key, IP, UID or order id is ever written. No fake numbers:
 when the autopilot is not running (no live holder of its lease, or the global stop) the numbers are real but "stale": true; when
 the account can not be read, the last published numbers stay, with "stale": true and their old asof (readers also treat an asof
@@ -30,7 +32,7 @@ from . import myspot_watch as ms
 
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
-        "alloc", "futures", "closed_n", "curve", "asof", "stale")
+        "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url")
 SPOT_KEYS, FUT_KEYS = ("sym", "share", "usd"), ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd")
 EVERY_S = 15 * 60
 STEP_MS = 15 * 60_000
@@ -150,7 +152,8 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None) -> dict:
             "today_pct": _r(today / (s0 + ref) * 100) if today is not None and (s0 + ref) else None,
             "spot": [{"sym": c, "share": _r(u / eq * 100 if eq else 0.0), "usd": _r(u)} for c, u in sorted(spot.items(), key=lambda x: -x[1])],
             "usdt_pct": _r(cash / eq * 100 if eq else 0.0), "usdt_usd": _r(cash), "alloc": dict(s.get("alloc") or {}), "futures": fut,
-            "closed_n": int(closed_n or 0), "curve": [[int(t), _r(v)] for t, v in curve], "asof": now, "stale": not running(s.get("lease"))}
+            "closed_n": int(closed_n or 0), "curve": [[int(t), _r(v)] for t, v in curve], "asof": now, "stale": not running(s.get("lease")),
+            "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url")}
 
 
 def clean(doc: dict) -> dict:
@@ -161,6 +164,8 @@ def clean(doc: dict) -> dict:
     out["spot"] = [{k: x.get(k) for k in SPOT_KEYS} for x in doc.get("spot") or []]
     out["futures"] = [{k: x.get(k) for k in FUT_KEYS} for x in doc.get("futures") or []]
     out["alloc"] = {k: (doc.get("alloc") or {}).get(k) for k in sub.ALLOC_KEYS}
+    out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
+    out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None
     return out
 
 

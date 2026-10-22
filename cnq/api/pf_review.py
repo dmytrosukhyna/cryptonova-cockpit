@@ -55,7 +55,7 @@ STATUS_LABEL = {
     "small": _L("небольшой суммой", "small amount only", "невеликою сумою", "μόνο μικρό ποσό", "solo poca cantidad"),
     "wait": _L("ждём", "wait", "чекаємо", "αναμονή", "esperar"),
     "avoid": _L("не брать", "avoid", "не брати", "αποφυγή", "evitar"),
-    "cash": _L("кэш", "cash", "кеш", "μετρητά", "efectivo"),
+    "cash": _L("доллары", "dollars", "долари", "δολάρια", "dólares"),
     "unknown": _L("нет оценки", "not rated", "немає оцінки", "χωρίς αξιολόγηση", "sin evaluar"),
 }
 
@@ -360,8 +360,8 @@ TXT = {
     "b_small": _L("Небольшой суммой", "Small amounts", "Невеликою сумою", "Μικρά ποσά", "Poca cantidad"),
     "b_other": _L("«Ждём», «не брать», без оценки", "“Wait”, “avoid”, not rated", "«Чекаємо», «не брати», без оцінки",
                   "«Αναμονή», «αποφυγή», χωρίς αξιολόγηση", "«Esperar», «evitar», sin evaluar"),
-    "b_cash": _L("Кэш (доллары)", "Cash (dollars)", "Кеш (долари)", "Μετρητά (δολάρια)", "Efectivo (dólares)"),
-    "cash_word": _L("кэш", "cash", "кеш", "μετρητά", "efectivo"),
+    "b_cash": _L("Доллары (USDT, USDC)", "Dollars (USDT, USDC)", "Долари (USDT, USDC)", "Δολάρια (USDT, USDC)", "Dólares (USDT, USDC)"),
+    "cash_word": _L("доллары", "dollars", "долари", "δολάρια", "dólares"),
     "model_hold": _L("На ваши {total} портфель CRYPTO NOVA держал бы: {items}.", "With your {total}, the CRYPTO NOVA portfolio would hold: {items}.",
                      "На ваші {total} портфель CRYPTO NOVA тримав би: {items}.", "Με τα {total} σας, το χαρτοφυλάκιο CRYPTO NOVA θα κρατούσε: {items}.",
                      "Con tus {total}, la cartera CRYPTO NOVA tendría: {items}."),

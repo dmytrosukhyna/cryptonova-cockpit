@@ -68,7 +68,7 @@ def test_sub_reader_places_nothing_and_reads_positions_stops_targets_and_targets
     spot = {r["ccy"]: r for r in out["spot"]["rows"]}
     assert set(spot) >= {"BTC", "ETH", "SOL", "AAA", "BBB"} and "XRP" not in spot     # the active coin is not a spot-portfolio coin
     assert abs(spot["BTC"]["target_pct"] - 19.5) < 0.01 and spot["BTC"]["state"] == "ok"
-    assert out["active"]["rows"] == [{"ccy": "XRP", "qty": 50.0, "usd": 100.0}]
+    assert out["active"]["rows"] == [{"ccy": "XRP", "qty": 50.0, "usd": 100.0, "copy": False, "copy_reason": "ordinary", "copy_pct": 0.0}]
     assert out["start"] == {"usd": 10000.0, "t": out["start"]["t"], "src": out["start"]["src"]} and out["start"]["src"] in ("log", "state")
     assert out["result"]["usd"] == round(out["total_usd"] - 10000.0, 2)
     m = out["match"]

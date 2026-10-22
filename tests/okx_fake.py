@@ -300,6 +300,9 @@ class FakeOkx:
                 base, quote = x["instId"].split("-")
                 self.bal[quote] = self.bal.get(quote, 0) + x["subPos"] * float(b.get("px") or self.px[base])
             return ok([{"subPosId": b["subPosId"], "tag": ""}])
+        if path == "/api/v5/copytrading/current-subpositions" and not q.get("instId"):
+            return ok([{"subPosId": f"s-{i}", "instId": i, "subPos": str(abs(self.pos[i]))} for i in sorted(self.pos)
+                       if i in self.swap_lead or not self.track_swap_lead])
         if path == "/api/v5/copytrading/current-subpositions":
             i = q.get("instId")
             return ok([{"subPosId": f"s-{i}", "instId": i, "subPos": str(abs(self.pos[i])),

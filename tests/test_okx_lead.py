@@ -49,7 +49,7 @@ def test_lead_role_buys_copyable_coins_as_lead_sets_the_instruments_and_leaves_t
     assert {o["instId"] for o in fk.lead_subs} == {"BTC-USDT", "ETH-USDT", "AAA-USDT", "BBB-USDT"} and fk.bal["SOL"] > 0
     txt = ap.plan_text(r["plan"], r["mode"])
     assert "ВЕДУЩИЙ ТРЕЙДЕР: спот — да (4 монеты копируются) · фьючерсы — нет · копируют: 3" in txt
-    assert "не копируется (обычные сделки): SOL — OKX не даёт копировать эту монету" in txt
+    assert "SOL: не добавлено в копируемый портфель: OKX не даёт копировать эту монету" in txt
     assert "КУПИТЬ" in txt and "· копируется ·" in txt and "· не копируется ·" in txt
     assert "профиль ведущего трейдера: https://www.okx.com/copy-trading/account/TESTLEAD01" in txt
     # the second pass: the account matches, the instruments are fresh → no new set call, no orders
@@ -133,7 +133,7 @@ def test_a_coin_okx_refuses_as_a_lead_instrument_is_added_one_by_one_and_bought_
     assert r["ok"] and fk.spot_enabled == {"BTC-USDT", "ETH-USDT", "AAA-USDT", "BBB-USDT"}
     by = {o["instId"]: o["tdMode"] for o in spot_orders(fk)}
     assert by["SOL-USDT"] == "cash" and by["BTC-USDT"] == "spot_isolated"
-    assert "SOL — OKX не принял её в лидерские инструменты" in ap.plan_text(r["plan"], r["mode"])
+    assert "SOL: не добавлено в копируемый портфель: OKX не принял её в список ведущего трейдера" in ap.plan_text(r["plan"], r["mode"])
     assert ap.load_state(live(tmp))["lead_fail"].keys() == {"SOL-USDT"}
 
 
@@ -147,7 +147,8 @@ def test_usdc_route_coin_is_not_copied():
     fk = fake(spot_role="1", usdc_only=("UUU",))
     r = ap.run_once(live(tmp), fk, pf, NOW, F.nosleep)
     assert r["ok"] and all(o["tdMode"] == "cash" for o in spot_orders(fk) if o["instId"] in ("UUU-USDC", "USDC-USDT"))
-    assert "UUU — через USDC — OKX копирует только пары к USDT" in ap.plan_text(r["plan"], r["mode"])
+    assert ("UUU: не добавлено в копируемый портфель: OKX копирует только пары к USDT, а у этой монеты есть только пара к USDC"
+            in ap.plan_text(r["plan"], r["mode"]))
 
 
 def test_coins_bought_before_the_switch_stay_and_the_plan_names_them_and_migrate_only_plans():
@@ -314,3 +315,32 @@ def test_impulse_on_a_coin_okx_does_not_copy_or_without_the_lead_role_stays_ordi
         assert fk.orders[-1]["tdMode"] == "cash" and not fk.set_calls and "lead" not in ac.load_state(e)["trades"]["I1"]
         ac.step(e, desk={"equity": 10000.0, "open": []}, now=NOW + 60_000, sleep=F.nosleep, cl=cl)
         assert fk.orders[-1]["side"] == "sell" and fk.orders[-1]["tdMode"] == "cash" and ac.held(e) == {}
+
+
+def test_public_real_marks_each_coin_and_position_copied_or_why_not_and_splits_the_result():
+    e = live(tempfile.mkdtemp())
+    fk = fake(spot_role="1", role="1", copiers=2, usdc_only=("UUU",), spot_supported={"BTC-USDT", "ETH-USDT"},
+              spot_enabled={"BTC-USDT", "ETH-USDT"}, lead_insts=["SOL-USDT-SWAP"],
+              balances={"USDT": 5000.0, "ETH": 0.5, "XRP": 100.0, "UUU": 25.0},
+              lead_subs=[{"subPosId": "s1", "instId": "BTC-USDT", "subPos": 0.01, "openAvgPx": 100000.0}],
+              hist=[{"instId": "APT-USDT-SWAP", "uTime": str(NOW + 1000), "realizedPnl": "-4.5"}])
+    fu.step(e, desks=F.desks(F.trade(), F.trade("T2", "APT", entry=1.0, stop=0.95, tp=1.2)), now=NOW, sleep=F.nosleep,
+            cl=ap.connect(e, fk, {}, F.nosleep))
+    fk.swap_lead.discard("APT-USDT-SWAP")                                   # APT: an ordinary position (e.g. refused as lead)
+
+    def fetch(host, path, params=None, signed=True):
+        import urllib.parse
+        assert path in sub.READS + (PR.HISTORY,), path
+        q = ("?" + urllib.parse.urlencode(params)) if params else ""
+        return fk("GET", host + path + q, {"OK-ACCESS-KEY": "x"} if signed else {}, None)
+    s = sub.read(e, fetch, NOW + 2000)
+    doc = PR.clean(PR.build(s, {}, NOW + 2000, *PR.closed_stats(fetch, "https://" + s["host"], NOW)))
+    spot = {x["sym"]: x for x in doc["spot"]}
+    assert spot["BTC"]["copy"] is True and spot["BTC"]["copy_reason"] is None
+    assert spot["ETH"]["copy"] is False and spot["ETH"]["copy_reason"] == "legacy"
+    assert spot["XRP"]["copy_reason"] == "not_supported" and spot["UUU"]["copy_reason"] == "usdc_only"
+    fut = {x["inst"]: x for x in doc["futures"]}
+    assert fut["SOL-USDT-SWAP"]["copy"] is True and fut["APT-USDT-SWAP"] == {**fut["APT-USDT-SWAP"], "copy": False, "copy_reason": "ordinary"}
+    upl = sum(p["upl"] or 0.0 for p in s["futures"]["positions"])
+    assert doc["fut_pnl_usd"] == round(-4.5 + upl, 2) and abs(doc["spot_pnl_usd"] + doc["fut_pnl_usd"] - doc["pnl_usd"]) < 0.02
+    assert ld.coin_copy("ZZZ", {"role": {"spot": False}, "off": False, "supported": set(), "held": {}}, 1.0, set())["copy_reason"] == "ordinary"

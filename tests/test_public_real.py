@@ -118,9 +118,9 @@ def test_app_home_public_real_in_every_language_and_stale_by_age(tmp_path):
         json.dump(real, f)
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
     r = doc["public"]["real"]
-    assert list(r) == list(app_home.REAL_KEYS) and r["equity_usd"] == 10012.5 and not r["stale"]
+    assert list(r) == list(app_home.REAL_KEYS) + list(app_home.REAL_OPT) and r["equity_usd"] == 10012.5 and not r["stale"]
     assert list(r["alloc"]) == list(app_home.REAL_ALLOC) and r["alloc"]["fut_margin_usd"] == 300.0
-    assert r["spot"] == [{"sym": "BTC", "share": 19.5, "usd": 1952.4}] and "ordId" not in r["futures"][0] and "host" not in r
+    assert r["spot"] == [{"sym": "BTC", "share": 19.5, "usd": 1952.4, "copy": None, "copy_reason": None, "copy_pct": None}] and "ordId" not in r["futures"][0] and "host" not in r
     for lang in ("en", "uk", "el", "es"):
         other = json.load(open(os.path.join(d, f"app_home.{lang}.json"), encoding="utf-8"))["public"]["real"]
         assert other == r, lang

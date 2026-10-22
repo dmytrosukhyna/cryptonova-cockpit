@@ -233,14 +233,59 @@ def sync(cl, ctx: dict, desired: set, st: dict, now: int, log=None) -> set:
     return en
 
 
+# Why a coin / a position is not copied — one code, one plain sentence (the plan, the card, public_real.json, the app)
+REASON_RU = {
+    "usdc_only": "не добавлено в копируемый портфель: OKX копирует только пары к USDT, а у этой монеты есть только пара к USDC",
+    "not_supported": "не добавлено в копируемый портфель: OKX не даёт копировать эту монету",
+    "legacy": "не добавлено в копируемый портфель: монета куплена до включения режима ведущего трейдера — это обычный спот",
+    "ordinary": "не добавлено в копируемый портфель: OKX не принял её в список ведущего трейдера — это обычная сделка",
+}
+
+
+def reason_text(code: str | None, detail: str | None = None) -> str:
+    t = REASON_RU.get(code or "", "")
+    return t + (f" (ответ OKX: {detail})" if t and detail else "")
+
+
 def _why_not(c: str, via, inst: str, ctx: dict, en: set) -> str | None:
+    """The plan's decision for a portfolio coin: None = copied, else a REASON_RU code."""
     if via:
-        return "через USDC — OKX копирует только пары к USDT"
+        return "usdc_only"
     if inst in en:
         return None
     if inst not in ctx["supported"]:
-        return "OKX не даёт копировать эту монету"
-    return "OKX не принял её в лидерские инструменты" + (f": {ctx['fails'][inst]}" if inst in ctx["fails"] else "")
+        return "not_supported"
+    return "ordinary"
+
+
+def coin_copy(c: str, ctx: dict, qty: float, pairs: set, quote: str = "USDT") -> dict:
+    """One held spot coin for the card / public_real: {"copy", "copy_reason", "copy_pct"} — copied = held as lead positions
+    (the whole coin; copy_pct = the lead share of it, %). The same codes as the plan (_why_not) + «legacy» for coins held normally."""
+    r = ctx["role"]
+    L = ((ctx.get("held") or {}).get(c) or {}).get("qty", 0.0) if r["spot"] else 0.0
+    pct = round(min(100.0, L / qty * 100), 1) if qty else 0.0
+    inst = f"{c}-{quote}"
+    if L > 0 and L >= qty * 0.99:
+        return {"copy": True, "copy_reason": None, "copy_pct": 100.0}
+    if inst not in pairs and f"{c}-USDC" in pairs:
+        code = "usdc_only"
+    elif not r["spot"] or ctx["off"]:
+        code = "ordinary"
+    elif ctx["supported"] and inst not in ctx["supported"]:
+        code = "not_supported"
+    elif inst in ctx.get("fails", {}):
+        code = "ordinary"
+    else:
+        code = "legacy"
+    return {"copy": False, "copy_reason": code, "copy_pct": pct}
+
+
+def swap_copy(inst: str, fut_lead: bool, lead_swaps: set | None) -> dict:
+    """One futures position: copied = it has lead sub-positions; otherwise «ordinary». lead_swaps None = unreadable."""
+    if fut_lead and lead_swaps is None:
+        return {"copy": None, "copy_reason": None}
+    ok = bool(fut_lead and inst in lead_swaps)
+    return {"copy": ok, "copy_reason": None if ok else "ordinary"}
 
 
 def mark(b: dict, ctx: dict, en: set | None = None) -> dict:
@@ -285,7 +330,7 @@ def mark(b: dict, ctx: dict, en: set | None = None) -> dict:
     b["lead"] = {"active": act, "spot": ctx["role"]["spot"], "fut": ctx["role"]["fut"], "off": ctx["off"], "copied": copied,
                  "not_copied": nc, "legacy": legacy, "legacy_usd": round(sum(q * (px.get(c) or 0) for c, q in legacy.items()), 2),
                  "lead_qty": {c: round(h["qty"], 8) for c, h in (ctx.get("held") or {}).items()}, "copiers": ctx["role"]["copiers"],
-                 "url": ctx["role"].get("url"), "err": ctx.get("err")}
+                 "url": ctx["role"].get("url"), "err": ctx.get("err"), "fails": dict(ctx.get("fails") or {})}
     return b
 
 
@@ -329,8 +374,8 @@ def plan_lines(b: dict) -> list[str]:
     if ld.get("active"):
         if ld.get("copied"):
             L.append("  копируются (ордера «spot_isolated»): " + ", ".join(ld["copied"]))
-        if ld.get("not_copied"):
-            L.append("  не копируется (обычные сделки): " + "; ".join(f"{c} — {w}" for c, w in ld["not_copied"].items()))
+        for c, w in (ld.get("not_copied") or {}).items():
+            L.append(f"  {c}: " + reason_text(w, (ld.get("fails") or {}).get(f"{c}-USDT") if w == "ordinary" else None))
         if ld.get("legacy"):
             L.append("  не лидерские (куплены до включения — обычный спот, копировщики их не получают): "
                      + ", ".join(f"{c} {q:g}" for c, q in ld["legacy"].items()) + f" ≈ {_usd(ld.get('legacy_usd') or 0)}. "

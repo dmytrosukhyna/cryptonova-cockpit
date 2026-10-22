@@ -874,6 +874,7 @@ REAL_KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct
 REAL_ALLOC = ("spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_usd", "fut_reserve_usd", "active_coins_usd",
               "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct")
 REAL_STALE_MS = 2 * 3_600_000
+REAL_OPT = ("copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd")       # 22.10 (build 45): null in a file from before
 
 
 def _public_real(out: str, now: int) -> dict | None:
@@ -887,8 +888,9 @@ def _public_real(out: str, now: int) -> dict | None:
     if not set(REAL_KEYS) <= set(d) or not d.get("asof"):
         return None
     r = {k: d[k] for k in REAL_KEYS}
-    r["spot"] = [{k: x.get(k) for k in ("sym", "share", "usd")} for x in d.get("spot") or [] if isinstance(x, dict)]
-    r["futures"] = [{k: x.get(k) for k in ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd")}
+    r.update({k: d.get(k) for k in REAL_OPT})
+    r["spot"] = [{k: x.get(k) for k in ("sym", "share", "usd", "copy", "copy_reason", "copy_pct")} for x in d.get("spot") or [] if isinstance(x, dict)]
+    r["futures"] = [{k: x.get(k) for k in ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason")}
                     for x in d.get("futures") or [] if isinstance(x, dict)]
     r["alloc"] = {k: d["alloc"].get(k) for k in REAL_ALLOC} if isinstance(d.get("alloc"), dict) else None
     r["stale"] = bool(d.get("stale")) or now - int(d["asof"]) > REAL_STALE_MS

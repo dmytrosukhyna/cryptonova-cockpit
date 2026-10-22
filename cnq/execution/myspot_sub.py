@@ -212,6 +212,12 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
             raw["trading"] = ld.merge(raw.get("trading") or [], lctx["held"])
         out["lead"] = ld.card(lctx)
         pos = _positions(fetch, host)
+        lead_swaps = set()                       # futures positions with lead sub-positions (copied); None = unreadable
+        if lctx["role"]["fut"] and pos:
+            try:
+                lead_swaps = {str(x.get("instId")) for x in ms._call(fetch, host, ld.SUBS, {"instType": "SWAP"}) or []}
+            except ms.OkxError:
+                lead_swaps = None
         algos = _algos(fetch, host) if pos else []
     except Exception as e:  # noqa: BLE001
         out["error"] = ap.describe_error(e).replace("Автопилот OKX: ", "")
@@ -224,13 +230,17 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
     targets = {str(r.get("ccy")): float(r.get("target_pct") or 0) for r in st.get("targets") or [] if r.get("ccy")}
     band = max(ap.MIN_ORDER, ap.BAND * total)
     px = {r["ccy"]: r.get("px") for r in rows}
+    # 22.10 (build 45): copied or not, and why — okx_lead's own codes (usdc_only / not_supported / legacy / ordinary), per coin
+    pairs = {str(t.get("instId") or "") for t in raw.get("tickers") or []}
+    cp = {r["ccy"]: ld.coin_copy(r["ccy"], lctx, r["qty"], pairs) for r in rows if not r["cash"]}
+    nocp = {"copy": False, "copy_reason": "ordinary", "copy_pct": 0.0}
 
     def spot_row(ccy, qty, usd_, where=None):
         t = targets.get(ccy, 0.0)
         gap = round(t / 100 * total - usd_, 2)
         state = ("keep" if ccy in keep else "ok" if abs(gap) < band else "out" if not t else "under" if gap > 0 else "over")
         return {"ccy": ccy, "qty": qty, "usd": round(usd_, 2), "now_pct": round(usd_ / total * 100, 2) if total else 0.0,
-                "target_pct": round(t, 2), "gap_usd": gap, "state": state, "where": where or []}
+                "target_pct": round(t, 2), "gap_usd": gap, "state": state, "where": where or [], **cp.get(ccy, nocp)}
 
     spot, seen = [], set()
     for r in rows:
@@ -244,12 +254,12 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
         seen.add(r["ccy"])
     spot += [spot_row(c, 0.0, 0.0) for c in targets if c not in seen]
     spot.sort(key=lambda x: -max(x["usd"], x["target_pct"] / 100 * total))
-    active = [{"ccy": c, "qty": q, "usd": round(q * (px.get(c) or 0.0), 2) if px.get(c) else None} for c, q in act.items()]
+    active = [{"ccy": c, "qty": q, "usd": round(q * (px.get(c) or 0.0), 2) if px.get(c) else None, **cp.get(c, nocp)} for c, q in act.items()]
     ours = {m.get("inst") for m in (fst.get("trades") or {}).values()}
     futures = []
     for p in pos:
         sl, tp = _stop_tp(algos, p["inst"], p["side"] == "LONG")
-        futures.append({**p, "stop": sl, "tp": tp, "ours": p["inst"] in ours})
+        futures.append({**p, "stop": sl, "tp": tp, "ours": p["inst"] in ours, **ld.swap_copy(p["inst"], lctx["role"]["fut"], lead_swaps)})
     quote = (st.get("last") or {}).get("quote") or "USDT"
     free = next((ms._f(d.get("availBal")) for d in raw.get("trading") or [] if str(d.get("ccy")) == quote), None)
     cash = [{"ccy": r["ccy"], "usd": r["usd"]} for r in rows if r["cash"]]

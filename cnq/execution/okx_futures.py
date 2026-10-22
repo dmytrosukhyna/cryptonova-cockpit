@@ -5,7 +5,7 @@ target events the Bybit demo mirror follows (web/paper.json; cnq/execution/mirro
 ONE $10 000 account (their average), so each desk gets an equal part of the budget.
 
 What it does, once a minute inside the autopilot window (okx_autopilot --loop) and once on --run:
-  • a NEW desk trade (opened ≤ 45 min ago, after this part started) → a USDT-margined perpetual swap (instType SWAP,
+  • a desk trade → a USDT-margined perpetual swap (instType SWAP,
     <COIN>-USDT-SWAP), isolated margin, a limit IOC entry at most OKX_SLIP (0.4 %) worse than the best price, with a stop-loss
     (and the desk's final target) ATTACHED to the order (attachAlgoOrds, trigger on the last price — what a lead trader needs);
     the stop is then checked on OKX: missing or wrong → amended or placed again for the whole position; if that fails too, the
@@ -13,7 +13,10 @@ What it does, once a minute inside the autopilot window (okx_autopilot --loop) a
   • a moved desk stop / target → the OKX stop / target amended; a partial desk exit (qty_left) → a reduce-only partial close;
   • a trade the desk closed → a reduce-only market close of the whole position and its stop orders cancelled;
   • a position closed by OKX itself (stop or target hit) → forgotten.
-Positions opened before this part started are not chased (the same rule as the Bybit mirror).
+Late-join guard (22.10 review): a desk trade is mirrored only if it was opened after the autopilot's first live start (and is ≤ 45
+min old), OR the price now is at most OKX_FUT_JOIN_GAP (0.3 %) worse than the desk's entry; otherwise it is skipped («пропущено:
+сделка открыта раньше, цена ушла на X% от входа системы») and looked at again a minute later. The size always comes from the worst
+price the entry may fill at vs the desk's stop, so the risk stays ≤ 0.5 % of the budget whatever the fill.
 
 Size: the desk's own risk (risk_usd ÷ desk equity) applied to the desk's part of the FUTURES BUDGET = OKX_FUT_SHARE (0.25) of the
 account (okx_alloc.shares). Hard caps (env can only make them stricter):
@@ -47,6 +50,7 @@ from . import okx_autopilot as ap
 
 LOG = "data/okx_futures.jsonl"
 FRESH_MS = 45 * 60_000
+JOIN_GAP = 0.003            # a trade opened before the start is joined only while the price is ≤ 0.3 % worse than the desk's entry
 MAX_LEV, DEF_LEV = 3, 2
 RISK_CAP = 0.005            # 0.5 % of the futures budget per trade
 MAX_POS = 5
@@ -89,6 +93,19 @@ def caps(env=None) -> dict:
             "risk": min(RISK_CAP, _num(e, "OKX_FUT_RISK", RISK_CAP)),
             "max_pos": max(1, min(MAX_POS, int(_num(e, "OKX_FUT_MAX_POS", MAX_POS)))),
             "day_loss": min(DAY_LOSS, _num(e, "OKX_FUT_DAY_LOSS", DAY_LOSS))}
+
+
+def join_gap(env=None) -> float:
+    try:
+        v = float((_env(env).get("OKX_FUT_JOIN_GAP") or JOIN_GAP))
+        return v if 0 <= v <= 0.02 else JOIN_GAP
+    except ValueError:
+        return JOIN_GAP
+
+
+def start_key(cl: ap.Okx, env=None) -> str:
+    """The first LIVE start counts for the real account; the first start for the demo one."""
+    return "first_live" if ap.live(env) and not cl.demo else "started"
 
 
 def lead_forced(env=None) -> bool:
@@ -535,12 +552,24 @@ def want_map(desks: list) -> dict:
     return out
 
 
-def is_fresh(t: dict, started: int, now: int) -> bool:
+def late(t: dict, px: float, mult: float, start: int, now: int, gap: float) -> str | None:
+    """None when the trade may be joined now; otherwise why not. New = opened after the start and ≤ 45 min ago; an older one only
+    while the price is at most `gap` worse than the desk's entry (higher for a long, lower for a short)."""
     o = int(t.get("opened") or 0)
-    return now - o <= FRESH_MS and o >= started - FRESH_MS
+    if o >= start and now - o <= FRESH_MS:
+        return None
+    entry = float(t["entry"]) / mult
+    away = (px / entry - 1) if t.get("side") == "LONG" else (1 - px / entry)
+    if away <= gap:
+        return None
+    x = f"{away * 100:.2f}".replace(".", ",")
+    if o < start:
+        return f"пропущено: сделка открыта раньше, цена ушла на {x}% от входа системы (порог {gap * 100:g}%)".replace(".", ",")
+    return f"пропущено: сигнал открыт {(now - o) / 60_000:.0f} мин назад, цена ушла на {x}% от входа системы".replace(".", ",")
 
 
-def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict, pos: dict, avail: float, slip: float) -> dict:
+def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict, pos: dict, avail: float, slip: float,
+           start: int = 0, now: int = 0, gap: float = JOIN_GAP) -> dict:
     """Everything about one new desk trade: the order it gets or why it gets none ({"skip", "final"}). Used by step() AND by the
     plan, so the plan shows exactly what the window would place."""
     inst_id, mult = inst_of(str(t["symbol"]))
@@ -562,6 +591,9 @@ def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict
         return {**base, "skip": "нет цены на OKX", "final": False}
     if abs(px * mult / float(t["entry"]) - 1) > PX_TOL:
         return {**base, "skip": f"цена {inst_id} отличается от входа сигнала больше чем на 15% — возможно, другой токен", "final": True}
+    why = late(t, px, mult, start, now or int(time.time() * 1000), gap)
+    if why:
+        return {**base, "skip": why, "final": False, "late": True}
     sz = size(t, desk_eq, part, bud, cap, inst, px, mult, sum(p["notional"] for p in pos.values()), avail, slip)
     if sz.get("skip"):
         return {**base, "skip": sz["skip"], "final": True}
@@ -595,6 +627,8 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             save_state(st, env)
         return res
     st.pop("last_refusal", None)
+    st.setdefault(start_key(cl, env), now)
+    start = int(st[start_key(cl, env)])
     ctx = Ctx(cl, cfg, env)
     ds = desks if desks is not None else fetch_desks(env)
     want = want_map(ds)
@@ -678,8 +712,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     # 3. new desk trades
     for k in ("skip", "tries", "done"):
         st[k] = {x: v for x, v in st[k].items() if x in want}
-    fresh = [(tid, w) for tid, w in want.items() if tid not in st["trades"] and tid not in st["skip"] and tid not in st["done"]
-             and is_fresh(w[0], int(st["started"]), now)]
+    fresh = [(tid, w) for tid, w in want.items() if tid not in st["trades"] and tid not in st["skip"] and tid not in st["done"]]
     if fresh:
         cap = caps(env)
         day = time.strftime("%Y-%m-%d", time.gmtime(now / 1000))
@@ -697,7 +730,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
         avail = ctx.avail_usdt() if fresh else 0.0
         part = bud["usd"] / max(1, len(ds))
         for tid, (t, deq, dk) in sorted(fresh, key=lambda x: int(x[1][0].get("opened") or 0)):
-            dcs = decide(ctx, t, deq, part, bud["usd"], cap, pos, avail, slip)
+            dcs = decide(ctx, t, deq, part, bud["usd"], cap, pos, avail, slip, start, now, join_gap(env))
             if dcs.get("skip"):
                 res["skipped"].append({"id": tid, "inst": dcs["inst"], "why": dcs["skip"]})
                 if dcs["final"]:
@@ -723,13 +756,15 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
                 if st["tries"][tid] >= MAX_TRIES:
                     st["skip"][tid] = f"цена ушла: IOC-ордер не исполнился {MAX_TRIES} раза"
                 continue
+            real_risk = f["filled"] * float(inst["ctVal"]) * abs((f["avg_px"] or s["worst"]) - s["stop"])
             m = {"inst": inst_id, "sym": str(t["symbol"]), "desk": dk, "side": "LONG" if long else "SHORT", "c0": f["filled"],
                  "stop": s["stop"], "tp": s.get("tp"), "mult": dcs["mult"], "lot": inst["lotSz"], "min": inst["minSz"],
                  "tick": inst["tickSz"], "ct": inst["ctVal"], "opened": now, "lev": s["lev"], "entry": f["avg_px"] or s["px"]}
             st["trades"][tid] = m
             ctx.forget(inst_id)
             log({"ev": "open", "id": tid, "inst": inst_id, "side": m["side"], "sz": f["filled"], "avg_px": f["avg_px"], "stop": s["stop"],
-                 "tp": s.get("tp"), "lev": s["lev"], "risk_usd": s["risk_usd"], "budget": bud["usd"]}, log_path)
+                 "tp": s.get("tp"), "lev": s["lev"], "risk_usd": round(real_risk, 2), "risk_cap": round(bud["usd"] * cap["risk"], 2),
+                 "budget": bud["usd"]}, log_path)
             pos = ctx.positions(fresh=True)
             try:
                 ensure_stop(ctx, m, (pos.get(inst_id) or {}).get("sz") or f["filled"], log_path)
@@ -846,7 +881,7 @@ def plan_lines(cl: ap.Okx, cfg: dict, env=None, desks: list | None = None, now: 
         L.append("  У столов сейчас нет открытых сделок — позиций нет. Новые сигналы окно повторит в течение минуты.")
         return L
     pos = ctx.positions()
-    started = int(st.get("started") or now)
+    start = int(st.get(start_key(cl, env)) or now)          # before the first live run: every open desk trade is «раньше»
     avail = ctx.avail_usdt()
     slip = ap.limits(env)["slip"]
     for tid, (t, deq, dk) in sorted(want.items(), key=lambda x: int(x[1][0].get("opened") or 0)):
@@ -863,12 +898,9 @@ def plan_lines(cl: ap.Okx, cfg: dict, env=None, desks: list | None = None, now: 
         if tid in (st.get("done") or {}):
             L.append(f"{head} → уже закрыт на OKX (стоп или цель) — повторно не открываем")
             continue
-        if not is_fresh(t, started, now):
-            L.append(f"{head} → не догоняем: сигнал старше 45 минут (так же делает зеркало Bybit)")
-            continue
-        dcs = decide(ctx, t, deq, part, b["usd"], cap, pos, avail, slip)
+        dcs = decide(ctx, t, deq, part, b["usd"], cap, pos, avail, slip, start, now, join_gap(env))
         if dcs.get("skip"):
-            L.append(f"{head} → не открываем: {dcs['skip']}")
+            L.append(f"{head} → {dcs['skip'] if dcs.get('late') else 'не открываем: ' + dcs['skip']}")
             continue
         s = dcs["s"]
         L.append(f"{head} → ОРДЕР: {'купить' if long else 'продать'} {s['sz']} контр. {dcs['inst']} ≈ {ap.usd(s['notional'])}, "

@@ -122,11 +122,38 @@ def test_max_five_positions_one_per_instrument_and_old_signals_not_chased():
     e = F.env()
     coins = ["SOL", "APT", "XRP", "LINK", "AVAX", "ADA", "DOT"]
     ts = [F.trade(f"T{i}", c, entry=F.PX[c], stop=F.PX[c] * 0.95, tp=F.PX[c] * 1.2, risk=50.0) for i, c in enumerate(coins)]
-    ts.append(F.trade("TOLD", "BTC", entry=100000.0, stop=95000.0, tp=120000.0, opened=NOW - 3 * 3600_000))
+    ts.append(F.trade("TOLD", "BTC", entry=95000.0, stop=90000.0, tp=120000.0, opened=NOW - 3 * 3600_000))   # price 5 % above
     r = run(fk, e, F.desks(*ts, imp=[F.trade("I1", "SOL", entry=200.0, stop=190.0, opened=NOW - 180_000)]))
     assert r["opened"] == 5 and len(fk.pos) == 5 and "BTC-USDT-SWAP" not in fk.pos
     why = " ".join(x["why"] for x in r["skipped"])
     assert "предел 5" in why and "уже есть позиция" in why
+    assert "пропущено: сделка открыта раньше, цена ушла на 5,37% от входа системы" in why
+
+
+def test_late_join_guard_old_trade_only_near_the_desk_entry_and_risk_from_the_worst_fill():
+    """19.10 AVAX trade at 9.772 while the price is 9.86 now (+0.9 %): skipped; at 9.79 (+0.2 % with the ask) it is joined."""
+    F.PX["AVAX"] = 9.86
+    try:
+        fk = F.FakeOkx()
+        e = F.env(CNQ_LIVE_TRADING="yes")
+        fk.demo_key = False
+        old = F.trade("AV", "AVAX", entry=9.772, stop=9.2, tp=11.0, risk=100.0, opened=NOW - 3 * 86_400_000)
+        cl = ap.connect(e, fk, {}, F.nosleep)
+        text = "\n".join(fu.plan_lines(cl, cl.config(), e, F.desks(old), NOW))
+        assert "пропущено: сделка открыта раньше, цена ушла на 1,00% от входа системы (порог 0,3%)" in text and not fk.orders
+        r = fu.step(e, desks=F.desks(old), now=NOW, sleep=F.nosleep, cl=cl)
+        assert r["opened"] == 0 and "цена ушла" in r["skipped"][0]["why"] and fu.load_state(e)["first_live"] == NOW
+        F.PX["AVAX"] = 9.775                                                     # back to the desk's entry (ask +0.13 %)
+        r = fu.step(e, desks=F.desks(old), now=NOW + 60_000, sleep=F.nosleep, cl=cl)
+        assert r["opened"] == 1
+        o = swap_orders(fk)[0]
+        assert float(o["sz"]) * (float(o["px"]) - 9.2) <= 2500 * 0.005 + 1e-6   # risk from the worst possible fill vs the desk stop
+        new = F.trade("NW", "SOL", entry=195.0, stop=185.0, tp=230.0, opened=NOW + 90_000)   # opened after the first live start
+        r = fu.step(e, desks=F.desks(old, new), now=NOW + 120_000, sleep=F.nosleep, cl=cl)
+        assert r["opened"] == 1                                                  # new signal: joined though the price is 2.7 % away
+        assert fu.join_gap({"OKX_FUT_JOIN_GAP": "0.01"}) == 0.01 and fu.join_gap({"OKX_FUT_JOIN_GAP": "0.5"}) == fu.JOIN_GAP
+    finally:
+        F.PX["AVAX"] = 30.0
 
 
 def test_daily_loss_stop_blocks_new_entries_for_the_day():

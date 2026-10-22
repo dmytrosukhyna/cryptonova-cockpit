@@ -67,13 +67,13 @@ def test_targets_equal_spot_share_times_portfolio_weights_and_never_guess_a_tick
 def test_plan_prints_every_order_futures_sizes_and_the_match_and_places_nothing():
     e = F.env()
     fk = live_fake(demo_key=True)
-    d = F.desks(F.trade(), F.trade("T2", "BTC", "SHORT", 100000.0, 102000.0, 90000.0), F.trade("T3", "APT", entry=1.0, stop=0.9, tp=1.3,
+    d = F.desks(F.trade(), F.trade("T2", "BTC", "SHORT", 100000.0, 102000.0, 90000.0), F.trade("T3", "APT", entry=0.95, stop=0.9, tp=1.3,
                                                                                                 opened=NOW - 5 * 3600_000))
     text, go = ap.plan_all(e, fk, PF, d, {"equity": 10000.0, "open": []}, NOW)
     assert go and not fk.orders and not fk.levers
     for s in ("ДЕЛЕНИЕ СЧЁТА", "Спот · CRYPTO NOVA портфель: 65%", "Фьючерсы · CRYPTO NOVA (отобранные сигналы): 25%", "Импульс BTC: 10%",
               "ПРОДАТЬ 5000 DOGE", "КУПИТЬ", "почему:", "ждёт сигнала", "ОРДЕР: купить", "SOL-USDT-SWAP", "стоп-лосс 190", "ОРДЕР: продать",
-              "BTC-USDT-SWAP", "не догоняем", "СОВПАДАЕТ С СИСТЕМОЙ CRYPTO NOVA: НЕТ", "ZZZ"):
+              "BTC-USDT-SWAP", "пропущено: сделка открыта раньше, цена ушла на 5,37%", "СОВПАДАЕТ С СИСТЕМОЙ CRYPTO NOVA: НЕТ", "ZZZ"):
         assert s in text, s
     text, go = ap.plan_all(F.env(), live_fake(), PF, d, {"open": []}, NOW)    # a real key, plan without --live (the usual way)
     assert go and "РЕАЛЬНЫЙ счёт" in text and "только после run --live" in text and "ОРДЕР: купить" in text and "НЕ БУДЕТ" not in text

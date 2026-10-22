@@ -191,3 +191,23 @@ def test_myspot_panel_decrypt_is_the_reference_copy():
     assert json.loads(r.stdout) == obj, r.stderr
     r = subprocess.run([node, "-e", code, js, p, "wrong"], capture_output=True, text=True, timeout=120)
     assert r.stdout.strip() == "ERR:Неверный пароль", r.stdout + r.stderr
+
+
+def test_myspot_personal_account_is_spot_only_and_buys_only_what_okx_lists():
+    """22.10 (owner): the personal OKX account is spot only — the futures reserve goes to BTC; 1000BONK is the spot coin BONK;
+    a model coin with no OKX spot pair cannot be bought there, so its share goes to BTC too."""
+    model = {"gauge": {"on": True, "bull": True}, "basket": ["1000BONK", "RUNE", "AAA"],
+             "targets_pct": {"BTC": 39.2, "Фьючерсы (сигналы)": 15.0, "USDT (Earn)": 10.0, "ETH": 6.3, "1000BONK": 2.0, "RUNE": 2.0,
+                             "AAA": 25.5}}
+    tgt, fut, earn, moved = ms.personal_targets(model, futures=False, tradeable={"BTC", "ETH", "BONK", "AAA"})
+    assert fut == 0.0 and earn == 10.0 and tgt["BTC"] == 56.2 and tgt["BONK"] == 2.0 and "RUNE" not in tgt and "1000BONK" not in tgt
+    assert abs(sum(tgt.values()) + earn - 100) < 1e-9 and len(moved) == 2 and "RUNE" in moved[1]
+    rows = [{"ccy": "BTC", "usd": 5620.0, "cash": False}, {"ccy": "BONK", "usd": 200.0, "cash": False},
+            {"ccy": "USDT", "usd": 4180.0, "cash": True}]
+    p = ms.plan(rows, model, futures=False, tradeable={"BTC", "ETH", "BONK", "AAA"})
+    by = {r["ccy"]: r for r in p["rows"]}
+    assert by["BTC"]["act"] == "hold" and by["BONK"]["act"] == "hold" and by["BONK"]["basket"]     # held BONK is the model's 1000BONK
+    assert p["cash"]["target_pct"] == 10.0 and p["fut_pct"] == 0.0 and "Фьючерсов на этом счёте нет" in p["cash"]["why"]
+    # the default keeps the published model as it is (15 % futures reserve in dollars)
+    assert ms.plan(rows, model)["cash"]["target_pct"] == 25.0
+    assert ms.futures_on({}) is False and ms.futures_on({"MYSPOT_FUTURES": "on"}) is True

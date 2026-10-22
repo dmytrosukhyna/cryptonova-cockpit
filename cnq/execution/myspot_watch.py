@@ -19,7 +19,8 @@ Env (~/.cryptonova.env on the Mac, never in the repo or in a chat):
   MYSPOT_PASS — the passphrase. The encrypted file is in a PUBLIC repository, so it is the only protection: 12+ characters,
     ideally its own phrase (22.10 audit; reusing the panel login still works — the card then opens by itself — but `--check` warns).
   Optional: MYSPOT_OKX_HOST (www.okx.com / eea.okx.com / my.okx.com — found by itself), MYSPOT_STATE, MYSPOT_EVERY (minutes, 15),
-  MYSPOT_MODEL_SRC (where the public model JSON is read from), CNQ_GH_TOKEN / CNQ_GH_REPO (publishing).
+  MYSPOT_MODEL_SRC (where the public model JSON is read from), MYSPOT_FUTURES (off by default since 22.10: the personal account
+  is spot only, the futures reserve goes to BTC), CNQ_GH_TOKEN / CNQ_GH_REPO (publishing).
   Any of the four MYSPOT_* missing → run() / check() return None and do nothing.
 Stdlib only."""
 from __future__ import annotations
@@ -319,14 +320,41 @@ def quality_facts(q: dict | None, universe: int | None = None) -> dict | None:
             "calm": bool(calm), "text": "; ".join(parts)}
 
 
-def plan(rows: list[dict], model: dict, quality: dict | None = None, profiles: dict | None = None) -> dict:
+def personal_targets(model: dict, futures: bool = True, tradeable: set | None = None) -> tuple[dict, float, float, list]:
+    """The model's shares for THIS account. 22.10 (owner): the personal account is spot only — futures=False moves the futures
+    reserve into BTC. A «1000X» contract name is the spot coin X (1000BONK → BONK). A coin with no spot pair on this OKX
+    (tradeable given) cannot be bought here — its share goes to BTC too. Returns (coin targets, futures %, earn %, moved notes)."""
+    tgt: dict[str, float] = {}
+    for k, v in (model.get("targets_pct") or {}).items():
+        k = str(k)
+        if k.startswith("1000") and len(k) > 4 and k not in (tradeable or ()):
+            k = k[4:]
+        tgt[k] = tgt.get(k, 0.0) + float(v)
+    fut, earn = tgt.pop(FUT_KEY, 0.0), tgt.pop(EARN_KEY, 0.0)
+    moved = []
+    if not futures and fut:
+        tgt["BTC"] = tgt.get("BTC", 0.0) + fut
+        moved.append(f"фьючерсов на этом счёте нет — их {_p(fut)}% в BTC")
+        fut = 0.0
+    if tradeable:
+        gone = [c for c in tgt if c != "BTC" and c not in tradeable]
+        for c in gone:
+            tgt["BTC"] = tgt.get("BTC", 0.0) + tgt.pop(c)
+        if gone:
+            moved.append(f"{', '.join(gone)} на этом OKX не торгуется — доля в BTC")
+    if "BTC" in tgt:
+        tgt["BTC"] = round(tgt["BTC"], 2)
+    return tgt, fut, earn, moved
+
+
+def plan(rows: list[dict], model: dict, quality: dict | None = None, profiles: dict | None = None, futures: bool = True,
+         tradeable: set | None = None) -> dict:
     """The model's rebalancing plan on today's prices. rows = assets(); model = web/altseason.json; quality = web/quality.json;
     profiles = web/coin_profiles.json. Every number here comes from those inputs — nothing is estimated."""
     quality, profiles = quality or {}, profiles or {}
-    tgt = {k: float(v) for k, v in (model.get("targets_pct") or {}).items()}
-    fut, earn = tgt.pop(FUT_KEY, 0.0), tgt.pop(EARN_KEY, 0.0)
+    tgt, fut, earn, moved = personal_targets(model, futures, tradeable)
     cash_t = fut + earn
-    basket = set(model.get("basket") or [])
+    basket = {str(c)[4:] if str(c).startswith("1000") and str(c) not in (tradeable or ()) else str(c) for c in model.get("basket") or []}
     g = model.get("gauge") or {}
     qrows = {str(r.get("symbol")).upper(): r for r in (quality.get("rows") or [])}
     qbasket = set(quality.get("basket") or [])
@@ -394,8 +422,9 @@ def plan(rows: list[dict], model: dict, quality: dict | None = None, profiles: d
     trim.sort(key=lambda r: r["gap_usd"])
     cash = {"now_usd": round(cash_now, 2), "now_pct": round(cash_now / T * 100, 2) if T else 0.0, "target_pct": cash_t,
             "gap_usd": round(cash_t / 100 * T - cash_now, 2),
-            "why": (f"Доллары: {_p(earn)}% модели — в USDT Earn под процент, {_p(fut)}% — резерв под фьючерсы по сигналам "
-                    "(фьючерсы пока в тесте, эту часть можно держать в USDT).")}
+            "why": ((f"Доллары: {_p(earn)}% модели — в USDT Earn под процент, {_p(fut)}% — резерв под фьючерсы по сигналам "
+                     "(фьючерсы пока в тесте, эту часть можно держать в USDT).") if fut else
+                    f"Доллары: {_p(earn)}% модели — в USDT Earn под процент. Фьючерсов на этом счёте нет: их доля в BTC.")}
     ideas = []
     for qr in quality.get("rows") or []:
         c = str(qr.get("symbol")).upper()
@@ -410,6 +439,7 @@ def plan(rows: list[dict], model: dict, quality: dict | None = None, profiles: d
                 + (f" (биткоин обгоняют {br}% альтов)." if br is not None else ".") + (" Правило модели: " + model["rules_ru"] if model.get("rules_ru") else ""))
     return {"total_usd": round(T, 2), "rows": out, "buy": buy, "trim": trim, "cash": cash, "ideas": ideas, "alt_note": alt_note,
             "regime": "рост" if g.get("bull") else "осторожно", "altseason": bool(g.get("on")),
+            "fut_pct": fut, "earn_pct": earn, "moved": moved,
             "model_asof": model.get("asof"), "quality_asof": quality.get("asof"), "note": NOTE}
 
 
@@ -443,13 +473,20 @@ def publish_myspot(blob: dict, token: str, repo: str = DEFAULT_REPO, http=None) 
 
 
 # ── entry points ─────────────────────────────────────────────────────────────────────────────────────────────────────
-def snapshot(fetch, state: dict, now: int, model=None) -> dict:
+def futures_on(env=None) -> bool:
+    """22.10 (owner): the personal account is spot only — the model's futures reserve goes to BTC. MYSPOT_FUTURES=on brings it back."""
+    env = os.environ if env is None else env
+    return str(env.get("MYSPOT_FUTURES") or "off").strip().lower() in ("on", "1", "yes", "true")
+
+
+def snapshot(fetch, state: dict, now: int, model=None, futures: bool = False) -> dict:
     host, bal = probe(fetch, state.get("host"))
     state["host"] = host
     raw = read_raw(fetch, host, bal)
     rows = assets(raw)
     alt, qual, prof = model if model is not None else fetch_model()
-    p = plan(rows, alt, qual, prof)
+    tradeable = {c for c in prices(raw.get("tickers")) if c not in ("USDT", "USDC", "FDUSD", "DAI", "TUSD", "USDE", "PYUSD", "USDG", "USD", "EUR")}
+    p = plan(rows, alt, qual, prof, futures=futures, tradeable=tradeable or None)
     hist = [h for h in state.get("hist") or [] if isinstance(h, list) and len(h) == 2]
     day = now - now % 86_400_000
     if not hist or hist[-1][0] < day:
@@ -480,7 +517,7 @@ def run(state: dict | None = None, now: int | None = None, fetch=None, put=None,
     if state is None:
         state = load_state(env)
         save = save or (lambda s: save_state(s, env))
-    out = snapshot(fetch or make_fetch(key, secret, passphrase), state, now, model)
+    out = snapshot(fetch or make_fetch(key, secret, passphrase), state, now, model, futures=futures_on(env))
     if save:
         save(state)
     blob = ivan_watch.encrypt(out, pw, asof=now)

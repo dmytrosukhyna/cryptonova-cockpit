@@ -3,6 +3,7 @@
 nginx: app.crypto-capital.app/v2/ → http://127.0.0.1:8090/v2/  (deploy/api/README.md). The old Java backend stays as it is.
 
 Public (no login):  GET /v2/health · GET /v2/agent/selftest (one real NOVA call per 10 min, see _selftest) · GET /v2/home (= app_home.json, fresh every minute) · GET /v2/feed/<name>
+                    (/v2/home also carries "news": «Главные новости рынка» from web/decision.json in the request's language — cnq/api/home_news.py)
                     (/v2/feed/nova = web/nova.json: NOVA's greeting, starter questions and topics — see cnq/api/nova.py)
                     ?lang=en|ru|uk|el|es (20.10, the app's language): web/<name>.<lang>.json when it exists, else <name>.json
                     (Russian); missing / unknown lang → ru. POST /v2/agent takes "lang" in its body the same way.
@@ -35,7 +36,7 @@ from urllib.parse import parse_qs, urlsplit
 from cnq.agents.i18n import DEFAULT, file_name, norm_lang
 from cnq.agents.llm import LLM, PROVIDERS
 
-from . import access as access_codes, bingx, console as admin_console, nova
+from . import access as access_codes, bingx, console as admin_console, home_news, nova
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -71,8 +72,12 @@ def _day() -> str:
 
 class Api:
     def __init__(self, store: Store, verifier: FirebaseVerifier, web_dir: str, llm=None, bingx_fetch=None, admin=None,
-                 knowledge: nova.Knowledge | None = None, console: admin_console.Console | None = None):
+                 knowledge: nova.Knowledge | None = None, console: admin_console.Console | None = None,
+                 news: home_news.HomeNews | None = None):
         self.store, self.verifier, self.web, self.llm, self.bingx_fetch = store, verifier, web_dir, llm, bingx_fetch
+        # build 44: «Главные новости рынка» on Home — the desk's top stories, translated once by NOVA's model and kept on disk
+        # next to the API's other data (<run>/data/news_i18n.json, git-ignored)
+        self.news = news or home_news.HomeNews(web_dir, os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "news_i18n.json"), llm)
         self.admin = admin                       # Firebase Admin (deletes the login with the account)
         self.console = console or admin_console.Console(store, web_dir)   # the owner's admin panel, /v2/admin/*
         self.access = access_codes.AccessCodes(store)          # 22.10: guest access codes, checked here (no public hash file)
@@ -222,7 +227,7 @@ class Api:
                      "firebase_admin": bool(getattr(self.admin, "ready", False)),
                      "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last,
-                         "panel_last": self.panel_last}
+                         "panel_last": self.panel_last, "news_last": self.news.last}
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()
         if method == "GET" and path == "/v2/agent/selftest":
@@ -236,6 +241,14 @@ class Api:
             cc = str(headers.get("cf-ipcountry") or headers.get("x-country") or "").strip().upper()
             if re.fullmatch(r"[A-Z]{2}", cc) and cc not in ("XX", "T1"):
                 d = {**d, "geo": {"country": cc}}
+            # build 44: «Главные новости рынка» (≤ 5 stories in this language); no stories → no key, the app hides the block
+            try:
+                news = self.news.feed(lang)
+            except Exception as e:  # noqa: BLE001 — the home feed never fails because of the news
+                print("home news error:", repr(e)[:200], file=sys.stderr, flush=True)
+                news = []
+            if news:
+                d = {**d, "news": news}
             return 200, d
         m = re.fullmatch(r"/v2/feed/([a-z_]+)", path)
         if method == "GET" and m:

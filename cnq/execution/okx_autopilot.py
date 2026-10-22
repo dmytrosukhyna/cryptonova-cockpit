@@ -79,6 +79,7 @@ MIN_ORDER = ms.MIN_ORDER             # $10 — smaller moves are not worth an or
 BAND = 0.003                          # a coin within 0.3 % of the account of its target is left alone
 DRIFT_EVERY_MS = 3_600_000            # the account is compared with the public portfolio at least hourly
 SPOT_EVERY_S = 300                    # the public portfolio is read every 5 minutes in the window
+PUBLIC_EVERY_S = 15 * 60              # server mode: web/public_real.json once at start, then every 15 minutes (public_real.py)
 DAY = 86_400
 
 
@@ -955,8 +956,19 @@ def _main(argv=None) -> int:
         from . import okx_active, okx_futures
         print(f"Автопилот OKX: окно запущено ({'РЕАЛЬНЫЕ ДЕНЬГИ' if live() else 'демо-торговля OKX'}). Фьючерсы и активный спот — каждую "
               "минуту, спот-портфель — каждые 5 минут. Остановить окно: Ctrl+C; остановить автопилот: --stop.", flush=True)
-        last_spot, said = 0.0, None
+        last_spot, said, last_pub, pub_said = 0.0, None, 0.0, False
         while True:
+            # 22.10: on the server the service also publishes «Реальный счёт CRYPTO NOVA на OKX» (public_real.py) — the Mac mirror
+            # does it while the autopilot runs on the Mac; public_real.writer() lets only the lease's machine write
+            if lease.node_of() == "server" and time.time() - last_pub >= PUBLIC_EVERY_S:
+                last_pub = time.time()
+                try:
+                    from . import public_real
+                    if public_real.run() is not None and not pub_said:
+                        pub_said = True
+                        print(time.strftime("%H:%M ") + "Реальный счёт CRYPTO NOVA на OKX: web/public_real.json обновляется каждые 15 мин", flush=True)
+                except Exception as e:  # noqa: BLE001
+                    print(time.strftime("%H:%M ") + "Реальный счёт OKX: " + describe_error(e).replace("Автопилот OKX: ", ""), flush=True)
             armed = load_state().get("armed") and enabled() and not stopped()
             # 22.10: the lease first (okx_lease.py) — another window or the server may be the one trading this account
             g = lease.gate() if armed else {"ok": False, "why": None}

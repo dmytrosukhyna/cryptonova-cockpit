@@ -62,12 +62,12 @@ case "$cmd" in
     [ -x "$PY" ] || die "Нет Python движка ($PY) — сначала установите движок: deploy/engine/install.sh."
     check_env
     mkdir -p "$STATE/data"
-    for f in .cryptonova_okx_autopilot.json .cryptonova_okx_futures.json .cryptonova_okx_active.json; do
+    for f in .cryptonova_okx_autopilot.json .cryptonova_okx_futures.json .cryptonova_okx_active.json .cryptonova_public_real.json; do
       if [ -f "$FROM/$f" ]; then cp "$FROM/$f" "$STATE/$f" && mv "$FROM/$f" "$FROM/$f.copied" && echo "Состояние с Мака: $f"; fi
     done
-    [ -n "$TEST" ] || { chown -R cnq:cnq "$STATE"; chmod 700 "$STATE"; chmod 600 "$STATE"/.cryptonova_okx_*.json 2>/dev/null; }
+    [ -n "$TEST" ] || { chown -R cnq:cnq "$STATE"; chmod 700 "$STATE"; chmod 600 "$STATE"/.cryptonova_*.json 2>/dev/null; }
     [ -f "$STATE/.cryptonova_okx_autopilot.json" ] || die "Нет файлов состояния автопилота с Мака. Сначала закройте окно автопилота на Маке (Ctrl+C), потом на Маке:
-  scp ~/.cryptonova_okx_*.json root@91.99.193.20:/root/
+  scp ~/.cryptonova_okx_*.json ~/.cryptonova_public_real.json root@91.99.193.20:/root/
 и повторите install."
     grep -Eq '"armed": ?true' "$STATE/.cryptonova_okx_autopilot.json" || die "Автопилот в этом состоянии не включён (нет первого run --live на Маке) — сначала запустите его на Маке."
     echo "Проверка ключа с сервера (ордеров нет):"
@@ -103,6 +103,6 @@ case "$cmd" in
     rm -f "$UNITDIR/$UNIT.service"; $SYSTEMCTL daemon-reload
     [ -f "$ENVF" ] && run_py -m cnq.execution.okx_lease --switch mac
     echo "Служба убрана, автопилот снова на Маке. Состояние осталось в $STATE. Перенести его на Мак (на Маке):"
-    echo "  scp 'root@91.99.193.20:$STATE/.cryptonova_okx_*.json' ~/   — потом двойной щелчок «CRYPTO NOVA»." ;;
+    echo "  scp 'root@91.99.193.20:$STATE/.cryptonova_*.json' ~/   — потом двойной щелчок «CRYPTO NOVA»." ;;
   *) echo "Команды: install | status | stop | start | uninstall" ;;
 esac

@@ -149,3 +149,30 @@ def test_panel_line_and_the_light_publish():
     assert "распределены: спот 65% · фьючерсы 25% (в позициях 4,0%) · активный спот 10%" in out
     out = subprocess.run([node, p, json.dumps(R), str(1792630000000 + 3 * 3_600_000)], capture_output=True, text=True, timeout=30).stdout
     assert "данные устарели" in out
+
+
+def test_one_writer_the_mac_mirror_or_the_server_service_never_both():
+    import inspect
+    from cnq.execution import okx_autopilot as ap
+    e, fk, _log = TS._setup()
+    e = {**e, "OKX_PUBLIC_STATE": os.path.join(tempfile.mkdtemp(), "pr.json")}
+    srv = {**e, "OKX_NODE": "server", "OKX_LEASE_ID": "server"}
+    assert PR.writer(e) and not PR.writer(srv)                                     # the autopilot runs on the Mac: the Mac writes
+    calls = []
+    assert PR.run(srv, TS._fetch(fk, calls), NOW, put=lambda d: True, state={}) is None and calls == []
+    L.release(e)
+    assert L.switch(srv, "server", NOW + 60_000)[0]                                # install moved it to the server
+    assert PR.writer(srv) and not PR.writer(e)
+    assert PR.run(e, TS._fetch(fk, calls), NOW, put=lambda d: True, state={}) is None and calls == []   # the Mac mirror skips
+    sent = []
+    assert PR.run(srv, TS._fetch(fk, []), NOW + 120_000, put=lambda d: sent.append(d) or True, state={}) and len(sent) == 1
+    assert not PR.writer({"OKX_NODE": "mac"})                                     # no token / no lease → nobody writes
+    loop = inspect.getsource(ap._main)
+    assert 'lease.node_of() == "server"' in loop and "public_real.run()" in loop and ap.PUBLIC_EVERY_S == PR.EVERY_S
+    doc = open(os.path.join(ROOT, "docs", "okx_server_mode.md"), encoding="utf-8").read()
+    for s in ("91.99.193.20", "188.4.179.38", "не удалять", "cp /opt/cnq/repo/deploy/okx/cnq-okx.env.example /etc/cnq-okx.env",
+              "scp ~/.cryptonova_okx_*.json ~/.cryptonova_public_real.json root@91.99.193.20:/root/",
+              "bash /opt/cnq/repo/scripts/okx_autopilot_server.sh install", "**ДА**"):
+        assert s in doc, s
+    for p in ("deploy/okx/cnq-okx.env.example", "scripts/okx_autopilot_server.sh"):
+        assert os.path.exists(os.path.join(ROOT, p))

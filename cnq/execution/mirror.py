@@ -16,6 +16,7 @@ Optional «Мой портфель · OKX» (cnq/execution/myspot_watch.py): wit
 to web/myspot.enc.json (nothing is traded).
 «Реальный счёт CRYPTO NOVA на OKX» (cnq/execution/public_real.py): with OKX_API_* (the autopilot's key, read here with GET only)
 and CNQ_GH_TOKEN, every 15 min a public summary of the SUB-ACCOUNT only → web/public_real.json (OKX_PUBLIC=off — never).
+Only while the autopilot runs on the Mac (the lease's node); in server mode the server's autopilot service writes it.
 «Автопилот OKX» (cnq/execution/okx_autopilot.py) runs in its OWN window (okx_autopilot --loop), not here: CNQ_LIVE_TRADING=yes
 for it must never reach this Bybit futures mirror. `--check` here also prints the autopilot's key, host and state.
 Log: data/mirror.jsonl, state: data/mirror_state.json. Stdlib only."""

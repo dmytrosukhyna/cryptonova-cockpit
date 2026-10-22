@@ -14,7 +14,9 @@ USDT = trading + funding (no Earn: the account is the system 1:1). No key, IP, U
 when the autopilot is not running (no live holder of its lease, or the global stop) the numbers are real but "stale": true; when
 the account can not be read, the last published numbers stay, with "stale": true and their old asof (readers also treat an asof
 older than 2 hours as stale). today_* are null until a day-start value exists. On by default when OKX_API_* exist; OKX_PUBLIC=off
-turns it off. Local state (the curve): ~/.cryptonova_public_real.json. Not financial advice. Stdlib only."""
+turns it off. Local state (the curve): ~/.cryptonova_public_real.json. One writer only (writer()): the Mac mirror while the
+autopilot runs on the Mac, the server's autopilot service (okx_autopilot --loop with OKX_NODE=server) while it runs there.
+Not financial advice. Stdlib only."""
 from __future__ import annotations
 
 import base64
@@ -109,6 +111,14 @@ def running(lease: dict | None) -> bool:
     return bool(lease) and not lease.get("error") and bool(lease.get("holder")) and not lease.get("stop")
 
 
+def writer(env=None) -> bool:
+    """22.10: exactly one writer of web/public_real.json — the machine the autopilot runs on (the lease's «node»): the Mac mirror
+    while it is «mac», the server's autopilot service while it is «server». Unknown (no token, unreadable lease) → nobody."""
+    from . import okx_lease
+    s = okx_lease.status(env)
+    return bool(s) and not s.get("error") and s.get("node") == okx_lease.node_of(env)
+
+
 def build(s: dict, st: dict, now: int, closed_n: int | None = None) -> dict:
     """The public summary from myspot_sub.read() (an ok read). Updates st["curve"]."""
     start = s.get("start") or {}
@@ -165,7 +175,7 @@ def publish(doc: dict, token: str, repo: str = ivan_watch.DEFAULT_REPO, http=Non
 
 def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | None = None, save=None) -> dict | None:
     """read (GET only) → summary → publish when it changed. None when off. A failed read republishes the last numbers as stale."""
-    if not enabled(env):
+    if not enabled(env) or not writer(env):
         return None
     e = _env(env)
     now = int(now or time.time() * 1000)

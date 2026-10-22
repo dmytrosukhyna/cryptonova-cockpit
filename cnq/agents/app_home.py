@@ -26,6 +26,7 @@ import re
 import sqlite3
 import time
 
+from . import panel_header as ph
 from .i18n import DEFAULT, LANGS, T, file_name, plural, t
 
 START = 10000.0
@@ -390,36 +391,10 @@ def _status(bal_open: int, closed: list, opened: list, lang: str = DEFAULT) -> s
 # allocator runs (bal + imp; the own daily signals join after their live record passes the gate), each from 18.10 (FUT_D0), as
 # ONE $10 000 account; open P&L included, so the curve and «today» move with the open trades. Trades of a desk that is still
 # being checked are listed with «in_result»: false and its progress to the gate (check.n of check.of closed trades).
-FUT_D0 = int(dt.datetime(2026, 10, 16, 21, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
-NOVA_BASE = ("bal", "imp")
-OWN_GATE_N, OWN_GATE_AVG = 30, 0.3
-
-
-def nova_keys(prof: dict) -> list[str]:
-    """the desks inside the CRYPTO NOVA futures result (the panel's novaRes)"""
-    s = (prof.get("own") or {}).get("stats") or {}
-    avg = s.get("avg_trade_pct")
-    ok = int(s.get("trades") or 0) >= OWN_GATE_N and isinstance(avg, (int, float)) and avg >= OWN_GATE_AVG
-    return [k for k in (*NOVA_BASE, *(("own",) if ok else ())) if prof.get(k)]
-
-
-def _base_d0(v: dict) -> float:
-    """the desk's equity at the CRYPTO NOVA start (18.10), or its own start when it began later"""
-    h = v.get("equity_history") or []
-    st = float(v.get("start_equity") or START)
-    if not h or int(h[0].get("time") or 0) >= FUT_D0:
-        return st
-    b = float(h[0].get("equity") or st)
-    for e in h:
-        if int(e.get("time") or 0) <= FUT_D0:
-            b = float(e.get("equity") or b)
-        else:
-            break
-    return b or st
-
-
-def _fut_eq(v: dict) -> float:
-    return float(v.get("equity", START)) + float(v.get("open_pnl_usd") or 0)
+# 22.10 (build 44): these are the panel's own functions (cnq/agents/panel_header.py, line for line with web/app.html) — the
+# futures tab, the open P&L and the app's PUBLIC portfolio use the same arithmetic as the owner's header.
+FUT_D0, NOVA_BASE, OWN_GATE_N, OWN_GATE_AVG = ph.FUT_D0, ph.NOVA_BASE, ph.OWN_GATE_N, ph.OWN_GATE_AVG
+nova_keys, _base_d0, _fut_eq = ph.nova_keys, ph.base_d0, ph.fut_eq
 
 
 def nova_result(prof: dict, now: int) -> tuple[float, list[tuple[int, float]]]:
@@ -721,13 +696,143 @@ def _buy_now(out: str, now: int, lang: str = DEFAULT) -> dict | None:
     return {"asof": int(d["asof"]), "checked": int(d.get("checked") or 0), "items": items}
 
 
+# ---------------------------------------------------------------------------------------------------------------------------
+# 22.10 (owner, build 44): the app's PUBLIC portfolio is exactly «наша система CRYPTO NOVA» as the header of the closed system
+# shows it — FUTURES · CRYPTO NOVA («отобранные сигналы») + SPOT · CRYPTO NOVA портфель (portfolio.json → ideas), from 17.10,
+# «Заработано всего» = futures + spot (cnq/agents/panel_header.py = web/app.html hdrVals). The capital.json allocator (key
+# "portfolio") is a different model: it stays in the feed only for the site and the older app builds, never as the public one.
+# "public": total_usd, base_usd (the two $10 000 demo accounts), since, futures {usd, pct, since, open_n, in_result_n, closed_n,
+# wins}, spot {usd, pct, value_usd, start_usd, since, cash_pct, cash_usd, coins [{sym, name, weight %, usd, pct since buy, kind,
+# plan %, stop, why}]}, curve [[t, $ futures + spot]] from 17.10 ending with the live point, calc — «Рассчитать мой портфель»:
+# the split of the user's sum (spot 65 / futures 25 / active spot 10 %) and the plain «почему так» of each part.
+CALC_SPLIT = {"spot": 65, "futures": 25, "active": 10}       # owner 22.10: how CRYPTO NOVA splits a user's sum
+try:                                                          # the same split the owner's OKX autopilot runs (okx_alloc.SHARES)
+    from ..execution.okx_alloc import SHARES as _OKX_SHARES
+    if {"spot", "futures", "active"} <= set(_OKX_SHARES):
+        CALC_SPLIT = {k: round(float(_OKX_SHARES[k]) * 100) for k in ("spot", "futures", "active")}
+except Exception:  # noqa: BLE001 — the app's split never depends on the autopilot module being importable
+    pass
+PUB_CURVE_N = 240
+_RATING = re.compile(r"[Аа]нкета (\d+)")
+_CONS = re.compile(r"консультант (\d+)")
+_DD30 = re.compile(r"[−-](\d+(?:\.\d+)?)% от максимума")
+
+
+def _dec(x: float, lang: str) -> str:
+    """7.5 → «7,5» (ru / uk / el / es) or «7.5» (en); a whole number without a fraction"""
+    v = round(float(x), 1)
+    s = str(int(v)) if v.is_integer() else f"{v:.1f}"
+    return s if lang == "en" else s.replace(".", ",")
+
+
+def _coin_kind(p: dict) -> str:
+    b, k = str(p.get("bucket") or ""), str(p.get("kind_ru") or "")
+    if b == "core" or k == "ядро":
+        return "core"
+    if b in ("meme", "small") or k.startswith("мем") or p.get("role") == "small":
+        return "small"
+    return "alt"
+
+
+def _coin_why(p: dict, kind: str, status_row: dict, lang: str) -> str:
+    """«почему» of one spot coin in plain words: the portfolio's rule for its kind + the table's own numbers for this coin"""
+    sym = str(p.get("symbol") or "")
+    plan = _dec(float(p.get("target_weight") or 0) * 100, lang)
+    src = " ".join(str(x) for x in (p.get("table_why_ru"), status_row.get("why_ru")) if x)
+    parts = []
+    if kind == "core":
+        parts.append(t(lang, "pub.why.core", sym=sym, plan=plan))
+        if sym == "BTC":
+            parts.append(t(lang, "pub.why.btc"))
+    elif kind == "small":
+        m = _DD30.search(src)
+        parts.append(t(lang, "pub.why.small", sym=sym, dd=_dec(float(m.group(1)), lang)) if m else t(lang, "pub.why.small0", sym=sym))
+        parts.append(t(lang, "pub.why.small_rules", plan=plan))
+    else:
+        r, c = _RATING.search(src), _CONS.search(src)
+        parts.append(t(lang, "pub.why.alt", sym=sym, rating=r.group(1), cons=c.group(1)) if r and c else t(lang, "pub.why.alt0", sym=sym))
+        if "тренд вверх" in src:
+            parts.append(t(lang, "pub.why.trend"))
+        if "BTC бычий" in src:
+            parts.append(t(lang, "pub.why.bull"))
+        parts.append(t(lang, "pub.why.alt_rules", plan=plan))
+    st = p.get("table_status") or status_row.get("status")
+    if st == "wait":
+        parts.append(t(lang, "pub.why.wait"))
+    elif st == "avoid":
+        parts.append(t(lang, "pub.why.avoid"))
+    return " ".join(parts)
+
+
+def _public_curve(fut_curve: list, pf_app: dict, s0: float, since: int, now: int, total: float) -> list:
+    """[[t, $ futures + $ spot]] from 17.10: each account's last known result at every point of either; ends on the live total"""
+    sc = sorted((int(h["t"]), (float(h["v"]) - 100.0) * s0 / 100.0) for h in pf_app.get("history") or []
+                if h.get("t") is not None and h.get("v") is not None)
+    fc = sorted((int(t_), float(v)) for t_, v in fut_curve)
+    ts = sorted({t_ for t_, _v in fc + sc if since <= t_ < now})
+    out, i, j, fv, sv = [], -1, -1, 0.0, 0.0
+    for t_ in ts:
+        while i + 1 < len(fc) and fc[i + 1][0] <= t_:
+            i += 1
+            fv = fc[i][1]
+        while j + 1 < len(sc) and sc[j + 1][0] <= t_:
+            j += 1
+            sv = sc[j][1]
+        out.append((t_, fv + sv))
+    out.append((now, total))                                   # the live point: the header's own number
+    return [[t_, _r(v)] for t_, v in _sample_keep_last(out, PUB_CURVE_N)]
+
+
+def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, rows: dict, now: int, lang: str = DEFAULT) -> dict | None:
+    prof = paper.get("profiles") or {}
+    H = ph.header(prof, ideas)
+    if not H or not H["fut"] or not H["spot"]:
+        return None
+    F, S = H["fut"], H["spot"]
+    s0, idx = S["s0"], float(ideas.get("index") or 0)
+    pos = ideas.get("positions") or []
+    coins = []
+    for p in pos:
+        if p.get("status") not in (None, "OPEN") or not p.get("symbol"):
+            continue
+        w = float(p.get("weight") or 0)
+        kind = _coin_kind(p)
+        entry, price = p.get("entry"), p.get("price")
+        plan = p.get("target_weight")
+        coins.append({"sym": p["symbol"], "name": p.get("name"), "weight": _r(w * 100, 2), "usd": _r(s0 * idx / 100.0 * w),
+                      "pct": _r((price / entry - 1) * 100, 1) if entry and price else None, "kind": kind,
+                      "plan": None if plan is None else _r(float(plan) * 100, 1), "stop": (p.get("levels") or {}).get("stop"),
+                      "why": _coin_why(p, kind, rows.get(p["symbol"]) or {}, lang)})
+    coins.sort(key=lambda c: -(c["weight"] or 0))
+    cash = max(0.0, 1.0 - sum(float(p.get("weight") or 0) for p in pos))
+    bal = next((x for x in paper.get("profile_list") or [] if x.get("key") == "bal"), {})
+    risk = _r(float(bal.get("risk") or 0.01) * 100, 2)
+    since = F["since"]
+    d0 = dt.datetime.fromtimestamp(since / 1000, _kyiv())
+    in_res = [o for o in fut.get("open") or [] if o.get("in_result")]
+    return {"since": since, "total_usd": _r(H["tot"]), "base_usd": _r(F["f0"] + s0),
+            "futures": {"usd": _r(F["fr"]), "pct": _r(F["fr"] / F["f0"] * 100), "equity": _r(F["f"]), "base": _r(F["f0"]),
+                        "since": since, "desks": F["keys"], "open_n": len(fut.get("open") or []), "in_result_n": len(in_res),
+                        "closed_n": fut.get("closed_n"), "wins": fut.get("wins")},
+            "spot": {"usd": _r(S["sr"]), "pct": _r(S["sr"] / s0 * 100), "value_usd": _r(S["sp"]), "start_usd": _r(s0),
+                     "since": S["since"], "cash_pct": _r(cash * 100, 2), "cash_usd": _r(s0 * idx / 100.0 * cash), "coins": coins},
+            "curve": _public_curve(fut_curve, pf_app, s0, since, now, H["tot"]),
+            "calc": {**CALC_SPLIT, "spot_why": t(lang, "pub.why.spot"), "cash_why": t(lang, "pub.why.cash"),
+                     "active_why": t(lang, "pub.why.active"),
+                     "futures_why": t(lang, "pub.why.futures", risk=_dec(risk, lang),
+                                      max_open=int(bal.get("max_open") or 4), since=f"{d0:%d.%m}",
+                                      n=int(fut.get("closed_n") or 0), w=int(fut.get("wins") or 0))}}
+
+
 def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT, ex: dict | None = None) -> dict:
     """app_home in one language — the same numbers in every language, only the words differ"""
+    ex = ex or {}
     fut, spot = _futures(paper, now, lang), _spot(pf, lang, ex)
     pub = _public_portfolio(out)
     total = pub["pnl_usd"] if pub else round((fut["usd"] or 0) + (spot["usd"] or 0), 2)
+    public = _public(paper, ex.get("ideas_pf") or {}, pf, fut, ex.get("fut_curve") or [], ex.get("rows") or {}, now, lang)
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
-            "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub,
+            "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub, "public": public,
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
             "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),
@@ -748,7 +853,9 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
     """web/app_home.json (ru) + web/app_home.<lang>.json for the other languages; returns the Russian one"""
     now = now or int(time.time() * 1000)
     paper, pf, mk = _load(out, "paper.json"), _load(out, "app_portfolio.json"), _load(out, "markets.json")
-    ex = {"ideas": ((_load(out, "portfolio.json").get("portfolios") or {}).get("ideas") or {}).get("positions") or [],
+    ideas = (_load(out, "portfolio.json").get("portfolios") or {}).get("ideas") or {}
+    ex = {"ideas": ideas.get("positions") or [], "ideas_pf": ideas, "rows": _load(out, "ideas.json").get("statuses") or {},
+          "fut_curve": nova_result(paper.get("profiles") or {}, now)[1],
           "tok": _load(out, "tokenomics.json"), "profiles": _load(out, "coin_profiles.json").get("coins") or {}}
     docs = {lang: build(paper, pf, mk, out, now, lang, ex) for lang in LANGS}
     for lang in [x for x in LANGS if x != DEFAULT] + [DEFAULT]:          # Russian last: its mtime says «all languages written»

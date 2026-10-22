@@ -597,6 +597,140 @@ T: dict[str, dict[str, str]] = {
                        "uk": "На сьогодні запитання закінчилися — завтра ліміт оновиться.",
                        "el": "Οι ερωτήσεις για σήμερα τελείωσαν — αύριο το όριο ανανεώνεται.",
                        "es": "Por hoy se acabaron las preguntas; mañana se renueva el límite."},
+
+    # ---------------------------------------------------------------- build 44: the public portfolio = the panel's header
+    # (app_home "public": spot coins «почему», «Рассчитать мой портфель» — every sentence is a rule or a number of the system)
+    "pub.why.core": {"ru": "{sym} — ядро портфеля: держим долго, через рыночные циклы, без стопа. План — {plan}% портфеля: если доля "
+                           "упадёт ниже ¾ плана, система докупит, если вырастет больше чем в 1,5 раза — продаст лишнее.",
+                     "en": "{sym} is the core of the portfolio: held for the long run, through market cycles, with no stop. The plan "
+                           "is {plan}% of the portfolio: if its share falls below ¾ of the plan, the system buys more; if it grows "
+                           "past 1.5 times the plan, it sells the extra.",
+                     "uk": "{sym} — ядро портфеля: тримаємо довго, крізь ринкові цикли, без стопа. План — {plan}% портфеля: якщо "
+                           "частка впаде нижче ¾ плану, система докупить, якщо виросте більш ніж у 1,5 раза — продасть зайве.",
+                     "el": "Το {sym} είναι ο πυρήνας του χαρτοφυλακίου: το κρατάμε μακροπρόθεσμα, μέσα από τους κύκλους της "
+                           "αγοράς, χωρίς stop. Το σχέδιο είναι {plan}% του χαρτοφυλακίου: αν το μερίδιο πέσει κάτω από τα ¾ "
+                           "του σχεδίου, το σύστημα αγοράζει κι άλλο· αν ξεπεράσει το 1,5 φορές, πουλά το επιπλέον.",
+                     "es": "{sym} es el núcleo de la cartera: lo mantenemos a largo plazo, a través de los ciclos del mercado, sin "
+                           "stop. El plan es el {plan}% de la cartera: si su parte baja de ¾ del plan, el sistema compra más; si "
+                           "supera 1,5 veces el plan, vende lo que sobra."},
+    "pub.why.btc": {"ru": "Биткоин — самая большая доля: в 2025–2026 он падал меньше эфира и соланы.",
+                    "en": "Bitcoin gets the biggest share: in 2025–2026 it fell less than Ether and Solana.",
+                    "uk": "Біткоїн — найбільша частка: у 2025–2026 він падав менше, ніж ефір і солана.",
+                    "el": "Το Bitcoin έχει το μεγαλύτερο μερίδιο: το 2025–2026 έπεσε λιγότερο από το Ether και το Solana.",
+                    "es": "Bitcoin tiene la parte más grande: en 2025–2026 cayó menos que Ether y Solana."},
+    "pub.why.alt": {"ru": "{sym} прошла отбор системы: анкета {rating} из 100, консультант {cons} из 100.",
+                    "en": "{sym} passed the system's selection: questionnaire {rating} of 100, consultant {cons} of 100.",
+                    "uk": "{sym} пройшла відбір системи: анкета {rating} зі 100, консультант {cons} зі 100.",
+                    "el": "Το {sym} πέρασε την επιλογή του συστήματος: ερωτηματολόγιο {rating} στα 100, σύμβουλος {cons} στα 100.",
+                    "es": "{sym} pasó la selección del sistema: cuestionario {rating} de 100, consultor {cons} de 100."},
+    "pub.why.alt0": {"ru": "{sym} прошла отбор системы по таблице «Что брать на спот».",
+                     "en": "{sym} passed the system's selection in the «What to buy on spot» table.",
+                     "uk": "{sym} пройшла відбір системи за таблицею «Що брати на спот».",
+                     "el": "Το {sym} πέρασε την επιλογή του συστήματος στον πίνακα «Τι αγοράζουμε στο spot».",
+                     "es": "{sym} pasó la selección del sistema en la tabla «Qué comprar en spot»."},
+    "pub.why.trend": {"ru": "Тренд монеты — вверх.", "en": "The coin's trend is up.", "uk": "Тренд монети — вгору.",
+                      "el": "Η τάση του νομίσματος είναι ανοδική.", "es": "La tendencia de la moneda es al alza."},
+    "pub.why.bull": {"ru": "Биткоин в росте.", "en": "Bitcoin is in an uptrend.", "uk": "Біткоїн у зростанні.",
+                     "el": "Το Bitcoin είναι σε άνοδο.", "es": "Bitcoin está en subida."},
+    "pub.why.alt_rules": {"ru": "Доля по плану — {plan}%, стоп −20% от цены покупки: если цена упадёт на 20%, система продаст.",
+                          "en": "The planned share is {plan}%, with a stop at −20% from the buy price: if the price falls 20%, "
+                                "the system sells.",
+                          "uk": "Частка за планом — {plan}%, стоп −20% від ціни купівлі: якщо ціна впаде на 20%, система продасть.",
+                          "el": "Το μερίδιο του σχεδίου είναι {plan}%, με stop στο −20% από την τιμή αγοράς: αν η τιμή πέσει "
+                                "20%, το σύστημα πουλά.",
+                          "es": "La parte prevista es el {plan}%, con stop en −20% del precio de compra: si el precio cae un 20%, "
+                                "el sistema vende."},
+    "pub.why.small": {"ru": "{sym} — небольшая доля с высоким риском: монета на {dd}% ниже своего максимума за 30 дней и прошла "
+                            "проверки системы.",
+                      "en": "{sym} is a small, high-risk share: the coin is {dd}% below its 30-day high and passed the system's "
+                            "checks.",
+                      "uk": "{sym} — невелика частка з високим ризиком: монета на {dd}% нижче свого максимуму за 30 днів і пройшла "
+                            "перевірки системи.",
+                      "el": "Το {sym} είναι ένα μικρό μερίδιο υψηλού ρίσκου: το νόμισμα είναι {dd}% κάτω από το υψηλό 30 ημερών "
+                            "και πέρασε τους ελέγχους του συστήματος.",
+                      "es": "{sym} es una parte pequeña y de alto riesgo: la moneda está un {dd}% por debajo de su máximo de 30 "
+                            "días y pasó los controles del sistema."},
+    "pub.why.small0": {"ru": "{sym} — небольшая доля с высоким риском: монета прошла проверки системы.",
+                       "en": "{sym} is a small, high-risk share: the coin passed the system's checks.",
+                       "uk": "{sym} — невелика частка з високим ризиком: монета пройшла перевірки системи.",
+                       "el": "Το {sym} είναι ένα μικρό μερίδιο υψηλού ρίσκου: το νόμισμα πέρασε τους ελέγχους του συστήματος.",
+                       "es": "{sym} es una parte pequeña y de alto riesgo: la moneda pasó los controles del sistema."},
+    "pub.why.small_rules": {"ru": "Доля — {plan}%, стоп −35%; если цена вырастет вдвое, система продаст половину.",
+                            "en": "The share is {plan}%, with a stop at −35%; if the price doubles, the system sells half.",
+                            "uk": "Частка — {plan}%, стоп −35%; якщо ціна зросте вдвічі, система продасть половину.",
+                            "el": "Το μερίδιο είναι {plan}%, με stop στο −35%· αν η τιμή διπλασιαστεί, το σύστημα πουλά τη μισή "
+                                  "θέση.",
+                            "es": "La parte es el {plan}%, con stop en −35%; si el precio se duplica, el sistema vende la mitad."},
+    "pub.why.wait": {"ru": "Сейчас таблица говорит «ждём»: новых покупок нет, позицию держим по правилам.",
+                     "en": "Right now the table says «wait»: no new buys, the position is held by the rules.",
+                     "uk": "Зараз таблиця каже «чекаємо»: нових купівель немає, позицію тримаємо за правилами.",
+                     "el": "Τώρα ο πίνακας λέει «περιμένουμε»: καμία νέα αγορά, η θέση κρατιέται με τους κανόνες.",
+                     "es": "Ahora la tabla dice «esperamos»: no hay compras nuevas, la posición se mantiene según las reglas."},
+    "pub.why.avoid": {"ru": "Таблица поставила «не брать»: система продаст монету на следующем прогоне.",
+                      "en": "The table marked it «don't buy»: the system sells the coin on its next run.",
+                      "uk": "Таблиця поставила «не брати»: система продасть монету на наступному прогоні.",
+                      "el": "Ο πίνακας το σημείωσε «δεν αγοράζουμε»: το σύστημα πουλά το νόμισμα στον επόμενο κύκλο.",
+                      "es": "La tabla la marcó «no comprar»: el sistema vende la moneda en su próxima pasada."},
+    "pub.why.cash": {"ru": "Не меньше 10% портфеля система всегда держит в долларах: из них она докупает ядро на просадках.",
+                     "en": "The system always keeps at least 10% of the portfolio in dollars: that is what it uses to top up "
+                           "the core in dips.",
+                     "uk": "Щонайменше 10% портфеля система завжди тримає в доларах: з них вона докуповує ядро на просіданнях.",
+                     "el": "Το σύστημα κρατά πάντα τουλάχιστον το 10% του χαρτοφυλακίου σε δολάρια: με αυτά συμπληρώνει τον "
+                           "πυρήνα στις πτώσεις.",
+                     "es": "El sistema siempre guarda al menos el 10% de la cartera en dólares: con ellos refuerza el núcleo en "
+                           "las caídas."},
+    "pub.why.spot": {"ru": "Спот — портфель CRYPTO NOVA, без плеча. Ядро — биткоин 30%, эфир 10%, солана 5% — держим долго; монеты "
+                           "с отметкой таблицы «можно брать» — по 7,5% со стопом −20%; рискованные — по 2,5%; не меньше 10% — "
+                           "в долларах. Всего не больше 8 монет вместе с ядром.",
+                     "en": "Spot is the CRYPTO NOVA portfolio, with no leverage. The core — Bitcoin 30%, Ether 10%, Solana 5% — is "
+                           "held for the long run; coins the table marks «can buy» get 7.5% each with a −20% stop; risky ones "
+                           "2.5% each; at least 10% stays in dollars. At most 8 coins including the core.",
+                     "uk": "Спот — портфель CRYPTO NOVA, без плеча. Ядро — біткоїн 30%, ефір 10%, солана 5% — тримаємо довго; "
+                           "монети з позначкою таблиці «можна брати» — по 7,5% зі стопом −20%; ризикові — по 2,5%; щонайменше "
+                           "10% — у доларах. Усього не більше 8 монет разом з ядром.",
+                     "el": "Το spot είναι το χαρτοφυλάκιο του CRYPTO NOVA, χωρίς μόχλευση. Ο πυρήνας — Bitcoin 30%, Ether 10%, "
+                           "Solana 5% — κρατιέται μακροπρόθεσμα· τα νομίσματα που ο πίνακας σημειώνει «μπορούμε να αγοράσουμε» "
+                           "παίρνουν 7,5% το καθένα με stop −20%· τα ριψοκίνδυνα 2,5%· τουλάχιστον 10% μένει σε δολάρια. Έως "
+                           "8 νομίσματα μαζί με τον πυρήνα.",
+                     "es": "El spot es la cartera de CRYPTO NOVA, sin apalancamiento. El núcleo —Bitcoin 30%, Ether 10%, Solana "
+                           "5%— se mantiene a largo plazo; las monedas que la tabla marca «se puede comprar» llevan un 7,5% cada "
+                           "una con stop en −20%; las arriesgadas, un 2,5%; al menos un 10% queda en dólares. Como máximo 8 "
+                           "monedas con el núcleo."},
+    "pub.why.futures": {"ru": "Фьючерсы — отобранные сигналы CRYPTO NOVA: в счёт идут только стратегии, прошедшие проверку на "
+                              "истории. У каждой сделки есть стоп; риск — {risk}% счёта на сделку, у основной стратегии не больше "
+                              "{max_open} сделок одновременно. Сделок закрыто с {since}: {n}, из них в плюсе {w}. Минус тоже бывает: "
+                              "убыточную сделку закрывает стоп.",
+                        "en": "Futures are CRYPTO NOVA's selected signals: only strategies that passed the test on history trade "
+                              "this account. Every trade has a stop; the risk is {risk}% of the account per trade, and the main "
+                              "strategy holds no more than {max_open} trades at once. Trades closed since {since}: {n}, {w} of them "
+                              "in profit. Losses happen too: the stop closes a losing trade.",
+                        "uk": "Ф’ючерси — відібрані сигнали CRYPTO NOVA: у рахунок ідуть лише стратегії, що пройшли перевірку на "
+                              "історії. У кожної угоди є стоп; ризик — {risk}% рахунку на угоду, в основної стратегії не більше "
+                              "{max_open} угод одночасно. Угод закрито з {since}: {n}, з них у плюсі {w}. Мінус теж буває: збиткову "
+                              "угоду закриває стоп.",
+                        "el": "Τα futures είναι τα επιλεγμένα σήματα του CRYPTO NOVA: στον λογαριασμό μπαίνουν μόνο στρατηγικές "
+                              "που πέρασαν τον έλεγχο στο ιστορικό. Κάθε συναλλαγή έχει stop· το ρίσκο είναι {risk}% του "
+                              "λογαριασμού ανά συναλλαγή και η κύρια στρατηγική κρατά έως {max_open} συναλλαγές ταυτόχρονα. "
+                              "Συναλλαγές που έκλεισαν από τις {since}: {n}, κερδοφόρες οι {w}. Συμβαίνουν και απώλειες: τη "
+                              "ζημιογόνα συναλλαγή την κλείνει το stop.",
+                        "es": "Los futuros son las señales seleccionadas de CRYPTO NOVA: en la cuenta solo operan estrategias que "
+                              "pasaron la prueba con el histórico. Cada operación tiene stop; el riesgo es el {risk}% de la cuenta "
+                              "por operación, y la estrategia principal no tiene más de {max_open} operaciones a la vez. "
+                              "Operaciones cerradas desde el {since}: {n}, {w} de ellas con ganancia. También hay pérdidas: el "
+                              "stop cierra la operación perdedora."},
+    "pub.why.active": {"ru": "Активный спот — «Импульс BTC»: когда биткоин за час вырос на 2,5% и больше, система покупает на споте "
+                             "самые ликвидные альткоины — они обычно догоняют. Без плеча, до 5 позиций, выход через 12 часов.",
+                       "en": "Active spot is «BTC momentum»: when Bitcoin rises 2.5% or more in an hour, the system buys the most "
+                             "liquid altcoins on spot — they usually catch up. No leverage, up to 5 positions, exit after 12 hours.",
+                       "uk": "Активний спот — «Імпульс BTC»: коли біткоїн за годину зріс на 2,5% і більше, система купує на "
+                             "споті найліквідніші альткоїни — вони зазвичай доганяють. Без плеча, до 5 позицій, вихід через 12 "
+                             "годин.",
+                       "el": "Το ενεργό spot είναι η «ώθηση BTC»: όταν το Bitcoin ανεβαίνει 2,5% ή περισσότερο μέσα σε μία ώρα, "
+                             "το σύστημα αγοράζει στο spot τα πιο ρευστά altcoins — συνήθως ακολουθούν. Χωρίς μόχλευση, έως 5 "
+                             "θέσεις, έξοδος σε 12 ώρες.",
+                       "es": "El spot activo es el «impulso BTC»: cuando Bitcoin sube un 2,5% o más en una hora, el sistema compra "
+                             "en spot las altcoins más líquidas, que suelen ponerse al día. Sin apalancamiento, hasta 5 "
+                             "posiciones, salida a las 12 horas."},
 }
 
 # plural words: ru / uk — (1, 2–4, 5+) in the case the sentence needs; en / el / es — (1, other)

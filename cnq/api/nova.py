@@ -411,7 +411,11 @@ class Knowledge:
         out = [f"ДАННЫЕ CRYPTO NOVA (демо-счета самой системы, учебные деньги; старт {_date(home.get('since'))}, "
                f"обновлено {_date(home.get('asof'))}):"]
         tot = home.get("total") or {}
-        if tot.get("usd") is not None:
+        pub = home.get("public") or {}
+        if pub.get("total_usd") is not None:       # 22.10 build 44: the public portfolio = the panel's header (futures + spot)
+            out.append(f"• Публичный портфель CRYPTO NOVA, заработано всего с {_date(pub.get('since'))}: {_usd(pub['total_usd'])} "
+                       f"(фьючерсы {_usd((pub.get('futures') or {}).get('usd'))}, спот {_usd((pub.get('spot') or {}).get('usd'))}).")
+        elif tot.get("usd") is not None:
             out.append(f"• Итог системы с начала демо: {_usd(tot.get('usd'))} (фьючерсы {_usd(tot.get('futures_usd'))}, "
                        f"спот {_usd(tot.get('spot_usd'))}).")
         f = home.get("futures") or {}

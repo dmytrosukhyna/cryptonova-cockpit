@@ -18,8 +18,9 @@ def test_app_home_numbers(tmp_path):
     hist = lambda k: [{"time": t0, "equity": 10000.0}, {"time": t0 + 60000, "equity": 10000.0 + 100 * k}]
     prof = {p: {"equity": 10000.0, "open_pnl_usd": 100.0 * k, "equity_history": hist(k), "open": [], "closed": [], "stats": {}}
             for p, k in (("cons", 0.5), ("bal", 1.0), ("aggr", 1.5))}
+    # 22.10: the open P&L is the panel's futEq — (price − entry) × qty_left + the realised part, like every desk row stores it
     prof["bal"]["open"] = [{"symbol": "ARB", "side": "LONG", "entry": 0.2, "price": 0.22, "stop": 0.18, "tps": [0.3],
-                            "open_pnl_usd": 100.0, "kind": "CLIMAX_LONG"}]
+                            "qty_left": 5000.0, "pnl_usd": 0.0, "open_pnl_usd": 100.0, "kind": "CLIMAX_LONG"}]
     _w(d, "paper.json", {"since": t0, "profiles": prof})
     _w(d, "app_portfolio.json", {"index": 99.0, "cash_pct": 15, "history": [{"t": t0, "v": 100.0}, {"t": t0 + 60000, "v": 99.0}],
                                  "positions": [{"symbol": "BTC", "weight": 0.5, "entry": 100, "price": 110, "kind_ru": "ядро"},

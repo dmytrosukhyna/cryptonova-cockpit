@@ -362,6 +362,12 @@ def main(argv: list[str] | None = None) -> int:
         from .agents import turbo_desk
         d = turbo_desk.run(sqlite3.connect("data/agents.sqlite"), args.out, candles_db=os.environ.get("CNQ_DB", "data/cnq.sqlite"))
         print("turbo:", {k: (v["equity"], v.get("month_pct")) for k, v in d.items()})
+        try:   # 22.10: «Ложный пробой · лонг» — a paper-only test desk (cnq/agents/sweep_desk.py, docs/research/sweep.md)
+            from .agents import sweep_desk
+            s = sweep_desk.run(sqlite3.connect("data/agents.sqlite"), args.out, candles_db=os.environ.get("CNQ_DB", "data/cnq.sqlite"))
+            print("sweep:", s["equity"], len(s["open"]), s["status_ru"][:160])
+        except Exception as e:  # noqa: BLE001 — the test desk never breaks the turbo step
+            print("sweep: error", type(e).__name__, str(e)[:200])
     elif args.cmd == "listings":
         import os, sqlite3
         from .agents import listing_desk

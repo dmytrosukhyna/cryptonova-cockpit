@@ -87,6 +87,7 @@ RULE_REF = {
     "LST": (2.6, "docs/research/listings_more.md: 729 листингов Binance; MEXC −2.1%, BingX не проверялся"),
     "J": (0.76, "docs/research/macro_factors.md: 2023–26, в 2021–22 ≈ 0"),
     "L": (0.30, "описание стола lab; docs/research/range.md: ни один вариант не прошёл"),
+    "SWP": (1.21, "docs/research/sweep.md: 217 сделок 2019–26, BTC + 10 альтов, «рост»; t по неделям 1.82 — на грани, альты выбраны задним числом"),
 }
 DESK_RULE_REF = {("imps", "K"): (0.16, "как K, но комиссия спота 0.1%/сторона: ≈ −0.06% на сделку")}
 
@@ -106,6 +107,7 @@ DESKS = {
     "lsn": {"dd": 25, "en": "Neutral basket", "ev": "in_sample"},
     "lstx": {"dd": 56, "en": "Turbo · listing short ×4", "ev": "in_sample", "mirror_of": "lst"},
     "btcx": {"dd": 69, "en": "Turbo · BTC ×2 in uptrend", "ev": "in_sample", "holding": True},
+    "swp": {"dd": None, "en": "False breakdown · long", "ev": "in_sample"},     # 22.10, paper only (cnq/agents/sweep_desk.py)
 }
 EVIDENCE = {
     "oos": ("есть честная проверка вслепую", "true out-of-sample check"),
@@ -139,6 +141,8 @@ CAVEATS = {
     "lstx": ("Не самостоятельная стратегия: зеркало «Шорта листингов» ×4, стадия следует за ним.",
              "Not an independent strategy: the listing short ×4; its stage follows `lst`."),
 }
+CAVEATS["swp"] = ("Только демо. Край на грани (t по неделям 1.82), на одном BTC ноль; 10 альтов выбраны по сегодняшней ликвидности.",
+                  "Paper only. Borderline edge (weekly t 1.82), zero on BTC alone; the 10 alts were chosen by today's liquidity.")
 CAVEATS["bal"] = CAVEATS["aggr"] = CAVEATS["cons"]
 CAVEATS["imps"] = CAVEATS["imp"]
 
@@ -512,6 +516,8 @@ def db_trades(conn: sqlite3.Connection | None, desk: str) -> list[dict] | None:
             rows = [_row(*r) for r in conn.execute("SELECT id, 'LST', closed, entry, qty, pnl_usd FROM lst_trades WHERE closed IS NOT NULL ORDER BY closed")]
         elif desk == "lsn":
             rows = [_row(*r) for r in conn.execute("SELECT id, 'LSN', closed, entry, qty, pnl_usd FROM lsn_closed WHERE closed IS NOT NULL ORDER BY closed")]
+        elif desk == "swp":      # pnl_usd is net of fees (cnq/agents/sweep_desk.py)
+            rows = [_row(*r) for r in conn.execute("SELECT id, 'SWP', closed, entry, qty, pnl_usd FROM swp_trades WHERE closed IS NOT NULL ORDER BY closed")]
         else:
             return None
     except sqlite3.Error:
@@ -546,6 +552,8 @@ def db_dd(conn: sqlite3.Connection | None, desk: str, start: int) -> float | Non
               (f"SELECT equity FROM {t} WHERE time >= ? ORDER BY time", (start,))]
     elif desk in ("own", "lst", "lsn"):
         qs = [(f"SELECT equity FROM {desk}_equity WHERE time >= ? ORDER BY time", (start,))]
+    elif desk == "swp":
+        qs = [("SELECT COALESCE(mtm, equity) FROM swp_equity WHERE time >= ? ORDER BY time", (start,))]
     elif desk in ("lstx", "btcx"):
         qs = [("SELECT equity FROM turbo_hist WHERE desk = ? AND time >= ? ORDER BY time", (desk, start))]
     for sql, args in qs:

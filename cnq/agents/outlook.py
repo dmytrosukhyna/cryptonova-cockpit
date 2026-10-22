@@ -438,6 +438,87 @@ def _horizon_text(sym: str, h: str, N: int, rng: dict | None, br: dict | None, r
 
 
 # ------------------------------------------------------------------ build
+def _btc_daily(term: dict | None) -> list:
+    """completed UTC daily bars of BTC from web/terminal.json [[t, o, h, l, c, v], …] (today's forming bar dropped)"""
+    term = term or {}
+    asof = term.get("asof") or term.get("generated") or 0
+    btc = next((c for c in term.get("coins") or [] if str(c.get("symbol", "")).startswith("BTC")), None) or {}
+    return [k for k in btc.get("candles_1d") or [] if len(k) >= 5 and not k[0] % DAY_MS and k[0] + DAY_MS <= asof + 900_000]
+
+
+def system_plan(ctx: dict, regime: dict, price: float | None) -> dict | None:
+    """«Что будет делать система» (22.10): the BTC key levels and, for each, the reactions that are ALREADY programmed — every line
+    names the code it comes from; nothing here is a forecast. Numbers are read from the modules themselves, so they cannot drift."""
+    from ..risk import limits as RL
+    from . import sweep_desk as SW
+    from .portfolio import TOPUP
+    from .spot_profiles import IDEAS
+    bars = _btc_daily(ctx.get("terminal"))
+    low20 = min(k[3] for k in bars[-20:]) if len(bars) >= 20 else regime.get("ll20")
+    high20 = max(k[2] for k in bars[-20:]) if len(bars) >= 20 else regime.get("hh20")
+    sma, sma_full = regime.get("sma200_panel") or regime.get("sma200_hist"), regime.get("sma200_hist")
+    price = price or regime.get("price")
+    if not price or not (low20 or high20 or sma):
+        return None
+    sw = (((ctx.get("paper") or {}).get("profiles") or {}).get(SW.KEY)) or {}
+    pc = lambda x: f"{x * 100:g}%".replace("-", "−")                                           # noqa: E731
+    lv = lambda key, name, p, lines, note=None: {"key": key, "name_ru": name, "price": round(p, 2), "note_ru": note,  # noqa: E731
+                                                 "dist_pct": round((p / price - 1) * 100, 2), "lines": lines}
+    L = []
+    if low20:
+        L.append(lv("low20", "Минимум 20 дней", low20, [
+            # cnq/agents/sweep_desk.py episodes() / step(): BREAK 0.5 %, WIN 3 closes, stop = sweep low − STOP_PAD, HOLD_D days, «рост» only
+            {"text_ru": f"Проткнёт на {pc(SW.BREAK)}+ и за {SW.WIN} дня вернётся выше → «{SW.NAME}» покупает (демо, только «рост»): "
+                        f"стоп −{pc(SW.STOP_PAD)} под минимумом, выход через {SW.HOLD_D} дней.",
+             "src": "cnq/agents/sweep_desk.py step()"},
+            # paper_desk.PROFILES: cons / bal / aggr trade A, B, E, F, D — longs only; own_desk.LONG_ONLY; no desk has a breakdown short
+            {"text_ru": "Закрепится ниже 3 дня → шорта нет: ни один счёт не шортит пробой поддержки (в «рост» это −3.76% на сделку).",
+             "src": "cnq/agents/paper_desk.py PROFILES; docs/research/sweep.md"},
+            # spot_profiles.IDEAS["stop_buy"] (IdeasPortfolio sells, ideas_reco «У стопа −20%»); core BTC/ETH/SOL — no stop
+            {"text_ru": f"Спот: альт — стоп {pc(IDEAS['stop_buy'])} от входа. Ядро BTC/ETH/SOL без стопа, докупка при −{pc(TOPUP['dip'])} "
+                        f"от средней цены (до {TOPUP['max_n']} раз за {TOPUP['window_d']} дней).",
+             "src": "cnq/agents/spot_profiles.py IDEAS stop_buy, ideas_reco, IdeasPortfolio._topups; cnq/agents/portfolio.py TOPUP"},
+        ]))
+    if high20:
+        L.append(lv("high20", "Максимум 20 дней", high20, [
+            # own_desk rule C: close above the previous 20-day high and the 20-day average, regime «рост», day volume ≥ 1.5× — demo
+            {"text_ru": "Закрытие выше → «Сигналы CRYPTO NOVA» (демо) покупают пробой 20 дней, только в «рост» и при объёме дня от 1.5×.",
+             "src": "cnq/agents/own_desk.py rule C"},
+            # paper_desk.signals class C makes a SHORT at a resistance zone in any regime (stop zone + 0.25 ATR), but no PROFILES desk trades C
+            {"text_ru": "Шорт от сопротивления в коде есть, но ни один счёт его не торгует — основной счёт только покупает.",
+             "src": "cnq/agents/paper_desk.py signals() class C; PROFILES"},
+        ]))
+    if sma:
+        note = (f"по полной истории {fmt_price(sma_full)} $" if sma_full and abs(sma / sma_full - 1) > 0.01 else None)
+        L.append(lv("sma200", "200-дневная средняя", sma, [
+            # spot_ideas.py: not bull → reason «BTC в медвежьем режиме — покупаем только ядро» (status changes in the table)
+            {"text_ru": "Закрытие ниже → режим «осторожно»: в таблице спота только ядро BTC/ETH/SOL, альты — «ждём».",
+             "src": "cnq/agents/spot_ideas.py (reason regime)"},
+            # paper_desk.signals: `side == LONG and not btc_bull and base != BTC` skips alt longs of classes C and R; B/E/F/D have no regime check
+            {"text_ru": "Фьючерсы: откупы паники и каскадов идут в любом режиме (запрет лонгов альтов — только у неторгуемых правил "
+                        "«у уровня» и «ретест»).", "src": "cnq/agents/paper_desk.py signals()"},
+            # turbo_desk.step (btcx → dollars), own_desk (buys only in «рост»), sweep_desk.step (bull is not True → no entry)
+            {"text_ru": "«Турбо · BTC ×2» уходит в доллары; «Сигналы CRYPTO NOVA» и «Ложный пробой» не покупают.",
+             "src": "cnq/agents/turbo_desk.py; cnq/agents/own_desk.py; cnq/agents/sweep_desk.py"},
+        ], note))
+    always = [
+        # cnq/execution/okx_futures.py: the stop is attached to the order and re-checked; missing and not restorable → closed at once
+        {"text_ru": "Реальная позиция на OKX всегда со стопом на бирже; стоп не ставится → закрываем сразу.",
+         "src": "cnq/execution/okx_futures.py"},
+        # cnq/risk/limits.py DAILY_LOSS_HALT, enforced in cnq/risk/gate.py _allow (latch «daily»); the real OKX sleeve has its own
+        # cnq/execution/okx_futures.py DAY_LOSS (3 % of the futures budget per UTC day) — read as text, execution is not imported here
+        {"text_ru": f"Дневной стоп {pc(RL.DAILY_LOSS_HALT)} (все демо-счета вместе; у OKX свой −3%) → без новых входов до 00:00 UTC.", "src": "cnq/risk/limits.py DAILY_LOSS_HALT; cnq/risk/gate.py; okx_futures DAY_LOSS"},
+        # cnq/risk/limits.py DRAWDOWN_HALT, enforced in cnq/risk/gate.py _allow (latch «drawdown»)
+        {"text_ru": f"Просадка {pc(RL.DRAWDOWN_HALT)} от пика (все демо-счета) → без новых входов до сброса владельцем.",
+         "src": "cnq/risk/limits.py DRAWDOWN_HALT; cnq/risk/gate.py"},
+    ]
+    bull = regime.get("btc_bull")
+    return {"price": price, "regime_ru": "рост" if bull else "осторожно" if bull is False else "неизвестен", "levels": L,
+            "always": always, "desk": {"key": SW.KEY, "name_ru": SW.NAME, "paper_only": True,
+                                       # cnq/agents/sweep_desk.status_ru (the live app prefers paper.json → profiles.swp.status_ru)
+                                       "status_ru": sw.get("status_ru") or "демо-счёт ещё не запущен на сервере"}}
+
+
 def build(ctx: dict, history: dict[str, dict[int, float]], now_ms: int | None = None) -> dict:
     now_ms = now_ms or int(time.time() * 1000)
     term = ctx.get("terminal") or {}
@@ -497,6 +578,11 @@ def build(ctx: dict, history: dict[str, dict[int, float]], now_ms: int | None = 
                              + ("Направление на всех горизонтах — как монетка." if coins and all(coins) else
                                 "Направление: " + ", ".join(f"{H_NAME[k].lower()} — {h[k]['base_rate_up']['verdict_ru']}" for k, _ in HORIZONS
                                                             if h.get(k) and h[k].get("base_rate_up")) + "."))
+    try:   # 22.10: «Что будет делать система» — the key BTC levels and the reactions already programmed at each (system_plan)
+        out["system_plan"] = system_plan(ctx, regime, out.get("price"))
+    except Exception as e:  # noqa: BLE001 — never breaks the outlook
+        out["system_plan"] = None
+        out["system_plan_error"] = f"{type(e).__name__}: {str(e)[:160]}"
     out["disclaimer_ru"] = "Это статистика прошлого, а не обещание. Не финансовая рекомендация."
     return out
 

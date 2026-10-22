@@ -197,20 +197,39 @@ def add_insts(cl, inst_type: str, cur: set, missing: set) -> tuple[set, dict]:
 
 
 def sync(cl, ctx: dict, desired: set, st: dict, now: int, log=None) -> set:
-    """Spot: add the wanted instruments that are missing (add_insts, instType SPOT); nothing missing → no call. Returns (and keeps
-    in ctx) the instruments OKX has now."""
-    cur = set(ctx["enabled"])
-    missing = set(desired) - cur
+    """Spot: every coin OKX supports for spot copy stays / becomes a lead instrument (22.10 owner: everything copyable), never
+    removed. Missing supported coins → one POST with the full list (at most once a day when OKX refuses it); a missing PORTFOLIO
+    coin is then added one by one (add_insts). Nothing missing → no call. Returns (and keeps in ctx) what OKX has now."""
     if not ctx["active"]:
         return ctx["enabled"]
     st["lead_t"] = now
-    if not missing:
+    cur = set(ctx["enabled"])
+    every = (set(ctx["supported"]) | set(desired)) - cur
+    if not every:
         return ctx["enabled"]
-    en, fails = add_insts(cl, "SPOT", cur, missing)
+    en, fails, added = cur, {}, set()
+    if every - set(desired) and now - int(st.get("lead_full_t") or 0) >= DAY_MS:
+        try:
+            cl.call("POST", SET, body={"instType": "SPOT", "instId": ",".join(sorted(cur | every))})
+            en, added = cur | every, every
+        except ms.OkxError as e:
+            st["lead_full_t"] = now
+            if log:
+                log({"ev": "lead_instruments_full_refused", "type": "SPOT", "n": len(cur | every), "error": str(e)[:160]})
+    missing = set(desired) - en
+    if missing:
+        en, fails = add_insts(cl, "SPOT", en, missing)
+        added |= missing - set(fails)
+    elif added:
+        try:
+            d = cl.call("GET", INSTS, {"instType": "SPOT"}) or []
+            en = {str(x.get("instId")) for x in d if str(x.get("enabled")).lower() == "true"} or en
+        except ms.OkxError:
+            pass
     ctx["enabled"], ctx["fails"] = en, {**{k: v for k, v in ctx["fails"].items() if k == "*"}, **fails}
-    st.update({"lead_added": sorted(missing - set(fails)), "lead_fail": fails})
+    st.update({"lead_added": sorted(added)[:300], "lead_fail": fails})
     if log:
-        log({"ev": "lead_instruments", "type": "SPOT", "added": sorted(missing - set(fails)), "failed": fails, "n": len(en)})
+        log({"ev": "lead_instruments", "type": "SPOT", "added": sorted(added), "failed": fails, "n": len(en)})
     return en
 
 

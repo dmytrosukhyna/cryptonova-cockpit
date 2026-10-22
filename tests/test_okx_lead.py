@@ -42,7 +42,7 @@ def test_lead_role_buys_copyable_coins_as_lead_sets_the_instruments_and_leaves_t
     assert r["ok"]
     # the lead instruments = the portfolio's coins OKX supports for spot copy (SOL is not one here, ZZZ has no pair), instType SPOT
     assert fk.set_calls and fk.set_calls[0]["instType"] == "SPOT"
-    assert set(fk.set_calls[0]["instId"].split(",")) == {"BTC-USDT", "ETH-USDT", "AAA-USDT", "BBB-USDT"}
+    assert set(fk.set_calls[0]["instId"].split(",")) == {"BTC-USDT", "ETH-USDT", "AAA-USDT", "BBB-USDT", "DOGE-USDT"}   # every supported
     by = {o["instId"]: o["tdMode"] for o in spot_orders(fk)}
     assert by["BTC-USDT"] == by["ETH-USDT"] == by["AAA-USDT"] == by["BBB-USDT"] == "spot_isolated"
     assert by["SOL-USDT"] == "cash"                                       # not supported for copy → an ordinary trade
@@ -203,9 +203,10 @@ def test_spot_lead_instruments_are_never_shrunk_only_missing_portfolio_coins_are
     many = {f"{c}-USDT" for c in ("BTC", "ETH", "AAA", "DOGE", "XRP", "LINK", "AVAX", "ADA", "DOT", "APT")}   # OKX: all enabled
     fk = fake(spot_role="1", spot_enabled=set(many))
     assert ap.run_once(live(tmp), fk, F.portfolio(), NOW, F.nosleep)["ok"]
-    assert len(fk.set_calls) == 1 and set(fk.set_calls[0]["instId"].split(",")) == many | {"SOL-USDT", "BBB-USDT"}
-    assert fk.spot_enabled == many | {"SOL-USDT", "BBB-USDT"}
-    fk2 = fake(spot_role="1", spot_enabled=many | {"SOL-USDT", "BBB-USDT"})
+    every = fk.spot_supported
+    assert len(fk.set_calls) == 1 and set(fk.set_calls[0]["instId"].split(",")) == every and fk.spot_enabled == every
+    assert not set(fk.set_calls[0]["instId"].split(",")) < many
+    fk2 = fake(spot_role="1", spot_enabled=set(F.FakeOkx().spot_supported))
     assert ap.run_once(live(tempfile.mkdtemp()), fk2, F.portfolio(), NOW, F.nosleep)["ok"] and not fk2.set_calls
 
 

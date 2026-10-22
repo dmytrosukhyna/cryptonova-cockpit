@@ -1937,5 +1937,194 @@ def ls_neutral(iv=None, ret_out=None):
          json.dumps({"funding files": f"{have_f}/{len(need)}", "months": len(plan), **out}, ensure_ascii=False))
 
 
+def ls_robust():
+    """22.10, backlog item 6 — «Нейтральная корзина»: how much of the result is the rebalance DAY, and 15/20 coins instead of 10.
+    Same book as ls_neutral() LS10 with --iv (quality composite, top-100 alts by 30-day $ volume, ≥ 1 year, inverse-vol weights
+    capped at 2.5× an equal share, 0.2 % of the replaced notional, real Binance monthly funding — a period that spans two calendar
+    months takes each month's sum in proportion to its days), now for every rebalance day 1 / 8 / 15 / 22 and N = 10 / 15 / 20.
+    Staggered books: the capital split into 2 (days 1 + 15) or 4 (1 / 8 / 15 / 22) independent sub-accounts, each its own monthly
+    book — the standard cure for «timing luck». Every curve is cut to the SAME window (the latest first day … the earliest last
+    day) and reported at gross 0.75 (the live setting). 12 single + 6 staggered = 18 variants; the composite's signs were chosen on
+    this history (round 13), so this is a robustness check of a live desk, not a new discovery."""
+    X = _spot_data()
+    D, cl, days, perp_for, want = X["D"], X["cl"], X["days"], X["perp_for"], X["want"]
+    rev, v30, first = X["rev"], X["v30"], X["first"]
+    sym_of = {perp: sym for sym, perp in perp_for.items()}
+    t0 = int(dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc).timestamp() * 1000)
+    G = 0.75
+
+    def ym(d):
+        return dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).strftime("%Y-%m")
+
+    def ssum(ser, d, n):
+        return sum(ser.get(d - k * DAY, 0.0) for k in range(n)) if ser else 0.0
+
+    rank_cache = {}
+
+    def ranking(d):
+        if d in rank_cache:
+            return rank_cache[d]
+        top = sorted((v30[s][d], s) for s in D if d in v30[s] and s not in ("BTC", "ETH") and d - first[s] >= 365 * DAY)[-100:]
+        uni = [s for _v, s in top]
+        F = {}
+        for s in uni:
+            c0, b0 = cl[s][d], cl["BTC"][d]
+            c3, b3 = cl[s].get(d - 91 * DAY), cl["BTC"].get(d - 91 * DAY)
+            vv = [v30[s][t] for t in v30[s] if d - 180 * DAY <= t <= d]
+            sym = sym_of.get(s)
+            r30 = ssum(rev.get(sym), d, 30) if sym in want else 0.0
+            r90, r90p = (ssum(rev.get(sym), d, 90), ssum(rev.get(sym), d - 90 * DAY, 90)) if sym in want else (0.0, 0.0)
+            F[s] = {"age": (d - first[s]) / DAY, "m3": (c0 / c3) / (b0 / b3) - 1 if c3 and b3 else 0.0,
+                    "vt": v30[s][d] / np.mean(vv) if vv else 1.0, "rev": 1.0 if r30 > 0 else 0.0,
+                    "rg": (r90 / r90p - 1) if r90p > 0 and r90 > 0 else None}
+
+        def prank(key):
+            xs = sorted((F[s][key], s) for s in uni if F[s][key] is not None)
+            n = max(1, len(xs) - 1)
+            o = {s: k / n for k, (_v, s) in enumerate(xs)}
+            return {s: o.get(s, 0.5) for s in uni}
+        ra, rm, rv, rg = prank("age"), prank("m3"), prank("vt"), prank("rg")
+        comp = {s: (ra[s] + (1 - rm[s]) + (1 - rv[s]) + rg[s]) / 4 + 0.5 * F[s]["rev"] for s in uni}
+        rank_cache[d] = sorted(uni, key=lambda s: -comp[s])
+        return rank_cache[d]
+
+    REB = (1, 8, 15, 22)
+    NS = (10, 15, 20)
+    starts = {r: [d for d in days if d >= t0 and dt.datetime.fromtimestamp(d / 1000, dt.timezone.utc).day == r] for r in REB}
+    books = {}                       # (r, n) -> [(d, d1, long, short)]
+    for r in REB:
+        ms = starts[r]
+        for n in NS:
+            books[(r, n)] = [(d, ms[i + 1], ranking(d)[:n], ranking(d)[-n:]) for i, d in enumerate(ms[:-1])]
+    need = set()
+    for bk in books.values():
+        for d, d1, lg, sh in bk:
+            for s in lg + sh:
+                need.add((s, ym(d)))
+                need.add((s, ym(d1 - DAY)))
+    need = sorted(need)
+    with ThreadPoolExecutor(48) as ex:
+        FR = dict(zip(need, ex.map(lambda k: _funding_month(*k), need)))
+    have_f = sum(1 for v in FR.values() if v is not None)
+
+    def vol30(s, d):
+        xs = [cl[s].get(d - k * DAY) for k in range(31)]
+        xs = [x for x in xs if x]
+        if len(xs) < 15:
+            return None
+        rr = np.diff(np.log(np.array(xs[::-1])))
+        return float(rr.std()) or None
+
+    def leg(ps, d, ts):
+        out, w = [], []
+        for s in ps:
+            c0 = cl[s].get(d)
+            if not c0:
+                continue
+            last, path = c0, []
+            for t in ts:
+                c = cl[s].get(t)
+                if c:
+                    last = c
+                path.append(last / c0)
+            out.append(path)
+            sv = vol30(s, d)
+            w.append(1.0 / sv if sv else None)
+        if not out:
+            return np.ones(len(ts))
+        if len(out) > 1:
+            med = float(np.median([x for x in w if x])) if any(w) else 1.0
+            w = np.array([x if x else med for x in w])
+            w = np.minimum(w / w.sum(), 2.5 / len(w))
+            w = w / w.sum()
+            return (np.array(out) * w[:, None]).sum(axis=0)
+        return np.array(out[0])
+
+    def fund_period(ps, d, d1):
+        """mean over coins of the funding sum for the period: each calendar month's sum × (days of it in the period ÷ its days)."""
+        if not ps:
+            return 0.0
+        tot = []
+        for s in ps:
+            f, t = 0.0, d
+            while t < d1:
+                m = ym(t)
+                dd_ = dt.datetime.fromtimestamp(t / 1000, dt.timezone.utc)
+                nxt = (dd_.replace(day=1) + dt.timedelta(days=32)).replace(day=1)
+                mdays = (nxt - dd_.replace(day=1)).days
+                end = min(d1, int(nxt.timestamp() * 1000))
+                f += (FR.get((s, m)) or 0.0) * ((end - t) / DAY) / mdays
+                t = end
+            tot.append(f)
+        return float(np.mean(tot))
+
+    def curve(r, n):
+        """daily equity {t: V} of one sub-account, gross G."""
+        V, out, pl, ps_ = 1.0, {}, set(), set()
+        for d, d1, lg, sh in books[(r, n)]:
+            ts = [t for t in days if d < t <= d1]
+            if not ts:
+                continue
+            tl = 1 - len(set(lg) & pl) / max(1, len(lg))
+            tsh = 1 - len(set(sh) & ps_) / max(1, len(sh))
+            cost = 0.002 * G * 0.5 * (tl + tsh)
+            fund = G * 0.5 * (-fund_period(lg, d, d1) + fund_period(sh, d, d1))
+            path = np.maximum(1 + G * 0.5 * ((leg(lg, d, ts) - 1) - (leg(sh, d, ts) - 1)) - cost, 0.0)
+            V0 = V
+            for t, p in zip(ts, path):
+                out[t] = V0 * p
+            V = V0 * (path[-1] + fund)
+            out[ts[-1]] = V
+            pl, ps_ = set(lg), set(sh)
+        return out
+    C = {(r, n): curve(r, n) for r in REB for n in NS}
+    lo = max(min(c) for c in C.values())
+    hi = min(max(c) for c in C.values())
+    grid = [t for t in days if lo <= t <= hi]
+
+    def on_grid(c):
+        last, xs = None, []
+        for t in grid:
+            last = c.get(t, last)
+            xs.append(last)
+        x = np.array(xs, dtype=float)
+        return x / x[0]
+    S = {f"d{r} N{n}": on_grid(C[(r, n)]) for r in REB for n in NS}
+    for n in NS:
+        S[f"d1+15 N{n}"] = (S[f"d1 N{n}"] + S[f"d15 N{n}"]) / 2
+        S[f"4part N{n}"] = sum(S[f"d{r} N{n}"] for r in REB) / 4
+
+    def stats(eq):
+        dd = float((eq / np.maximum.accumulate(eq) - 1).min())
+        mon, prev_m, base = [], None, eq[0]
+        for t, v in zip(grid, eq):
+            m = ym(t)
+            if prev_m is not None and m != prev_m:
+                mon.append(lastv / base - 1)
+                base = lastv
+            prev_m, lastv = m, v
+        mon.append(eq[-1] / base - 1)
+        mr = np.array(mon)
+        yrs, pv = {}, eq[0]
+        for t, v in zip(grid, eq):
+            yrs.setdefault(ym(t)[:4], [pv, v])[1] = v
+            pv = v
+        half = len(eq) // 2
+        return [round(float(eq[-1]), 2), round(dd * 100), round(float(mr.mean()) * 100, 2),
+                round(float(mr.mean() / (mr.std() + 1e-12) * np.sqrt(len(mr))), 2), round(float((mr > 0).mean()) * 100),
+                [round((b / a - 1) * 100) for _y, (a, b) in sorted(yrs.items())],
+                round(float(eq[half] / eq[0]), 2), round(float(eq[-1] / eq[half]), 2)]
+    out = {k: stats(v) for k, v in S.items()}
+    for n in NS:
+        xs = [out[f"d{r} N{n}"][0] for r in REB]
+        out[f"spread N{n}"] = [min(xs), max(xs), round(float(np.std(xs)), 2)]
+    note("ls robust · meta", json.dumps({"funding files": f"{have_f}/{len(need)}", "variants": 18, "gross": G,
+                                          "window": [ym(lo), ym(hi)], "days": len(grid),
+                                          "cols": "x, dd %, month %, t(months), months+ %, years %, half1 x, half2 x"}))
+    note("ls robust · single days", json.dumps({k: v for k, v in out.items() if k.startswith("d") and "+" not in k}, ensure_ascii=False))
+    note("ls robust · staggered + spread", json.dumps({k: v for k, v in out.items() if not (k.startswith("d") and "+" not in k)},
+                                                      ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    (ls_neutral() if "--ls" in sys.argv else quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (ls_robust() if "--lsrob" in sys.argv else ls_neutral() if "--ls" in sys.argv else quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

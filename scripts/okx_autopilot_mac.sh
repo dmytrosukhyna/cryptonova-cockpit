@@ -14,6 +14,10 @@
 cd "$(dirname "$0")/.." || exit 1
 [ -f ~/.cryptonova.env ] && source ~/.cryptonova.env
 unset CNQ_LIVE_TRADING
+# 22.10: one autopilot per account (cnq/execution/okx_lease.py, needs CNQ_GH_TOKEN): this window's own id — the same across the
+# restarts inside this window, another window gets another id and waits instead of trading the same account
+export OKX_NODE=mac
+export OKX_LEASE_ID="${OKX_LEASE_ID:-mac-$(od -An -N3 -tx1 /dev/urandom | tr -d ' \n')}"
 cmd="${1:-check}"
 for v in OKX_API_KEY OKX_API_SECRET OKX_API_PASSPHRASE; do
   if [ -z "${!v}" ] && [ "$cmd" != "stop" ] && [ "$cmd" != "resume" ]; then

@@ -36,7 +36,11 @@ Safety:
     The quote is USDT on the global account; only an OKX Europe account would trade in USDC / EUR.
   • every order is a limit IOC at most OKX_SLIP (0.4 %) worse than the best price — never a blind market order;
     one order ≤ OKX_MAX_ORDER_USD ($3 000; bigger ones are split), all orders in a day ≤ OKX_MAX_DAY_USD ($25 000).
-  • kill switch: the file ~/.cryptonova_okx_stop (made by --stop) is checked before every order.
+  • kill switch: the file ~/.cryptonova_okx_stop (made by --stop) is checked before every order; --stop also writes the global
+    stop into the lease, so an autopilot on the server stops too.
+  • one autopilot per account (22.10, okx_lease.py): every order cycle (spot rebalance, futures, active spot) first asks the
+    lease on the repository's branch okx-lease — the right machine (Mac / server), no other live window, no global stop; and
+    this client refuses any order once its lease ran out mid-cycle. When in doubt — no orders.
   • coins outside the trading account (Funding, Simple Earn) are counted but never moved: the owner moves them.
   • OKX_KEEP=SOL,LINK — coins the autopilot never touches (not sold, not bought, not counted).
 Log: data/okx_autopilot.jsonl (local, ignored by git). State: ~/.cryptonova_okx_autopilot.json (outside the repo). The card shows
@@ -63,6 +67,7 @@ import urllib.request
 
 from . import myspot_watch as ms
 from . import okx_alloc as al
+from . import okx_lease as lease
 
 LOG = "data/okx_autopilot.jsonl"
 HOSTS = ms.HOSTS
@@ -194,6 +199,7 @@ class Okx:
         self.key, self.secret, self.passphrase, self.host, self.demo = key, secret, passphrase, host, demo
         self._open = opener or self._http
         self._sleep = sleep
+        self.lease_deadline = None      # set by a gated cycle (okx_lease.gate): no order goes out after this wall-clock ms
 
     @staticmethod
     def _http(method: str, url: str, headers: dict, body: str | None) -> dict:
@@ -208,6 +214,9 @@ class Okx:
                 return {"code": str(-e.code), "msg": f"HTTP {e.code}", "data": []}
 
     def call(self, method: str, path: str, params: dict | None = None, body: dict | None = None, signed: bool = True) -> list:
+        if method != "GET" and self.lease_deadline is not None and time.time() * 1000 >= self.lease_deadline:
+            # 22.10: this process's lease ran out mid-cycle (a sleeping Mac, a long pause) — another autopilot may trade now
+            raise lease.LeaseLost("замок автопилота закончился посреди цикла — ордер не отправлен")
         q = ("?" + urllib.parse.urlencode(params)) if params else ""
         payload = json.dumps(body, separators=(",", ":")) if body is not None else ""
         hdr = {"User-Agent": "cnq-okx-autopilot/1.0", "Accept": "application/json", "Content-Type": "application/json"}
@@ -674,7 +683,11 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
     st = load_state(env)
     if stopped(env):
         return {"ok": False, "why": "включён стоп (--stop) — ордера не ставлю. Снять: --resume"}
+    g = lease.gate(env, now)                    # 22.10: never two autopilots on one account (okx_lease.py)
+    if not g["ok"]:
+        return {"ok": False, "why": g["why"]}
     cl = connect(env, opener, st, sleep)
+    cl.lease_deadline = lease.deadline(g, now)
     perm = perm_of(cl.config())
     if "withdraw" in perm:
         log({"ev": "refused", "why": "withdraw permission"}, log_path)
@@ -686,6 +699,8 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
         return {"ok": False, "why": bad}
     b = build(cl, env, model)
     mode = "РЕАЛЬНЫЕ ДЕНЬГИ" if live(env) else "демо-торговля OKX"
+    if live(env) and not cl.demo and not st.get("first_live"):
+        st["first_live"] = {"t": now, "usd": b["total_usd"]}       # the start of «результат с начала» on the owner's card
     log({"ev": "plan", "mode": mode, "reason": reason, "total_usd": b["total_usd"], "sells": len(b["sells"]), "buys": len(b["buys"])}, log_path)
     res = execute(cl, b, st, env, now, sleep, log_path)
     summary = {"t": now, "reason": reason, "mode": mode, **res, "total_usd": b["total_usd"], "quote": b["quote"]}
@@ -773,6 +788,7 @@ def stop(env=None, opener=None) -> str:
     st = load_state(env)
     st["armed"] = False
     save_state(st, env)
+    glob = lease.set_stop(env, True)      # 22.10: the stop reaches every machine (the Mac window and the server service)
     n = 0
     if creds(env):
         try:
@@ -797,7 +813,10 @@ def stop(env=None, opener=None) -> str:
     except Exception:  # noqa: BLE001
         pass
     cancelled = f", отменено открытых ордеров: {n}" if n else ""
-    return f"Автопилот OKX остановлен: новых ордеров не будет{cancelled}.{fut} Включить снова: --resume, затем --run."
+    where = (" Общий стоп записан: автопилот на сервере тоже остановлен." if glob else
+             " Общий стоп НЕ записан (нет связи с GitHub или нет CNQ_GH_TOKEN) — если автопилот работает на сервере, "
+             "остановите его там: bash scripts/okx_autopilot_server.sh stop.")
+    return f"Автопилот OKX остановлен: новых ордеров не будет{cancelled}.{fut}{where} Включить снова: --resume, затем --run."
 
 
 def resume(env=None) -> str:
@@ -805,7 +824,9 @@ def resume(env=None) -> str:
         os.remove(stop_path(env))
     except FileNotFoundError:
         pass
-    return "Стоп снят. Автопилот снова включится после следующего --run (с OKX_AUTOPILOT=on)."
+    glob = lease.set_stop(env, False)
+    return ("Стоп снят. Автопилот снова включится после следующего --run (с OKX_AUTOPILOT=on)."
+            + ("" if glob else " Общий стоп снять не удалось (нет связи с GitHub или нет CNQ_GH_TOKEN) — повторите resume."))
 
 
 def check(env=None, opener=None) -> list[str]:
@@ -849,6 +870,7 @@ def check(env=None, opener=None) -> list[str]:
             out.append("  автопилот: " + ("СТОП (--resume, чтобы снять)" if stopped(env) else
                                           "включён — ребалансирует сам" if st.get("armed") and enabled(env) else
                                           "выключен (OKX_AUTOPILOT=on и первый --run включат его)"))
+            out.append("  " + lease.status_text(env))
         except Exception as e:  # noqa: BLE001
             out.append(describe_error(e))
     else:
@@ -890,6 +912,26 @@ def plan_all(env=None, opener=None, model=None, desks=None, act_desk=None, now: 
 
 
 def main(argv=None) -> int:
+    """22.10: a clean exit (Ctrl+C, a closed Terminal window = SIGHUP, systemctl stop = SIGTERM) gives the lease back at once."""
+    import signal
+
+    def bye(_signum, _frame):
+        raise SystemExit(0)
+    for sig in ("SIGTERM", "SIGHUP"):
+        try:
+            signal.signal(getattr(signal, sig), bye)
+        except (AttributeError, ValueError, OSError):
+            pass
+    try:
+        return _main(argv)
+    except KeyboardInterrupt:
+        return 130
+    finally:
+        if lease._CACHE:                        # this process held the lease
+            lease.release()
+
+
+def _main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     ipv4_only()
     if "--stop" in argv:
@@ -913,10 +955,18 @@ def main(argv=None) -> int:
         from . import okx_active, okx_futures
         print(f"Автопилот OKX: окно запущено ({'РЕАЛЬНЫЕ ДЕНЬГИ' if live() else 'демо-торговля OKX'}). Фьючерсы и активный спот — каждую "
               "минуту, спот-портфель — каждые 5 минут. Остановить окно: Ctrl+C; остановить автопилот: --stop.", flush=True)
-        last_spot = 0.0
+        last_spot, said = 0.0, None
         while True:
             armed = load_state().get("armed") and enabled() and not stopped()
-            if armed:
+            # 22.10: the lease first (okx_lease.py) — another window or the server may be the one trading this account
+            g = lease.gate() if armed else {"ok": False, "why": None}
+            if armed and not g["ok"] and g["why"] != said:
+                said = g["why"]
+                print(time.strftime("%H:%M ") + "Замок: " + said, flush=True)
+            elif armed and g["ok"] and said:
+                said = None
+                print(time.strftime("%H:%M ") + "Замок получен — это окно снова ведёт счёт.", flush=True)
+            if armed and g["ok"]:
                 for name, fn in (("Фьючерсы OKX", lambda: okx_futures.summary(okx_futures.step())),
                                  ("Активный спот OKX", lambda: (lambda r: (f"Активный спот OKX: куплено {r['bought']}, продано {r['sold']}"
                                                                            if r["bought"] or r["sold"] else None))(okx_active.step()))):
@@ -926,14 +976,14 @@ def main(argv=None) -> int:
                             print(time.strftime("%H:%M ") + msg, flush=True)
                     except Exception as e:  # noqa: BLE001
                         print(time.strftime("%H:%M ") + name + ": " + describe_error(e).replace("Автопилот OKX: ", ""), flush=True)
-            if time.time() - last_spot >= SPOT_EVERY_S:
-                last_spot = time.time()
-                try:
-                    msg = tick()
-                    if msg:
-                        print(time.strftime("%H:%M ") + msg, flush=True)
-                except Exception as e:  # noqa: BLE001
-                    print(time.strftime("%H:%M ") + describe_error(e), flush=True)
+                if time.time() - last_spot >= SPOT_EVERY_S:
+                    last_spot = time.time()
+                    try:
+                        msg = tick()
+                        if msg:
+                            print(time.strftime("%H:%M ") + msg, flush=True)
+                    except Exception as e:  # noqa: BLE001
+                        print(time.strftime("%H:%M ") + describe_error(e), flush=True)
             time.sleep(60)
     if "--plan" in argv or "--run" in argv:
         try:

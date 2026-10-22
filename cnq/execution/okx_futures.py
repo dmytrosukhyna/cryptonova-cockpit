@@ -612,11 +612,16 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     if ap.stopped(env):
         res["why"] = "включён стоп (--stop) — фьючерсы ничего не делают; позиции остаются со своими стопами на OKX"
         return res
+    g = ap.lease.gate(env, now)                 # 22.10: never two autopilots on one account (okx_lease.py)
+    if not g["ok"]:
+        res["why"] = g["why"] + " · позиции остаются со своими стопами на OKX"
+        return res
     st = load_state(env)
     st.setdefault("started", now)
     for k in ("trades", "skip", "tries", "done"):
         st.setdefault(k, {})
     cl = cl or connect(env, opener, sleep)
+    cl.lease_deadline = ap.lease.deadline(g, now)
     cfg = cl.config()
     bad = refuse(cfg, cl, env)
     if bad:

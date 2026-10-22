@@ -100,6 +100,10 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
     if ap.stopped(env):
         res["why"] = "включён стоп"
         return res
+    g = ap.lease.gate(env, now)                 # 22.10: never two autopilots on one account (okx_lease.py)
+    if not g["ok"]:
+        res["why"] = g["why"]
+        return res
     st = load_state(env)
     st.setdefault("started", now)
     st.setdefault("trades", {})
@@ -111,6 +115,7 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
             save_state(st, env)
         return res
     cl = cl or ap.connect(env, opener, ap.load_state(env), sleep)
+    cl.lease_deadline = ap.lease.deadline(g, now)
     perm = ap.perm_of(cl.config())
     bad = ("ключ с правом ВЫВОДА" if "withdraw" in perm else "у ключа нет права «Торговля»" if "trade" not in perm else ap.world_ok(cl, env))
     if bad:

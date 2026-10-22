@@ -21,7 +21,7 @@ jobs:
       - run: pip install -q numpy pillow pytest
       - name: tests/run.py against the known failures
         run: |
-          python tests/run.py > tests.log 2>&1 || true
+          python -u tests/run.py > tests.log 2>&1 || true
           tail -3 tests.log
           python - <<'PY'
           import re, sys
@@ -31,6 +31,10 @@ jobs:
           summary = (re.findall(r"^\d+ passed, \d+ failed.*$", log, re.M) or ["no summary line"])[-1]
           new = sorted(failed - known)
           if new:
+              for name in new:                     # the traceback's last lines as an annotation: logs are not readable from sessions
+                  m = re.search(r"^FAIL\s+" + re.escape(name) + r"\n(.*?)(?=^(?:PASS|FAIL)\s|^\d+ passed, |\Z)", log, re.M | re.S)
+                  tail = " | ".join(l.strip() for l in (m.group(1).strip().splitlines() if m else [])[-6:])[:900]
+                  print(f"::warning title=trace {name}::{tail or 'no traceback found'}")
               print(f"::error title=tests: NEW failures::{summary}; new: {', '.join(new)}")
               sys.exit(1)
           print(f"::notice title=tests: green::{summary}; only known failures ({len(failed & known)})")

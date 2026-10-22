@@ -267,7 +267,8 @@ def test_run_returns_six_portfolios(tmp_path):
     import json
     import os
     cwd = os.getcwd()
-    old = pf.coingecko_markets, pf.hyperliquid_universe
+    old = pf.coingecko_markets, pf.hyperliquid_universe, pf.okx_spot_list
+    pf.okx_spot_list = lambda conn, now, get=None: None   # offline: no OKX spot filter (in CI the real OKX list leaked in, 22.10)
     mk = fake_markets()
     mk.append({"symbol": "SOL", "name": "Solana", "id": "solana", "price": 100, "mcap": 5e10, "rank": 6, "volume": 3e9, "chg24": 1, "chg7": 1,
                "chg30": 5, "chg200": 10, "chg1y": 20, "ath_chg": -60, "ath_date": "2025-01-01T00:00:00Z", "atl_date": "2020-05-01T00:00:00Z"})
@@ -283,7 +284,7 @@ def test_run_returns_six_portfolios(tmp_path):
         res = pf.run(sqlite3.connect(":memory:"), btc_bull=True, llm=None, now=T0 + 60_000)
     finally:
         os.chdir(cwd)
-        pf.coingecko_markets, pf.hyperliquid_universe = old
+        pf.coingecko_markets, pf.hyperliquid_universe, pf.okx_spot_list = old
     assert res["portfolio_order"] == ["cons", "mod", "high", "meme", "bal", "ideas"] and set(res["portfolios"]) == set(res["portfolio_order"])
     for k, P in res["portfolios"].items():
         assert "error" not in P, (k, P.get("error"))

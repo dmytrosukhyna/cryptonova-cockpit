@@ -657,6 +657,12 @@ def run(web_dir: str = "web", now: int | None = None) -> dict:
 
 def write(out_dir: str = "web", web_dir: str | None = None) -> dict:
     d = run(web_dir or out_dir)
+    # 22.10: «Поддержка проекта» (cnq/agents/support.py) — information only: adds rows[].support / support, changes no status
+    try:
+        from . import support
+        support.attach(d, web_dir or out_dir)
+    except Exception as e:  # noqa: BLE001 — the table is written even if the support block fails
+        d["support_error"] = repr(e)[:200]
     os.makedirs(out_dir, exist_ok=True)
     tmp = os.path.join(out_dir, "ideas.json.tmp")
     with open(tmp, "w", encoding="utf-8") as f:

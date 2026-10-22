@@ -955,3 +955,22 @@ def test_ideas_money_of_a_coin_okx_does_not_list_goes_to_the_core():
     assert not port.rp._meta("okx_swap")                                         # the table's ADD1 took part of it, the core the rest
     st2 = port.step(src, _ideas(rows, T0), T0 + 3_600_000, tradeable=okx)       # nothing left to swap → no more core buys
     assert not [a for a in st2["actions"] if "Замена" in a["reason"]]
+
+
+def test_ideas_owner_trusted_coin_bought_small_while_the_table_waits():
+    """22.10 (owner «Б»): HYPE from the trust list — 2.5 %, rules of «небольшая сумма» — while the table says «ждём» for the
+    questionnaire; never when a consultant / overheating check fails."""
+    rows, src = ideas_world()
+    rows.insert(0, {**_irow("HYPE", "wait", 78.0), "why_ru": "Анкета 24/100 ниже порога 40 — ждём",
+                 "checks": [{"key": "rating", "ok": False}, {"key": "consultant", "ok": True}, {"key": "overheat", "ok": True}]})
+    src["cg"]["HYPE"] = 78.0
+    st = sp.IdeasPortfolio(sqlite3.connect(":memory:")).step(src, _ideas(rows, T0 - 1_800_000), T0)
+    by = {p["symbol"]: p for p in st["positions"]}
+    assert "HYPE" in by and by["HYPE"]["role"] == "small" and abs(by["HYPE"]["weight"] - 0.025) < 0.001
+    buy = next(a for a in st["actions"] if a["symbol"] == "HYPE")
+    assert "Исключение владельца" in buy["reason"] and "стоп −35%" in buy["reason"]
+    rows2, src2 = ideas_world()
+    rows2.insert(0, {**_irow("HYPE", "wait", 78.0), "checks": [{"key": "overheat", "ok": False}]})
+    src2["cg"]["HYPE"] = 78.0
+    st2 = sp.IdeasPortfolio(sqlite3.connect(":memory:")).step(src2, _ideas(rows2, T0 - 1_800_000), T0)
+    assert "HYPE" not in {p["symbol"] for p in st2["positions"]}

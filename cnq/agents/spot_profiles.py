@@ -333,6 +333,11 @@ IDEAS = {
     # coin is topped up when it drifts under ¾ of its plan and, at the Monday review, trimmed back when it grew past 1.5× its plan
     "core_w": {"BTC": 0.30, "ETH": 0.10, "SOL": 0.05}, "core_floor": 0.73, "core_trim": 1.5,
     "small_w": 0.025, "small_n": 3,       # table status «можно на небольшую сумму»: 2.5 % each, at most 3 coins
+    # 22.10 (owner chose «Б», confirmed 14:28): coins from the owner's trust list bought as «небольшая сумма» (2.5 %, stop −35 %,
+    # ×2 → half) even while the table says «ждём» because of the questionnaire or token dilution — only if the consultant,
+    # overheating, ATH, trend, turnover and regime checks pass, the coin is not «не брать» and OKX lists it. Kept through the
+    # Monday «ждём» review.
+    "trusted_small": ("HYPE",),
     "min_cash": 0.10, "fee": 0.001,       # cash ≥ 10 % after a buy; 0.1 % of every traded notional (the 10 % / 2.5 % include it)
     "stop_buy": -0.20,                    # buy/add coins except core (the table's «ядро» BTC/ETH/SOL — no stop)
     "stop_small": -0.35, "body_x": 2.0, "trail": 0.35,   # «small»: stop, ×2 → sell half (body back), the rest trails 35 % from the peak
@@ -638,7 +643,7 @@ class IdeasPortfolio:
                 self._sell(now, s, p, px, f"Трейлинг: {s} на {(1 - px / high) * 100:.0f}% ниже пика {_fp(high)} — остаток продаём ({res}).", actions)
             elif est != "small" and kind != "core" and ret <= P["stop_buy"]:
                 self._sell(now, s, p, px, f"Стоп {_pc(P['stop_buy'])}: {s} {res}. Убыток режем; {P['cooldown_d']} дней монету не берём.", actions)
-            elif weekly and st == "wait" and ret <= P["review_pnl"]:
+            elif weekly and st == "wait" and ret <= P["review_pnl"] and s not in P["trusted_small"]:
                 self._sell(now, s, p, px, f"Недельный пересмотр: в таблице «ждём» ({r.get('why_ru') or '—'}), позиция {res} — "
                            "освобождаем место.", actions)
         # --- 3. buys: table order, buy/add 10 % (≤ 8), small 2.5 % (≤ 4), cash ≥ 10 %, 14-day cooldown, a reliable live price
@@ -651,9 +656,12 @@ class IdeasPortfolio:
             cool = rp.sold_recently(now, P["cooldown_d"])
             for r in rows:
                 st, s = r.get("status"), (r.get("symbol") or "").upper()
-                if st not in ("buy", "add", "small") or not s or s in held:
+                trusted = (st == "wait" and s in P["trusted_small"]
+                           and not any(c.get("ok") is False for c in (r.get("checks") or [])
+                                       if c.get("key") in ("consultant", "overheat", "ath", "trend200", "vol", "regime")))
+                if (st not in ("buy", "add", "small") and not trusted) or not s or s in held:
                     continue
-                small = st == "small"
+                small = st == "small" or trusted
                 w = P["small_w"] if small else core_target(s) if (r.get("kind") == "core") else P["buy_w"]
                 st_ru = r.get("status_ru") or st
                 px = k = why_not = None
@@ -680,8 +688,10 @@ class IdeasPortfolio:
                 cost = w * V / (1 + P["fee"])
                 rule = (f"стоп {_pc(P['stop_small'])}, на ×{P['body_x']:.0f} продаём половину, остаток — до отката "
                         f"{P['trail']*100:.0f}% от пика" if small else "ядро — без стопа" if kind == "core" else f"стоп {_pc(P['stop_buy'])} от входа")
-                actions.append(rp._act(now, s, "BUY", cost, px, f"Из таблицы «{st_ru}»: {r.get('why_ru') or '—'}. {w*100:g}% счёта, {rule}; "
-                                       "продаём и при статусе «не брать».", f"{kind}:{st}"))
+                head = (f"Исключение владельца (22.10): {s} из списка доверия — на небольшую сумму, хотя таблица пишет «{r.get('why_ru') or 'ждём'}»"
+                        if trusted else f"Из таблицы «{st_ru}»: {r.get('why_ru') or '—'}")
+                actions.append(rp._act(now, s, "BUY", cost, px, f"{head}. {w*100:g}% счёта, {rule}; "
+                                       "продаём и при статусе «не брать».", f"{kind}:{'small' if trusted else st}"))
                 rp._set_cash(rp.cash() - cost * P["fee"])
                 rp._set_meta(f"src:{s}", _SRC_CODE[k])
                 rp._set_meta(f"px:{s}", px)

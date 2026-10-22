@@ -751,7 +751,7 @@
             },
             {
               "title": "Qué te da la conexión",
-              "text": "Una vez conectada, las operaciones de CRYPTO NOVA se abren y se cierran solas en tu cuenta: OKX las repite por el importe que elijas. Puedes dejar de copiar en OKX en cualquier momento, y puede haber pérdidas. Además, con una cuenta conectada NOVA responde 100 preguntas al día en lugar de 5.",
+              "text": "Una vez conectada, las operaciones de CRYPTO NOVA se abren y se cierran solas en tu cuenta: OKX las repite por el importe que elijas. Puedes dejar de copiar en OKX en cualquier momento, y puede haber pérdidas.",
               "example": "En la vida real: el riego automático del huerto. Tú eliges cuánta agua y lo apagas cuando quieras, y el huerto sigue siendo tuyo.",
               "art": "target",
               "screen": "Live",
@@ -765,11 +765,6 @@
                   "n": 2,
                   "target": "auto",
                   "text": "Para la copia en OKX cuando quieras"
-                },
-                {
-                  "n": 3,
-                  "target": "nova",
-                  "text": "NOVA: 100 preguntas al día"
                 }
               ]
             },

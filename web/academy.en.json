@@ -751,7 +751,7 @@
             },
             {
               "title": "What connecting gives you",
-              "text": "Once connected, CRYPTO NOVA's trades open and close in your account on their own: OKX repeats them for the amount you choose. You can stop copying in OKX at any time, and losses are possible. With a connected account, NOVA also answers 100 questions a day instead of 5.",
+              "text": "Once connected, CRYPTO NOVA's trades open and close in your account on their own: OKX repeats them for the amount you choose. You can stop copying in OKX at any time, and losses are possible.",
               "example": "In real life: automatic watering in your garden. You choose how much water and can switch it off whenever you like, and the garden is still yours.",
               "art": "target",
               "screen": "Live",
@@ -765,11 +765,6 @@
                   "n": 2,
                   "target": "auto",
                   "text": "Stop it in OKX at any time"
-                },
-                {
-                  "n": 3,
-                  "target": "nova",
-                  "text": "NOVA: 100 questions a day"
                 }
               ]
             },

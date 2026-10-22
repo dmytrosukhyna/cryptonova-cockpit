@@ -139,11 +139,13 @@ def test_background_worker_fills_the_cache(tmp_path):
     llm = FakeLLM()
     news = HomeNews(web, cache, llm)
     assert news.feed("es", NOW)[0]["meaning"] == ""           # served at once, the worker starts
-    for _ in range(100):
+    for _ in range(500):                                         # up to 10 s: a busy CI runner is slower than a laptop
         if news.feed("es", NOW, background=False)[0]["meaning"]:
             break
         time.sleep(0.02)
-    assert news.feed("es", NOW, background=False)[0]["meaning"] == ANSWER["es"]["meaning"] and llm.calls == 1
+    got = news.feed("es", NOW, background=False)[0]["meaning"]
+    assert got == ANSWER["es"]["meaning"], (got, llm.calls, news.last, news._busy)
+    assert llm.calls == 1, llm.calls
 
 
 def test_model_failure_keeps_the_fallback_and_is_not_hammered(tmp_path):

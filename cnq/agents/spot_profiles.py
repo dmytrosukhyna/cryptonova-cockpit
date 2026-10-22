@@ -341,7 +341,7 @@ IDEAS = {
     "stale_h": 3,                         # ideas.json older than this → no buys
     "px_tol": 0.25,                       # a live price within 25 % of the table's (or the last seen) price = the same coin, not a namesake
 }
-IDEAS_ABOUT = ("Наш портфель CRYPTO NOVA: сам покупает то, что советует таблица «Что брать на спот». Старт $10 000. Ядро — BTC 30%, ETH 10%, "
+IDEAS_ABOUT = ("Наш портфель CRYPTO NOVA: сам покупает то, что советует таблица «Что брать на спот». Старт $10 000. С 22.10 — только монеты со спот-парой на OKX: его повторяет реальный счёт CRYPTO NOVA. Ядро — BTC 30%, ETH 10%, "
                "SOL 5% (доливаем, если доля упала ниже ¾ плана; продаём лишнее, если выросла больше чем в 1.5 раза), остальные «можно брать» и «можно добрать» — по 7.5%, всего не больше 8 монет вместе с ядром; «можно на небольшую сумму» — по 2.5%, "
                "не больше 3; кэш не меньше 10%, комиссия 0.1% с каждой сделки. Продаём, если таблица поставила «не брать»; стоп −20% от "
                "входа (ядро BTC, ETH, SOL — без стопа); для небольшой суммы стоп −35%, на ×2 продаём половину, остаток — до отката 35% от "
@@ -578,10 +578,14 @@ class IdeasPortfolio:
         actions.append(self.rp._act(now, s, "TRIM", half, px, reason, fixes=(p["fixes"] or 0) + 1, last_fix=px))
         self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
 
-    def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None) -> dict:
+    def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None,
+             tradeable: set | None = None) -> dict:
         """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
         "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas()); `sma200` (20.10) —
-        {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map)."""
+        {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map). `tradeable` (22.10, owner) — coins with an
+        OKX spot pair: the owner's real OKX account repeats this portfolio, so a coin OKX does not list is not bought, and a held one
+        is sold (None — the list is unknown this run: nothing is filtered)."""
+        okx = {str(c).upper() for c in tradeable} if tradeable else None
         now = now or int(time.time() * 1000)
         P, rp = IDEAS, self.rp
         src = {k: {str(s).upper(): float(v) for s, v in ((sources or {}).get(k) or {}).items() if _posnum(v)} for k in IDEAS_SRC}
@@ -618,7 +622,10 @@ class IdeasPortfolio:
             r = smap.get(s) or {}
             st = r.get("status")
             res = f"{_pc(ret)} от входа" + ("" if s in live else f", цена — {IDEAS_SRC_RU[psrc[s]]}")
-            if st == "avoid":
+            if okx is not None and s not in okx and kind != "core":
+                self._sell(now, s, p, px, f"Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный "
+                           f"счёт CRYPTO NOVA. {s} на споте OKX нет — продаём, итог {res}.", actions)
+            elif st == "avoid":
                 self._sell(now, s, p, px, f"Таблица поставила «не брать»: {r.get('why_ru') or 'проверки не пройдены'}. Продаём, итог {res}.", actions)
             elif est == "small" and not fixes and ret <= P["stop_small"]:
                 self._sell(now, s, p, px, f"Стоп {_pc(P['stop_small'])}: {s} {res} — небольшую сумму режем целиком.", actions)
@@ -648,7 +655,9 @@ class IdeasPortfolio:
                 w = P["small_w"] if small else core_target(s) if (r.get("kind") == "core") else P["buy_w"]
                 st_ru = r.get("status_ru") or st
                 px = k = why_not = None
-                if s in cool:
+                if okx is not None and s not in okx:
+                    why_not = "на споте OKX нет пары — портфель повторяет реальный счёт CRYPTO NOVA на OKX"
+                elif s in cool:
                     t = self.conn.execute(f"SELECT MAX(time) FROM {rp.T_ACT} WHERE symbol=? AND action='SELL'", (s,)).fetchone()[0] or now
                     dd = lambda x: datetime.fromtimestamp(x / 1000, tz=timezone.utc).strftime("%d.%m")   # noqa: E731
                     why_not = f"продана {dd(t)} — снова не раньше {dd(t + P['cooldown_d'] * DAY)}"

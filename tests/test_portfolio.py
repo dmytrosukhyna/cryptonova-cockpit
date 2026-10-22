@@ -902,3 +902,36 @@ def test_ideas_d10_tops_up_core_only():
     by = {p["symbol"]: p for p in st["positions"]}
     assert 0.35 < by["BTC"]["value_usd"] / (st["index"] * 100) <= 1.5 * 0.30 + 1e-3              # 26.4 % + 1/3 × 30 % of the value
     assert port.rp.cash() >= 0.10 * st["index"] / 100 - 1e-9 and any("Докупка ядра на просадке" in r for r in st["rules_ru"])
+
+
+def test_ideas_only_coins_with_an_okx_spot_pair():
+    """22.10 (owner): the real OKX account repeats this portfolio — a coin OKX does not list is not bought, a held one is sold;
+    the core stays; without the list (None) nothing changes."""
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    st = port.step(src, _ideas(rows, T0 - 1_800_000), T0)                        # no list → as before: A1…A6 bought
+    assert {"A1", "A2", "M1"} <= {p["symbol"] for p in st["positions"]}
+    okx = {"BTC", "ETH", "A2", "A3", "A4", "A5", "A6", "ADD1", "M2", "M3", "M4", "M5"} | {f"Z{i}" for i in range(60)}
+    st2 = port.step(src, _ideas(rows, T0), T0 + 1_800_000, tradeable=okx)
+    held = {p["symbol"] for p in st2["positions"]}
+    assert "A1" not in held and "M1" not in held and {"BTC", "ETH"} <= held
+    sells = {a["symbol"]: a["reason"] for a in st2["actions"] if a["action"] == "SELL"}
+    assert set(sells) == {"A1", "M1"} and all("спот-парой на OKX" in r for r in sells.values())
+    assert "ADD1" in held or any("ADD1" == x["symbol"] for x in st2["not_bought"])   # the freed place goes to a coin OKX lists
+    conn3 = sqlite3.connect(":memory:")
+    st3 = sp.IdeasPortfolio(conn3).step(src, _ideas(rows, T0 - 1_800_000), T0, tradeable=okx)
+    nb = {x["symbol"]: x["why_ru"] for x in st3["not_bought"]}
+    assert "A1" not in {p["symbol"] for p in st3["positions"]} and "на споте OKX нет пары" in nb["A1"]
+    assert "A1" not in sp.IdeasPortfolio(conn3).rp.sold_recently(T0 + 1, 14)       # never bought → no cooldown entry
+
+
+def test_okx_spot_list_uses_the_daily_cache_and_never_guesses():
+    from cnq.agents import portfolio as pf
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE IF NOT EXISTS meme_spot_cache (k TEXT PRIMARY KEY, t INTEGER, v TEXT)")
+    data = {"data": [{"baseCcy": f"C{i}", "quoteCcy": "USDT"} for i in range(80)] + [{"baseCcy": "EURX", "quoteCcy": "EUR"}]}
+    got = pf.okx_spot_list(conn, T0, get=lambda u: data)
+    assert "C1" in got and "EURX" not in got and len(got) == 80
+    assert pf.okx_spot_list(conn, T0 + 60_000, get=lambda u: (_ for _ in ()).throw(AssertionError("cached"))) == got
+    assert pf.okx_spot_list(sqlite3.connect(":memory:"), T0, get=lambda u: {"data": [{"baseCcy": "BTC", "quoteCcy": "USDT"}]}) is None

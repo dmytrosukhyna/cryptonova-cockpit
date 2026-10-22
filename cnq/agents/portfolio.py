@@ -1328,7 +1328,8 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
     from .spot_profiles import IDEAS, IDEAS_ABOUT, IdeasPortfolio, load_ideas
     try:      # 6th: «По рекомендациям» — buys what the spot ideas table says (web/ideas.json of the PREVIOUS run: the ideas step runs
               # after this one); prices: the same live sources as the other profiles, the source a coin was bought with is kept
-        profiles["ideas"] = IdeasPortfolio(conn).step({"cg": price, "meme": meme_px, "hl": hl_px}, load_ideas(), now, sma200=sma)
+        profiles["ideas"] = IdeasPortfolio(conn).step({"cg": price, "meme": meme_px, "hl": hl_px}, load_ideas(), now, sma200=sma,
+                                                      tradeable=okx_spot_list(conn, now))
     except Exception as e:  # noqa: BLE001
         profiles["ideas"] = {"key": "ideas", "name": IDEAS["name"], "about": IDEAS_ABOUT, "experiment": True, "error": str(e), **empty}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),
@@ -1337,6 +1338,25 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
             "hl_spot_top": [{"symbol": k, "vol24": v["vol24"], "price": v["price"], "chg24": v["chg24"],
                              "score": next((r["score"] for r in rows if r["symbol"] == k), None)} for k, v in hl_spot_list],
             "sources": ["CoinGecko /coins/markets", "Hyperliquid info API"]}
+
+
+def okx_spot_list(conn, now: int, get=None) -> set | None:
+    """22.10 (owner): coins with an OKX spot pair (USDT/USDC) — the CRYPTO NOVA portfolio buys only these, because the owner's real
+    OKX account repeats it. The same daily cache the spot meme check keeps (meme_spot «okx_spot»); a failed fetch → the last list;
+    nothing at all → None (no filter this run)."""
+    try:
+        from .meme_spot import _cache_any, _cache_get, _cache_put, okx_spot_bases
+        got = _cache_get(conn, "okx_spot", DAY_MS, now)
+        if got is None:
+            try:
+                got = okx_spot_bases(get or _get)
+                if got:
+                    _cache_put(conn, "okx_spot", got, now)
+            except Exception:  # noqa: BLE001
+                got = _cache_any(conn, "okx_spot")[1]
+        return {str(x).upper() for x in got} if got and len(got) > 50 else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 PORTFOLIO_SYSTEM = """Ты — портфельный консультант CRYPTO NOVΛ по спотовому рынку. Пиши по-русски, просто и конкретно, 6–10 предложений.

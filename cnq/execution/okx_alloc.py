@@ -85,9 +85,22 @@ def fetch_portfolio(get=None) -> dict:
         return {}
 
 
+def own_reason(p: dict, actions: list) -> str:
+    """Why the public portfolio holds this coin, in ITS own words (22.10): the reason of its latest buy / top-up of the current
+    holding, else the position's own reason. Never the screener's today line (table_why_ru) — for a coin the portfolio already
+    holds it can say the opposite («ждём просадку от −30%» next to a buy)."""
+    sym, since = str(p.get("symbol") or "").upper(), int(p.get("entry_time") or 0)
+    for a in sorted(actions or [], key=lambda a: -int(a.get("time") or 0)):
+        if (str(a.get("symbol") or "").upper() == sym and a.get("action") in ("BUY", "ADD") and a.get("reason")
+                and int(a.get("time") or 0) >= since - 86_400_000):
+            return str(a["reason"]).strip()
+    return str(p.get("reason") or "").strip()
+
+
 def ideas(portfolio: dict) -> dict:
     """{ticker: row} for the open positions of «Наш портфель CRYPTO NOVA»; row["w"] = its weight in that portfolio."""
     pf = (portfolio.get("portfolios") or {}).get("ideas") or {}
+    acts = [a for a in (pf.get("recent_actions") or []) + (pf.get("actions") or []) if isinstance(a, dict)]
     out = {}
     for p in pf.get("positions") or []:
         sym, w = str(p.get("symbol") or "").upper(), _f(p.get("weight"))
@@ -95,7 +108,7 @@ def ideas(portfolio: dict) -> dict:
             continue
         lv = p.get("levels") or {}
         out[sym] = {"sym": sym, "w": w, "price": _f(p.get("price")), "name": p.get("name") or sym, "bucket": p.get("bucket"),
-                    "kind_ru": p.get("kind_ru") or "", "role_ru": p.get("role_ru") or "", "why": p.get("table_why_ru") or "",
+                    "kind_ru": p.get("kind_ru") or "", "role_ru": p.get("role_ru") or "", "why": own_reason(p, acts),
                     "stop": _f(lv.get("stop")), "take_half": _f(lv.get("take_half")), "target_w": _f(p.get("target_weight")),
                     "entry": _f(p.get("entry"))}
     return out
@@ -110,11 +123,17 @@ def meta(portfolio: dict) -> dict:
 
 
 def reason(t: dict) -> str:
-    """Why the public portfolio holds this coin, in its own words, with its exit rule."""
-    head = t["name"] + (f" — {t['kind_ru']}" if t.get("kind_ru") else "") + (f", {t['role_ru']}" if t.get("role_ru") else "")
-    parts = [head] + ([t["why"]] if t.get("why") else [])
+    """Why the public portfolio holds this coin — its own reason (own_reason) and its own stop, never the screener's advice."""
+    head = t["name"] + (f" — {t['kind_ru']}" if t.get("kind_ru") else "")
+    why = (t.get("why") or "").rstrip(" .")
+    if why:
+        why = "в портфеле CRYPTO NOVA: " + (why[0].lower() + why[1:] if why[1:2].islower() else why)
+    elif t.get("role_ru"):
+        why = "в портфеле CRYPTO NOVA: " + t["role_ru"]
+    parts = [head] + ([why] if why else [])
     if t["sym"] in CORE:
-        parts.append("ядро — без стопа")
+        if "без стопа" not in why:
+            parts.append("ядро — без стопа")
     elif t.get("stop"):
         parts.append(f"стоп портфеля {t['stop']:.6g}" + (f", на ×2 продаёт половину ({t['take_half']:.6g})" if t.get("take_half") else ""))
     return "; ".join(parts)

@@ -272,3 +272,32 @@ def test_okx_autopilot_talks_ipv4_only_so_the_bound_ip_matches():
         assert socket.getaddrinfo("x", 1, socket.AF_INET6)[0][0] == socket.AF_INET6   # an explicit family is left alone
     finally:
         socket.getaddrinfo = orig
+
+
+def test_plan_reason_of_a_held_coin_is_the_portfolios_own_never_the_screeners_opposite_advice():
+    """22.10: «КУПИТЬ … PENGU … почему: … ждём просадку от −30%» — the screener's line of today said the opposite of the portfolio
+    that holds the coin. A held coin's reason is the portfolio's own (its buy / top-up reason, else the position's reason) + its stop."""
+    pf = json.loads(json.dumps(PF))
+    pos = pf["portfolios"]["ideas"]["positions"]
+    bbb = next(p for p in pos if p["symbol"] == "1000BBB")
+    bbb.update({"table_why_ru": "−26% от максимума за 30 дней — ждём просадку от −30%", "entry_time": NOW - 5 * 86_400_000,
+                "reason": "Из таблицы «можно на небольшую сумму»: Просадка −32% от максимума за 30 дней, проверки пройдены. 2.5% счёта, "
+                          "стоп −35%, на ×2 продаём половину; продаём и при статусе «не брать».", "levels": {"stop": 1.3, "take_half": 4.0}})
+    aaa = next(p for p in pos if p["symbol"] == "AAA")
+    aaa.update({"table_why_ru": "ждём отката", "entry_time": NOW - 5 * 86_400_000, "reason": "План: AAA 9.7% счёта — лишнее продаём."})
+    pf["portfolios"]["ideas"]["recent_actions"] += [
+        {"time": NOW - 5 * 86_400_000, "symbol": "AAA", "action": "BUY", "reason": "Из таблицы «можно брать»: Анкета 50. 10% счёта, стоп −20% от входа."},
+        {"time": NOW - 86_400_000, "symbol": "AAA", "action": "TRIM", "reason": "План: AAA 9.7% счёта — лишнее продаём."},
+        {"time": NOW - 30 * 86_400_000, "symbol": "BBB", "action": "BUY", "reason": "старая покупка до продажи"}]
+    by = al.ideas(pf)
+    why = al.reason(by["1000BBB"])
+    assert "ждём" not in why and "Просадка −32%" in why and "в портфеле CRYPTO NOVA: из таблицы «можно на небольшую сумму»" in why
+    assert "стоп портфеля 1.3, на ×2 продаёт половину (4)" in why and "старая покупка" not in why
+    why = al.reason(by["AAA"])
+    assert "ждём" not in why and "Анкета 50" in why and "лишнее продаём" not in why     # the buy reason, not the later trim
+    assert "без стопа" in al.reason(by["BTC"]) and al.reason(by["BTC"]).count("без стопа") == 1
+    e = F.env()
+    b = ap.build(ap.connect(e, live_fake(demo_key=True), {}, F.nosleep), e, pf)
+    text = ap.plan_text(b, "test")
+    line = next(x for x in text.split("\n") if "КУПИТЬ" in x and " BBB " in x)
+    assert "ждём" not in line and "Просадка −32%" in line and "стоп портфеля 1.3" in line

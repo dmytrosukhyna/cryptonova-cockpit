@@ -45,7 +45,7 @@ def test_size_from_desk_risk_scaled_to_budget_with_stop_attached_isolated_ioc():
     part = budget / 2                                                        # two desks (bal + imp) share the budget
     worst = float(o["px"])
     risk = float(o["sz"]) * 1 * (worst - 190.0)                              # SOL ctVal 1
-    assert abs(risk - part * 0.005) <= 2.0 and risk <= budget * 0.005 + 1e-6
+    assert abs(risk - part * 0.005) <= 2.0 and risk <= budget * 0.01 + 1e-6   # the desk's own 0.5 % of this desk's part
     assert o["tdMode"] == "isolated" and o["ordType"] == "ioc" and o["side"] == "buy" and o["clOrdId"].startswith("cnqf")
     assert worst <= 200 * 1.001 * 1.0041                                     # never more than OKX_SLIP above the ask
     a = o["attachAlgoOrds"][0]
@@ -56,13 +56,19 @@ def test_size_from_desk_risk_scaled_to_budget_with_stop_attached_isolated_ioc():
     assert list(st["trades"]) == ["bal:T1"] and st["trades"]["bal:T1"]["stop"] == 190.0
 
 
-def test_risk_cap_half_percent_and_leverage_never_above_three():
+def test_risk_as_the_system_capped_at_one_percent_and_leverage_never_above_three():
+    """Owner 22.10: «риск фьючерсов как у системы» — the desk's own risk share × this desk's part; 1 % of the budget is the ceiling."""
     fk = F.FakeOkx()
     e = F.env(OKX_FUT_MAX_LEV="10", OKX_FUT_RISK="0.05")                   # env can't loosen the hard caps
-    assert fu.caps(e) == {"lev": 3, "risk": 0.005, "max_pos": 5, "day_loss": 0.03}
-    run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 0.5 % of the budget
+    assert fu.caps(e) == {"lev": 3, "risk": 0.01, "max_pos": 5, "day_loss": 0.03}
+    run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 1 % of the budget
     o = swap_orders(fk)[0]
-    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 2500 * 0.005 + 1e-6
+    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 2500 * 0.01 + 1e-6
+    fk2 = F.FakeOkx()
+    run(fk2, F.env(), F.desks(F.trade(risk=150.0)))                          # desk risked 1.5 % → 1.5 % of the $1 250 part = $18.75
+    o2 = swap_orders(fk2)[0]
+    r2 = float(o2["sz"]) * (float(o2["px"]) - 190.0)
+    assert 17.0 <= r2 <= 18.75 + 1e-6
     assert fk.levers[0]["lever"] == "3"
     fk = F.FakeOkx()                                                         # a 0.3 % stop: the leverage room is the limit
     run(fk, F.env(), F.desks(F.trade(entry=200.0, stop=199.0, tp=210.0, risk=500.0)))

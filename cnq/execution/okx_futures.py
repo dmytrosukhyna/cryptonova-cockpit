@@ -16,12 +16,13 @@ What it does, once a minute inside the autopilot window (okx_autopilot --loop) a
 Late-join guard (22.10 review): a desk trade is mirrored only if it was opened after the autopilot's first live start (and is ≤ 45
 min old), OR the price now is at most OKX_FUT_JOIN_GAP (0.3 %) worse than the desk's entry; otherwise it is skipped («пропущено:
 сделка открыта раньше, цена ушла на X% от входа системы») and looked at again a minute later. The size always comes from the worst
-price the entry may fill at vs the desk's stop, so the risk stays ≤ 0.5 % of the budget whatever the fill.
+price the entry may fill at vs the desk's stop, so the risk stays within the cap whatever the fill.
 
 Size: the desk's own risk (risk_usd ÷ desk equity) applied to the desk's part of the FUTURES BUDGET = OKX_FUT_SHARE (0.25) of the
 account (okx_alloc.shares). Hard caps (env can only make them stricter):
   leverage ≤ 3 (OKX_FUT_MAX_LEV, default 2; isolated margin, set per instrument) and all positions' notional ≤ budget × leverage;
-  risk per trade ≤ 0.5 % of the budget (distance to the stop × size);   at most 5 open positions;
+  risk per trade = the desk's own risk share × this desk's part of the budget (owner 22.10: «риск как у системы»), never more than
+  1 % of the whole budget (distance to the stop × size);   at most 5 open positions;
   daily loss stop: realised P/L of the UTC day + open losses ≤ −3 % of the budget → no new entries until the next UTC day;
   the kill switch ~/.cryptonova_okx_stop (shared with the spot autopilot): nothing is placed at all — positions keep their stops on
   OKX; `--fut-close` closes them now.
@@ -52,7 +53,7 @@ LOG = "data/okx_futures.jsonl"
 FRESH_MS = 45 * 60_000
 JOIN_GAP = 0.003            # a trade opened before the start is joined only while the price is ≤ 0.3 % worse than the desk's entry
 MAX_LEV, DEF_LEV = 3, 2
-RISK_CAP = 0.005            # 0.5 % of the futures budget per trade
+RISK_CAP = 0.01             # hard ceiling: 1 % of the futures budget per trade (the desk's own risk, e.g. 1.5 % of a half budget = 0.75 %, fits)
 MAX_POS = 5
 DAY_LOSS = 0.03             # 3 % of the futures budget per UTC day
 OWN_GATE = (30, 0.3)        # «Сигналы CRYPTO NOVA» join the futures result after 30 closed trades at ≥ +0.3 % a trade (as the header)
@@ -343,7 +344,7 @@ def budget(cl: ap.Okx, st: dict, env=None, now: int | None = None, fresh: bool =
 def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict, px: float, mult: float, open_notional: float,
          avail: float, slip: float = 0.004) -> dict:
     """Contracts for one desk trade, or {"skip": why}. part = this desk's share of the budget (budget ÷ number of desks).
-    Risk = the desk's risk share × part, never more than 0.5 % of the whole budget, counted from the WORST price the IOC entry may
+    Risk = the desk's risk share × part (as the system), never more than RISK_CAP of the whole budget, counted from the WORST price the IOC entry may
     fill at (price ± OKX_SLIP) to the rounded stop; then the leverage room (all positions' notional ≤ budget × leverage) and the
     free USDT can only make it smaller."""
     long = t.get("side") == "LONG"
@@ -363,7 +364,7 @@ def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict
     risk_usd = min(frac * part, cap["risk"] * bud)
     lev = max(1, min(cap["lev"], int(float(inst.get("lever") or cap["lev"]))))
     coins = risk_usd / abs(worst - stop)
-    capped = "лимит риска 0,5% бюджета" if frac * part > cap["risk"] * bud else None
+    capped = f"лимит риска {cap['risk'] * 100:g}% бюджета".replace(".", ",") if frac * part > cap["risk"] * bud else None
     room = bud * lev - open_notional
     if coins * worst > room:
         coins, capped = max(0.0, room) / worst, f"предел плеча {lev} на весь бюджет"
@@ -838,7 +839,7 @@ def check_lines(cl: ap.Okx, cfg: dict, env=None) -> list[str]:
     try:
         b = budget(cl, {}, env, fresh=True)
         out.append(f"  бюджет фьючерсов: {ap.usd(b['usd'])} = {al._p(b['share'])} счёта {ap.usd(b['total'])} · плечо не выше {cap['lev']}"
-                   f" · риск на сделку не больше {ap.usd(b['usd'] * cap['risk'])} (0,5%) · дневной стоп {ap.usd(b['usd'] * cap['day_loss'])} (3%)"
+                   f" · риск на сделку не больше {ap.usd(b['usd'] * cap['risk'])} ({cap['risk'] * 100:g}%; сама сделка — с риском стола, как у системы) · дневной стоп {ap.usd(b['usd'] * cap['day_loss'])} (3%)"
                    f" · не больше {cap['max_pos']} позиций")
     except Exception as e:  # noqa: BLE001
         out.append(f"  бюджет фьючерсов не посчитан: {str(e)[:120]}")

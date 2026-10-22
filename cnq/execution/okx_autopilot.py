@@ -26,7 +26,7 @@ Bybit futures mirror on purpose: CNQ_LIVE_TRADING=yes is given to THIS process o
 
 Safety:
   • spot orders are tdMode «cash» (no borrowing); futures are isolated-margin swaps with the caps of okx_futures.py (leverage ≤ 3,
-    0.5 % risk a trade, 5 positions, 3 % daily loss stop); never a withdrawal or a transfer — the client has no such call. A key
+    the desk's own risk a trade, ≤ 1 %, 5 positions, 3 % daily loss stop); never a withdrawal or a transfer — the client has no such call. A key
     with the «Withdraw» permission is refused outright (nothing is traded with it).
   • real money only with CNQ_LIVE_TRADING=yes, given on the autopilot's own command line (scripts/okx_autopilot_mac.sh --live asks
     to type «ДА»), never in ~/.cryptonova.env (the Bybit futures mirror reads that file). Otherwise OKX demo trading (header
@@ -574,7 +574,7 @@ def same_text(b: dict, fut_on: bool, act_on: bool) -> str:
         d.append(f"активный спот выключен (OKX_ACTIVE=off) — его {al._p(b['split']['active'])} лежат в {b['quote']}")
     L = ["СОВПАДАЕТ С СИСТЕМОЙ CRYPTO NOVA: " + ("ДА" if not d else "НЕТ")]
     L += ["  отличие: " + x for x in d]
-    L.append("  по устройству: фьючерсы повторяют сигналы с лимитами (риск ≤ 0,5% бюджета на сделку, плечо ≤ 3, до 5 позиций) — "
+    L.append("  по устройству: фьючерсы повторяют сигналы с риском как у системы (не больше 1% бюджета на сделку, плечо ≤ 3, до 5 позиций) — "
              "размер может быть меньше, чем у демо-счёта системы; сделку, открытую до запуска, повторяем, только пока цена не дальше 0,3% "
              "от входа системы; продажи и стопы спот-портфеля "
              "приходят с его обновлением (проверка каждые 5 минут).")

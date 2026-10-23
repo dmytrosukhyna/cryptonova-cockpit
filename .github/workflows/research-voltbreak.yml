@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "all"
+        description: "all | regime (backlog #35)"
         required: false
         default: "all"
 
@@ -21,4 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -q numpy
-      - run: python scripts/voltbreak_all_study.py
+      - env: { MODE: "${{ inputs.mode }}" }
+        run: |
+          case "$MODE" in all|regime) ;; *) echo "bad mode"; exit 1;; esac
+          python scripts/voltbreak_all_study.py "$MODE"

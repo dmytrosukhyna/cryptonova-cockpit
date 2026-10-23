@@ -12,7 +12,8 @@ const fs = require('fs');
   const p = await b.newPage();
   const failed = [], errors = [];
   p.on('requestfailed', r => failed.push(r.url().split('?')[0].slice(0, 90) + ' ' + ((r.failure() || {}).errorText || '')));
-  p.on('pageerror', e => errors.push(String(e && e.message || e).slice(0, 200)));
+  const perr = [];
+  p.on('pageerror', e => perr.push(String(e && e.message || e).slice(0, 300)));
   p.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 160)); });
   await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await new Promise(r => setTimeout(r, 50000));
@@ -28,10 +29,12 @@ const fs = require('fs');
       return { bytes: B(body), chars: body.length, parts, current: cur, events: ((C.current || {}).events || []).length,
                coins: (C.coins || []).length, news: (C.news || []).length, route: typeof aiRoute === 'function' ? aiRoute() : null, body };
     } catch (e) { return { err: String(e), href: location.href, title: document.title, html: document.documentElement.outerHTML.length,
-                           scripts: document.scripts.length, ask: typeof askLLM, ctx: typeof ctxForAI, pack: typeof ctxPack }; }
+                           scripts: document.scripts.length, ask: typeof askLLM, ctx: typeof ctxForAI, pack: typeof ctxPack,
+                           adm: typeof adminTok, sizes: [...document.scripts].map(x => (x.src ? 'src:' + x.src.split('/').pop() : x.text.length)) }; }
   });
   if (out.body) { fs.writeFileSync('panel_body.json', out.body); delete out.body; }
   console.log(JSON.stringify(out));
+  console.log('uncaught page errors: ' + perr.length + (perr.length ? ' · ' + [...new Set(perr)].slice(0, 6).join(' | ') : ''));
   console.log('page errors: ' + errors.length + (errors.length ? ' · ' + errors.slice(0, 6).join(' | ') : ''));
   console.log('failed requests: ' + failed.length + (failed.length ? ' · ' + failed.slice(0, 8).join(' | ') : ''));
   await b.close();

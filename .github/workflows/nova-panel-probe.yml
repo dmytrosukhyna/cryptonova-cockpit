@@ -1,0 +1,71 @@
+name: nova-panel-probe
+# 23.10.2026 (owner: «в закрытой системе CRYPTO NOVA AI по какой-то причине не отвечает») — the whole path of the panel's chat,
+# from a GitHub runner (the server is not reachable from Claude's sandbox). Nothing secret is printed; no admin token is used.
+#   1. POST /v2/admin/nova: CORS preflight for https://cryptonova.vip, then requests WITHOUT a token at 2 / 15 / 20 / 30 / 40 KB —
+#      which layer answers (the API: 401 / 413 too_large; nginx: 413 HTML without CORS = the browser sees «нет связи»).
+#   2. The live panel in headless Chrome: the exact chat request ask() would send (size, biggest parts) — not sent.
+#   3. That request through the same model and settings as the server's /v2/admin/nova (key = CNQ_LLM_KEY): time, finish, empty?
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: 1 · CORS and body limits of /v2/admin/nova (no token)
+        run: |
+          set -u
+          A=https://app.crypto-capital.app/v2/admin/nova
+          pre=$(curl -sS -m 20 -o /dev/null -D - -X OPTIONS -H 'Origin: https://cryptonova.vip' -H 'Access-Control-Request-Method: POST' \
+                -H 'Access-Control-Request-Headers: authorization,content-type' "$A" | tr -d '\r' | grep -iE '^HTTP|^access-control' | tr '\n' ' ')
+          echo "::notice title=preflight::$pre"
+          for kb in 2 15 20 30 40; do
+            python3 -c "import json,sys; n=int(sys.argv[1])*1024; u='Контекст панели (JSON):\n'+'я'*(n//2)+'\n\nВопрос: тест'; sys.stdout.write(json.dumps({'system':'x','user':u,'max_tokens':200},ensure_ascii=False))" $kb > body.json
+            sz=$(wc -c < body.json)
+            r=$(curl -sS -m 30 -o resp.txt -D hdr.txt -w '%{http_code} %{time_total}s' -X POST -H 'Origin: https://cryptonova.vip' \
+                -H 'content-type: application/json' --data-binary @body.json "$A" || echo "000")
+            ct=$(tr -d '\r' < hdr.txt | grep -i '^content-type' | head -1)
+            acao=$(tr -d '\r' < hdr.txt | grep -i '^access-control-allow-origin' | head -1)
+            echo "::notice title=POST ${kb} KB::body ${sz} bytes → HTTP $r · ${ct:-no content-type} · ${acao:-NO CORS HEADER} · $(head -c 160 resp.txt | tr '\n' ' ')"
+          done
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: 2 · the panel's real chat request (headless Chrome, not sent)
+        run: |
+          npm i -s --no-save puppeteer-core@23.11.1 >/dev/null 2>&1
+          out=$(node scripts/nova_panel_probe.js https://cryptonova.vip/app.html | tr '\n' ' ')
+          echo "::notice title=panel request::$(echo "$out" | cut -c1-3500)"
+      - name: 3 · that request through the server's model settings (no retry)
+        env:
+          CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}
+          CNQ_LLM_PROVIDER: ${{ vars.CNQ_LLM_PROVIDER }}
+          CNQ_LLM_MODEL: ${{ vars.CNQ_LLM_MODEL }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, time
+          sys.path.insert(0, ".")
+          from cnq.agents.llm import LLM
+          from cnq.api.server import AGENT_LLM
+          if not os.path.exists("panel_body.json"):
+              print("::notice title=model::no panel request was captured"); raise SystemExit(0)
+          d = json.load(open("panel_body.json", encoding="utf-8"))
+          llm = LLM(**{**AGENT_LLM, "max_tokens": max(200, min(1200, int(d.get("max_tokens") or 800)))})   # = Api._panel_nova
+          t0 = time.time()
+          try:
+              raw = llm.complete(d["system"][:4000], d["user"][:40000], temperature=0.3)
+              txt = (raw or "").strip()
+              res = "ok" if txt else "empty"
+          except Exception as e:  # noqa: BLE001
+              txt, res = "", ("timeout" if "timed out" in str(e).lower() else "rate_limit" if "429" in str(e) else "llm_error: " + str(e)[:200])
+          u = llm.last_usage or {}
+          print(f"::notice title=model::{llm.provider} · {llm.model} · {res} · {round(time.time() - t0, 1)} s · finish {llm.last_finish} · "
+                f"prompt {u.get('prompt_tokens')} · completion {u.get('completion_tokens')} · reasoning "
+                f"{(u.get('completion_tokens_details') or {}).get('reasoning_tokens')} · {txt[:200]!r}".replace("\n", " "))
+          PY

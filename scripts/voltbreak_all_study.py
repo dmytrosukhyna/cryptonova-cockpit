@@ -206,7 +206,119 @@ def per_trade(trades, dates):
             "win": round(float((tot > 0).mean()) * 100, 1), "t_by_date": round(tstat, 2)}
 
 
+def wportfolio(trades, weights, d0, d1):
+    """Per-trade weights (share of equity); gross scaled down to ≤ 100 % on crowded days. → (day array, daily return array)."""
+    span = np.arange(d0, d1 + 1)
+    s = np.zeros(len(span))
+    g = np.zeros(len(span))
+    for (days, rets), w in zip(trades, weights):
+        for dd, rr in zip(days, rets):
+            k = dd - d0
+            if 0 <= k < len(span):
+                s[k] += w * rr
+                g[k] += w
+    scale = np.where(g > 1.0, 1.0 / np.maximum(g, 1e-12), 1.0)
+    return span, s * scale
+
+
+TARGET, WMAX, SMA = 0.004, 0.20, 200   # backlog #35, fixed before the run: 0.4 % of equity per 1σ daily move, cap 20 %
+
+
+def regime_main():
+    """Backlog #35 (23.10.2026): long volatility breakout with two conditions fixed in advance —
+    (1) BTC close above its 200-day average on the signal day, (2) position size = 0.4 % / σ20 of the coin (cap 20 %, gross ≤ 100 %).
+    Variants: base (as 22.10), filter only, sizing only, filter + sizing (the pre-registered one). N_luck = 508 + 4 = 512.
+    Pass: DD > −35 %, Sharpe above BTC hold in both halves, Sharpe above the luck hurdle, beats placebo p95."""
+    global N_LUCK
+    N_LUCK = 508 + 4
+    t0 = time.time()
+    os.makedirs(CACHE, exist_ok=True)
+    syms = list_symbols()
+    with ThreadPoolExecutor(24) as ex:
+        data = [x for x in ex.map(load, syms) if x is not None]
+    live_end = max(int(x["d"][-1]) for x in data)
+    dead = sum(1 for x in data if x["d"][-1] < live_end - 3)
+    note("vb35 · loaded", f"{len(syms)} symbols, {len(data)} usable, {dead} delisted; {time.time() - t0:.0f}s")
+    btc = next(x for x in data if x["sym"] == "BTCUSDT")
+    bc = dict(zip((int(d) for d in btc["d"]), btc["c"]))
+    bdays = sorted(bc)
+    bull = {}
+    for n, d in enumerate(bdays):
+        if n >= SMA - 1:
+            w = [bc[bdays[m]] for m in range(n - SMA + 1, n + 1)]
+            bull[d] = bc[d] > sum(w) / SMA
+
+    def sigma(x, i):
+        c = x["c"]
+        r = c[i - LOOK + 1:i + 1] / c[i - LOOK:i] - 1
+        return float(np.std(r, ddof=1))
+
+    d0 = min(int(x["d"][0]) for x in data)
+    d1 = live_end
+    sig = []
+    for k, x in enumerate(data):
+        for i, side, z, q20 in signals(x):
+            if side > 0:
+                sig.append((k, i, q20))
+    span = np.arange(d0, d1 + 1)
+    bpr = np.zeros(len(span))
+    for j in range(1, len(btc["c"])):
+        kk = int(btc["d"][j]) - d0
+        if 0 <= kk < len(span):
+            bpr[kk] = btc["c"][j] / btc["c"][j - 1] - 1
+    bb = stats(span, bpr)
+    note("vb35 · BTC hold", f"Sharpe {bb['sharpe']} halves {bb['halves']} {bb['cagr_pct']}%/yr DD {bb['dd_pct']}%; "
+         f"BTC above SMA200 on {round(100 * sum(bull.values()) / max(1, len(bull)))}% of days")
+    rng = np.random.default_rng(35)
+    rows = {}
+    for name, filt, size in (("base", False, False), ("filter", True, False), ("sizing", False, True), ("filter+sizing", True, True)):
+        tr, ws, dates = [], [], []
+        for k, i, q20 in sig:
+            x = data[k]
+            if filt and not bull.get(int(x["d"][i]), False):
+                continue
+            p = trade_path(x, i, 1, q20)
+            if p:
+                tr.append(p)
+                ws.append(min(WMAX, TARGET / max(sigma(x, i), 1e-6)) if size else SLOT)
+                dates.append(int(x["d"][i]))
+        sp, pr = wportfolio(tr, ws, d0, d1)
+        st = stats(sp, pr)
+        pt = per_trade(tr, dates)
+        plac = []
+        for rep in range(20):
+            ptr = []
+            for k, i, q20 in sig:
+                x = data[k]
+                if filt and not bull.get(int(x["d"][i]), False):
+                    continue
+                for _ in range(20):
+                    j = int(rng.integers(WARM, len(x["c"]) - 1))
+                    if not filt or bull.get(int(x["d"][j]), False):
+                        break
+                else:
+                    continue
+                p = trade_path(x, j, 1, x["q"][max(0, j - LOOK):j].mean())
+                if p:
+                    ptr.append(p)
+            plac.append(np.mean([sum(r) for _, r in ptr]) * 100 if ptr else 0)
+        p95 = float(np.percentile(plac, 95))
+        ok = (st["dd_pct"] > -35 and all(a > b for a, b in zip(st["halves"], bb["halves"])) and st["sharpe"] > st["hurdle"]
+              and pt["mean_pct"] > p95)
+        rows[name] = {**st, "trades": pt, "placebo_mean_pct": round(float(np.mean(plac)), 2), "placebo_p95_pct": round(p95, 2),
+                      "avg_weight_pct": round(100 * float(np.mean(ws)), 1) if ws else 0, "PASS": ok}
+        note(f"vb35 · {name}", f"{'PASS' if ok else 'no'} — Sharpe {st['sharpe']} (halves {st['halves'][0]}/{st['halves'][1]} vs BTC "
+             f"{bb['halves'][0]}/{bb['halves'][1]}), {st['cagr_pct']}%/yr, DD {st['dd_pct']}%, hurdle {st['hurdle']}; trades {pt['n']} on "
+             f"{pt['dates']} days, mean {pt['mean_pct']}% (median {pt['median_pct']}%, win {pt['win']}%, t by date {pt['t_by_date']}); "
+             f"placebo {rows[name]['placebo_mean_pct']}% p95 {rows[name]['placebo_p95_pct']}%; avg weight {rows[name]['avg_weight_pct']}%; "
+             f"years {st['years']}")
+    note("vb35 · summary", json.dumps({"N_luck": N_LUCK, "btc": bb, "rows": rows, "sec": round(time.time() - t0)},
+                                      ensure_ascii=False, default=str)[:3800])
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "regime":
+        return regime_main()
     t0 = time.time()
     os.makedirs(CACHE, exist_ok=True)
     syms = list_symbols()

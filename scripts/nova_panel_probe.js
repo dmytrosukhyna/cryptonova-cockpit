@@ -10,8 +10,10 @@ const fs = require('fs');
   const exe = ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium-browser'].find(p => fs.existsSync(p));
   const b = await puppeteer.launch({ executablePath: exe, headless: 'new', args: ['--no-sandbox'] });
   const p = await b.newPage();
-  const failed = [];
+  const failed = [], errors = [];
   p.on('requestfailed', r => failed.push(r.url().split('?')[0].slice(0, 90) + ' ' + ((r.failure() || {}).errorText || '')));
+  p.on('pageerror', e => errors.push(String(e && e.message || e).slice(0, 200)));
+  p.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 160)); });
   await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await new Promise(r => setTimeout(r, 50000));
   const out = await p.evaluate(() => {
@@ -25,10 +27,12 @@ const fs = require('fs');
       for (const k in (C.current || {})) cur[k] = B(JSON.stringify(C.current[k]));
       return { bytes: B(body), chars: body.length, parts, current: cur, events: ((C.current || {}).events || []).length,
                coins: (C.coins || []).length, news: (C.news || []).length, route: typeof aiRoute === 'function' ? aiRoute() : null, body };
-    } catch (e) { return { err: String(e) }; }
+    } catch (e) { return { err: String(e), href: location.href, title: document.title, html: document.documentElement.outerHTML.length,
+                           scripts: document.scripts.length, ask: typeof askLLM, ctx: typeof ctxForAI, pack: typeof ctxPack }; }
   });
   if (out.body) { fs.writeFileSync('panel_body.json', out.body); delete out.body; }
   console.log(JSON.stringify(out));
+  console.log('page errors: ' + errors.length + (errors.length ? ' · ' + errors.slice(0, 6).join(' | ') : ''));
   console.log('failed requests: ' + failed.length + (failed.length ? ' · ' + failed.slice(0, 8).join(' | ') : ''));
   await b.close();
 })().catch(e => { console.log(JSON.stringify({ err: String(e) })); process.exit(0); });

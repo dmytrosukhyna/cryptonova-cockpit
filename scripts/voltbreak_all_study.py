@@ -271,13 +271,27 @@ def regime_main():
          f"BTC above SMA200 on {round(100 * sum(bull.values()) / max(1, len(bull)))}% of days")
     rng = np.random.default_rng(35)
     rows = {}
-    for name, filt, size in (("base", False, False), ("filter", True, False), ("sizing", False, True), ("filter+sizing", True, True)):
+    cap = len(sys.argv) > 2 and sys.argv[2] == "cap"
+    if cap:  # backlog #46: at most 3 open trades × 10 %, signals beyond that are skipped (earliest entry first, then larger 20-day turnover)
+        N_LUCK = 508 + 5
+        sig.sort(key=lambda s: (int(data[s[0]]["d"][s[1]]), -s[2]))
+    combos = (("filter+cap3", True, False),) if cap else (("base", False, False), ("filter", True, False), ("sizing", False, True),
+                                                          ("filter+sizing", True, True))
+    for name, filt, size in combos:
         tr, ws, dates = [], [], []
+        busy = []
         for k, i, q20 in sig:
             x = data[k]
             if filt and not bull.get(int(x["d"][i]), False):
                 continue
+            if cap:
+                day = int(x["d"][i])
+                busy = [e for e in busy if e > day]
+                if len(busy) >= 3:
+                    continue
             p = trade_path(x, i, 1, q20)
+            if p and cap:
+                busy.append(p[0][-1])
             if p:
                 tr.append(p)
                 ws.append(min(WMAX, TARGET / max(sigma(x, i), 1e-6)) if size else SLOT)
@@ -317,7 +331,9 @@ def regime_main():
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "regime":
+    if len(sys.argv) > 1 and sys.argv[1] in ("regime", "cap"):
+        if sys.argv[1] == "cap":
+            sys.argv = [sys.argv[0], "regime", "cap"]
         return regime_main()
     t0 = time.time()
     os.makedirs(CACHE, exist_ok=True)

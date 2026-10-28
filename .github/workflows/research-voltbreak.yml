@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "all | regime (backlog #35) | cap (#46) | f36 (#36, live desk rules on all perps) | s50 (#50, short rules outside «рост»)"
+        description: "all | regime (backlog #35) | cap (#46) | f36 (#36, live desk rules on all perps) | s50 (#50, short rules outside «рост») | c47 (#47, breakout C capped on liquid perps)"
         required: false
         default: "all"
 
@@ -23,5 +23,5 @@ jobs:
       - run: pip install -q numpy
       - env: { MODE: "${{ inputs.mode }}" }
         run: |
-          case "$MODE" in all|regime|cap|f36|s50) ;; *) echo "bad mode"; exit 1;; esac
-          if [ "$MODE" = f36 ]; then python scripts/families36_study.py; elif [ "$MODE" = s50 ]; then python scripts/shorts50_study.py; else python scripts/voltbreak_all_study.py "$MODE"; fi
+          case "$MODE" in all|regime|cap|f36|s50|c47) ;; *) echo "bad mode"; exit 1;; esac
+          if [ "$MODE" = f36 ]; then python scripts/families36_study.py; elif [ "$MODE" = s50 ]; then python scripts/shorts50_study.py; elif [ "$MODE" = c47 ]; then python scripts/c47_study.py; else python scripts/voltbreak_all_study.py "$MODE"; fi

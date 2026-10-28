@@ -169,7 +169,7 @@ def test_system_status_from_real_timestamps(tmp_path):
     C = {c["key"]: c for c in d["components"]}
     assert C["engine"]["status"] == "ok" and "почти не укладывается" in C["engine"]["note_ru"]
     assert C["autopilot"]["status"] == "ok" and C["api"]["status"] == "ok" and C["api"]["last_ok"] == NOW
-    assert C["public_real"]["status"] == "stale" and C["mac_mirror"]["status"] == "stopped"
+    assert C["public_real"]["status"] == "stale" and C["mac_mirror"]["status"] == "stopped" and C["monitors"]["status"] == "stopped"
     assert C["state"]["status"] == "error" and C["researcher"]["status"] == "ok"
     assert C["site_pipeline"]["status"] == "error"                       # no status.json / version.json at all → no timestamp
     assert d["overall"] == "error" and all(c["status"] in ("ok", "stale", "error", "stopped") for c in d["components"])

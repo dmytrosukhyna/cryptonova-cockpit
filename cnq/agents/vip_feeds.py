@@ -177,6 +177,14 @@ def _real_spot(real: dict) -> dict:
     return out
 
 
+def _cross_stop(row: dict) -> bool:
+    try:
+        from .spot_profiles import cross_stop
+        return cross_stop(row)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _okx_base(sym: str) -> str:
     try:
         from ..execution.okx_alloc import okx_base
@@ -254,6 +262,10 @@ def spot_pipeline(pf: dict, ideas: dict, memes: dict, real: dict, prev: dict | N
                 why = f"Таблица: «{r.get('status_ru') or st}» ({why_t or UNKNOWN_RU}); портфель покупает на ближайшем прогоне."
             else:
                 why = f"Таблица: «{r.get('status_ru') or st}» ({why_t or UNKNOWN_RU}). Портфель не покупает: {stale_note or UNKNOWN_RU}"
+        elif st == "avoid" and _cross_stop(r):
+            stage, passed = "first_check", ["found", "first_check"]
+            why = (f"Таблица: «не брать» — {why_t or UNKNOWN_RU}. Для портфеля CRYPTO NOVA это «не добирать»: не покупает, но и не "
+                   "продаёт (решение владельца 28.10).")
         elif st == "avoid":
             stage, passed = "rejected", ["found", "first_check"]
             why = f"Таблица: «не брать» — {why_t or UNKNOWN_RU}."
@@ -319,8 +331,17 @@ def cash_block(ip: dict, real: dict, nb: dict, acts: list, now: int) -> dict:
         parts.append(f"Кэш спот-части реального счёта — {_pct_ru(cash_real)} ({_usd_ru(sc)} из {_usd_ru(sc + sk)}).")
     if cash_pf is not None:
         parts.append(f"В портфеле CRYPTO NOVA, который счёт повторяет, — {_pct_ru(cash_pf)}.")
-    parts.append(f"{floor * 100:.0f}% — это нижняя граница кэша, а не цель покупок: портфель тратит кэш только на монеты из таблицы, "
-                 f"которые проходят все его правила, и сам «лишний» кэш не раскладывает.")
+    idle = ip.get("idle_cash") or {}
+    parts.append(f"{floor * 100:.0f}% — это нижняя граница кэша, а не цель покупок: портфель тратит кэш на монеты из таблицы, "
+                 "которые проходят все его правила.")
+    if idle.get("rule_ru"):
+        parts.append("С 28.10 (решение владельца): если кэш выше 10% три полных дня подряд и подходящих монет нет, кэш сверх 10% "
+                     "уходит в ядро BTC / ETH / SOL (30 / 10 / 5); новую подходящую монету портфель оплатит сначала этой доливкой.")
+        if idle.get("due"):
+            parts.append(f"Сейчас кэш «лишний» с {dt.datetime.fromtimestamp(idle['since'] / 1000, KYIV).strftime('%d.%m %H:%M')}; "
+                         f"если подходящих монет не появится, перевод в ядро — {dt.datetime.fromtimestamp(idle['due'] / 1000, KYIV).strftime('%d.%m %H:%M')} по Киеву.")
+        if idle.get("core_extra_total_pct"):
+            parts.append(f"В ядре сейчас доливки «кэш → ядро»: {_pct_ru(idle['core_extra_total_pct'])} счёта.")
     parts.append(f"Свободных мест: {free_buy} из {buy_n} для «можно брать» (по 7,5%) и {free_small} из {small_n} «на небольшую сумму» (по 2,5%).")
     # sales of the last 14 days whose money stayed in cash (the 22.10 «no OKX pair» sales went into the core the same run — not these)
     sells = [a for a in sorted(acts, key=lambda a: -a["time"]) if a.get("action") == "SELL" and now - a["time"] <= 14 * DAY
@@ -338,7 +359,7 @@ def cash_block(ip: dict, real: dict, nb: dict, acts: list, now: int) -> dict:
                     ("fut_reserve_usd", "фьючерсы: резерв без открытых сделок"), ("fut_margin_usd", "фьючерсы: маржа в сделках")):
         if _num(al.get(k)) is not None:
             acc[k] = {"usd": round(_num(al.get(k)), 2), "name_ru": name}
-    return {"cash_pct_real": cash_real, "cash_pct_portfolio": cash_pf, "cash_target_pct": round(floor * 100, 1),
+    return {"cash_pct_real": cash_real, "cash_pct_portfolio": cash_pf, "cash_target_pct": round(floor * 100, 1), "idle_cash": idle or None,
             "cash_target_kind": "minimum", "cash_free_slots": {"buy": free_buy, "buy_total": buy_n, "small": free_small, "small_total": small_n},
             "account_usdt_pct": _r((real or {}).get("usdt_pct"), 2), "account_usdt_parts": acc,
             "real_asof": (real or {}).get("asof"), "real_stale": bool((real or {}).get("stale")),
@@ -441,9 +462,11 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
             status, why = "Paused", c.get("reason_ru") or "снят конвейером"
         elif c.get("stage") == "ready":
             status, why = "Approved", "прошёл ворота конвейера PAPER → READY"
+        elif k in ("cons", "bal", "aggr"):
+            status, why = "Validation", ("размер семейства «Автопилот», которое сейчас ведёт реальные фьючерсы размером «"
+                                         + ((prof.get(main) or {}).get("name") or main) + "»; автовыбор размеры не переключает (решение владельца 28.10)")
         elif k in sel_c or k == "own":
-            status, why = "Validation", ("кандидат автовыбора основного стола: " + (sel_c.get(k) or {}).get("why", "")) if k in sel_c and k != "own" \
-                else "входит в реальные фьючерсы после своих ворот: 30 сделок и от +0,3% на сделку"
+            status, why = "Validation", "кандидат автовыбора основного стола: нужна готовность READY по конвейеру, 20+ сделок и лучший результат к просадке"
         else:
             status, why = "Testing", "демо-счёт $10 000, к реальным деньгам не допущен"
         start = _num(v.get("start_equity"), 10_000.0) or 10_000.0
@@ -600,14 +623,13 @@ def selector_block(sel: dict, cdesks: dict) -> dict:
     review = [
         "Метрика — результат к максимальной просадке за одно и то же окно (с 17.10 или с более позднего старта обоих столов); "
         "процент выигрышей не используется.",
-        "Выборка: претенденту нужно 20 закрытых демо-сделок; просадка должна быть в пределах того, что обещала история стола.",
+        "Выборка: претенденту нужно 20 закрытых демо-сделок и (с 28.10, решение владельца) готовность READY по конвейеру — 30 сделок, "
+        "21 день, профит-фактор от 1,2, средняя сделка от +0,3%; просадка должна быть в пределах того, что обещала история стола.",
         "Комиссии, проскальзывание и фандинг учтены в демо-счетах; проверка вне выборки — только «частичная» у всех столов.",
         "Переключение — не чаще раза в 7 дней и никогда при открытой позиции текущего стола на реальном счёте.",
         "История решений: каждое переключение — строка в data/desk_select.jsonl на сервере, а состояние — в истории web/desk_select.json.",
-        "Расхождение с конвейером: для реальных денег автовыбору хватает 20 сделок, а ворота конвейера PAPER → READY требуют 30 сделок, "
-        "21 день, профит-фактор от 1,2 и среднюю сделку от +0,3%. Это правило, а не ошибка кода — предложение владельцу: требовать READY.",
-        "«Консервативная», «Сбалансированная» и «Агрессивная» — одни и те же сигналы разного размера: переключение между ними меняет "
-        "размер риска, а не стратегию.",
+        "«Консервативная», «Сбалансированная» и «Агрессивная» — одно семейство «Автопилот» (одни сигналы разного размера): с 28.10 "
+        "автовыбор сравнивает семейства, а не размеры; размер семейства — «Агрессивная» (выбор владельца).",
     ]
     if not sel:
         return {"available": False, "review_ru": review}
@@ -807,13 +829,20 @@ def system_status(out: str, now: int, lease: dict | None, api: tuple | None, pre
     wt, wl = watch
     comps.append(_comp("researcher", "Дежурный исследователь (раз в час)", _fresh(wt, now, 130) if wt else "error", wt, now,
                        (wl[:220] + ("…" if len(wl) > 220 else "")) if wl else "Журнал дежурства не прочитан."))
-    # the Mac mirror (Bybit demo, «Иван тест», «Мой портфель»)
-    t_mac = max(_ms(_load(out, "bybit.json").get("asof")) or 0, _ms(_load(out, "ivan.enc.json").get("asof")) or 0,
-                _ms(_load(out, "pulse.json").get("t")) or 0) or None
+    # 28.10: «Иван тест» and «Мой портфель» — the read-only monitors (the server's timer since 28.10, before that the Mac mirror)
+    t_iv, t_my = _ms(_load(out, "ivan.enc.json").get("asof")), _ms(_load(out, "myspot.enc.json").get("asof"))
+    t_mon = max(t_iv or 0, t_my or 0) or None
+    st = "ok" if t_mon and now - t_mon <= 45 * 60_000 else "stopped"
+    comps.append(_comp("monitors", "Мониторы «Иван тест» и «Мой портфель» (только чтение, раз в 15 минут)", st, t_mon, now,
+                       "Работают." if st == "ok" else
+                       f"Не обновлялись с {_ddmm(t_mon) if t_mon else '—'}: web/ivan.enc.json и web/myspot.enc.json показывают старые данные. "
+                       "Включить на сервере: ключи «только чтение» в /etc/cnq-okx.env и `okx_autopilot_server.sh monitors`."))
+    # the Mac's Bybit demo mirror (it trades the demo account — stays on the Mac)
+    t_mac = max(_ms(_load(out, "bybit.json").get("asof")) or 0, _ms(_load(out, "pulse.json").get("t")) or 0) or None
     st = "ok" if t_mac and now - t_mac <= 45 * 60_000 else "stopped"
-    comps.append(_comp("mac_mirror", "Зеркало на Маке (Bybit демо, «Иван тест», «Мой портфель»)", st, t_mac, now,
-                       "Работает." if st == "ok" else "Не обновляло файлы с " + (_ddmm(t_mac) if t_mac else "—") +
-                       ": web/bybit.json, web/ivan.enc.json и web/myspot.enc.json показывают старые данные."))
+    comps.append(_comp("mac_mirror", "Зеркало на Маке (Bybit демо)", st, t_mac, now,
+                       "Работает." if st == "ok" else "Не обновляло web/bybit.json с " + (_ddmm(t_mac) if t_mac else "—") +
+                       ": демо-счёт Bybit в панели показывает старые данные."))
     # the voice brief
     B = _load(out, "brief.json")
     if B:

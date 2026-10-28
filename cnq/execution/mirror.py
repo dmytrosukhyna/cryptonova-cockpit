@@ -17,6 +17,7 @@ to web/myspot.enc.json (nothing is traded).
 «Реальный счёт CRYPTO NOVA на OKX» (cnq/execution/public_real.py): with OKX_API_* (the autopilot's key, read here with GET only)
 and CNQ_GH_TOKEN, every 15 min a public summary of the SUB-ACCOUNT only → web/public_real.json (OKX_PUBLIC=off — never).
 Only while the autopilot runs on the Mac (the lease's node); in server mode the server's autopilot service writes it.
+28.10: the same for «Иван тест» and «Мой портфель» — in server mode the server's monitor timer publishes them (monitors.py).
 «Автопилот OKX» (cnq/execution/okx_autopilot.py) runs in its OWN window (okx_autopilot --loop), not here: CNQ_LIVE_TRADING=yes
 for it must never reach this Bybit futures mirror. `--check` here also prints the autopilot's key, host and state.
 Log: data/mirror.jsonl, state: data/mirror_state.json. Stdlib only."""
@@ -93,9 +94,27 @@ def publish(bx: BybitTrader, st: dict) -> bool:
     return ivan_watch.put_contents(url, hdr, content, "bybit demo status")   # retries a 409 conflict with a fresh sha
 
 
+_SAID: dict = {}
+
+
+def _monitor_writer(name: str) -> bool:
+    """28.10 (owner): the monitors moved to the server (cnq/execution/monitors.py). One writer: the Mac publishes «Иван тест» and
+    «Мой портфель» only while the lease names the Mac (okx_lease «node»), like web/public_real.json. Says why once."""
+    from . import monitors
+    ok, why = monitors.writer()
+    if not ok and _SAID.get(name) != why:
+        _SAID[name] = why
+        print(f"{name}: {why}", flush=True)
+    if ok:
+        _SAID.pop(name, None)
+    return ok
+
+
 def myspot_tick() -> bool:
     """«Мой портфель · OKX»: one read-only snapshot → encrypted web/myspot.enc.json. A failure prints one line and never stops the mirror."""
     try:
+        if not _monitor_writer("Мой портфель OKX"):
+            return False
         return myspot_watch.run() is not None
     except Exception as e:  # noqa: BLE001
         print(myspot_watch.describe_error(e), flush=True)
@@ -115,6 +134,8 @@ def public_real_tick() -> bool:
 def ivan_tick() -> bool:
     """«Иван тест»: one read-only snapshot → encrypted web/ivan.enc.json. A failure prints one line and never stops the mirror."""
     try:
+        if not _monitor_writer("Иван тест"):
+            return False
         return ivan_watch.run() is not None
     except Exception as e:  # noqa: BLE001
         print(ivan_watch.describe_error(e), flush=True)

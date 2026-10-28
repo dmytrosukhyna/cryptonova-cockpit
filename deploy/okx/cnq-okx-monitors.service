@@ -1,0 +1,31 @@
+# Read-only monitors of the CRYPTO NOVA server (28.10.2026, owner: move «Иван тест» and «Мой портфель» from the Mac to the server):
+# «Иван тест» → web/ivan.enc.json + web/ivan_stats.json, «Мой портфель · OKX» (+ the CRYPTO NOVA sub-account) → web/myspot.enc.json.
+# GET requests only — nothing is traded here (cnq/execution/monitors.py). Started by cnq-okx-monitors.timer every 15 minutes;
+# installed ONLY by hand: `bash /opt/cnq/repo/scripts/okx_autopilot_server.sh monitors` (root). The repository's auto-update never
+# installs, enables or starts it. One writer: it publishes only while the autopilot lease names the server.
+[Unit]
+Description=CRYPTO NOVA read-only monitors («Иван тест», «Мой портфель» — GET only, encrypted publishing)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=cnq
+Group=cnq
+# the same env file as the autopilot (keys of the monitors: IVAN_* and MYSPOT_*; CNQ_GH_TOKEN; OKX_API_* read with GET only)
+EnvironmentFile=/etc/cnq-okx.env
+Environment=HOME=/var/lib/cnq-okx
+Environment=PYTHONPATH=/opt/cnq/repo
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Environment=OKX_NODE=server
+WorkingDirectory=/var/lib/cnq-okx
+StateDirectory=cnq-okx
+StateDirectoryMode=0700
+ExecStart=/opt/cnq/venv/bin/python -m cnq.execution.monitors --once
+TimeoutStartSec=300
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+MemoryMax=256M

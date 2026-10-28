@@ -1,0 +1,11 @@
+# Every 15 minutes: the read-only monitors (cnq-okx-monitors.service). A run still going is never started twice (oneshot).
+[Unit]
+Description=CRYPTO NOVA read-only monitors every 15 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

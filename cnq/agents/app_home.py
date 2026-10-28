@@ -1011,11 +1011,16 @@ def _buy_now(out: str, now: int, lang: str = DEFAULT, real_syms: set | None = No
 # wins}, spot {usd, pct, value_usd, start_usd, since, cash_pct, cash_usd, coins [{sym, name, weight %, usd, pct since buy, kind,
 # plan %, stop, why}]}, curve [[t, $ futures + spot]] from 17.10 ending with the live point, calc — «Рассчитать мой портфель»:
 # the split of the user's sum (spot 65 / futures 25 / active spot 10 %) and the plain «почему так» of each part.
-CALC_SPLIT = {"spot": 65, "futures": 25, "active": 10}       # owner 22.10: how CRYPTO NOVA splits a user's sum
+# owner's decision of 28.10 (real money): spot portfolio 65 % + extra core BTC / ETH / SOL 10 % + futures 15 % + «Импульс BTC» 10 %.
+# "spot" = the spot portfolio + the extra core (75) so spot + futures + active stay 100 for the app builds that add them up;
+# "core" = the part of "spot" that is the extra core.
+CALC_SPLIT = {"spot": 75, "futures": 15, "active": 10, "core": 10}
 try:                                                          # the same split the owner's OKX autopilot runs (okx_alloc.SHARES)
     from ..execution.okx_alloc import SHARES as _OKX_SHARES
     if {"spot", "futures", "active"} <= set(_OKX_SHARES):
-        CALC_SPLIT = {k: round(float(_OKX_SHARES[k]) * 100) for k in ("spot", "futures", "active")}
+        _core = float(_OKX_SHARES.get("core") or 0.0)
+        CALC_SPLIT = {"spot": round((float(_OKX_SHARES["spot"]) + _core) * 100), "futures": round(float(_OKX_SHARES["futures"]) * 100),
+                      "active": round(float(_OKX_SHARES["active"]) * 100), "core": round(_core * 100)}
 except Exception:  # noqa: BLE001 — the app's split never depends on the autopilot module being importable
     pass
 PUB_CURVE_N = 240
@@ -1140,7 +1145,7 @@ def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, 
 REAL_KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
              "alloc", "futures", "closed_n", "curve", "asof", "stale")
 REAL_ALLOC = ("spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_usd", "fut_reserve_usd", "active_coins_usd",
-              "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct")
+              "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct", "core_pct")      # core_pct: 28.10
 REAL_STALE_MS = 2 * 3_600_000
 REAL_OPT = ("copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd",      # 22.10 (build 45): null in a file from before
             "closed", "fut_curve", "actions", "flows")                # 28.10 (build 46)
@@ -1288,7 +1293,8 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             cats.append({"key": c, "name": t(lang, f"pp.c.{c}"), "usd": _r(v), "share": _r(v / eq * 100 if eq else None)})
     # ---- the spot and futures parts: the base = their share of the starting capital, the result from OKX
     fut_share = al.get("fut_pct")
-    spot_share = (al.get("spot_pct") or 0) + (al.get("active_pct") or 0) if al.get("spot_pct") is not None else None
+    # 28.10 (owner's decision): the spot part = spot portfolio + extra core + «Импульс BTC» (85 %), the futures part 15 %
+    spot_share = (al.get("spot_pct") or 0) + (al.get("core_pct") or 0) + (al.get("active_pct") or 0) if al.get("spot_pct") is not None else None
     fcurve = sorted((int(p[0]), float(p[1])) for p in real.get("fut_curve") or [] if isinstance(p, list) and len(p) == 2 and p[1] is not None)
     tot = dict(curve)
     scurve = [(t_, tot[t_] - v) for t_, v in fcurve if t_ in tot]
@@ -1482,7 +1488,7 @@ MONTHS = {"ru": ("января", "февраля", "марта", "апреля",
                  "Νοεμβρίου", "Δεκεμβρίου"),
           "es": ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")}
 REP_WHAT = {"spot_buy": "buy", "active_buy": "buy", "spot_sell": "sell", "active_sell": "sell", "fut_open": "fut_open",
-            "fut_close": "fut_close", "fut_reduce": "fut_close", "fut_gone": "fut_gone"}
+            "fut_close": "fut_close", "fut_reduce": "fut_close", "fut_gone": "fut_gone", "active_park": "buy", "active_unpark": "sell"}
 
 
 def _say_money(x, lang: str, sign: bool = False) -> str:

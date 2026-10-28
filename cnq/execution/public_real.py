@@ -70,7 +70,8 @@ FUT_KEYS = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "
 CLOSED_KEYS = ("inst", "side", "open_px", "close_px", "move_pct", "pnl_usd", "lev", "opened", "closed", "partial")
 CLOSED_MAX = 50
 ACTION_KEYS = ("t", "kind", "sym", "side", "usd", "px", "sig")
-ACTION_KINDS = ("spot_buy", "spot_sell", "active_buy", "active_sell", "fut_open", "fut_close", "fut_reduce", "fut_gone")
+ACTION_KINDS = ("spot_buy", "spot_sell", "active_buy", "active_sell", "fut_open", "fut_close", "fut_reduce", "fut_gone",
+                "active_park", "active_unpark")        # 28.10 (owner's decision): «Импульс BTC» between its trades in BTC
 ACTIONS_MAX = 30
 TAIL_BYTES = 512 * 1024
 SYM_RE = re.compile(r"^[A-Z0-9]{1,20}$")
@@ -205,8 +206,9 @@ def actions(since: int, logs: dict | None = None) -> list[dict]:
         if ev.get("ev") == "order" and (ms._f(ev.get("filled")) or 0) > 0 and ev.get("side") in ("buy", "sell"):
             add(ev, "spot_" + ev["side"], ev.get("ccy"), usd=ms._f(ev.get("usd")), px=ev.get("avg_px"))
     for ev in _tail(logs["active"]):
-        if ev.get("ev") in ("buy", "sell") and (ms._f(ev.get("filled")) or 0) > 0:
-            add(ev, "active_" + ev["ev"], ev.get("ccy") or ev.get("inst"), usd=ms._f(ev.get("usd")), px=ev.get("avg_px"))
+        if ev.get("ev") in ("buy", "sell", "park", "unpark") and (ms._f(ev.get("filled")) or 0) > 0:
+            add(ev, "active_" + {"buy": "buy", "sell": "sell", "park": "park", "unpark": "unpark"}[ev["ev"]], ev.get("ccy") or ev.get("inst"),
+                usd=ms._f(ev.get("usd")), px=ev.get("avg_px"))
     for ev in _tail(logs["fut"]):
         e_ = ev.get("ev")
         side = {"LONG": "long", "SHORT": "short"}.get(str(ev.get("side") or ""))

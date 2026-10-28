@@ -31,11 +31,17 @@ def live_fake(**kw):
 
 
 def test_split_defaults_env_and_normalisation():
-    assert al.shares({}) == {"spot": 0.65, "futures": 0.25, "active": 0.1, "reserve": 0.0}
-    w = al.shares({"OKX_SPOT_SHARE": "0.6", "OKX_FUT_SHARE": "0.2", "OKX_ACT_SHARE": "0.1"})
+    # owner's decision of 28.10: spot portfolio 65 % + extra core 10 % + futures 15 % + «Импульс BTC» 10 %
+    assert al.shares({}) == {"spot": 0.65, "core": 0.1, "futures": 0.15, "active": 0.1, "reserve": 0.0}
+    w = al.shares({"OKX_SPOT_SHARE": "0.6", "OKX_CORE_SHARE": "0", "OKX_FUT_SHARE": "0.2", "OKX_ACT_SHARE": "0.1"})
     assert w["spot"] == 0.6 and round(w["reserve"], 6) == 0.1
     w = al.shares({"OKX_SPOT_SHARE": "0.8", "OKX_FUT_SHARE": "0.4", "OKX_ACT_SHARE": "0.0"})   # > 100 % → scaled to 100 %
-    assert abs(w["spot"] + w["futures"] + w["active"] - 1) < 1e-6 and w["reserve"] == 0.0
+    assert abs(w["spot"] + w["core"] + w["futures"] + w["active"] - 1) < 1e-6 and w["reserve"] == 0.0
+    # the extra core in the core's plan proportions 30 / 10 / 5 — the same as the CRYPTO NOVA portfolio's core
+    from cnq.agents.spot_profiles import IDEAS
+    assert al.CORE_PLAN == IDEAS["core_w"]
+    x = al.core_extra(al.shares({}))
+    assert abs(sum(x.values()) - 0.10) < 1e-9 and abs(x["BTC"] - 0.10 * 30 / 45) < 1e-9 and abs(x["SOL"] - 0.10 * 5 / 45) < 1e-9
     assert al.shares({"OKX_SPOT_SHARE": "abc"})["spot"] == 0.65
 
 
@@ -47,8 +53,10 @@ def test_targets_equal_spot_share_times_portfolio_weights_and_never_guess_a_tick
     total = b["total_usd"]
     pos = al.ideas(PF)
     got = {r["sym"]: r["target_pct"] / 100 for r in b["targets"]}
+    extra = al.core_extra(al.shares(e))                                       # owner 28.10: + the extra core 30 / 10 / 5
     for sym in ("BTC", "ETH", "SOL", "AAA", "1000BBB"):
-        assert abs(got[sym] - 0.65 * pos[sym]["w"]) <= 0.005, sym             # = spot share × the portfolio's weight (±0.5 %)
+        assert abs(got[sym] - 0.65 * pos[sym]["w"] - extra.get(sym, 0.0)) <= 0.005, sym   # = spot share × the portfolio's weight (±0.5 %)
+    assert abs(got["BTC"] - (0.65 * 0.30 + 0.10 * 30 / 45)) <= 0.005 and "доп. доля ядра" in next(o for o in b["buys"] if o["ccy"] == "BTC")["why"]
     assert {r["ccy"] for r in b["targets"]} == {"BTC", "ETH", "SOL", "AAA", "BBB"}  # 1000BBB → BBB-USDT (price × 1000 matches)
     assert "ZZZ" not in got and "CCC" not in got                               # missing on OKX / different price → never bought
     text = " ".join(b["diffs"])
@@ -71,7 +79,8 @@ def test_plan_prints_every_order_futures_sizes_and_the_match_and_places_nothing(
                                                                                                 opened=NOW - 5 * 3600_000))
     text, go = ap.plan_all(e, fk, PF, d, {"equity": 10000.0, "open": []}, NOW)
     assert go and not fk.orders and not fk.levers
-    for s in ("ДЕЛЕНИЕ СЧЁТА", "Спот · CRYPTO NOVA портфель: 65%", "Фьючерсы · CRYPTO NOVA (отобранные сигналы): 25%", "Импульс BTC: 10%",
+    for s in ("ДЕЛЕНИЕ СЧЁТА", "Спот · CRYPTO NOVA портфель: 65%", "Фьючерсы · CRYPTO NOVA (отобранные сигналы): 15%", "Импульс BTC: 10%",
+              "Ядро BTC / ETH / SOL (доп., 30 / 10 / 5): 10%",
               "ПРОДАТЬ 5000 DOGE", "КУПИТЬ", "почему:", "ждёт сигнала", "ОРДЕР: купить", "SOL-USDT-SWAP", "стоп-лосс 190", "ОРДЕР: продать",
               "BTC-USDT-SWAP", "пропущено: сделка открыта раньше, цена ушла на 5,37%", "СОВПАДАЕТ С СИСТЕМОЙ CRYPTO NOVA: НЕТ", "ZZZ"):
         assert s in text, s
@@ -232,7 +241,7 @@ def test_card_prices_eea_pairs_and_shows_the_autopilot_state():
     assert p["BTC"] == (100000.0, 98000.0) and round(p["XYZ"][0], 6) == 10.0 and round(p["EUR"][0], 6) == round(1 / 0.9, 6)
     tmp = tempfile.mkdtemp()
     st = ap.status(F.env(tmp, OKX_AUTOPILOT="on"))
-    assert st["configured"] and not st["armed"] and st["mode"] == "демо-торговля OKX" and st["split"]["futures"] == 0.25
+    assert st["configured"] and not st["armed"] and st["mode"] == "демо-торговля OKX" and st["split"]["futures"] == 0.15
     assert "futures" in st and st["futures"]["lev"] == 2 and st["active"]["enabled"]
     assert ap.status({"OKX_AUTOPILOT_STATE": os.path.join(tmp, "x")}) is None
 

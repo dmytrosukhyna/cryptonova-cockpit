@@ -5,9 +5,15 @@ holds. «Наша система» = what the closed system's header shows: FUTU
   spot     OKX_SPOT_SHARE (0.65) — mirrors web/portfolio.json → portfolios.ideas («Наш портфель CRYPTO NOVA»): every coin at
            its weight in that portfolio, its cash rule (≥ 10 %) included; its stops, take-profits and sells reach the account as
            the portfolio's own changes (okx_autopilot rebalances when they happen).
-  futures  OKX_FUT_SHARE (0.25) — the budget of okx_futures.py (the CRYPTO NOVA futures desks).
-  active   OKX_ACT_SHARE (0.10) — okx_active.py follows the «Импульс BTC» spot desk; in USDT while it has no trade («ждёт сигнала»).
-  The rest of 100 % (if the three add up to less) is a USDT reserve. Nothing is moved between accounts by code.
+  core     OKX_CORE_SHARE (0.10) — owner's decision of 28.10 (real money, answered explicitly): the 10 % freed from the futures
+           go to the core BTC / ETH / SOL in the core's plan proportions 30 / 10 / 5 (CORE_PLAN, the same as the portfolio's
+           core and its «кэш → ядро» rule) on top of what the spot portfolio holds.
+  futures  OKX_FUT_SHARE (0.15; 0.25 until 28.10, owner's decision of 28.10) — the budget of okx_futures.py (the CRYPTO NOVA
+           futures desks): this share of the STARTING capital + the futures' own result (fut_budget), never below the margin of
+           the open positions — not a share of the account's current value any more (owner's decision of 28.10).
+  active   OKX_ACT_SHARE (0.10) — okx_active.py follows the «Импульс BTC» spot desk; between its trades the sleeve waits in BTC
+           (owner's decision of 28.10; USDT for 3 days after the desk's exit — okx_active.py).
+  The rest of 100 % (if the shares add up to less) is a USDT reserve. Nothing is moved between accounts by code.
 
 The account's target for a coin = spot share × the coin's weight in the public portfolio. Symbols: a public ticker is mapped to an
 OKX spot pair only when the pair exists AND its price matches the public portfolio's price within 25 % (the public portfolio's own
@@ -23,12 +29,15 @@ import urllib.request
 
 SRC = os.environ.get("OKX_PUBLIC_SRC") or os.environ.get("MYSPOT_MODEL_SRC") or \
     "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/"
-SHARES = {"spot": 0.65, "futures": 0.25, "active": 0.10}
-ENV_KEYS = {"spot": "OKX_SPOT_SHARE", "futures": "OKX_FUT_SHARE", "active": "OKX_ACT_SHARE"}
+# Owner's decision of 28.10 (real money, answered explicitly): futures 25 % → 15 %, the freed 10 % → the core BTC / ETH / SOL.
+# Account: spot portfolio 65 % + extra core 10 % + futures 15 % + «Импульс BTC» 10 %. Leverage stays 2x (max 3x, okx_futures).
+SHARES = {"spot": 0.65, "core": 0.10, "futures": 0.15, "active": 0.10}
+ENV_KEYS = {"spot": "OKX_SPOT_SHARE", "core": "OKX_CORE_SHARE", "futures": "OKX_FUT_SHARE", "active": "OKX_ACT_SHARE"}
 PRICE_TOL = 0.25
 CORE = ("BTC", "ETH", "SOL")
-NAMES = {"spot": "Спот · CRYPTO NOVA портфель", "futures": "Фьючерсы · CRYPTO NOVA (отобранные сигналы)",
-         "active": "Активный спот · Импульс BTC", "reserve": "Резерв USDT"}
+CORE_PLAN = {"BTC": 0.30, "ETH": 0.10, "SOL": 0.05}     # = cnq/agents/spot_profiles.py IDEAS["core_w"] (a test keeps them equal)
+NAMES = {"spot": "Спот · CRYPTO NOVA портфель", "core": "Ядро BTC / ETH / SOL (доп., 30 / 10 / 5)",
+         "futures": "Фьючерсы · CRYPTO NOVA (отобранные сигналы)", "active": "Активный спот · Импульс BTC", "reserve": "Резерв USDT"}
 # public tickers (Binance futures / Hyperliquid names) → the OKX spot coin and how many coins one unit of the ticker is
 RENAMED = {"1000BONK": ("BONK", 1000), "1000PEPE": ("PEPE", 1000), "1000SHIB": ("SHIB", 1000), "1000FLOKI": ("FLOKI", 1000),
            "1000SATS": ("SATS", 1000), "1000RATS": ("RATS", 1000), "1000LUNC": ("LUNC", 1000), "1000XEC": ("XEC", 1000),
@@ -51,8 +60,8 @@ def _p(v: float) -> str:
 
 
 def shares(env=None) -> dict:
-    """{"spot", "futures", "active", "reserve"} — shares of the whole account. A bad or missing env value → the default; if the three
-    add up to more than 100 % they are scaled down to 100 %."""
+    """{"spot", "core", "futures", "active", "reserve"} — shares of the whole account. A bad or missing env value → the default; if
+    they add up to more than 100 % they are scaled down to 100 %."""
     e = os.environ if env is None else env
     w = {}
     for k, d in SHARES.items():
@@ -65,9 +74,22 @@ def shares(env=None) -> dict:
     return {k: round(v, 6) for k, v in w.items()}
 
 
+def core_extra(w: dict) -> dict:
+    """{BTC / ETH / SOL: share of the WHOLE account} — the extra core (owner's decision of 28.10) in the core's plan proportions"""
+    c, tot = float(w.get("core") or 0.0), sum(CORE_PLAN.values())
+    return {k: c * v / tot for k, v in CORE_PLAN.items()} if c > 0 else {}
+
+
+def fut_budget(share: float, capital: float, realized: float, upl: float, margin_open: float = 0.0) -> float:
+    """Owner's decision of 28.10 (real money): the futures part = its share of the starting capital (the start + net deposits /
+    withdrawals) + its own result (realized since the start, fees and funding included, + the open positions' P/L) — not a share
+    of the account's current value; never below the margin of the open positions (a position is never squeezed)."""
+    return round(max(float(margin_open or 0.0), float(share) * float(capital) + float(realized or 0.0) + float(upl or 0.0)), 2)
+
+
 def split_text(w: dict, total: float | None = None) -> list[str]:
     out = []
-    for k in ("spot", "futures", "active", "reserve"):
+    for k in ("spot", "core", "futures", "active", "reserve"):
         if w.get(k) or k != "reserve":
             out.append(f"{NAMES[k]}: {_p(w.get(k, 0))}" + (f" ≈ ${total * w.get(k, 0):,.0f}".replace(",", " ") if total else ""))
     return out
@@ -131,6 +153,8 @@ def reason(t: dict) -> str:
     elif t.get("role_ru"):
         why = "в портфеле CRYPTO NOVA: " + t["role_ru"]
     parts = [head] + ([why] if why else [])
+    if t.get("core_extra"):
+        parts.append(f"плюс доп. доля ядра {_p(t['core_extra'])} счёта (решение владельца 28.10: 10% из фьючерсов в ядро 30 / 10 / 5)")
     if t["sym"] in CORE:
         if "без стопа" not in why:
             parts.append("ядро — без стопа")
@@ -173,7 +197,8 @@ def resolve(sym: str, ref_px: float | None, lookup) -> dict:
 
 
 def targets(w: dict, pos: dict) -> dict:
-    """{ticker: share of the WHOLE account} = spot share × the coin's weight in the public portfolio."""
+    """{ticker: share of the WHOLE account} = spot share × the coin's weight in the public portfolio (the extra core is added by
+    okx_autopilot.build from core_extra — per OKX coin, after the ticker is mapped)."""
     return {s: w["spot"] * t["w"] for s, t in pos.items()}
 
 

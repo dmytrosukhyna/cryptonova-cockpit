@@ -1,7 +1,15 @@
 """«Автопилот OKX · активный спот» (22.10.2026) — the active-spot sleeve (OKX_ACT_SHARE, 0.10 of the account) follows the «Импульс
 BTC» spot desk (web/paper.json → profiles.imps: when BTC jumps ≥ 2.5 % in an hour it buys the most liquid alts on spot, up to 5
-positions × 20 % of its account, exits after 12 h or at its wide stop). While that desk has no open trade the sleeve waits in USDT
-(«ждёт сигнала»).
+positions × 20 % of its account, exits after 12 h or at its wide stop).
+Between the desk's trades — owner's decision of 28.10 (real money, answered explicitly): the sleeve waits in BTC, not in USDT
+(«парковка», state "park"). On the desk's exit signal (it closed a trade) the sleeve's BTC is sold to USDT and stays in USDT until
+the desk's next entry signal or 3 days, whichever comes first (PAUSE_MS); then back to BTC. On an entry signal the BTC already held
+pays for the buy (sold to USDT first, as much as the buy needs). Every move is logged in plain words ("text"). The parked BTC is
+this sleeve's own: held() counts it, so the spot rebalance (okx_autopilot) and the extra core never count or sell it — nothing is
+counted twice. The usual limits hold: the $10 minimum, limit IOC orders within OKX_SLIP, ≤ OKX_MAX_ORDER_USD an order, a daily cap
+(OKX_MAX_DAY_USD); the parking is looked at every 15 minutes; a top-up / trim of the parked BTC only when it is more than
+max($25, 1 % of the account) off the sleeve's share (the first parking: more than max($10, 0.3 %)). OKX_ACT_PARK=off → the old
+behaviour (USDT between trades).
 
   • a NEW desk trade (≤ 45 min old, after this part started) → a spot buy of the same coin (limit IOC, at most OKX_SLIP above the
     best price) for the same share of the sleeve as the desk's position is of its account;
@@ -30,6 +38,9 @@ from . import okx_lead as ld
 LOG = "data/okx_active.jsonl"
 FRESH_MS = 45 * 60_000
 MAX_POS = 5
+PARK = "BTC"                       # owner's decision of 28.10: between the desk's trades the sleeve waits in BTC
+PAUSE_MS = 3 * 86_400_000          # … USDT after the desk's exit until its next entry signal or 3 days, whichever comes first
+PARK_EVERY_MS = 15 * 60_000
 SRC = "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/paper.json"
 
 
@@ -66,11 +77,18 @@ def save_state(st: dict, env=None) -> None:
     os.replace(p + ".tmp", p)
 
 
+def parking_on(env=None) -> bool:
+    return (_env(env).get("OKX_ACT_PARK") or "BTC").strip().lower() not in ("off", "no", "0", "false", "usdt")
+
+
 def held(env=None, lead: bool | None = None) -> dict:
-    """{COIN: quantity} bought by this sleeve and not sold yet — the spot rebalance leaves these alone. lead=True: only the ones
-    held as lead positions (spot lead trader), lead=False: only the ordinary ones."""
+    """{COIN: quantity} bought by this sleeve and not sold yet — its trades and its parked BTC (owner's decision of 28.10); the
+    spot rebalance leaves these alone. lead=True: only the ones held as lead positions (spot lead trader), lead=False: only the
+    ordinary ones."""
     out = {}
-    for m in (load_state(env).get("trades") or {}).values():
+    st = load_state(env)
+    park = st.get("park") or {}
+    for m in list((st.get("trades") or {}).values()) + ([park] if float(park.get("qty") or 0) > 0 else []):
         if lead is not None and bool(m.get("lead")) != lead:
             continue
         out[m["ccy"]] = out.get(m["ccy"], 0.0) + float(m.get("qty") or 0)
@@ -131,7 +149,14 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
     st.setdefault("skip", {})
     d = desk if desk is not None else fetch_desk(env)
     want = {str(t["id"]): t for t in d.get("open") or [] if t.get("id") and t.get("symbol") and t.get("side") == "LONG"}
-    if not want and not st["trades"]:
+    # owner's decision of 28.10: the desk's exit signal (a trade it closed after we last looked) and the BTC parking
+    park_on, parked = parking_on(env), float((st.get("park") or {}).get("qty") or 0.0)
+    last_close = max([int(c.get("closed") or 0) for c in d.get("closed") or [] if isinstance(c, dict)] or [0])
+    st.setdefault("exit_seen", last_close)                      # first sight: the desk's old exits never trigger anything
+    desk_exit = last_close if last_close > int(st.get("exit_seen") or 0) else 0
+    pause_end = bool(st.get("pause_until")) and now >= int(st["pause_until"])
+    park_due = (park_on and (bool(desk_exit) or pause_end or now - int(st.get("park_t") or 0) >= PARK_EVERY_MS)) or (not park_on and parked > 0)
+    if not want and not st["trades"] and not park_due:
         if save:
             save_state(st, env)
         return res
@@ -153,9 +178,12 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
     slip = ap.limits(env)["slip"]
     seq = 0
     via = False                                  # a USDC leg happened this pass → free USDC back to USDT at its end
+    exited = False
     # exits and cuts
     for tid, m in list(st["trades"].items()):
         t = want.get(tid)
+        if t is None and not m.get("exit_t"):          # the desk closed it: an exit signal — once per trade, even if a sell is retried
+            m["exit_t"], exited = now, True
         keep_frac = 0.0 if t is None else ((float(t["qty_left"]) / float(t["qty"])) if t.get("qty_left") is not None and float(t.get("qty") or 0) > 0 else 1.0)
         sell_q = float(m["qty"]) - float(m["q0"]) * keep_frac
         if sell_q <= float(m["q0"]) * 0.001:
@@ -174,6 +202,18 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
             res["sold"] += 1
         if m["qty"] <= float(m["q0"]) * 0.001 or (t is None and f.get("dust")):
             st["trades"].pop(tid)
+    # owner's decision of 28.10: the desk's exit signal → the sleeve's BTC to USDT, USDT until the next entry or 3 days
+    if exited or desk_exit:
+        t_exit = desk_exit or now
+        st["exit_seen"] = max(int(st.get("exit_seen") or 0), desk_exit)
+        if float((st.get("park") or {}).get("qty") or 0) > 0:
+            seq += 1
+            via = _unpark(cl, st, quote, None, slip, f"cnqap{now // 1000}{seq:03d}", sleep, env, lp, res,
+                          "стол «Импульс BTC» закрыл сделку — BTC этой части продан в USDT") or via
+        if park_on:
+            st["pause_until"] = max(int(st.get("pause_until") or 0), t_exit + PAUSE_MS)
+            ap.log({"ev": "pause", "until": st["pause_until"],
+                    "text": f"«Импульс BTC»: после выхода стола эта часть в USDT до следующего сигнала или до {_when(st['pause_until'])}"}, lp)
     # entries
     st["skip"] = {k: v for k, v in st["skip"].items() if k in want}
     fresh = [t for tid, t in want.items() if tid not in st["trades"] and tid not in st["skip"]
@@ -183,6 +223,14 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
             total = sum(r["usd"] for r in ms.assets(ms.read_raw(cl.fetch, cl.host)))
         bud = total * al.shares(env)["active"]
         deq = float(d.get("equity") or d.get("start_equity") or 10_000)
+        if st.get("pause_until"):                     # owner's decision of 28.10: an entry signal ends the USDT pause
+            st["pause_until"] = 0
+            ap.log({"ev": "pause_end", "text": "«Импульс BTC»: сигнал на вход — пауза в USDT закончилась"}, lp)
+        if float((st.get("park") or {}).get("qty") or 0) > 0:       # … and the BTC already held pays for the buy
+            need = sum(float(t.get("qty_left") or t["qty"]) * float(t["entry"]) / deq * bud for t in fresh[:max(0, MAX_POS - len(st["trades"]))])
+            seq += 1
+            via = _unpark(cl, st, quote, need * 1.01, slip, f"cnqap{now // 1000}{seq:03d}", sleep, env, lp, res,
+                          "сигнал «Импульс BTC» на вход — для покупки продан BTC этой части") or via
         for t in fresh:
             tid = str(t["id"])
             if len(st["trades"]) >= MAX_POS:
@@ -234,11 +282,136 @@ def step(env=None, opener=None, desk: dict | None = None, now: int | None = None
                 res["bought"] += 1
             elif f.get("half"):
                 res["skipped"].append({"id": tid, "why": f["half"]})          # not «skip» for good: tried again next minute
+    # owner's decision of 28.10: between the desk's trades the sleeve waits in BTC (not in a pass with an exit or an entry)
+    if not park_on and float((st.get("park") or {}).get("qty") or 0) > 0:
+        seq += 1
+        via = _unpark(cl, st, quote, None, slip, f"cnqap{now // 1000}{seq:03d}", sleep, env, lp, res,
+                      "парковка выключена (OKX_ACT_PARK=off) — BTC этой части продан в USDT") or via
+    elif park_on and park_due and not (exited or desk_exit or fresh) and now >= int(st.get("pause_until") or 0):
+        try:
+            _park(cl, st, quote, slip, now, seq, sleep, env, lp, res, total, lctx)
+        except Exception as e:  # noqa: BLE001 — the parking never breaks the sleeve's trades
+            res["errors"] += 1
+            ap.log({"ev": "park_error", "error": str(e)[:200]}, lp)
     if via:
         ap.sweep(cl, env, f"cnqau{now // 1000}", sleep, lp)                  # unused USDC back to USDT at the end of the pass
     if save:
         save_state(st, env)
     return res
+
+
+def _when(ms_: int) -> str:
+    import datetime as dt
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("Europe/Kyiv")
+    except Exception:  # noqa: BLE001
+        tz = dt.timezone(dt.timedelta(hours=2))
+    return dt.datetime.fromtimestamp(int(ms_) / 1000, tz).strftime("%d.%m %H:%M") + " по Киеву"
+
+
+def _day_ok(st: dict, usd: float, now: int, env=None) -> bool:
+    """the daily cap (OKX_MAX_DAY_USD) for the parking's own orders"""
+    day = time.strftime("%Y-%m-%d", time.gmtime(now / 1000))
+    if st.get("day") != day:
+        st["day"], st["day_usd"] = day, 0.0
+    return float(st.get("day_usd") or 0.0) + usd <= ap.limits(env)["max_day"]
+
+
+def _unpark(cl, st: dict, quote: str, usd: float | None, slip: float, cl_id: str, sleep, env, lp, res: dict, why: str) -> bool:
+    """sell the sleeve's parked BTC: all of it (usd None — an exit, the parking turned off) or about usd of it (an entry pays with
+    it). Logged in plain words. Returns True when a USDC leg happened."""
+    p = st.get("park") or {}
+    q = float(p.get("qty") or 0.0)
+    if q <= 0:
+        return False
+    full = usd is None
+    if not full:
+        tk = cl.ticker(f"{PARK}-{quote}") or {}
+        bid = ms._f(tk.get("bidPx")) or ms._f(tk.get("last"))
+        if not bid:
+            return False
+        q = min(q, usd / bid)
+    try:
+        f = _sell(cl, PARK, quote, q, slip, cl_id, sleep, env, lp, p, full)
+    except Exception as e:  # noqa: BLE001
+        res["errors"] += 1
+        ap.log({"ev": "unpark_error", "ccy": PARK, "error": str(e)[:200]}, lp)
+        return False
+    got = float(f.get("filled") or 0.0)
+    p["qty"] = max(0.0, float(p["qty"]) - got)
+    if p["qty"] <= 1e-9 or (full and f.get("dust")):
+        st["park"] = {}
+    usd_ = float(f.get("usd") or 0.0)
+    ap.log({"ev": "unpark", "ccy": PARK, "want": q, **{k: v for k, v in f.items() if k != "dust"},
+            "text": f"«Импульс BTC»: {why}" + (f" (≈ {ap.usd(usd_)})" if usd_ else "")}, lp)
+    if got:
+        res["sold"] += 1
+    return bool(p.get("via")) or bool(f.get("half"))
+
+
+def _park(cl, st: dict, quote: str, slip: float, now: int, seq: int, sleep, env, lp, res: dict, total: float | None, lctx) -> None:
+    """the sleeve's money between the desk's trades → BTC (owner's decision of 28.10): target = the sleeve's share of the account
+    minus what its open trades cost; a top-up or a trim only beyond max($25, 1 % of the account) once parked (the first parking:
+    beyond max($10, 0.3 %)); limit IOC within OKX_SLIP, ≤ OKX_MAX_ORDER_USD an order, the daily cap. Logged in plain words."""
+    pause_was = st.get("pause_until")
+    st["park_t"] = now
+    if pause_was:
+        st["pause_until"] = 0
+        ap.log({"ev": "pause_end", "text": "«Импульс BTC»: 3 дня после выхода прошли, сигнала не было — эта часть снова в BTC"}, lp)
+    if total is None:
+        total = sum(r["usd"] for r in ms.assets(ms.read_raw(cl.fetch, cl.host)))
+    rt = ap.route(cl, PARK, quote)
+    inst_id, inst, tk = rt["inst"], rt["info"], rt["tk"]
+    bid = ms._f((tk or {}).get("bidPx")) or ms._f((tk or {}).get("last"))
+    ask = ms._f((tk or {}).get("askPx")) or ms._f((tk or {}).get("last"))
+    if not inst or not bid or not ask or rt["via"]:
+        return
+    p = st.setdefault("park", {})
+    q0 = float(p.get("qty") or 0.0)
+    alts = sum(float(m.get("qty") or 0) * float(m.get("px") or 0) for m in (st.get("trades") or {}).values())
+    target = max(0.0, total * al.shares(env)["active"] - alts)
+    gap = target - q0 * bid
+    thr = max(ap.MIN_ORDER, ap.BAND * total) if q0 <= 0 else max(25.0, 0.01 * total)
+    lim = ap.limits(env)
+    lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
+    if gap >= thr:
+        usd = min(gap, cl.avail(quote) * 0.98, lim["max_order"])
+        q = ap.floor_to(usd / ask, lot)
+        if q < mn or q * ask < ap.MIN_ORDER or not _day_ok(st, q * ask, now, env):
+            return
+        o = {"ccy": PARK, "inst": inst_id, "side": "buy", "sz": ap.fmt(q, inst["lotSz"]), "lot": inst["lotSz"], "min": inst["minSz"],
+             "via": None, "px": ap.fmt(ap.ceil_to(ask * (1 + slip), tick), inst["tickSz"])}
+        lc = lctx() if quote == "USDT" else None
+        if lc and lc["active"]:                           # copyable like the sleeve's trades (okx_lead), when OKX lists it
+            if inst_id not in lc["enabled"] and inst_id in lc["supported"] and lc["enabled"]:
+                lc["enabled"], _fails = ld.add_insts(cl, "SPOT", set(lc["enabled"]), {inst_id})
+            if inst_id in lc["enabled"]:
+                o.update(td=ld.TD, lead=True)
+        if q0 > 0 and bool(p.get("lead")) != bool(o.get("lead")):
+            return                                          # one kind of BTC position per parking: never mix lead and ordinary
+        f = ap._fill(cl, o, f"cnqap{now // 1000}{seq + 1:03d}", sleep)
+        got = float(f.get("filled") or 0.0)
+        if got > 0:
+            p.update({"ccy": PARK, "qty": q0 + got, "q0": float(p.get("q0") or 0.0) + got, "t": now, "px": f.get("avg_px"),
+                      **({"lead": True, "ords": list(p.get("ords") or []) + [f["ordId"]]} if o.get("lead") else {})})
+            st["day_usd"] = round(float(st.get("day_usd") or 0.0) + float(f.get("usd") or 0.0), 2)
+            res["bought"] += 1
+        ap.log({"ev": "park", "ccy": PARK, "inst": inst_id, **({"copy": bool(o.get("lead"))} if lc and lc["active"] else {}), **f,
+                "text": (f"«Импульс BTC»: сигнала нет — деньги этой части (≈ {ap.usd(f.get('usd') or 0)}) держим в BTC, а не в USDT"
+                         if q0 <= 0 else f"«Импульс BTC»: BTC этой части добран до её доли (≈ {ap.usd(f.get('usd') or 0)})")}, lp)
+    elif -gap >= thr and q0 > 0:
+        q = ap.floor_to(min(q0, -gap / bid), lot)
+        if q < mn or q * bid < ap.MIN_ORDER or not _day_ok(st, q * bid, now, env):
+            return
+        f = _sell(cl, PARK, quote, q, slip, f"cnqap{now // 1000}{seq + 1:03d}", sleep, env, lp, p, False)
+        got = float(f.get("filled") or 0.0)
+        p["qty"] = max(0.0, q0 - got)
+        st["day_usd"] = round(float(st.get("day_usd") or 0.0) + float(f.get("usd") or 0.0), 2)
+        if got:
+            res["sold"] += 1
+        ap.log({"ev": "unpark", "ccy": PARK, "want": q, **{k: v for k, v in f.items() if k != "dust"},
+                "text": f"«Импульс BTC»: BTC этой части больше её доли — лишнее продано (≈ {ap.usd(f.get('usd') or 0)})"}, lp)
 
 
 def plan_lines(env=None, desk: dict | None = None, now: int | None = None, total: float = 0.0) -> list[str]:
@@ -253,8 +426,17 @@ def plan_lines(env=None, desk: dict | None = None, now: int | None = None, total
     st = load_state(env)
     mine = st.get("trades") or {}
     opened = [t for t in d.get("open") or [] if t.get("side") == "LONG"]
+    park, pause = st.get("park") or {}, int(st.get("pause_until") or 0)
+    if not parking_on(env):
+        idle = "эта часть лежит в USDT (парковка выключена: OKX_ACT_PARK=off)"
+    elif pause > now:
+        idle = f"после выхода стола эта часть в USDT до следующего сигнала или до {_when(pause)}"
+    elif float(park.get("qty") or 0) > 0:
+        idle = f"эта часть ждёт в BTC ({float(park['qty']):g} BTC), а не в USDT (решение владельца 28.10)"
+    else:
+        idle = "эта часть переходит в BTC на ближайшей проверке (решение владельца 28.10: между сделками — в BTC, а не в USDT)"
     if not opened and not mine:
-        return L + ["  ждёт сигнала: у стола «Импульс BTC» нет открытых сделок — эта часть лежит в USDT."]
+        return L + [f"  ждёт сигнала: у стола «Импульс BTC» нет открытых сделок — {idle}."]
     deq = float(d.get("equity") or 10_000)
     started = int(st.get("started") or now)
     for t in opened:
@@ -274,4 +456,7 @@ def plan_lines(env=None, desk: dict | None = None, now: int | None = None, total
 
 def status(env=None) -> dict:
     st = load_state(env)
-    return {"enabled": enabled(env), "open": [{"ccy": m["ccy"], "qty": m["qty"]} for m in (st.get("trades") or {}).values()]}
+    park = st.get("park") or {}
+    return {"enabled": enabled(env), "open": [{"ccy": m["ccy"], "qty": m["qty"]} for m in (st.get("trades") or {}).values()],
+            "park": {"ccy": park.get("ccy"), "qty": park.get("qty")} if float(park.get("qty") or 0) > 0 else None,
+            "pause_until": st.get("pause_until") or None}

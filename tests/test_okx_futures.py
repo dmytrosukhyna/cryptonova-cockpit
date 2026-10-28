@@ -1,5 +1,6 @@
 """«Автопилот OKX · фьючерсы» (cnq/execution/okx_futures.py) and the active spot (okx_active.py) with a fake OKX (tests/okx_fake.py):
-sizing from the desk's risk scaled to the budget (25 % of the account, split between the CRYPTO NOVA desks), the caps (leverage,
+sizing from the desk's risk scaled to the budget (15 % of the account since the owner's decision of 28.10 — before the first live run;
+on the real account 15 % of the starting capital + the futures' own result — split between the CRYPTO NOVA desks), the caps (leverage,
 0.5 % risk, 5 positions, 3 % daily loss stop), a stop attached to every entry and re-placed when missing (or the position closed),
 reduce-only exits, partial exits, moved stops, the kill switch, refusal without live mode / with a withdraw key / in the spot account
 mode / on a copy-trader account, the lead-trader path. Every coin, key and amount here is made-up test data; no real API is called."""
@@ -111,7 +112,7 @@ def test_size_from_desk_risk_scaled_to_budget_with_stop_attached_isolated_ioc():
     r = run(fk, e, F.desks(F.trade(risk=50.0)))                             # desk risk 0.5 % of its $10 000
     assert r["opened"] == 1 and not r["errors"]
     o = swap_orders(fk)[0]
-    budget = 10000 * 0.25
+    budget = 10000 * 0.15                                                    # owner 28.10: 15 % (no live start yet: of the account now)
     part = budget / 2                                                        # two desks (bal + imp) share the budget
     worst = float(o["px"])
     risk = float(o["sz"]) * 1 * (worst - 190.0)                              # SOL ctVal 1
@@ -133,12 +134,12 @@ def test_risk_as_the_system_capped_at_one_percent_and_leverage_never_above_three
     assert fu.caps(e) == {"lev": 3, "risk": 0.01, "max_pos": 5, "day_loss": 0.03}
     run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 1 % of the budget
     o = swap_orders(fk)[0]
-    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 2500 * 0.01 + 1e-6
+    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 1500 * 0.01 + 1e-6
     fk2 = F.FakeOkx()
-    run(fk2, F.env(), F.desks(F.trade(risk=150.0)))                          # desk risked 1.5 % → 1.5 % of the $1 250 part = $18.75
+    run(fk2, F.env(), F.desks(F.trade(risk=150.0)))                          # desk risked 1.5 % → 1.5 % of the $750 part = $11.25
     o2 = swap_orders(fk2)[0]
     r2 = float(o2["sz"]) * (float(o2["px"]) - 190.0)
-    assert 17.0 <= r2 <= 18.75 + 1e-6
+    assert 10.0 <= r2 <= 11.25 + 1e-6
     assert fk.levers[0]["lever"] == "3"
     fk = F.FakeOkx()                                                         # a 0.3 % stop: the leverage room is the limit
     run(fk, F.env(), F.desks(F.trade(entry=200.0, stop=199.0, tp=210.0, risk=500.0)))

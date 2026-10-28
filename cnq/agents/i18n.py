@@ -688,21 +688,26 @@ T: dict[str, dict[str, str]] = {
                            "las caídas."},
     "pub.why.spot": {"ru": "Спот — портфель CRYPTO NOVA, без плеча. Ядро — биткоин 30%, эфир 10%, солана 5% — держим долго; монеты "
                            "которые проходят проверки системы, — по 7,5% со стопом −20%; рискованные — по 2,5%; не меньше 10% — "
-                           "в долларах. Всего не больше 8 монет вместе с ядром.",
+                           "в долларах. Всего не больше 8 монет вместе с ядром. Ещё 10% счёта — дополнительное ядро: BTC, ETH и SOL в тех же "
+                           "пропорциях 30 / 10 / 5.",
                      "en": "Spot is the CRYPTO NOVA portfolio, with no leverage. The core — Bitcoin 30%, Ether 10%, Solana 5% — is "
                            "held for the long run; coins the table marks «can buy» get 7.5% each with a −20% stop; risky ones "
-                           "2.5% each; at least 10% stays in dollars. At most 8 coins including the core.",
+                           "2.5% each; at least 10% stays in dollars. At most 8 coins including the core. Another 10% of the account is extra "
+                           "core: BTC, ETH and SOL in the same 30 / 10 / 5 proportions.",
                      "uk": "Спот — портфель CRYPTO NOVA, без плеча. Ядро — біткоїн 30%, ефір 10%, солана 5% — тримаємо довго; "
                            "монети з позначкою таблиці «можна брати» — по 7,5% зі стопом −20%; ризикові — по 2,5%; щонайменше "
-                           "10% — у доларах. Усього не більше 8 монет разом з ядром.",
+                           "10% — у доларах. Усього не більше 8 монет разом з ядром. Ще 10% рахунку — додаткове ядро: BTC, ETH і SOL у тих "
+                           "самих пропорціях 30 / 10 / 5.",
                      "el": "Το spot είναι το χαρτοφυλάκιο του CRYPTO NOVA, χωρίς μόχλευση. Ο πυρήνας — Bitcoin 30%, Ether 10%, "
                            "Solana 5% — κρατιέται μακροπρόθεσμα· τα νομίσματα που ο πίνακας σημειώνει «μπορούμε να αγοράσουμε» "
                            "παίρνουν 7,5% το καθένα με stop −20%· τα ριψοκίνδυνα 2,5%· τουλάχιστον 10% μένει σε δολάρια. Έως "
-                           "8 νομίσματα μαζί με τον πυρήνα.",
+                           "8 νομίσματα μαζί με τον πυρήνα. Ακόμη 10% του λογαριασμού είναι επιπλέον πυρήνας: BTC, ETH και SOL στις ίδιες "
+                           "αναλογίες 30 / 10 / 5.",
                      "es": "El spot es la cartera de CRYPTO NOVA, sin apalancamiento. El núcleo —Bitcoin 30%, Ether 10%, Solana "
                            "5%— se mantiene a largo plazo; las monedas que la tabla marca «se puede comprar» llevan un 7,5% cada "
                            "una con stop en −20%; las arriesgadas, un 2,5%; al menos un 10% queda en dólares. Como máximo 8 "
-                           "monedas con el núcleo."},
+                           "monedas con el núcleo. Otro 10% de la cuenta es núcleo adicional: BTC, ETH y SOL en las mismas "
+                           "proporciones 30 / 10 / 5."},
     "pub.why.futures": {"ru": "Фьючерсы — отобранные сигналы CRYPTO NOVA: в счёт идут только стратегии, прошедшие проверку на "
                               "истории. У каждой сделки есть стоп; риск — {risk}% счёта на сделку, у основной стратегии не больше "
                               "{max_open} сделок одновременно. Минус тоже бывает: "
@@ -725,18 +730,22 @@ T: dict[str, dict[str, str]] = {
                               "También hay pérdidas: el "
                               "stop cierra la operación perdedora."},
     "pub.why.active": {"ru": "Активный спот — «Импульс BTC»: когда биткоин за час вырос на 2,5% и больше, система покупает на споте "
-                             "самые ликвидные альткоины — они обычно догоняют. Без плеча, до 5 позиций, выход через 12 часов.",
+                             "самые ликвидные альткоины — они обычно догоняют. Без плеча, до 5 позиций, выход через 12 часов. Между сделками эта "
+                             "часть ждёт в BTC; после выхода — до 3 дней в долларах, пока не придёт новый сигнал.",
                        "en": "Active spot is «BTC momentum»: when Bitcoin rises 2.5% or more in an hour, the system buys the most "
-                             "liquid altcoins on spot — they usually catch up. No leverage, up to 5 positions, exit after 12 hours.",
+                             "liquid altcoins on spot — they usually catch up. No leverage, up to 5 positions, exit after 12 hours. Between "
+                             "trades this part waits in BTC; after an exit it stays in dollars for up to 3 days, until a new signal.",
                        "uk": "Активний спот — «Імпульс BTC»: коли біткоїн за годину зріс на 2,5% і більше, система купує на "
                              "споті найліквідніші альткоїни — вони зазвичай доганяють. Без плеча, до 5 позицій, вихід через 12 "
-                             "годин.",
+                             "годин. Між угодами ця частина чекає в BTC; після виходу — до 3 днів у доларах, поки не прийде новий сигнал.",
                        "el": "Το ενεργό spot είναι η «ώθηση BTC»: όταν το Bitcoin ανεβαίνει 2,5% ή περισσότερο μέσα σε μία ώρα, "
                              "το σύστημα αγοράζει στο spot τα πιο ρευστά altcoins — συνήθως ακολουθούν. Χωρίς μόχλευση, έως 5 "
-                             "θέσεις, έξοδος σε 12 ώρες.",
+                             "θέσεις, έξοδος σε 12 ώρες. Ανάμεσα στις συναλλαγές το μερίδιο περιμένει σε BTC· μετά την έξοδο μένει σε δολάρια "
+                             "έως 3 ημέρες, μέχρι να έρθει νέο σήμα.",
                        "es": "El spot activo es el «impulso BTC»: cuando Bitcoin sube un 2,5% o más en una hora, el sistema compra "
                              "en spot las altcoins más líquidas, que suelen ponerse al día. Sin apalancamiento, hasta 5 "
-                             "posiciones, salida a las 12 horas."},
+                             "posiciones, salida a las 12 horas. Entre operaciones esta parte espera en BTC; tras una salida queda en dólares "
+                             "hasta 3 días, hasta que llegue una nueva señal."},
 
     # ---------------------------------------------------------------- build 46 (28.10): app_home "public_portfolio" — the PUBLIC mode
     # = the real CRYPTO NOVA account on OKX since 22.10 (web/public_real.json), its allocation, spot / futures parts and real actions
@@ -811,8 +820,20 @@ T: dict[str, dict[str, str]] = {
                         "el": "Νομίσματα του χαρτοφυλακίου spot", "es": "Monedas de la cartera spot"},
     "pp.g.spot_cash": {"ru": "Доллары спот-портфеля", "en": "Spot portfolio dollars", "uk": "Долари спот-портфеля",
                        "el": "Δολάρια του χαρτοφυλακίου spot", "es": "Dólares de la cartera spot"},
-    "pp.g.active_coins": {"ru": "Активный спот: монеты", "en": "Active spot: coins", "uk": "Активний спот: монети",
-                          "el": "Ενεργό spot: νομίσματα", "es": "Spot activo: monedas"},
+    "pp.g.active_coins": {"ru": "Активный спот: монеты (между сигналами — BTC)", "en": "Active spot: coins (BTC between signals)",
+                          "uk": "Активний спот: монети (між сигналами — BTC)", "el": "Ενεργό spot: νομίσματα (BTC ανάμεσα στα σήματα)",
+                          "es": "Spot activo: monedas (BTC entre señales)"},
+    # 28.10 (owner's decision): «Импульс BTC» waits in BTC between its trades; USDT for 3 days after the desk's exit
+    "pp.a.active_park": {"ru": "Куплено {sym} на {usd}: «Импульс BTC» между сигналами держит свою часть в BTC, а не в долларах.",
+                         "en": "Bought {sym} for {usd}: between its signals «BTC momentum» keeps its part in BTC, not in dollars.",
+                         "uk": "Куплено {sym} на {usd}: «Імпульс BTC» між сигналами тримає свою частину в BTC, а не в доларах.",
+                         "el": "Αγοράστηκε {sym} για {usd}: ανάμεσα στα σήματα η «ώθηση BTC» κρατά το μερίδιό της σε BTC, όχι σε δολάρια.",
+                         "es": "Comprado {sym} por {usd}: entre señales, el «impulso BTC» mantiene su parte en BTC, no en dólares."},
+    "pp.a.active_unpark": {"ru": "Продано {sym} на {usd}: часть «Импульс BTC» перешла в доллары — выход сигнала или покупка по новому сигналу.",
+                           "en": "Sold {sym} for {usd}: the «BTC momentum» part moved to dollars — a signal's exit or a buy on a new signal.",
+                           "uk": "Продано {sym} на {usd}: частина «Імпульс BTC» перейшла в долари — вихід сигналу або купівля за новим сигналом.",
+                           "el": "Πουλήθηκε {sym} για {usd}: το μερίδιο της «ώθησης BTC» πέρασε σε δολάρια — έξοδος σήματος ή αγορά με νέο σήμα.",
+                           "es": "Vendido {sym} por {usd}: la parte del «impulso BTC» pasó a dólares — salida de una señal o compra por una nueva."},
     "pp.g.active_wait": {"ru": "Активный спот: ждёт сигнала", "en": "Active spot: waiting for a signal",
                          "uk": "Активний спот: чекає на сигнал", "el": "Ενεργό spot: σε αναμονή σήματος",
                          "es": "Spot activo: esperando una señal"},

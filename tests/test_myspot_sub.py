@@ -67,7 +67,7 @@ def test_sub_reader_places_nothing_and_reads_positions_stops_targets_and_targets
     assert p["inst"] == "SOL-USDT-SWAP" and p["side"] == "LONG" and p["stop"] == 190.0 and p["tp"] == 230.0 and p["ours"]
     spot = {r["ccy"]: r for r in out["spot"]["rows"]}
     assert set(spot) >= {"BTC", "ETH", "SOL", "AAA", "BBB"} and "XRP" not in spot     # the active coin is not a spot-portfolio coin
-    assert abs(spot["BTC"]["target_pct"] - 19.5) < 0.01 and spot["BTC"]["state"] == "ok"
+    assert abs(spot["BTC"]["target_pct"] - (19.5 + 10 * 30 / 45)) < 0.01 and spot["BTC"]["state"] == "ok"   # + the extra core (28.10)
     assert out["active"]["rows"] == [{"ccy": "XRP", "qty": 50.0, "usd": 100.0, "copy": False, "copy_reason": "ordinary", "copy_pct": 0.0}]
     assert out["start"] == {"usd": 10000.0, "t": out["start"]["t"], "src": out["start"]["src"]} and out["start"]["src"] in ("log", "state")
     assert out["result"]["usd"] == round(out["total_usd"] - 10000.0, 2)
@@ -155,7 +155,7 @@ def test_dollars_are_allocated_to_their_parts_and_add_up_to_the_usdt():
     e, fk, log = _setup()
     s = sub.read(e, _fetch(fk, []), NOW + 60_000)
     a, T, usdt = s["alloc"], s["total_usd"], s["cash"]["usd"]
-    assert list(a) == list(sub.ALLOC_KEYS) and (a["spot_pct"], a["fut_pct"], a["active_pct"]) == (65.0, 25.0, 10.0)
+    assert list(a) == list(sub.ALLOC_KEYS) and (a["spot_pct"], a["core_pct"], a["fut_pct"], a["active_pct"]) == (65.0, 10.0, 15.0, 10.0)
     parts = a["spot_cash_usd"] + a["fut_margin_usd"] + a["fut_reserve_usd"] + a["active_wait_usd"] + a["other_usd"]
     assert abs(parts - usdt) <= 1.0 and min(a[k] for k in ("spot_cash_usd", "fut_margin_usd", "fut_reserve_usd", "active_wait_usd")) >= 0
     st = ap.load_state(e)
@@ -163,16 +163,18 @@ def test_dollars_are_allocated_to_their_parts_and_add_up_to_the_usdt():
     assert a["fut_budget_usd"] == fu.status(e)["budget_usd"]                         # the futures budget of okx_futures itself
     assert abs(a["fut_margin_usd"] + a["fut_reserve_usd"] - a["fut_budget_usd"]) < 0.02 and a["fut_margin_usd"] > 0
     assert abs(a["active_coins_usd"] - 100.0) < 0.01 and abs(a["active_wait_usd"] - (0.10 * T - 100.0)) < 0.02
-    # the order the USDT is handed out in: a short account never shows more than it has
+    # the order the USDT is handed out in: a short account never shows more than it has; owner's decision of 28.10: the futures
+    # part is its own money, so its reserve comes before the spot cash
     x = sub.allocate(1000.0, 50.0, 900.0, 0.0, [{"margin": 30.0, "upl": -2.0}], {"spot": 0.65, "futures": 0.25, "active": 0.1}, 0.1, 250.0)
-    assert x["fut_margin_usd"] == 28.0 and x["spot_cash_usd"] == 22.0 and x["active_wait_usd"] == 0.0 and x["fut_reserve_usd"] == 0.0
+    assert x["fut_margin_usd"] == 28.0 and x["fut_reserve_usd"] == 22.0 and x["spot_cash_usd"] == 0.0 and x["active_wait_usd"] == 0.0
     assert x["other_usd"] == 0.0
     y = sub.allocate(1000.0, 400.0, 600.0, 0.0, [], {"spot": 0.65, "futures": 0.25, "active": 0.1}, None, None, 55.0)
     assert y["spot_cash_usd"] == round((1 - 55 / 65) * 650, 2) and y["fut_budget_usd"] == 250.0 and abs(sum(
         y[k] for k in ("spot_cash_usd", "fut_margin_usd", "fut_reserve_usd", "active_wait_usd", "other_usd")) - 400.0) < 0.01
     html = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "app.html"), encoding="utf-8").read()
     card = html[html.index("function subHtml(S,apBox)"):html.index("function okHtml(D)")]
-    for w in ("распределены: спот ${sh(AL.spot_pct)}, фьючерсы ${sh(AL.fut_pct)} (в позициях ${sh(fp)}), активный спот ${sh(AL.active_pct)}",
+    for w in ("распределены: спот ${sh(AL.spot_pct)}${AL.core_pct?`, доп. ядро BTC/ETH/SOL ${sh(AL.core_pct)}`:''}, фьючерсы ${sh(AL.fut_pct)} "
+              "(в позициях ${sh(fp)}), активный спот ${sh(AL.active_pct)}",
               "Спот · запас под новые монеты", "в позициях (маржа)", "резерв под новые сделки", "ждёт сигнала «Импульс BTC»", "Прочее"):
         assert w in card, w
     assert "свободн" not in card                                                     # never «свободный кэш»

@@ -174,7 +174,7 @@ def test_futures_usdc_margined_swap_funds_margin_in_usdc_same_risk_and_converts_
     assert ids[:2] == ["USDC-USDT", "UUU-USDC-SWAP"]                                    # margin as USDC first, then the entry
     o = fk.orders[1]
     risk = float(o["sz"]) * 1 * (float(o["px"]) - 3.8)
-    assert abs(risk - 10000 * 0.25 / 2 * 0.005) <= 1.0                                   # the same sizing as a USDT swap
+    assert abs(risk - 10000 * 0.15 / 2 * 0.005) <= 1.0                                   # the same sizing as a USDT swap (15 %, 28.10)
     assert o["tdMode"] == "isolated" and o["ordType"] == "ioc" and o["attachAlgoOrds"][0]["slTriggerPx"] == "3.800"
     assert fk.levers[-1] == {"instId": "UUU-USDC-SWAP", "lever": "2", "mgnMode": "isolated"}
     assert fu.load_state(e)["trades"]["bal:U1"]["settle"] == "USDC" and fk.margin["UUU-USDC-SWAP"] > 0

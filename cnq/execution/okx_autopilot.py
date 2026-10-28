@@ -2,11 +2,14 @@
 нашу систему … я смог бы подключить на своём OKX эту систему … не вручную … завести там 10 тысяч долларов»; 09:56: «наша система» =
 the closed system's header — FUTURES · CRYPTO NOVA and SPOT · CRYPTO NOVA портфель; no DeFi or yield sleeves on this account).
 
-The account is split (okx_alloc.shares; env OKX_SPOT_SHARE / OKX_FUT_SHARE / OKX_ACT_SHARE):
+The account is split (okx_alloc.shares; env OKX_SPOT_SHARE / OKX_CORE_SHARE / OKX_FUT_SHARE / OKX_ACT_SHARE) — owner's decision of
+28.10 (real money, answered explicitly; until then 65 / 25 / 10):
   spot 65 %     — mirrors «Наш портфель CRYPTO NOVA» (web/portfolio.json → portfolios.ideas): every coin at its weight there, its
                   cash rule (≥ 10 %), its stops / take-profits / sells — they arrive as the portfolio's own changes (this file);
-  futures 25 %  — the CRYPTO NOVA futures desks, swaps with a stop on every position (okx_futures.py);
-  active 10 %   — the «Импульс BTC» spot desk; USDT while it has no trade (okx_active.py).
+  core +10 %    — BTC / ETH / SOL on top, in the core's plan proportions 30 / 10 / 5 (okx_alloc.core_extra, this file);
+  futures 15 %  — the CRYPTO NOVA futures desks, swaps with a stop on every position (okx_futures.py); its budget = 15 % of the
+                  starting capital + its own result, never below the open positions' margin;
+  active 10 %   — the «Импульс BTC» spot desk; between its trades in BTC, USDT for 3 days after its exit (okx_active.py).
 Runs on the owner's Mac; keys never leave it.
 
   python3 -m cnq.execution.okx_autopilot --check     keys, host, permissions, account mode, money, the futures readiness
@@ -57,7 +60,8 @@ the state (on / off / stopped, last rebalance, the split, the futures positions)
 Env (~/.cryptonova.env on the Mac, never in the repo or in a chat):
   OKX_API_KEY, OKX_API_SECRET, OKX_API_PASSPHRASE — an OKX API key with «Read» + «Trade», WITHOUT «Withdraw», bound to the Mac's IP;
   OKX_AUTOPILOT=on — the autopilot window may rebalance by itself (after the first --run).
-  Optional: OKX_SPOT_SHARE / OKX_FUT_SHARE / OKX_ACT_SHARE (0.65 / 0.25 / 0.10), OKX_FUTURES=off, OKX_ACTIVE=off,
+  Optional: OKX_SPOT_SHARE / OKX_CORE_SHARE / OKX_FUT_SHARE / OKX_ACT_SHARE (0.65 / 0.10 / 0.15 / 0.10), OKX_FUTURES=off,
+  OKX_ACTIVE=off, OKX_ACT_PARK=off (the «Импульс BTC» sleeve waits in USDT instead of BTC),
   OKX_FUT_MAX_LEV (2, at most 3), OKX_IS_LEAD=1, OKX_SPOT_LEAD=off (okx_lead.py), OKX_HOST, OKX_QUOTE (found by itself), OKX_KEEP, OKX_MAX_ORDER_USD,
   OKX_MAX_DAY_USD, OKX_SLIP, OKX_TAKER_FEE (0.002 on OKX Europe since 25.09.2026, 0.001 elsewhere), OKX_AUTOPILOT_STATE, OKX_STOP_FILE.
 Not financial advice. Stdlib only."""
@@ -610,6 +614,17 @@ def build(cl: Okx, env=None, model=None) -> dict:
             continue
         targets[m["base"]] = targets.get(m["base"], 0.0) + tgt_share[sym]
         mapped[m["base"]] = {**t, "sym": sym, "mult": m["mult"]}
+    # owner's decision of 28.10 (real money): the 10 % freed from the futures → the core BTC / ETH / SOL in the plan proportions
+    # 30 / 10 / 5, on top of the spot portfolio's own core (okx_alloc.core_extra); bought by the same rebalance (sells first, the
+    # $10 minimum, the 0.3 % band, IOC limits, the per-order and daily caps)
+    for c, f in al.core_extra(w).items():
+        if c in keep:
+            diffs.append(f"{c}: монета в OKX_KEEP — доп. доля ядра {al._p(f)} счёта остаётся в {quote}")
+            continue
+        targets[c] = targets.get(c, 0.0) + f
+        mapped.setdefault(c, {"sym": c, "w": 0.0, "name": c, "kind_ru": "ядро", "role_ru": "", "why": "", "stop": None,
+                              "take_half": None, "price": None, "mult": 1.0})
+        mapped[c]["core_extra"] = f
     outside = [r["ccy"] for r in rows if not r["cash"] and set(r.get("where") or []) - {"торговый счёт"}]
     if outside:
         diffs.append("Монеты вне торгового счёта (Funding / Earn) учтены, но автопилот их не продаёт и не переводит: "
@@ -717,7 +732,8 @@ def plan_text(b: dict, mode: str) -> str:
     L += ["  " + x for x in al.split_text(b["split"], T)]
     L.append(f"СПОТ · {b['pf_name']} — {al._p(b['split']['spot'])} счёта ≈ {usd(T * b['split']['spot'])}; в монетах сейчас {usd(b['spot_now_usd'])}."
              f" Кэш портфеля {al._p(b['pf_cash'])} (правило: не меньше 10%) — остаётся в {b['quote']}.")
-    L.append("  Цель по монетам (доля счёта = доля спота × вес в портфеле): "
+    L.append("  Цель по монетам (доля счёта = доля спота × вес в портфеле; у BTC / ETH / SOL плюс доп. ядро "
+             f"{al._p(b['split'].get('core') or 0)} счёта в пропорции 30 / 10 / 5): "
              + ", ".join(f"{r['ccy']} {ms._p(r['target_pct'])}% (сейчас {ms._p(r['now_pct'])}%)" for r in b["targets"]))
     L += ld.plan_lines(b)
     on = (b.get("lead") or {}).get("active")

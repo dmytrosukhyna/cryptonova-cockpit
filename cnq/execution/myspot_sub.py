@@ -30,7 +30,8 @@ from . import okx_lead as ld
 START_USD = 10_000.0
 LIVE_MODE = "РЕАЛЬНЫЕ ДЕНЬГИ"
 READS = ("/api/v5/account/balance", "/api/v5/asset/balances", "/api/v5/finance/savings/balance", "/api/v5/market/tickers",
-         "/api/v5/account/config", "/api/v5/account/positions", "/api/v5/trade/orders-algo-pending") + ld.READS
+         "/api/v5/account/config", "/api/v5/account/positions", "/api/v5/trade/orders-algo-pending",
+         "/api/v5/account/positions-history") + ld.READS          # 28.10: the futures' own result (okx_futures.own_capital)
 
 
 def _env(env=None) -> dict:
@@ -138,7 +139,7 @@ def _stop_tp(algos: list, inst: str, long: bool) -> tuple:
 
 
 ALLOC_KEYS = ("spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_usd", "fut_reserve_usd", "active_coins_usd",
-              "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct")
+              "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct", "core_pct")
 
 
 def allocate(total: float, usdt: float, spot_coins: float, active_coins: float, positions: list, split: dict, pf_cash: float | None,
@@ -146,9 +147,10 @@ def allocate(total: float, usdt: float, spot_coins: float, active_coins: float, 
     """22.10 (owner read «43% USDT» as idle cash): where the account's dollars belong, from the autopilot's own budgets —
     okx_alloc.shares (spot / futures / active), the portfolio's own cash share (okx_autopilot state pf_cash) × the spot budget,
     the futures budget (okx_futures.budget), the active budget = total × active share (okx_active). The USDT is handed out in
-    this order: futures margin in positions (real, with its open result) → the spot portfolio's cash → active spot waiting for
-    «Импульс BTC» → the futures reserve for new trades → «прочее» (fees, rounding, coins still to buy). The USDT parts add up to
-    the USDT on the account."""
+    this order: futures margin in positions (real, with its open result) → the futures reserve for new trades → the spot
+    portfolio's cash → active spot waiting for «Импульс BTC» → «прочее» (fees, rounding, coins still to buy). The USDT parts add up
+    to the USDT on the account. Owner's decision of 28.10: the futures part is its own money (15 % of the starting capital + its
+    result), so it is handed out before the spot cash; the extra core (core_pct) is part of the spot coins."""
     sp, fu_, ac_ = (float(split.get(k) or 0.0) for k in ("spot", "futures", "active"))
     if pf_cash is None:                              # an older state: the spot share not in coin targets = the portfolio's cash
         pf_cash = max(0.0, 1 - targets_pct / 100 / sp) if sp else 0.0
@@ -161,13 +163,14 @@ def allocate(total: float, usdt: float, spot_coins: float, active_coins: float, 
         margin += (m or 0.0) + (p.get("upl") or 0.0)
     left = max(0.0, usdt)
     out = {}
-    for k, want in (("fut_margin_usd", margin), ("spot_cash_usd", pf_cash * total * sp), ("active_wait_usd", total * ac_ - active_coins),
-                    ("fut_reserve_usd", budget - margin)):
+    for k, want in (("fut_margin_usd", margin), ("fut_reserve_usd", budget - margin), ("spot_cash_usd", pf_cash * total * sp),
+                    ("active_wait_usd", total * ac_ - active_coins)):
         v = min(max(0.0, want), left)
         out[k], left = round(v, 2), left - v
     out["other_usd"] = round(usdt - sum(out[k] for k in ("fut_margin_usd", "spot_cash_usd", "active_wait_usd", "fut_reserve_usd")), 2)
     out.update({"spot_coins_usd": round(spot_coins, 2), "fut_budget_usd": round(budget, 2), "active_coins_usd": round(active_coins, 2),
-                "spot_pct": round(sp * 100, 2), "fut_pct": round(fu_ * 100, 2), "active_pct": round(ac_ * 100, 2)})
+                "spot_pct": round(sp * 100, 2), "fut_pct": round(fu_ * 100, 2), "active_pct": round(ac_ * 100, 2),
+                "core_pct": round(float(split.get("core") or 0.0) * 100, 2)})
     return {k: out[k] for k in ALLOC_KEYS}
 
 
@@ -195,7 +198,7 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
     st = ap.load_state(env)
     fst = okx_futures.load_state(env)
     out = {"asof": now, "ok": False, "start": start(env, st, log_path, fst), "match": match(env, st),
-           "split": st.get("split") or al.shares(env)}
+           "split": al.shares(env)}                 # 28.10: the rule now (the state's split is the one of the last rebalance)
     try:
         out["lease"] = ap.lease.status(env, now)
     except Exception:  # noqa: BLE001
@@ -280,6 +283,13 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
                    "share": (out["split"] or {}).get("active")},
         "cash": {"ccy": quote, "rows": cash, "usd": round(sum(x["usd"] for x in cash), 2), "free": free},
     })
+    fb = ms._f(fs.get("budget_usd"))
+    try:                                          # owner's decision of 28.10: the futures budget = 15 % of the start + its own result
+        own = okx_futures.own_capital(fetch, host, env)
+        if own is not None and own.get("realized") is not None:
+            fb = al.fut_budget(al.shares(env)["futures"], own["capital"], own["realized"], own["upl"], own["margin"])
+    except Exception:  # noqa: BLE001 — the card never fails because of it: the autopilot's last budget stays
+        pass
     out["alloc"] = allocate(total, out["cash"]["usd"], out["spot"]["usd"], out["active"]["usd"], futures, out["split"] or {},
-                            ms._f(st.get("pf_cash")), ms._f(fs.get("budget_usd")), sum(targets.values()))
+                            ms._f(st.get("pf_cash")), fb, sum(targets.values()))
     return out

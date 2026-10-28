@@ -23,8 +23,9 @@ min old), OR the price now is at most OKX_FUT_JOIN_GAP (0.3 %) worse than the de
 сделка открыта раньше, цена ушла на X% от входа системы») and looked at again a minute later. The size always comes from the worst
 price the entry may fill at vs the desk's stop, so the risk stays within the cap whatever the fill.
 
-Size: the desk's own risk (risk_usd ÷ desk equity) applied to the desk's part of the FUTURES BUDGET = OKX_FUT_SHARE (0.25) of the
-account (okx_alloc.shares). Hard caps (env can only make them stricter):
+Size: the desk's own risk (risk_usd ÷ desk equity) applied to the desk's part of the FUTURES BUDGET = OKX_FUT_SHARE (0.15 since the
+owner's decision of 28.10; 0.25 before) of the STARTING capital + the futures' own result (budget(), okx_alloc.fut_budget). Leverage
+stays 2x, at most 3x (owner's decision of 28.10: no change). Hard caps (env can only make them stricter):
   leverage ≤ 3 (OKX_FUT_MAX_LEV, default 2; isolated margin, set per instrument) and all positions' notional ≤ budget × leverage;
   risk per trade = the desk's own risk share × this desk's part of the budget (owner 22.10: «риск как у системы»), never more than
   1 % of the whole budget (distance to the stop × size);   at most 5 open positions;
@@ -397,16 +398,60 @@ def account_total(cl: ap.Okx) -> float:
 
 
 def budget(cl: ap.Okx, st: dict, env=None, now: int | None = None, fresh: bool = False) -> dict:
-    """{"usd", "share", "total"}: OKX_FUT_SHARE (0.25) of the whole account, refreshed every 15 min."""
+    """{"usd", "share", "total", "how", …}, refreshed every 15 min.
+    Owner's decision of 28.10 (real money, answered explicitly): the futures part = OKX_FUT_SHARE (0.15) of the STARTING capital
+    (the start of «результат с начала» + net deposits / withdrawals, public_real flows) + the futures' own result (OKX's realized
+    P/L of the swaps closed since the start, fees and funding included, + the open positions' P/L) — okx_alloc.fut_budget; never
+    below the margin of the open positions. Spot results no longer move it, so the app's «перераспределение» line disappears.
+    No known start (a demo key before its first live run) → the old rule, the share of the account now ("how": "account")."""
     now = int(now or time.time() * 1000)
     b = st.get("budget") or {}
-    if not fresh and b.get("usd") and now - int(b.get("t") or 0) < BUDGET_TTL:
+    if not fresh and b.get("usd") and b.get("how") and now - int(b.get("t") or 0) < BUDGET_TTL:
         return b
     share = al.shares(env)["futures"]
     total = account_total(cl)
-    b = {"t": now, "usd": round(total * share, 2), "share": share, "total": total}
+    own = own_capital(cl.fetch, cl.host, env)
+    if own is None:
+        b = {"t": now, "usd": round(total * share, 2), "share": share, "total": total, "how": "account"}
+    elif own.get("realized") is None and b.get("how") == "own" and b.get("usd"):
+        return b                                    # the history did not read: keep the last known budget, try again next time
+    else:
+        b = {"t": now, "usd": al.fut_budget(share, own["capital"], own.get("realized") or 0.0, own["upl"], own["margin"]),
+             "share": share, "total": total, "how": "own", "capital": own["capital"], "realized": own.get("realized"),
+             "upl": own["upl"], "margin": own["margin"], "since": own["since"]}
     st["budget"] = b
     return b
+
+
+def budget_text(b: dict) -> str:
+    """the budget and where it comes from, in the owner's words"""
+    if b.get("how") == "own":
+        res = float(b.get("realized") or 0.0) + float(b.get("upl") or 0.0)
+        return (f"{ap.usd(b['usd'])} = {al._p(b['share'])} стартового капитала {ap.usd(b['capital'])} + результат фьючерсов "
+                f"{('+' if res >= 0 else '−') + ap.usd(abs(res))}" + (f" (не меньше маржи открытых позиций {ap.usd(b['margin'])})"
+                                                                         if b.get("margin") else ""))
+    return f"{ap.usd(b['usd'])} = {al._p(b['share'])} счёта {ap.usd(b['total'])}"
+
+
+def own_capital(fetch, host: str, env=None) -> dict | None:
+    """The inputs of the futures budget (owner's decision of 28.10): {"capital": the start + net flows, "since", "realized" (None
+    when OKX's history did not read), "upl", "margin" of the open positions}; None without a known start. GET only."""
+    from . import myspot_sub as sub, public_real as pr
+    s0 = sub.start(env, fut_st=load_state(env))
+    if not s0.get("t") or not s0.get("usd"):
+        return None
+    since = int(s0["t"])
+    try:
+        net = float(pr.flows_summary(pr.load_state(env), since).get("net_usd") or 0.0)
+    except Exception:  # noqa: BLE001 — no flows known = none counted
+        net = 0.0
+    realized = pr.closed_stats(fetch, host, since)[1]
+    pos = sub._positions(fetch, host)
+    upl = sum(float(p.get("upl") or 0.0) for p in pos)
+    margin = sum(float(p.get("margin") if p.get("margin") is not None else (p.get("notional") or 0.0) / (p.get("lev") or 1.0))
+                 + float(p.get("upl") or 0.0) for p in pos)
+    return {"capital": round(float(s0["usd"]) + net, 2), "since": since, "realized": realized, "upl": round(upl, 2),
+            "margin": round(max(0.0, margin), 2)}
 
 
 def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict, px: float, mult: float, open_notional: float,
@@ -901,6 +946,10 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             avail = ctx.avail_usdt()
     if via_used:
         ap.sweep(cl, env, _cid("cnqfb", now, seq + 1), sleep, log_path)      # freed / unused USDC back to USDT at the end of the pass
+    try:                                         # owner's decision of 28.10: the budget the card and the app show stays current
+        budget(cl, st, env, now)                 # (every 15 min; the first pass on this code moves it to 15 % + own result at once)
+    except Exception:  # noqa: BLE001 — never fails the pass
+        pass
     st["last"] = {k: res[k] for k in ("t", "opened", "closed", "reduced", "stops", "gone", "errors")}
     st["last"]["skipped"] = len(res["skipped"])
     if save:
@@ -987,7 +1036,7 @@ def check_lines(cl: ap.Okx, cfg: dict, env=None) -> list[str]:
         out.append("  ордера не пойдут: " + bad)
     try:
         b = budget(cl, {}, env, fresh=True)
-        out.append(f"  бюджет фьючерсов: {ap.usd(b['usd'])} = {al._p(b['share'])} счёта {ap.usd(b['total'])} · плечо не выше {cap['lev']}"
+        out.append(f"  бюджет фьючерсов: {budget_text(b)} · плечо не выше {cap['lev']}"
                    f" · риск на сделку не больше {ap.usd(b['usd'] * cap['risk'])} ({cap['risk'] * 100:g}%; сама сделка — с риском стола, как у системы) · дневной стоп {ap.usd(b['usd'] * cap['day_loss'])} (3%)"
                    f" · не больше {cap['max_pos']} позиций")
     except Exception as e:  # noqa: BLE001
@@ -1023,7 +1072,7 @@ def plan_lines(cl: ap.Okx, cfg: dict, env=None, desks: list | None = None, now: 
     except Exception as e:  # noqa: BLE001
         return L + [f"  сигналы не загрузились: {str(e)[:120]} — новых позиций не будет"]
     part = b["usd"] / max(1, len(ds))
-    L.append(f"  бюджет {ap.usd(b['usd'])} ({al._p(b['share'])} счёта) · столы: {', '.join(k for k, _ in ds) or 'нет'} — по {ap.usd(part)} на стол"
+    L.append(f"  бюджет {budget_text(b)} · столы: {', '.join(k for k, _ in ds) or 'нет'} — по {ap.usd(part)} на стол"
              f" · плечо ≤ {cap['lev']} (изолированная маржа) · риск ≤ {ap.usd(b['usd'] * cap['risk'])} на сделку · дневной стоп "
              f"{ap.usd(b['usd'] * cap['day_loss'])} · до {cap['max_pos']} позиций · стоп-лосс у каждой позиции на OKX")
     want = want_map(ds)

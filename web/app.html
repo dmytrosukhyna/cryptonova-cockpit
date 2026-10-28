@@ -4038,7 +4038,7 @@ web/public_real.json is published by the Mac mirror (cnq/execution/public_real.p
   function line(R,now){ if(!R||!R.since||R.equity_usd==null) return '';
     const d=new Date(R.since).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'}), old=R.stale||now-(R.asof||0)>2*3600000, c=R.pnl_usd>0?'pos':R.pnl_usd<0?'neg':'';
     return `<span>Реальный счёт CRYPTO NOVA на OKX · с ${d}</span><i>·</i><b>${money(R.equity_usd)}</b><i>·</i><b class="${c}">${sig(R.pnl_usd||0)}${R.pnl_pct!=null?` (${pct(R.pnl_pct)})`:''}</b>`
-      +(R.alloc&&R.equity_usd?`<i>·</i><span>распределены: спот ${pp(R.alloc.spot_pct)} · фьючерсы ${pp(R.alloc.fut_pct)} (в позициях ${pp(R.alloc.fut_margin_usd/R.equity_usd*100)}) · активный спот ${pp(R.alloc.active_pct)}</span>`:'')
+      +(R.alloc&&R.equity_usd?`<i>·</i><span>распределены: спот ${pp(R.alloc.spot_pct)}${R.alloc.core_pct?` · доп. ядро BTC/ETH/SOL ${pp(R.alloc.core_pct)}`:''} · фьючерсы ${pp(R.alloc.fut_pct)} (в позициях ${pp(R.alloc.fut_margin_usd/R.equity_usd*100)}) · активный спот ${pp(R.alloc.active_pct)}</span>`:'')
       +(R.copiers!=null?`<i>·</i><span>копируют: <b>${+R.copiers||0}</b>${/^https:\/\/www\.okx\.com\/copy-trading\/account\/[A-Za-z0-9]+$/.test(R.copy_url||'')?` · <a href="${R.copy_url}" target="_blank" rel="noopener">профиль на OKX</a>`:''}</span>`:'')
       +(old?'<i>·</i><span class="old">данные устарели — автопилот сейчас не обновляет счёт</span>':''); }
   async function load(){ const el=document.getElementById('realLine'); if(!el) return;
@@ -4241,7 +4241,7 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
         ['резерв под новые сделки',AL.fut_reserve_usd,'rgba(242,193,78,.4)'],['Активный спот · в монетах',AL.active_coins_usd,'#6fcf97'],
         ['Активный спот · ждёт сигнала «Импульс BTC»',AL.active_wait_usd,'rgba(111,207,151,.4)'],['Прочее',AL.other_usd,'#8fa1b3']];
       const row=(n,v,c,sub)=>`<div class="ar${sub?' sub':''}"><span><i style="background:${c}"></i>${n}</span><b>${usd(v||0)}</b><em>${p(v||0)}</em></div>`;
-      h+=`<div class="msal"><div class="hd">Ваши ${usd((S.start||{}).usd||T)} распределены: спот ${sh(AL.spot_pct)}, фьючерсы ${sh(AL.fut_pct)} (в позициях ${sh(fp)}), активный спот ${sh(AL.active_pct)}</div>`
+      h+=`<div class="msal"><div class="hd">Ваши ${usd((S.start||{}).usd||T)} распределены: спот ${sh(AL.spot_pct)}${AL.core_pct?`, доп. ядро BTC/ETH/SOL ${sh(AL.core_pct)}`:''}, фьючерсы ${sh(AL.fut_pct)} (в позициях ${sh(fp)}), активный спот ${sh(AL.active_pct)}</div>`
         +`<i class="mssplit">${parts.filter(x=>x[1]>0).map(x=>`<i style="width:${(x[1]/T*100).toFixed(2)}%;background:${x[2]}"></i>`).join('')}</i>`
         +row('Спот · монеты',AL.spot_coins_usd,'var(--acc)')+row('Спот · запас под новые монеты (правило портфеля: не меньше 10%)',AL.spot_cash_usd,'#4d7fa8')
         +row('Бюджет фьючерсов',AL.fut_budget_usd,'#f2c14e')+row('в позициях (маржа)',AL.fut_margin_usd,'#f2c14e',1)+row('резерв под новые сделки',AL.fut_reserve_usd,'rgba(242,193,78,.4)',1)

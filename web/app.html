@@ -3502,7 +3502,11 @@ async function ask(q,bubble){ if(!bubble&&isGreeting(q)){ voiceCommand(q); retur
 /* Settings → «Проверить ИИ»: one tiny request to the chosen provider; says OK with the time, or the exact error */
 function aiKeyNote(t){ const out=$('#sAiCheck'); if(out){ out.textContent=t; out.className='warn'; } }
 const AI_BADKEY=m=>/invalid.{0,12}(api.?)?key|incorrect api key|api key not valid|unauthori[sz]ed|permission denied|HTTP 40[13]|401|403/i.test(String(m||''));
-async function checkAI(){ const out=$('#sAiCheck'); if(!out) return; out.className='muted'; const key=$('#sAnth').value.trim(), prov=$('#sLlmP').value;
+/* 28.10 (build 46 §15: «логи в момент сбоя»): the last calls of this browser (cnq_ai_log: time, route, status, ms, error — never a key or a text) under «Проверить ИИ», so the moment NOVA did not answer can be read on the owner's own device */
+function aiLogText(n){ try{ const L=load('cnq_ai_log',[]).slice(0,n||6); if(!L.length) return ''; const two=x=>String(x).padStart(2,'0');
+  return '\nПоследние вызовы ИИ в этом браузере:\n'+L.map(r=>{ const d=new Date(r.t||0); return `${two(d.getDate())}.${two(d.getMonth()+1)} ${two(d.getHours())}:${two(d.getMinutes())} · ${r.prov||''} · ${r.ok?'ответ':'ошибка'}${r.status?' · HTTP '+r.status:''}${r.ms!=null?' · '+r.ms+' мс':''}${r.err?' · '+String(r.err).slice(0,80):''}`; }).join('\n'); }catch(e){ return ''; } }
+async function checkAI(){ const out=$('#sAiCheck'); if(!out) return; out.className='muted'; try{ await checkAI0(out); }finally{ out.textContent+=aiLogText(6); } }
+async function checkAI0(out){ const key=$('#sAnth').value.trim(), prov=$('#sLlmP').value;
   if(ADM_LIKE(key)){ aiKeyNote('Это похоже на токен «Управления» — его место во вкладке «Управление», не здесь. Провайдеру ИИ он не отправлен.'); return; }
   if(!key){ if(!adminTok()){ out.textContent='Ключа нет и вход в «Управление» не выполнен — ИИ не подключён.'; return; } out.textContent='Проверяю сервер…'; const t0=performance.now();
     try{ const t=await askServer('Ты проверка связи. Ответь одним словом.','Скажи слово: работает',200,{timeout:30000}); out.textContent=`Работает через сервер CRYPTO NOVA: ответ за ${((performance.now()-t0)/1000).toFixed(1)} с («${t.slice(0,30)}»).`; }

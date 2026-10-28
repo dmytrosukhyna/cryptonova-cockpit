@@ -96,6 +96,9 @@ def test_panel_chat_has_states_and_retry():
     assert "a.textContent='…'" not in body                      # no bare ellipsis left waiting
     assert re.search(r'id="sAiBtn"', s) and "checkAI" in s       # Settings → «Проверить ИИ»
     assert "SET.anth" not in s[s.index("function aiLog"):s.index("function llmErrText")]   # the log never stores the key
+    # 28.10 (build 46 §15): «Проверить ИИ» also lists this browser's last calls — status, time, error; never a key or a text
+    a = s[s.index("function aiLogText"):s.index("async function checkAI0(")]
+    assert "cnq_ai_log" in a and "SET.anth" not in a and "adminTok" not in a and "finally{ out.textContent+=aiLogText(6); }" in a
 
 
 class _LLM:

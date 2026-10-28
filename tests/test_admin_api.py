@@ -83,6 +83,8 @@ def seed(store):
     store.add_push("u2", "tok-u2-" + "x" * 20, "android")
     store.add_push("u2", "tok-u2b-" + "x" * 20, "ios")
     store.add_push("u4", "tok-u4-" + "x" * 20, "android")
+    store.set_prefs("u1", {"news": True})                                 # u1 and u2 switched «Важное на рынке» on
+    store.set_prefs("u2", {"news": True})
     store.set_prefs("u4", {"news": False})                                # u4 switched the news pushes off
     today = time.strftime("%Y-%m-%d", time.gmtime())
     store._q("INSERT INTO usage VALUES('u1', ?, 3)", (today,))

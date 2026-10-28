@@ -24,7 +24,10 @@ CREATE TABLE IF NOT EXISTS admin_log(t INTEGER, action TEXT, detail TEXT);
 CREATE TABLE IF NOT EXISTS admin_kv(k TEXT PRIMARY KEY, v TEXT, t INTEGER);
 """
 
-DEFAULT_PREFS = {"trades": True, "news": True, "piggy": False, "brief": True}
+# 28.10 (owner's spec §14: no notifications without consent): every switch is OFF until the person turns it on in the app.
+# A saved row is the person's own choice and is kept as saved (rows from before 28.10 hold the whole screen they saved);
+# from now on a row holds only the switches the person actually sent, so a default stays a default.
+DEFAULT_PREFS = {"trades": False, "news": False, "piggy": False, "brief": False}
 
 
 class Store:
@@ -76,13 +79,18 @@ class Store:
         else:
             self._q(f"INSERT OR REPLACE INTO {table} VALUES(?,?,?)", (uid, json.dumps(data, ensure_ascii=False), int(time.time() * 1000)))
 
+    def _own_prefs(self, uid: str) -> dict:
+        """only the switches this person saved (no defaults mixed in)"""
+        d = self._doc("prefs", uid, {})
+        return {k: bool(v) for k, v in d.items() if k in DEFAULT_PREFS} if isinstance(d, dict) else {}
+
     def prefs(self, uid: str) -> dict:
-        return {**DEFAULT_PREFS, **self._doc("prefs", uid, {})}
+        return {**DEFAULT_PREFS, **self._own_prefs(uid)}
 
     def set_prefs(self, uid: str, data: dict) -> dict:
-        p = {**self.prefs(uid), **{k: bool(v) for k, v in data.items() if k in DEFAULT_PREFS}}
-        self._put("prefs", uid, p)
-        return p
+        own = {**self._own_prefs(uid), **{k: bool(v) for k, v in (data or {}).items() if k in DEFAULT_PREFS}}
+        self._put("prefs", uid, own)
+        return {**DEFAULT_PREFS, **own}
 
     def piggy(self, uid: str) -> dict | None:
         return self._doc("piggy", uid, None)

@@ -1,7 +1,7 @@
 """Push messages for the 2.0 app — useful, calm, never spammy (owner 19.10: «чтобы это не раздражало, было понятно, приятно»).
 
 Rules:
-- only what the user switched on (Кабинет → Уведомления); default: trades on, news on, piggy off, weekly summary on;
+- only what the user switched on (Кабинет → Уведомления); default (28.10, spec §14 — no notifications without consent): all off;
 - quiet hours 22:00–09:00 Kyiv time: nothing is sent (trade news is not queued — it would be stale);
 - trades: a CRYPTO NOVA demo trade opened or closed, at most 6 messages a day per person, several at once are bundled;
 - piggy: one reminder on the buy day at 10:00 Kyiv; weekly summary: Friday 18:00 Kyiv;

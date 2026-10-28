@@ -26,6 +26,9 @@ def paper(opens=(), closes=()):
                                  "closed": [{"id": c, "symbol": c, "pnl_usd": 2.04, "closed": 2} for c in closes]}}}
 
 
+ON = {"trades": True, "news": True, "brief": True}        # what this person switched on in the app
+
+
 def setup(tmp_path, prefs=None):
     web = tmp_path / "web"
     web.mkdir()
@@ -33,9 +36,45 @@ def setup(tmp_path, prefs=None):
     st = Store(api)
     st.upsert_user("u1", None, None)
     st.add_push("u1", "tok-" + "x" * 30, "ios")
-    if prefs:
-        st.set_prefs("u1", prefs)
+    if prefs != {}:
+        st.set_prefs("u1", ON if prefs is None else prefs)
     return web, api, sqlite3.connect(str(tmp_path / "agents.sqlite"))
+
+
+def test_default_settings_send_nothing(tmp_path):
+    """28.10 (spec §14): a person who never touched the switches gets no push of any kind"""
+    web, api, conn = setup(tmp_path, {})
+    st = Store(api)
+    assert st.prefs("u1") == {"trades": False, "news": False, "piggy": False, "brief": False}
+    st.set_piggy("u1", {"amount": 20, "freq": "week", "on": True, "start_day": int(ms(10, 2, weekday_fri=True) // 86_400_000)})
+    (web / "paper.json").write_text(json.dumps({"profiles": {"bal": {"open": [], "closed": [], "equity_history": [
+        {"time": ms(12, day=16), "equity": 10000}, {"time": ms(17, day=23), "equity": 10100}]}}}))
+    f = FakeFcm()
+    app_push.run(conn, api, str(web), ms(9, day=23), f)                   # first run: silent
+    (web / "markets.json").write_text(json.dumps({"top": [{"symbol": "BTC", "price": 70000, "chg24": -9.0}]}))
+    doc = json.loads((web / "paper.json").read_text())
+    doc["profiles"]["bal"]["open"] = paper(["ARB"])["profiles"]["bal"]["open"]
+    (web / "paper.json").write_text(json.dumps(doc))
+    for h, m in ((10, 2), (12, 0), (18, 2)):                              # piggy day, big move, new trade, Friday summary
+        app_push.run(conn, api, str(web), ms(h, m, weekday_fri=True), f)
+    assert f.sent == []
+    st.set_prefs("u1", {"trades": True})                                  # the person turns one switch on → only that one
+    assert st.prefs("u1") == {"trades": True, "news": False, "piggy": False, "brief": False}
+    doc["profiles"]["bal"]["open"] = paper(["ARB", "SEI"])["profiles"]["bal"]["open"]
+    (web / "paper.json").write_text(json.dumps(doc))
+    app_push.run(conn, api, str(web), ms(18, 3, weekday_fri=True), f)
+    assert len(f.sent) == 1 and "SEI" in f.sent[0][2]
+
+
+def test_saved_settings_are_kept_and_only_sent_switches_are_stored(tmp_path):
+    st = Store(str(tmp_path / "api.sqlite"))
+    st._put("prefs", "old", {"trades": True, "news": True, "piggy": False, "brief": True})   # saved by the app before 28.10
+    assert st.prefs("old") == {"trades": True, "news": True, "piggy": False, "brief": True}
+    st.set_prefs("old", {"news": False})
+    assert st.prefs("old") == {"trades": True, "news": False, "piggy": False, "brief": True}
+    st.set_prefs("new", {"piggy": True, "hack": 1})
+    assert st._doc("prefs", "new", None) == {"piggy": True}                # defaults are not written into the row
+    assert [u for u, _ in st.push_tokens(pref="news")] == []
 
 
 def test_first_run_is_silent_then_new_trade_sends(tmp_path):

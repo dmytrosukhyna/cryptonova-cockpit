@@ -390,3 +390,14 @@ def test_exchange_lists_parse():
     assert spot_top.bingx_bases(lambda u: bx) == {"BTC", "SOL"}
     L = spot_top.Listings({"okx": lambda: (_ for _ in ()).throw(RuntimeError("down")), "bingx": lambda: {"BTC"}})
     assert L.get(background=False) == {"bingx": {"BTC"}}
+
+
+def test_numbers_and_rule_texts_in_the_language_format():
+    """final QA 28.10 §7: a decimal comma in ru / uk / el / es (the rules' «1,5 раза», «7,5%», «2,5%» too), the point in en"""
+    from cnq.api import pf_review as R
+    assert R.pct(7.5) == "7,5%" and R.pct(7.5, "es") == "7,5%" and R.pct(7.5, "en") == "7.5%" and R.pct(0.05, "el") == "<0,1%"
+    assert R.usd(12.5, "uk") == "$12,50" and R.usd(12.5, "en") == "$12.50"
+    for lang in ("ru", "uk", "el", "es"):
+        txt = R._t(R.RULE["conc"][1], lang) + R._t(R.RULE["core_high"][1], lang) + R._t(R.REC["risky"], lang)
+        assert "7,5%" in txt and "2,5%" in txt and "1,5" in txt and "7.5" not in txt and "1.5" not in txt, lang
+    assert "7.5%" in R._t(R.RULE["conc"][1], "en")

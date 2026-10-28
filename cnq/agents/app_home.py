@@ -1189,9 +1189,10 @@ def _public_real(out: str, now: int) -> dict | None:
 #   alloc: groups (where the dollars are: spot coins, spot dollars, active spot, futures in trades / reserve, other — they add up to
 #   the value), categories (core BTC/ETH/SOL, other coins, USDT), assets; spot / futures: the part of the starting capital the
 #   system gives each (okx_alloc shares) as the base, the result from OKX (fut_pnl_usd: closed P/L incl. fees and funding + open),
-#   spot = the rest; their periods from fut_curve (kept from 28.10 on — before that only «all»); futures.open with the desk's own
-#   «why» (by the desk trade id the position mirrors), futures.closed (OKX history; a partly closed position stays under «open»)
-#   and stats; actions — the autopilot's own filled orders in plain words. Nothing is back-filled, nothing invented.
+#   spot = the rest; their periods from fut_curve (kept by the writer from 28.10 on; before that the futures part is back-filled
+#   from 22.10 as its base + the realized P/L of the trades closed by then — final QA 28.10, see _real_portfolio); futures.open with
+#   the desk's own «why» (by the desk trade id the position mirrors), futures.closed (OKX history; a partly closed position stays
+#   under «open») and stats; actions — the autopilot's own filled orders in plain words. Nothing invented.
 PP_PERIODS = (("day", None), ("week", 7), ("month", 30), ("all", 0))
 PP_GROUPS = ("spot_coins", "spot_cash", "active_coins", "active_wait", "fut_margin", "fut_reserve", "other")
 CORE = {"BTC", "ETH", "SOL"}
@@ -1256,10 +1257,28 @@ def _desk_trade(paper: dict, sig: str | None) -> tuple[dict | None, str, dict]:
     return None, k, desk
 
 
-def _pp_action(a: dict, lang: str) -> str:
-    k, sym = a["kind"], a["sym"]
+# Final QA 28.10: each action names the rule it comes from, by the kinds the autopilot records — active_* = «Импульс BTC» (its own
+# texts), spot_* = the spot rebalance. Since the owner's decision of 28.10 (live at 17:30 UTC, okx_alloc.core_extra) a BTC / ETH / SOL
+# order of that rebalance is the core's (the spot portfolio's core + the extra core 10 %), and the first rebalance after it (within a
+# few minutes of its first core buy, the same day) bought the extra core only: «Куплено BTC на $…: доп. ядро 10% (решение владельца 28.10)».
+CORE_EXTRA_FROM = 1_793_208_600_000          # 28.10.2026 17:30 UTC
+CORE_EXTRA_PASS_MS = 10 * 60_000
+
+
+def _pp_rule_kinds(acts: list) -> dict:
+    """{id(action): text key} for the spot orders of the core (see above); every other action keeps its own kind"""
+    core = [a for a in acts if a.get("kind") in ("spot_buy", "spot_sell") and a.get("sym") in CORE
+            and isinstance(a.get("t"), (int, float)) and a["t"] >= CORE_EXTRA_FROM]
+    buys = [a["t"] for a in core if a["kind"] == "spot_buy"]
+    first = min(buys) if buys and min(buys) < CORE_EXTRA_FROM + DAY_MS else None
+    return {id(a): ("core_extra" if a["kind"] == "spot_buy" and first is not None and a["t"] <= first + CORE_EXTRA_PASS_MS
+                    else "core_" + a["kind"].split("_", 1)[1]) for a in core}
+
+
+def _pp_action(a: dict, lang: str, key: str | None = None) -> str:
+    k, sym = key or a["kind"], a["sym"]
     side = t(lang, "pp.side.long" if a.get("side") == "long" else "pp.side.short") if a.get("side") in ("long", "short") else ""
-    if k.startswith(("spot_", "active_")):
+    if k.startswith(("spot_", "active_", "core_")):
         return t(lang, f"pp.a.{k}", sym=sym, usd=_usd_text(a["usd"], lang)) if a.get("usd") else t(lang, f"pp.a.{k}", sym=sym, usd="—")
     if k == "fut_open":
         return t(lang, "pp.a.fut_open", sym=sym, side=side, px=_price(a["px"])) if a.get("px") else t(lang, "pp.a.fut_open0", sym=sym, side=side)
@@ -1300,9 +1319,22 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
     # 28.10 (owner's decision): the spot part = spot portfolio + extra core + «Импульс BTC» (85 %), the futures part 15 %
     spot_share = (al.get("spot_pct") or 0) + (al.get("core_pct") or 0) + (al.get("active_pct") or 0) if al.get("spot_pct") is not None else None
     fcurve = sorted((int(p[0]), float(p[1])) for p in real.get("fut_curve") or [] if isinstance(p, list) and len(p) == 2 and p[1] is not None)
-    tot = dict(curve)
-    scurve = [(t_, tot[t_] - v) for t_, v in fcurve if t_ in tot]
     split_from = fcurve[0][0] if fcurve else None
+    # Final QA 28.10 (owner's budget rule: futures = 15 % of the start + their own result): the writer keeps the futures' own curve
+    # only from 28.10; before that the futures part is back-filled from 22.10 as its base + the realized P/L of the futures trades
+    # closed by then (OKX's own positions history, fees and funding included) — the real history under the new budget rule:
+    # $1 503,66 until the APT close on 23.10 05:48 UTC, then $1 503,93. Realized only: the unrealized P/L of a position that was
+    # open before 28.10 was never recorded (APT, open 22.10–23.10, closed at +0,17 % of price), so it is not invented. A point is
+    # added at each close, the step holds until the next point; spot = total − futures at every point of the account's curve. This
+    # lets the app's demo futures part stay flat while the real futures are flat (and spot / futures have their own week / month).
+    if fcurve and split_from > since:
+        closes = sorted((int(c["closed"]), float(c.get("pnl_usd") or 0)) for c in real.get("closed") or []
+                        if isinstance(c, dict) and isinstance(c.get("closed"), (int, float)) and since <= c["closed"] < split_from)
+        back = {t_: sum(u for tc, u in closes if tc <= t_) for t_ in [t0 for t0, _ in curve if since <= t0 < split_from] + [tc for tc, _ in closes]}
+        back[since] = back.get(since, 0.0)
+        fcurve = sorted({**back, **dict(fcurve)}.items())
+        split_from = since
+    scurve = [(t_, v - f_) for t_, v in curve if (f_ := _at(fcurve, t_)) is not None]
     fpnl, spnl = real.get("fut_pnl_usd"), real.get("spot_pnl_usd")
 
     def part(share, res, crv, key):
@@ -1390,8 +1422,10 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
                     "running": not real.get("stale")})
         lv = _real_lev(real.get("futures") or [], closed)          # build 47 (§6.5): the cap in one short note
         fut.update({"lev_cap": lv, "lev_note": t(lang, "pp.lev_note", lev=lv["now"], max=lv["max"], risk=_dec(lv["risk_pct"], lang))})
-    acts = [{**{k: a.get(k) for k in ("t", "kind", "sym", "side", "usd", "px")}, "text": _pp_action(a, lang)}
-            for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
+    raw_acts = [a for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
+    rule = _pp_rule_kinds(raw_acts)
+    acts = [{**{k: a.get(k) for k in ("t", "kind", "sym", "side", "usd", "px")}, "text": _pp_action(a, lang, rule.get(id(a)))}
+            for a in raw_acts]
     return {"kind": "real", "exchange": real.get("exchange") or "OKX", "title": t(lang, "pp.title"), "since": since,
             "start_usd": _r(s0), "value_usd": _r(eq), "pnl_usd": _r(pnl), "pnl_pct": real.get("pnl_pct"),
             "today_usd": real.get("today_usd"), "today_pct": real.get("today_pct"), "asof": asof, "stale": bool(real.get("stale")),

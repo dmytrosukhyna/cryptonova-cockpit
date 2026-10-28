@@ -535,17 +535,17 @@ T: dict[str, dict[str, str]] = {
 
     # ---------------------------------------------------------------- the spot portfolio's last action (spot.last_action.text)
     # Russian keeps the portfolio's own sentence (why_ru); the other languages get these, with the numbers read from it
-    "act.trim_plan": {"ru": "{sym} выросла до {w}% счёта — больше плановых {p}%; лишнее продаём.",
+    "act.trim_plan": {"ru": "{sym} выросла до {w}% портфеля — больше плановых {p}%; лишнее продаём.",
                       "en": "{sym} grew to {w}% of the portfolio, above its {p}% plan — the excess is sold.",
                       "uk": "{sym}: {w}% портфеля — більше за план {p}%; зайве продаємо.",
                       "el": "Το {sym} έφτασε το {w}% του χαρτοφυλακίου, πάνω από το πλάνο του {p}% — πουλάμε το επιπλέον.",
                       "es": "{sym} llegó al {w}% de la cartera, por encima de su plan del {p}%: vendemos el exceso."},
-    "act.add_core": {"ru": "{sym} — монета ядра: сейчас {w}% счёта, система докупает её до {p}%.",
+    "act.add_core": {"ru": "{sym} — монета ядра: сейчас {w}% портфеля, система докупает её до {p}%.",
                      "en": "{sym} is a core coin: {w}% of the portfolio now, the system tops it up to {p}%.",
                      "uk": "{sym} — монета ядра: зараз {w}% портфеля, система докуповує її до {p}%.",
                      "el": "Το {sym} είναι νόμισμα του πυρήνα: τώρα {w}% του χαρτοφυλακίου, το σύστημα το συμπληρώνει έως το {p}%.",
                      "es": "{sym} es una moneda del núcleo: ahora el {w}% de la cartera; el sistema la completa hasta el {p}%."},
-    "act.buy_table": {"ru": "Купили {sym}: монета прошла все проверки системы; {w}% счёта.",
+    "act.buy_table": {"ru": "Купили {sym}: монета прошла все проверки системы; {w}% портфеля.",
                       "en": "Bought {sym}: the coin passed all of the system's checks; {w}% of the portfolio.",
                       "uk": "Купили {sym}: монета пройшла всі перевірки системи; {w}% портфеля.",
                       "el": "Αγοράσαμε {sym}: το νόμισμα πέρασε όλους τους ελέγχους του συστήματος· {w}% του χαρτοφυλακίου.",
@@ -709,24 +709,24 @@ T: dict[str, dict[str, str]] = {
                            "monedas con el núcleo. Otro 10% de la cuenta es núcleo adicional: BTC, ETH y SOL en las mismas "
                            "proporciones 30 / 10 / 5."},
     "pub.why.futures": {"ru": "Фьючерсы — отобранные сигналы CRYPTO NOVA: в счёт идут только стратегии, прошедшие проверку на "
-                              "истории. У каждой сделки есть стоп; риск — {risk}% счёта на сделку, у основной стратегии не больше "
+                              "истории. У каждой сделки есть стоп; риск — {risk}% фьючерсного бюджета на сделку, у основной стратегии не больше "
                               "{max_open} сделок одновременно. Минус тоже бывает: "
                               "убыточную сделку закрывает стоп.",
                         "en": "Futures are CRYPTO NOVA's selected signals: only strategies that passed the test on history trade "
-                              "this account. Every trade has a stop; the risk is {risk}% of the account per trade, and the main "
+                              "this account. Every trade has a stop; the risk is {risk}% of the futures budget per trade, and the main "
                               "strategy holds no more than {max_open} trades at once. Losses happen too: the stop closes a losing trade.",
                         "uk": "Ф’ючерси — відібрані сигнали CRYPTO NOVA: у рахунок ідуть лише стратегії, що пройшли перевірку на "
-                              "історії. У кожної угоди є стоп; ризик — {risk}% рахунку на угоду, в основної стратегії не більше "
+                              "історії. У кожної угоди є стоп; ризик — {risk}% ф’ючерсного бюджету на угоду, в основної стратегії не більше "
                               "{max_open} угод одночасно. Мінус теж буває: збиткову "
                               "угоду закриває стоп.",
                         "el": "Τα futures είναι τα επιλεγμένα σήματα του CRYPTO NOVA: στον λογαριασμό μπαίνουν μόνο στρατηγικές "
                               "που πέρασαν τον έλεγχο στο ιστορικό. Κάθε συναλλαγή έχει stop· το ρίσκο είναι {risk}% του "
-                              "λογαριασμού ανά συναλλαγή και η κύρια στρατηγική κρατά έως {max_open} συναλλαγές ταυτόχρονα. "
+                              "προϋπολογισμού για futures ανά συναλλαγή και η κύρια στρατηγική κρατά έως {max_open} συναλλαγές ταυτόχρονα. "
                               "Συμβαίνουν και απώλειες: τη "
                               "ζημιογόνα συναλλαγή την κλείνει το stop.",
                         "es": "Los futuros son las señales seleccionadas de CRYPTO NOVA: en la cuenta solo operan estrategias que "
-                              "pasaron la prueba con el histórico. Cada operación tiene stop; el riesgo es el {risk}% de la cuenta "
-                              "por operación, y la estrategia principal no tiene más de {max_open} operaciones a la vez. "
+                              "pasaron la prueba con el histórico. Cada operación tiene stop; el riesgo es el {risk}% del presupuesto de "
+                              "futuros por operación, y la estrategia principal no tiene más de {max_open} operaciones a la vez. "
                               "También hay pérdidas: el "
                               "stop cierra la operación perdedora."},
     "pub.why.active": {"ru": "Активный спот — «Импульс BTC»: когда биткоин за час вырос на 2,5% и больше, система покупает на споте "
@@ -862,16 +862,33 @@ T: dict[str, dict[str, str]] = {
                        "uk": "Продано {sym} на {usd}: спот-портфель приведено до плану системи.",
                        "el": "Πώληση {sym} αξίας {usd}: το χαρτοφυλάκιο spot επανήλθε στο σχέδιο του συστήματος.",
                        "es": "Vendido {sym} por {usd}: la cartera spot volvió al plan del sistema."},
-    "pp.a.active_buy": {"ru": "Куплено {sym} на {usd} по сигналу активного спота.",
-                        "en": "Bought {sym} for {usd} on an active spot signal.",
-                        "uk": "Куплено {sym} на {usd} за сигналом активного спота.",
-                        "el": "Αγορά {sym} αξίας {usd} με σήμα του ενεργού spot.",
-                        "es": "Comprado {sym} por {usd} con una señal del spot activo."},
-    "pp.a.active_sell": {"ru": "Продано {sym} на {usd}: сигнал активного спота завершён.",
-                         "en": "Sold {sym} for {usd}: the active spot signal ended.",
-                         "uk": "Продано {sym} на {usd}: сигнал активного спота завершено.",
-                         "el": "Πώληση {sym} αξίας {usd}: το σήμα του ενεργού spot έληξε.",
-                         "es": "Vendido {sym} por {usd}: la señal del spot activo terminó."},
+    "pp.a.active_buy": {"ru": "Куплено {sym} на {usd}: сигнал «Импульс BTC» (активный спот 10%).",
+                        "en": "Bought {sym} for {usd}: a «BTC momentum» signal (active spot 10%).",
+                        "uk": "Куплено {sym} на {usd}: сигнал «Імпульс BTC» (активний спот 10%).",
+                        "el": "Αγορά {sym} αξίας {usd}: σήμα της «ώθησης BTC» (ενεργό spot 10%).",
+                        "es": "Comprado {sym} por {usd}: una señal del «impulso BTC» (spot activo 10%)."},
+    "pp.a.active_sell": {"ru": "Продано {sym} на {usd}: сигнал «Импульс BTC» завершён.",
+                         "en": "Sold {sym} for {usd}: the «BTC momentum» signal ended.",
+                         "uk": "Продано {sym} на {usd}: сигнал «Імпульс BTC» завершено.",
+                         "el": "Πώληση {sym} αξίας {usd}: το σήμα της «ώθησης BTC» έληξε.",
+                         "es": "Vendido {sym} por {usd}: la señal del «impulso BTC» terminó."},
+    # final QA 28.10: a BTC / ETH / SOL order of the spot rebalance is the core's — since the owner's decision of 28.10 the spot
+    # portfolio's core plus the extra core 10 % (okx_alloc.core_extra); the first rebalance after that decision bought the extra core
+    "pp.a.core_extra": {"ru": "Куплено {sym} на {usd}: доп. ядро 10% (решение владельца 28.10).",
+                        "en": "Bought {sym} for {usd}: the extra core 10% (the owner's decision of 28 Oct).",
+                        "uk": "Куплено {sym} на {usd}: додаткове ядро 10% (рішення власника 28.10).",
+                        "el": "Αγορά {sym} αξίας {usd}: επιπλέον πυρήνας 10% (απόφαση του ιδιοκτήτη 28.10).",
+                        "es": "Comprado {sym} por {usd}: núcleo adicional del 10% (decisión del propietario del 28.10)."},
+    "pp.a.core_buy": {"ru": "Куплено {sym} на {usd}: ядро BTC, ETH и SOL приведено к плану (спот-портфель 65% + доп. ядро 10%).",
+                      "en": "Bought {sym} for {usd}: the BTC, ETH and SOL core brought back to plan (spot portfolio 65% + extra core 10%).",
+                      "uk": "Куплено {sym} на {usd}: ядро BTC, ETH і SOL приведено до плану (спот-портфель 65% + додаткове ядро 10%).",
+                      "el": "Αγορά {sym} αξίας {usd}: ο πυρήνας BTC, ETH και SOL επανήλθε στο σχέδιο (χαρτοφυλάκιο spot 65% + επιπλέον πυρήνας 10%).",
+                      "es": "Comprado {sym} por {usd}: el núcleo BTC, ETH y SOL volvió al plan (cartera spot 65% + núcleo adicional 10%)."},
+    "pp.a.core_sell": {"ru": "Продано {sym} на {usd}: ядро BTC, ETH и SOL приведено к плану (спот-портфель 65% + доп. ядро 10%).",
+                       "en": "Sold {sym} for {usd}: the BTC, ETH and SOL core brought back to plan (spot portfolio 65% + extra core 10%).",
+                       "uk": "Продано {sym} на {usd}: ядро BTC, ETH і SOL приведено до плану (спот-портфель 65% + додаткове ядро 10%).",
+                       "el": "Πώληση {sym} αξίας {usd}: ο πυρήνας BTC, ETH και SOL επανήλθε στο σχέδιο (χαρτοφυλάκιο spot 65% + επιπλέον πυρήνας 10%).",
+                       "es": "Vendido {sym} por {usd}: el núcleo BTC, ETH y SOL volvió al plan (cartera spot 65% + núcleo adicional 10%)."},
     "pp.a.fut_open": {"ru": "Открыта фьючерсная сделка {sym} {side} по цене {px}; стоп сразу стоит на бирже.",
                       "en": "Opened a futures trade on {sym}, {side}, at {px}; the stop is on the exchange from the start.",
                       "uk": "Відкрито ф'ючерсну угоду {sym} {side} за ціною {px}; стоп одразу стоїть на біржі.",
@@ -1487,6 +1504,9 @@ P: dict[str, dict[str, tuple[str, ...]]] = {
 # Every server text the app shows: «CRYPTO NOVA» never wraps (U+00A0), a negative amount has the true minus (U+2212), and in ru / uk /
 # el / es a decimal number has a comma and its thousands a non-breaking space (en keeps 2.5 and 10,000). A date (22.10, 06.10.2025),
 # a version (2.0), a year range (2023–2026), a ticker pair (BTC-USDT) and a URL are left as they are.
+# Final QA 28.10 §8: el / es write their thousands with a dot, as the app does ($9.833,32); ru / uk keep the non-breaking space. The
+# texts are made with a space (or U+00A0) between the thousands and this last step turns it into the dot, so a dotted thousand is
+# never mistaken for a decimal point; a number already written that way ($9.833,32) is left as it is.
 NBSP, MINUS = "\u00a0", "\u2212"
 _BRAND = re.compile(r"CRYPTO[ \u00a0]+NOV[AΛ]")
 _MINUS = re.compile(r"(?<![\w)\]])-(?=\$?\d)")
@@ -1495,8 +1515,11 @@ _THOU = re.compile(r"(?<![\d.,])(\d{1,3})((?:[ \u00a0]\d{3})+)(?![\d])")
 
 
 def _dec_ok(m) -> bool:
-    """a decimal number to convert, not a date / a version: with $ or %, or not shaped like dd.mm"""
+    """a decimal number to convert, not a date / a version: with $ or %, or not shaped like dd.mm; not a thousand already written
+    with a dot and followed by its decimal comma (el / es: $9.833,32)"""
     a, b = m.group("a"), m.group("b")
+    if len(b) == 3 and not m.group("suf") and re.match(r",\d", m.string[m.end():]):
+        return False
     if m.group("cur") or m.group("suf"):
         return True
     if len(b) == 1 and b == "0" and len(a) == 1:          # «2.0» — an app version, a multiplier like ×2.0 has its ×
@@ -1506,16 +1529,21 @@ def _dec_ok(m) -> bool:
     return True
 
 
-def polish(text, lang: str = DEFAULT):
-    """one text as the app shows it (see above); anything that is not a str, and URLs, come back unchanged"""
+def polish(text, lang: str = DEFAULT, native: bool = False):
+    """one text as the app shows it (see above); anything that is not a str, and URLs, come back unchanged. native=True: the text
+    was written in the language's own style (NOVA AI's answer) — in el / es a dotted group of three digits there is a thousand
+    ($9.877), not a decimal point"""
     if not isinstance(text, str) or not text or "://" in text:
         return text
     s = _BRAND.sub(lambda m: m.group(0).replace(" ", NBSP).replace(NBSP + NBSP, NBSP), text)
     s = re.sub(r"CRYPTO[ \u00a0]+(NOV[AΛ])", "CRYPTO" + NBSP + r"\1", s)
     s = _MINUS.sub(MINUS, s)
     if lang != "en":
-        s = _DEC.sub(lambda m: (m.group("cur") or "") + m.group("a") + "," + m.group("b") + (m.group("suf") or "") if _dec_ok(m) else m.group(0), s)
-        s = _THOU.sub(lambda m: m.group(1) + m.group(2).replace(" ", NBSP), s)
+        keep = native and lang in ("el", "es")
+        s = _DEC.sub(lambda m: (m.group("cur") or "") + m.group("a") + "," + m.group("b") + (m.group("suf") or "")
+                     if _dec_ok(m) and not (keep and len(m.group("b")) == 3 and m.group("a")[0] != "0" and not m.group("suf")) else m.group(0), s)
+        sep = "." if lang in ("el", "es") else NBSP
+        s = _THOU.sub(lambda m: m.group(1) + re.sub("[ \u00a0]", sep, m.group(2)), s)
     return s
 
 

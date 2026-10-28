@@ -252,12 +252,12 @@ RULE = {   # the rule a recommendation comes from: «its name» · where it is w
     "avoid": ("ideas", _L("«Не брать»", "“Avoid”", "«Не брати»", "«Αποφυγή»", "«Evitar»")),
     "core": ("pf", _L("«Ядро — BTC 30%, ETH 10%, SOL 5%»", "“Core: BTC 30%, ETH 10%, SOL 5%”", "«Ядро — BTC 30%, ETH 10%, SOL 5%»",
                       "«Πυρήνας: BTC 30%, ETH 10%, SOL 5%»", "«Núcleo: BTC 30%, ETH 10%, SOL 5%»")),
-    "core_high": ("pf", _L("«Лишнее ядро — если доля больше плана в 1.5 раза»", "“Excess core: a share over 1.5× the plan”",
-                           "«Зайве ядро — якщо частка більша за план у 1.5 раза»", "«Πλεόνασμα πυρήνα: μερίδιο πάνω από 1.5× του πλάνου»",
-                           "«Exceso de núcleo: un peso de más de 1.5× el plan»")),
-    "conc": ("pf", _L("«Монета вне ядра — до 7.5%, рискованная — до 2.5%»", "“A non-core coin: up to 7.5%, a risky one: up to 2.5%”",
-                      "«Монета поза ядром — до 7.5%, ризикова — до 2.5%»", "«Νόμισμα εκτός πυρήνα: έως 7.5%, ριψοκίνδυνο: έως 2.5%»",
-                      "«Moneda fuera del núcleo: hasta 7.5%; arriesgada: hasta 2.5%»")),
+    "core_high": ("pf", _L("«Лишнее ядро — если доля больше плана в 1,5 раза»", "“Excess core: a share over 1.5× the plan”",
+                           "«Зайве ядро — якщо частка більша за план у 1,5 раза»", "«Πλεόνασμα πυρήνα: μερίδιο πάνω από 1,5× του πλάνου»",
+                           "«Exceso de núcleo: un peso de más de 1,5× el plan»")),
+    "conc": ("pf", _L("«Монета вне ядра — до 7,5%, рискованная — до 2,5%»", "“A non-core coin: up to 7.5%, a risky one: up to 2.5%”",
+                      "«Монета поза ядром — до 7,5%, ризикова — до 2,5%»", "«Νόμισμα εκτός πυρήνα: έως 7,5%, ριψοκίνδυνο: έως 2,5%»",
+                      "«Moneda fuera del núcleo: hasta 7,5%; arriesgada: hasta 2,5%»")),
     "risky": ("ideas", _L("«Можно на небольшую сумму»", "“A small amount only”", "«Можна на невелику суму»", "«Μόνο μικρό ποσό»",
                           "«Solo poca cantidad»")),
     "cash": ("pf", _L("«Кэш не меньше 10%»", "“Cash at least 10%”", "«Кеш не менше 10%»", "«Μετρητά τουλάχιστον 10%»",
@@ -297,23 +297,23 @@ REC = {
         "Ο πυρήνας σας — BTC, ETH και SOL — είναι {you}. Στο χαρτοφυλάκιο CRYPTO NOVA ο πυρήνας είναι 45% με βάση το πλάνο, τώρα {model}. Το σύστημα κρατά τον πυρήνα χωρίς stop.",
         "Tu núcleo — BTC, ETH y SOL — es el {you}. En la cartera CRYPTO NOVA el núcleo es del 45% según el plan, ahora {model}. El sistema mantiene el núcleo sin stop."),
     "core_high": _L(
-        "{coin} — {you} портфеля. В портфеле CRYPTO NOVA план для {coin} — {plan}, и лишнее продают, когда доля больше плановой в 1.5 раза: одна монета не должна решать судьбу всего счёта.",
+        "{coin} — {you} портфеля. В портфеле CRYPTO NOVA план для {coin} — {plan}, и лишнее продают, когда доля больше плановой в 1,5 раза: одна монета не должна решать судьбу всего счёта.",
         "{coin} is {you} of the portfolio. The CRYPTO NOVA portfolio plans {plan} for {coin} and sells the excess when the share passes 1.5× the plan: one coin shouldn't decide the whole account.",
-        "{coin} — {you} портфеля. У портфелі CRYPTO NOVA план для {coin} — {plan}, і зайве продають, коли частка більша за планову в 1.5 раза: одна монета не має вирішувати долю всього рахунку.",
-        "Το {coin} είναι {you} του χαρτοφυλακίου. Το χαρτοφυλάκιο CRYPTO NOVA προβλέπει {plan} για το {coin} και πουλά το πλεόνασμα όταν το μερίδιο ξεπεράσει το 1.5× του πλάνου: ένα νόμισμα δεν πρέπει να κρίνει όλο τον λογαριασμό.",
-        "{coin} es el {you} de la cartera. La cartera CRYPTO NOVA prevé un {plan} para {coin} y vende el exceso cuando el peso pasa de 1.5× el plan: una sola moneda no debe decidir toda la cuenta."),
+        "{coin} — {you} портфеля. У портфелі CRYPTO NOVA план для {coin} — {plan}, і зайве продають, коли частка більша за планову в 1,5 раза: одна монета не має вирішувати долю всього рахунку.",
+        "Το {coin} είναι {you} του χαρτοφυλακίου. Το χαρτοφυλάκιο CRYPTO NOVA προβλέπει {plan} για το {coin} και πουλά το πλεόνασμα όταν το μερίδιο ξεπεράσει το 1,5× του πλάνου: ένα νόμισμα δεν πρέπει να κρίνει όλο τον λογαριασμό.",
+        "{coin} es el {you} de la cartera. La cartera CRYPTO NOVA prevé un {plan} para {coin} y vende el exceso cuando el peso pasa de 1,5× el plan: una sola moneda no debe decidir toda la cuenta."),
     "conc": _L(
-        "{coins} — {you} портфеля. В портфеле CRYPTO NOVA одна монета вне ядра занимает не больше 7.5%, рискованная — 2.5%: если она сильно упадёт, весь счёт не провалится.",
+        "{coins} — {you} портфеля. В портфеле CRYPTO NOVA одна монета вне ядра занимает не больше 7,5%, рискованная — 2,5%: если она сильно упадёт, весь счёт не провалится.",
         "{coins}: {you} of the portfolio. In the CRYPTO NOVA portfolio one coin outside the core takes no more than 7.5%, a risky one 2.5%: if it falls hard, the whole account doesn't sink.",
-        "{coins} — {you} портфеля. У портфелі CRYPTO NOVA одна монета поза ядром займає не більше 7.5%, ризикова — 2.5%: якщо вона сильно впаде, весь рахунок не провалиться.",
-        "{coins}: {you} του χαρτοφυλακίου. Στο χαρτοφυλάκιο CRYPTO NOVA ένα νόμισμα εκτός πυρήνα πιάνει έως 7.5%, ένα ριψοκίνδυνο έως 2.5%: αν πέσει πολύ, δεν βουλιάζει όλος ο λογαριασμός.",
-        "{coins}: el {you} de la cartera. En la cartera CRYPTO NOVA una moneda fuera del núcleo ocupa como mucho un 7.5%, una arriesgada un 2.5%: si cae mucho, no se hunde toda la cuenta."),
+        "{coins} — {you} портфеля. У портфелі CRYPTO NOVA одна монета поза ядром займає не більше 7,5%, ризикова — 2,5%: якщо вона сильно впаде, весь рахунок не провалиться.",
+        "{coins}: {you} του χαρτοφυλακίου. Στο χαρτοφυλάκιο CRYPTO NOVA ένα νόμισμα εκτός πυρήνα πιάνει έως 7,5%, ένα ριψοκίνδυνο έως 2,5%: αν πέσει πολύ, δεν βουλιάζει όλος ο λογαριασμός.",
+        "{coins}: el {you} de la cartera. En la cartera CRYPTO NOVA una moneda fuera del núcleo ocupa como mucho un 7,5%, una arriesgada un 2,5%: si cae mucho, no se hunde toda la cuenta."),
     "risky": _L(
-        "Мемы и монеты высокого риска — {you} портфеля ({coins}). По правилам CRYPTO NOVA их берут только небольшой суммой: до 2.5% на монету и не больше 3 таких монет.",
+        "Мемы и монеты высокого риска — {you} портфеля ({coins}). По правилам CRYPTO NOVA их берут только небольшой суммой: до 2,5% на монету и не больше 3 таких монет.",
         "Memes and high-risk coins are {you} of the portfolio ({coins}). By CRYPTO NOVA's rules they are bought only in small amounts: up to 2.5% per coin and no more than 3 such coins.",
-        "Меми та монети високого ризику — {you} портфеля ({coins}). За правилами CRYPTO NOVA їх беруть лише невеликою сумою: до 2.5% на монету і не більше 3 таких монет.",
-        "Τα meme και τα νομίσματα υψηλού κινδύνου είναι {you} του χαρτοφυλακίου ({coins}). Με τους κανόνες του CRYPTO NOVA αγοράζονται μόνο σε μικρά ποσά: έως 2.5% ανά νόμισμα και όχι πάνω από 3 τέτοια νομίσματα.",
-        "Los memes y las monedas de alto riesgo son el {you} de la cartera ({coins}). Según las reglas de CRYPTO NOVA solo se compran en poca cantidad: hasta un 2.5% por moneda y no más de 3 monedas así."),
+        "Меми та монети високого ризику — {you} портфеля ({coins}). За правилами CRYPTO NOVA їх беруть лише невеликою сумою: до 2,5% на монету і не більше 3 таких монет.",
+        "Τα meme και τα νομίσματα υψηλού κινδύνου είναι {you} του χαρτοφυλακίου ({coins}). Με τους κανόνες του CRYPTO NOVA αγοράζονται μόνο σε μικρά ποσά: έως 2,5% ανά νόμισμα και όχι πάνω από 3 τέτοια νομίσματα.",
+        "Los memes y las monedas de alto riesgo son el {you} de la cartera ({coins}). Según las reglas de CRYPTO NOVA solo se compran en poca cantidad: hasta un 2,5% por moneda y no más de 3 monedas así."),
     "cash_low": _L(
         "Запас в долларах (USDT, USDC) у вас {you}. Портфель CRYPTO NOVA всегда держит не меньше 10% — чтобы было чем докупить ядро, если оно подешевеет.",
         "Your dollar reserve (USDT, USDC) is {you}. The CRYPTO NOVA portfolio always keeps at least 10% — so there is something to add to the core with if it gets cheaper.",
@@ -535,21 +535,26 @@ def coins_word(n: int, lang: str) -> str:
 
 
 # ------------------------------------------------------------------------------------------------ numbers
-def usd(v: float) -> str:
+def _comma(s: str, lang: str) -> str:
+    """final QA 28.10 §7: a decimal comma in ru / uk / el / es, the point in en"""
+    return s if lang == "en" else s.replace(".", ",")
+
+
+def usd(v: float, lang: str = DEFAULT) -> str:
     v = float(v or 0)
     if abs(v) >= 100:
         return "$" + f"{v:,.0f}".replace(",", " ")
-    return "$" + f"{v:,.2f}".replace(",", " ")
+    return "$" + _comma(f"{v:,.2f}".replace(",", " "), lang)
 
 
-def pct(v: float) -> str:
+def pct(v: float, lang: str = DEFAULT) -> str:
     v = float(v or 0)
     if v <= 0:
         return "0%"
     if v < 0.1:
-        return "<0.1%"
+        return _comma("<0.1%", lang)
     if v < 10:
-        return f"{v:.1f}".rstrip("0").rstrip(".") + "%"
+        return _comma(f"{v:.1f}".rstrip("0").rstrip("."), lang) + "%"
     return f"{v:.0f}%"
 
 
@@ -671,7 +676,7 @@ def clean_holdings(items, cap: int = 100) -> list[dict]:
 
 
 # ------------------------------------------------------------------------------------------------ the model: the real account
-def real_model(real: dict, statuses: dict) -> dict | None:
+def real_model(real: dict, statuses: dict, lang: str = DEFAULT) -> dict | None:
     """the spot part of the real CRYPTO NOVA account (web/public_real.json) as the review's model: {"model": {sym: % of the spot
     holdings}, "buckets", "cash" (%), "split": the account's spot / futures / active shares as text, "asof"}; None without it"""
     if not isinstance(real, dict) or not real.get("asof") or not isinstance(real.get("spot"), list):
@@ -695,9 +700,9 @@ def real_model(real: dict, statuses: dict) -> dict | None:
         b["core" if s in CORE else "small" if st == "small" else "buy" if st in ("buy", "add") else "other"] += w
     split = None
     if al.get("spot_pct") is not None and al.get("fut_pct") is not None:
-        split = {"spot": pct(float(al["spot_pct"])), "fut": pct(float(al["fut_pct"])), "act": pct(float(al.get("active_pct") or 0))}
+        split = {"spot": pct(float(al["spot_pct"]), lang), "fut": pct(float(al["fut_pct"]), lang), "act": pct(float(al.get("active_pct") or 0), lang)}
         if float(al.get("core_pct") or 0) > 0:                         # 28.10: the extra core
-            split["core"] = pct(float(al["core_pct"]))
+            split["core"] = pct(float(al["core_pct"]), lang)
     return {"model": model, "buckets": b, "cash": cash / hold * 100, "split": split, "asof": int(real["asof"])}
 
 
@@ -767,7 +772,7 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
     # 28.10 (build 46 QA: the model still showed coins the account had sold, «ядро 50% … датчик альтсезона», «на 22.10»): the model
     # is the spot part of the REAL CRYPTO NOVA account now (web/public_real.json — the same file and moment as the app's PUBLIC
     # portfolio): each coin's share of the spot holdings, the spot dollars; the account's split (65 / 10 / 15 / 10 since the owner's decision of 28.10) in a line of its own
-    rm = real_model(real, statuses)
+    rm = real_model(real, statuses, lang)
     model_src, model_asof = "pf", ideas.get("asof")
     if rm:
         model, mbuck, mcash = rm["model"], rm["buckets"], rm["cash"]
@@ -789,25 +794,25 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
     if avoid and av >= 0.5:
         top = avoid[0]
         rs = top["reason"]
-        add(av * 3, "avoid" if len(avoid) > 1 else "avoid1", "avoid", coins=_list([r["sym"] for r in avoid], lang), you=pct(av), top=top["sym"],
+        add(av * 3, "avoid" if len(avoid) > 1 else "avoid1", "avoid", coins=_list([r["sym"] for r in avoid], lang), you=pct(av, lang), top=top["sym"],
             reason=rs[:1].lower() + rs[1:] if rs and not rs[:2].isupper() else rs)
     if total > 0 and core < 30:
-        add((CORE_PLAN_SUM - core) * 1.5, "core_low", "core", you=pct(core), model=pct(model_core), alt=pct(a_core))
+        add((CORE_PLAN_SUM - core) * 1.5, "core_low", "core", you=pct(core, lang), model=pct(model_core, lang), alt=pct(a_core, lang))
     for c in CORE:
         sh = share(lambda r, c=c: r["sym"] == c)
         if sh > CORE_PLAN[c] * 1.5:
-            add((sh - CORE_PLAN[c] * 1.5) * 0.8, "core_high", "core_high", coin=c, you=pct(sh), plan=pct(CORE_PLAN[c]))
+            add((sh - CORE_PLAN[c] * 1.5) * 0.8, "core_high", "core_high", coin=c, you=pct(sh, lang), plan=pct(CORE_PLAN[c], lang))
             break
     big = [r for r in rows if r["sym"] not in CORE and r["status"] != "cash" and r["share_pct"] > 2 * ALT_MAX]
     if big:
         add(sum(r["share_pct"] - ALT_MAX for r in big) * 1.2, "conc", "conc", coins=_list([r["sym"] for r in big], lang),
-            you=pct(sum(r["share_pct"] for r in big)))
+            you=pct(sum(r["share_pct"] for r in big), lang))
     risky_rows = [r for r in rows if r["sym"] not in CORE and r["status"] != "avoid" and (r["kind"] in ("meme", "high") or r["status"] == "small")]
     rk = sum(r["share_pct"] for r in risky_rows)
     if rk > SMALL_MAX * SMALL_COUNT:
-        add((rk - SMALL_MAX * SMALL_COUNT) * 1.5, "risky", "risky", you=pct(rk), coins=_list([r["sym"] for r in risky_rows], lang))
+        add((rk - SMALL_MAX * SMALL_COUNT) * 1.5, "risky", "risky", you=pct(rk, lang), coins=_list([r["sym"] for r in risky_rows], lang))
     if total > 0 and cash < CASH_MIN:
-        add((CASH_MIN - cash) * 1.0, "cash_low", "cash", you=pct(cash))
+        add((CASH_MIN - cash) * 1.0, "cash_low", "cash", you=pct(cash, lang))
     for flag, key, wt in (("overheat", "overheat", 1.0), ("dilution", "dilution", 1.0), ("cex", "cex", 0.8)):
         fr = [r for r in rows if r["flag"] == flag and r["status"] != "avoid"]
         if fr:
@@ -815,7 +820,7 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
     unk = [r for r in rows + unpriced if r["status"] == "unknown"]
     uk = sum(r["share_pct"] or 0 for r in unk)
     if unk and (uk >= 5 or len(unk) >= 3):
-        add(max(uk, 3.0) * 0.9, "unknown", "unknown", coins=_list([r["sym"] for r in unk], lang), you=pct(uk), n=len(statuses))
+        add(max(uk, 3.0) * 0.9, "unknown", "unknown", coins=_list([r["sym"] for r in unk], lang), you=pct(uk, lang), n=len(statuses))
     if coins_n > COINS_MAX:
         add((coins_n - COINS_MAX) * 2.0, "count", "count", count=coins_word(coins_n, lang))
     if qn:
@@ -828,9 +833,9 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
     good: list[tuple[float, str, dict]] = []
     keys = {k for _w, k, _d in picked}
     if total > 0 and core >= 30 and "core_high" not in keys:
-        good.append((0, "core_ok", {"rule": "core", "kw": {"you": pct(core), "model": pct(model_core)}}))
+        good.append((0, "core_ok", {"rule": "core", "kw": {"you": pct(core, lang), "model": pct(model_core, lang)}}))
     if total > 0 and cash >= CASH_MIN:
-        good.append((0, "cash_ok", {"rule": "cash", "kw": {"you": pct(cash)}}))
+        good.append((0, "cash_ok", {"rule": "cash", "kw": {"you": pct(cash, lang)}}))
     ok_coins = syms(lambda r: r["status"] in ("buy", "add"))
     if ok_coins:
         good.append((0, "buy_ok", {"rule": "buy", "kw": {"coins": _list(ok_coins, lang)}}))
@@ -851,17 +856,17 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
     ub["other"] = max(0.0, 100 - sum(ub.values())) if total > 0 else 0.0
     user_w = {r["sym"]: r["share_pct"] for r in rows if r["status"] != "cash"}
     match = sum(min(w, model.get(s, 0)) for s, w in user_w.items()) + min(cash, mcash) if total > 0 else 0.0
-    items = [f"{s} {usd(total * w / 100)}" for s, w in sorted(model.items(), key=lambda x: -x[1])]
-    items.append(f"{_t(TXT['cash_word'], lang)} {usd(total * mcash / 100)}")
+    items = [f"{s} {usd(total * w / 100, lang)}" for s, w in sorted(model.items(), key=lambda x: -x[1])]
+    items.append(f"{_t(TXT['cash_word'], lang)} {usd(total * mcash / 100, lang)}")
     compare = {
         "title": _t(TXT["cmp_title"], lang), "you": _t(TXT["you"], lang), "model": _t(TXT["model"], lang),
         "model_name": _t(SRC[model_src], lang),
         "rows": [{"key": k, "label": _t(TXT["b_" + k], lang), "you_pct": round(ub[k], 1), "model_pct": round(mbuck[k], 1),
-                  "you": pct(ub[k]), "model_txt": pct(mbuck[k])} for k in ("core", "buy", "small", "other", "cash")],
+                  "you": pct(ub[k], lang), "model_txt": pct(mbuck[k], lang)} for k in ("core", "buy", "small", "other", "cash")],
         "coins": [{"sym": s, "pct": round(w, 1), "usd": round(total * w / 100, 2)} for s, w in sorted(model.items(), key=lambda x: -x[1])],
         "cash_pct": round(mcash, 1),
-        "hold": _t(TXT["model_hold"], lang, total=usd(total), items=" · ".join(items)) if total > 0 else "",
-        "match_pct": round(match, 1), "match": _t(TXT["match"], lang, p=pct(match)),
+        "hold": _t(TXT["model_hold"], lang, total=usd(total, lang), items=" · ".join(items)) if total > 0 else "",
+        "match_pct": round(match, 1), "match": _t(TXT["match"], lang, p=pct(match, lang)),
         # the old «ядро + альтсезон» line is gone; the key stays (build 45 shows it) with the real account's split
         "alt": _t(TXT["split_core" if "core" in (rm or {}).get("split", {}) else "split"], lang, **rm["split"]) if rm and rm.get("split") else "",
         "split": _t(TXT["split_core" if "core" in (rm or {}).get("split", {}) else "split"], lang, **rm["split"]) if rm and rm.get("split") else "",
@@ -870,9 +875,9 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
     return {
         "lang": lang, "title": _t(TXT["title"], lang),
         "intro": _t(TXT["intro"], lang, n=coins_word(n_all, lang), date=_date(model_asof or time.time() * 1000)),
-        "asof": model_asof, "total_usd": round(total, 2), "total": usd(total), "total_label": _t(TXT["total"], lang),
+        "asof": model_asof, "total_usd": round(total, 2), "total": usd(total, lang), "total_label": _t(TXT["total"], lang),
         "count": n_all,
-        "rows": [{**r, "share": pct(r["share_pct"]) if r["share_pct"] is not None else "—"} for r in rows + unpriced],
+        "rows": [{**r, "share": pct(r["share_pct"], lang) if r["share_pct"] is not None else "—"} for r in rows + unpriced],
         "unpriced": [r["sym"] for r in unpriced],
         "unpriced_note": _t(TXT["unpriced"], lang, coins=_list([r["sym"] for r in unpriced], lang, 6)) if unpriced else "",
         "recs": recs, "rule_label": _t(TXT["rule"], lang), "compare": compare, "disclaimer": _t(TXT["disclaimer"], lang),

@@ -310,7 +310,14 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     assert S["value_usd"] + F["value_usd"] == pp["value_usd"] and F["pct"] == round(-2.0 / 2500 * 100, 2)
     assert F["periods"]["day"]["available"] and F["periods"]["day"]["usd"] == 3.0                 # −2 now vs −5 before 00:00
     assert S["periods"]["day"]["usd"] == round(-28.0 - (-60.0 + 5.0), 2)                         # spot = total − futures
-    assert pp["split_note"] and S["curve"][-1] == [now - 60_000, 7500.0 - 28.0]
+    assert S["curve"][-1] == [now - 60_000, 7500.0 - 28.0]
+    # final QA 28.10: the futures part is back-filled from the start (base + the P/L of the trades closed by then, a point at each
+    # close), spot = total − futures — so both parts have their own history from day one and no «separate history since» note
+    assert pp["split_note"] is None
+    assert F["curve"][:5] == [[since, 2500.0], [since + 2 * H, 2500.5], [since + 3 * H, 2502.5], [since + 4 * H, 2496.5],
+                              [since + 24 * H, 2496.5]]
+    assert S["curve"][:2] == [[since, 7500.0], [since + 24 * H, 7500.0 - 40.0 + 3.5]]
+    assert F["periods"]["week"]["available"] and F["periods"]["week"]["usd"] == -2.0 and S["periods"]["week"]["usd"] == -28.0
     assert abs(sum(c["share_spot"] for c in S["coins"]) + (S["cash_usd"] / S["holdings_usd"] * 100) - 100) < 0.1
     # 28.10 (build 46 QA): money moved between spot and futures is no one's result — each part's «now» is the money in it
     assert F["value_usd"] == 2492.5 and S["value_usd"] == S["holdings_usd"] == 7477.5 and S["cash_usd"] == 2492.5

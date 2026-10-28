@@ -143,7 +143,7 @@ def test_app_home_in_every_language_from_the_same_data(tmp_path, main):
     assert not os.path.exists(os.path.join(d, "app_home.json.tmp"))
     f = ru["futures"]
     assert {o["sym"] for o in f["open"]} == {"SOL", "ETH", "LINK", "BNB", "AVAX", "NEAR", "SEI", "SUI", "NEWX"}
-    assert ru["sources"][3]["label"] == "арбитраж, рынки прогнозов" and ru["spot"]["last_action"]["text"].startswith("SOL выросла до 10% счёта")
+    assert ru["sources"][3]["label"] == "арбитраж, рынки прогнозов" and ru["spot"]["last_action"]["text"].startswith("SOL выросла до 10% портфеля")
     every = {lang: _texts(doc) for lang, doc in docs.items()}
     for lang, doc in docs.items():
         assert _numbers(doc) == _numbers(docs["ru"]), lang                                   # the same numbers, only the words differ
@@ -338,8 +338,10 @@ class Capture:
 
 def test_agent_answers_in_the_requested_language(tmp_path):
     api, _ = make(tmp_path)
-    home_el = {"asof": int(time.time() * 1000), "futures": {"open": [{"sym": "AVAX", "side": "LONG", "src_ru": "υποχώρηση σε τάση",
-                                                                     "why": "Ένα νόμισμα σε ανοδική τάση υποχώρησε."}]}}
+    # final QA 28.10: NOVA reads the real account's own open trades (public_portfolio.futures.open), never the demo desks'
+    home_el = {"asof": int(time.time() * 1000), "public_portfolio": {"value_usd": 9900.0, "futures": {"open": [
+        {"sym": "AVAX", "side": "LONG", "src_ru": "υποχώρηση σε τάση", "why": "Ένα νόμισμα σε ανοδική τάση υποχώρησε."}]}},
+        "futures": {"open": [{"sym": "AVAX", "side": "LONG", "src_ru": "demo", "why": "Demo desk text — never sent."}]}}
     _w(api.web, "app_home.el.json", home_el)
     api.llm = cap = Capture()
     t = token("lang")
@@ -352,6 +354,7 @@ def test_agent_answers_in_the_requested_language(tmp_path):
     assert "«Ο λογαριασμός demo μου» на αρχική οθόνη" in user
     call(api, "POST", "/v2/agent", {"q": "Γιατί αγοράσατε AVAX;", "lang": "el"}, t)
     assert "Ένα νόμισμα σε ανοδική τάση υποχώρησε." in cap.seen[-1][1]           # the trade texts of app_home.el.json
+    assert "Demo desk text" not in cap.seen[-1][1]
     for body, want in (({"q": "What is leverage?", "lang": "en-US"}, "English"), ({"q": "Що таке плече?", "lang": "uk"}, "українською"),
                        ({"q": "¿Qué es el apalancamiento?", "lang": "es"}, "español")):
         call(api, "POST", "/v2/agent", body, t)
@@ -410,3 +413,8 @@ def test_polish_numbers_brand_and_minus_per_language():
     assert i18n.polish("https://x.io/a-1.5", "ru") == "https://x.io/a-1.5" and i18n.polish(7.5, "ru") == 7.5
     doc = i18n.polish_doc({"sym": "BTC-1.5", "text": "7.5%", "rows": [{"url": "a 1.5", "why": "1.5 раза"}], "n": 1.5}, "es")
     assert doc == {"sym": "BTC-1.5", "text": "7,5%", "rows": [{"url": "a 1.5", "why": "1,5 раза"}], "n": 1.5}
+    # final QA 28.10 §8: el / es thousands with a dot, as the app writes them ($9.833,32); ru / uk keep the no-break space; a number
+    # already written that way stays; NOVA's own answer (native) keeps a dotted thousand
+    assert i18n.polish("$9 833.32 · 10 024,40 · 0.7760 · 1.234", "es") == "$9.833,32 · 10.024,40 · 0,7760 · 1,234"
+    assert i18n.polish("$9 833.32", "el") == "$9.833,32" and i18n.polish("$9 833.32", "uk") == f"$9{N}833,32"
+    assert i18n.polish("$9.833,32", "es") == "$9.833,32" and i18n.polish("9.877 dólares", "es", native=True) == "9.877 dólares"

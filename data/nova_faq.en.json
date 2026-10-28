@@ -149,7 +149,7 @@
       "id": "price",
       "topic": "money",
       "q": "How much does it cost?",
-      "a": "Demo, the Piggy bank, 52 lessons and me, NOVA — no subscriptions or in-app purchases. If you copy CRYPTO NOVA on OKX, the exchange keeps a share of your profit for the lead trader, that is CRYPTO NOVA: the percentage is shown in the profile before you start, and no profit means no fee. For an account opened through our link, the exchange gives us part of its own fee, and your fees don't change. If paid features ever appear, we'll show the terms and price in advance.",
+      "a": "Demo, the Piggy bank, 52 lessons and me, NOVA AI — no subscriptions or in-app purchases. If you copy CRYPTO NOVA on OKX, the exchange keeps a share of your profit for the lead trader, that is CRYPTO NOVA: the percentage is shown in the profile before you start, and no profit means no fee. For an account opened through our link, the exchange gives us part of its own fee, and your fees don't change. If paid features ever appear, we'll show the terms and price in advance.",
       "tags": [
         "cost",
         "price",
@@ -199,7 +199,7 @@
       "id": "how_works",
       "topic": "how",
       "q": "How does CRYPTO NOVA work?",
-      "a": "CRYPTO NOVA is an AI system: it watches the crypto market 24/7 and looks for trades using rules tested on price history. Since October 22, 2026 it has been running a real account on OKX with about $10 000 — that's the “Public portfolio”: you see the coins, the trades, the entry, the stop and a simple “why we entered”. Next to it there's your demo portfolio, a bitcoin Piggy bank, 52 lessons and me, NOVA. It isn't an exchange and isn't financial advice.",
+      "a": "CRYPTO NOVA is an AI system: it watches the crypto market 24/7 and looks for trades using rules tested on price history. Since October 22, 2026 it has been running a real account on OKX with about $10 000 — that's the “Public portfolio”: you see the coins, the trades, the entry, the stop and a simple “why we entered”. Next to it there's your demo portfolio, a bitcoin Piggy bank, 52 lessons and me, NOVA AI. It isn't an exchange and isn't financial advice.",
       "tags": [
         "work",
         "works",
@@ -377,7 +377,7 @@
       "id": "eu",
       "topic": "how",
       "q": "Why can't I see the exchange link?",
-      "a": "If OKX and BingX don't operate in your country, the US for example, the app shows no exchange link: we don't offer what isn't allowed where you are. Learning, demo, the Piggy bank and me, NOVA, work fully, and the system's trades are visible in the app. The availability of copy trading and of some instruments depends on your country and region — OKX shows the terms.",
+      "a": "If OKX and BingX don't operate in your country, the US for example, the app shows no exchange link: we don't offer what isn't allowed where you are. Learning, demo, the Piggy bank and me, NOVA AI, work fully, and the system's trades are visible in the app. The availability of copy trading and of some instruments depends on your country and region — OKX shows the terms.",
       "tags": [
         "eu",
         "europe",
@@ -406,7 +406,7 @@
       "id": "leverage_real",
       "topic": "learn",
       "q": "Why is the real account's leverage only 2x?",
-      "a": "On CRYPTO NOVA's real account the leverage is 2x: the system's rules set it, with a cap of 3x. Leverage doesn't change the amount at risk: the trade size comes from the stop, and one trade risks at most 1% of the futures budget. Higher leverage would only lower the margin and bring liquidation closer, and the trades' stops can be 6–12% away. The signals show 2x–5x: that's the rule's own label — the farther the stop, the lower the leverage.",
+      "a": "On CRYPTO NOVA's real account the leverage is 2x: the system's rules set it, with a cap of 3x. Leverage doesn't change the amount at risk: the trade size comes from the stop, and one trade risks at most 1% of the futures budget. Higher leverage would only lower the margin and bring liquidation closer, and the trades' stops can be 6–12% away. Demo-account signals may show 2x–5x, but on the real account the leverage is 2x, with a cap of 3x.",
       "tags": [
         "leverage",
         "2x",
@@ -439,7 +439,7 @@
       "id": "long_short",
       "topic": "learn",
       "q": "What are long and short?",
-      "a": "Long is a bet on the price rising: buy lower, sell higher. Short is a bet on it falling: you earn if the price goes down. Futures allow both, so the system can earn in a falling market too. But it can also be wrong in either direction.",
+      "a": "Long is a bet on the price rising: buy lower, sell higher. Short is a bet on it falling: you earn if the price goes down. Futures allow both, so the system can earn in a falling market too. But it can also be wrong in either direction. For now CRYPTO NOVA's real account only buys (LONG); the system tests shorts on its demo accounts.",
       "tags": [
         "long",
         "short",
@@ -576,7 +576,7 @@
       "id": "who",
       "topic": "learn",
       "q": "Who are you, NOVA?",
-      "a": "I'm NOVA, the CRYPTO NOVA AI assistant. I explain crypto in plain words and tell you how the system's trades, the Piggy bank and the lessons work. I can make mistakes, and I don't give personal advice to buy or sell — the decision is always yours.",
+      "a": "I'm NOVA AI, CRYPTO NOVA's assistant. I explain crypto in plain words and tell you how the system's trades, the Piggy bank and the lessons work. I can make mistakes, and I don't give personal advice to buy or sell — the decision is always yours.",
       "tags": [
         "who are you",
         "nova",
@@ -602,7 +602,7 @@
       "id": "public",
       "topic": "how",
       "q": "How does the public portfolio work?",
-      "a": "It's CRYPTO NOVA's real account on OKX with real money: about $10 000, and its history starts on October 22, 2026. The system's autopilot places the trades: the spot portfolio gets 65%, extra core BTC, ETH and SOL 10%, futures on selected signals 15%, active spot 10%. The app shows its value, the result in dollars and percent, a chart by period, the coins and the trades; the data updates about every 15 minutes. Past results don't guarantee future ones.",
+      "a": "It's CRYPTO NOVA's real account on OKX with real money: about $10 000, and its history starts on October 22, 2026. The system's autopilot places the trades: the spot portfolio gets 65%, extra core BTC, ETH and SOL 10%, futures on selected signals 15%, active spot «BTC momentum» 10%, which waits in BTC between signals. The app shows its value, the result in dollars and percent, a chart by period, the coins and the trades; the data updates about every 15 minutes. Past results don't guarantee future ones.",
       "tags": [
         "public portfolio",
         "public",

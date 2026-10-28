@@ -241,7 +241,7 @@ def spot_pipeline(pf: dict, ideas: dict, memes: dict, real: dict, prev: dict | N
         if p:
             stage, passed = "bought", ["found", "first_check", "all_filters", "recommended", "bought"]
             reco = p.get("reco") or {}
-            why = "; ".join(w for w in [f"в портфеле, {_pct_ru(_num(p.get('weight'), 0) * 100)} счёта",
+            why = "; ".join(w for w in [f"в портфеле CRYPTO NOVA: {_pct_ru(_num(p.get('weight'), 0) * 100)} портфеля",
                                         (reco.get("t") + (" — " + reco["why"] if reco.get("why") else "")) if reco.get("t") else ""] if w)
             since = _ms(p.get("entry_time"))
         elif x:
@@ -378,7 +378,7 @@ _C_ORDER = {k: i for i, k in enumerate(("used", "validation", "testing", "paused
 _T_ORDER = {"futures": 0, "spot": 1, "other": 2}
 STATUS_RULES_RU = [
     "Active — по ней сейчас торгует реальный счёт CRYPTO NOVA на OKX (основной стол выбирает web/desk_select.json, «Импульс BTC» — "
-    "вторая половина фьючерсов, «Активный спот · Импульс BTC» — 10% счёта, «CRYPTO NOVA портфель» — спот 65% и доп. ядро BTC/ETH/SOL 10%).",
+    "вторая половина фьючерсов, «Импульс BTC · спот 10%» — активный спот, «CRYPTO NOVA портфель» — спот 65% и доп. ядро BTC/ETH/SOL 10%).",
     "Approved — прошла ворота конвейера PAPER → READY (сейчас таких нет). На реальные деньги — только решением владельца или автовыбора.",
     "Validation — кандидат на реальные деньги, ждёт своих ворот: автовыбор основного стола (20 сделок, результат к просадке лучше на 20%) "
     "или ворота «Сигналов CRYPTO NOVA» (30 сделок, от +0,3% на сделку).",
@@ -485,7 +485,9 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
         gate = c.get("reason_ru")
         nxt = (f"Ворота конвейера PAPER → READY: от 30 сделок и 21 дня, средняя сделка от +0,3%, профит-фактор от 1,2, просадка в пределах. "
                f"Сейчас: {gate}.") if gate else None
-        out.append(_st(k, v.get("name") or k, "spot" if spot else "futures", status, why,
+        # final QA 28.10: the 10 % active spot sleeve is «Импульс BTC · спот 10%» — not to be confused with the futures desk «Импульс BTC»
+        name = f"Импульс BTC · спот {SHARES.get('active', 0.1) * 100:.0f}%" if spot else (v.get("name") or k)
+        out.append(_st(k, name, "spot" if spot else "futures", status, why,
                        since=_ms(c.get("since") or v.get("since")), trades=n,
                        win_rate=_r(c.get("winrate_pct"), 1) if n else None, net_usd=round(net, 2), net_pct=round(net / start * 100, 2),
                        max_dd_pct=_r(c.get("max_dd_pct") if c.get("max_dd_pct") is not None else (v.get("stats") or {}).get("max_dd_pct"), 2),
@@ -506,7 +508,8 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
         since = _ms(p.get("started")) or _ms((p.get("reset") or {}).get("time")) or (_ms(ha[0].get("time")) if ha else None)
         dd = _db_dd(conn, k, since)
         if k == "ideas":
-            status, why = "Active", f"спот реального счёта повторяет его ({SHARES.get('spot', 0.65) * 100:.0f}% счёта)"
+            status, why = "Active", (f"спот реального счёта повторяет его ({SHARES.get('spot', 0.65) * 100:.0f}% счёта + доп. ядро "
+                                     f"{SHARES.get('core', 0.10) * 100:.0f}%)")
         else:
             status, why = "Testing", "модельный спот-портфель на $10 000, к реальным деньгам не допущен"
         issues = [f"Ошибка прогона: {p['error']}"] if p.get("error") else []
@@ -609,7 +612,9 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
                   "equity_usd": _r((real or {}).get("equity_usd")), "pnl_usd": _r((real or {}).get("pnl_usd")),
                   "spot_pnl_usd": _r((real or {}).get("spot_pnl_usd")), "fut_pnl_usd": _r((real or {}).get("fut_pnl_usd")),
                   "fut_closed_n": (real or {}).get("closed_n"), "asof": _ms((real or {}).get("asof")), "stale": bool((real or {}).get("stale")),
-                  "split_pct": {k: _num(al.get(f"{k}_pct")) for k in ("spot", "fut", "active")},
+                  # final QA 28.10: + the extra core 10 % (spot 65 + core 10 + futures 15 + «Импульс BTC» 10)
+                  "split_pct": {**{k: _num(al.get(f"{k}_pct")) for k in ("spot", "fut", "active")},
+                                "core": _num(al.get("core_pct"), round(SHARES.get("core", 0.10) * 100, 1))},
                   "note_ru": "Реальный счёт CRYPTO NOVA на OKX с 22.10.2026 — отдельно от демо-результатов стратегий ниже."} if real else None
     return {"asof": now, "statuses": [{"key": k, "name_ru": v, "category": CATEGORY[k]} for k, v in STATUS_RU.items()],
             "status_rules_ru": STATUS_RULES_RU, "categories": [{"key": k, "name_ru": v} for k, v in CATEGORY_RU.items()],

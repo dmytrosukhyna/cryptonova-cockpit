@@ -148,7 +148,8 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
         week_ago = now_ms - 7 * 86_400_000
         base = next((h["equity"] for h in hist if h["time"] >= week_ago), None)
         if base and hist:
-            msgs.append(("brief", "Итоги недели · CRYPTO NOVA", f"Система за неделю: {_fmt_usd(hist[-1]['equity'] - base)} на демо-счёте $10 000. Подробности — в приложении.",
+            # final QA 28.10: «Итоги системы за неделю» — not «что заработала система» (a week can end in a loss)
+            msgs.append(("brief", "Итоги системы за неделю", f"Система за неделю: {_fmt_usd(hist[-1]['equity'] - base)} на демо-счёте $10 000. Подробности — в приложении.",
                          {"open": "home"}))
     move = _big_move(out)
     if move and 10 <= k.hour < 21:

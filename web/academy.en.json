@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-10-21",
+  "updated": "2026-10-28",
   "title": "Learn with CRYPTO NOVA",
   "note": "Not financial advice. Past results don't guarantee future ones.",
   "levels": [
@@ -29,7 +29,7 @@
             },
             {
               "title": "What's in the app",
-              "text": "At the bottom of the screen are the tabs: “Home”, “Futures”, “Spot” and “Learn”. In the middle is the glowing NOVA orb, an AI assistant for your questions. Home has 6 more buttons, including “Piggy bank” and “Tour”. Tap the round profile icon at the top to open “Account”.",
+              "text": "At the bottom of the screen are the tabs: “Home”, “Futures”, “Spot” and “Learn”. In the middle is the NOVA AI atom, the assistant for your questions. Home has 6 more buttons, including “Piggy bank” and “Tour”. Tap the round profile icon at the top to open “Account”.",
               "example": "In real life: it's like a shopping mall with several floors. You don't have to see everything at once. Start with one shop — the rest will wait.",
               "art": "phone_app"
             },
@@ -283,7 +283,7 @@
             },
             {
               "title": "Tabs at the bottom, and NOVA",
-              "text": "At the very bottom are the tabs: Home, Futures, Spot, Learn. In the middle is the glowing NOVA orb. It's an AI assistant: ask in plain words, for example, “Why did the system enter this trade?” Or pick a ready question from the list.",
+              "text": "At the very bottom are the tabs: Home, Futures, Spot, Learn. In the middle is the NOVA AI atom. It's the assistant: ask in plain words, for example, “Why did the system enter this trade?” Or pick a ready question from the list.",
               "example": "In real life: NOVA is like a helpful shop assistant. She'll give tips and explain things. But shop assistants sometimes get things wrong, too.",
               "art": "robot",
               "screen": "Main",
@@ -349,26 +349,26 @@
           "goal": "By the end, you'll be able to read a trade: where the entry, stop and target are, and why the system went in.",
           "cards": [
             {
-              "title": "The total at the top",
-              "text": "At the top is “System status”: the $10,000 futures demo account and its chart. You can see how much has been earned, how much today, how many trades there were and the drawdown. “Drawdown” is the account's deepest fall from its highest point.",
-              "example": "In real life: after a hike, it's not just about how far you got. It also matters how deep a ravine you had to climb down along the way.",
+              "title": "Budget and result",
+              "text": "The “Futures” tab is the futures part of CRYPTO NOVA's real account on OKX. Its budget is 15% of the starting capital plus its own result. Leverage is 2x, with a cap of 3x. “Statistics” shows how many trades have closed and how many were in profit, and “Trade history” keeps every closed trade. The “largest drawdown” is the deepest fall from the highest point.",
+              "example": "In real life: a family keeps a separate envelope for the holiday. They spend from it, and whatever they win or lose stays in that same envelope.",
               "art": "chart_up",
               "screen": "Futures",
               "callouts": [
                 {
                   "n": 1,
                   "target": "result",
-                  "text": "Earned on the $10,000 account"
+                  "text": "Futures budget and result"
                 },
                 {
                   "n": 2,
                   "target": "stats",
-                  "text": "Today, trades, drawdown"
+                  "text": "Statistics: closed, in profit, at a loss"
                 },
                 {
                   "n": 3,
                   "target": "chart",
-                  "text": "The account's chart"
+                  "text": "The futures part's chart"
                 }
               ]
             },
@@ -431,7 +431,7 @@
             },
             {
               "title": "Repeating a trade",
-              "text": "Under each trade are 2 buttons. “Copy trade” copies the coin, entry, stop and target. “Open on BingX” opens that coin on the exchange. Whether to repeat the trade on your own account is up to you. In the EU and some other countries, the exchange button isn't shown.",
+              "text": "Under each trade are 2 buttons. “Copy trade” copies the coin, entry, stop and target. “Open the pair on OKX” opens that coin on the exchange. Whether to repeat the trade on your own account is up to you.",
               "example": "In real life: a friend reads you a recipe. Whether you cook it is your call. And you'll season it to your own taste.",
               "art": "handshake",
               "screen": "Futures",

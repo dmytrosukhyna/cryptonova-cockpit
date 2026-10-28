@@ -150,7 +150,7 @@ def test_app_home_public_block_is_the_panel_header(tmp_path):
     assert "26%" in coins["PENGU"]["why"] and "новых покупок не делает" in coins["PENGU"]["why"]
     calc = p["calc"]
     # owner's decision of 28.10: spot portfolio 65 + extra core 10 (= "spot" 75), futures 15, «Импульс BTC» 10
-    assert (calc["spot"], calc["futures"], calc["active"], calc["core"]) == (75, 15, 10, 10) and "1% счёта" in calc["futures_why"]
+    assert (calc["spot"], calc["futures"], calc["active"], calc["core"]) == (75, 15, 10, 10) and "1% фьючерсного бюджета на сделку" in calc["futures_why"]
     en = json.load(open(os.path.join(d, "app_home.en.json"), encoding="utf-8"))["public"]
     assert en["total_usd"] == p["total_usd"] and "questionnaire 51 of 100" in en["spot"]["coins"][1]["why"]
     assert "7.5%" in en["spot"]["coins"][1]["why"] and "Futures are" in en["calc"]["futures_why"]

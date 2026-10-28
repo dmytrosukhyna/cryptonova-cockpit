@@ -119,5 +119,14 @@ def test_voice_brief_says_what_the_panel_shows(tmp_path):
         assert k["fut"] == "nova" and k["spot"] == "ideas" and k["mode"] == "desks" and k["fut_open"] == 0
         assert k["parts"] == {"fut": 100, "spot": 300} and k["total"] == 400      # (200 + 0) / 20 000 × 10 000 = 100, not the sum 200
         assert "arb" not in k["parts"] and k["probation"]["arb"] == 33.27
-        assert "в плюсе на 100 доллар" in text and "Заработано всего — плюс 400" in text
+        assert "в плюсе на 100 доллар" in text and "Итого по демо — плюс 400" in text
+        # final QA 28.10: the desks are labelled demo, never «CRYPTO NOVA — …» as the system's result; no real file → no real line
+        assert "Демо-фьючерсы, отобранные сигналы: с" in text and "CRYPTO NOVA — отобранные" not in text and "Реальный счёт" not in text
+    # the real account first: web/public_real.json (value, result since 22.10, its futures)
+    (d / "public_real.json").write_text(json.dumps({"since": 1792669322166, "equity_usd": 9877.17, "pnl_usd": -147.23, "futures": [],
+                                                    "closed_n": 1, "fut_pnl_usd": 0.27, "stale": False}))
+    text = voice.compose(str(d))
+    assert text.index("Реальный счёт CRYPTO NOVA на OKX — 9877 долларов: с 22.10 в минусе на 147 долларов.") < text.index("Демо-фьючерсы")
+    assert "Фьючерсы реального счёта: открытых сделок нет; закрыто с начала: 1; итог около нуля." in text
+    assert voice.compose.keys["parts"] == {"fut": 100, "spot": 300}          # the panel's keys are unchanged (it still plays the audio)
     assert voice.spoken("CRYPTO NOVA портфель") == "Крипто Но́ва портфель"

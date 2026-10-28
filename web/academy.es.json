@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-10-21",
+  "updated": "2026-10-28",
   "title": "Aprender con CRYPTO NOVA",
   "note": "No es asesoramiento financiero. Los resultados pasados no garantizan los futuros.",
   "levels": [
@@ -29,7 +29,7 @@
             },
             {
               "title": "Qué hay en la app",
-              "text": "Abajo de la pantalla están las pestañas: «Inicio», «Futuros», «Spot» y «Aprender». En el centro está la esfera luminosa de NOVA, el asistente de IA para tus preguntas. En Inicio hay otros 6 botones, entre ellos «Hucha» y «Recorrido». «Mi cuenta» se abre con el icono redondo de perfil de arriba.",
+              "text": "Abajo de la pantalla están las pestañas: «Inicio», «Futuros», «Spot» y «Aprender». En el centro está el átomo de NOVA AI, el asistente para tus preguntas. En Inicio hay otros 6 botones, entre ellos «Hucha» y «Recorrido». «Mi cuenta» se abre con el icono redondo de perfil de arriba.",
               "example": "En la vida real: es como un centro comercial con varias plantas. No hace falta recorrerlo todo de una vez: empieza por una tienda y las demás te esperan.",
               "art": "phone_app"
             },
@@ -283,7 +283,7 @@
             },
             {
               "title": "Las pestañas de abajo y NOVA",
-              "text": "Abajo del todo están las pestañas: Inicio, Futuros, Spot y Aprender. En el centro está la esfera luminosa de NOVA. Es el asistente de IA: pregúntale con palabras sencillas, por ejemplo «¿Por qué el sistema entró en esta operación?». O elige una de las preguntas sugeridas.",
+              "text": "Abajo del todo están las pestañas: Inicio, Futuros, Spot y Aprender. En el centro está el átomo de NOVA AI. Es el asistente: pregúntale con palabras sencillas, por ejemplo «¿Por qué el sistema entró en esta operación?». O elige una de las preguntas sugeridas.",
               "example": "En la vida real: NOVA es como un vendedor en una tienda. Te orienta y te explica. Pero un vendedor también se equivoca a veces.",
               "art": "robot",
               "screen": "Main",
@@ -349,26 +349,26 @@
           "goal": "Al terminar, podrás leer una operación: dónde están la entrada, el stop y el objetivo, y por qué entró el sistema.",
           "cards": [
             {
-              "title": "El resultado, arriba",
-              "text": "Arriba está el «Estado del sistema»: la cuenta demo de futuros de $10 000 y su gráfico. Se ve cuánto ha ganado, cuánto hoy, cuántas operaciones hubo y la caída máxima. La «Caída máx.» es la mayor caída de la cuenta desde su punto más alto.",
-              "example": "En la vida real: después de una caminata no solo importa hasta dónde llegaste. También importa lo hondo que fue el barranco que bajaste por el camino.",
+              "title": "Presupuesto y resultado",
+              "text": "La pestaña «Futuros» es la parte de futuros de la cuenta real de CRYPTO NOVA en OKX. Su presupuesto es el 15% del capital inicial más su propio resultado. El apalancamiento es 2x, con un límite de 3x. En «Estadísticas» ves cuántas operaciones se cerraron y cuántas en ganancia, y el «Historial de operaciones» guarda todas las operaciones cerradas. La «mayor caída» es el descenso más profundo desde el punto más alto.",
+              "example": "En la vida real: para las vacaciones la familia guarda un sobre aparte. Gasta de ese sobre, y lo que gane o pierda se queda en el mismo sobre.",
               "art": "chart_up",
               "screen": "Futures",
               "callouts": [
                 {
                   "n": 1,
                   "target": "result",
-                  "text": "Ganado en la cuenta de $10 000"
+                  "text": "Presupuesto de futuros y resultado"
                 },
                 {
                   "n": 2,
                   "target": "stats",
-                  "text": "Hoy, operaciones, caída máx."
+                  "text": "Estadísticas: cerradas, en ganancia, en pérdida"
                 },
                 {
                   "n": 3,
                   "target": "chart",
-                  "text": "Gráfico de la cuenta"
+                  "text": "Gráfico de la parte de futuros"
                 }
               ]
             },
@@ -431,7 +431,7 @@
             },
             {
               "title": "Replicar la operación",
-              "text": "Debajo de la operación hay 2 botones. «Copiar operación» copia la moneda, la entrada, el stop y el objetivo. «Abrir en BingX» abre esa moneda en el exchange. Replicar la operación en tu cuenta o no lo decides tú. En la UE y en algunos otros países no aparece el botón del exchange.",
+              "text": "Debajo de la operación hay 2 botones. «Copiar operación» copia la moneda, la entrada, el stop y el objetivo. «Abrir el par en OKX» abre esa moneda en el exchange. Replicar la operación en tu cuenta o no lo decides tú.",
               "example": "En la vida real: una amiga te dicta una receta. Cocinarla o no es cosa tuya. Y la sal la pondrás a tu gusto.",
               "art": "handshake",
               "screen": "Futures",

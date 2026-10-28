@@ -118,6 +118,14 @@ def test_strategies_one_status_set_and_real_money_only_for_active():
     assert S["brk"]["status"] == "Testing" and any("НЕ проходит" in i for i in S["brk"]["issues_ru"])
     assert S["lst"]["status"] == "Testing" and S["lst"]["sample_note_ru"].startswith("Закрытых сделок ещё нет")
     assert S["spot_ideas"]["status"] == "Active" and S["spot_ideas"]["max_dd_pct"] is None      # no full ledger → no drawdown
+    # final QA 28.10: the spot portfolio + the extra core; the 10 % active spot sleeve has a name of its own; the split has the core
+    assert S["spot_ideas"]["status_why_ru"].endswith("(65% счёта + доп. ядро 10%)")
+    d2 = vf.strategies({**PAPER, "profiles": {**PAPER["profiles"], "imps": {"name": "Активный спот · Импульс BTC", "start_equity": 10000,
+                                                                             "equity": 10000, "open": [], "stats": {"trades": 0}}}},
+                       CONV, SEL, _pf(POS, [], []), {}, {}, {}, {}, {}, {"asof": NOW - 6 * DAY}, None, REAL, NOW)
+    assert {x["key"]: x for x in d2["strategies"]}["imps"]["name_ru"] == "Импульс BTC · спот 10%" and S["imp"]["name_ru"] == "Импульс BTC"
+    if d["real_account"]:
+        assert d["real_account"]["split_pct"]["core"] == 10
     assert S["ivan"]["status"] == "Testing" and S["ivan"]["trades"] is None and not S["ivan"]["real_money"]
     assert S["lab_doc:x"]["status"] == "In Development"
     assert {x["status"] for x in d["strategies"]} <= set(vf.STATUS_RU)

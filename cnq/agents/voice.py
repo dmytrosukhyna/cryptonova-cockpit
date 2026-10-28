@@ -83,11 +83,39 @@ def spoken(text: str) -> str:
     return text.replace("CRYPTO NOVA", "Крипто Но́ва")
 
 
+def real_line(out: str = "web") -> str | None:
+    """Final QA 28.10 (owner): the brief starts with the REAL account — the public portfolio, CRYPTO NOVA's own OKX account since
+    22.10 (web/public_real.json, the autopilot's sub-account only): its value, its result since the start, its futures. None without
+    the file."""
+    r = _load(out, "public_real.json") or {}
+    if r.get("equity_usd") is None or r.get("since") is None:
+        return None
+    since = (dt.datetime.utcfromtimestamp(int(r["since"]) / 1000) + dt.timedelta(hours=3)).strftime("%d.%m")
+    pnl = float(r.get("pnl_usd") or 0)
+    n_open = len([x for x in r.get("futures") or [] if isinstance(x, dict)])
+    fut = f"в работе {deals(n_open)}" if n_open else "открытых сделок нет"
+    if int(r.get("closed_n") or 0):
+        fut += f"; закрыто с начала: {int(r['closed_n'])}"
+    if r.get("fut_pnl_usd") is not None:
+        fp = float(r["fut_pnl_usd"])
+        fut += "; итог около нуля" if abs(fp) < 5 else f"; итог — {result(fp)}"
+    stale = " Данные счёта могли устареть." if r.get("stale") else ""
+    return (f"Реальный счёт CRYPTO NOVA на OKX — {usd(float(r['equity_usd']))}: с {since} "
+            f"{'около нуля' if abs(pnl) < 5 else result(pnl)}. Фьючерсы реального счёта: {fut}.{stale}")
+
+
 def compose(out: str = "web") -> str:
-    """Executive report in plain words: what we closed, where we stand, how many trades are open, market direction."""
+    """Executive report in plain words: the real account first (final QA 28.10), then the demo desks — labelled demo, never as
+    CRYPTO NOVA's result — how many trades are open, market direction."""
     hour = (dt.datetime.utcnow() + dt.timedelta(hours=3)).hour
     hello = "Доброй ночи" if hour < 5 else "Доброе утро" if hour < 12 else "Добрый день" if hour < 18 else "Добрый вечер"
     L = [f"{hello}, {NAME}. Система работает штатно."]
+    try:
+        rl = real_line(out)
+    except Exception:  # noqa: BLE001 — the brief never fails because of one file
+        rl = None
+    if rl:
+        L.append(rl)
     paper = _load(out, "paper.json") or {}
     from . import panel_header as ph
     prof = (paper.get("profiles") or {}).get(ph.main_desk(ph.load_sel(out))) or paper      # 28.10: the main desk (panel: hdrVals P)
@@ -104,12 +132,12 @@ def compose(out: str = "web") -> str:
             upnl = sum(o.get("open_pnl_usd") or 0 for o in opened)
             parts.append(f"в работе {deals(n)}, {'она' if n == 1 else 'они'} сейчас {result(upnl)}")
         else:
-            parts.append("открытых сделок нет — автопилот ждёт свой сигнал")
+            parts.append("открытых демо-сделок нет")
         # 18.10: our futures result = CRYPTO NOVA = the desks in the mix (CNPTS «Сбалансированная» + «Импульс BTC»); own signals join after
         # their live gate. 21.10: the panel shows the mix as ONE $10 000 account — the AVERAGE of its desks (novaRes) — and the brief must say
         # the same number, or the panel refuses the neural audio and falls back to the robotic browser voice (owner: «голос робота снова»)
         fut_res, since = nova_result(paper, out)
-        L.append("По фьючерсам, CRYPTO NOVA — отобранные сигналы" + (f": с {since} {result(fut_res)}; " if fut_res is not None else ": ")
+        L.append("Демо-фьючерсы, отобранные сигналы" + (f": с {since} {result(fut_res)}; " if fut_res is not None else ": ")
                  + "; ".join(parts) + ".")
     spot_res = None
     pf = _load(out, "portfolio.json") or {}
@@ -121,8 +149,8 @@ def compose(out: str = "web") -> str:
     elif sp.get("index"):
         spot_res = 10_000 * sp["index"] / 100 - 10_000
     if spot_res is not None:
-        nm = "портфель CRYPTO NOVA" if sp_key == "ideas" else (sp.get("name_short") or "Умеренный")
-        L.append(f"По споту, {nm}: {'в плюсе на ' + usd(spot_res) if spot_res > 5 else 'в минусе на ' + usd(spot_res) if spot_res < -5 else 'около нуля'}.")
+        nm = "модельный портфель CRYPTO NOVA" if sp_key == "ideas" else (sp.get("name_short") or "Умеренный")
+        L.append(f"Демо-спот, {nm}: {'в плюсе на ' + usd(spot_res) if spot_res > 5 else 'в минусе на ' + usd(spot_res) if spot_res < -5 else 'около нуля'}.")
     # every desk counts in «Заработано всего»: funding carry (real demo), arbitrage and triangle (virtual estimates)
     extra = {}
     fd = _load(out, "funding.json") or {}
@@ -136,7 +164,7 @@ def compose(out: str = "web") -> str:
     # funding, arbitrage and triangle are on probation (tab «Заработок») and are not in the total — so they are not in the keys either
     if fut_res is not None and spot_res is not None:
         tot = fut_res + spot_res
-        L.append(f"Заработано всего — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}.")
+        L.append(f"Итого по демо — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}.")
     else:
         tot = None
     markets = _load(out, "markets.json") or {}

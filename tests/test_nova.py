@@ -38,8 +38,8 @@ class GroqGptOss:
     """a stand-in for groq · openai/gpt-oss-120b, measured by scripts/nova_probe.py on 20.10: hidden reasoning counts against
     max_tokens; «Сколько я заработал?» took 506 of 600 tokens at the default effort and the answer was cut mid-sentence (85–263
     for «Объясни плечо» / «Что такое копилка?»); a little more thinking leaves no answer at all — the owner's case."""
-    ANSWER = ("Ваш личный результат — на карточке «Мой демо-счёт» на главном экране. А демо-счёт CRYPTO NOVA с 17.10 даёт +$186 "
-              "на фьючерсах. Гарантий нет — рынок может и падать.")
+    ANSWER = ("Ваш личный результат — на карточке «Мой демо-счёт» на главном экране. А публичный портфель CRYPTO NOVA — реальный счёт "
+              "OKX с 22.10 — виден в режиме PUBLIC. Гарантий нет — рынок может и падать.")
 
     def __init__(self, answer_tokens=150, earned_thinking=600):
         self.bodies, self.answer_tokens, self.earned_thinking = [], answer_tokens, earned_thinking
@@ -159,24 +159,39 @@ def test_ctx_is_users_own_data(tmp_path):
 
 
 def test_demo_block_from_app_home():
+    """final QA 28.10: NOVA's data = the public portfolio only — the real OKX account since 22.10 (futures open / closed, spot, the
+    autopilot's actions, the spoken report); the 17.10 demo desks (the $20 000 header, «+$108, закрыто 8», their trades) never"""
     home = json.load(open(os.path.join(ROOT, "web", "app_home.json"), encoding="utf-8"))
     k = nova.Knowledge(os.path.join(ROOT, "data"))
     b = k.demo_block(home)
-    assert "демо-счёт $10 000" in b and "«Спот»" in b and "Рынок: биткоин $" in b and "ниже рекорда $126 210" in b
-    assert "Почему вошли" in b and len(b) < 4000
+    assert "реальный счёт на OKX" in b and "«Фьючерсы» = фьючерсная часть этого реального счёта" in b and "«Спот» = спот-часть" in b
+    assert "только LONG" in b and "Рынок: биткоин $" in b and "ниже рекорда $126 210" in b and len(b) < 4000
+    assert "демо-счёт $10 000" not in b and "Система на демо-счетах" not in b and "17.10" not in b and "$20 000" not in b
+    for sym in [o.get("sym") for o in (home.get("futures") or {}).get("open") or []]:      # the demo desks' trades never reach the model
+        assert f"– {sym} " not in b and f"открыта {sym} " not in b
     assert "сейчас недоступны" in k.demo_block({})
-    # the open trades go to the model only when the question is about them (tokens per minute on the free model plan)
-    sym = home["futures"]["open"][0]["sym"]
-    assert f"– {sym} " in k.user_message(f"Почему система вошла в {sym}?", home, "")
-    o = dict(home["futures"]["open"][0], why_title="Откат в растущем тренде",
-             checks=[{"t": "Откат", "v": "−1.8% за 2 дня, RSI(2) = 5.9", "ok": True}], history={"text": "в среднем +3.1% на сделку"})
-    h2 = {**home, "futures": {**home["futures"], "open": [o]}}
-    msg = k.user_message(f"почему вы купили {sym.lower()}?", h2, "")
-    assert f"Подробно про {sym}: Откат в растущем тренде" in msg and "RSI(2) = 5.9" in msg and "+3.1% на сделку" in msg
+    assert "данные сейчас не пришли" in k.demo_block({k_: v for k_, v in home.items() if k_ != "public_portfolio"})
+    # the real account's open trades go to the model only when the question is about them (tokens per minute on the free plan)
+    pp = home["public_portfolio"]
+    o = {"sym": "SOL", "inst": "SOL-USDT-SWAP", "side": "LONG", "entry": 200.0, "price": 201.0, "stop": 190.0, "target": 230.0,
+         "pnl_usd": 1.5, "move_pct": 0.5, "lev": 2.0, "src_ru": "откат в тренде", "why": "Монета в растущем тренде откатилась вниз.",
+         "why_title": "Откат в растущем тренде", "checks": [{"t": "Откат", "v": "−1.8% за 2 дня, RSI(2) = 5.9", "ok": True}],
+         "history": {"text": "в среднем +3.1% на сделку"}}
+    h2 = {**home, "public_portfolio": {**pp, "futures": {**pp["futures"], "open": [o], "open_n": 1}}}
+    assert "открыта SOL Long: вход 200, сейчас 201 (+0,5%), результат +$1,50" in k.user_message("Почему система вошла в SOL?", h2, "")
+    msg = k.user_message("почему вы купили sol?", h2, "")
+    assert "Подробно про SOL: Откат в растущем тренде" in msg and "RSI(2) = 5.9" in msg and "+3.1% на сделку" in msg
     assert "Подробно про" not in k.user_message("Какие сделки сейчас открыты?", h2, "")
-    assert f"– {sym} " in k.user_message("Какие сделки сейчас открыты?", home, "")
-    assert f"– {sym} " not in k.user_message("Что такое плечо?", home, "") and "открыто сейчас" in k.user_message("Что такое плечо?", home, "")
+    assert "открыта SOL " in k.user_message("Какие сделки сейчас открыты?", h2, "")
+    q_ = k.user_message("Что такое плечо?", h2, "")
+    assert "открыта SOL " not in q_ and "Фьючерсных сделок открыто сейчас 1" in q_
     assert "ДАННЫЕ CRYPTO NOVA" in k.user_message("q?", {"futures": {"open": "broken"}, "market": {"btc": {"price": "x"}}}, "")
+    # numbers in the answer's language (QA 28.10 §7 / §8): ru 10 024,40 · en 10,024.40 · el / es 10.024,40
+    assert "старт $10 024,40" in b or pp["start_usd"] != 10024.4
+    assert nova._usd(10024.4, False, "es", True) == "$10 024,40" and nova._usd(10024.4, False, "en", True) == "$10,024.40"
+    from cnq.agents.i18n import polish                    # the answer's polish: el / es thousands with a dot, as the app writes them
+    assert polish("$10 024,40 και −1,47%", "el") == "$10.024,40 και −1,47%" and polish("$9.833,32", "es") == "$9.833,32"
+    assert nova._pct(-1.47) == "−1,47%" and nova._pct(-1.47, lang="en") == "−1.47%" and nova._pct(7.5, False, "el") == "7,5%"
 
 
 def test_agent_never_bare_500(tmp_path, monkeypatch):
@@ -266,6 +281,12 @@ def test_knowledge_files():
         assert must in system, must
     assert "UID" not in system and "Оставить заявку" not in system
     assert "копирование пока недоступно" not in system and "VPN" in system          # owner 28.10: no ban volunteered, never a VPN
+    # final QA 28.10: one product — the real account since 22.10; the demo desks of 17.10, their 3 sizes and the EU X-Perps line are gone
+    for must in ("Ты — NOVA AI", "Реальный счёт сейчас открывает только LONG", "плечо 2x, предел 3x", "15% стартового капитала",
+                 "не больше 1% фьючерсного бюджета", "«Импульс BTC»", "реальный счёт CRYPTO NOVA на OKX"):
+        assert must in system, must
+    for gone in ("17.10", "демо-счёта $10 000", "3 размера", "X-Perps", "плечо до 10x", "USDT в ЕС недоступен", "на демо-счетах по $10 000"):
+        assert gone not in system, gone
 
 
 def test_tidy_plain_text_for_voice():

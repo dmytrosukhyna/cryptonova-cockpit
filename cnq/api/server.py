@@ -432,7 +432,7 @@ class Api:
             try:
                 c_, d_ = self._agent(uid, data, lang)
                 if isinstance(d_, dict) and isinstance(d_.get("answer"), str):
-                    d_ = {**d_, "answer": polish(d_["answer"], lang)}        # build 46 QA: the language's numbers, «CRYPTO NOVA» whole
+                    d_ = {**d_, "answer": polish(d_["answer"], lang, native=True)}   # build 46 QA: the language's numbers, «CRYPTO NOVA» whole
                 return c_, d_
             except Exception as e:  # noqa: BLE001 — NOVA never answers with a bare 500
                 print("agent error:", repr(e)[:300], file=sys.stderr, flush=True)

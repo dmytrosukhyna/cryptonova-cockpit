@@ -147,7 +147,7 @@
       "id": "price",
       "topic": "money",
       "q": "¿Cuánto cuesta?",
-      "a": "La demo, la hucha, 52 lecciones y yo, NOVA, sin suscripciones ni compras dentro de la app. Si copias a CRYPTO NOVA en OKX, el exchange retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA: el porcentaje aparece en el perfil antes de empezar, y sin ganancia no hay pago. Por una cuenta abierta con nuestro enlace, el exchange nos da parte de su comisión; tus comisiones no cambian. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
+      "a": "La demo, la hucha, 52 lecciones y yo, NOVA AI, sin suscripciones ni compras dentro de la app. Si copias a CRYPTO NOVA en OKX, el exchange retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA: el porcentaje aparece en el perfil antes de empezar, y sin ganancia no hay pago. Por una cuenta abierta con nuestro enlace, el exchange nos da parte de su comisión; tus comisiones no cambian. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
       "tags": [
         "cuesta",
         "precio",
@@ -197,7 +197,7 @@
       "id": "how_works",
       "topic": "how",
       "q": "¿Cómo funciona CRYPTO NOVA?",
-      "a": "CRYPTO NOVA es un sistema de IA: vigila el mercado cripto 24/7 y busca operaciones con reglas probadas en el histórico de precios. Desde el 22 de octubre de 2026 lleva una cuenta real en OKX con unos $10 000: es la «Cartera pública», donde ves las monedas, las operaciones, la entrada, el stop y un sencillo «por qué entramos». Al lado están tu cartera demo, una hucha en bitcoin, 52 lecciones y yo, NOVA. No es un exchange ni asesoramiento financiero.",
+      "a": "CRYPTO NOVA es un sistema de IA: vigila el mercado cripto 24/7 y busca operaciones con reglas probadas en el histórico de precios. Desde el 22 de octubre de 2026 lleva una cuenta real en OKX con unos $10 000: es la «Cartera pública», donde ves las monedas, las operaciones, la entrada, el stop y un sencillo «por qué entramos». Al lado están tu cartera demo, una hucha en bitcoin, 52 lecciones y yo, NOVA AI. No es un exchange ni asesoramiento financiero.",
       "tags": [
         "funciona",
         "sistema",
@@ -370,7 +370,7 @@
       "id": "eu",
       "topic": "how",
       "q": "¿Por qué no veo el enlace al exchange?",
-      "a": "Si OKX y BingX no operan en tu país, por ejemplo en Estados Unidos, la app no muestra enlace a ningún exchange: no ofrecemos lo que allí no está permitido. Las lecciones, la demo, la hucha y yo, NOVA, funcionan por completo, y las operaciones del sistema se ven en la app. La disponibilidad del copy trading y de algunos instrumentos depende del país y la región: OKX muestra las condiciones.",
+      "a": "Si OKX y BingX no operan en tu país, por ejemplo en Estados Unidos, la app no muestra enlace a ningún exchange: no ofrecemos lo que allí no está permitido. Las lecciones, la demo, la hucha y yo, NOVA AI, funcionan por completo, y las operaciones del sistema se ven en la app. La disponibilidad del copy trading y de algunos instrumentos depende del país y la región: OKX muestra las condiciones.",
       "tags": [
         "ue",
         "europa",
@@ -399,7 +399,7 @@
       "id": "leverage_real",
       "topic": "learn",
       "q": "¿Por qué el apalancamiento de la cuenta real es solo 2x?",
-      "a": "En la cuenta real de CRYPTO NOVA el apalancamiento es 2x: así lo fijan las reglas del sistema, con un límite de 3x. El apalancamiento no cambia la cantidad en riesgo: el tamaño de la operación se calcula desde el stop, y una operación arriesga como máximo el 1% del presupuesto de futuros. Más apalancamiento solo reduciría el margen, pero acercaría la liquidación, y los stops de las operaciones pueden estar a −6…−12%. En las señales aparece 2x–5x: es la etiqueta de la regla; cuanto más lejos el stop, menor el apalancamiento.",
+      "a": "En la cuenta real de CRYPTO NOVA el apalancamiento es 2x: así lo fijan las reglas del sistema, con un límite de 3x. El apalancamiento no cambia la cantidad en riesgo: el tamaño de la operación se calcula desde el stop, y una operación arriesga como máximo el 1% del presupuesto de futuros. Más apalancamiento solo reduciría el margen, pero acercaría la liquidación, y los stops de las operaciones pueden estar a −6…−12%. En las señales de las cuentas demo puede aparecer 2x–5x, pero en la cuenta real el apalancamiento es 2x, con un límite de 3x.",
       "tags": [
         "apalancamiento",
         "2x",
@@ -431,7 +431,7 @@
       "id": "long_short",
       "topic": "learn",
       "q": "¿Qué son long y short?",
-      "a": "Long es apostar a que el precio sube: compras más barato y vendes más caro. Short es apostar a que baja: ganas si el precio cae. En futuros se pueden hacer las dos cosas, así que el sistema puede ganar también en un mercado que cae. Pero también puede equivocarse en ambas direcciones.",
+      "a": "Long es apostar a que el precio sube: compras más barato y vendes más caro. Short es apostar a que baja: ganas si el precio cae. En futuros se pueden hacer las dos cosas, así que el sistema puede ganar también en un mercado que cae. Pero también puede equivocarse en ambas direcciones. Por ahora la cuenta real de CRYPTO NOVA solo abre operaciones al alza (LONG); los cortos el sistema los prueba en las cuentas demo.",
       "tags": [
         "long",
         "short",
@@ -564,7 +564,7 @@
       "id": "who",
       "topic": "learn",
       "q": "¿Quién eres, NOVA?",
-      "a": "Soy NOVA, el asistente de IA de CRYPTO NOVA. Explico las cripto con palabras sencillas y te cuento cómo funcionan las operaciones del sistema, la hucha y las lecciones. Puedo equivocarme y no doy consejos personales de comprar o vender: la decisión siempre es tuya.",
+      "a": "Soy NOVA AI, el asistente de CRYPTO NOVA. Explico las cripto con palabras sencillas y te cuento cómo funcionan las operaciones del sistema, la hucha y las lecciones. Puedo equivocarme y no doy consejos personales de comprar o vender: la decisión siempre es tuya.",
       "tags": [
         "quién eres",
         "nova",
@@ -590,7 +590,7 @@
       "id": "public",
       "topic": "how",
       "q": "¿Cómo funciona la cartera pública?",
-      "a": "Es la cuenta real de CRYPTO NOVA en OKX con dinero real: unos $10 000, y su historial empieza el 22 de octubre de 2026. Las operaciones las abre el piloto automático del sistema: la cartera spot recibe el 65%, el núcleo adicional BTC, ETH y SOL el 10%, los futuros con señales seleccionadas el 15% y el spot activo el 10%. En la app ves el valor, el resultado en dólares y en porcentaje, un gráfico por periodos, las monedas y las operaciones; los datos se actualizan más o menos cada 15 minutos. Los resultados pasados no garantizan los futuros.",
+      "a": "Es la cuenta real de CRYPTO NOVA en OKX con dinero real: unos $10 000, y su historial empieza el 22 de octubre de 2026. Las operaciones las abre el piloto automático del sistema: la cartera spot recibe el 65%, el núcleo adicional BTC, ETH y SOL el 10%, los futuros con señales seleccionadas el 15% y el spot activo «impulso BTC» el 10%, que entre señales espera en BTC. En la app ves el valor, el resultado en dólares y en porcentaje, un gráfico por periodos, las monedas y las operaciones; los datos se actualizan más o menos cada 15 minutos. Los resultados pasados no garantizan los futuros.",
       "tags": [
         "cartera pública",
         "pública",

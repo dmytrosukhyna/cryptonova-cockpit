@@ -273,7 +273,8 @@ def test_app_config_in_git_is_valid():
     assert c["okx_regions"] == "ALL"
     assert "US" in c["okx_barred"] and not {"UA", "GR", "RU"} & set(c["okx_barred"])
     assert "US" in c["bingx_barred"] and not {"UA", "RU"} & set(c["bingx_barred"])
-    assert "GR" in c["okx_copy_barred"] and "UA" not in c["okx_copy_barred"] and c.get("okx_signal_url") is None
+    # final QA 28.10 (owner): the copy button is shown everywhere — one calm «i» note about regions instead of a country list
+    assert c["okx_copy_barred"] == [] and c.get("okx_signal_url") is None
 
 
 def test_spot_coins_explain_themselves_in_russian_only(tmp_path):

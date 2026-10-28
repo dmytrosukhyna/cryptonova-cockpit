@@ -163,11 +163,11 @@ def desk_src(env=None) -> tuple[str, list | None]:
 
 
 def pick_desks(paper: dict, forced: list | None = None) -> list:
-    """[(key, desk)] — the desks of FUTURES · CRYPTO NOVA, as the header counts them (bal + imp, + own after its gate)."""
+    """[(key, desk)] — the desks of FUTURES · CRYPTO NOVA, as the header counts them (aggr + imp since 28.10, + own after its gate)."""
     pr = paper.get("profiles") or {}
     if not pr and paper.get("open") is not None:          # a single desk file
         return [(paper.get("profile") or "bal", paper)]
-    keys = forced or ["bal", "imp"]
+    keys = forced or ["aggr", "imp"]        # 28.10 (owner): «Агрессивная» instead of «Сбалансированная» = panel_header.NOVA_BASE
     if not forced:
         s = (pr.get("own") or {}).get("stats") or {}
         if (s.get("trades") or 0) >= OWN_GATE[0] and s.get("avg_trade_pct") is not None and s["avg_trade_pct"] >= OWN_GATE[1]:

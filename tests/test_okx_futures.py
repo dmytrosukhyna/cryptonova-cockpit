@@ -27,11 +27,11 @@ def swap_orders(fk):
 
 
 def test_desks_are_the_headers_crypto_nova_set():
-    paper = {"profiles": {"bal": {"open": []}, "imp": {"open": []}, "own": {"open": [], "stats": {"trades": 12, "avg_trade_pct": 1.0}},
+    paper = {"profiles": {"bal": {"open": []}, "aggr": {"open": []}, "imp": {"open": []}, "own": {"open": [], "stats": {"trades": 12, "avg_trade_pct": 1.0}},
                           "imps": {"open": []}}}
-    assert [k for k, _ in fu.pick_desks(paper)] == ["bal", "imp"]           # «Сигналы» join only after their gate
+    assert [k for k, _ in fu.pick_desks(paper)] == ["aggr", "imp"]          # 28.10: «Агрессивная»; «Сигналы» join only after their gate
     paper["profiles"]["own"]["stats"] = {"trades": 31, "avg_trade_pct": 0.4}
-    assert [k for k, _ in fu.pick_desks(paper)] == ["bal", "imp", "own"]
+    assert [k for k, _ in fu.pick_desks(paper)] == ["aggr", "imp", "own"]
     assert [k for k, _ in fu.pick_desks(paper, ["bal"])] == ["bal"]
 
 

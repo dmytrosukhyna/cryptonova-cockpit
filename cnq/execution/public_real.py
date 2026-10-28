@@ -32,7 +32,8 @@ orders, active spot buys / sells, futures opens / closes, positions OKX closed a
 ACTIONS_MAX, only filled orders — [{"t", "kind": spot_buy | spot_sell | active_buy | active_sell | fut_open | fut_close |
 fut_reduce | fut_gone, "sym", "side" (futures: long | short), "usd" (spot: the filled amount), "px" (average fill price), "sig"}].
 28.10 (owner): deposits, withdrawals and transfers between the main account and this sub-account are NOT a result. "flows":
-{"in_usd", "out_usd", "net_usd", "n", "last_t", "events": [[ms, ± $]], "by": {kind: [n, $]}} — read from OKX's own bills
+{"in_usd", "out_usd", "net_usd", "n", "last_t", "events": [[ms, ± $]], "by": {kind: [n, $]}, "checked_t" (the last time both bill
+lists were read — null: «0» is not confirmed)} — read from OKX's own bills
 (funding: deposits, withdrawals, cancelled withdrawals, master ↔ sub transfers; trading: transfers that are not the account's own
 funding ↔ trading moves), each valued in USDT at its time (USDT / USDC = 1, other coins at the 1-minute close then). Remembered in
 the local state (a bill hash, never published), so bills older than OKX's windows still count. With F(t) = the flows up to t:
@@ -263,7 +264,7 @@ def _hid(prefix: str, b: dict) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
-def read_flows(fetch, host: str, since: int, st: dict) -> None:
+def read_flows(fetch, host: str, since: int, st: dict, now: int | None = None) -> None:
     """adds the new money flows since the start to st["flows"] {hash: [ms, ± $, kind]} (local state only). Never raises: a failed
     read leaves what is already known; a flow whose price can not be read now is tried again next time."""
     known = st.setdefault("flows", {})
@@ -275,6 +276,8 @@ def read_flows(fetch, host: str, since: int, st: dict) -> None:
         trade = _bills(fetch, host, TRADE_BILLS, since, "billId", {"type": "1"})       # type 1 = transfer
     except Exception:  # noqa: BLE001
         trade = None
+    if fund is not None and trade is not None:   # both bill lists read: «0 flows» is a fact, not a failed read
+        st["flows_checked"] = int(now or time.time() * 1000)
     new = []
     internal = []
     for b in fund or []:
@@ -316,7 +319,7 @@ def flows_summary(st: dict, since: int) -> dict:
     inn = sum(u for _t, u, _k in ev if u > 0)
     out = -sum(u for _t, u, _k in ev if u < 0)
     return {"in_usd": _r(inn), "out_usd": _r(out), "net_usd": _r(inn - out), "n": len(ev), "last_t": ev[-1][0] if ev else None,
-            "events": [[t, _r(u)] for t, u, _k in ev][-FLOW_EVENTS_MAX:], "by": by}
+            "events": [[t, _r(u)] for t, u, _k in ev][-FLOW_EVENTS_MAX:], "by": by, "checked_t": st.get("flows_checked")}
 
 
 def _by(v) -> list:
@@ -457,7 +460,8 @@ def clean(doc: dict) -> dict:
                     "n": int(num(f.get("n")) or 0), "last_t": int(f["last_t"]) if num(f.get("last_t")) else None,
                     "events": [[int(e[0]), num(e[1])] for e in f.get("events") or []
                                if isinstance(e, (list, tuple)) and len(e) == 2 and num(e[0]) and num(e[1]) is not None][-FLOW_EVENTS_MAX:],
-                    "by": {k: _by((f.get("by") if isinstance(f.get("by"), dict) else {}).get(k)) for k in FLOW_KINDS}}
+                    "by": {k: _by((f.get("by") if isinstance(f.get("by"), dict) else {}).get(k)) for k in FLOW_KINDS},
+                    "checked_t": int(f["checked_t"]) if num(f.get("checked_t")) else None}
     out["fut_curve"] = [[int(p[0]), num(p[1])] for p in doc.get("fut_curve") or []
                         if isinstance(p, (list, tuple)) and len(p) == 2 and num(p[0]) and num(p[1]) is not None]
     out["alloc"] = {k: (doc.get("alloc") or {}).get(k) for k in sub.ALLOC_KEYS}
@@ -494,7 +498,7 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
         except Exception:  # noqa: BLE001 — the summary never fails because of a log
             acts = []
         try:
-            read_flows(fetch, "https://" + s["host"], since, state)
+            read_flows(fetch, "https://" + s["host"], since, state, now)
         except Exception:  # noqa: BLE001 — never fails because of the flows: the known ones stay
             pass
         doc = clean(build(s, state, now, *closed_history(fetch, "https://" + s["host"], since), acts=acts))

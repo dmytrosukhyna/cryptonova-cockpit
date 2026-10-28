@@ -429,6 +429,7 @@ def test_deposits_withdrawals_and_transfers_are_not_a_result():
     F = doc1["flows"]
     assert F["n"] == 2 and F["in_usd"] == 1000.0 and F["out_usd"] == 200.0 and F["net_usd"] == 800.0 and F["last_t"] == t1 - 10_000
     assert F["by"] == {"deposit": [0, 0.0], "withdrawal": [1, -200.0], "transfer": [1, 1000.0]}
+    assert F["checked_t"] == t1                                                # the bills were really read: the numbers are a fact
     assert doc1["equity_usd"] == round(doc0["equity_usd"] + 1000.0, 2)                    # the money is really there …
     assert abs(doc1["pnl_usd"] - (doc1["equity_usd"] - doc1["start_usd"] - 800.0)) < 0.011     # … but the result leaves the flows out
     assert abs(doc1["pnl_usd"] - (p0 + 200.0)) < 0.02                       # the ETH that left was in the equity before: +200 back in
@@ -441,7 +442,7 @@ def test_deposits_withdrawals_and_transfers_are_not_a_result():
         assert bad not in text, bad
     # a failed read keeps the flows already known; the same bills are never counted twice
     doc2 = PR.run(e, _flow_fetch(fk, fail=True), t1 + 60_000, put=put, state=st)
-    assert doc2["flows"]["n"] == 2 and doc2["flows"]["net_usd"] == 800.0
+    assert doc2["flows"]["n"] == 2 and doc2["flows"]["net_usd"] == 800.0 and doc2["flows"]["checked_t"] == t1   # not re-confirmed
     doc3 = PR.run(e, _flow_fetch(fk, fund, trade, candle=4000.0), t1 + 120_000, put=put, state=st)
     assert doc3["flows"]["n"] == 2
     # a coin whose price can not be read now is not counted yet (tried again next time), never valued at a guess
@@ -476,7 +477,7 @@ def test_public_portfolio_periods_leave_the_flows_out(tmp_path):
     assert P["day"]["pct"] == round(10.0 / cap_day * 100, 2)
     assert P["all"]["usd"] == -40.0 and P["all"]["pct"] == round(-40.0 / (10000.0 + 1000.0 * (asof - tf) / (asof - since)) * 100, 2)
     assert pp["value_usd"] == 10960.0 and pp["capital_usd"] == 11000.0 and pp["curve"][-1] == [asof, 9960.0]
-    assert pp["flows"] == {"in_usd": 1000.0, "out_usd": 0.0, "net_usd": 1000.0, "n": 1, "last_t": tf}
+    assert pp["flows"] == {"in_usd": 1000.0, "out_usd": 0.0, "net_usd": 1000.0, "n": 1, "last_t": tf, "checked_t": None}
     assert pp["flows_note"] == "Пополнения и выводы не считаются результатом: +$1 000,00."
     en = json.load(open(os.path.join(d, "app_home.en.json"), encoding="utf-8"))["public_portfolio"]
     assert en["flows_note"] == "Deposits and withdrawals don't count as the result: +$1,000.00." and en["periods"] == P

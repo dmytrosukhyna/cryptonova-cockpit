@@ -1150,7 +1150,8 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             "copy_url": real.get("copy_url"), "copiers": real.get("copiers"),
             # the curve = start + the result without the flows (so a deposit is never a jump); value_usd = the money really there
             "curve": [[t_, _r(s0 + v)] for t_, v in curve], "periods": _periods(curve, pnl, s0, since, asof, since, fl["events"]),
-            "flows": {k: fl[k] for k in ("in_usd", "out_usd", "net_usd", "n", "last_t")}, "capital_usd": _r(cap0),
+            "flows": {**{k: fl[k] for k in ("in_usd", "out_usd", "net_usd", "n", "last_t")}, "checked_t": f.get("checked_t")},
+            "capital_usd": _r(cap0),
             "flows_note": t(lang, "pp.flows", usd=("+" if fl["net_usd"] > 0 else "") + _usd_text(fl["net_usd"], lang)) if fl["n"] else None,
             "alloc": {"asof": asof, "value_usd": _r(eq), "groups": groups, "categories": cats, "assets": assets},
             "spot": spot, "futures": fut, "actions": acts}

@@ -4,7 +4,7 @@ name: publish
 on:
   push:
     branches: [main]
-    paths: ["web/paper.json", "web/signals_feed.json", "web/engine.json", "web/app_home.json", "web/app_home.*.json", "web/bybit.json", "web/ivan.enc.json", "web/owner.enc.json", "web/public_real.json"]
+    paths: ["web/paper.json", "web/signals_feed.json", "web/engine.json", "web/app_home.json", "web/app_home.*.json", "web/bybit.json", "web/ivan.enc.json", "web/owner.enc.json", "web/public_real.json", "web/ivan_stats.json"]
 
 permissions:
   contents: write

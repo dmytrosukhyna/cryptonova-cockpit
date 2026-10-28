@@ -28,6 +28,8 @@
   python -m cnq.cli conveyor [run|status] [--force]   strategy conveyor LAB → PAPER → READY → RETIRED → data/conveyor_state.json + web/conveyor.json
   python -m cnq.cli conveyor reinstate <desk> --reason «…»   the owner brings a retired desk back to PAPER (demo only)
   python -m cnq.cli deskselect      the main futures desk (slow, evidence-based) → web/desk_select.json (+ data/desk_select.jsonl on a switch)
+  python -m cnq.cli vipfeeds        the closed panel's VIP feeds (read-only): web/spot_pipeline.json, web/strategies.json,
+                                    web/opportunities.json, web/system_status.json (cnq/agents/vip_feeds.py)
   python -m cnq.cli scorecard [--out web]     public prediction scorecard: every published forecast / signal → hash-chained
                                               data/scorecard_ledger.jsonl, checked on the engine's candles → web/scorecard.json
   python -m cnq.cli appsignals [--out web]    CRYPTO NOVΛ app signals (public /api/signals/active + /history) → agents.sqlite history,
@@ -52,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
         from .risk import cli as risk_cli
         return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
     ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
     ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
@@ -409,6 +411,17 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:  # noqa: BLE001 — the last web/desk_select.json stays; readers fall back to «Агрессивная» if it breaks
             print("desk_select failed:", repr(e)[:300]); return 1
         print(f"desk_select.json: current={d['current']} ({d['by']}) decision={d['decision']} — {d['short_ru']}")
+    elif args.cmd == "vipfeeds":
+        # 28.10 (owner's VIP spec): spot pipeline, strategies, other opportunities, system status — read-only, from the recorded data
+        import os, sqlite3
+        from .agents import vip_feeds
+        conn = sqlite3.connect("data/agents.sqlite") if os.path.exists("data/agents.sqlite") else None
+        d = vip_feeds.run(args.out, conn)
+        sp, ss = d["spot_pipeline.json"], d["system_status.json"]
+        print(f"vip feeds: cash real={sp.get('cash_pct_real')}% portfolio={sp.get('cash_pct_portfolio')}% floor={sp.get('cash_target_pct')}% "
+              f"stages={sp.get('counts')} strategies={len(d['strategies.json']['strategies'])} "
+              f"opportunities={len(d['opportunities.json']['items'])} status={ss['overall']} "
+              + " ".join(f"{c['key']}={c['status']}" for c in ss["components"]))
     elif args.cmd == "okxsignal":
         import os, sqlite3
         from .agents import okx_signal

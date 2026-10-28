@@ -9,8 +9,9 @@ on:
                    "web/conveyor.json", "web/risk.json", "web/desk_select.json", "data/desk_select.jsonl",
                    "web/scorecard.json", "data/scorecard_ledger.jsonl", "data/scorecard_outcomes.jsonl", "data/scorecard/**",
                    # 28.10: the engine pushes these too (cnq/engine.py OWNED since 22.10) — without them every engine sync (~3 min) restarted
-                   # this whole pipeline: ~250 runs a day instead of ~50–100, each saving another ~100 MB state cache
-                   "web/okx_signal.json", "web/buy_now.json"]
+                   # this whole pipeline: ~250 runs a day instead of ~50–100, each saving another ~100 MB state cache; the Mac mirror
+                   # pushes the stats-only «Иван тест» file
+                   "web/okx_signal.json", "web/buy_now.json", "web/ivan_stats.json"]
   schedule:
     - cron: "*/30 * * * *"      # данные + отдел новостей каждые 30 минут (UTC)
     - cron: "13,43 * * * *"     # второе расписание со сдвигом: GitHub часто задерживает/пропускает запуски, два шанса в полчаса
@@ -238,12 +239,16 @@ jobs:
         run: python scripts/ci_books.py
       - name: Status file for the panel
         run: python scripts/ci_status.py
+      - name: VIP feeds (read-only) → web/spot_pipeline.json, web/strategies.json, web/opportunities.json, web/system_status.json
+        continue-on-error: true
+        timeout-minutes: 2
+        run: python -m cnq.cli vipfeeds --out web
       - name: Commit refreshed data (state also survives in the cache)
         continue-on-error: true
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/tokenomics.json web/channel_watch.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/tokenomics.json web/channel_watch.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 web/spot_pipeline.json web/strategies.json web/opportunities.json web/system_status.json; do [ -f "$f" ] && git add "$f"; done
           # 20.10: data/agents.sqlite reached GitHub's 100 MB file limit (whale study candles/fills) — every push after 09:44 UTC was
           # rejected, so no data reached main for hours. Past 95 MB the database stays in the Actions cache only (it is restored from there).
           sz=$(stat -c %s data/agents.sqlite 2>/dev/null || echo 0)

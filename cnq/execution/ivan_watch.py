@@ -300,7 +300,9 @@ def stats(trades: list[dict]) -> dict:
         b["pnl"] += t["pnl"]
     n = len(trades)
     r4 = lambda x: round(x, 4)  # noqa: E731
-    return {"n": n, "wins": len(wins), "losses": len(losses), "winrate": round(len(wins) / n, 4) if n else None,
+    fees = [t["fee"] for t in trades if t.get("fee") is not None]
+    return {"n": n, "wins": len(wins), "losses": len(losses), "breakeven": n - len(wins) - len(losses),
+            "winrate": round(len(wins) / n, 4) if n else None, "fees_sum": r4(sum(fees)) if fees else None, "fees_known": len(fees),
             "pnl_sum": r4(sum(pnls)), "avg_win": r4(sum(wins) / len(wins)) if wins else None,
             "avg_loss": r4(sum(losses) / len(losses)) if losses else None, "max_loss": r4(min(losses)) if losses else None,
             "best": r4(max(pnls)) if pnls else None,
@@ -433,6 +435,40 @@ def decrypt(blob, pw: str):
     return json.loads(_xor_stream(ek, nonce, ct).decode("utf-8"))
 
 
+# ── stats only (28.10, owner's VIP spec §10): what a test needs to be judged, and nothing about the account ───────────────
+STATS_PATH = "web/ivan_stats.json"
+STATS_KEYS = {"v", "asof", "since", "first_trade", "closed_n", "wins", "losses", "breakeven", "win_rate", "net_closed_usd", "fees_usd",
+              "fees_known", "open_n", "open_upnl_usd", "max_dd_pct", "partial_note_ru", "note_ru"}
+
+
+def public_stats(out: dict) -> dict:
+    """The stats-only summary that may be public: closed trades, wins / losses / breakeven, win rate with its sample size, the closed
+    result after fees, the number of open positions and their open result, the account's worst drawdown in %. NO balance, equity,
+    host, account type, symbols, sizes, prices or positions (those stay in the encrypted file)."""
+    st = out.get("stats") or {}
+    n = int(st.get("n") or 0)
+    d = {"v": 1, "asof": out.get("asof"), "since": out.get("since"), "first_trade": st.get("first_trade"), "closed_n": n,
+         "wins": st.get("wins"), "losses": st.get("losses"), "breakeven": st.get("breakeven"),
+         "win_rate": round(100 * (st.get("wins") or 0) / n, 1) if n else None, "net_closed_usd": st.get("pnl_sum"),
+         "fees_usd": st.get("fees_sum"), "fees_known": st.get("fees_known"), "open_n": len(out.get("positions") or []),
+         "open_upnl_usd": out.get("upnl"), "max_dd_pct": round(100 * float(out.get("max_dd") or 0), 2),
+         "partial_note_ru": "Каждое закрытие на бирже (и частичное) — отдельная строка Bybit closed-pnl, так она и считается сделкой.",
+         "note_ru": NOTE}
+    return {k: v for k, v in d.items() if k in STATS_KEYS}
+
+
+def publish_stats(doc: dict, token: str, repo: str = DEFAULT_REPO, http=None) -> bool:
+    """PUT web/ivan_stats.json — only the STATS_KEYS fields are accepted (anything else → ValueError, nothing is sent)."""
+    if not token:
+        return False
+    if not isinstance(doc, dict) or set(doc) - STATS_KEYS:
+        raise ValueError("ivan: refusing to publish fields outside the stats-only summary")
+    url = f"https://api.github.com/repos/{repo}/contents/{STATS_PATH}"
+    hdr = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-ivan"}
+    content = base64.b64encode(json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode()).decode()
+    return put_contents(url, hdr, content, "ivan: stats", http=http)
+
+
 # ── publish ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 def _http(method: str, url: str, headers: dict, data: bytes | None = None, timeout: int = 20):
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
@@ -486,10 +522,11 @@ def put_contents(url: str, hdr: dict, content_b64: str, message: str, http=None,
 
 
 # ── entry points ─────────────────────────────────────────────────────────────────────────────────────────────────────
-def run(state: dict | None = None, now: int | None = None, fetch=None, put=None, env=None, save=None):
+def run(state: dict | None = None, now: int | None = None, fetch=None, put=None, env=None, save=None, put_stats=None):
     """fetch → stats → encrypt → publish. Returns the plaintext dict (None when IVAN_* env is missing).
     state=None → loaded from / saved to the state file; a dict passed in is mutated and saved only via `save`.
-    fetch(base, path, params) → Bybit JSON;  put(blob) → bool (default: publish_ivan with CNQ_GH_TOKEN / CNQ_GH_REPO)."""
+    fetch(base, path, params) → Bybit JSON;  put(blob) → bool (default: publish_ivan with CNQ_GH_TOKEN / CNQ_GH_REPO);
+    put_stats(doc) → bool (default: publish_stats — the stats-only web/ivan_stats.json, 28.10)."""
     c = creds(env)
     if not c:
         return None
@@ -508,6 +545,14 @@ def run(state: dict | None = None, now: int | None = None, fetch=None, put=None,
         put = (lambda b: publish_ivan(b, tok, repo)) if tok else None
     if put is not None and not put(blob):
         raise RuntimeError("GitHub не принял web/ivan.enc.json")
+    if put_stats is None:
+        tok, repo = env.get("CNQ_GH_TOKEN", ""), env.get("CNQ_GH_REPO") or DEFAULT_REPO
+        put_stats = (lambda d: publish_stats(d, tok, repo)) if tok else None
+    if put_stats is not None:
+        try:                                    # the stats-only file never blocks the encrypted one
+            put_stats(public_stats(out))
+        except Exception as e:  # noqa: BLE001
+            print(f"Иван тест: web/ivan_stats.json не опубликован — {str(e)[:120]}", flush=True)
     return out
 
 

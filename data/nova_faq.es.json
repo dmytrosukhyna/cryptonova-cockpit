@@ -396,6 +396,26 @@
       ]
     },
     {
+      "id": "leverage_real",
+      "topic": "learn",
+      "q": "¿Por qué el apalancamiento de la cuenta real es solo 2x?",
+      "a": "En la cuenta real de CRYPTO NOVA el apalancamiento es 2x: así lo fijan las reglas del sistema, con un límite de 3x. El apalancamiento no cambia la cantidad en riesgo: el tamaño de la operación se calcula desde el stop, y una operación arriesga como máximo el 1% del presupuesto de futuros. Más apalancamiento solo reduciría el margen, pero acercaría la liquidación, y los stops de las operaciones pueden estar a −6…−12%. En las señales aparece 2x–5x: es la etiqueta de la regla; cuanto más lejos el stop, menor el apalancamiento.",
+      "tags": [
+        "apalancamiento",
+        "2x",
+        "3x",
+        "por qué",
+        "cuenta",
+        "real",
+        "solo",
+        "liquidación"
+      ],
+      "alt": [
+        "¿Por qué el apalancamiento es solo 2x?",
+        "¿Por qué el apalancamiento es 2x o 3x?"
+      ]
+    },
+    {
       "id": "stop",
       "topic": "learn",
       "q": "¿Qué es un stop?",

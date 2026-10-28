@@ -212,7 +212,8 @@ def tidy(txt: str, cut: bool = False) -> str:
     # build 47 (§8.4 probe 28.10): the model writes «BTC‑USDT» / «‑1,04 %» / «–$104» with look-alike dashes — a pair keeps its plain
     # hyphen, a negative number gets the true minus
     t = re.sub("[\u2010\u2011\u2012]", "-", t)
-    t = re.sub(r"(?<![\w)\]])[\u2013-](?=\$?\d)", "\u2212", t)
+    t = re.sub(r"(?<![\w)\]])-(?=\$?\d)", "\u2212", t)
+    t = re.sub(r"(?<![^\s(])\u2013(?=\$?\d)", "\u2212", t)        # an en dash as a minus only after a space / «(»: 2×–5× is a range
     t = re.sub(r"[ \t]+\n", "\n", re.sub(r"\n{3,}", "\n\n", t)).strip()
     if cut:                                   # stopped by max_tokens: keep the full sentences, or nothing (→ FAQ / «busy»)
         ends = _ends(t[:ANSWER_MAX])
@@ -501,7 +502,8 @@ class Knowledge:
         if bn.get("items") and any(x.get("status_ru") for x in bn["items"]):     # build 47 (§12.1): the screen is not the buy list
             out.append(f"• «Если покупать сегодня» — кандидаты по графику из {bn.get('checked')} монет, а не покупки; что с ними в "
                        f"портфеле: " + "; ".join(f"{x.get('sym')} — {x.get('status_ru')} ({clean_text(x.get('status_note') or '', 120).rstrip('.')})"
-                                                for x in bn["items"][:5] if x.get("status_ru")) + ".")
+                                                for x in bn["items"][:5] if x.get("status_ru"))
+                       + ". Почему монету не покупают — говори только эти причины, других не придумывай.")
         m = home.get("market") or {}
         btc = m.get("btc") or {}
         if btc.get("price"):

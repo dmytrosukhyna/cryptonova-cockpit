@@ -42,6 +42,12 @@ jobs:
           npm i -s --no-save puppeteer-core@23.11.1 >/dev/null 2>&1
           out=$(node scripts/nova_panel_probe.js https://cryptonova.vip/app.html | tr '\n' ' ')
           echo "::notice title=panel request::$(echo "$out" | cut -c1-3500)"
+          if [ -f panel_body.json ]; then      # the same body, as the browser would send it, to the real API WITHOUT a token
+            r=$(curl -sS -m 30 -o resp.txt -D hdr.txt -w '%{http_code}' -X POST -H 'Origin: https://cryptonova.vip' \
+                -H 'content-type: application/json' --data-binary @panel_body.json https://app.crypto-capital.app/v2/admin/nova || echo 000)
+            acao=$(tr -d '\r' < hdr.txt | grep -i '^access-control-allow-origin' | head -1)
+            echo "::notice title=panel body → API (no token)::$(wc -c < panel_body.json) bytes → HTTP $r · ${acao:-NO CORS HEADER} · $(head -c 160 resp.txt | tr '\n' ' ')"
+          fi
       - name: 3 · that request through the server's model settings (no retry)
         env:
           CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}

@@ -331,3 +331,58 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     # no real file → no public portfolio (the app shows its empty state, never the demo numbers instead)
     os.remove(os.path.join(d, "public_real.json"))
     assert app_home.run(sqlite3.connect(":memory:"), d, now=now)["public_portfolio"] is None
+
+
+def test_market_view_spot_actions_and_demo_stats_in_plain_words(tmp_path):
+    """28.10 (build 46): §10.4 the market in plain words from the app's own data (no forecast, no closed-system outlook); §12.4 the
+    spot portfolio's actions said simply; §10.6 the demo futures' closed trades in the one-account scale (they add up)."""
+    d = str(tmp_path)
+    c = _cases()[0]
+    _pp_files(d, {"exchange": "OKX"})                                     # an unusable real file: no public portfolio
+    now = T0 + 70 * 3_600_000
+    mk = {"asof": now, "btc_bull": True, "fng": {"value": 51, "label": "нейтрально", "week": 68},
+          "top": [{"symbol": "BTC", "price": 80895, "chg24": -6.2, "chg7": -2.06, "chg30": -2.85, "chg1y": -28.88, "ath_chg": -35.84}]}
+    acts = [{"time": now - 3_600_000, "action": "SELL", "symbol": "AAVE", "price": 136.34,
+             "why_ru": "Недельный пересмотр: в таблице «ждём» (Анкета 38/100 ниже порога 40 — ждём), позиция −11% от входа — освобождаем место."},
+            {"time": now - 2 * 3_600_000, "action": "BUY", "symbol": "HYPE", "price": 78.43,
+             "why_ru": "Исключение владельца (22.10): HYPE из списка доверия — на небольшую сумму, хотя таблица пишет «Анкета 24/100 ниже "
+                       "порога 40 — ждём». 2.5% счёта, стоп −35%, на ×2 продаём половину"},
+            {"time": now - 3 * 3_600_000, "action": "SELL", "symbol": "XMR", "price": 609.84,
+             "why_ru": "Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный счёт CRYPTO NOVA. "
+                       "XMR на споте OKX нет — продаём, итог +9% от входа; деньги — в ядро"},
+            {"time": now - 4 * 3_600_000, "action": "ADD", "symbol": "BTC", "price": 81527.0,
+             "why_ru": "Замена: монет без спот-пары на OKX в портфеле больше нет — их деньги в ядро по плану BTC 30 / ETH 10 / SOL 5, BTC +8.4% счёта."}]
+    for name, obj in (("markets.json", mk), ("app_portfolio.json", {"index": 99.0, "cash_pct": 20, "history": [], "positions": [],
+                                                                       "recent_actions": acts})):
+        with open(os.path.join(d, name), "w", encoding="utf-8") as f:
+            json.dump(obj, f)
+    doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
+    mv = doc["market_view"]
+    assert mv["now"] == "Биткоин сейчас $80 895, за сутки −6,2%." and mv["short"] == "За неделю −2,1%: небольшое снижение."
+    assert "режим «рост»" in mv["mid"] and "разворота не обещает" in mv["mid"] and mv["long"] == "За год −28,9%; биткоин на 35,8% ниже своего рекорда."
+    assert mv["factors"] == ["Индекс страха и жадности — 51 (нейтрально), неделю назад был 68."]
+    assert mv["risks"][0].startswith("Сильное движение за сутки (−6,2%)") and "стоп −20% от покупки" in mv["risks"][-1]
+    assert mv["system"] == [] and mv["limits"].startswith("Это описание того, что уже произошло") and "прогноз" in mv["limits"]
+    text = json.dumps(mv, ensure_ascii=False).lower()
+    for bad in ("вырастет", "упадёт до", "гарант", "коридор", "сценарий", "вероятн"):                  # no forecast words
+        assert bad not in text, bad
+    en = json.load(open(os.path.join(d, "app_home.en.json"), encoding="utf-8"))
+    assert en["market_view"]["now"] == "Bitcoin is at $80,895 now, −6.2% over the past day." and en["market_view"]["btc"] == mv["btc"]
+    A = [a["text"] for a in doc["spot"]["actions"]]
+    assert A[0].startswith("Продано AAVE: монета перестала проходить проверку качества системы (оценка 38 из 100 при пороге 40)")
+    assert A[1].startswith("Куплено HYPE на небольшую долю (2,5% портфеля) по решению владельца") and A[1].endswith("Стоп −35%.")
+    assert A[2] == "Продано XMR: этой монеты нет на споте OKX, а портфель повторяет реальный счёт CRYPTO NOVA на OKX. Итог +9% от входа."
+    assert A[3] == "Докуплено BTC (+8,4% портфеля): деньги проданных монет переложены в ядро портфеля."
+    for t_ in A:
+        for jargon in ("Исключение владельца", "списка доверия", "Анкета", "ниже порога 40 — ждём"):
+            assert jargon not in t_, (jargon, t_)
+    for lang in ("en", "uk", "el", "es"):
+        o = json.load(open(os.path.join(d, f"app_home.{lang}.json"), encoding="utf-8"))
+        assert len(o["spot"]["actions"]) == 4 and all(x["text"] for x in o["spot"]["actions"]), lang
+        assert [x["sym"] for x in o["spot"]["actions"]] == ["AAVE", "HYPE", "XMR", "BTC"], lang
+    # demo futures: the closed trades in the one-account scale add up to the stats; the % has the $10 000 account as its base
+    st = doc["futures"]["stats"]
+    assert st["base_usd"] == 10000.0 and st["n"] == st["wins"] + st["losses"] + sum(
+        1 for k in doc["futures"]["in_result"] for x in c["paper"]["profiles"][k].get("closed") or [] if not x.get("pnl_usd"))
+    for r in doc["futures"]["closed"]:
+        assert r["acct_usd"] == round(r["pnl_usd"] * 10000 / (10000 * len(doc["futures"]["in_result"])), 2)

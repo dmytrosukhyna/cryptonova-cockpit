@@ -800,22 +800,22 @@ T: dict[str, dict[str, str]] = {
     "pp.a.spot_buy": {"ru": "Куплено {sym} на {usd}: спот-портфель приведён к плану системы.",
                       "en": "Bought {sym} for {usd}: the spot portfolio was brought back to the system's plan.",
                       "uk": "Куплено {sym} на {usd}: спот-портфель приведено до плану системи.",
-                      "el": "Αγοράστηκε {sym} αξίας {usd}: το χαρτοφυλάκιο spot επανήλθε στο σχέδιο του συστήματος.",
+                      "el": "Αγορά {sym} αξίας {usd}: το χαρτοφυλάκιο spot επανήλθε στο σχέδιο του συστήματος.",
                       "es": "Comprado {sym} por {usd}: la cartera spot volvió al plan del sistema."},
     "pp.a.spot_sell": {"ru": "Продано {sym} на {usd}: спот-портфель приведён к плану системы.",
                        "en": "Sold {sym} for {usd}: the spot portfolio was brought back to the system's plan.",
                        "uk": "Продано {sym} на {usd}: спот-портфель приведено до плану системи.",
-                       "el": "Πουλήθηκε {sym} αξίας {usd}: το χαρτοφυλάκιο spot επανήλθε στο σχέδιο του συστήματος.",
+                       "el": "Πώληση {sym} αξίας {usd}: το χαρτοφυλάκιο spot επανήλθε στο σχέδιο του συστήματος.",
                        "es": "Vendido {sym} por {usd}: la cartera spot volvió al plan del sistema."},
     "pp.a.active_buy": {"ru": "Куплено {sym} на {usd} по сигналу активного спота.",
                         "en": "Bought {sym} for {usd} on an active spot signal.",
                         "uk": "Куплено {sym} на {usd} за сигналом активного спота.",
-                        "el": "Αγοράστηκε {sym} αξίας {usd} με σήμα του ενεργού spot.",
+                        "el": "Αγορά {sym} αξίας {usd} με σήμα του ενεργού spot.",
                         "es": "Comprado {sym} por {usd} con una señal del spot activo."},
     "pp.a.active_sell": {"ru": "Продано {sym} на {usd}: сигнал активного спота завершён.",
                          "en": "Sold {sym} for {usd}: the active spot signal ended.",
                          "uk": "Продано {sym} на {usd}: сигнал активного спота завершено.",
-                         "el": "Πουλήθηκε {sym} αξίας {usd}: το σήμα του ενεργού spot έληξε.",
+                         "el": "Πώληση {sym} αξίας {usd}: το σήμα του ενεργού spot έληξε.",
                          "es": "Vendido {sym} por {usd}: la señal del spot activo terminó."},
     "pp.a.fut_open": {"ru": "Открыта фьючерсная сделка {sym} {side} по цене {px}; стоп сразу стоит на бирже.",
                       "en": "Opened a futures trade on {sym}, {side}, at {px}; the stop is on the exchange from the start.",
@@ -841,6 +841,168 @@ T: dict[str, dict[str, str]] = {
                       "uk": "Угоду {sym} закрила біржа: спрацював стоп або ціль.",
                       "el": "Το ανταλλακτήριο έκλεισε τη συναλλαγή στο {sym}: ενεργοποιήθηκε το stop ή ο στόχος.",
                       "es": "El exchange cerró la operación de {sym}: saltó el stop o el objetivo."},
+    # ---------------------------------------------------------------- build 46 (28.10) §10.4: app_home "market_view" — the market in
+    # plain words from the data the app already has (web/markets.json, the real account, the demo desks); never a forecast
+    "mv.now": {"ru": "Биткоин сейчас {price}, за сутки {chg}.", "en": "Bitcoin is at {price} now, {chg} over the past day.",
+               "uk": "Біткоїн зараз {price}, за добу {chg}.", "el": "Το bitcoin είναι τώρα στα {price}, {chg} στο τελευταίο 24ωρο.",
+               "es": "Bitcoin está ahora en {price}, {chg} en el último día."},
+    "mv.week": {"ru": "За неделю {chg}: {word}.", "en": "Over the week: {chg}, {word}.", "uk": "За тиждень {chg}: {word}.",
+                "el": "Μέσα στην εβδομάδα: {chg}, {word}.", "es": "En la semana: {chg}, {word}."},
+    "mv.w.down2": {"ru": "заметное снижение", "en": "a noticeable decline", "uk": "помітне зниження", "el": "αισθητή πτώση",
+                   "es": "una bajada notable"},
+    "mv.w.down1": {"ru": "небольшое снижение", "en": "a small decline", "uk": "невелике зниження", "el": "μικρή πτώση",
+                   "es": "una bajada pequeña"},
+    "mv.w.flat": {"ru": "цена почти на месте", "en": "the price has barely moved", "uk": "ціна майже на місці",
+                  "el": "η τιμή σχεδόν δεν κουνήθηκε", "es": "el precio apenas se ha movido"},
+    "mv.w.up1": {"ru": "небольшой рост", "en": "a small rise", "uk": "невелике зростання", "el": "μικρή άνοδος", "es": "una subida pequeña"},
+    "mv.w.up2": {"ru": "заметный рост", "en": "a noticeable rise", "uk": "помітне зростання", "el": "αισθητή άνοδος", "es": "una subida notable"},
+    "mv.month": {"ru": "За месяц {chg}.", "en": "Over the month: {chg}.", "uk": "За місяць {chg}.", "el": "Μέσα στον μήνα: {chg}.",
+                 "es": "En el mes: {chg}."},
+    "mv.regime.up": {"ru": "Биткоин выше своей средней цены за 200 дней — по правилам системы это режим «рост».",
+                     "en": "Bitcoin is above its 200-day average price — by the system's rules that's the “rising” mode.",
+                     "uk": "Біткоїн вище за свою середню ціну за 200 днів — за правилами системи це режим «зростання».",
+                     "el": "Το bitcoin είναι πάνω από τη μέση τιμή του των 200 ημερών — με τους κανόνες του συστήματος αυτό είναι η "
+                           "κατάσταση «άνοδος».",
+                     "es": "Bitcoin está por encima de su precio medio de 200 días: según las reglas del sistema es el modo «subida»."},
+    "mv.regime.down": {"ru": "Биткоин ниже своей средней цены за 200 дней — по правилам системы это режим «спад»: в спот-портфеле "
+                             "система покупает только ядро BTC, ETH и SOL.",
+                       "en": "Bitcoin is below its 200-day average price — by the system's rules that's the “falling” mode: in the spot "
+                             "portfolio the system buys only the core, BTC, ETH and SOL.",
+                       "uk": "Біткоїн нижче за свою середню ціну за 200 днів — за правилами системи це режим «спад»: у спот-портфелі "
+                             "система купує лише ядро BTC, ETH і SOL.",
+                       "el": "Το bitcoin είναι κάτω από τη μέση τιμή του των 200 ημερών — με τους κανόνες του συστήματος αυτό είναι η "
+                             "κατάσταση «πτώση»: στο χαρτοφυλάκιο spot το σύστημα αγοράζει μόνο τον πυρήνα, BTC, ETH και SOL.",
+                       "es": "Bitcoin está por debajo de su precio medio de 200 días: según las reglas del sistema es el modo «bajada», "
+                             "y en la cartera spot el sistema solo compra el núcleo: BTC, ETH y SOL."},
+    "mv.diverge.down_in_up": {"ru": "Короткое снижение идёт на фоне режима «рост»: это разные горизонты, одно не отменяет другое — но и "
+                                    "разворота не обещает.",
+                              "en": "The short-term dip is happening within the “rising” mode: these are different horizons, one doesn't "
+                                    "cancel the other — and it doesn't promise a turn either.",
+                              "uk": "Коротке зниження відбувається на тлі режиму «зростання»: це різні горизонти, одне не скасовує "
+                                    "іншого — але й розвороту не обіцяє.",
+                              "el": "Η βραχυπρόθεσμη πτώση γίνεται μέσα στην κατάσταση «άνοδος»: είναι διαφορετικοί ορίζοντες, το ένα "
+                                    "δεν ακυρώνει το άλλο — ούτε όμως υπόσχεται αναστροφή.",
+                              "es": "La bajada a corto plazo ocurre dentro del modo «subida»: son horizontes distintos, uno no anula al "
+                                    "otro, pero tampoco promete un giro."},
+    "mv.diverge.up_in_down": {"ru": "Короткий рост идёт на фоне режима «спад»: одно не отменяет другое, и это ещё не смена режима.",
+                              "en": "The short-term rise is happening within the “falling” mode: one doesn't cancel the other, and it "
+                                    "isn't a change of mode yet.",
+                              "uk": "Коротке зростання відбувається на тлі режиму «спад»: одне не скасовує іншого, і це ще не зміна режиму.",
+                              "el": "Η βραχυπρόθεσμη άνοδος γίνεται μέσα στην κατάσταση «πτώση»: το ένα δεν ακυρώνει το άλλο, και δεν "
+                                    "είναι ακόμη αλλαγή κατάστασης.",
+                              "es": "La subida a corto plazo ocurre dentro del modo «bajada»: una no anula a la otra, y todavía no es "
+                                    "un cambio de modo."},
+    "mv.year": {"ru": "За год {chg}; биткоин на {gap} ниже своего рекорда.",
+                "en": "Over the year: {chg}; bitcoin is {gap} below its record.",
+                "uk": "За рік {chg}; біткоїн на {gap} нижче за свій рекорд.",
+                "el": "Μέσα στη χρονιά: {chg}· το bitcoin είναι {gap} κάτω από το ρεκόρ του.",
+                "es": "En el año: {chg}; bitcoin está un {gap} por debajo de su récord."},
+    "mv.fng": {"ru": "Индекс страха и жадности — {v} ({label}), неделю назад был {w}.",
+               "en": "The fear & greed index is {v} ({label}); a week ago it was {w}.",
+               "uk": "Індекс страху й жадібності — {v} ({label}), тиждень тому був {w}.",
+               "el": "Ο δείκτης φόβου και απληστίας είναι {v} ({label}), πριν από μια εβδομάδα ήταν {w}.",
+               "es": "El índice de miedo y codicia está en {v} ({label}); hace una semana estaba en {w}."},
+    "mv.fng0": {"ru": "Индекс страха и жадности — {v} ({label}).", "en": "The fear & greed index is {v} ({label}).",
+                "uk": "Індекс страху й жадібності — {v} ({label}).", "el": "Ο δείκτης φόβου και απληστίας είναι {v} ({label}).",
+                "es": "El índice de miedo y codicia está en {v} ({label})."},
+    "mv.risk.move": {"ru": "Сильное движение за сутки ({chg}): цена сейчас сильно прыгает.",
+                     "en": "A big move over the day ({chg}): the price is swinging hard right now.",
+                     "uk": "Сильний рух за добу ({chg}): ціна зараз сильно стрибає.",
+                     "el": "Μεγάλη κίνηση μέσα στο 24ωρο ({chg}): η τιμή κάνει τώρα μεγάλα σκαμπανεβάσματα.",
+                     "es": "Un movimiento fuerte en el día ({chg}): el precio está saltando mucho ahora."},
+    "mv.risk.always": {"ru": "Риск есть всегда: у фьючерсных сделок системы стоп стоит на бирже, у альткоинов спот-портфеля — стоп {stop} "
+                             "от покупки, а ядро BTC, ETH и SOL держится без стопа.",
+                       "en": "There is always risk: the system's futures trades have their stop on the exchange, the spot portfolio's "
+                             "altcoins have a stop at {stop} from the buy, and the core — BTC, ETH and SOL — is held without a stop.",
+                       "uk": "Ризик є завжди: у ф'ючерсних угод системи стоп стоїть на біржі, в альткоїнів спот-портфеля — стоп {stop} "
+                             "від купівлі, а ядро BTC, ETH і SOL тримається без стопа.",
+                       "el": "Κίνδυνος υπάρχει πάντα: οι συναλλαγές futures του συστήματος έχουν το stop στο ανταλλακτήριο, τα altcoins "
+                             "του χαρτοφυλακίου spot έχουν stop στο {stop} από την αγορά, και ο πυρήνας — BTC, ETH και SOL — κρατιέται "
+                             "χωρίς stop.",
+                       "es": "Siempre hay riesgo: las operaciones de futuros del sistema tienen su stop en el exchange, las altcoins de "
+                             "la cartera spot tienen un stop del {stop} desde la compra y el núcleo —BTC, ETH y SOL— se mantiene sin stop."},
+    "mv.risk.fall": {"ru": "Открытых фьючерсных сделок на реальном счёте: {n}; у каждой стоит стоп, сейчас по ним {usd}.",
+                     "en": "Open futures trades on the real account: {n}; each has its stop, and right now they stand at {usd}.",
+                     "uk": "Відкритих ф'ючерсних угод на реальному рахунку: {n}; у кожної стоїть стоп, зараз по них {usd}.",
+                     "el": "Ανοιχτές συναλλαγές futures στον πραγματικό λογαριασμό: {n}· η καθεμία έχει stop, και τώρα βρίσκονται "
+                           "στα {usd}.",
+                     "es": "Operaciones de futuros abiertas en la cuenta real: {n}; cada una tiene su stop y ahora están en {usd}."},
+    "mv.sys.real_open": {"ru": "Реальный счёт CRYPTO NOVA: открыто фьючерсных сделок — {n}, у каждой стоп на бирже.",
+                         "en": "CRYPTO NOVA's real account: {n} open futures trades, each with its stop on the exchange.",
+                         "uk": "Реальний рахунок CRYPTO NOVA: відкрито ф'ючерсних угод — {n}, у кожної стоп на біржі.",
+                         "el": "Πραγματικός λογαριασμός CRYPTO NOVA: ανοιχτές συναλλαγές futures — {n}, η καθεμία με stop στο "
+                               "ανταλλακτήριο.",
+                         "es": "Cuenta real de CRYPTO NOVA: {n} operaciones de futuros abiertas, cada una con su stop en el exchange."},
+    "mv.sys.real_none": {"ru": "Реальный счёт CRYPTO NOVA: открытых фьючерсных сделок сейчас нет — система открывает их только по своим "
+                               "сигналам.",
+                         "en": "CRYPTO NOVA's real account: no open futures trades right now — the system opens them only on its own "
+                               "signals.",
+                         "uk": "Реальний рахунок CRYPTO NOVA: відкритих ф'ючерсних угод зараз немає — система відкриває їх лише за "
+                               "своїми сигналами.",
+                         "el": "Πραγματικός λογαριασμός CRYPTO NOVA: δεν υπάρχουν ανοιχτές συναλλαγές futures αυτή τη στιγμή — το "
+                               "σύστημα τις ανοίγει μόνο με τα δικά του σήματα.",
+                         "es": "Cuenta real de CRYPTO NOVA: ahora no hay operaciones de futuros abiertas; el sistema solo las abre con "
+                               "sus propias señales."},
+    "mv.sys.last": {"ru": "Последнее действие ({d}): {text}", "en": "Last action ({d}): {text}", "uk": "Остання дія ({d}): {text}",
+                    "el": "Τελευταία ενέργεια ({d}): {text}", "es": "Última acción ({d}): {text}"},
+    "mv.sys.demo_open": {"ru": "Демо-счета системы: в работе сделок — {n}.", "en": "The system's demo accounts: {n} trades open.",
+                         "uk": "Демо-рахунки системи: в роботі угод — {n}.",
+                         "el": "Οι λογαριασμοί demo του συστήματος: ανοιχτές συναλλαγές — {n}.",
+                         "es": "Cuentas demo del sistema: {n} operaciones abiertas."},
+    "mv.limits": {"ru": "Это описание того, что уже произошло с ценой, а не прогноз: куда пойдёт рынок, никто не знает заранее.",
+                  "en": "This describes what has already happened to the price, not a forecast: nobody knows in advance where the "
+                        "market will go.",
+                  "uk": "Це опис того, що вже сталося з ціною, а не прогноз: куди піде ринок, ніхто не знає заздалегідь.",
+                  "el": "Αυτή είναι περιγραφή όσων έχουν ήδη συμβεί στην τιμή, όχι πρόβλεψη: κανείς δεν ξέρει από πριν πού θα πάει "
+                        "η αγορά.",
+                  "es": "Esto describe lo que ya ha pasado con el precio, no es un pronóstico: nadie sabe de antemano adónde irá el "
+                        "mercado."},
+    # ---------------------------------------------------------------- build 46 (28.10) §12.4: the spot portfolio's actions in plain
+    # words (app_home spot.actions) — «исключение владельца», «хайп из списка доверия», «анкета ниже порога» said simply
+    "act2.sell_quality": {"ru": "Продано {sym}: монета перестала проходить проверку качества системы (оценка {r} из 100 при пороге {p}), "
+                                "позиция была {pct} от входа — деньги освобождены для других монет.",
+                          "en": "Sold {sym}: the coin stopped passing the system's quality check (a score of {r} out of 100, the bar is "
+                                "{p}); the position was {pct} from the entry — the money is freed for other coins.",
+                          "uk": "Продано {sym}: монета перестала проходити перевірку якості системи (оцінка {r} зі 100 при порозі {p}), "
+                                "позиція була {pct} від входу — гроші звільнено для інших монет.",
+                          "el": "Πουλήθηκε το {sym}: το νόμισμα δεν περνά πια τον έλεγχο ποιότητας του συστήματος (βαθμός {r} στα 100, "
+                                "το όριο είναι {p}), η θέση ήταν {pct} από την είσοδο — τα χρήματα ελευθερώθηκαν για άλλα νομίσματα.",
+                          "es": "Vendido {sym}: la moneda dejó de pasar el control de calidad del sistema (nota de {r} sobre 100, el "
+                                "mínimo es {p}); la posición estaba en {pct} desde la entrada y el dinero queda libre para otras monedas."},
+    "act2.sell_stop": {"ru": "Продано {sym}: цена подошла к стопу, и система перестала рекомендовать монету. Итог {pct} от входа.",
+                       "en": "Sold {sym}: the price came close to the stop and the system stopped recommending the coin. The result "
+                             "is {pct} from the entry.",
+                       "uk": "Продано {sym}: ціна підійшла до стопа, і система перестала рекомендувати монету. Підсумок {pct} від входу.",
+                       "el": "Πουλήθηκε το {sym}: η τιμή πλησίασε το stop και το σύστημα σταμάτησε να προτείνει το νόμισμα. "
+                             "Αποτέλεσμα {pct} από την είσοδο.",
+                       "es": "Vendido {sym}: el precio se acercó al stop y el sistema dejó de recomendar la moneda. Resultado: {pct} "
+                             "desde la entrada."},
+    "act2.sell_okx": {"ru": "Продано {sym}: этой монеты нет на споте OKX, а портфель повторяет реальный счёт CRYPTO NOVA на OKX. Итог {pct} "
+                            "от входа.",
+                      "en": "Sold {sym}: this coin isn't on OKX spot, and the portfolio is repeated by CRYPTO NOVA's real account on OKX. "
+                            "The result is {pct} from the entry.",
+                      "uk": "Продано {sym}: цієї монети немає на споті OKX, а портфель повторює реальний рахунок CRYPTO NOVA на OKX. "
+                            "Підсумок {pct} від входу.",
+                      "el": "Πουλήθηκε το {sym}: αυτό το νόμισμα δεν υπάρχει στο spot του OKX, και το χαρτοφυλάκιο το επαναλαμβάνει ο "
+                            "πραγματικός λογαριασμός του CRYPTO NOVA στο OKX. Αποτέλεσμα {pct} από την είσοδο.",
+                      "es": "Vendido {sym}: esta moneda no está en el spot de OKX, y la cartera la repite la cuenta real de CRYPTO NOVA "
+                            "en OKX. Resultado: {pct} desde la entrada."},
+    "act2.buy_owner": {"ru": "Куплено {sym} на небольшую долю ({w}% портфеля) по решению владельца: монета в его списке доверия, хотя "
+                             "оценка системы пока ниже порога. Стоп {stop}.",
+                       "en": "Bought {sym} for a small share ({w}% of the portfolio) by the owner's decision: the coin is on his trusted "
+                             "list, although the system's score is still below the bar. Stop at {stop}.",
+                       "uk": "Куплено {sym} на невелику частку ({w}% портфеля) за рішенням власника: монета в його списку довіри, хоча "
+                             "оцінка системи поки нижча за поріг. Стоп {stop}.",
+                       "el": "Αγορά {sym} σε μικρό μερίδιο ({w}% του χαρτοφυλακίου) με απόφαση του ιδιοκτήτη: το νόμισμα είναι "
+                             "στη λίστα εμπιστοσύνης του, αν και ο βαθμός του συστήματος είναι ακόμη κάτω από το όριο. Stop στο {stop}.",
+                       "es": "Comprado {sym} con una parte pequeña ({w}% de la cartera) por decisión del propietario: la moneda está en "
+                             "su lista de confianza, aunque la nota del sistema aún no llega al mínimo. Stop en {stop}."},
+    "act2.add_swap": {"ru": "Докуплено {sym} (+{w}% портфеля): деньги проданных монет переложены в ядро портфеля.",
+                      "en": "Topped up {sym} (+{w}% of the portfolio): the money from the coins sold went into the portfolio's core.",
+                      "uk": "Докуплено {sym} (+{w}% портфеля): гроші проданих монет перекладено в ядро портфеля.",
+                      "el": "Συμπληρώθηκε το {sym} (+{w}% του χαρτοφυλακίου): τα χρήματα από τα νομίσματα που πουλήθηκαν πήγαν στον "
+                            "πυρήνα του χαρτοφυλακίου.",
+                      "es": "Reforzado {sym} (+{w}% de la cartera): el dinero de las monedas vendidas pasó al núcleo de la cartera."},
 }
 
 # plural words: ru / uk — (1, 2–4, 5+) in the case the sentence needs; en / el / es — (1, other)

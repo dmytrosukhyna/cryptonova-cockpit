@@ -447,10 +447,23 @@ def _futures(paper: dict, now: int, lang: str = DEFAULT) -> dict:
     opened.sort(key=lambda o: -(o.get("opened") or 0))
     in_open = sum(1 for o in opened if o["in_result"])
     closed_all = [c for k in keys for c in (prof.get(k) or {}).get("closed") or []]
+    # build 46 (§10.6, §17): a desk trade's $ is in its own $10 000 desk; the account above is the desks' average (nova_result:
+    # Σ results ÷ Σ starts × $10 000) — acct_usd is the trade's part of THAT account and acct_pct its % of the $10 000, so the
+    # closed trades add up to the account's realized result instead of twice it
+    sb = sum(float((prof.get(k) or {}).get("start_equity") or START) for k in keys) or START
+    k_acct = START / sb
     closed = []
     for c in sorted(closed_all, key=lambda c: c.get("closed") or 0, reverse=True)[:8]:
-        closed.append({"sym": c.get("symbol"), "side": str(c.get("side") or "").upper(), "pnl_usd": _r(float(c.get("pnl_usd") or 0)),
-                       "closed": c.get("closed")})
+        pu = float(c.get("pnl_usd") or 0)
+        closed.append({"sym": c.get("symbol"), "side": str(c.get("side") or "").upper(), "pnl_usd": _r(pu),
+                       "closed": c.get("closed"), "acct_usd": _r(pu * k_acct), "acct_pct": _r(pu * k_acct / START * 100, 3)})
+    since_c = [c for c in closed_all if (c.get("closed") or 0) >= FUT_D0]
+    w_ = sum(1 for c in since_c if float(c.get("pnl_usd") or 0) > 0)
+    l_ = sum(1 for c in since_c if float(c.get("pnl_usd") or 0) < 0)
+    tot_ = sum(float(c.get("pnl_usd") or 0) for c in since_c) * k_acct
+    stats = {"n": len(since_c), "wins": w_, "losses": l_, "win_rate": _r(w_ / len(since_c) * 100, 1) if since_c else None,
+             "realized_usd": _r(tot_), "realized_pct": _r(tot_ / START * 100), "avg_usd": _r(tot_ / len(since_c)) if since_c else None,
+             "since": FUT_D0, "base_usd": START}
     n_closed = wins = 0
     for k in keys:
         st = (prof.get(k) or {}).get("stats") or {}
@@ -461,7 +474,7 @@ def _futures(paper: dict, now: int, lang: str = DEFAULT) -> dict:
     return {"usd": _r(usd), "pct": _r(usd / START * 100), "today_usd": _r(today), "trades": n_closed + in_open,
             "status_ru": _status(in_open, closed, others, lang), "scan": _scan((prof.get("own") or {}).get("scan"), now, lang),
             "wins": wins, "closed_n": n_closed, "worst_dd_pct": _r(dd * 100, 1), "since": FUT_D0, "in_result": keys,
-            "open": opened, "closed": closed, "curve": [[t_, _r(v)] for t_, v in _sample_keep_last(curve)],
+            "open": opened, "closed": closed, "stats": stats, "curve": [[t_, _r(v)] for t_, v in _sample_keep_last(curve)],
             "about_ru": t(lang, "futures.about")}
 
 
@@ -497,6 +510,48 @@ def _action_text(a: dict, lang: str) -> str | None:
     if not sym:
         return None
     return t(lang, f"act.{act}" if act in ("BUY", "ADD", "TRIM", "SELL") else "act.other", sym=sym)
+
+
+_Q_SELL = re.compile(r"Анкета (\d+)/100 ниже порога (\d+).*?позиция ([−+-]?\d+(?:\.\d+)?)% от входа")
+_STOP_SELL = re.compile(r"«не брать».*?у стопа.*?итог ([−+-]?\d+(?:\.\d+)?)% от входа")
+_OKX_SELL = re.compile(r"спот-парой на OKX.*?на споте OKX нет — продаём, итог ([−+-]?\d+(?:\.\d+)?)% от входа")
+_OWNER_BUY = re.compile(r"^Исключение владельца.*?([\d.]+)% счёта, стоп ([−-]\d+)%")
+_SWAP_ADD = re.compile(r"^Замена: .*? в ядро .*?\b([A-Z0-9]+) \+([\d.]+)% счёта")
+ACTIONS_N = 10
+
+
+def _pct_word(v: str, lang: str) -> str:
+    """«−11» → «−11%» with the language's decimal comma"""
+    x = float(v.replace("−", "-"))
+    s = _dec(abs(x), lang) + "%"
+    return ("−" if x < 0 else "+" if x > 0 else "") + s
+
+
+def _action_plain(a: dict, lang: str) -> str | None:
+    """build 46 (§12.4): one action of the spot portfolio in plain words in every language — what, which coin, why (the reason the
+    engine stored); the cases the engine writes in its own jargon get a sentence of their own, the rest keep _action_text"""
+    sym, act, txt = str(a.get("symbol") or ""), str(a.get("action") or "").upper(), str(a.get("why_ru") or "")
+    m = _Q_SELL.search(txt)
+    if act == "SELL" and m:
+        return t(lang, "act2.sell_quality", sym=sym, r=m.group(1), p=m.group(2), pct=_pct_word(m.group(3), lang))
+    m = _STOP_SELL.search(txt)
+    if act == "SELL" and m:
+        return t(lang, "act2.sell_stop", sym=sym, pct=_pct_word(m.group(1), lang))
+    m = _OKX_SELL.search(txt)
+    if act == "SELL" and m:
+        return t(lang, "act2.sell_okx", sym=sym, pct=_pct_word(m.group(1), lang))
+    m = _OWNER_BUY.search(txt)
+    if act == "BUY" and m:
+        return t(lang, "act2.buy_owner", sym=sym, w=_dec(float(m.group(1)), lang), stop=_pct_word(m.group(2), lang))
+    m = _SWAP_ADD.search(txt)
+    if act == "ADD" and m and m.group(1) == sym:
+        return t(lang, "act2.add_swap", sym=sym, w=_dec(float(m.group(2)), lang))
+    m = _TRIM_PLAN.match(txt)
+    if act == "TRIM" and m:
+        return t(lang, "act.trim_plan", sym=m.group(1), w=_dec(float(m.group(2)), lang), p=_dec(float(m.group(3)), lang))
+    if lang == DEFAULT and txt:
+        return txt
+    return _action_text(a, lang) if lang != DEFAULT else (t(lang, f"act.{act}", sym=sym) if act in ("BUY", "ADD", "TRIM", "SELL") and sym else None)
 
 
 def _money(x) -> str:
@@ -572,6 +627,10 @@ def _spot(pf: dict, lang: str = DEFAULT, ex: dict | None = None) -> dict:
             "curve": [[h["t"], _r((float(h["v"]) - 100.0) * START / 100.0)] for h in _sample(hist) if h.get("v") is not None],
             "last_action": None if not last else {"t": last.get("time"), "text": _action_text(last, lang), "sym": last.get("symbol"),
                                                   "action": last.get("action")},
+            # build 46 (§12.4): the last actions in plain words (newest first); every one is a real order of the demo portfolio
+            "actions": [{"t": a.get("time"), "sym": a.get("symbol"), "action": str(a.get("action") or "").upper(), "price": a.get("price"),
+                         "text": _action_plain(a, lang)}
+                        for a in sorted(acts, key=lambda a: -(a.get("time") or 0))[:ACTIONS_N] if a.get("symbol")],
             "started": pf.get("started"), "coins": _coins(pf, ex or {}, lang)}
 
 
@@ -1084,6 +1143,89 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             "spot": spot, "futures": fut, "actions": acts}
 
 
+def _pct_txt(x, lang: str, d: int = 1) -> str:
+    """+1,5% / −2,1% (en: +1.5%) — a percent in the texts"""
+    v = round(float(x), d)
+    s = f"{abs(v):.{d}f}"
+    s = s if lang == "en" else s.replace(".", ",")
+    return ("+" if v > 0 else "−" if v < 0 else "") + s + "%"
+
+
+def _usd0(x, lang: str) -> str:
+    s = f"{abs(float(x)):,.0f}"
+    return "$" + (s if lang == "en" else s.replace(",", "\u00a0"))
+
+
+def _market_view(mk: dict, pport: dict | None, fut: dict, now: int, lang: str = DEFAULT) -> dict | None:
+    """build 46 (§10.4): the market in plain words from what the app already has — bitcoin's own moves (web/markets.json), the
+    system's regime (BTC vs its 200-day average, the same rule the system trades by), fear & greed, the real account's open trades
+    with their stops and its last action, the demo desks' open trades. Facts about the past only — never a forecast, never the
+    closed system's outlook (owner: VIP analytics stay out of the app)."""
+    top = {str(r.get("symbol") or "").upper(): r for r in mk.get("top") or []}
+    b = top.get("BTC") or {}
+    if not b.get("price") or b.get("chg24") is None:
+        return None
+    c24, c7, c30, c1y, ath = (b.get(k) for k in ("chg24", "chg7", "chg30", "chg1y", "ath_chg"))
+    bull = mk.get("btc_bull")
+    out = {"asof": mk.get("asof"), "btc": {"price": b.get("price"), "chg24": _r(c24), "chg7": _r(c7), "chg30": _r(c30), "chg1y": _r(c1y),
+                                           "ath_chg": _r(ath)}, "regime": None if bull is None else ("up" if bull else "down")}
+    out["now"] = t(lang, "mv.now", price=_usd0(b["price"], lang), chg=_pct_txt(c24, lang))
+    out["short"] = None
+    if c7 is not None:
+        w = "down2" if c7 <= -5 else "down1" if c7 <= -1.5 else "flat" if c7 < 1.5 else "up1" if c7 < 5 else "up2"
+        out["short"] = t(lang, "mv.week", chg=_pct_txt(c7, lang), word=t(lang, f"mv.w.{w}"))
+    mid = [t(lang, "mv.month", chg=_pct_txt(c30, lang))] if c30 is not None else []
+    if bull is not None:
+        mid.append(t(lang, "mv.regime.up" if bull else "mv.regime.down"))
+        if c7 is not None and bull and c7 <= -1.5:
+            mid.append(t(lang, "mv.diverge.down_in_up"))
+        elif c7 is not None and not bull and c7 >= 1.5:
+            mid.append(t(lang, "mv.diverge.up_in_down"))
+    out["mid"] = " ".join(mid) or None
+    out["long"] = t(lang, "mv.year", chg=_pct_txt(c1y, lang), gap=_pct_txt(abs(ath), lang).lstrip("+")) if c1y is not None and ath is not None and ath < 0 else None
+    fng = mk.get("fng") or {}
+    factors = []
+    if fng.get("value") is not None:
+        lab = _fng_label(fng, lang) or ""
+        factors.append(t(lang, "mv.fng", v=fng["value"], label=lab, w=fng["week"]) if fng.get("week") is not None
+                       else t(lang, "mv.fng0", v=fng["value"], label=lab))
+    out["factors"] = factors
+    try:
+        from .spot_profiles import IDEAS
+        stop = _pct_txt(float(IDEAS["stop_buy"]) * 100, lang, 0)
+    except Exception:  # noqa: BLE001
+        stop = None
+    risks = []
+    if abs(float(c24)) >= 5:
+        risks.append(t(lang, "mv.risk.move", chg=_pct_txt(c24, lang)))
+    pf_ = ((pport or {}).get("futures") or {}) if pport else {}
+    if float(c24) <= -5 and pf_.get("open_n"):
+        risks.append(t(lang, "mv.risk.fall", n=pf_["open_n"], usd=_usd_text(pf_.get("open_pnl_usd") or 0, lang)))
+    if stop:
+        risks.append(t(lang, "mv.risk.always", stop=stop))
+    out["risks"] = risks
+    system = []
+    if pport and pport.get("futures") is not None:
+        n = pf_.get("open_n") or 0
+        system.append(t(lang, "mv.sys.real_open", n=n) if n else t(lang, "mv.sys.real_none"))
+        acts = pport.get("actions") or []
+        if acts:
+            system.append(t(lang, "mv.sys.last", d=_date_text(acts[0]["t"], lang), text=acts[0]["text"]))
+    out["system"] = system
+    n_demo = len(fut.get("open") or [])
+    out["system_demo"] = [t(lang, "mv.sys.demo_open", n=n_demo)] if n_demo else []
+    out["limits"] = t(lang, "mv.limits")
+    return out
+
+
+def _market_view_safe(mk, pport, fut, now, lang):
+    try:
+        return _market_view(mk, pport, fut, now, lang)
+    except Exception as e:  # noqa: BLE001 — the feed never breaks because of a text block
+        print("app_home market_view:", repr(e)[:200], flush=True)
+        return None
+
+
 def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT, ex: dict | None = None) -> dict:
     """app_home in one language — the same numbers in every language, only the words differ"""
     ex = ex or {}
@@ -1101,7 +1243,7 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
         pport = None
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
             "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub, "public": public,
-            "public_portfolio": pport,
+            "public_portfolio": pport, "market_view": _market_view_safe(mk, pport, fut, now, lang),
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
             "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),

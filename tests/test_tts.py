@@ -146,8 +146,11 @@ def test_app_home_spoken_report_in_every_language(tmp_path):
     _pp_files(d, real)
     with open(os.path.join(d, "markets.json"), "w") as f:
         json.dump({"btc_bull": True, "top": [{"symbol": "BTC", "price": 80900, "chg24": 1.7}]}, f)
+    with open(os.path.join(d, "system_status.json"), "w") as f:      # build 47: every part ok (a missing file is said aloud)
+        json.dump({"asof": now - 60_000, "components": [{"key": "public_real", "status": "ok"}, {"key": "engine", "status": "ok"}]}, f)
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
     r = doc["report"]
+    assert r["status"] == "ok" and r["issues"] == []
     assert r["text"].startswith("Публичный портфель CRYPTO\u00a0NOVA сейчас — 9 871 доллар.") and "$" not in r["text"]
     assert "С 22 октября — минус 129 долларов, это минус 1,3 процента." in r["text"] or "минус 129 долларов" in r["text"]
     assert "продажа AAVE" in r["text"] and r["text"].endswith("Биткоин стоит 80 900 долларов, за сутки плюс 1,7 процента.")

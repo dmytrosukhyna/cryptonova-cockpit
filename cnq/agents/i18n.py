@@ -782,9 +782,13 @@ T: dict[str, dict[str, str]] = {
                         "uk": "Реальний рахунок CRYPTO NOVA з {since}: закрито ф'ючерсних угод — {n}, з них у плюсі {w}.",
                         "el": "Πραγματικός λογαριασμός CRYPTO NOVA από τις {since}: έκλεισαν {n} συναλλαγές futures, κερδοφόρες οι {w}.",
                         "es": "Cuenta real de CRYPTO NOVA desde el {since}: {n} operaciones de futuros cerradas, {w} de ellas con ganancia."},
-    "pp.moved": {"ru": "Перевод между спотом и фьючерсами: {usd}.", "en": "Moved between spot and futures: {usd}.",
-                 "uk": "Переказ між спотом і ф'ючерсами: {usd}.", "el": "Μεταφορά μεταξύ spot και futures: {usd}.",
-                 "es": "Traspaso entre spot y futuros: {usd}."},
+    # 28.10 (build 47 §6.4): the per-part note no longer says «перевод» — no money moves between spot and futures on OKX (one USDT
+    # balance, acctLv 2); the system re-splits the account's current value (see "pp.moved.why.*" and public_portfolio.moved)
+    "pp.moved": {"ru": "Перераспределение внутри одного счёта: {usd}. Это не перевод денег и не прибыль или убыток.",
+                 "en": "Reallocation inside one account: {usd}. This is not a money transfer and not a profit or loss.",
+                 "uk": "Перерозподіл усередині одного рахунку: {usd}. Це не переказ грошей і не прибуток чи збиток.",
+                 "el": "Ανακατανομή μέσα στον ίδιο λογαριασμό: {usd}. Δεν είναι μεταφορά χρημάτων ούτε κέρδος ή ζημία.",
+                 "es": "Redistribución dentro de la misma cuenta: {usd}. No es una transferencia de dinero ni una ganancia o pérdida."},
     "coin.live": {"ru": "Сейчас — {w}% спота реального счёта.", "en": "Now: {w}% of the real account's spot.",
                   "uk": "Зараз — {w}% спота реального рахунку.", "el": "Τώρα: {w}% του spot του πραγματικού λογαριασμού.",
                   "es": "Ahora: el {w}% del spot de la cuenta real."},
@@ -1075,6 +1079,312 @@ T: dict[str, dict[str, str]] = {
     "rep.plus": {"ru": "плюс", "en": "plus", "uk": "плюс", "el": "συν", "es": "más"},
     "rep.minus": {"ru": "минус", "en": "minus", "uk": "мінус", "el": "μείον", "es": "menos"},
     "rep.pct_frac": {"ru": "процента", "en": "percent", "uk": "відсотка", "el": "τοις εκατό", "es": "por ciento"},
+
+    # ---------------------------------------------------------------- build 47 (28.10): audits → display data (owner spec §6.4, §6.5,
+    # §12.1, §13.6, §15). Numbers come from the data; the words only say what the code and the data show.
+    # §6.4 public_portfolio.moved — the «перевод между спотом и фьючерсами» is a re-split of one USDT balance, not a transfer / P&L
+    "pp.moved.label": {"ru": "Перераспределение между спотом и фьючерсами", "en": "Reallocation between spot and futures",
+                       "uk": "Перерозподіл між спотом і ф'ючерсами", "el": "Ανακατανομή μεταξύ spot και futures",
+                       "es": "Redistribución entre spot y futuros"},
+    "pp.moved.why.f2s": {
+        "ru": "Это не перевод денег, не комиссия и не прибыль или убыток. Спот и фьючерсы работают на одном счёте OKX с одними и теми "
+              "же USDT. Система делит текущую стоимость счёта, а не стартовую: спот {sp}%, фьючерсы {fu}%, активный спот {ac}%. "
+              "Поэтому на фьючерсы сейчас приходится на {usd} меньше, чем их стартовая доля плюс их собственный результат, а на спот — "
+              "на столько же больше. Из этой разницы {rebase} — доля фьючерсов в изменении стоимости всего счёта, {drift} — доли "
+              "сдвинулись между пересчётами: цены монет меняются постоянно, а система выравнивает доли, только когда отклонение больше "
+              "порога.",
+        "en": "This is not a money transfer, a fee, or a profit or loss. Spot and futures run on one OKX account with the same USDT. The "
+              "system splits the account's current value, not its starting value: spot {sp}%, futures {fu}%, active spot {ac}%. So "
+              "futures now get {usd} less than their starting share plus their own result, and spot gets the same amount more. Of this "
+              "difference, {rebase} is the futures' share of the change in the whole account's value, and {drift} is how the shares "
+              "drifted between recalculations: coin prices move all the time, and the system rebalances only when the gap passes a "
+              "threshold.",
+        "uk": "Це не переказ грошей, не комісія і не прибуток чи збиток. Спот і ф'ючерси працюють на одному рахунку OKX з тими самими "
+              "USDT. Система ділить поточну вартість рахунку, а не стартову: спот {sp}%, ф'ючерси {fu}%, активний спот {ac}%. Тому на "
+              "ф'ючерси зараз припадає на {usd} менше, ніж їхня стартова частка плюс їхній власний результат, а на спот — на стільки ж "
+              "більше. З цієї різниці {rebase} — частка ф'ючерсів у зміні вартості всього рахунку, {drift} — частки зсунулися між "
+              "перерахунками: ціни монет змінюються постійно, а система вирівнює частки, лише коли відхилення більше за поріг.",
+        "el": "Δεν είναι μεταφορά χρημάτων, ούτε προμήθεια, ούτε κέρδος ή ζημία. Το spot και τα futures λειτουργούν στον ίδιο "
+              "λογαριασμό OKX με τα ίδια USDT. Το σύστημα μοιράζει την τρέχουσα αξία του λογαριασμού, όχι την αρχική: spot {sp}%, "
+              "futures {fu}%, ενεργό spot {ac}%. Γι' αυτό στα futures αντιστοιχούν τώρα {usd} λιγότερα από το αρχικό τους μερίδιο συν "
+              "το δικό τους αποτέλεσμα, και στο spot τόσα περισσότερα. Από αυτή τη διαφορά, {rebase} είναι το μερίδιο των futures στη "
+              "μεταβολή της αξίας όλου του λογαριασμού και {drift} είναι η μετατόπιση των μεριδίων ανάμεσα στους επανυπολογισμούς: οι "
+              "τιμές των νομισμάτων αλλάζουν συνεχώς και το σύστημα εξισορροπεί μόνο όταν η απόκλιση ξεπεράσει ένα όριο.",
+        "es": "No es una transferencia de dinero, ni una comisión, ni una ganancia o pérdida. El spot y los futuros funcionan en la misma "
+              "cuenta de OKX con los mismos USDT. El sistema reparte el valor actual de la cuenta, no el inicial: spot {sp}%, futuros "
+              "{fu}%, spot activo {ac}%. Por eso a los futuros ahora les corresponden {usd} menos que su parte inicial más su propio "
+              "resultado, y al spot lo mismo de más. De esta diferencia, {rebase} es la parte de los futuros en el cambio de valor de "
+              "toda la cuenta y {drift} es cuánto se desplazaron las partes entre recálculos: los precios de las monedas cambian todo "
+              "el tiempo y el sistema reequilibra solo cuando la desviación supera un umbral."},
+    "pp.moved.why.s2f": {
+        "ru": "Это не перевод денег, не комиссия и не прибыль или убыток. Спот и фьючерсы работают на одном счёте OKX с одними и теми "
+              "же USDT. Система делит текущую стоимость счёта, а не стартовую: спот {sp}%, фьючерсы {fu}%, активный спот {ac}%. "
+              "Поэтому на фьючерсы сейчас приходится на {usd} больше, чем их стартовая доля плюс их собственный результат, а на спот — "
+              "на столько же меньше. Из этой разницы {rebase} — доля фьючерсов в изменении стоимости всего счёта, {drift} — доли "
+              "сдвинулись между пересчётами: цены монет меняются постоянно, а система выравнивает доли, только когда отклонение больше "
+              "порога.",
+        "en": "This is not a money transfer, a fee, or a profit or loss. Spot and futures run on one OKX account with the same USDT. The "
+              "system splits the account's current value, not its starting value: spot {sp}%, futures {fu}%, active spot {ac}%. So "
+              "futures now get {usd} more than their starting share plus their own result, and spot gets the same amount less. Of this "
+              "difference, {rebase} is the futures' share of the change in the whole account's value, and {drift} is how the shares "
+              "drifted between recalculations: coin prices move all the time, and the system rebalances only when the gap passes a "
+              "threshold.",
+        "uk": "Це не переказ грошей, не комісія і не прибуток чи збиток. Спот і ф'ючерси працюють на одному рахунку OKX з тими самими "
+              "USDT. Система ділить поточну вартість рахунку, а не стартову: спот {sp}%, ф'ючерси {fu}%, активний спот {ac}%. Тому на "
+              "ф'ючерси зараз припадає на {usd} більше, ніж їхня стартова частка плюс їхній власний результат, а на спот — на стільки ж "
+              "менше. З цієї різниці {rebase} — частка ф'ючерсів у зміні вартості всього рахунку, {drift} — частки зсунулися між "
+              "перерахунками: ціни монет змінюються постійно, а система вирівнює частки, лише коли відхилення більше за поріг.",
+        "el": "Δεν είναι μεταφορά χρημάτων, ούτε προμήθεια, ούτε κέρδος ή ζημία. Το spot και τα futures λειτουργούν στον ίδιο "
+              "λογαριασμό OKX με τα ίδια USDT. Το σύστημα μοιράζει την τρέχουσα αξία του λογαριασμού, όχι την αρχική: spot {sp}%, "
+              "futures {fu}%, ενεργό spot {ac}%. Γι' αυτό στα futures αντιστοιχούν τώρα {usd} περισσότερα από το αρχικό τους μερίδιο "
+              "συν το δικό τους αποτέλεσμα, και στο spot τόσα λιγότερα. Από αυτή τη διαφορά, {rebase} είναι το μερίδιο των futures "
+              "στη μεταβολή της αξίας όλου του λογαριασμού και {drift} είναι η μετατόπιση των μεριδίων ανάμεσα στους επανυπολογισμούς: "
+              "οι τιμές των νομισμάτων αλλάζουν συνεχώς και το σύστημα εξισορροπεί μόνο όταν η απόκλιση ξεπεράσει ένα όριο.",
+        "es": "No es una transferencia de dinero, ni una comisión, ni una ganancia o pérdida. El spot y los futuros funcionan en la misma "
+              "cuenta de OKX con los mismos USDT. El sistema reparte el valor actual de la cuenta, no el inicial: spot {sp}%, futuros "
+              "{fu}%, spot activo {ac}%. Por eso a los futuros ahora les corresponden {usd} más que su parte inicial más su propio "
+              "resultado, y al spot lo mismo de menos. De esta diferencia, {rebase} es la parte de los futuros en el cambio de valor de "
+              "toda la cuenta y {drift} es cuánto se desplazaron las partes entre recálculos: los precios de las monedas cambian todo "
+              "el tiempo y el sistema reequilibra solo cuando la desviación supera un umbral."},
+    # §6.5 the leverage cap in one short note: the real account (okx_futures caps) and the demo signals (signal_feed.LEV)
+    "pp.lev_note": {
+        "ru": "Плечо на реальном счёте — {lev}x, предел системы — {max}x. Сумму риска плечо не меняет: размер сделки считается от стопа, "
+              "и одна сделка рискует не больше {risk}% фьючерсного бюджета. Большее плечо лишь уменьшило бы залог, но приблизило бы "
+              "ликвидацию.",
+        "en": "Leverage on the real account is {lev}x; the system's cap is {max}x. Leverage doesn't change the amount at risk: the trade "
+              "size comes from the stop, and one trade risks at most {risk}% of the futures budget. Higher leverage would only lower "
+              "the margin and bring liquidation closer.",
+        "uk": "Плече на реальному рахунку — {lev}x, межа системи — {max}x. Суму ризику плече не змінює: розмір угоди рахується від "
+              "стопа, і одна угода ризикує не більше ніж {risk}% ф'ючерсного бюджету. Більше плече лише зменшило б заставу, але "
+              "наблизило б ліквідацію.",
+        "el": "Η μόχλευση στον πραγματικό λογαριασμό είναι {lev}×, το όριο του συστήματος είναι {max}×. Η μόχλευση δεν αλλάζει το ποσό "
+              "σε κίνδυνο: το μέγεθος της συναλλαγής υπολογίζεται από το stop και μία συναλλαγή ρισκάρει το πολύ {risk}% του "
+              "προϋπολογισμού για futures. Μεγαλύτερη μόχλευση θα μείωνε μόνο το περιθώριο, αλλά θα έφερνε πιο κοντά τη ρευστοποίηση.",
+        "es": "El apalancamiento en la cuenta real es de {lev}x; el límite del sistema es {max}x. El apalancamiento no cambia la cantidad "
+              "en riesgo: el tamaño de la operación se calcula desde el stop, y una operación arriesga como máximo el {risk}% del "
+              "presupuesto de futuros. Más apalancamiento solo reduciría el margen, pero acercaría la liquidación."},
+    "fut.lev_note": {
+        "ru": "Плечо в сигналах — от {lo}x до {hi}x: чем дальше стоп, тем меньше плечо. Сумму риска плечо не меняет: её задают размер "
+              "сделки и расстояние до стопа.",
+        "en": "Leverage in the signals is {lo}x to {hi}x: the farther the stop, the lower the leverage. Leverage doesn't change the "
+              "amount at risk: the trade size and the distance to the stop set it.",
+        "uk": "Плече в сигналах — від {lo}x до {hi}x: що далі стоп, то менше плече. Суму ризику плече не змінює: її задають розмір угоди "
+              "й відстань до стопа.",
+        "el": "Η μόχλευση στα σήματα είναι από {lo}× ως {hi}×: όσο πιο μακριά το stop, τόσο μικρότερη η μόχλευση. Το ποσό σε κίνδυνο δεν "
+              "αλλάζει με τη μόχλευση: το ορίζουν το μέγεθος της συναλλαγής και η απόσταση ως το stop.",
+        "es": "El apalancamiento en las señales va de {lo}x a {hi}x: cuanto más lejos el stop, menor el apalancamiento. El apalancamiento "
+              "no cambia la cantidad en riesgo: la fijan el tamaño de la operación y la distancia al stop."},
+    # §12.1 «Если покупать сегодня»: each coin's real state in the spot portfolio (web/spot_pipeline.json) — never «рекомендовано»
+    "buy.note": {
+        "ru": "Система проверила {n} {coins} по графику: цена выше средней за 200 дней, отскоки от поддержки, RSI, оценка проекта и "
+              "позиции крупных трейдеров. Это кандидаты по графику, а не покупки: портфель CRYPTO NOVA покупает только монеты, которые "
+              "прошли его таблицу и правила. Статус рядом с монетой — что с ней сейчас в портфеле.",
+        "en": "The system checked {n} {coins} on the chart: price above its 200-day average, bounces off a support, RSI, the project's "
+              "score and the largest traders' positions. These are chart candidates, not buys: the CRYPTO NOVA portfolio buys only "
+              "coins that pass its table and rules. The status next to a coin shows where it stands in the portfolio now.",
+        "uk": "Система перевірила {n} {coins} за графіком: ціна вище за 200-денну середню, відскоки від підтримки, RSI, оцінка проєкту "
+              "й позиції великих трейдерів. Це кандидати за графіком, а не покупки: портфель CRYPTO NOVA купує лише монети, які пройшли "
+              "його таблицю й правила. Статус біля монети — що з нею зараз у портфелі.",
+        "el": "Το σύστημα έλεγξε {n} {coins} στο γράφημα: τιμή πάνω από τον μέσο όρο 200 ημερών, αναπηδήσεις από στήριξη, RSI, "
+              "βαθμολογία του έργου και θέσεις των μεγαλύτερων traders. Είναι υποψήφια από το γράφημα, όχι αγορές: το χαρτοφυλάκιο "
+              "CRYPTO NOVA αγοράζει μόνο νομίσματα που περνούν τον πίνακα και τους κανόνες του. Η κατάσταση δίπλα σε κάθε νόμισμα "
+              "δείχνει πού βρίσκεται τώρα στο χαρτοφυλάκιο.",
+        "es": "El sistema revisó {n} {coins} en el gráfico: precio por encima de su media de 200 días, rebotes en un soporte, RSI, la "
+              "puntuación del proyecto y las posiciones de los grandes traders. Son candidatas por el gráfico, no compras: la cartera "
+              "CRYPTO NOVA compra solo monedas que pasan su tabla y sus reglas. El estado junto a cada moneda muestra dónde está ahora "
+              "en la cartera."},
+    "bst.watch": {"ru": "наблюдение", "en": "watching", "uk": "спостереження", "el": "παρακολούθηση", "es": "en observación"},
+    "bst.analysis": {"ru": "анализ", "en": "under analysis", "uk": "аналіз", "el": "υπό ανάλυση", "es": "en análisis"},
+    "bst.not_met": {"ru": "условия не выполнены", "en": "conditions not met", "uk": "умови не виконано",
+                    "el": "οι προϋποθέσεις δεν πληρούνται", "es": "condiciones no cumplidas"},
+    "bst.signal": {"ru": "сигнал сформирован", "en": "signal formed", "uk": "сигнал сформовано", "el": "το σήμα σχηματίστηκε",
+                   "es": "señal generada"},
+    "bst.pending": {"ru": "ожидается исполнение", "en": "awaiting execution", "uk": "очікується виконання", "el": "αναμένεται εκτέλεση",
+                    "es": "pendiente de ejecución"},
+    "bst.open": {"ru": "позиция открыта", "en": "position open", "uk": "позицію відкрито", "el": "η θέση είναι ανοιχτή",
+                 "es": "posición abierta"},
+    "bst.n.chart": {"ru": "Только кандидат по графику: таблица спот-портфеля эту монету не рассматривает.",
+                    "en": "Only a chart candidate: the spot portfolio's table doesn't consider this coin.",
+                    "uk": "Лише кандидат за графіком: таблиця спот-портфеля цю монету не розглядає.",
+                    "el": "Μόνο υποψήφιο από το γράφημα: ο πίνακας του χαρτοφυλακίου spot δεν εξετάζει αυτό το νόμισμα.",
+                    "es": "Solo una candidata por el gráfico: la tabla de la cartera spot no considera esta moneda."},
+    "bst.n.found": {"ru": "Монета в списке таблицы портфеля, но оценки ещё нет.", "en": "The coin is on the portfolio table's list but has no score yet.",
+                    "uk": "Монета в списку таблиці портфеля, але оцінки ще немає.",
+                    "el": "Το νόμισμα είναι στη λίστα του πίνακα του χαρτοφυλακίου, αλλά δεν έχει ακόμη βαθμολογία.",
+                    "es": "La moneda está en la lista de la tabla de la cartera, pero aún no tiene puntuación."},
+    "bst.n.table_wait": {"ru": "Таблица портфеля пишет «ждём»: не все проверки пройдены.",
+                         "en": "The portfolio's table says “wait”: not all checks are passed.",
+                         "uk": "Таблиця портфеля пише «чекаємо»: не всі перевірки пройдено.",
+                         "el": "Ο πίνακας του χαρτοφυλακίου λέει «αναμονή»: δεν πέρασαν όλοι οι έλεγχοι.",
+                         "es": "La tabla de la cartera dice «esperar»: no pasó todos los controles."},
+    "bst.n.table_avoid": {"ru": "Таблица портфеля поставила «не брать».", "en": "The portfolio's table marked it “don't buy”.",
+                          "uk": "Таблиця портфеля поставила «не брати».", "el": "Ο πίνακας του χαρτοφυλακίου το σημείωσε «όχι αγορά».",
+                          "es": "La tabla de la cartera la marcó como «no comprar»."},
+    "bst.n.no_okx": {"ru": "На споте OKX нет пары с этой монетой, а портфель повторяет реальный счёт на OKX.",
+                     "en": "OKX has no spot pair for this coin, and the portfolio mirrors the real account on OKX.",
+                     "uk": "На споті OKX немає пари з цією монетою, а портфель повторює реальний рахунок на OKX.",
+                     "el": "Στο spot του OKX δεν υπάρχει ζεύγος για αυτό το νόμισμα, και το χαρτοφυλάκιο ακολουθεί τον πραγματικό λογαριασμό στο OKX.",
+                     "es": "OKX no tiene par spot para esta moneda, y la cartera replica la cuenta real en OKX."},
+    "bst.n.cooldown": {"ru": "Монету недавно продали: по правилу портфеля снова купить её можно не раньше {d}.",
+                       "en": "The coin was sold recently: by the portfolio's rule it can be bought again no earlier than {d}.",
+                       "uk": "Монету нещодавно продали: за правилом портфеля знову купити її можна не раніше {d}.",
+                       "el": "Το νόμισμα πουλήθηκε πρόσφατα: με τον κανόνα του χαρτοφυλακίου μπορεί να αγοραστεί ξανά όχι πριν από τις {d}.",
+                       "es": "La moneda se vendió hace poco: por la regla de la cartera se puede volver a comprar no antes del {d}."},
+    "bst.n.slots": {"ru": "Прошла таблицу, но все места в портфеле для таких монет заняты.",
+                    "en": "Passed the table, but all the portfolio's places for such coins are taken.",
+                    "uk": "Пройшла таблицю, але всі місця в портфелі для таких монет зайняті.",
+                    "el": "Πέρασε τον πίνακα, αλλά όλες οι θέσεις του χαρτοφυλακίου για τέτοια νομίσματα είναι πιασμένες.",
+                    "es": "Pasó la tabla, pero todos los huecos de la cartera para este tipo de monedas están ocupados."},
+    "bst.n.cash": {"ru": "Прошла таблицу, но покупка опустила бы доллары портфеля ниже минимума {p}%.",
+                   "en": "Passed the table, but a buy would take the portfolio's dollars below the {p}% minimum.",
+                   "uk": "Пройшла таблицю, але купівля опустила б долари портфеля нижче мінімуму {p}%.",
+                   "el": "Πέρασε τον πίνακα, αλλά μια αγορά θα κατέβαζε τα δολάρια του χαρτοφυλακίου κάτω από το ελάχιστο {p}%.",
+                   "es": "Pasó la tabla, pero una compra dejaría los dólares de la cartera por debajo del mínimo del {p}%."},
+    "bst.n.rule": {"ru": "Прошла таблицу, но правило портфеля пока не даёт купить.",
+                   "en": "Passed the table, but a portfolio rule doesn't allow a buy yet.",
+                   "uk": "Пройшла таблицю, але правило портфеля поки не дає купити.",
+                   "el": "Πέρασε τον πίνακα, αλλά ένας κανόνας του χαρτοφυλακίου δεν επιτρέπει ακόμη αγορά.",
+                   "es": "Pasó la tabla, pero una regla de la cartera aún no permite comprar."},
+    "bst.n.price": {"ru": "Прошла таблицу и правила портфеля, но живая цена ещё не сверилась: покупка ждёт проверки цены.",
+                    "en": "Passed the table and the portfolio's rules, but the live price hasn't been checked yet: the buy waits for it.",
+                    "uk": "Пройшла таблицю й правила портфеля, але жива ціна ще не звірилася: купівля чекає перевірки ціни.",
+                    "el": "Πέρασε τον πίνακα και τους κανόνες του χαρτοφυλακίου, αλλά η τρέχουσα τιμή δεν επιβεβαιώθηκε ακόμη: η αγορά περιμένει.",
+                    "es": "Pasó la tabla y las reglas de la cartera, pero el precio en vivo aún no se verificó: la compra espera."},
+    "bst.n.all_filters": {"ru": "Прошла таблицу; портфель её ещё не рассматривал.", "en": "Passed the table; the portfolio hasn't looked at it yet.",
+                          "uk": "Пройшла таблицю; портфель її ще не розглядав.",
+                          "el": "Πέρασε τον πίνακα· το χαρτοφυλάκιο δεν το έχει εξετάσει ακόμη.",
+                          "es": "Pasó la tabla; la cartera aún no la ha revisado."},
+    "bst.n.recommended": {"ru": "Прошла таблицу и правила портфеля: портфель покупает её на ближайшем прогоне.",
+                          "en": "Passed the table and the portfolio's rules: the portfolio buys it on its next run.",
+                          "uk": "Пройшла таблицю й правила портфеля: портфель купує її на найближчому прогоні.",
+                          "el": "Πέρασε τον πίνακα και τους κανόνες του χαρτοφυλακίου: το χαρτοφυλάκιο το αγοράζει στον επόμενο κύκλο.",
+                          "es": "Pasó la tabla y las reglas de la cartera: la cartera la compra en su próxima ejecución."},
+    "bst.n.pending": {"ru": "Портфель CRYPTO NOVA её купил, реальный счёт OKX ещё не повторил покупку.",
+                      "en": "The CRYPTO NOVA portfolio bought it; the real OKX account hasn't repeated the buy yet.",
+                      "uk": "Портфель CRYPTO NOVA її купив, реальний рахунок OKX ще не повторив купівлю.",
+                      "el": "Το χαρτοφυλάκιο CRYPTO NOVA το αγόρασε· ο πραγματικός λογαριασμός OKX δεν έχει επαναλάβει ακόμη την αγορά.",
+                      "es": "La cartera CRYPTO NOVA la compró; la cuenta real de OKX aún no repitió la compra."},
+    "bst.n.open": {"ru": "Монета в портфеле CRYPTO NOVA и на реальном счёте OKX.", "en": "The coin is in the CRYPTO NOVA portfolio and on the real OKX account.",
+                   "uk": "Монета в портфелі CRYPTO NOVA і на реальному рахунку OKX.",
+                   "el": "Το νόμισμα είναι στο χαρτοφυλάκιο CRYPTO NOVA και στον πραγματικό λογαριασμό OKX.",
+                   "es": "La moneda está en la cartera CRYPTO NOVA y en la cuenta real de OKX."},
+    "bst.n.unknown": {"ru": "Статус в портфеле сейчас не проверен: данные портфеля не обновлялись.",
+                      "en": "Its status in the portfolio isn't checked right now: the portfolio data hasn't been updated.",
+                      "uk": "Статус у портфелі зараз не перевірено: дані портфеля не оновлювалися.",
+                      "el": "Η κατάστασή του στο χαρτοφυλάκιο δεν έχει ελεγχθεί τώρα: τα δεδομένα του χαρτοφυλακίου δεν ενημερώθηκαν.",
+                      "es": "Su estado en la cartera no está comprobado ahora: los datos de la cartera no se actualizaron."},
+    # §15 the spoken report says plainly when a part of the system is not working (web/system_status.json)
+    "rep.degraded": {"ru": "Внимание: сейчас есть перебои — {parts}. Часть цифр может быть не самой свежей.",
+                     "en": "Heads-up: there are interruptions right now — {parts}. Some numbers may not be the latest.",
+                     "uk": "Увага: зараз є перебої — {parts}. Частина цифр може бути не найсвіжішою.",
+                     "el": "Προσοχή: αυτή τη στιγμή υπάρχουν διακοπές — {parts}. Κάποιοι αριθμοί ίσως δεν είναι οι πιο πρόσφατοι.",
+                     "es": "Atención: ahora mismo hay interrupciones — {parts}. Algunas cifras pueden no ser las más recientes."},
+    "rep.part.account": {"ru": "данные и автопилот реального счёта", "en": "the real account's data and autopilot",
+                         "uk": "дані й автопілот реального рахунку", "el": "τα δεδομένα και ο αυτόματος πιλότος του πραγματικού λογαριασμού",
+                         "es": "los datos y el piloto automático de la cuenta real"},
+    "rep.part.signals": {"ru": "расчёт сигналов", "en": "the signal engine", "uk": "розрахунок сигналів", "el": "ο υπολογισμός των σημάτων",
+                         "es": "el cálculo de señales"},
+    "rep.part.data": {"ru": "обновление рыночных данных и спот-портфеля", "en": "market data and spot portfolio updates",
+                      "uk": "оновлення ринкових даних і спот-портфеля",
+                      "el": "η ενημέρωση των δεδομένων της αγοράς και του χαρτοφυλακίου spot",
+                      "es": "la actualización de los datos del mercado y de la cartera spot"},
+    "rep.part.app": {"ru": "сервер приложения", "en": "the app's server", "uk": "сервер застосунку", "el": "ο διακομιστής της εφαρμογής",
+                     "es": "el servidor de la app"},
+    "rep.part.check": {"ru": "проверка состояния системы", "en": "the system health check", "uk": "перевірка стану системи",
+                       "el": "ο έλεγχος κατάστασης του συστήματος", "es": "la comprobación del estado del sistema"},
+    "rep.value_stale": {"ru": "По последним подтверждённым данным на {d} публичный портфель CRYPTO NOVA — {v}.",
+                        "en": "By the last confirmed data, as of {d}, the CRYPTO NOVA public portfolio was at {v}.",
+                        "uk": "За останніми підтвердженими даними на {d} публічний портфель CRYPTO NOVA — {v}.",
+                        "el": "Σύμφωνα με τα τελευταία επιβεβαιωμένα δεδομένα, στις {d}, το δημόσιο χαρτοφυλάκιο CRYPTO NOVA ήταν {v}.",
+                        "es": "Según los últimos datos confirmados, del {d}, la cartera pública de CRYPTO NOVA estaba en {v}."},
+    # §13.6 the connection states of «Подключиться к системе CRYPTO NOVA» (app_config.connect_states): what each means and the next
+    # step. CRYPTO NOVA has no technical link to a user's OKX account, so «confirmed» is never shown today (available: false).
+    # The OKX section names are the app guide's own («Копитрейдинг» → «Мои копирования» / My copies).
+    "cs.not_started.title": {"ru": "Подключение не начато", "en": "Not started", "uk": "Підключення не розпочато",
+                             "el": "Η σύνδεση δεν ξεκίνησε", "es": "Sin empezar"},
+    "cs.not_started.text": {"ru": "Вы ещё не начинали подключать свой счёт на бирже.", "en": "You haven't started connecting your exchange account yet.",
+                            "uk": "Ви ще не почали підключати свій рахунок на біржі.",
+                            "el": "Δεν έχετε ξεκινήσει ακόμη τη σύνδεση του λογαριασμού σας στο ανταλλακτήριο.",
+                            "es": "Aún no has empezado a conectar tu cuenta del exchange."},
+    "cs.not_started.next": {"ru": "Откройте «Подключиться к системе CRYPTO NOVA» и начните с регистрации на OKX.",
+                            "en": "Open “Connect to the CRYPTO NOVA system” and start by signing up on OKX.",
+                            "uk": "Відкрийте «Підключитися до системи CRYPTO NOVA» і почніть з реєстрації на OKX.",
+                            "el": "Ανοίξτε το «Σύνδεση στο σύστημα CRYPTO NOVA» και ξεκινήστε με την εγγραφή στο OKX.",
+                            "es": "Abre «Conectarse al sistema CRYPTO NOVA» y empieza registrándote en OKX."},
+    "cs.action_on_exchange.title": {"ru": "Нужен шаг на бирже", "en": "A step on the exchange", "uk": "Потрібен крок на біржі",
+                                    "el": "Χρειάζεται ένα βήμα στο ανταλλακτήριο", "es": "Falta un paso en el exchange"},
+    "cs.action_on_exchange.text": {
+        "ru": "Следующий шаг делается в приложении или на сайте OKX: регистрация, проверка личности, пополнение счёта или включение "
+              "копирования CRYPTO NOVA.",
+        "en": "The next step happens in the OKX app or website: sign-up, identity check, a deposit, or turning on copying of CRYPTO NOVA.",
+        "uk": "Наступний крок робиться в застосунку або на сайті OKX: реєстрація, перевірка особи, поповнення рахунку або ввімкнення "
+              "копіювання CRYPTO NOVA.",
+        "el": "Το επόμενο βήμα γίνεται στην εφαρμογή ή στον ιστότοπο του OKX: εγγραφή, έλεγχος ταυτότητας, κατάθεση ή ενεργοποίηση "
+              "της αντιγραφής του CRYPTO NOVA.",
+        "es": "El siguiente paso se hace en la app o la web de OKX: registro, verificación de identidad, depósito o activar la copia "
+              "de CRYPTO NOVA."},
+    "cs.action_on_exchange.next": {"ru": "Откройте OKX, завершите шаг и вернитесь к инструкции.",
+                                   "en": "Open OKX, finish the step and come back to the guide.",
+                                   "uk": "Відкрийте OKX, завершіть крок і поверніться до інструкції.",
+                                   "el": "Ανοίξτε το OKX, ολοκληρώστε το βήμα και επιστρέψτε στον οδηγό.",
+                                   "es": "Abre OKX, termina el paso y vuelve a la guía."},
+    "cs.waiting.title": {"ru": "Ожидается подтверждение", "en": "Waiting for confirmation", "uk": "Очікується підтвердження",
+                         "el": "Αναμονή επιβεβαίωσης", "es": "Esperando confirmación"},
+    "cs.waiting.text": {"ru": "Биржа ещё проверяет ваши данные или зачисляет пополнение. Это делает OKX, а не CRYPTO NOVA.",
+                        "en": "The exchange is still checking your details or crediting your deposit. OKX does this, not CRYPTO NOVA.",
+                        "uk": "Біржа ще перевіряє ваші дані або зараховує поповнення. Це робить OKX, а не CRYPTO NOVA.",
+                        "el": "Το ανταλλακτήριο ακόμη ελέγχει τα στοιχεία σας ή πιστώνει την κατάθεσή σας. Αυτό το κάνει το OKX, όχι το CRYPTO NOVA.",
+                        "es": "El exchange aún está revisando tus datos o abonando tu depósito. Lo hace OKX, no CRYPTO NOVA."},
+    "cs.waiting.next": {"ru": "Дождитесь уведомления OKX и затем продолжите инструкцию.", "en": "Wait for OKX's notification, then continue the guide.",
+                        "uk": "Дочекайтеся сповіщення OKX і потім продовжте інструкцію.",
+                        "el": "Περιμένετε την ειδοποίηση του OKX και μετά συνεχίστε τον οδηγό.",
+                        "es": "Espera la notificación de OKX y luego continúa la guía."},
+    "cs.confirmed.title": {"ru": "Подключение подтверждено", "en": "Connection confirmed", "uk": "Підключення підтверджено",
+                           "el": "Η σύνδεση επιβεβαιώθηκε", "es": "Conexión confirmada"},
+    "cs.confirmed.text": {"ru": "Биржа подтвердила, что копирование CRYPTO NOVA на вашем счёте активно.",
+                          "en": "The exchange confirmed that copying CRYPTO NOVA is active on your account.",
+                          "uk": "Біржа підтвердила, що копіювання CRYPTO NOVA на вашому рахунку активне.",
+                          "el": "Το ανταλλακτήριο επιβεβαίωσε ότι η αντιγραφή του CRYPTO NOVA είναι ενεργή στον λογαριασμό σας.",
+                          "es": "El exchange confirmó que la copia de CRYPTO NOVA está activa en tu cuenta."},
+    "cs.confirmed.next": {"ru": "Следите за сделками в приложении. Остановить копирование можно в OKX в любой момент.",
+                          "en": "Follow the trades in the app. You can stop copying in OKX at any time.",
+                          "uk": "Стежте за угодами в застосунку. Зупинити копіювання можна в OKX у будь-який момент.",
+                          "el": "Παρακολουθήστε τις συναλλαγές στην εφαρμογή. Μπορείτε να σταματήσετε την αντιγραφή στο OKX οποιαδήποτε στιγμή.",
+                          "es": "Sigue las operaciones en la app. Puedes detener la copia en OKX en cualquier momento."},
+    "cs.error.title": {"ru": "Ошибка", "en": "Error", "uk": "Помилка", "el": "Σφάλμα", "es": "Error"},
+    "cs.error.text": {"ru": "Шаг не удался: например, биржа отклонила проверку личности, пополнение не дошло или копирование недоступно в "
+                            "вашей стране.",
+                      "en": "A step didn't go through: for example, the exchange rejected the identity check, the deposit didn't arrive, or "
+                            "copying isn't available in your country.",
+                      "uk": "Крок не вдався: наприклад, біржа відхилила перевірку особи, поповнення не надійшло або копіювання недоступне у "
+                            "вашій країні.",
+                      "el": "Ένα βήμα δεν ολοκληρώθηκε: για παράδειγμα, το ανταλλακτήριο απέρριψε τον έλεγχο ταυτότητας, η κατάθεση δεν "
+                            "έφτασε ή η αντιγραφή δεν είναι διαθέσιμη στη χώρα σας.",
+                      "es": "Un paso no salió bien: por ejemplo, el exchange rechazó la verificación de identidad, el depósito no llegó o la "
+                            "copia no está disponible en tu país."},
+    "cs.error.next": {"ru": "Посмотрите причину в OKX, исправьте её там и повторите шаг. Если не получается — напишите в поддержку.",
+                      "en": "Check the reason in OKX, fix it there and repeat the step. If it doesn't work, contact support.",
+                      "uk": "Перегляньте причину в OKX, виправте її там і повторіть крок. Якщо не виходить — напишіть у підтримку.",
+                      "el": "Δείτε την αιτία στο OKX, διορθώστε την εκεί και επαναλάβετε το βήμα. Αν δεν γίνεται, γράψτε στην υποστήριξη.",
+                      "es": "Revisa el motivo en OKX, corrígelo allí y repite el paso. Si no funciona, escribe a soporte."},
+    "cs.unverifiable.title": {"ru": "Проверить из приложения нельзя", "en": "Can't be checked from the app",
+                              "uk": "Перевірити із застосунку не можна", "el": "Δεν ελέγχεται από την εφαρμογή",
+                              "es": "No se puede comprobar desde la app"},
+    "cs.unverifiable.text": {
+        "ru": "У CRYPTO NOVA нет технической связи с вашим счётом на OKX, поэтому приложение не видит, включено ли копирование. Это не "
+              "ошибка.",
+        "en": "CRYPTO NOVA has no technical link to your OKX account, so the app can't see whether copying is on. This is not an error.",
+        "uk": "У CRYPTO NOVA немає технічного зв'язку з вашим рахунком на OKX, тому застосунок не бачить, чи ввімкнено копіювання. Це "
+              "не помилка.",
+        "el": "Το CRYPTO NOVA δεν έχει τεχνική σύνδεση με τον λογαριασμό σας στο OKX, οπότε η εφαρμογή δεν βλέπει αν η αντιγραφή είναι "
+              "ενεργή. Δεν είναι σφάλμα.",
+        "es": "CRYPTO NOVA no tiene conexión técnica con tu cuenta de OKX, así que la app no ve si la copia está activa. No es un error."},
+    "cs.unverifiable.next": {
+        "ru": "Проверьте сами в OKX: «Копитрейдинг» → «Мои копирования» (My copies) — там должен быть CRYPTO NOVA со статусом «активно».",
+        "en": "Check it yourself in OKX: “Copy trading” → “My copies”: CRYPTO NOVA should be there with the status “active”.",
+        "uk": "Перевірте самі в OKX: «Копітрейдинг» → «Мої копіювання» (My copies) — там має бути CRYPTO NOVA зі статусом «активно».",
+        "el": "Ελέγξτε το μόνοι σας στο OKX: «Copy trading» → «My copies» — εκεί πρέπει να υπάρχει το CRYPTO NOVA με κατάσταση «ενεργό».",
+        "es": "Compruébalo tú en OKX: «Copy trading» → «Mis copias» (My copies): ahí debe aparecer CRYPTO NOVA con el estado «activo»."},
 }
 
 # plural words: ru / uk — (1, 2–4, 5+) in the case the sentence needs; en / el / es — (1, other)
@@ -1142,7 +1452,7 @@ def polish(text, lang: str = DEFAULT):
 
 NO_POLISH = {"sym", "inst", "sig", "key", "kind", "lang", "src", "action", "side", "mode", "regime", "grade", "id", "image", "link",
              "url", "audio_url", "copy_url", "status", "rule_id", "rule_source", "art", "screen", "target", "level", "updated",
-             "version", "v"}
+             "version", "v", "dir"}
 
 
 def polish_doc(doc, lang: str = DEFAULT, _key: str | None = None):

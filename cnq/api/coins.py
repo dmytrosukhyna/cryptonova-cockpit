@@ -468,7 +468,7 @@ _INTENT = re.compile("|".join([
     r"\bgood (buy|investment|coin|project)\b", r"\bbuy or (sell|not)\b", r"\bprospects?\b", r"\bfuture of\b", r"\bpromising\b",
     r"\bhow about\b", r"\bwhat about\b", r"\bverdict\b", r"\bforecast\b", r"\bprediction\b", r"\bbullish on\b", r"\bis \w+ a good\b",
     # el (no accents)
-    r"\bτι πιστευει?σ\b|\bτι πιστευετε\b", r"\bγνωμη", r"\bαξιζει", r"\bνα αγορασω\b", r"\bπροοπτικ", r"\bτι λεσ\b|\bτι λετε\b",
+    r"\bτι πιστευει?σ\b|\bτι πιστευετε\b", r"\bγνωμη", r"(?<!ποσο )\bαξιζει", r"\bνα αγορασω\b", r"\bπροοπτικ", r"\bτι λεσ\b|\bτι λετε\b",
     r"\bκαλη επενδυση", r"\bπροβλεψη",
     # es
     r"\bopinas\b|\bopina\b|\bpiensas\b", r"\bopinion\b", r"\bvale la pena\b|\bmerece la pena\b", r"\bdeberia (comprar|invertir|vender)",

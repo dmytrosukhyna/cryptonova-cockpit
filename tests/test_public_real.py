@@ -317,7 +317,10 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     assert S["moved_usd"] == 5.5 and F["moved_usd"] == -5.5
     for X in (S, F):
         assert abs(X["start_usd"] + X["pnl_usd"] + X["moved_usd"] - X["value_usd"]) < 0.01
-    assert S["moved_note"] == "Перевод между спотом и фьючерсами: +$5,50." and F["moved_note"] == "Перевод между спотом и фьючерсами: −$5,50."
+    # build 47 (§6.4): not «перевод» — one USDT balance re-split (public_portfolio.moved explains it)
+    assert S["moved_note"] == "Перераспределение внутри одного счёта: +$5,50. Это не перевод денег и не прибыль или убыток."
+    assert F["moved_note"] == "Перераспределение внутри одного счёта: −$5,50. Это не перевод денег и не прибыль или убыток."
+    assert pp["moved"]["dir"] == "futures→spot" and pp["moved"]["usd"] == 5.5 and pp["moved"]["is_pnl"] is False
     # «Рассчитать мой портфель»: the real account's own futures record, not the 17.10 demo desks'
     assert doc["public"]["calc"]["futures_why"].endswith(
         f"Реальный счёт CRYPTO\u00a0NOVA с {app_home._date_text(since, 'ru')}: закрыто фьючерсных сделок — 3, из них в плюсе 1.")
@@ -333,7 +336,7 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     assert pp["actions"][1]["text"] == "Куплено BTC на $1 234,50: спот-портфель приведён к плану системы."
     en = json.load(open(os.path.join(d, "app_home.en.json"), encoding="utf-8"))["public_portfolio"]
     assert en["actions"][1]["text"].startswith("Bought BTC for $1,234.50") and " Oct 2026 " in en["note"]
-    assert en["spot"]["moved_note"] == "Moved between spot and futures: +$5.50." and en["futures"]["moved_usd"] == -5.5
+    assert en["spot"]["moved_note"].startswith("Reallocation inside one account: +$5.50.") and en["futures"]["moved_usd"] == -5.5
     for lang in ("uk", "el", "es"):
         other = json.load(open(os.path.join(d, f"app_home.{lang}.json"), encoding="utf-8"))["public_portfolio"]
         assert other["periods"] == pp["periods"] and other["alloc"]["groups"][0]["usd"] == al["groups"][0]["usd"], lang

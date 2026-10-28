@@ -474,11 +474,39 @@ def _futures(paper: dict, now: int, lang: str = DEFAULT, sel: dict | None = None
         n_closed += n
         wins += round(float(st.get("winrate") or 0) * n)
     others = [o for o in opened if not o["in_result"]]
+    lo, hi = _signal_lev()
     return {"usd": _r(usd), "pct": _r(usd / START * 100), "today_usd": _r(today), "trades": n_closed + in_open,
             "status_ru": _status(in_open, closed, others, lang), "scan": _scan((prof.get("own") or {}).get("scan"), now, lang),
             "wins": wins, "closed_n": n_closed, "worst_dd_pct": _r(dd * 100, 1), "since": FUT_D0, "in_result": keys,
             "open": opened, "closed": closed, "stats": stats, "curve": [[t_, _r(v)] for t_, v in _sample_keep_last(curve)],
-            "about_ru": t(lang, "futures.about")}
+            "about_ru": t(lang, "futures.about"),
+            # build 47 (§6.5): why the demo trades show 2x–5x — the signal's own label per rule (signal_feed.LEV), not a risk knob
+            "lev_note": t(lang, "fut.lev_note", lo=lo, hi=hi), "lev_range": [lo, hi]}
+
+
+def _signal_lev() -> tuple[int, int]:
+    """the lowest and highest leverage the signals carry (signal_feed.LEV: per rule — the farther the stop, the lower)"""
+    try:
+        from .signal_feed import LEV
+        vals = [int(v) for v in LEV.values()]
+        return min(vals), max(vals)
+    except Exception:  # noqa: BLE001
+        return 2, 5
+
+
+def _real_lev(real_futures: list, closed: list) -> dict:
+    """build 47 (§6.5): the real account's leverage — what OKX applied to its trades (newest first) and the hard caps of
+    cnq/execution/okx_futures.py (default 2x, never above MAX_LEV 3x, risk ≤ RISK_CAP 1 % of the futures budget per trade)"""
+    try:
+        from ..execution import okx_futures as of
+        c = of.caps()
+        caps = {"cap_default": of.DEF_LEV, "max": of.MAX_LEV, "set": c["lev"], "risk_pct": round(c["risk"] * 100, 2)}
+    except Exception:  # noqa: BLE001 — the feed never depends on the autopilot module
+        caps = {"cap_default": 2, "max": 3, "set": 2, "risk_pct": 1.0}
+    seen = [float(x["lev"]) for x in list(real_futures or []) + sorted(closed or [], key=lambda c: -(c.get("closed") or 0))
+            if isinstance(x.get("lev"), (int, float)) and x["lev"] > 0]
+    lev = seen[0] if seen else float(caps["set"])
+    return {**caps, "now": int(lev) if lev == int(lev) else lev, "seen": sorted({int(v) if v == int(v) else v for v in seen})}
 
 
 def _sample_keep_last(points: list, n: int = 60) -> list:
@@ -736,7 +764,20 @@ def _engine_facts(out: str) -> dict:
             "cycle_sec": 60}
 
 
-def _config(out: str) -> dict:
+CONNECT_STATES = ("not_started", "action_on_exchange", "waiting", "confirmed", "error", "unverifiable")
+CONNECT_VERIFIABLE = False        # CRYPTO NOVA has no technical link to a user's OKX account (no API key, no OKX copier list)
+
+
+def connect_states(lang: str = DEFAULT) -> dict:
+    """build 47 (§13.6): what each state of «Подключиться к системе CRYPTO NOVA» means and the next step, in this file's language.
+    «confirmed» exists only when the system can really check (can_verify) — today it cannot, so it is "available": false and the
+    app shows «unverifiable» after the guide instead of «Не подтверждено»."""
+    return {"can_verify": CONNECT_VERIFIABLE, "after_guide": "confirmed" if CONNECT_VERIFIABLE else "unverifiable",
+            "states": {k: {"title": t(lang, f"cs.{k}.title"), "text": t(lang, f"cs.{k}.text"), "next": t(lang, f"cs.{k}.next"),
+                           "available": CONNECT_VERIFIABLE or k != "confirmed"} for k in CONNECT_STATES}}
+
+
+def _config(out: str, lang: str = DEFAULT) -> dict:
     """web/app_config.json (in git): what the app may change without a new App Store version — the exchange partner link"""
     c = _load(out, "app_config.json")
     ref = c.get("exchange_ref")
@@ -775,7 +816,8 @@ def _config(out: str) -> dict:
             # 22.10: no okx_copy_url in app_config → the lead trader's public OKX profile the autopilot publishes (public_real.json)
             **({} if _https(c.get("okx_copy_url")) else {"okx_copy_url": _copy_url(out)}),
             "app_links": {str(k): v.strip() for k, v in (links if isinstance(links, dict) else {}).items() if isinstance(v, str) and _deep(v)},
-            "portfolio": {k: v for k, v in pf.items() if v}}
+            "portfolio": {k: v for k, v in pf.items() if v},
+            "connect_states": connect_states(lang)}
 
 
 CONNECT_KEYS = ("okx_copy_url", "bingx_copy_url", "okx_signal_url", "okx_app_ios", "okx_app_android", "okx_kyc_url", "okx_deposit_url",
@@ -838,12 +880,79 @@ def _public_portfolio(out: str) -> dict | None:
 BUY_KEYS = {"sma200", "support", "rsi", "quality", "whales"}
 
 
-def _buy_now(out: str, now: int, lang: str = DEFAULT) -> dict | None:
+PIPE_STALE_MS = 3 * 3_600_000
+_COOL = re.compile(r"снова не раньше (\d\d)\.(\d\d)")
+_CASH_MIN = re.compile(r"кэш не опускаем ниже (\d+(?:\.\d+)?)%")
+_MON_EN = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _pipeline(out: str, now: int) -> tuple[dict | None, int | None]:
+    """web/spot_pipeline.json (cnq/agents/vip_feeds.py): ({sym: the coin's stage on its way from the spot table to the CRYPTO NOVA
+    portfolio and the real OKX account}, its asof); (None, None) when missing or older than 3 hours (nothing is guessed then)"""
+    d = _load(out, "spot_pipeline.json")
+    if not isinstance(d.get("coins"), list) or not isinstance(d.get("asof"), (int, float)) or now - d["asof"] > PIPE_STALE_MS:
+        return None, None
+    return {str(c.get("sym") or "").upper(): c for c in d["coins"] if isinstance(c, dict) and c.get("sym")}, int(d["asof"])
+
+
+def _ddmm(dd: str, mm: str, lang: str) -> str:
+    return f"{int(dd)} {_MON_EN[int(mm) - 1]}" if lang == "en" and 1 <= int(mm) <= 12 else f"{dd}.{mm}"
+
+
+def buy_status(sym: str, pipe: dict | None, real_syms: set, lang: str = DEFAULT) -> tuple[str, str]:
+    """build 47 (§12.1): (status, note) — a «Если покупать сегодня» coin's REAL state in the spot portfolio, never «рекомендовано»
+    for a coin that is only watched. Statuses only where the system has that state (web/spot_pipeline.json stages):
+      open      bought, and the real OKX account holds it            pending   bought / cleared, the real account not yet
+      signal    passed the table and the portfolio's rules: bought on the next run
+      analysis  passed the table, the portfolio has not looked at it  not_met   the table says «ждём» / «не брать», no OKX pair,
+      watch     only a chart candidate (not in the table) / no score yet / the pipeline is not fresh   or a portfolio rule blocks"""
+    if pipe is None:
+        return ("open", t(lang, "bst.n.open")) if sym in real_syms else ("watch", t(lang, "bst.n.unknown"))
+    c = pipe.get(sym)
+    if not c:
+        return "watch", t(lang, "bst.n.chart")
+    st, why = c.get("stage"), str(c.get("why_ru") or "")
+    if st == "bought":
+        return ("open", t(lang, "bst.n.open")) if c.get("in_real_account") else ("pending", t(lang, "bst.n.pending"))
+    if st == "recommended":
+        return "signal", t(lang, "bst.n.recommended")
+    if st == "all_filters":
+        return "analysis", t(lang, "bst.n.all_filters")
+    if st == "waiting":
+        if "recommended" in (c.get("passed") or []):
+            return "pending", t(lang, "bst.n.price")
+        m = _COOL.search(why)
+        if m:
+            return "not_met", t(lang, "bst.n.cooldown", d=_ddmm(m.group(1), m.group(2), lang))
+        if "заняты" in why:
+            return "not_met", t(lang, "bst.n.slots")
+        m = _CASH_MIN.search(why)
+        if m:
+            return "not_met", t(lang, "bst.n.cash", p=_dec(float(m.group(1)), lang))
+        return "not_met", t(lang, "bst.n.rule")
+    if st == "rejected":
+        if c.get("okx_pair") is False or "нет пары" in why:
+            return "not_met", t(lang, "bst.n.no_okx")
+        if c.get("table_status") == "avoid":
+            return "not_met", t(lang, "bst.n.table_avoid")
+        return "not_met", t(lang, "bst.n.rule")
+    if st == "first_check":
+        return "not_met", t(lang, "bst.n.table_wait")
+    if st == "found":
+        return "watch", t(lang, "bst.n.found")
+    return "watch", t(lang, "bst.n.chart")
+
+
+def _buy_now(out: str, now: int, lang: str = DEFAULT, real_syms: set | None = None) -> dict | None:
     """22.10: «Если покупать сегодня» on the app's Home — web/buy_now.json (cnq/agents/buy_now.py) in this file's language.
-    None when the file is missing or older than 3 hours (the app then hides the block)."""
+    None when the file is missing or older than 3 hours (the app then hides the block).
+    build 47 (§12.1): every item also has its real state in the spot portfolio — status (watch / analysis / not_met / signal /
+    pending / open), status_ru (the word in this file's language) and status_note (why); "note" explains what the list is: a
+    technical screen of the 40 most traded coins (buy_now.py), not the portfolio's buy list."""
     d = _load(out, "buy_now.json")
     if not d.get("available") or not isinstance(d.get("asof"), (int, float)) or now - d["asof"] > 3 * 3_600_000:
         return None
+    pipe, pipe_t = _pipeline(out, now)
     items = []
     for x in d.get("items") or []:
         why = []
@@ -859,9 +968,13 @@ def _buy_now(out: str, now: int, lang: str = DEFAULT) -> dict | None:
             else:
                 why.append(t(lang, f"buy.{k}"))
         g = x.get("grade") if x.get("grade") in ("strong", "good", "possible") else "possible"
+        st, note = buy_status(str(x.get("sym") or "").upper(), pipe, real_syms or set(), lang)
         items.append({"sym": x.get("sym"), "price": x.get("price"), "chg24": x.get("chg24"), "score": x.get("score"), "grade": g,
-                      "grade_text": t(lang, f"buy.grade.{g}"), "why": why})
-    return {"asof": int(d["asof"]), "checked": int(d.get("checked") or 0), "items": items}
+                      "grade_text": t(lang, f"buy.grade.{g}"), "why": why, "status": st, "status_ru": t(lang, f"bst.{st}"),
+                      "status_note": note})
+    n = int(d.get("checked") or 0)
+    return {"asof": int(d["asof"]), "checked": n, "items": items, "note": t(lang, "buy.note", n=n, coins=plural(lang, n, "coin_acc")),
+            "status_asof": pipe_t}
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
@@ -1172,6 +1285,15 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
     # 28.10 (build 46 QA): money moved inside the account between spot and futures is neither side's profit — each part's «now»
     # is the money really in it (spot + futures = the account), its result stays the trading result, and the difference is
     # the transfer: spot.moved_usd = −futures.moved_usd, with a plain note
+    # build 47 (§6.4, audit 28.10): it is NOT a transfer — spot and futures share ONE USDT balance on OKX (acctLv 2, no code moves
+    # money between accounts, OKX bills show no transfer). The autopilot splits the account's CURRENT value 65 / 25 / 10
+    # (okx_alloc.shares; okx_futures.budget = 25 % of the total, refreshed every 15 min; myspot_sub.allocate hands the USDT out
+    # margin → spot cash → active spot → futures reserve), while each part's base is its share of the STARTING capital. So
+    #   moved = futures money now − (futures base + futures result) = rebase + drift,
+    #   rebase = futures share × value now − (futures base + futures result)   (the futures' share of the whole account's change)
+    #   drift  = futures money now − futures share × value now                 (spot coins / budget off their share between rebalances)
+    # public_portfolio.moved says so in the app's languages; is_pnl is always false.
+    moved_doc = None
     if spot is not None and fut is not None and fpnl is not None and any(f"fut_{k}_usd" in al for k in ("margin", "reserve")):
         fut_hold = float(al.get("fut_margin_usd") or 0) + float(al.get("fut_reserve_usd") or 0)
         moved = fut_hold - (cap0 * float(fut_share) / 100 + float(fpnl))
@@ -1179,6 +1301,16 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             prt.update({"value_usd": _r(hold), "moved_usd": _r(x),
                         "moved_note": t(lang, "pp.moved", usd=("+" if x > 0 else "−") + _usd_text(abs(x), lang)) if abs(x) >= 0.5 else None})
         holdings = eq - fut_hold
+        if abs(moved) >= 0.5:
+            target = float(fut_share) / 100 * eq
+            rebase, drift = target - (cap0 * float(fut_share) / 100 + float(fpnl)), fut_hold - target
+            sg = lambda v: ("+" if v > 0 else "") + _usd_text(v, lang)                                       # noqa: E731
+            moved_doc = {"usd": _r(abs(moved)), "dir": "spot→futures" if moved > 0 else "futures→spot", "t": asof,
+                         "fut_usd": _r(moved), "spot_usd": _r(-moved), "rebase_usd": _r(rebase), "drift_usd": _r(drift),
+                         "kind": "allocation", "is_pnl": False, "label": t(lang, "pp.moved.label"),
+                         "why_ru": t(lang, "pp.moved.why." + ("s2f" if moved > 0 else "f2s"), usd=_usd_text(abs(moved), lang),
+                                     sp=_dec(float(al.get("spot_pct") or 0), lang), fu=_dec(float(fut_share), lang),
+                                     ac=_dec(float(al.get("active_pct") or 0), lang), rebase=sg(rebase), drift=sg(drift))}
     if spot is not None:
         spot.update({"holdings_usd": _r(holdings),
                      "coins": [{**a, "share_spot": _r(float(a["usd"] or 0) / holdings * 100) if holdings else None}
@@ -1220,6 +1352,8 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
     if fut is not None:
         fut.update({"open": open_rows, "open_n": len(open_rows), "open_pnl_usd": _r(upl), "closed": closed, "stats": stats,
                     "running": not real.get("stale")})
+        lv = _real_lev(real.get("futures") or [], closed)          # build 47 (§6.5): the cap in one short note
+        fut.update({"lev_cap": lv, "lev_note": t(lang, "pp.lev_note", lev=lv["now"], max=lv["max"], risk=_dec(lv["risk_pct"], lang))})
     acts = [{**{k: a.get(k) for k in ("t", "kind", "sym", "side", "usd", "px")}, "text": _pp_action(a, lang)}
             for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
     return {"kind": "real", "exchange": real.get("exchange") or "OKX", "title": t(lang, "pp.title"), "since": since,
@@ -1235,7 +1369,7 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             "capital_usd": _r(cap0),
             "flows_note": t(lang, "pp.flows", usd=("+" if fl["net_usd"] > 0 else "") + _usd_text(fl["net_usd"], lang)) if fl["n"] else None,
             "alloc": {"asof": asof, "value_usd": _r(eq), "groups": groups, "categories": cats, "assets": assets},
-            "spot": spot, "futures": fut, "actions": acts}
+            "spot": spot, "futures": fut, "actions": acts, "moved": moved_doc}
 
 
 def _pct_txt(x, lang: str, d: int = 1) -> str:
@@ -1351,14 +1485,47 @@ def _say_date(ms: int, lang: str) -> str:
     return f"{m} {d.day}" if lang == "en" else f"{d.day} de {m}" if lang == "es" else f"{d.day} {m}"
 
 
-def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT) -> dict:
+# build 47 (§15, owner: «не заявляй, что система работает штатно, если обнаружены ошибки»): the report reads web/system_status.json
+# (cnq/agents/vip_feeds.py: every background part ok / stale / error / stopped) and says plainly which part of what it speaks about
+# is not working; report.status = "ok" | "degraded", report.issues = the parts. Only the parts behind the public report count —
+# the owner's private monitors on his Mac (mac_mirror), the voice file, the nightly lab and the hourly researcher do not.
+SYS_PARTS = {"public_real": "account", "autopilot": "account", "engine": "signals", "engine_sync": "signals", "conveyor": "signals",
+             "state": "data", "spot_table": "data", "site_pipeline": "data", "api": "app"}
+SYS_ORDER = ("account", "signals", "data", "app", "check")
+SYS_STALE_MS = 2 * 3_600_000
+
+
+def sys_issues(out: str, now: int) -> list[str]:
+    """the parts of the system the public report depends on that are not «ok» in web/system_status.json; ["check"] when that
+    file is missing or older than 2 hours (then nothing can be confirmed)"""
+    d = _load(out, "system_status.json")
+    if not isinstance(d.get("components"), list) or not isinstance(d.get("asof"), (int, float)) or now - d["asof"] > SYS_STALE_MS:
+        return ["check"]
+    bad = {SYS_PARTS[c["key"]] for c in d["components"] if isinstance(c, dict) and c.get("key") in SYS_PARTS and c.get("status") != "ok"}
+    return [p for p in SYS_ORDER if p in bad]
+
+
+def _say_when(ms: int, lang: str) -> str:
+    return f"{_say_date(ms, lang)}, {dt.datetime.fromtimestamp(int(ms) / 1000, _kyiv()):%H:%M}"
+
+
+def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, issues: list[str] | None = None) -> dict:
     out = []
+    issues = list(issues or [])
+    if (not pport or pport.get("stale")) and "account" not in issues:
+        issues.insert(0, "account")
+    issues = [p for p in SYS_ORDER if p in issues]
+    if issues:                                    # first, in plain words — never a calm report over a broken part
+        out.append(t(lang, "rep.degraded", parts=", ".join(t(lang, f"rep.part.{p}") for p in issues)))
     if not pport:
         out.append(t(lang, "rep.none"))
     else:
-        out.append(t(lang, "rep.value", v=_say_money(pport["value_usd"], lang)))
+        if pport.get("stale"):                    # an old amount is never said as today's
+            out.append(t(lang, "rep.value_stale", d=_say_when(pport["asof"], lang), v=_say_money(pport["value_usd"], lang)))
+        else:
+            out.append(t(lang, "rep.value", v=_say_money(pport["value_usd"], lang)))
         day = (pport.get("periods") or {}).get("day") or {}
-        if day.get("available") and day.get("usd") is not None and day.get("pct") is not None:
+        if not pport.get("stale") and day.get("available") and day.get("usd") is not None and day.get("pct") is not None:
             out.append(t(lang, "rep.today", chg=_say_money(day["usd"], lang, True), pct=_say_pct(day["pct"], lang)))
         if pport.get("pnl_usd") is not None and pport.get("pnl_pct") is not None:
             out.append(t(lang, "rep.since", d=_say_date(pport["since"], lang), chg=_say_money(pport["pnl_usd"], lang, True),
@@ -1370,8 +1537,6 @@ def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT) 
         if acts:
             a = acts[0]
             out.append(t(lang, "rep.last", d=_say_date(a["t"], lang), what=t(lang, f"rep.w.{REP_WHAT[a['kind']]}"), sym=a["sym"]))
-        if pport.get("stale"):
-            out.append(t(lang, "rep.stale"))
     b = (mv or {}).get("btc") or {}
     if b.get("price") and b.get("chg24") is not None:
         out.append(t(lang, "rep.btc", v=_say_money(b["price"], lang), pct=_say_pct(b["chg24"], lang)))
@@ -1381,12 +1546,13 @@ def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT) 
         k = tts_key(text, lang)
     except Exception:  # noqa: BLE001
         k = None
-    return {"kind": "public", "lang": lang, "text": text, "key": k, "asof": now, "audio_url": None}
+    return {"kind": "public", "lang": lang, "text": text, "key": k, "asof": now, "audio_url": None,
+            "status": "degraded" if issues else "ok", "issues": issues}
 
 
-def _report_safe(pport, mv, now, lang):
+def _report_safe(pport, mv, now, lang, issues=None):
     try:
-        return _report(pport, mv, now, lang)
+        return _report(pport, mv, now, lang, issues)
     except Exception as e:  # noqa: BLE001
         print("app_home report:", repr(e)[:200], flush=True)
         return None
@@ -1422,13 +1588,15 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
         public["calc"]["futures_why"] += " " + t(lang, "pub.why.fut_rec", since=_date_text(pport["since"], lang), n=int(st_["n"]),
                                                  w=int(st_.get("wins") or 0))
     mv = _market_view_safe(mk, pport, fut, now, lang)
+    issues = ex["sys"] if "sys" in ex else sys_issues(out, now)
+    real_syms = {str(x.get("sym") or "").upper() for x in (real or {}).get("spot") or [] if x.get("sym")}
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
             "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub, "public": public,
-            "public_portfolio": pport, "market_view": mv, "report": _report_safe(pport, mv, now, lang),
+            "public_portfolio": pport, "market_view": mv, "report": _report_safe(pport, mv, now, lang, issues),
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
-            "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),
-            "buy_now": _buy_now(out, now, lang),
+            "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out, lang),
+            "buy_now": _buy_now(out, now, lang, real_syms),
             "note_ru": t(lang, "home.note")}
 
 
@@ -1465,7 +1633,7 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
     ex = {"ideas": ideas.get("positions") or [], "ideas_pf": ideas, "rows": _load(out, "ideas.json").get("statuses") or {},
           "fut_curve": nova_result(paper.get("profiles") or {}, now, sel)[1], "sel": sel,
           "tok": _load(out, "tokenomics.json"), "profiles": _load(out, "coin_profiles.json").get("coins") or {},
-          "live": _live_shares(out, now)}
+          "live": _live_shares(out, now), "sys": sys_issues(out, now)}
     docs = {lang: _polished(build(paper, pf, mk, out, now, lang, ex), lang) for lang in LANGS}
     for lang in [x for x in LANGS if x != DEFAULT] + [DEFAULT]:          # Russian last: its mtime says «all languages written»
         _write(out, file_name("app_home", lang), docs[lang])

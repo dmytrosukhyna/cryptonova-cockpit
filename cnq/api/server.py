@@ -13,6 +13,8 @@ With the Firebase ID token («Authorization: Bearer …»):
   PUT  /v2/piggy     the free demo piggy bank: amount, how often, goal, mode, start day
   PUT  /v2/progress  lessons done, quiz scores, XP
   POST /v2/push      the phone's FCM token
+  POST /v2/tts       build 46: NOVA AI's male voice for a phrase — {"text", "lang"} → audio/mpeg (cnq/api/tts.py); 503 without edge-tts
+                     (also without login, by IP)
   POST /v2/agent     a question to NOVA (free: 5 a day, real account connected: 100) — {"q", "ctx"?, "lang"?}; always 200 with
                      an answer in that language, see Api._agent
   POST /v2/vip/check BingX UID → invited by our link and deposited → VIP
@@ -271,7 +273,8 @@ class Api:
                      "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last,
                          "panel_last": self.panel_last, "news_last": self.news.last,
-                         "portfolio": {"vision": bool(self.vision), "last": self.pf_last}}
+                         "portfolio": {"vision": bool(self.vision), "last": self.pf_last},
+                         "tts_last": getattr(self.tts, "last", None) if getattr(self, "tts", None) else None}
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()
         if method == "GET" and path == "/v2/agent/selftest":
@@ -318,6 +321,21 @@ class Api:
             return deny if deny else self._panel_nova(body)
         if path == "/v2/admin" or path.startswith("/v2/admin/"):          # the owner's admin panel: its own token, not Firebase
             return self.console.handle(method, path, url.query, headers, body)
+        if method == "POST" and path == "/v2/tts":                       # build 46: NOVA AI's male voice (cnq/api/tts.py)
+            try:
+                data = json.loads(body.decode() or "{}") if body else {}
+            except ValueError:
+                return 400, {"error": "bad_json"}
+            if not isinstance(data, dict):
+                return 400, {"error": "bad_json"}
+            try:
+                who = "uid:" + self._uid(headers)["uid"]
+            except Exception:  # noqa: BLE001 — the voice works signed out too, limited by the caller's IP
+                who = "ip:" + str(headers.get("x-real-ip") or headers.get("x-forwarded-for") or "local").split(",")[0].strip()[:64]
+            if getattr(self, "tts", None) is None:
+                from .tts import Tts
+                self.tts = Tts(os.path.join(os.environ.get("CNQ_RUN_DIR", "."), "data", "tts"))
+            return self.tts.speak(str(data.get("text") or ""), norm_lang(data.get("lang")), who)
         # ------------------------------------------------------------ signed-in user
         try:
             who = self._uid(headers)
@@ -665,6 +683,15 @@ def make_handler(api: Api):
             self.send_header("Vary", "Origin")
 
         def _send(self, code: int, doc: dict) -> None:
+            if code == 200 and isinstance(doc, dict) and isinstance(doc.get("_audio"), (bytes, bytearray)):   # build 46: /v2/tts
+                raw = bytes(doc["_audio"])
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Content-Length", str(len(raw)))
+                self.send_header("Cache-Control", "private, max-age=86400")
+                self.end_headers()
+                self.wfile.write(raw)
+                return
             raw = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode()
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")

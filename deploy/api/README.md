@@ -42,6 +42,12 @@ Settings in `/etc/cnq.env`:
   Optional: `/opt/cnq/venv/bin/pip install pypdf` reads unusual PDF fonts better (without it a small built-in reader is used).
   Nothing is stored: the file and the coins live only in the request's memory; `/v2/health` "portfolio" shows counts only.
 
+- Build 46 NOVA AI's voice (`POST /v2/tts`, `cnq/api/tts.py`): the app's report and NOVA AI's answers in a male neural voice
+  (edge-tts; the same male voices as the spoken greeting, never a female one). One-time step on the server (root):
+  `/opt/cnq/venv/bin/pip install edge-tts && systemctl restart cnq-api`. Without it the route answers 503 `tts_unavailable` and the
+  app falls back to the phone's male voice, then to text. Phrases are cached in `/opt/cnq/run/data/tts/` (≤ 500 files);
+  `/v2/health` "tts_last" shows the last attempt (ok / the error, never the text).
+
 Endpoints: see the docstring of `cnq/api/server.py`. Data: `/opt/cnq/run/data/api.sqlite` (not in git).
 
 Legal pages for the stores (published with the site): https://cryptonova.vip/privacy.html · terms.html · delete.html

@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import time
 from datetime import datetime, timezone
@@ -345,13 +346,22 @@ IDEAS = {
     "cooldown_d": 14,                     # a sold coin is not bought again for 14 days
     "stale_h": 3,                         # ideas.json older than this → no buys
     "px_tol": 0.25,                       # a live price within 25 % of the table's (or the last seen) price = the same coin, not a namesake
+    # 28.10 (owner's decisions on the data agent's proposals, real money):
+    # 1) idle cash → core: spot cash above the 10 % minimum for 3 full days with no coin eligible to buy → the cash above 10 %
+    #    goes to the core BTC / ETH / SOL in the plan proportions (30 / 10 / 5, like the 22.10 swap); a newly eligible coin is paid
+    #    by selling that top-up first, then from cash. Logged «Кэш → ядро (3 дня без подходящих монет)» and the reverse.
+    "idle_days": 3, "idle_min": 0.005,    # 3 full days; less than 0.5 % of the account above the floor is not «idle cash»
+    # 2) another portfolio's stop («Наш портфель «Умеренный» у стопа — не добираем») means «не добирать» here: no buy, no sale;
+    #    only the coin's own stop, its own take-profit rule and the Monday review sell. A coin the table sold («не брать») whose
+    #    status is «можно брать / добрать» again inside the 14-day pause gets the pause lifted — at most once per pause.
 }
 IDEAS_ABOUT = ("Наш портфель CRYPTO NOVA: сам покупает то, что советует таблица «Что брать на спот». Старт $10 000. С 22.10 — только монеты со спот-парой на OKX: его повторяет реальный счёт CRYPTO NOVA. Ядро — BTC 30%, ETH 10%, "
                "SOL 5% (доливаем, если доля упала ниже ¾ плана; продаём лишнее, если выросла больше чем в 1.5 раза), остальные «можно брать» и «можно добрать» — по 7.5%, всего не больше 8 монет вместе с ядром; «можно на небольшую сумму» — по 2.5%, "
                "не больше 3; кэш не меньше 10%, комиссия 0.1% с каждой сделки. Продаём, если таблица поставила «не брать»; стоп −20% от "
                "входа (ядро BTC, ETH, SOL — без стопа); для небольшой суммы стоп −35%, на ×2 продаём половину, остаток — до отката 35% от "
                "пика; по понедельникам продаём монеты со статусом «ждём» и минусом 10% и больше. Проданную монету 14 дней не берём. "
-               "Результат не обещаем — может быть и минус.")
+               "С 28.10 (решение владельца): чужой стоп — «не добирать», а не продавать; кэш выше 10% три дня без подходящих монет — "
+               "в ядро BTC / ETH / SOL. Результат не обещаем — может быть и минус.")
 IDEAS_RULES = [
     "Что покупаем: строки таблицы «Что брать на спот» с прошлого прогона сервера (таблица считается сразу после портфелей). "
     "Ядро — BTC 30%, ETH 10%, SOL 5% счёта (биткоин — главный: в 2025–2026 он падал меньше ETH и SOL); остальные «можно брать» и "
@@ -371,7 +381,13 @@ IDEAS_RULES = [
     "Небольшая сумма (мемы и высокий риск): стоп −35%; на ×2 продаём половину — вложенное вернулось, остаток держим до отката "
     "35% от пика.",
     "Раз в неделю, в понедельник: если у монеты в таблице «ждём» и позиция в минусе на 10% и больше — продаём.",
-    "Проданную монету не покупаем снова 14 дней.",
+    "Проданную монету не покупаем снова 14 дней. Исключение (решение владельца 28.10): монету продали по «не брать» таблицы, а таблица "
+    "снова пишет «можно брать / добрать» — пауза снимается (не чаще раза за паузу).",
+    "Чужой стоп (решение владельца 28.10): если «не брать» пришло из-за другого нашего портфеля у стопа, это значит «не добирать» — "
+    "не покупаем, но и не продаём; продают только свой стоп −20%, свои правила фиксации и понедельничный пересмотр.",
+    "Кэш → ядро (решение владельца 28.10): если кэш выше 10% три полных дня подряд и ни одна монета не проходит правила покупки, "
+    "кэш сверх 10% идёт в ядро BTC / ETH / SOL в пропорции плана 30 / 10 / 5. Когда появляется подходящая монета, её покупку "
+    "оплачиваем сначала продажей этой доливки ядра, потом из кэша.",
     "Если таблица не обновлялась больше 3 часов (или её нет) — новых покупок нет, позиции держим и оцениваем; работают только "
     "ценовые правила (стопы, ×2, трейлинг).",
     "Это проверка таблицы на учебном счёте, а не совет и не прогноз: результат может оказаться минусом.",
@@ -480,6 +496,16 @@ def ideas_statuses(d: dict | None) -> dict:
     return out
 
 
+_CROSS_STOP = re.compile(r"^Наш портфель «[^»]+» у стопа")
+
+
+def cross_stop(row: dict | None) -> bool:
+    """28.10: the table's «не брать» came from ANOTHER of our portfolios sitting at its stop (spot_ideas dkey «stop») — for the
+    real-money model that means «не добирать» (no buy, no sale). `decided` is written since 28.10; the reason text for older tables."""
+    r = row or {}
+    return r.get("status") == "avoid" and (r.get("decided") == "stop" or bool(_CROSS_STOP.match(str(r.get("why_ru") or ""))))
+
+
 def ideas_reco(kind: str, est: str, p: dict, px: float | None, row: dict | None, fresh: bool) -> dict:
     """Server recommendation {k: hold|add|trim|sell, t, why} for one position of «По рекомендациям»."""
     P = IDEAS
@@ -489,6 +515,9 @@ def ideas_reco(kind: str, est: str, p: dict, px: float | None, row: dict | None,
     st = (row or {}).get("status")
     tab = (f"в таблице «{row['status_ru']}»" if row and row.get("status_ru") else "монеты сейчас нет в таблице") if fresh \
         else "таблица устарела — работают только ценовые правила"
+    if fresh and st == "avoid" and cross_stop(row):
+        return {"k": "hold", "t": "Не добирать", "why": f"Таблица: {row.get('why_ru') or 'чужой стоп'} — это «не добирать», не продажа "
+                "(решение владельца 28.10); продаст только свой стоп, своя фиксация или понедельничный пересмотр."}
     if fresh and st == "avoid":
         return {"k": "sell", "t": "Продать — «не брать»", "why": f"Таблица: {row.get('why_ru') or 'не брать'}."}
     if est == "small":
@@ -632,7 +661,7 @@ class IdeasPortfolio:
                 self._sell(now, s, p, px, f"Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный "
                            f"счёт CRYPTO NOVA. {s} на споте OKX нет — продаём, итог {res}; деньги — в ядро, пока таблица не "
                            "предложит монету с OKX.", actions)
-            elif st == "avoid":
+            elif st == "avoid" and not cross_stop(r):
                 self._sell(now, s, p, px, f"Таблица поставила «не брать»: {r.get('why_ru') or 'проверки не пройдены'}. Продаём, итог {res}.", actions)
             elif est == "small" and not fixes and ret <= P["stop_small"]:
                 self._sell(now, s, p, px, f"Стоп {_pc(P['stop_small'])}: {s} {res} — небольшую сумму режем целиком.", actions)
@@ -643,12 +672,14 @@ class IdeasPortfolio:
                 self._sell(now, s, p, px, f"Трейлинг: {s} на {(1 - px / high) * 100:.0f}% ниже пика {_fp(high)} — остаток продаём ({res}).", actions)
             elif est != "small" and kind != "core" and ret <= P["stop_buy"]:
                 self._sell(now, s, p, px, f"Стоп {_pc(P['stop_buy'])}: {s} {res}. Убыток режем; {P['cooldown_d']} дней монету не берём.", actions)
-            elif weekly and st == "wait" and ret <= P["review_pnl"] and s not in P["trusted_small"]:
+            elif weekly and (st == "wait" or cross_stop(r)) and ret <= P["review_pnl"] and s not in P["trusted_small"]:
                 self._sell(now, s, p, px, f"Недельный пересмотр: в таблице «ждём» ({r.get('why_ru') or '—'}), позиция {res} — "
                            "освобождаем место.", actions)
         # --- 3. buys: table order, buy/add 10 % (≤ 8), small 2.5 % (≤ 4), cash ≥ 10 %, 14-day cooldown, a reliable live price
         not_bought: list[dict] = []
         if fresh:
+            self._idle_housekeeping()
+            eligible_seen = False                 # 28.10: a coin passed every rule of the portfolio this run (bought or cash-blocked)
             held = {p["symbol"]: p for p in rp.positions()}
             n_buy = sum(1 for p in held.values() if self._split(p["bucket"])[1] != "small")
             n_small = len(held) - n_buy
@@ -665,17 +696,19 @@ class IdeasPortfolio:
                 w = P["small_w"] if small else core_target(s) if (r.get("kind") == "core") else P["buy_w"]
                 st_ru = r.get("status_ru") or st
                 px = k = why_not = None
+                lifted = None
                 if okx is not None and s not in okx:
                     why_not = "на споте OKX нет пары — портфель повторяет реальный счёт CRYPTO NOVA на OKX"
-                elif s in cool:
+                elif s in cool and not (lifted := self._cooldown_lift(now, s, st)):
                     t = self.conn.execute(f"SELECT MAX(time) FROM {rp.T_ACT} WHERE symbol=? AND action='SELL'", (s,)).fetchone()[0] or now
                     dd = lambda x: datetime.fromtimestamp(x / 1000, tz=timezone.utc).strftime("%d.%m")   # noqa: E731
                     why_not = f"продана {dd(t)} — снова не раньше {dd(t + P['cooldown_d'] * DAY)}"
                 elif (n_small >= P["small_n"]) if small else (n_buy >= P["buy_n"]):
                     n = P["small_n"] if small else P["buy_n"]
                     why_not = f"все {n} {'места' if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else 'мест'} для «{st_ru}» заняты"
-                elif rp.cash() - w * V < P["min_cash"] * V - 1e-9:
+                elif rp.cash() - max(0.0, w * V - self._idle_value(price, live)) < P["min_cash"] * V - 1e-9:
                     why_not = f"кэш не опускаем ниже {P['min_cash']*100:.0f}%"
+                    eligible_seen = True          # 28.10: an eligible coin blocked only by the cash floor — not «idle cash»
                 else:
                     px, k, why_not = self._entry_price(s, r, src)
                     if px is None:
@@ -685,13 +718,18 @@ class IdeasPortfolio:
                     not_bought.append({"symbol": s, "status": st, "why_ru": why_not})
                     continue
                 kind = r.get("kind") or "high"
+                eligible_seen = True
+                # 28.10 (owner): the idle-cash top-up of the core pays for a newly eligible coin first, then the cash
+                self._idle_release(now, w * V / (1 - P["fee"]), price, live, actions, s)   # the sale's own fee included
+                if lifted:
+                    rp._set_meta(f"cool_lift:{s}", now)
                 cost = w * V / (1 + P["fee"])
                 rule = (f"стоп {_pc(P['stop_small'])}, на ×{P['body_x']:.0f} продаём половину, остаток — до отката "
                         f"{P['trail']*100:.0f}% от пика" if small else "ядро — без стопа" if kind == "core" else f"стоп {_pc(P['stop_buy'])} от входа")
                 head = (f"Исключение владельца (22.10): {s} из списка доверия — на небольшую сумму, хотя таблица пишет «{r.get('why_ru') or 'ждём'}»"
                         if trusted else f"Из таблицы «{st_ru}»: {r.get('why_ru') or '—'}")
                 actions.append(rp._act(now, s, "BUY", cost, px, f"{head}. {w*100:g}% счёта, {rule}; "
-                                       "продаём и при статусе «не брать».", f"{kind}:{'small' if trusted else st}"))
+                                       "продаём и при статусе «не брать»." + (f" {lifted}" if lifted else ""), f"{kind}:{'small' if trusted else st}"))
                 rp._set_cash(rp.cash() - cost * P["fee"])
                 rp._set_meta(f"src:{s}", _SRC_CODE[k])
                 rp._set_meta(f"px:{s}", px)
@@ -730,8 +768,9 @@ class IdeasPortfolio:
                     continue
                 T = core_target(s)
                 mw = p["weight"] * price[s] / p["entry"] / V
-                if weekly and mw > T * P["core_trim"]:
-                    te = min(1.5 * T, T + (rp._meta(f"topup_extra:{s}") or 0.0))
+                ish = (rp._meta(f"idle_q:{s}") or 0.0) * price[s] / V      # 28.10: the idle-cash top-up is not «лишнее» — never trimmed back
+                if weekly and mw > T * P["core_trim"] + ish:
+                    te = min(1.5 * T, T + (rp._meta(f"topup_extra:{s}") or 0.0)) + ish
                     neww = te * V * p["entry"] / price[s]
                     actions.append(rp._act(now, s, "TRIM", neww, price[s],
                                            f"Ядро: {s} {mw*100:.0f}% счёта — больше плана {T*100:.0f}% в {mw / T:.1f} раза; лишнее продаём "
@@ -754,6 +793,7 @@ class IdeasPortfolio:
             # down here («одна покупка на монету»): on 2023–2026 averaging alts gave +17 % vs +39 %, drawdown −68 % vs −58 %.
             actions += self._topups(now, price, smap, sma200 or {}, live)
             actions += self._okx_swap(now, price, okx, src)
+            actions += self._idle_cash(now, price, live, eligible_seen)
         self.conn.commit()
         return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
 
@@ -800,6 +840,111 @@ class IdeasPortfolio:
             rp._set_cash(rp.cash() - add * P["fee"])
             used += add * (1 + P["fee"])
         return out
+
+    # ── 28.10 (owner): idle cash → core, and the way back ────────────────────────────────────────────────────────────
+    IDLE_CORE = ("BTC", "ETH", "SOL")
+
+    def _idle_housekeeping(self) -> None:
+        """the idle top-up of a core coin (meta idle_q:SYM, coins in ledger units: Σ added cost ÷ price) never exceeds what is held;
+        a core coin sold by its own rules takes its top-up with it"""
+        rp = self.rp
+        held = {p["symbol"]: p for p in rp.positions()}
+        for c in self.IDLE_CORE:
+            q = rp._meta(f"idle_q:{c}")
+            if not q:
+                continue
+            p = held.get(c)
+            qh = p["weight"] / p["entry"] if p and p.get("entry") else 0.0
+            if qh <= 0:
+                self.conn.execute(f"DELETE FROM {rp.T_META} WHERE k=?", (f"idle_q:{c}",))
+            elif q > qh:
+                rp._set_meta(f"idle_q:{c}", qh)
+
+    def _idle_value(self, price: dict, live: set | None = None) -> float:
+        """the idle top-up of the core at today's prices (units of the $10 000 start); with `live` only what can be sold this run"""
+        rp = self.rp
+        return sum((rp._meta(f"idle_q:{c}") or 0.0) * (price.get(c) or 0.0) for c in self.IDLE_CORE if live is None or c in live)
+
+    def _idle_release(self, now: int, need: float, price: dict, live: set, actions: list, for_sym: str) -> float:
+        """sell up to `need` (units) of the idle top-up — from each core coin in proportion to its part — before a buy"""
+        rp, P = self.rp, IDEAS
+        parts = {c: (rp._meta(f"idle_q:{c}") or 0.0) * price[c] for c in self.IDLE_CORE
+                 if (rp._meta(f"idle_q:{c}") or 0.0) > 0 and price.get(c) and c in live}
+        tot = sum(parts.values())
+        S = min(need, tot)
+        if S <= 0:
+            return 0.0
+        V = self.value(price) or 1.0
+        held = {p["symbol"]: p for p in rp.positions()}
+        done = 0.0
+        for c, v in parts.items():
+            p = held.get(c)
+            if not p or not p.get("entry"):
+                continue
+            sc = S * v / tot
+            neww = max(0.0, p["weight"] - sc * p["entry"] / price[c])
+            actions.append(rp._act(now, c, "TRIM", neww, price[c],
+                                   f"Ядро → кэш (обратно, для покупки {for_sym}): продаём часть доливки «кэш → ядро (3 дня без подходящих "
+                                   f"монет)» — {c} −{sc / V * 100:.1f}% счёта (решение владельца 28.10).", None))
+            rp._set_cash(rp.cash() - sc * P["fee"])
+            rp._set_meta(f"idle_q:{c}", max(0.0, (rp._meta(f"idle_q:{c}") or 0.0) - sc / price[c]))
+            done += sc
+        return done
+
+    def _idle_cash(self, now: int, price: dict, live: set, eligible_seen: bool) -> list[dict]:
+        """the 3-day clock (meta idle_since) and the move of the cash above the floor into the core in the plan proportions"""
+        rp, P = self.rp, IDEAS
+        V = self.value(price)
+        if not V:
+            return []
+        excess = rp.cash() - P["min_cash"] * V
+        since = rp._meta("idle_since") or 0.0
+        if eligible_seen or excess < P["idle_min"] * V:
+            if since:
+                rp._set_meta("idle_since", 0.0)
+            return []
+        if not since:
+            rp._set_meta("idle_since", now)       # the clock starts at the first run that sees idle cash (no back-dating)
+            return []
+        if now - since < P["idle_days"] * DAY or any(c not in live or not price.get(c) for c in self.IDLE_CORE):
+            return []
+        core = {c: core_target(c) for c in self.IDLE_CORE}
+        tot = sum(core.values())
+        held = {p["symbol"]: p for p in rp.positions()}
+        out = []
+        days = (now - since) / DAY
+        for c, t in core.items():
+            add = excess * t / tot / (1 + P["fee"])
+            px = price[c]
+            why = (f"Кэш → ядро (3 дня без подходящих монет): кэш выше {P['min_cash'] * 100:.0f}% уже {days:.1f} дн., ни одна монета не "
+                   f"проходит правила покупки — {c} +{add / V * 100:.1f}% счёта по плану BTC 30 / ETH 10 / SOL 5 (решение владельца 28.10). "
+                   "Подходящую монету портфель оплатит сначала этой доливкой.")
+            p = held.get(c)
+            if p and p.get("entry"):
+                out.append(rp._act(now, c, "ADD", p["weight"] + add, px, why, p["bucket"]))
+            else:
+                out.append(rp._act(now, c, "BUY", add, px, why, "core:buy"))
+                rp._set_meta(f"px:{c}", px)
+            rp._set_cash(rp.cash() - add * P["fee"])
+            rp._set_meta(f"idle_q:{c}", (rp._meta(f"idle_q:{c}") or 0.0) + add / px)
+        rp._set_meta("idle_since", 0.0)
+        return out
+
+    def _cooldown_lift(self, now: int, s: str, st: str | None) -> str | None:
+        """28.10 (owner): the 14-day pause after a TABLE sale («Таблица поставила «не брать»») is lifted when the table says «можно
+        брать / добрать» again — at most once per pause. Returns the line for the buy's reason, or None (the pause stays)."""
+        rp, P = self.rp, IDEAS
+        if st not in ("buy", "add"):
+            return None
+        row = self.conn.execute(f"SELECT time, reason FROM {rp.T_ACT} WHERE symbol=? AND action='SELL' ORDER BY time DESC LIMIT 1",
+                                (s,)).fetchone()
+        if not row or not str(row[1] or "").startswith("Таблица поставила «не брать»"):
+            return None
+        if (rp._meta(f"cool_lift:{s}") or 0.0) >= row[0]:
+            return None                           # already lifted once after this sale
+        d = datetime.fromtimestamp(row[0] / 1000, tz=timezone.utc).strftime("%d.%m")
+        return (f"14-дневная пауза снята: монету продали {d} по «не брать» таблицы, а таблица снова пишет «можно брать» "
+                "(решение владельца 28.10).")
 
     def _topup_housekeeping(self, price: dict, btc_bull) -> None:
         """The raised plan of a topped-up core coin ends when its price is back at the average entry or the BTC regime flips."""
@@ -896,4 +1041,16 @@ class IdeasPortfolio:
                 "ideas": {"asof": (ideas or {}).get("asof"), "fresh": fresh, "note_ru": note,
                           "summary_ru": (ideas or {}).get("summary_ru") if fresh else None},
                 "not_bought": not_bought,
+                "idle_cash": self._idle_info(price, V, now),
                 "started": int(started) if started else None, "last_weekly": int(last_weekly) if last_weekly else None}
+
+    def _idle_info(self, price: dict, V: float, now: int) -> dict:
+        """28.10: the idle-cash rule's state for the panel — since when the cash is idle, when the move is due, the core top-up now"""
+        rp, P = self.rp, IDEAS
+        since = rp._meta("idle_since") or 0.0
+        extra = {c: round((rp._meta(f"idle_q:{c}") or 0.0) * (price.get(c) or 0.0) / V * 100, 2) for c in self.IDLE_CORE
+                 if rp._meta(f"idle_q:{c}")}
+        return {"since": int(since) if since else None, "due": int(since + P["idle_days"] * DAY) if since else None,
+                "core_extra_pct": extra, "core_extra_total_pct": round(sum(extra.values()), 2),
+                "rule_ru": "Кэш выше 10% три полных дня без подходящих монет → кэш сверх 10% в ядро BTC / ETH / SOL (30 / 10 / 5); "
+                           "новая подходящая монета оплачивается сначала этой доливкой (решение владельца 28.10)."}

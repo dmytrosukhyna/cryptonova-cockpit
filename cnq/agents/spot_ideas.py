@@ -592,7 +592,8 @@ def evaluate(sym: str, s: dict, ctx: dict) -> dict:
            "score": int(score), "why_ru": _clip(why[:1].upper() + why[1:]), "info_ru": " ".join(sent), "in_portfolios": held,
            "price": price, "chg7": round(chg7, 2) if chg7 is not None else None,
            "from_high30_pct": hi30, "high30_basis": hi30_basis, "rating": int(R) if R is not None else None,
-           "consultant": cons, "meme_quality": int(M) if M is not None else None, "checks": checks}
+           "consultant": cons, "meme_quality": int(M) if M is not None else None, "checks": checks,
+           "decided": dkey}            # 28.10: the check that decided the status («stop» = another portfolio at its stop)
     if card.get("image"):
         row["image"] = card["image"]
     if links:
@@ -648,7 +649,7 @@ def build(inp: dict, now: int | None = None) -> dict:
             "rows": rows,
             # every evaluated coin, not only the 30 shown rows — «По рекомендациям» sells by status even when a coin left the table
             "statuses": {r["symbol"]: {"status": r["status"], "status_ru": r["status_ru"], "why_ru": r["why_ru"], "kind": r["kind"],
-                                       "price": r["price"]} for r in sorted(allrows, key=lambda r: r["symbol"])}}
+                                       "price": r["price"], "decided": r.get("decided")} for r in sorted(allrows, key=lambda r: r["symbol"])}}
 
 
 def run(web_dir: str = "web", now: int | None = None) -> dict:

@@ -975,3 +975,132 @@ def test_ideas_owner_trusted_coin_bought_small_while_the_table_waits():
     src2["cg"]["HYPE"] = 78.0
     st2 = sp.IdeasPortfolio(sqlite3.connect(":memory:")).step(src2, _ideas(rows2, T0 - 1_800_000), T0)
     assert "HYPE" not in {p["symbol"] for p in st2["positions"]}
+
+
+# ── 28.10 owner decisions: another portfolio's stop = «не добирать»; the cooldown lift; idle cash → core ─────────────────────
+CROSS = "Наш портфель «Умеренный» у стопа (−13%) — не добираем"
+
+
+def _small_world():
+    rows = [_irow("BTC", "buy", 80000, "core"), _irow("ETH", "buy", 2400, "core"), _irow("SOL", "buy", 100, "core"),
+            _irow("A1", "buy", 10.0)]
+    cg = {r["symbol"]: r["price"] for r in rows}
+    return rows, {"cg": cg, "meme": {}, "hl": {}}
+
+
+def test_ideas_another_portfolios_stop_means_do_not_add_not_sell():
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows, T0), T0)
+    rows1 = copy.deepcopy(rows)
+    _set(rows1, "A1", status="avoid", status_ru="не брать", why_ru=CROSS)
+    _set(rows1, "A2", status="avoid", status_ru="не брать", why_ru="Оборот $3M в сутки — цену легко сдвинуть")
+    st = port.step(src, _ideas(rows1, T0 + DAY), T0 + DAY)
+    sells = {a["symbol"] for a in st["actions"] if a["action"] == "SELL"}
+    assert "A1" not in sells and "A2" in sells                                     # the table's own «не брать» still sells
+    a1 = {p["symbol"]: p for p in st["positions"]}["A1"]
+    assert a1["reco"]["k"] == "hold" and a1["reco"]["t"] == "Не добирать"
+    # the new field from spot_ideas works the same as the text
+    rows2 = copy.deepcopy(rows1)
+    _set(rows2, "A1", why_ru="другая формулировка", decided="stop")
+    assert sp.cross_stop({"status": "avoid", "decided": "stop"}) and not sp.cross_stop({"status": "avoid", "decided": "vol"})
+    st = port.step(src, _ideas(rows2, T0 + DAY + 3_600_000), T0 + DAY + 3_600_000)
+    assert "A1" not in {a["symbol"] for a in st["actions"] if a["action"] == "SELL"}
+    # its own stop −20 % still sells
+    src2 = copy.deepcopy(src)
+    src2["cg"]["A1"] *= 0.79
+    st = port.step(src2, _ideas(rows2, T0 + DAY + 7_200_000), T0 + DAY + 7_200_000)
+    a1s = [a for a in st["actions"] if a["symbol"] == "A1" and a["action"] == "SELL"]
+    assert len(a1s) == 1 and a1s[0]["reason"].startswith("Стоп −20%")
+
+
+def test_ideas_monday_review_still_sells_under_another_portfolios_stop():
+    rows, src = ideas_world()
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    port.step(src, _ideas(rows, T0), T0)                                            # Wednesday 14.10
+    rows1, src1 = copy.deepcopy(rows), copy.deepcopy(src)
+    _set(rows1, "A3", status="avoid", status_ru="не брать", why_ru=CROSS)
+    src1["cg"]["A3"] *= 0.88                                                        # −12 %
+    st = port.step(src1, _ideas(rows1, T0 + 4 * DAY), T0 + 4 * DAY)                 # Sunday: kept
+    assert "A3" not in {a["symbol"] for a in st["actions"] if a["action"] == "SELL"}
+    mon = T0 + 5 * DAY + 3_600_000
+    st = port.step(src1, _ideas(rows1, mon), mon)
+    assert {a["symbol"] for a in st["actions"] if a["action"] == "SELL"} == {"A3"}
+
+
+def test_ideas_table_sale_pause_is_lifted_when_the_table_buys_again_once():
+    rows, src = _small_world()
+    rows.append(_irow("A2", "buy", 20.0))
+    src["cg"]["A2"] = 20.0
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    port.step(src, _ideas(rows, T0), T0)
+    rows1 = copy.deepcopy(rows)
+    _set(rows1, "A1", status="avoid", status_ru="не брать", why_ru="Оборот $3M в сутки — цену легко сдвинуть")
+    src2 = copy.deepcopy(src)
+    src2["cg"]["A2"] *= 0.79                                                        # A2: its own stop
+    st = port.step(src2, _ideas(rows1, T0 + DAY), T0 + DAY)
+    assert {"A1", "A2"} <= {a["symbol"] for a in st["actions"] if a["action"] == "SELL"}
+    _set(rows1, "A1", status="buy", status_ru="можно брать", why_ru="A1: можно брать")
+    _set(rows1, "A2", price=src2["cg"]["A2"])
+    st = port.step(src2, _ideas(rows1, T0 + 2 * DAY), T0 + 2 * DAY)
+    buys = {a["symbol"]: a["reason"] for a in st["actions"] if a["action"] == "BUY"}
+    assert "A1" in buys and "пауза снята" in buys["A1"] and "решение владельца 28.10" in buys["A1"]
+    assert "A2" not in buys and "снова не раньше" in {x["symbol"]: x["why_ru"] for x in st["not_bought"]}["A2"]   # a stop keeps the pause
+    # sold by the table again → a new pause → lifted once more; «на небольшую сумму» never lifts it
+    _set(rows1, "A1", status="avoid", status_ru="не брать", why_ru="Оборот $3M в сутки — цену легко сдвинуть")
+    port.step(src2, _ideas(rows1, T0 + 3 * DAY), T0 + 3 * DAY)
+    assert port._cooldown_lift(T0 + 3 * DAY + 1, "A1", "small") is None
+    _set(rows1, "A1", status="buy", status_ru="можно брать", why_ru="A1: можно брать")
+    st = port.step(src2, _ideas(rows1, T0 + 4 * DAY), T0 + 4 * DAY)
+    assert "A1" in {a["symbol"] for a in st["actions"] if a["action"] == "BUY"}
+    # the same pause is lifted only once: a lift already recorded after the last table sale → None
+    assert port._cooldown_lift(T0 + 4 * DAY + 1, "A1", "buy") is None
+
+
+def test_ideas_idle_cash_goes_to_the_core_after_three_full_days_and_back_for_a_new_coin():
+    rows, src = _small_world()
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    st = port.step(src, _ideas(rows, T0), T0)                                       # buys BTC 30 / ETH 10 / SOL 5 / A1 7.5 → cash ≈ 47 %
+    assert st["cash_pct"] > 40 and st["idle_cash"]["since"] is None                  # buys happened this run → not idle
+    t1 = T0 + 3_600_000
+    st = port.step(src, _ideas(rows, t1), t1)
+    assert st["idle_cash"]["since"] == t1 and st["idle_cash"]["due"] == t1 + 3 * DAY and not st["actions"]   # the clock starts, no back-dating
+    st = port.step(src, _ideas(rows, t1 + 3 * DAY - 60_000), t1 + 3 * DAY - 60_000)
+    assert not [a for a in st["actions"] if "Кэш → ядро" in (a["reason"] or "")]        # not yet 3 full days
+    t2 = t1 + 3 * DAY + 60_000
+    st = port.step(src, _ideas(rows, t2), t2)
+    moves = {a["symbol"]: a for a in st["actions"] if a["reason"].startswith("Кэш → ядро (3 дня без подходящих монет)")}
+    assert set(moves) == {"BTC", "ETH", "SOL"} and all(a["action"] == "ADD" for a in moves.values())
+    by = {p["symbol"]: p for p in st["positions"]}
+    extra = st["idle_cash"]["core_extra_pct"]
+    assert abs(extra["BTC"] / extra["ETH"] - 3) < 0.01 and abs(extra["ETH"] / extra["SOL"] - 2) < 0.01        # 30 / 10 / 5
+    assert 9.9 <= port.rp.cash() / (st["index"] / 100) * 100 <= 10.1 and st["idle_cash"]["since"] is None
+    assert by["BTC"]["weight"] > 0.30 + 0.20 and by["A1"]["weight"] < 0.08
+    # the Monday trim of the core never undoes the idle top-up
+    mon = T0 + 5 * DAY + 3_600_000                                                   # Monday 19.10 (t2 is Saturday 17.10)
+    st = port.step(src, _ideas(rows, mon), mon)
+    assert not [a for a in st["actions"] if a["action"] == "TRIM"]
+    # a newly eligible coin: the top-up pays first («Ядро → кэш»), then the coin is bought; cash stays at the floor
+    rows2 = rows + [_irow("A2", "buy", 20.0)]
+    src2 = copy.deepcopy(src)
+    src2["cg"]["A2"] = 20.0
+    st = port.step(src2, _ideas(rows2, mon + 3_600_000), mon + 3_600_000)
+    acts = [(a["symbol"], a["action"], a["reason"]) for a in st["actions"]]
+    trims = [x for x in acts if x[1] == "TRIM" and x[2].startswith("Ядро → кэш (обратно, для покупки A2)")]
+    assert {x[0] for x in trims} == {"BTC", "ETH", "SOL"} and ("A2", "BUY") in {(x[0], x[1]) for x in acts}
+    assert acts.index(trims[0]) < [i for i, x in enumerate(acts) if x[:2] == ("A2", "BUY")][0]                # sells first
+    assert port.rp.cash() >= 0.10 * st["index"] / 100 - 1e-6
+    assert abs(st["idle_cash"]["core_extra_total_pct"] - (sum(extra.values()) - 7.5)) < 0.3
+
+
+def test_ideas_an_eligible_coin_blocked_by_cash_or_a_stale_table_is_not_idle():
+    rows, src = _small_world()
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    port.step(src, _ideas(rows, T0), T0)
+    t1 = T0 + 3_600_000
+    port.step(src, _ideas(rows, t1), t1)
+    st = port.step(src, _ideas(rows, t1 - 4 * 3_600_000), t1 + 3 * DAY + 60_000)      # the table is 4 h old → no buys, the clock waits
+    assert not st["actions"] and st["idle_cash"]["since"] == t1
+    st = port.step(src, _ideas(rows, t1 + 3 * DAY + 120_000), t1 + 3 * DAY + 120_000)
+    assert {a["symbol"] for a in st["actions"] if "Кэш → ядро" in a["reason"]} == {"BTC", "ETH", "SOL"}

@@ -7,7 +7,10 @@ on:
                    "web/calendar.json", "web/quality.json", "web/altseason.json", "web/app_home.json", "web/app_btc.json",
                    "web/app_home.en.json", "web/app_home.uk.json", "web/app_home.el.json", "web/app_home.es.json",
                    "web/conveyor.json", "web/risk.json", "web/desk_select.json", "data/desk_select.jsonl",
-                   "web/scorecard.json", "data/scorecard_ledger.jsonl", "data/scorecard_outcomes.jsonl", "data/scorecard/**"]
+                   "web/scorecard.json", "data/scorecard_ledger.jsonl", "data/scorecard_outcomes.jsonl", "data/scorecard/**",
+                   # 28.10: the engine pushes these too (cnq/engine.py OWNED since 22.10) — without them every engine sync (~3 min) restarted
+                   # this whole pipeline: ~250 runs a day instead of ~50–100, each saving another ~100 MB state cache
+                   "web/okx_signal.json", "web/buy_now.json"]
   schedule:
     - cron: "*/30 * * * *"      # данные + отдел новостей каждые 30 минут (UTC)
     - cron: "13,43 * * * *"     # второе расписание со сдвигом: GitHub часто задерживает/пропускает запуски, два шанса в полчаса
@@ -40,6 +43,9 @@ jobs:
           restore-keys: |
             cnq-state-
             cnq-db-
+      - name: State guard — the spot portfolio never runs on a rolled-back database (23.10 incident, scripts/ci_state_guard.py)
+        id: state
+        run: python scripts/ci_state_guard.py
       - name: Pillow for post charts, edge-tts for the spoken brief
         run: pip install -q pillow edge-tts gtts
       - name: Server engine alive? (web/engine.json fresher than 10 min → its desks are skipped here; quiet → taken back)
@@ -138,6 +144,7 @@ jobs:
         timeout-minutes: 5
         run: python -m cnq.cli whalestudy --out web
       - name: Spot portfolio department → web/portfolio.json
+        if: ${{ steps.state.outputs.stale != 'true' }}      # 28.10: never on a rolled-back database — the real OKX account mirrors this model
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

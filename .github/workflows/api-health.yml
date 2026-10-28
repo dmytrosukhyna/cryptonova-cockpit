@@ -45,6 +45,9 @@ jobs:
             nw=$(curl -sS -m 20 "https://app.crypto-capital.app/v2/home?lang=$l" | jq -c '[(.news // [])[] | {asset, direction, magnitude, title, meaning}]' 2>/dev/null || echo "not JSON")
             echo "::notice title=news $l::$(echo "$nw" | cut -c1-3800)"
           done
+          # 28.10 (build 46): the PUBLIC mode's real account, the market in plain words, the spot actions, the demo stats
+          b46=$(curl -sS -m 20 'https://app.crypto-capital.app/v2/home?lang=ru' | jq -c '{pp: (.public_portfolio | if . then {since, start_usd, value_usd, pnl_usd, stale, day: .periods.day, spot_day: .spot.periods.day.available, fut_open: .futures.open_n, fut_stats: .futures.stats, actions: (.actions | length), last: (.actions[0].text // null)} else null end), mv: (.market_view | if . then {now, short, system} else null end), spot_actions: ((.spot.actions // []) | length), demo_stats: .futures.stats}' 2>/dev/null || echo "not JSON")
+          echo "::notice title=build 46 home::$(echo "$b46" | cut -c1-3800)"
           el=$(curl -sS -m 20 -w '\n%{http_code}' 'https://app.crypto-capital.app/v2/feed/nova?lang=el' || printf '{}\n000')
           code=$(echo "$el" | tail -n 1)
           summary=$(echo "$el" | sed '$d' | jq -c '{lang, greeting: ((.greeting // "") | .[0:90]), greeting_vip: ((.greeting_vip // "") | .[0:90]), suggest: ((.suggest // []) | .[0:3]), topics: [(.topics // [])[] | "\(.title) (\(.qs | length))"]}' 2>/dev/null || echo "not JSON")

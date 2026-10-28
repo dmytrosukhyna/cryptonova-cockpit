@@ -874,7 +874,9 @@ REAL_KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct
 REAL_ALLOC = ("spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_usd", "fut_reserve_usd", "active_coins_usd",
               "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct")
 REAL_STALE_MS = 2 * 3_600_000
-REAL_OPT = ("copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd")       # 22.10 (build 45): null in a file from before
+REAL_OPT = ("copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd",      # 22.10 (build 45): null in a file from before
+            "closed", "fut_curve", "actions")                         # 28.10 (build 46)
+REAL_FUT = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason", "mark", "lev", "opened", "sig")
 
 
 def _public_real(out: str, now: int) -> dict | None:
@@ -890,11 +892,196 @@ def _public_real(out: str, now: int) -> dict | None:
     r = {k: d[k] for k in REAL_KEYS}
     r.update({k: d.get(k) for k in REAL_OPT})
     r["spot"] = [{k: x.get(k) for k in ("sym", "share", "usd", "copy", "copy_reason", "copy_pct")} for x in d.get("spot") or [] if isinstance(x, dict)]
-    r["futures"] = [{k: x.get(k) for k in ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason")}
-                    for x in d.get("futures") or [] if isinstance(x, dict)]
+    r["futures"] = [{k: x.get(k) for k in REAL_FUT} for x in d.get("futures") or [] if isinstance(x, dict)]
+    for k in ("closed", "fut_curve", "actions"):
+        r[k] = [x for x in r.get(k) or [] if isinstance(x, (dict, list))]
     r["alloc"] = {k: d["alloc"].get(k) for k in REAL_ALLOC} if isinstance(d.get("alloc"), dict) else None
     r["stale"] = bool(d.get("stale")) or now - int(d["asof"]) > REAL_STALE_MS
     return r
+
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# 28.10 (build 46, owner: «публичная история начинается 22 октября 2026 года, когда подключили $10 000 … удалить из публичного
+# представления портфель с датой 17 октября и суммой $20 000»). Where that portfolio came from: app_home "public" — the closed
+# system's header, the two $10 000 DEMO accounts (futures + spot) from 17.10 (base_usd = $20 000), which build 44 made «the public
+# portfolio». It stays in the feed untouched (older builds and the DEMO mode read it, as the system's demo history); the PUBLIC mode
+# of build 46 reads "public_portfolio" — the real CRYPTO NOVA account on OKX only (web/public_real.json, since 22.10), with every
+# number from that one file and its one asof:
+#   value / result / today; curve [[t, $ value]]; periods {day (since 00:00 UTC), week (7 days), month (30 days), all (the start)}:
+#   {from, clipped (the period starts before the history), available, base_usd (the value at «from»), usd, pct = usd / base};
+#   alloc: groups (where the dollars are: spot coins, spot dollars, active spot, futures in trades / reserve, other — they add up to
+#   the value), categories (core BTC/ETH/SOL, other coins, USDT), assets; spot / futures: the part of the starting capital the
+#   system gives each (okx_alloc shares) as the base, the result from OKX (fut_pnl_usd: closed P/L incl. fees and funding + open),
+#   spot = the rest; their periods from fut_curve (kept from 28.10 on — before that only «all»); futures.open with the desk's own
+#   «why» (by the desk trade id the position mirrors), futures.closed (OKX history; a partly closed position stays under «open»)
+#   and stats; actions — the autopilot's own filled orders in plain words. Nothing is back-filled, nothing invented.
+PP_PERIODS = (("day", None), ("week", 7), ("month", 30), ("all", 0))
+PP_GROUPS = ("spot_coins", "spot_cash", "active_coins", "active_wait", "fut_margin", "fut_reserve", "other")
+CORE = {"BTC", "ETH", "SOL"}
+DAY_MS = 86_400_000
+
+
+def _usd_text(x: float, lang: str) -> str:
+    """$10 097,45 (ru / uk / el / es) · $10,097.45 (en) — the money format of the texts"""
+    s = f"{abs(float(x)):,.2f}"
+    if lang != "en":
+        s = s.replace(",", "\u00a0").replace(".", ",")
+    return ("−" if float(x) < 0 else "") + "$" + s
+
+
+def _date_text(ms: int, lang: str) -> str:
+    d = dt.datetime.fromtimestamp(int(ms) / 1000, _kyiv())
+    if lang == "en":
+        return f"{d.day} {('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')[d.month - 1]} {d.year}"
+    return f"{d:%d.%m.%Y}"
+
+
+def _at(curve: list, x: int):
+    """the last result at or before x (the curve is a step: a point holds until the next one); None before the first point"""
+    v = None
+    for t_, r in curve:
+        if t_ > x:
+            break
+        v = r
+    return v
+
+
+def _periods(curve: list, res_now, base, since: int, now: int, known_from: int | None = None) -> dict:
+    """{day, week, month, all}: the change of the result over the period and its % of the value at the period's start"""
+    day0 = now - now % DAY_MS
+    out = {}
+    for key, days in PP_PERIODS:
+        frm = day0 if days is None else since if days == 0 else now - days * DAY_MS
+        eff = max(frm, since)
+        ref = 0.0 if eff <= since else (None if known_from is None or eff < known_from else _at(curve, eff))
+        ok = ref is not None and res_now is not None and base is not None
+        b = (base + ref) if ok else None
+        out[key] = {"from": int(eff), "clipped": frm < since, "available": ok, "base_usd": _r(b),
+                    "usd": _r(res_now - ref) if ok else None, "pct": _r((res_now - ref) / b * 100) if ok and b else None}
+    return out
+
+
+def _desk_trade(paper: dict, sig: str | None) -> tuple[dict | None, str, dict]:
+    """the desk trade a real position mirrors («bal:<id>»): (trade, desk key, desk) — open first, then closed"""
+    if not sig or ":" not in sig:
+        return None, "", {}
+    k, tid = sig.split(":", 1)
+    prof = paper.get("profiles") or {}
+    desk = prof.get(k) or (paper if k == "bal" else {})
+    for o in list(desk.get("open") or []) + list(desk.get("closed") or []):
+        if str(o.get("id")) == tid:
+            return o, k, desk
+    return None, k, desk
+
+
+def _pp_action(a: dict, lang: str) -> str:
+    k, sym = a["kind"], a["sym"]
+    side = t(lang, "pp.side.long" if a.get("side") == "long" else "pp.side.short") if a.get("side") in ("long", "short") else ""
+    if k.startswith(("spot_", "active_")):
+        return t(lang, f"pp.a.{k}", sym=sym, usd=_usd_text(a["usd"], lang)) if a.get("usd") else t(lang, f"pp.a.{k}", sym=sym, usd="—")
+    if k == "fut_open":
+        return t(lang, "pp.a.fut_open", sym=sym, side=side, px=_price(a["px"])) if a.get("px") else t(lang, "pp.a.fut_open0", sym=sym, side=side)
+    if k == "fut_close":
+        return t(lang, "pp.a.fut_close", sym=sym, px=_price(a["px"])) if a.get("px") else t(lang, "pp.a.fut_close0", sym=sym)
+    return t(lang, f"pp.a.{k}", sym=sym)
+
+
+def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAULT) -> dict | None:
+    if not real or not real.get("since") or real.get("equity_usd") is None:
+        return None
+    since, s0, eq, pnl = int(real["since"]), float(real.get("start_usd") or 0), float(real["equity_usd"]), real.get("pnl_usd")
+    asof = int(real["asof"])
+    curve = sorted((int(p[0]), float(p[1])) for p in real.get("curve") or [] if isinstance(p, list) and len(p) == 2 and p[1] is not None)
+    al = real.get("alloc") or {}
+    # ---- allocation: one file, one asof
+    groups = []
+    for g in PP_GROUPS:
+        v = al.get(f"{g}_usd")
+        if isinstance(v, (int, float)) and v > 0.005:
+            groups.append({"key": g, "name": t(lang, f"pp.g.{g}"), "usd": _r(v), "share": _r(v / eq * 100 if eq else None)})
+    assets = [{"sym": x["sym"], "usd": x.get("usd"), "share": x.get("share"), "kind": "core" if x["sym"] in CORE else "alt",
+               "copy": x.get("copy")} for x in real.get("spot") or [] if x.get("sym")]
+    if real.get("usdt_usd") is not None:
+        assets.append({"sym": "USDT", "usd": real["usdt_usd"], "share": real.get("usdt_pct"), "kind": "cash", "copy": None})
+    cats = []
+    for c in ("core", "alt", "cash"):
+        v = sum(float(a["usd"] or 0) for a in assets if a["kind"] == c)
+        if v > 0.005:
+            cats.append({"key": c, "name": t(lang, f"pp.c.{c}"), "usd": _r(v), "share": _r(v / eq * 100 if eq else None)})
+    # ---- the spot and futures parts: the base = their share of the starting capital, the result from OKX
+    fut_share = al.get("fut_pct")
+    spot_share = (al.get("spot_pct") or 0) + (al.get("active_pct") or 0) if al.get("spot_pct") is not None else None
+    fcurve = sorted((int(p[0]), float(p[1])) for p in real.get("fut_curve") or [] if isinstance(p, list) and len(p) == 2 and p[1] is not None)
+    tot = dict(curve)
+    scurve = [(t_, tot[t_] - v) for t_, v in fcurve if t_ in tot]
+    split_from = fcurve[0][0] if fcurve else None
+    fpnl, spnl = real.get("fut_pnl_usd"), real.get("spot_pnl_usd")
+
+    def part(share, res, crv, key):
+        if share is None:
+            return None
+        base = s0 * float(share) / 100
+        return {"share_pct": _r(share), "start_usd": _r(base), "pnl_usd": _r(res), "value_usd": _r(base + res) if res is not None else None,
+                "pct": _r(res / base * 100) if res is not None and base else None, "since": since,
+                "base_note": t(lang, f"pp.base.{key}", share=_dec(float(share), lang), usd=_usd_text(base, lang)),
+                "curve": [[t_, _r(base + v)] for t_, v in _sample_keep_last(crv, PUB_CURVE_N)] if crv else [],
+                "periods": _periods(crv, res, base, since, asof, split_from)}
+    spot = part(spot_share, spnl, scurve, "spot")
+    fut = part(fut_share, fpnl, fcurve, "fut")
+    holdings = sum(float(al.get(f"{k}_usd") or 0) for k in ("spot_coins", "spot_cash", "active_coins", "active_wait"))
+    if spot is not None:
+        spot.update({"holdings_usd": _r(holdings),
+                     "coins": [{**a, "share_spot": _r(float(a["usd"] or 0) / holdings * 100) if holdings else None}
+                               for a in assets if a["kind"] != "cash"],
+                     "cash_usd": _r((al.get("spot_cash_usd") or 0) + (al.get("active_wait_usd") or 0))})
+    # ---- futures: open (with the desk's own «why»), closed (OKX history), stats
+    open_rows, open_inst = [], set()
+    for x in real.get("futures") or []:
+        inst = str(x.get("inst") or "")
+        open_inst.add(inst)
+        row = {"sym": inst.split("-")[0], "inst": inst, "side": str(x.get("side") or "").upper(), "entry": x.get("entry"),
+               "price": x.get("mark"), "stop": x.get("stop"), "target": x.get("target"), "pnl_usd": x.get("upnl_usd"),
+               "move_pct": x.get("upnl_pct"), "lev": x.get("lev"), "opened": x.get("opened"), "copy": x.get("copy"),
+               "status": "open", "sig": x.get("sig"), "closed_part_usd": None}
+        o, k, desk = _desk_trade(paper, x.get("sig"))
+        if o:
+            d = _open_row(o, k, desk, now, lang)
+            row.update({kk: d.get(kk) for kk in ("why", "why_title", "src_ru", "checks", "history")})
+        open_rows.append(row)
+    closed, part_open = [], {}
+    for c in real.get("closed") or []:
+        if c.get("partial") and c.get("inst") in open_inst:          # never one trade both open and closed
+            part_open[c["inst"]] = part_open.get(c["inst"], 0.0) + float(c.get("pnl_usd") or 0)
+            continue
+        closed.append({"sym": str(c.get("inst") or "").split("-")[0], **{k: c.get(k) for k in ("inst", "open_px", "close_px",
+                       "move_pct", "pnl_usd", "lev", "opened", "closed", "partial")}, "side": str(c.get("side") or "").upper() or None})
+    for r_ in open_rows:
+        if r_["inst"] in part_open:
+            r_["closed_part_usd"] = _r(part_open[r_["inst"]])
+    upl = sum(float(x.get("upnl_usd") or 0) for x in real.get("futures") or [])
+    n = int(real.get("closed_n") or 0)
+    realized = _r(fpnl - upl) if fpnl is not None else None
+    wins = sum(1 for c in closed if (c["pnl_usd"] or 0) > 0)
+    losses = sum(1 for c in closed if (c["pnl_usd"] or 0) < 0)
+    stats = {"n": n, "listed": len(closed), "complete": len(closed) + len(part_open) >= n, "wins": wins, "losses": losses,
+             "win_rate": _r(wins / len(closed) * 100, 1) if closed else None, "realized_usd": realized,
+             "avg_usd": _r(realized / n) if realized is not None and n else None,
+             "realized_pct_start": _r(realized / s0 * 100) if realized is not None and s0 else None, "since": since}
+    if fut is not None:
+        fut.update({"open": open_rows, "open_n": len(open_rows), "open_pnl_usd": _r(upl), "closed": closed, "stats": stats,
+                    "running": not real.get("stale")})
+    acts = [{**{k: a.get(k) for k in ("t", "kind", "sym", "side", "usd", "px")}, "text": _pp_action(a, lang)}
+            for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
+    return {"kind": "real", "exchange": real.get("exchange") or "OKX", "title": t(lang, "pp.title"), "since": since,
+            "start_usd": _r(s0), "value_usd": _r(eq), "pnl_usd": _r(pnl), "pnl_pct": real.get("pnl_pct"),
+            "today_usd": real.get("today_usd"), "today_pct": real.get("today_pct"), "asof": asof, "stale": bool(real.get("stale")),
+            "note": t(lang, "pp.note", d=_date_text(since, lang), usd=_usd_text(s0, lang)),
+            "stale_note": t(lang, "pp.stale") if real.get("stale") else None,
+            "split_note": t(lang, "pp.split_from", d=_date_text(split_from, lang)) if split_from and split_from > since else None,
+            "copy_url": real.get("copy_url"), "copiers": real.get("copiers"),
+            "curve": [[t_, _r(s0 + v)] for t_, v in curve], "periods": _periods(curve, pnl, s0, since, asof, since),
+            "alloc": {"asof": asof, "value_usd": _r(eq), "groups": groups, "categories": cats, "assets": assets},
+            "spot": spot, "futures": fut, "actions": acts}
 
 
 def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT, ex: dict | None = None) -> dict:
@@ -907,8 +1094,14 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
     real = _public_real(out, now)
     if public is not None and real is not None:
         public["real"] = real
+    try:
+        pport = _real_portfolio(real, paper, now, lang)
+    except Exception as e:  # noqa: BLE001 — the feed never breaks because of the real account's file
+        print("app_home public_portfolio:", repr(e)[:200], flush=True)
+        pport = None
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
             "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub, "public": public,
+            "public_portfolio": pport,
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
             "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),

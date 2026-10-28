@@ -248,3 +248,86 @@ def test_actions_are_the_autopilots_own_filled_orders_without_ids():
     assert "ordId" not in text and "X2" not in text and "X1" not in text
     assert PR.actions(NOW + 10 ** 9) == []                                        # nothing before the start counts
     assert PR._tail(os.path.join(tempfile.mkdtemp(), "none.jsonl")) == []
+
+
+def _pp_files(d, real, paper=None):
+    c = _cases()[0]
+    p = paper or {**c["paper"], "profile_list": [{"key": "bal", "risk": 0.01, "max_open": 4}]}
+    for name, obj in (("paper.json", p), ("portfolio.json", {"portfolios": {"ideas": c["ideas"]}}), ("public_real.json", real)):
+        with open(os.path.join(d, name), "w", encoding="utf-8") as f:
+            json.dump(obj, f)
+
+
+def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
+    """28.10 (build 46): app_home "public_portfolio" = the real OKX account (web/public_real.json) — not the $20 000 demo header
+    from 17.10. Periods, allocation, the spot / futures parts and actions all come from that one file and add up."""
+    d = str(tmp_path)
+    H = 3_600_000
+    since = T0 + 100 * H
+    now = since + 6 * 24 * H + 5 * H
+    day0 = now - now % (24 * H)
+    curve = [[since, 0.0], [since + 24 * H, -40.0], [day0 - 2 * H, -60.0], [day0 + H, -50.0], [now - 60_000, -30.0]]
+    fcurve = [[day0 - 2 * H, -5.0], [day0 + H, -4.0], [now - 60_000, -2.0]]
+    paper = json.loads(json.dumps(_cases()[0]["paper"]))
+    paper["profiles"]["bal"]["open"].append({"id": "F-SOL-1", "symbol": "SOL", "side": "LONG", "grade": "F", "kind": "OI_FLUSH",
+                                             "entry": 200.0, "stop": 190.0, "tps": [230.0], "price": 201.0, "opened": since + H})
+    real = {"exchange": "OKX", "since": since, "start_usd": 10000.0, "equity_usd": 9970.0, "pnl_usd": -30.0, "pnl_pct": -0.3,
+            "today_usd": 30.0, "today_pct": 0.3, "spot": [{"sym": "BTC", "share": 40.0, "usd": 3988.0}, {"sym": "ZEC", "share": 10.0, "usd": 997.0}],
+            "usdt_pct": 50.0, "usdt_usd": 4985.0,
+            "alloc": {"spot_coins_usd": 4985.0, "spot_cash_usd": 1500.0, "fut_budget_usd": 2492.5, "fut_margin_usd": 100.0, "fut_reserve_usd": 2392.5,
+                      "active_coins_usd": 0.0, "active_wait_usd": 990.0, "other_usd": 2.5, "spot_pct": 65.0, "fut_pct": 25.0, "active_pct": 10.0},
+            "futures": [{"inst": "SOL-USDT-SWAP", "side": "long", "entry": 200.0, "stop": 190.0, "target": 230.0, "upnl_pct": 0.5,
+                         "upnl_usd": 1.5, "copy": False, "copy_reason": "ordinary", "mark": 201.0, "lev": 2.0, "opened": since + H, "sig": "bal:F-SOL-1"}],
+            "closed_n": 3, "curve": curve, "asof": now - 60_000, "stale": False, "copiers": 0, "copy_url": None, "spot_pnl_usd": -28.0,
+            "fut_pnl_usd": -2.0,
+            "closed": [{"inst": "SOL-USDT-SWAP", "side": "long", "open_px": 199.0, "close_px": 201.0, "move_pct": 1.01, "pnl_usd": 0.5,
+                        "lev": 2.0, "opened": since + H, "closed": since + 2 * H, "partial": True},
+                       {"inst": "APT-USDT-SWAP", "side": "long", "open_px": 0.77, "close_px": 0.78, "move_pct": 1.3, "pnl_usd": 2.0,
+                        "lev": 2.0, "opened": since, "closed": since + 3 * H, "partial": False},
+                       {"inst": "ETH-USDT-SWAP", "side": "short", "open_px": 4000.0, "close_px": 4100.0, "move_pct": -2.5, "pnl_usd": -6.0,
+                        "lev": 2.0, "opened": since, "closed": since + 4 * H, "partial": False}],
+            "fut_curve": fcurve,
+            "actions": [{"t": now - 2 * H, "kind": "fut_open", "sym": "SOL", "side": "long", "usd": None, "px": 200.0, "sig": "bal:F-SOL-1"},
+                        {"t": now - 3 * H, "kind": "spot_buy", "sym": "BTC", "side": None, "usd": 1234.5, "px": 80000.0, "sig": None}]}
+    _pp_files(d, real, paper)
+    doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
+    pp = doc["public_portfolio"]
+    assert pp["kind"] == "real" and pp["since"] == since and pp["start_usd"] == 10000.0 and pp["value_usd"] == 9970.0
+    assert doc["public"]["base_usd"] == 20000.0                       # the demo header stays as it was (older builds, DEMO mode)
+    assert "22" not in pp["title"] and pp["note"].startswith("Реальный счёт CRYPTO NOVA на OKX")
+    P = pp["periods"]
+    assert P["all"] == {"from": since, "clipped": False, "available": True, "base_usd": 10000.0, "usd": -30.0, "pct": -0.3}
+    assert P["day"]["from"] == day0 and P["day"]["usd"] == 30.0 and P["day"]["base_usd"] == 9940.0          # = today_usd
+    assert P["week"]["clipped"] and P["week"]["from"] == since and P["week"]["usd"] == -30.0               # 6 days of history
+    assert pp["curve"][0] == [since, 10000.0] and pp["curve"][-1] == [now - 60_000, 9970.0]
+    # the allocation: the groups add up to the value, the categories too, from the same file
+    al = pp["alloc"]
+    assert abs(sum(g["usd"] for g in al["groups"]) - 9970.0) < 0.01 and abs(sum(c["usd"] for c in al["categories"]) - 9970.0) < 0.01
+    assert [c["key"] for c in al["categories"]] == ["core", "alt", "cash"] and al["assets"][-1]["sym"] == "USDT"
+    # the parts: their bases are the system's shares of the starting capital; spot + futures = the whole result
+    S, F = pp["spot"], pp["futures"]
+    assert S["start_usd"] == 7500.0 and F["start_usd"] == 2500.0 and S["pnl_usd"] + F["pnl_usd"] == pp["pnl_usd"]
+    assert S["value_usd"] + F["value_usd"] == pp["value_usd"] and F["pct"] == round(-2.0 / 2500 * 100, 2)
+    assert F["periods"]["day"]["available"] and F["periods"]["day"]["usd"] == 3.0                 # −2 now vs −5 before 00:00
+    assert S["periods"]["day"]["usd"] == round(-28.0 - (-60.0 + 5.0), 2)                         # spot = total − futures
+    assert pp["split_note"] and S["curve"][-1] == [now - 60_000, 7500.0 - 28.0]
+    assert abs(sum(c["share_spot"] for c in S["coins"]) + (S["cash_usd"] / S["holdings_usd"] * 100) - 100) < 0.1
+    # futures: the open SOL with the desk's own «why», the partly closed SOL stays under «open», stats from the closed ones
+    (o,) = F["open"]
+    assert o["sym"] == "SOL" and o["price"] == 201.0 and o["lev"] == 2.0 and o["why"] and o["why_title"] and o["closed_part_usd"] == 0.5
+    assert [c["sym"] for c in F["closed"]] == ["APT", "ETH"] and F["closed"][1]["side"] == "SHORT"
+    st = F["stats"]
+    assert (st["n"], st["wins"], st["losses"], st["win_rate"], st["complete"]) == (3, 1, 1, 50.0, True)
+    assert st["realized_usd"] == -3.5 and st["avg_usd"] == round(-3.5 / 3, 2)                     # fut result − open P/L
+    # actions in plain words, in every language
+    assert pp["actions"][0]["text"] == "Открыта фьючерсная сделка SOL на рост (LONG) по цене 200.00; стоп сразу стоит на бирже."
+    assert pp["actions"][1]["text"] == "Куплено BTC на $1 234,50: спот-портфель приведён к плану системы."
+    en = json.load(open(os.path.join(d, "app_home.en.json"), encoding="utf-8"))["public_portfolio"]
+    assert en["actions"][1]["text"].startswith("Bought BTC for $1,234.50") and " Oct 2026 " in en["note"]
+    for lang in ("uk", "el", "es"):
+        other = json.load(open(os.path.join(d, f"app_home.{lang}.json"), encoding="utf-8"))["public_portfolio"]
+        assert other["periods"] == pp["periods"] and other["alloc"]["groups"][0]["usd"] == al["groups"][0]["usd"], lang
+        assert other["note"] != pp["note"] and other["actions"][0]["text"] != pp["actions"][0]["text"], lang
+    # no real file → no public portfolio (the app shows its empty state, never the demo numbers instead)
+    os.remove(os.path.join(d, "public_real.json"))
+    assert app_home.run(sqlite3.connect(":memory:"), d, now=now)["public_portfolio"] is None

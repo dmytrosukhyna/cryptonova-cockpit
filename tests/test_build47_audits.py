@@ -132,6 +132,8 @@ def test_buy_now_items_carry_their_real_state_never_recommended_when_watched(tmp
             assert x["status"] == st[x["sym"]][0] and x["status_ru"] and x["status_note"], (lang, x["sym"])
             assert not any(w in (x["status_ru"] + x["status_note"]).lower() for w in ("рекоменд", "recommend", "рекомендов", "recomend", "συνιστ"))
     assert "no earlier than 7 Nov" in {x["sym"]: x for x in _lang(d, "en")["buy_now"]["items"]}["NEAR"]["status_note"]
+    block = nova.Knowledge(os.path.join(ROOT, "data")).demo_block(doc)          # NOVA answers «почему не покупает BNB» from the same data
+    assert "кандидаты по графику из 40 монет, а не покупки" in block and "BTC — позиция открыта" in block and "BNB — условия не выполнены" in block
     # no fresh pipeline: nothing is guessed — the real account's coins are «open», the rest «watch» with the reason
     _w(d, "spot_pipeline.json", {"asof": now - 5 * H, "coins": []})
     st2 = {x["sym"]: x["status"] for x in app_home.run(sqlite3.connect(":memory:"), d, now=now)["buy_now"]["items"]}

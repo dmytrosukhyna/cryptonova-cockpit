@@ -95,7 +95,7 @@ LANG = {
            "levels": "«С нуля», «Инвестор», «Трейдер», «Продвинутый»", "name": "русский", "native": ""},
     "en": {"voice": "Голос мужской.",
            "how": "• По-английски (English): тепло и просто, обращение «you», очень простыми словами, можно пример из жизни. Числа — "
-                  "по-английски: десятичная точка (5.4%).",
+                  "по-английски: десятичная точка и тысячи через запятую (5.4%, $9,925).",
            "nfa": "“This is not financial advice”",
            "example": "“Look how far it has come: in 2010 someone paid 10 000 bitcoins for 2 pizzas, and in October 2025 one "
                       "bitcoin was worth $126 210! Now the world's biggest funds are buying bitcoin. But the price can also fall "
@@ -494,6 +494,11 @@ class Knowledge:
             la = s.get("last_action") or {}
             if la.get("text"):
                 out.append(f"  Последнее действие ({_date(la.get('t'))}): {clean_text(la['text'], 200)}")
+        bn = home.get("buy_now") or {}
+        if bn.get("items") and any(x.get("status_ru") for x in bn["items"]):     # build 47 (§12.1): the screen is not the buy list
+            out.append(f"• «Если покупать сегодня» — кандидаты по графику из {bn.get('checked')} монет, а не покупки; что с ними в "
+                       f"портфеле: " + "; ".join(f"{x.get('sym')} — {x.get('status_ru')} ({clean_text(x.get('status_note') or '', 120).rstrip('.')})"
+                                                for x in bn["items"][:5] if x.get("status_ru")) + ".")
         m = home.get("market") or {}
         btc = m.get("btc") or {}
         if btc.get("price"):

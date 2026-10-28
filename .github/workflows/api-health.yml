@@ -73,3 +73,31 @@ jobs:
             if [ -n "$u" ]; then r=$(curl -sS -m 40 -o rep_$l.bin -w '%{http_code} %{time_total}s %{size_download}B' "$u" || echo 000); else r="no audio_url"; fi
             echo "::notice title=report $l::$r · $u · $t"
           done
+
+  tts-code:
+    # 28.10 (build 46 #6): the server's own synthesis code (cnq/api/tts.py synth) against the real edge-tts and Microsoft's voices,
+    # on a runner — proves the code before / independently of the server's install
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q "edge-tts>=7"
+      - name: synth ru / en / uk / el / es
+        run: |
+          python - <<'PY'
+          import time
+          from cnq.api import tts
+          T = {"ru": "Публичный портфель CRYPTO NOVA сейчас — 9 886 долларов. Я NOVA AI.", "en": "The CRYPTO NOVA public portfolio is now at 9,886 dollars.",
+               "uk": "Публічний портфель CRYPTO NOVA зараз — 9 886 доларів.", "el": "Το δημόσιο χαρτοφυλάκιο του CRYPTO NOVA είναι τώρα στα 9 886 δολάρια.",
+               "es": "La cartera pública de CRYPTO NOVA está ahora en 9 886 dólares."}
+          for lang, text in T.items():
+              t0 = time.time()
+              try:
+                  b = tts.synth(text, lang)
+                  ok = b[:3] == b"ID3" or b[:2] in (b"\xff\xf3", b"\xff\xfb", b"\xff\xf2")
+                  print(f"::notice title=synth {lang}::{tts.VOICES[lang]} · {len(b)} bytes · mp3 {ok} · {time.time() - t0:.1f} s")
+              except Exception as e:
+                  print(f"::notice title=synth {lang}::FAILED {e}")
+          PY

@@ -1,54 +1,66 @@
 {
   "v": 1,
-  "updated": "2026-10-20",
+  "updated": "2026-10-28",
   "lang": "en",
-  "greeting": "Hi! I'm NOVA AI — your guide to the world of crypto. I'll explain everything in plain words: how CRYPTO NOVA's trades work, the bitcoin Piggy bank, and why the world is moving into crypto so fast. We're in demo mode — you have 5 questions a day. Type your question or pick one below.",
+  "greeting": "Hello! I'm NOVA AI, your assistant in the world of crypto. I'll help you understand how CRYPTO NOVA works, explain the portfolio's numbers and answer questions about crypto market basics. In demo mode you have 5 questions a day. Type your question or pick a topic below.",
   "greeting_vip": "Hi! I'm NOVA AI. Your real account is connected — now you have up to 100 questions a day. Ask me anything: about the system's trades, your account, the Piggy bank and the future of crypto. Type your question or pick one below.",
   "suggest": [
     "Is it safe?",
     "How much have I earned?",
     "How does CRYPTO NOVA work?",
-    "What is the Piggy bank and why bitcoin?",
-    "Why are there no trades right now?",
-    "What is leverage?",
-    "Why is everyone talking about the future of crypto?",
-    "What is a real account?"
+    "What is a real account?",
+    "How much does it cost?",
+    "What is a stablecoin?"
   ],
   "topics": [
     {
+      "id": "how",
+      "title": "How CRYPTO NOVA works",
+      "qs": [
+        "What is CRYPTO NOVA?",
+        "How does the public portfolio work?",
+        "How do you test strategies?",
+        "What if the system is wrong?"
+      ]
+    },
+    {
+      "id": "portfolio",
+      "title": "Portfolio & trades",
+      "qs": [
+        "What does a trade's result mean?",
+        "Why are there no trades right now?",
+        "What is “My demo account”?",
+        "What is a stop?"
+      ]
+    },
+    {
+      "id": "money",
       "title": "Money & safety",
       "qs": [
-        "Is this a scam?",
+        "How do I connect to the system?",
+        "What are the risks?",
         "Where is my money?",
-        "How do I withdraw money?",
-        "How much does it cost?"
+        "Is this a scam?"
       ]
     },
     {
-      "title": "How it works",
+      "id": "market",
+      "title": "Crypto & the market",
       "qs": [
-        "What is demo?",
-        "How do you test strategies?",
-        "What if the system is wrong?",
-        "Why the exchange and the referral link?"
-      ]
-    },
-    {
-      "title": "Crypto and the future",
-      "qs": [
-        "What is a bitcoin ETF?",
-        "What is stock tokenization?",
+        "What are spot and futures?",
+        "What is bitcoin?",
         "Is it too late to buy bitcoin?",
         "Bitcoin dropped — is this the end?"
       ]
     },
     {
+      "id": "learn",
       "title": "Learn",
       "qs": [
         "Where should I start learning?",
         "What are long and short?",
-        "What is a stop?",
-        "What is a stablecoin?"
+        "What is leverage?",
+        "What is the Piggy bank and why bitcoin?"
       ]
     }
   ]

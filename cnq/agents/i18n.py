@@ -582,21 +582,27 @@ T: dict[str, dict[str, str]] = {
                           "uk": "Не вдалося розібрати запитання. Скажіть або напишіть його ще раз — я на зв'язку.",
                           "el": "Δεν κατάλαβα την ερώτηση. Πείτε ή γράψτε τη ξανά — είμαι εδώ.",
                           "es": "No he podido entender la pregunta. Dímela o escríbela otra vez: aquí estoy."},
-    "nova.limit_free": {"ru": "На сегодня 5 вопросов закончились — завтра будут новые. С подключённым реальным счётом — "
-                              "до 100 вопросов в день.",
-                        "en": "Your 5 questions for today are used up — new ones come tomorrow. With a real account "
-                              "connected, you get up to 100 questions a day.",
-                        "uk": "На сьогодні 5 запитань закінчилися — завтра будуть нові. З підключеним реальним "
-                              "рахунком — до 100 запитань на день.",
-                        "el": "Οι 5 ερωτήσεις για σήμερα τελείωσαν — αύριο θα έχετε καινούργιες. Με συνδεδεμένο "
-                              "πραγματικό λογαριασμό — έως 100 ερωτήσεις την ημέρα.",
-                        "es": "Ya usaste tus 5 preguntas de hoy; mañana tendrás nuevas. Con tu cuenta real conectada, "
-                              "hasta 100 preguntas al día."},
-    "nova.limit_vip": {"ru": "На сегодня вопросы закончились — завтра лимит обновится.",
-                       "en": "You're out of questions for today — the limit resets tomorrow.",
-                       "uk": "На сьогодні запитання закінчилися — завтра ліміт оновиться.",
-                       "el": "Οι ερωτήσεις για σήμερα τελείωσαν — αύριο το όριο ανανεώνεται.",
-                       "es": "Por hoy se acabaron las preguntas; mañana se renueva el límite."},
+    # 28.10 (build 46 §11.4): what to do after the limit — the ready-made questions still work (answered from the FAQ, not counted);
+    # no promise of more questions for connecting: an OKX copy is not confirmed in the app (only a BingX-checked account is «vip»)
+    "nova.limit_free": {"ru": "На сегодня 5 вопросов закончились — завтра будут новые. На вопросы из готового списка ниже я отвечу и "
+                              "сейчас.",
+                        "en": "Your 5 questions for today are used up — new ones come tomorrow. I can still answer the ready-made "
+                              "questions from the list below.",
+                        "uk": "На сьогодні 5 запитань закінчилися — завтра будуть нові. На запитання з готового списку нижче я "
+                              "відповім і зараз.",
+                        "el": "Οι 5 ερωτήσεις για σήμερα τελείωσαν — αύριο θα έχετε καινούργιες. Στις έτοιμες ερωτήσεις της λίστας "
+                              "παρακάτω απαντώ και τώρα.",
+                        "es": "Ya has usado tus 5 preguntas de hoy; mañana tendrás nuevas. A las preguntas de la lista de abajo te "
+                              "respondo también ahora."},
+    "nova.limit_vip": {"ru": "На сегодня вопросы закончились — завтра лимит обновится. На вопросы из готового списка ниже я отвечу и сейчас.",
+                       "en": "You're out of questions for today — the limit resets tomorrow. I can still answer the ready-made questions "
+                             "from the list below.",
+                       "uk": "На сьогодні запитання закінчилися — завтра ліміт оновиться. На запитання з готового списку нижче я "
+                             "відповім і зараз.",
+                       "el": "Οι ερωτήσεις για σήμερα τελείωσαν — αύριο το όριο ανανεώνεται. Στις έτοιμες ερωτήσεις της λίστας "
+                             "παρακάτω απαντώ και τώρα.",
+                       "es": "Por hoy se acabaron las preguntas; mañana se renueva el límite. A las preguntas de la lista de abajo te "
+                             "respondo también ahora."},
 
     # ---------------------------------------------------------------- build 44: the public portfolio = the panel's header
     # (app_home "public": spot coins «почему», «Рассчитать мой портфель» — every sentence is a rule or a number of the system)

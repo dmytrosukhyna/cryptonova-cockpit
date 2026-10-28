@@ -101,6 +101,12 @@ def test_agent_limit(tmp_path):
         assert c == 200 and d["agent"]["left"] == 4 - i
     c, d = call(api, "POST", "/v2/agent", {"q": "Ещё вопрос"}, t)
     assert c == 200 and d["error"] == "limit" and d["answer"] and d["agent"]["left"] == 0 and llm.calls == 5
+    # 28.10 (build 46 §11.4): a ready-made question still gets its FAQ answer after the limit — not counted, no model call
+    c, d = call(api, "POST", "/v2/agent", {"q": "Что такое стоп?"}, t)
+    assert c == 200 and d.get("error") is None and d["source"] == "faq" and d["answer"] and d["agent"]["left"] == 0 and llm.calls == 5
+    c, d = call(api, "POST", "/v2/agent", {"q": "What is a stop?", "lang": "en"}, t)
+    assert d["source"] == "faq" and d["answer"].startswith("A stop")
+    assert "готового списка" in call(api, "POST", "/v2/agent", {"q": "Расскажи анекдот"}, t)[1]["answer"]
 
 
 def test_vip_check(tmp_path):

@@ -19,7 +19,8 @@ DATA, WEB = os.path.join(ROOT, "data"), os.path.join(ROOT, "web")
 OTHER = [x for x in i18n.LANGS if x != i18n.DEFAULT]
 CYR = re.compile(r"[А-Яа-яЁёІіЇїЄєҐґ]")
 GREEK_LATIN = {"atr", "btc", "binance", "bingx", "bitcoin", "crypto", "nova", "ether", "solana", "rsi", "short", "token", "altcoin",
-               "altcoins", "demo", "funding", "future", "futures", "meme", "coins", "pump", "spot", "stop", "top", "r"}
+               "altcoins", "demo", "funding", "future", "futures", "meme", "coins", "pump", "spot", "stop", "top", "r",
+               "long", "traders", "okx", "eth", "sol", "usdt"}        # 28.10: tickers, the exchange, «long» as Greek crypto texts write it
 
 
 # ------------------------------------------------------------------------------------------------ the catalog
@@ -54,7 +55,10 @@ def test_nova_fixed_answers_per_language():
     for lang in i18n.LANGS:
         for f in (nova.busy(lang), nova.bad_question(lang), nova.limit(lang), nova.limit(lang, vip=True)):
             assert f and "VIP" not in f
-    assert "100" in nova.limit("el") and "πραγματικό" in nova.limit("el") and "tomorrow" in nova.limit("en", vip=True)
+    # 28.10 (build 46 §11.4): no promise of 100 questions for connecting (an OKX copy is not confirmed in the app); the ready-made
+    # questions still work after the limit
+    assert "100" not in nova.limit("el") and "έτοιμες ερωτήσεις" in nova.limit("el") and "tomorrow" in nova.limit("en", vip=True)
+    assert all("5" in nova.limit(lg) for lg in i18n.LANGS)
 
 
 # ------------------------------------------------------------------------------------------------ app home in five languages
@@ -109,7 +113,8 @@ def _texts(doc: dict) -> list[str]:
 def _numbers(doc):
     """the document without its words: what must be identical in every language"""
     if isinstance(doc, dict):
-        return {k: _numbers(v) for k, v in doc.items() if not isinstance(v, str) or k in ("sym", "side", "src", "action", "mode", "regime")}
+        return {k: _numbers(v) for k, v in doc.items() if (not isinstance(v, str) or k in ("sym", "side", "src", "action", "mode", "regime"))
+                and not (v is None and k.endswith("_ru"))}          # a Russian-only text left empty is a word, not a number
     if isinstance(doc, list):
         return [_numbers(v) for v in doc]
     return doc
@@ -241,13 +246,13 @@ def test_nova_feed_in_every_language():
         assert d["lang"] == lang and "5" in d["greeting"] and "100" in d["greeting_vip"], lang
         assert "VIP" not in d["greeting"] + d["greeting_vip"], lang
         chips = d["suggest"] + [q for t in d["topics"] for q in t["qs"]]
-        assert 6 <= len(d["suggest"]) <= 8 and len(d["topics"]) == 4 and all(3 <= len(t["qs"]) <= 4 for t in d["topics"]), lang
+        assert 6 <= len(d["suggest"]) <= 8 and len(d["topics"]) == 5 and all(3 <= len(t["qs"]) <= 4 for t in d["topics"]), lang
         assert len(set(chips)) == len(chips) and all(len(q) <= 60 for q in chips), lang
         faq = {i["q"]: i for i in k.faq(lang)}
         for q in chips:                                       # every chip has an exact FAQ answer in its language (the model may be down)
             assert q in faq and k.match(q, lang) is faq[q], (lang, q)
         titles[lang] = [t["title"] for t in d["topics"]]
-    assert titles["en"] == ["Money & safety", "How it works", "Crypto and the future", "Learn"]           # the app's own topic names
+    assert titles["en"] == ["How CRYPTO NOVA works", "Portfolio & trades", "Money & safety", "Crypto & the market", "Learn"]
     connected = {"ru": "реальный счёт подключён", "en": "real account is connected", "uk": "реальний рахунок підключено",
                  "el": "πραγματικός σας λογαριασμός είναι συνδεδεμένος", "es": "cuenta real está conectada"}
     for lang, words in connected.items():
@@ -332,7 +337,7 @@ def test_agent_answers_in_the_requested_language(tmp_path):
     assert c == 200 and d["answer"] == "Answer." and d["agent"]["left"] == 4
     system, user = cap.seen[-1]
     assert "ЯЗЫК ОТВЕТА — греческий" in system and "Απάντα πάντα στα ελληνικά" in system and "«Κουμπαράς»" in system
-    assert "Στις 10 Ιανουαρίου 2024" in system and "είμαι χαρούμενη" in system and "VIP" in system      # «don't say VIP» rule only
+    assert "Στις 10 Ιανουαρίου 2024" in system and "είμαι χαρούμενος" in system and "VIP" in system      # «don't say VIP» rule only
     assert "В: Τι είναι η μόχλευση;" in user and "ЯЗЫК ОТВЕТА: греческий" in user and user.endswith("ВОПРОС ПОЛЬЗОВАТЕЛЯ:\nΤι είναι η μόχλευση;")
     assert "«Ο λογαριασμός demo μου» на αρχική οθόνη" in user
     call(api, "POST", "/v2/agent", {"q": "Γιατί αγοράσατε AVAX;", "lang": "el"}, t)

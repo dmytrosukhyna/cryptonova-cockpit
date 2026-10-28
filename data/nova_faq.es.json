@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": "2026-10-22",
+  "updated": "2026-10-28",
   "lang": "es",
   "about": "NOVA's FAQ in Spanish — the same ids as data/nova_faq.json (Russian, the source). cnq/api/nova.py: the closest items go to the model as reference; when the model is down, a near-exact match (q or alt) is answered from here. Change an answer in every language.",
   "items": [
@@ -551,6 +551,82 @@
         "asistente",
         "ayudante",
         "bot"
+      ]
+    },
+    {
+      "id": "what_is",
+      "topic": "how",
+      "q": "¿Qué es CRYPTO NOVA?",
+      "a": "CRYPTO NOVA es un sistema que vigila el mercado cripto las 24 horas y funciona con reglas probadas de antemano en el historial de precios. Desde el 22 de octubre de 2026 lleva una cuenta real en OKX con unos $10 000: es la «Cartera pública» de la pantalla de inicio. En la app puedes seguirla, probar tu propia cartera demo, aprender y preguntarme. No es un exchange ni asesoramiento financiero: tu dinero siempre se queda en tu propia cuenta del exchange.",
+      "tags": [
+        "qué es crypto nova",
+        "cryptonova",
+        "sobre el sistema",
+        "sobre el proyecto",
+        "qué app es"
+      ]
+    },
+    {
+      "id": "public",
+      "topic": "how",
+      "q": "¿Cómo funciona la cartera pública?",
+      "a": "Es la cuenta real de CRYPTO NOVA en OKX con dinero real: unos $10 000, y su historial empieza el 22 de octubre de 2026. Las operaciones las abre el piloto automático del sistema: la cartera spot recibe el 65%, los futuros con señales seleccionadas el 25% y el spot activo el 10%. En la app ves el valor, el resultado en dólares y en porcentaje, un gráfico por periodos, las monedas y las operaciones; los datos se actualizan más o menos cada 15 minutos. Los resultados pasados no garantizan los futuros.",
+      "tags": [
+        "cartera pública",
+        "pública",
+        "public",
+        "cuenta del sistema",
+        "piloto automático",
+        "historial de la cartera"
+      ]
+    },
+    {
+      "id": "trade_result",
+      "topic": "how",
+      "q": "¿Qué significa el resultado de una operación?",
+      "a": "Es cuánto ganó o perdió la operación en dólares. En una operación cerrada es el resultado final tras la salida; en una abierta es la ganancia o pérdida actual, que cambia con el precio. El porcentaje de al lado muestra cuánto cambió el precio de la moneda, y eso no es lo mismo que un porcentaje de la cuenta: con apalancamiento la operación se mueve más rápido que el precio. Por eso juzga el sistema por toda la cartera.",
+      "tags": [
+        "resultado",
+        "resultado de la operación",
+        "ganancia de la operación",
+        "porcentaje de la operación",
+        "qué significa"
+      ]
+    },
+    {
+      "id": "spot_futures",
+      "topic": "learn",
+      "q": "¿Qué son el spot y los futuros?",
+      "a": "El spot es comprar las propias monedas, sin deuda: lo que compras es tuyo y puedes mantenerlo el tiempo que quieras. Los futuros son operaciones sobre el movimiento del precio: puedes ganar con la subida (long) o con la bajada (short), a menudo con apalancamiento, así que las ganancias y las pérdidas crecen más rápido. En CRYPTO NOVA el spot es la base de la cartera, los futuros son la parte más pequeña y cada operación de futuros tiene stop.",
+      "tags": [
+        "spot y futuros",
+        "diferencia spot futuros",
+        "spot o futuros"
+      ]
+    },
+    {
+      "id": "connect",
+      "topic": "money",
+      "q": "¿Cómo me conecto al sistema?",
+      "a": "Te conectas a CRYPTO NOVA a través del copy trading de OKX: regístrate en OKX con nuestro enlace, pasa la verificación de identidad, recarga tu cuenta en USDT y toca «Copiar CRYPTO NOVA» en la app. A partir de ahí OKX repite las operaciones del sistema por el importe que elijas. La guía paso a paso está en el botón «Conectarse al sistema CRYPTO NOVA». Puedes dejar de copiar en OKX cuando quieras, las pérdidas son posibles y solo para mayores de 18 años; en la UE y el EEE la copia automática aún no está disponible.",
+      "tags": [
+        "conectarse",
+        "conectarse al sistema",
+        "cómo me conecto",
+        "cómo empezar",
+        "copiar el sistema"
+      ]
+    },
+    {
+      "id": "risks",
+      "topic": "money",
+      "q": "¿Qué riesgos hay?",
+      "a": "El principal riesgo es el propio mercado: las cripto pueden caer mucho y cualquier estrategia puede entrar en pérdidas, aunque antes funcionara. Los futuros con apalancamiento aceleran tanto la ganancia como la pérdida, aunque cada operación tiene stop. Si copias, tu resultado puede diferir de la cartera pública por el importe, las comisiones y el precio de entrada. Invierte solo lo que puedas perder con tranquilidad y nunca compartas contraseñas ni códigos con nadie.",
+      "tags": [
+        "riesgos",
+        "qué riesgos",
+        "qué arriesgo",
+        "puedo perder"
       ]
     }
   ]

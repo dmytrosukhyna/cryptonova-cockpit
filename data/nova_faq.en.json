@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "updated": "2026-10-22",
+  "updated": "2026-10-28",
   "lang": "en",
   "about": "NOVA's FAQ in English — the same ids as data/nova_faq.json (Russian, the source). cnq/api/nova.py: the closest items go to the model as reference; when the model is down, a near-exact match (q or alt) is answered from here. Change an answer in every language.",
   "items": [
@@ -562,6 +562,82 @@
         "assistant",
         "helper",
         "bot"
+      ]
+    },
+    {
+      "id": "what_is",
+      "topic": "how",
+      "q": "What is CRYPTO NOVA?",
+      "a": "CRYPTO NOVA is a system that watches the crypto market around the clock and works by rules tested in advance on the history of prices. Since October 22, 2026 it has been running a real account on OKX with about $10 000 — that's the “Public portfolio” on the Home screen. In the app you can follow it, try your own demo portfolio, learn and ask me. It isn't an exchange and isn't financial advice: your money always stays in your own exchange account.",
+      "tags": [
+        "what is crypto nova",
+        "cryptonova",
+        "about the system",
+        "about the project",
+        "what is this app"
+      ]
+    },
+    {
+      "id": "public",
+      "topic": "how",
+      "q": "How does the public portfolio work?",
+      "a": "It's CRYPTO NOVA's real account on OKX with real money: about $10 000, and its history starts on October 22, 2026. The system's autopilot places the trades: the spot portfolio gets 65%, futures on selected signals 25%, active spot 10%. The app shows its value, the result in dollars and percent, a chart by period, the coins and the trades; the data updates about every 15 minutes. Past results don't guarantee future ones.",
+      "tags": [
+        "public portfolio",
+        "public",
+        "system account",
+        "autopilot",
+        "portfolio history"
+      ]
+    },
+    {
+      "id": "trade_result",
+      "topic": "how",
+      "q": "What does a trade's result mean?",
+      "a": "It's how much the trade made or lost in dollars. For a closed trade it's the final result after the exit; for an open one it's the current profit or loss, which moves with the price. The percent next to it shows how much the coin's price changed, and that isn't the same as a percent of the account: with leverage a trade moves faster than the price. So judge the system by the whole portfolio.",
+      "tags": [
+        "result",
+        "trade result",
+        "trade profit",
+        "trade percent",
+        "what does it mean"
+      ]
+    },
+    {
+      "id": "spot_futures",
+      "topic": "learn",
+      "q": "What are spot and futures?",
+      "a": "Spot means buying the coins themselves, with no debt: what you buy is yours, and you can hold it as long as you like. A futures trade is a bet on the price move: you can earn on a rise (long) or on a fall (short), often with leverage, so profits and losses both grow faster. In CRYPTO NOVA spot is the base of the portfolio, futures are the smaller part, and every futures trade has a stop.",
+      "tags": [
+        "spot and futures",
+        "difference spot futures",
+        "spot vs futures",
+        "spot or futures"
+      ]
+    },
+    {
+      "id": "connect",
+      "topic": "money",
+      "q": "How do I connect to the system?",
+      "a": "You connect to CRYPTO NOVA through OKX copy trading: sign up on OKX with our link, pass the identity check, top up your account in USDT and tap “Copy CRYPTO NOVA” in the app. After that OKX itself repeats the system's trades for the amount you choose. The step-by-step guide is behind the “Connect to the CRYPTO NOVA system” button. You can stop copying in OKX at any time, losses are possible, 18+ only; in the EU and EEA automatic copying isn't available yet.",
+      "tags": [
+        "connect",
+        "connect to the system",
+        "how to connect",
+        "how to start",
+        "copy the system"
+      ]
+    },
+    {
+      "id": "risks",
+      "topic": "money",
+      "q": "What are the risks?",
+      "a": "The main risk is the market itself: crypto can fall hard, and any strategy can go into the red, even one that worked before. Futures with leverage speed up both profit and loss, although every trade has a stop. When copying, your result can differ from the public portfolio because of the amount, fees and the entry price. Only put in what you can calmly afford to lose, and never share passwords or codes with anyone.",
+      "tags": [
+        "risks",
+        "what risks",
+        "what do i risk",
+        "can i lose"
       ]
     }
   ]

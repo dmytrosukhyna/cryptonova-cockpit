@@ -486,6 +486,12 @@ class Api:
         if len(q) < 2:
             return 200, {"error": "bad_question", "answer": nova.bad_question(lang), "agent": al}
         if al["left"] <= 0:
+            # 28.10 (build 46 §11.4): after the limit the app's own ready-made questions still get their FAQ answer (not counted)
+            nq = nova._norm(q)
+            if any(self.nova._same(nq, it) for lg in LANGS for it in self.nova.faq(lg)):
+                hit = self.nova.match(q, lang)
+                if hit:
+                    return 200, {"answer": hit["a"], "source": "faq", "agent": al}
             return 200, {"error": "limit", "answer": nova.limit(lang, vip=tier == "vip"), "agent": al}
         ctx = nova.clean_text(data.get("ctx"), nova.CTX_MAX)
         t0, answer, result = time.time(), "", "not_configured"

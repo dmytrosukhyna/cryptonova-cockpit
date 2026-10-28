@@ -225,8 +225,15 @@ def test_nova_feed_is_public(tmp_path):
     # 20.10: the app no longer says «VIP» to people — the greeting for a connected real account says so in words
     assert "VIP" not in d["greeting_vip"] and "реальный счёт подключён" in d["greeting_vip"] and "100" in d["greeting_vip"]
     assert 6 <= len(d["suggest"]) <= 8 and all(isinstance(q, str) and len(q) <= 60 for q in d["suggest"])
-    assert [t["title"] for t in d["topics"]] == ["Деньги и безопасность", "Как это работает", "Крипта и будущее", "Обучение"]
+    # 28.10 (build 46 §11.5): five tidy categories, the long list folded by the app
+    assert [t["title"] for t in d["topics"]] == ["Как работает CRYPTO NOVA", "Портфель и сделки", "Деньги и безопасность",
+                                                  "Криптовалюты и рынок", "Обучение"]
+    assert [t["id"] for t in d["topics"]] == ["how", "portfolio", "money", "market", "learn"]
     assert all(3 <= len(t["qs"]) <= 4 for t in d["topics"])
+    for q in ("Что такое CRYPTO NOVA?", "Как работает публичный портфель?", "Что означает результат сделки?", "Что такое спот и фьючерсы?",
+              "Как подключиться к системе?", "Какие риски существуют?"):                    # the owner's own list of frequent questions
+        assert q in [x for t in d["topics"] for x in t["qs"]], q
+    assert d["greeting"].startswith("Здравствуйте! Я NOVA AI — ваш помощник в мире криптовалют.") and "гарант" not in d["greeting"]
     faq = {i["q"] for i in nova.Knowledge(os.path.join(ROOT, "data")).faq()}
     every = d["suggest"] + [q for t in d["topics"] for q in t["qs"]]
     assert len(set(every)) == len(every) and set(every) <= faq      # every chip has an exact FAQ answer (works even if the model is down)
@@ -240,7 +247,7 @@ def test_knowledge_files():
         assert f["date"] and f["source"].startswith("https://") and f.get("source_date"), f["id"]
     samsung = next(f for f in facts if f["id"] == "samsung_usdc")["fact"]
     assert "82 млн устройств Galaxy, совместимых" in samsung and "платить криптой" not in samsung and "USDC" in samsung and "пока нельзя" in samsung
-    assert 25 <= len(faq) <= 40 and len({i["q"] for i in faq}) == len(faq)
+    assert 25 <= len(faq) <= 45 and len({i["q"] for i in faq}) == len(faq)
     for q in OWNER_QUESTIONS:
         assert k.match(q) and k.match(q)["q"] == q, q
     for i in faq:

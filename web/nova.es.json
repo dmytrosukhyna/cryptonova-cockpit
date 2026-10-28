@@ -1,54 +1,66 @@
 {
   "v": 1,
-  "updated": "2026-10-20",
+  "updated": "2026-10-28",
   "lang": "es",
-  "greeting": "¡Hola! Soy NOVA AI, tu guía en el mundo cripto. Te lo explico todo con palabras sencillas: cómo funcionan las operaciones de CRYPTO NOVA, la hucha en bitcoin y por qué el mundo se está pasando tan rápido a las cripto. Estamos en el modo demo: tienes 5 preguntas al día. Escribe tu pregunta o elige una abajo.",
+  "greeting": "¡Hola! Soy NOVA AI, tu asistente en el mundo cripto. Te ayudo a entender cómo funciona CRYPTO NOVA, te explico los datos de la cartera y respondo a tus preguntas sobre lo básico del mercado cripto. En el modo demo tienes 5 preguntas al día. Escribe tu pregunta o elige un tema abajo.",
   "greeting_vip": "¡Hola! Soy NOVA AI. Tu cuenta real está conectada: ahora tienes hasta 100 preguntas al día. Pregúntame lo que quieras: sobre las operaciones del sistema, tu cuenta, la hucha y el futuro de las cripto. Escribe tu pregunta o elige una abajo.",
   "suggest": [
     "¿Es seguro?",
     "¿Cuánto he ganado?",
     "¿Cómo funciona CRYPTO NOVA?",
-    "¿Qué es la hucha y por qué bitcoin?",
-    "¿Por qué ahora no hay operaciones?",
-    "¿Qué es el apalancamiento?",
-    "¿Por qué todos hablan del futuro de las cripto?",
-    "¿Qué es la cuenta real?"
+    "¿Qué es la cuenta real?",
+    "¿Cuánto cuesta?",
+    "¿Qué es una stablecoin?"
   ],
   "topics": [
     {
+      "id": "how",
+      "title": "Cómo funciona CRYPTO NOVA",
+      "qs": [
+        "¿Qué es CRYPTO NOVA?",
+        "¿Cómo funciona la cartera pública?",
+        "¿Cómo prueban las estrategias?",
+        "¿Y si el sistema se equivoca?"
+      ]
+    },
+    {
+      "id": "portfolio",
+      "title": "Cartera y operaciones",
+      "qs": [
+        "¿Qué significa el resultado de una operación?",
+        "¿Por qué ahora no hay operaciones?",
+        "¿Qué es «Mi cuenta demo»?",
+        "¿Qué es un stop?"
+      ]
+    },
+    {
+      "id": "money",
       "title": "Dinero y seguridad",
       "qs": [
-        "¿Esto es una estafa?",
+        "¿Cómo me conecto al sistema?",
+        "¿Qué riesgos hay?",
         "¿Dónde está mi dinero?",
-        "¿Cómo retiro mi dinero?",
-        "¿Cuánto cuesta?"
+        "¿Esto es una estafa?"
       ]
     },
     {
-      "title": "Cómo funciona",
+      "id": "market",
+      "title": "Cripto y mercado",
       "qs": [
-        "¿Qué es la demo?",
-        "¿Cómo prueban las estrategias?",
-        "¿Y si el sistema se equivoca?",
-        "¿Para qué el exchange y el enlace de referido?"
-      ]
-    },
-    {
-      "title": "Cripto y futuro",
-      "qs": [
-        "¿Qué es un ETF de bitcoin?",
-        "¿Qué es la tokenización de acciones?",
+        "¿Qué son el spot y los futuros?",
+        "¿Qué es bitcoin?",
         "¿Es tarde para comprar bitcoin?",
         "Bitcoin cayó, ¿es el final?"
       ]
     },
     {
+      "id": "learn",
       "title": "Aprender",
       "qs": [
         "¿Por dónde empiezo a aprender?",
         "¿Qué son long y short?",
-        "¿Qué es un stop?",
-        "¿Qué es una stablecoin?"
+        "¿Qué es el apalancamiento?",
+        "¿Qué es la hucha y por qué bitcoin?"
       ]
     }
   ]

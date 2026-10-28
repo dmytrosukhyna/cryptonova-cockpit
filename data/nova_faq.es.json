@@ -197,7 +197,7 @@
       "id": "how_works",
       "topic": "how",
       "q": "¿Cómo funciona CRYPTO NOVA?",
-      "a": "CRYPTO NOVA es un sistema de IA: vigila el mercado cripto 24/7 y busca operaciones con reglas probadas en el histórico de precios. Las operaciones se hacen en una cuenta demo de $10 000: ves la entrada, el stop, el objetivo y un sencillo «por qué entramos». Al lado hay una cartera spot tranquila, una hucha en bitcoin, 52 lecciones y yo, NOVA. Es aprendizaje y demo, no un exchange ni asesoramiento financiero.",
+      "a": "CRYPTO NOVA es un sistema de IA: vigila el mercado cripto 24/7 y busca operaciones con reglas probadas en el histórico de precios. Desde el 22 de octubre de 2026 lleva una cuenta real en OKX con unos $10 000: es la «Cartera pública», donde ves las monedas, las operaciones, la entrada, el stop y un sencillo «por qué entramos». Al lado están tu cartera demo, una hucha en bitcoin, 52 lecciones y yo, NOVA. No es un exchange ni asesoramiento financiero.",
       "tags": [
         "funciona",
         "sistema",
@@ -344,7 +344,7 @@
       "id": "spot",
       "topic": "how",
       "q": "¿Qué es el spot?",
-      "a": "Spot es comprar las monedas en sí, sin préstamos ni apalancamiento: lo que compras es tuyo. En la pestaña «Spot» está la cartera demo de largo plazo de CRYPTO NOVA: un núcleo de bitcoin, ether y solana, altcoins grandes, algunas monedas meme y una reserva en dólares. El sistema se encarga de que los pesos no se desequilibren.",
+      "a": "Spot es comprar las monedas en sí, sin préstamos ni apalancamiento: lo que compras es tuyo. En la pestaña «Spot» está la cartera spot de largo plazo de CRYPTO NOVA: un núcleo de bitcoin, ether y solana, altcoins grandes y una reserva en dólares; en el modo PUBLIC son las monedas de la cuenta real en OKX. El sistema se encarga de que los pesos no se desequilibren.",
       "tags": [
         "spot",
         "cartera",
@@ -357,7 +357,7 @@
       "id": "futures",
       "topic": "how",
       "q": "¿Qué son los futuros?",
-      "a": "Un futuro es una operación sobre el movimiento del precio: no compras la moneda en sí, sino que ganas con la subida (long) o con la bajada (short). A menudo con apalancamiento, así que tanto la ganancia como la pérdida crecen más rápido. En la pestaña «Futuros» el sistema hace estas operaciones en una cuenta demo de $10 000, con entrada, stop y objetivo.",
+      "a": "Un futuro es una operación sobre el movimiento del precio: no compras la moneda en sí, sino que ganas con la subida (long) o con la bajada (short). A menudo con apalancamiento, así que tanto la ganancia como la pérdida crecen más rápido. En la pestaña «Futuros» se ven estas operaciones del sistema, con entrada, stop y objetivo; en el modo PUBLIC son las operaciones de la cuenta real en OKX.",
       "tags": [
         "futuros",
         "futuro",

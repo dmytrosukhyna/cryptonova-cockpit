@@ -199,7 +199,7 @@
       "id": "how_works",
       "topic": "how",
       "q": "How does CRYPTO NOVA work?",
-      "a": "CRYPTO NOVA is an AI system: it watches the crypto market 24/7 and looks for trades using rules tested on price history. The trades run on a $10 000 demo account — you see the entry, stop, target and a simple “why we entered”. Next to it there's a calm spot portfolio, a bitcoin Piggy bank, 52 lessons and me, NOVA. It's learning and demo, not an exchange and not financial advice.",
+      "a": "CRYPTO NOVA is an AI system: it watches the crypto market 24/7 and looks for trades using rules tested on price history. Since October 22, 2026 it has been running a real account on OKX with about $10 000 — that's the “Public portfolio”: you see the coins, the trades, the entry, the stop and a simple “why we entered”. Next to it there's your demo portfolio, a bitcoin Piggy bank, 52 lessons and me, NOVA. It isn't an exchange and isn't financial advice.",
       "tags": [
         "work",
         "works",
@@ -351,7 +351,7 @@
       "id": "spot",
       "topic": "how",
       "q": "What is spot?",
-      "a": "Spot means buying the coins themselves, with no borrowing and no leverage: what you buy is yours. The “Spot” tab has CRYPTO NOVA's long-term demo portfolio: a core of bitcoin, ether and solana, large altcoins, a few meme coins and a reserve in dollars. The system itself keeps the shares from getting lopsided.",
+      "a": "Spot means buying the coins themselves, with no borrowing and no leverage: what you buy is yours. The “Spot” tab has CRYPTO NOVA's long-term spot portfolio: a core of bitcoin, ether and solana, large altcoins and a reserve in dollars; in PUBLIC mode these are the coins of the real account on OKX. The system itself keeps the shares from getting lopsided.",
       "tags": [
         "spot",
         "portfolio",
@@ -364,7 +364,7 @@
       "id": "futures",
       "topic": "how",
       "q": "What are futures?",
-      "a": "A futures contract is a trade on the price move: you don't buy the coin itself, you profit from a rise (long) or a fall (short). Often with leverage, so both profit and loss grow faster. On the “Futures” tab the system runs such trades on a $10 000 demo account — with an entry, a stop and a target.",
+      "a": "A futures contract is a trade on the price move: you don't buy the coin itself, you profit from a rise (long) or a fall (short). Often with leverage, so both profit and loss grow faster. The “Futures” tab shows the system's trades of this kind, with an entry, a stop and a target; in PUBLIC mode these are the real account's trades on OKX.",
       "tags": [
         "futures",
         "future",

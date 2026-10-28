@@ -14,10 +14,11 @@ from cnq.api.store import Store
 KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
-def token(uid="u1", project="crypto-nova", exp=3600):
+def token(uid="u1", project="crypto-nova", exp=3600, verified=True):
     now = int(time.time())
     return jwt.encode({"sub": uid, "aud": project, "iss": f"https://securetoken.google.com/{project}", "iat": now,
-                       "exp": now + exp, "email": f"{uid}@x.io"}, KEY, algorithm="RS256", headers={"kid": "k1"})
+                       "exp": now + exp, "email": f"{uid}@x.io", "email_verified": verified}, KEY, algorithm="RS256",
+                      headers={"kid": "k1"})
 
 
 class FakeLLM:
@@ -67,6 +68,8 @@ def test_me_is_owner(tmp_path, monkeypatch):
     monkeypatch.setenv("CNQ_OWNER_EMAIL", " Owner@X.io ")
     assert call(api, "POST", "/v2/me", {}, token(uid="owner"))[1]["user"]["is_owner"] is True
     assert call(api, "POST", "/v2/me", {}, token(uid="u2"))[1]["user"]["is_owner"] is False
+    # 28.10: an unverified email is never the owner (an Email/Password account anybody could make with the owner's address)
+    assert call(api, "POST", "/v2/me", {}, token(uid="owner", verified=False))[1]["user"]["is_owner"] is False
     monkeypatch.setenv("CNQ_OWNER_EMAIL", "")
     assert call(api, "POST", "/v2/me", {}, token(uid="owner"))[1]["user"]["is_owner"] is False
 

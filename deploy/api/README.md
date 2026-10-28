@@ -42,6 +42,29 @@ Settings in `/etc/cnq.env`:
   Optional: `/opt/cnq/venv/bin/pip install pypdf` reads unusual PDF fonts better (without it a small built-in reader is used).
   Nothing is stored: the file and the coins live only in the request's memory; `/v2/health` "portfolio" shows counts only.
 
+- 28.10 — **the owner's one sign-in for the closed panel** (`/v2/auth/*`, `/v2/owner/*`; `cnq/api/owner_auth.py`,
+  `cnq/api/passkey.py`, `cnq/api/owner_data.py`; the page side is `web/vip/auth.js` → `window.CNAuth`). Email + password, Apple,
+  Google (Firebase, the app's project `crypto-nova`) → an owner session (15-minute access token + rotated, device-bound refresh
+  token, 30 days on a remembered device); Face ID / Touch ID as passkeys. Settings in `/etc/cnq.env`, then
+  `systemctl restart cnq-api`:
+  - `CNQ_OWNER_EMAIL` — already there; may now list several addresses separated by commas (e.g. the Gmail and an Apple «Hide my
+    email» relay address). The email must be **verified** in Firebase (Google and Apple always are).
+  - `CNQ_FIREBASE_WEB_API_KEY`, `CNQ_FIREBASE_WEB_APP_ID` — the public web config (Firebase console → Project settings →
+    General → Your apps → Add app → Web `</>` → copy `apiKey` and `appId`). Public by design; without them the sign-in sheet says
+    «Вход … ещё не настроен». Optional: `CNQ_FIREBASE_AUTH_DOMAIN` (default `crypto-nova.firebaseapp.com`).
+  - `IVAN_PASS`, `MYSPOT_PASS` — the same strings as in `~/.cryptonova.env` on the Mac. The server then decrypts
+    `web/ivan.enc.json` and `web/myspot.enc.json` in memory for the signed-in owner (`GET /v2/owner/ivan`, `/v2/owner/myspot`) —
+    no per-section passwords in the panel. Without them those two answer 503 `not_configured` (the old in-page passwords still work).
+  - Optional: `CNQ_PASSKEY_RP_ID` (default: the host of `CNQ_ADMIN_ORIGIN`, i.e. `cryptonova.vip`), `CNQ_PASSKEY_ORIGINS` (extra
+    page origins, comma-separated), `CNQ_OWNER_PROVIDERS` (default `password,apple.com,google.com`).
+  Firebase console (once): Authentication → Sign-in method → **Email/Password: Enable**; Google: enabled; Apple: enabled and, for
+  the web, filled with a Services ID (Apple Developer → Identifiers → Services IDs → Sign in with Apple → domain
+  `crypto-nova.firebaseapp.com`, return URL `https://crypto-nova.firebaseapp.com/__/auth/handler`) + Team ID + Key ID + the .p8 key;
+  Authentication → Settings → **Authorized domains → add `cryptonova.vip`**. An account created with Google or Apple gets a
+  password through «Забыли пароль?» on the sign-in sheet (Firebase's reset email adds the password to the same account).
+  `CNQ_ADMIN_TOKEN` and the encrypted files keep working unchanged; `/v2/admin/*` accepts the owner session as well.
+  No new Python packages (passkeys are verified with `cryptography`, already installed).
+
 Endpoints: see the docstring of `cnq/api/server.py`. Data: `/opt/cnq/run/data/api.sqlite` (not in git).
 
 Legal pages for the stores (published with the site): https://cryptonova.vip/privacy.html · terms.html · delete.html

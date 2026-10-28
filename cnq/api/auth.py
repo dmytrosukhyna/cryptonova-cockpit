@@ -51,4 +51,10 @@ class FirebaseVerifier:
             raise AuthError(str(e)) from e
         if not claims.get("sub"):
             raise AuthError("no uid")
-        return {"uid": claims["sub"], "email": claims.get("email"), "name": claims.get("name")}
+        # 28.10 (owner sign-in, cnq/api/owner_auth.py): also whether Firebase verified the email, when the person actually signed
+        # in (auth_time — an ID token is refreshed silently for weeks, auth_time stays) and with what (password / google.com /
+        # apple.com). The app's own calls only read uid, email and name.
+        fb = claims.get("firebase") if isinstance(claims.get("firebase"), dict) else {}
+        return {"uid": claims["sub"], "email": claims.get("email"), "name": claims.get("name"),
+                "email_verified": claims.get("email_verified") is True, "auth_time": claims.get("auth_time"),
+                "provider": fb.get("sign_in_provider")}

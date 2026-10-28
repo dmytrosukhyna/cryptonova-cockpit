@@ -1,7 +1,8 @@
 """The owner's admin console API — /v2/admin/* (21.10.2026, owner: «админ-панель … CRM, масштабирование, Meta/Facebook, шлюзы,
 коннекторы … продумай всё до мелочей»). The page is web/admin.html (https://cryptonova.vip/admin.html).
 
-Access: only the owner. Every call carries `Authorization: Bearer <CNQ_ADMIN_TOKEN>` — a long random string in /etc/cnq.env
+Access: only the owner. Every call carries `Authorization: Bearer <CNQ_ADMIN_TOKEN>` (28.10: or the owner session «cno_…» from
+the panel's sign-in, cnq/api/owner_auth.py) — a long random string in /etc/cnq.env
 (never in git, never in chat), compared in constant time. CNQ_ADMIN_TOKEN absent or shorter than 24 characters → every admin call
 answers 403 admin_disabled. A wrong or missing token → 401; 20 wrong tokens from one address within 10 minutes → 429 for that
 address. The token is never logged or echoed. Answers carry CORS for https://cryptonova.vip only (CNQ_ADMIN_ORIGIN overrides it
@@ -118,10 +119,28 @@ class Console:
         self.sending = threading.Lock()
         self.last_push: dict | None = None
         self.access = None                      # 22.10: guest access codes (cnq/api/access.py), set by the API
+        self.owner_auth = None                  # 28.10: the owner's sign-in (cnq/api/owner_auth.py), set by the API
 
     # ------------------------------------------------------------ access
     def check(self, headers: dict) -> tuple[int, dict] | None:
-        """None when the caller is the owner; else (code, answer). Never prints or returns the token."""
+        """None when the caller is the owner; else (code, answer). Never prints or returns the token.
+        28.10: an owner session from the panel's sign-in («Bearer cno_…», cnq/api/owner_auth.py) is accepted as well as
+        CNQ_ADMIN_TOKEN — the token stays for scripts and as the fallback until the owner switches."""
+        got = str(headers.get("authorization") or "")
+        got = got[7:].strip() if got[:7].lower() == "bearer " else ""
+        if self.owner_auth is not None and got.startswith("cno_"):
+            ip = str(headers.get("x-real-ip") or headers.get("x-forwarded-for") or "local").split(",")[0].strip()[:64]
+            now = time.time()
+            with self.lock:
+                recent = [t for t in self.fails.get(ip, []) if now - t < FAIL_WINDOW]
+                self.fails[ip] = recent
+                if len(recent) >= FAIL_MAX:
+                    return 429, {"error": "too_many_attempts", "retry_after_sec": int(FAIL_WINDOW - (now - recent[0])) + 1}
+            if self.owner_auth.session(headers):
+                return None
+            with self.lock:
+                self.fails.setdefault(ip, []).append(now)
+            return 401, {"error": "token_expired"}
         want = (os.environ.get("CNQ_ADMIN_TOKEN") or "").strip()
         if len(want) < MIN_TOKEN:
             return 403, {"error": "admin_disabled"}

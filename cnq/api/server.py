@@ -26,6 +26,12 @@ With the Firebase ID token («Authorization: Bearer …»):
                              небольшую сумму», a reason each in ?lang=, held by «CRYPTO NOVA портфель», on OKX / BingX spot (cnq/api/spot_top.py)
   DELETE /v2/me      delete the account: every row on our server + the Firebase login (Apple 5.1.1(v))
 The owner's admin panel (web/admin.html), its own token CNQ_ADMIN_TOKEN, not Firebase: /v2/admin/* — see cnq/api/console.py.
+28.10 — the owner's ONE sign-in for the closed panel cryptonova.vip (cnq/api/owner_auth.py): /v2/auth/* (Firebase email + password /
+Apple / Google → an owner session; passkeys = Face ID / Touch ID), and with that session (Authorization: Bearer cno_…):
+  GET /v2/owner/overview     who is signed in + the headline of each private section (cnq/api/owner_data.py)
+  GET /v2/owner/myspot       «Мой портфель · OKX» — decrypted on the server with MYSPOT_PASS from /etc/cnq.env (read-only)
+  GET /v2/owner/ivan         «Иван тест» — decrypted on the server with IVAN_PASS (view-only: a strategy under test)
+  /v2/admin/*                accepts the owner session as well as CNQ_ADMIN_TOKEN.
 Demo only until 2.1; nothing here places orders or holds money."""
 from __future__ import annotations
 
@@ -46,7 +52,8 @@ from urllib.parse import parse_qs, urlsplit
 from cnq.agents.i18n import DEFAULT, LANGS, file_name, norm_lang, polish, polish_doc
 from cnq.agents.llm import LLM, PROVIDERS
 
-from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, pf_parse, pf_review, spot_top, tts
+from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, owner_auth, owner_data, pf_parse, \
+    pf_review, spot_top, tts
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -116,6 +123,10 @@ class Api:
         self.console = console or admin_console.Console(store, web_dir)   # the owner's admin panel, /v2/admin/*
         self.access = access_codes.AccessCodes(store)          # 22.10: guest access codes, checked here (no public hash file)
         self.console.access = self.access
+        # 28.10: the owner's one sign-in (Firebase → owner session, passkeys) and his private sections, decrypted on the server
+        self.owner_auth = owner_auth.OwnerAuth(store, verifier)
+        self.console.owner_auth = self.owner_auth            # /v2/admin/* accepts the owner session too
+        self.owner_data = owner_data.OwnerData(web_dir)
         self.nova = knowledge or nova.Knowledge()
         self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
         self.selftest: dict | None = None        # GET /v2/agent/selftest: the last real model call on a fixed question
@@ -275,16 +286,17 @@ class Api:
         return {"limit": lim, "left": max(0, lim - used)}
 
     @staticmethod
-    def _is_owner(email: str | None) -> bool:
+    def _is_owner(email: str | None, verified: bool | None = True) -> bool:
         """build 45 (owner 22.10): the signed-in user is the owner when their email equals CNQ_OWNER_EMAIL (/etc/cnq.env).
-        Empty / unset = nobody is the owner. The email itself is never in the repo or the app."""
-        owner = (os.environ.get("CNQ_OWNER_EMAIL") or "").strip().lower()
-        return bool(owner) and (email or "").strip().lower() == owner
+        Empty / unset = nobody is the owner. The email itself is never in the repo or the app.
+        28.10: and Firebase must have VERIFIED that email — with Email/Password sign-in switched on, anybody could otherwise make an
+        unverified password account with the owner's address. Several addresses may be listed, separated by commas."""
+        return owner_auth.is_owner(email, verified)
 
-    def _profile(self, uid: str) -> dict:
+    def _profile(self, uid: str, verified: bool | None = None) -> dict:
         u = self.store.user(uid)
         return {"user": {**{k: u.get(k) for k in ("uid", "email", "name", "tier", "vip_since", "bingx_uid", "created")},
-                         "is_owner": self._is_owner(u.get("email"))},
+                         "is_owner": self._is_owner(u.get("email"), verified)},
                 "prefs": self.store.prefs(uid), "piggy": self.store.piggy(uid), "progress": self.store.progress(uid),
                 "agent": self._allowance(uid, u.get("tier") or "free")}
 
@@ -360,6 +372,10 @@ class Api:
         if method == "POST" and path == "/v2/admin/nova":                # the closed system's NOVA chat through the server's key
             deny = self.console.check(headers)
             return deny if deny else self._panel_nova(body)
+        if path.startswith("/v2/auth/"):                                  # 28.10: the owner's sign-in (cnq/api/owner_auth.py)
+            return self.owner_auth.handle(method, path, headers, body)
+        if path == "/v2/owner" or path.startswith("/v2/owner/"):          # 28.10: the owner's private sections, owner session only
+            return self._owner(method, path, headers)
         if path == "/v2/admin" or path.startswith("/v2/admin/"):          # the owner's admin panel: its own token, not Firebase
             return self.console.handle(method, path, url.query, headers, body)
         # ------------------------------------------------------------ signed-in user
@@ -383,7 +399,7 @@ class Api:
             return 400, {"error": "bad_json"}
         if method == "POST" and path == "/v2/me":
             self.store.upsert_user(uid, who.get("email"), who.get("name"), str(data.get("lang") or "")[:5] or None)
-            return 200, self._profile(uid)
+            return 200, self._profile(uid, who.get("email_verified"))
         if not self.store.user(uid):
             self.store.upsert_user(uid, who.get("email"), who.get("name"))
         if method == "PUT" and path == "/v2/prefs":
@@ -423,10 +439,31 @@ class Api:
                 self.agent_last = {"result": "server_error", "ms": None, "at": int(time.time()), "lang": lang}
                 return 200, {"error": "busy", "answer": nova.busy(lang)}
         if method == "POST" and path == "/v2/vip/check":
-            return self._vip(uid, str(data.get("bingx_uid") or "").strip())
+            return self._vip(uid, str(data.get("bingx_uid") or "").strip(), who.get("email_verified"))
         if method == "POST" and path == "/v2/portfolio/review":
             lang = norm_lang(data.get("lang") or lang)
             return self._pf_guard("review", lang, lambda: self._pf_review(uid, data, lang))
+        return 404, {"error": "not_found"}
+
+    # ---------------------------------------------------------------- 28.10: the owner's private sections
+    def _owner(self, method: str, path: str, headers: dict) -> tuple[int, dict]:
+        """GET /v2/owner/overview · /v2/owner/myspot · /v2/owner/ivan — only with a valid owner session (checked here, on the
+        server, on every call). Read-only: nothing here can change an account, a key or a trading setting."""
+        s, deny = self.owner_auth.require(headers)
+        if deny:
+            return deny
+        if method != "GET":
+            return 405, {"error": "method"}
+        if path == "/v2/owner/overview":
+            return 200, {"owner": {"email": s["email"], "method": s["method"]},
+                         "session": self.owner_auth._pub(s, s["id"]),
+                         "sections": self.owner_data.summary(),
+                         "configured": {**self.owner_data.configured(),
+                                        "admin_token": len((os.environ.get("CNQ_ADMIN_TOKEN") or "").strip()) >= admin_console.MIN_TOKEN},
+                         "now": int(time.time() * 1000)}
+        m = re.fullmatch(r"/v2/owner/(myspot|ivan)", path)
+        if m:
+            return self.owner_data.get(m.group(1))
         return 404, {"error": "not_found"}
 
     # ---------------------------------------------------------------- build 45: «Разбор портфеля»
@@ -669,7 +706,7 @@ class Api:
             self.selftest = out
             return {**out, "cached": False, "age_sec": 0}
 
-    def _vip(self, uid: str, bx: str) -> tuple[int, dict]:
+    def _vip(self, uid: str, bx: str, verified: bool | None = None) -> tuple[int, dict]:
         owner = self.store.bingx_owner(bx) if bx else None
         if owner and owner != uid:
             return 409, {"error": "uid_taken"}
@@ -677,7 +714,7 @@ class Api:
         if res.get("reason") in ("not_configured", "exchange_error"):
             return 503, {"error": res["reason"]}
         self.store.set_vip(uid, bx, bool(res.get("ok")), res)
-        return 200, {"vip": bool(res.get("ok")), "reason": res.get("reason"), "user": self._profile(uid)["user"]}
+        return 200, {"vip": bool(res.get("ok")), "reason": res.get("reason"), "user": self._profile(uid, verified)["user"]}
 
 
 def _body_lang(body: bytes) -> str:
@@ -715,7 +752,8 @@ def make_handler(api: Api):
 
         def _is_admin(self) -> bool:          # the pages on cryptonova.vip call these from the browser → CORS for that origin only
             p = self.path.split("?", 1)[0].rstrip("/")
-            return p == "/v2/admin" or p.startswith("/v2/admin/") or p == "/v2/access/verify"
+            return (p == "/v2/admin" or p.startswith("/v2/admin/") or p == "/v2/access/verify"
+                    or p.startswith("/v2/auth/") or p == "/v2/owner" or p.startswith("/v2/owner/"))    # 28.10: the owner's sign-in
 
         def _cors(self) -> None:          # the admin page lives on cryptonova.vip and calls this API from the owner's browser
             self.send_header("Access-Control-Allow-Origin", admin_console.origin())

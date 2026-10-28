@@ -81,6 +81,31 @@ jobs:
             echo "::notice title=report $l::$r · $u · $t"
           done
 
+      # 28.10: the owner's sign-in for cryptonova.vip (cnq/api/owner_auth.py) — the public config answers, and every owner
+      # endpoint refuses a call without a session (401), also with a made-up session token. Fails the run if any does not.
+      - name: Owner sign-in — closed without a session
+        run: |
+          set -u
+          A=https://app.crypto-capital.app
+          cfg=$(curl -sS -m 20 -w '\n%{http_code}' $A/v2/auth/config || printf '{}\n000')
+          echo "::notice title=auth config::HTTP $(echo "$cfg" | tail -n 1) · $(echo "$cfg" | sed '$d' | jq -c '{firebase_web: (.firebase != null), providers, owner_configured, passkey, session}' 2>/dev/null || echo 'not JSON')"
+          pre=$(curl -sS -m 20 -o /dev/null -D - -X OPTIONS -H 'Origin: https://cryptonova.vip' -H 'Access-Control-Request-Method: POST' $A/v2/auth/session | tr -d '\r' | grep -i -E '^HTTP|^access-control-allow-origin' | tr '\n' ' ' || true)
+          echo "::notice title=auth CORS preflight::$pre"
+          out=""; bad=""
+          for ep in "GET /v2/owner/overview" "GET /v2/owner/myspot" "GET /v2/owner/ivan" "GET /v2/auth/me" "GET /v2/auth/sessions" \
+                    "GET /v2/auth/passkeys" "POST /v2/auth/passkey/register/options" "POST /v2/auth/passkey/register/verify" \
+                    "POST /v2/auth/sessions/revoke" "POST /v2/auth/passkeys/delete" "POST /v2/auth/logout"; do
+            set -- $ep
+            if [ "$1" = GET ]; then code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "$A$2" || echo 000)
+            else code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "$A$2" || echo 000); fi
+            out="$out $2=$code"; [ "$code" = 401 ] || bad="$bad $2=$code"
+          done
+          for ep in /v2/owner/overview /v2/admin/ping; do
+            code=$(curl -sS -m 20 -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer cno_made-up-session-token-000000000000000000' "$A$ep" || echo 000)
+            out="$out $ep(fake session)=$code"; [ "$code" = 401 ] || bad="$bad $ep(fake)=$code"
+          done
+          echo "::notice title=owner endpoints without a session (401 expected)::$out"
+          if [ -n "$bad" ]; then echo "::error title=owner endpoints not closed::$bad"; exit 1; fi
   tts-code:
     # 28.10 (build 46 #6): the server's own synthesis code (cnq/api/tts.py synth) against the real edge-tts and Microsoft's voices,
     # on a runner — proves the code before / independently of the server's install

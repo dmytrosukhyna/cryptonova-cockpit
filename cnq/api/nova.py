@@ -431,6 +431,9 @@ class Knowledge:
                 line += f"; из них спот {_usd(sp_['pnl_usd'])}, фьючерсы {_usd(fu_['pnl_usd'])}"
             st = fu_.get("stats") or {}
             line += f"; фьючерсов открыто {fu_.get('open_n', 0)}, закрыто {st.get('n', 0)}"
+            fl_ = pp.get("flows") or {}
+            if fl_.get("n"):                     # 28.10 (owner): deposits / withdrawals are not a result
+                line += f"; пополнения и выводы ({_usd(fl_.get('net_usd'))}) не считаются результатом"
             out.append(line + ("; данные могли устареть." if pp.get("stale") else "."))
         if pub.get("total_usd") is not None:       # 22.10 build 44: the panel's header (demo futures + demo spot) — build 46: demo history
             out.append(f"• Система на демо-счетах (учебные деньги, не публичный портфель), заработано с {_date(pub.get('since'))}: "

@@ -31,6 +31,15 @@ trade it mirrors, «bal:<id>» — public in web/paper.json; null when not ours)
 orders, active spot buys / sells, futures opens / closes, positions OKX closed at the stop or target), newest first, at most
 ACTIONS_MAX, only filled orders — [{"t", "kind": spot_buy | spot_sell | active_buy | active_sell | fut_open | fut_close |
 fut_reduce | fut_gone, "sym", "side" (futures: long | short), "usd" (spot: the filled amount), "px" (average fill price), "sig"}].
+28.10 (owner): deposits, withdrawals and transfers between the main account and this sub-account are NOT a result. "flows":
+{"in_usd", "out_usd", "net_usd", "n", "last_t", "events": [[ms, ± $]], "by": {kind: [n, $]}} — read from OKX's own bills
+(funding: deposits, withdrawals, cancelled withdrawals, master ↔ sub transfers; trading: transfers that are not the account's own
+funding ↔ trading moves), each valued in USDT at its time (USDT / USDC = 1, other coins at the 1-minute close then). Remembered in
+the local state (a bill hash, never published), so bills older than OKX's windows still count. With F(t) = the flows up to t:
+  result(t) = equity(t) − start − F(t)        (the published "curve", "pnl_usd", "today_usd"; the state keeps the raw equity − start)
+  % = result ÷ (start + Σ flow × (now − t_flow) ÷ (now − since))       (Modified Dietz: a flow counts for the part of the period it
+       was in the account — honest when money comes in late, and = result ÷ start when there are no flows; today: the same over the day)
+No id, address or hash leaves this module; a failed read keeps the flows already known.
 USDT = trading + funding (no Earn: the account is the system 1:1). No key, IP, UID or order id is ever written. No fake numbers:
 when the autopilot is not running (no live holder of its lease, or the global stop) the numbers are real but "stale": true; when
 the account can not be read, the last published numbers stay, with "stale": true and their old asof (readers also treat an asof
@@ -41,6 +50,7 @@ Not financial advice. Stdlib only."""
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -53,7 +63,7 @@ from . import myspot_watch as ms
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
         "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve",
-        "actions")
+        "actions", "flows")
 SPOT_KEYS = ("sym", "share", "usd", "copy", "copy_reason", "copy_pct")
 FUT_KEYS = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason", "mark", "lev", "opened", "sig")
 CLOSED_KEYS = ("inst", "side", "open_px", "close_px", "move_pct", "pnl_usd", "lev", "opened", "closed", "partial")
@@ -209,6 +219,122 @@ def actions(since: int, logs: dict | None = None) -> list[dict]:
     return out[:ACTIONS_MAX]
 
 
+# ── 28.10: deposits / withdrawals / master ↔ sub transfers (read-only bills) ──────────────────────────────────────────────
+FUND_BILLS, TRADE_BILLS = "/api/v5/asset/bills", "/api/v5/account/bills"
+FUND_KIND = {"1": "deposit", "2": "withdrawal", "13": "withdrawal", "20": "transfer", "21": "transfer", "22": "transfer", "23": "transfer"}
+FUND_INTERNAL = {"130", "131"}               # the account's own funding ↔ trading moves — not a flow
+STABLE = {"USDT", "USDC", "USD"}
+FLOW_KINDS = ("deposit", "withdrawal", "transfer")
+FLOW_EVENTS_MAX = 200
+
+
+def _bills(fetch, host: str, path: str, since: int, cursor: str, params: dict | None = None, pages: int = 5) -> list:
+    """bills since `since`, newest first, page by page (asset bills page by ts, account bills by billId)"""
+    out, after = [], None
+    for _ in range(pages):
+        d = ms._call(fetch, host, path, {**(params or {}), "limit": "100", **({"after": after} if after else {})})
+        out += d
+        if len(d) < 100 or any(int(b.get("ts") or 0) < since for b in d):
+            break
+        last = d[-1]
+        after = str(last.get(cursor) or last.get("ts") or "")
+        if not after:
+            break
+    return [b for b in out if int(b.get("ts") or 0) >= since]
+
+
+def _px_at(fetch, host: str, ccy: str, t: int) -> float | None:
+    """the coin's USDT price at t: 1 for USDT / USDC; else the close of the 1-minute candle at t (the ticker when there is none)"""
+    if ccy in STABLE:
+        return 1.0
+    try:
+        d = ms._call(fetch, host, "/api/v5/market/history-candles", {"instId": f"{ccy}-USDT", "bar": "1m", "after": str(t + 60_000), "limit": "1"},
+                     signed=False)
+        if d and ms._f(d[0][4]):
+            return ms._f(d[0][4])
+        d = ms._call(fetch, host, "/api/v5/market/ticker", {"instId": f"{ccy}-USDT"}, signed=False)
+        return ms._f(d[0].get("last")) if d else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _hid(prefix: str, b: dict) -> str:
+    raw = f"{prefix}:{b.get('billId') or ''}:{b.get('ts')}:{b.get('ccy')}:{b.get('balChg')}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def read_flows(fetch, host: str, since: int, st: dict) -> None:
+    """adds the new money flows since the start to st["flows"] {hash: [ms, ± $, kind]} (local state only). Never raises: a failed
+    read leaves what is already known; a flow whose price can not be read now is tried again next time."""
+    known = st.setdefault("flows", {})
+    try:
+        fund = _bills(fetch, host, FUND_BILLS, since, "ts")
+    except Exception:  # noqa: BLE001
+        fund = None
+    try:
+        trade = _bills(fetch, host, TRADE_BILLS, since, "billId", {"type": "1"})       # type 1 = transfer
+    except Exception:  # noqa: BLE001
+        trade = None
+    new = []
+    internal = []
+    for b in fund or []:
+        typ, chg = str(b.get("type") or ""), ms._f(b.get("balChg"))
+        if not chg:
+            continue
+        if typ in FUND_INTERNAL:
+            internal.append([str(b.get("ccy") or ""), chg, int(b.get("ts") or 0)])
+        elif typ in FUND_KIND:
+            new.append((_hid("f", b), int(b.get("ts") or 0), str(b.get("ccy") or ""), chg, FUND_KIND[typ]))
+    for b in trade or []:
+        chg, ccy, t = ms._f(b.get("balChg")), str(b.get("ccy") or ""), int(b.get("ts") or 0)
+        if not chg:
+            continue
+        twin = next((i for i in internal if i[0] == ccy and abs(i[1] + chg) <= 1e-9 + abs(chg) * 1e-6 and abs(i[2] - t) <= 120_000), None)
+        if twin is not None:                       # the other half of a funding ↔ trading move inside this account
+            internal.remove(twin)
+            continue
+        if fund is None:                           # without the funding bills an internal move can not be told apart — wait
+            continue
+        new.append((_hid("t", b), t, ccy, chg, "transfer"))
+    for h, t, ccy, chg, kind in new:
+        if h in known or not ccy:
+            continue
+        px = _px_at(fetch, host, ccy, t)
+        if px is None:
+            continue
+        known[h] = [t, round(chg * px, 2), kind]
+
+
+def flows_summary(st: dict, since: int) -> dict:
+    ev = sorted((int(v[0]), float(v[1]), str(v[2])) for v in (st.get("flows") or {}).values()
+                if isinstance(v, list) and len(v) == 3 and int(v[0]) >= since)
+    by = {k: [0, 0.0] for k in FLOW_KINDS}
+    for _t, u, k in ev:
+        if k in by:
+            by[k][0] += 1
+            by[k][1] = round(by[k][1] + u, 2)
+    inn = sum(u for _t, u, _k in ev if u > 0)
+    out = -sum(u for _t, u, _k in ev if u < 0)
+    return {"in_usd": _r(inn), "out_usd": _r(out), "net_usd": _r(inn - out), "n": len(ev), "last_t": ev[-1][0] if ev else None,
+            "events": [[t, _r(u)] for t, u, _k in ev][-FLOW_EVENTS_MAX:], "by": by}
+
+
+def _by(v) -> list:
+    if isinstance(v, (list, tuple)) and len(v) == 2 and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in v):
+        return [int(v[0]), round(float(v[1]), 2)]
+    return [0, 0.0]
+
+
+def _f_at(events: list, t: int) -> float:
+    return sum(u for te, u in events if te <= t)
+
+
+def dietz(base: float, events: list, t0: int, t1: int) -> float:
+    """the capital a result is divided by: base + every flow in (t0, t1] weighted by the share of the period it was in"""
+    span = max(1, t1 - t0)
+    return base + sum(u * (t1 - te) / span for te, u in events if t0 < te <= t1)
+
+
 def compact(curve: list, max_n: int = CURVE_MAX, recent: int = CURVE_RECENT) -> list:
     if len(curve) <= max_n:
         return curve
@@ -240,7 +366,10 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
     start = s.get("start") or {}
     s0, since = float(start.get("usd") or sub.START_USD), int(start.get("t") or now)
     eq = float(s["total_usd"])
-    pnl = eq - s0
+    fl = flows_summary(st, since)
+    ev = [(t, u) for t, u in fl["events"]]
+    raw = eq - s0                                  # the state's curve keeps equity − start; the flows come off at publishing
+    pnl = raw - _f_at(ev, now)
     fpnl = None if fut_realized is None else fut_realized + sum(float(p.get("upl") or 0.0) for p in (s.get("futures") or {}).get("positions") or [])
     curve = [p for p in st.get("curve") or [] if isinstance(p, list) and len(p) == 2 and p[0] >= since]
     fcurve = [p for p in st.get("fut_curve") or [] if isinstance(p, list) and len(p) == 2 and p[0] >= since]
@@ -249,15 +378,21 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
         if not fcurve:
             fcurve = [[since, 0.0]]            # at the start both results are 0 by definition
     if now - curve[-1][0] >= STEP_MS:
-        curve.append([now, round(pnl, 2)])
+        curve.append([now, round(raw, 2)])
         if fpnl is not None:
             fcurve.append([now, round(fpnl, 2)])
     st["curve"] = curve = compact(curve)
     ts = {p[0] for p in curve}
     st["fut_curve"] = fcurve = [p for p in fcurve if p[0] in ts]       # only at the curve's own (kept) timestamps
     day0 = now - now % DAY_MS
-    ref = 0.0 if since >= day0 else next((v for t, v in reversed(curve) if t < day0), None)
-    today = None if ref is None else pnl - ref
+    refp = (since, 0.0) if since >= day0 else next(((t, v) for t, v in reversed(curve) if t < day0), None)
+    today = today_pct = None
+    if refp is not None:
+        t_ref, raw_ref = refp
+        today = pnl - (raw_ref - _f_at(ev, t_ref))                    # the change of the result, not of the money in the account
+        cap = dietz(s0 + raw_ref, ev, t_ref, now)                       # the equity at the day's start + the day's flows, weighted
+        today_pct = today / cap * 100 if cap else None
+    cap_all = dietz(s0, ev, since, now)
     spot, cps = {}, {}
     for r in list((s.get("spot") or {}).get("rows") or []) + list((s.get("active") or {}).get("rows") or []):
         if r.get("usd"):
@@ -273,13 +408,13 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
                     "copy_reason": p.get("copy_reason"), "mark": p.get("mark"), "lev": p.get("lev"), "opened": p.get("ctime"),
                     "sig": p.get("sig")})
     return {"exchange": "OKX", "since": since, "start_usd": _r(s0), "equity_usd": _r(eq), "pnl_usd": _r(pnl),
-            "pnl_pct": _r(pnl / s0 * 100 if s0 else None), "today_usd": _r(today),
-            "today_pct": _r(today / (s0 + ref) * 100) if today is not None and (s0 + ref) else None,
+            "pnl_pct": _r(pnl / cap_all * 100 if cap_all else None), "today_usd": _r(today), "today_pct": _r(today_pct),
             "spot": [{"sym": c, "share": _r(u / eq * 100 if eq else 0.0), "usd": _r(u), **cps.get(c, {})}
                      for c, u in sorted(spot.items(), key=lambda x: -x[1])],
             "spot_pnl_usd": _r(pnl - fpnl) if fpnl is not None else None, "fut_pnl_usd": _r(fpnl),
             "usdt_pct": _r(cash / eq * 100 if eq else 0.0), "usdt_usd": _r(cash), "alloc": dict(s.get("alloc") or {}), "futures": fut,
-            "closed_n": int(closed_n or 0), "curve": [[int(t), _r(v)] for t, v in curve], "asof": now, "stale": not running(s.get("lease")),
+            "closed_n": int(closed_n or 0), "curve": [[int(t), _r(v - _f_at(ev, t))] for t, v in curve], "asof": now,
+            "stale": not running(s.get("lease")), "flows": fl,
             "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url"),
             "closed": list(closed_rows or [])[:CLOSED_MAX], "fut_curve": [[int(t), _r(v)] for t, v in fcurve],
             "actions": list(acts or [])[:ACTIONS_MAX]}
@@ -317,6 +452,12 @@ def clean(doc: dict) -> dict:
                                "side": x.get("side") if x.get("side") in ("long", "short") else None,
                                "usd": num(x.get("usd")), "px": num(x.get("px")),
                                "sig": x["sig"] if isinstance(x.get("sig"), str) and SIG_RE.match(x["sig"]) else None})
+    f = doc.get("flows") if isinstance(doc.get("flows"), dict) else {}
+    out["flows"] = {"in_usd": num(f.get("in_usd")) or 0.0, "out_usd": num(f.get("out_usd")) or 0.0, "net_usd": num(f.get("net_usd")) or 0.0,
+                    "n": int(num(f.get("n")) or 0), "last_t": int(f["last_t"]) if num(f.get("last_t")) else None,
+                    "events": [[int(e[0]), num(e[1])] for e in f.get("events") or []
+                               if isinstance(e, (list, tuple)) and len(e) == 2 and num(e[0]) and num(e[1]) is not None][-FLOW_EVENTS_MAX:],
+                    "by": {k: _by((f.get("by") if isinstance(f.get("by"), dict) else {}).get(k)) for k in FLOW_KINDS}}
     out["fut_curve"] = [[int(p[0]), num(p[1])] for p in doc.get("fut_curve") or []
                         if isinstance(p, (list, tuple)) and len(p) == 2 and num(p[0]) and num(p[1]) is not None]
     out["alloc"] = {k: (doc.get("alloc") or {}).get(k) for k in sub.ALLOC_KEYS}
@@ -352,10 +493,14 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
             acts = actions(since)
         except Exception:  # noqa: BLE001 — the summary never fails because of a log
             acts = []
+        try:
+            read_flows(fetch, "https://" + s["host"], since, state)
+        except Exception:  # noqa: BLE001 — never fails because of the flows: the known ones stay
+            pass
         doc = clean(build(s, state, now, *closed_history(fetch, "https://" + s["host"], since), acts=acts))
     elif state.get("last"):
         # the last real numbers, their own asof — never invented ones (a «last» from before 28.10 gets the new keys empty)
-        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], **state["last"], "stale": True})
+        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, **state["last"], "stale": True})
     else:
         return None
     if put is None:

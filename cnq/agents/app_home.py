@@ -934,7 +934,7 @@ REAL_ALLOC = ("spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_u
               "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct")
 REAL_STALE_MS = 2 * 3_600_000
 REAL_OPT = ("copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd",      # 22.10 (build 45): null in a file from before
-            "closed", "fut_curve", "actions")                         # 28.10 (build 46)
+            "closed", "fut_curve", "actions", "flows")                # 28.10 (build 46)
 REAL_FUT = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason", "mark", "lev", "opened", "sig")
 
 
@@ -1005,18 +1005,23 @@ def _at(curve: list, x: int):
     return v
 
 
-def _periods(curve: list, res_now, base, since: int, now: int, known_from: int | None = None) -> dict:
-    """{day, week, month, all}: the change of the result over the period and its % of the value at the period's start"""
+def _periods(curve: list, res_now, base, since: int, now: int, known_from: int | None = None, flows: list | None = None) -> dict:
+    """{day, week, month, all}: the change of the result over the period and its % — 28.10 (owner): deposits / withdrawals are not
+    a result. The curve is the result WITHOUT the flows (cnq/execution/public_real.py), so the change never jumps at a deposit;
+    base_usd = the money in the account at the period's start (start + result + the flows so far) and the % divides by it plus the
+    period's flows weighted by the time they were in (Modified Dietz) — with no flows simply the change ÷ the value at the start."""
     day0 = now - now % DAY_MS
+    ev = [(int(t_), float(u)) for t_, u in flows or []]
     out = {}
     for key, days in PP_PERIODS:
         frm = day0 if days is None else since if days == 0 else now - days * DAY_MS
         eff = max(frm, since)
         ref = 0.0 if eff <= since else (None if known_from is None or eff < known_from else _at(curve, eff))
         ok = ref is not None and res_now is not None and base is not None
-        b = (base + ref) if ok else None
+        b = (base + ref + sum(u for t_, u in ev if t_ <= eff)) if ok else None
+        cap = (b + sum(u * (now - t_) / max(1, now - eff) for t_, u in ev if eff < t_ <= now)) if ok else None
         out[key] = {"from": int(eff), "clipped": frm < since, "available": ok, "base_usd": _r(b),
-                    "usd": _r(res_now - ref) if ok else None, "pct": _r((res_now - ref) / b * 100) if ok and b else None}
+                    "usd": _r(res_now - ref) if ok else None, "pct": _r((res_now - ref) / cap * 100) if ok and cap else None}
     return out
 
 
@@ -1050,6 +1055,11 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
         return None
     since, s0, eq, pnl = int(real["since"]), float(real.get("start_usd") or 0), float(real["equity_usd"]), real.get("pnl_usd")
     asof = int(real["asof"])
+    f = real.get("flows") if isinstance(real.get("flows"), dict) else {}
+    fl = {"in_usd": float(f.get("in_usd") or 0), "out_usd": float(f.get("out_usd") or 0), "net_usd": float(f.get("net_usd") or 0),
+          "n": int(f.get("n") or 0), "last_t": f.get("last_t"),
+          "events": [e for e in f.get("events") or [] if isinstance(e, list) and len(e) == 2 and e[1] is not None]}
+    cap0 = s0 + fl["net_usd"]
     curve = sorted((int(p[0]), float(p[1])) for p in real.get("curve") or [] if isinstance(p, list) and len(p) == 2 and p[1] is not None)
     al = real.get("alloc") or {}
     # ---- allocation: one file, one asof
@@ -1079,7 +1089,7 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
     def part(share, res, crv, key):
         if share is None:
             return None
-        base = s0 * float(share) / 100
+        base = cap0 * float(share) / 100            # the part's share of the capital: the start + the net flows (28.10)
         return {"share_pct": _r(share), "start_usd": _r(base), "pnl_usd": _r(res), "value_usd": _r(base + res) if res is not None else None,
                 "pct": _r(res / base * 100) if res is not None and base else None, "since": since,
                 "base_note": t(lang, f"pp.base.{key}", share=_dec(float(share), lang), usd=_usd_text(base, lang)),
@@ -1138,7 +1148,10 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             "stale_note": t(lang, "pp.stale") if real.get("stale") else None,
             "split_note": t(lang, "pp.split_from", d=_date_text(split_from, lang)) if split_from and split_from > since else None,
             "copy_url": real.get("copy_url"), "copiers": real.get("copiers"),
-            "curve": [[t_, _r(s0 + v)] for t_, v in curve], "periods": _periods(curve, pnl, s0, since, asof, since),
+            # the curve = start + the result without the flows (so a deposit is never a jump); value_usd = the money really there
+            "curve": [[t_, _r(s0 + v)] for t_, v in curve], "periods": _periods(curve, pnl, s0, since, asof, since, fl["events"]),
+            "flows": {k: fl[k] for k in ("in_usd", "out_usd", "net_usd", "n", "last_t")}, "capital_usd": _r(cap0),
+            "flows_note": t(lang, "pp.flows", usd=("+" if fl["net_usd"] > 0 else "") + _usd_text(fl["net_usd"], lang)) if fl["n"] else None,
             "alloc": {"asof": asof, "value_usd": _r(eq), "groups": groups, "categories": cats, "assets": assets},
             "spot": spot, "futures": fut, "actions": acts}
 

@@ -386,3 +386,99 @@ def test_market_view_spot_actions_and_demo_stats_in_plain_words(tmp_path):
         1 for k in doc["futures"]["in_result"] for x in c["paper"]["profiles"][k].get("closed") or [] if not x.get("pnl_usd"))
     for r in doc["futures"]["closed"]:
         assert r["acct_usd"] == round(r["pnl_usd"] * 10000 / (10000 * len(doc["futures"]["in_result"])), 2)
+
+
+def _flow_fetch(fk, fund=(), trade=(), candle=None, fail=False):
+    """the fake OKX + the bills and candles of the money flows (made-up)"""
+    base = TS._fetch(fk, [])
+
+    def fetch(host, path, params=None, signed=True):
+        if fail and path in (PR.FUND_BILLS, PR.TRADE_BILLS):
+            return {"code": "50011", "msg": "rate limit", "data": []}
+        if path == PR.FUND_BILLS:
+            return {"code": "0", "data": list(fund)}
+        if path == PR.TRADE_BILLS:
+            return {"code": "0", "data": list(trade)}
+        if path == "/api/v5/market/history-candles":
+            return {"code": "0", "data": [[str(int(params["after"]) - 60_000), "1", "1", "1", str(candle), "1"]] if candle else []}
+        return base(host, path, params, signed)
+    return fetch
+
+
+def test_deposits_withdrawals_and_transfers_are_not_a_result():
+    """28.10 (owner): money moved in or out of the account is not profit or loss. A master → sub transfer of $1 000 and a withdrawal
+    of 0.05 ETH (valued at its own time) are flows; the account's own funding ↔ trading move is not. The result, today, the curve and
+    the % (Modified Dietz) leave the flows out; no bill id is published; a failed read keeps what is known."""
+    e, fk, _log = TS._setup()
+    e = {**e, "OKX_PUBLIC_STATE": os.path.join(tempfile.mkdtemp(), "pr.json")}
+    st = {}
+    t = NOW + 60_000
+    put = lambda d: True  # noqa: E731
+    doc0 = PR.run(e, _flow_fetch(fk), t, put=put, state=st)
+    since, p0 = doc0["since"], doc0["pnl_usd"]
+    assert doc0["flows"]["n"] == 0 and doc0["flows"]["net_usd"] == 0.0
+    t1 = t + PR.STEP_MS
+    fk.bal["USDT"] += 1000.0                                                   # the owner moves $1 000 in from the main account
+    fund = [{"billId": "B1", "type": "23", "ccy": "USDT", "balChg": "1000", "ts": str(t1 - 30_000)},
+            {"billId": "B2", "type": "131", "ccy": "USDT", "balChg": "-1000", "ts": str(t1 - 20_000)},        # funding → trading (own)
+            {"billId": "B3", "type": "2", "ccy": "ETH", "balChg": "-0.05", "ts": str(t1 - 10_000)},           # a withdrawal of ETH
+            {"billId": "B4", "type": "150", "ccy": "USDT", "balChg": "3", "ts": str(t1 - 5_000)}]             # a reward: a result, not a flow
+    trade = [{"billId": "C1", "type": "1", "subType": "11", "ccy": "USDT", "balChg": "1000", "ts": str(t1 - 19_000)}]  # the twin of B2
+    fk.bal["ETH"] = max(0.0, fk.bal.get("ETH", 0.0))
+    doc1 = PR.run(e, _flow_fetch(fk, fund, trade, candle=4000.0), t1, put=put, state=st)
+    F = doc1["flows"]
+    assert F["n"] == 2 and F["in_usd"] == 1000.0 and F["out_usd"] == 200.0 and F["net_usd"] == 800.0 and F["last_t"] == t1 - 10_000
+    assert F["by"] == {"deposit": [0, 0.0], "withdrawal": [1, -200.0], "transfer": [1, 1000.0]}
+    assert doc1["equity_usd"] == round(doc0["equity_usd"] + 1000.0, 2)                    # the money is really there …
+    assert abs(doc1["pnl_usd"] - (doc1["equity_usd"] - doc1["start_usd"] - 800.0)) < 0.011     # … but the result leaves the flows out
+    assert abs(doc1["pnl_usd"] - (p0 + 200.0)) < 0.02                       # the ETH that left was in the equity before: +200 back in
+    cap = PR.dietz(doc1["start_usd"], [(t1 - 30_000, 1000.0), (t1 - 10_000, -200.0)], since, t1)
+    assert doc1["pnl_pct"] == round(doc1["pnl_usd"] / cap * 100, 2)
+    assert doc1["curve"][-1] == [t1, doc1["pnl_usd"]] and doc1["curve"][0] == [since, 0.0]    # no jump at the deposit
+    assert st["curve"][-1][1] == round(doc1["equity_usd"] - doc1["start_usd"], 2)             # the state keeps the raw value
+    text = json.dumps(doc1)
+    for bad in ("B1", "B2", "B3", "C1", "billId"):
+        assert bad not in text, bad
+    # a failed read keeps the flows already known; the same bills are never counted twice
+    doc2 = PR.run(e, _flow_fetch(fk, fail=True), t1 + 60_000, put=put, state=st)
+    assert doc2["flows"]["n"] == 2 and doc2["flows"]["net_usd"] == 800.0
+    doc3 = PR.run(e, _flow_fetch(fk, fund, trade, candle=4000.0), t1 + 120_000, put=put, state=st)
+    assert doc3["flows"]["n"] == 2
+    # a coin whose price can not be read now is not counted yet (tried again next time), never valued at a guess
+    st2 = {}
+    PR.read_flows(_flow_fetch(fk, [{"billId": "X", "type": "1", "ccy": "ABC", "balChg": "5", "ts": str(t1)}]), "https://www.okx.com", since, st2)
+    assert st2["flows"] == {}
+    assert PR.clean({**doc1, "flows": {"n": "x", "by": {"deposit": "y"}, "events": [[1, "z"]]}})["flows"]["n"] == 0
+
+
+def test_public_portfolio_periods_leave_the_flows_out(tmp_path):
+    """28.10 (owner): a $1 000 deposit during the week is not a result in any period; the % divides by the money that was in
+    (Modified Dietz); the note says so in every language; the app's chart (start + result) has no jump."""
+    d = str(tmp_path)
+    H = 3_600_000
+    since = T0 + 100 * H
+    now = (since + 6 * 24 * H) // (24 * H) * (24 * H) + 12 * H             # 12:00 UTC
+    day0 = now - now % (24 * H)
+    tf = day0 + 2 * H                                                     # the deposit: today, after 00:00 UTC
+    curve = [[since, 0.0], [day0 - H, -50.0], [day0 + 3 * H, -45.0], [now - 60_000, -40.0]]   # already without the flow
+    real = {"exchange": "OKX", "since": since, "start_usd": 10000.0, "equity_usd": 10960.0, "pnl_usd": -40.0, "pnl_pct": -0.39,
+            "today_usd": 10.0, "today_pct": 0.1, "spot": [], "usdt_pct": 100.0, "usdt_usd": 10960.0, "alloc": None, "futures": [],
+            "closed_n": 0, "curve": curve, "asof": now - 60_000, "stale": False,
+            "flows": {"in_usd": 1000.0, "out_usd": 0.0, "net_usd": 1000.0, "n": 1, "last_t": tf, "events": [[tf, 1000.0]],
+                      "by": {"deposit": [0, 0.0], "withdrawal": [0, 0.0], "transfer": [1, 1000.0]}}}
+    _pp_files(d, real)
+    doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
+    pp = doc["public_portfolio"]
+    P = pp["periods"]
+    asof = now - 60_000
+    assert P["day"]["usd"] == 10.0 and P["day"]["base_usd"] == 9950.0                        # −40 now vs −50 before 00:00
+    cap_day = 9950.0 + 1000.0 * (asof - tf) / (asof - day0)
+    assert P["day"]["pct"] == round(10.0 / cap_day * 100, 2)
+    assert P["all"]["usd"] == -40.0 and P["all"]["pct"] == round(-40.0 / (10000.0 + 1000.0 * (asof - tf) / (asof - since)) * 100, 2)
+    assert pp["value_usd"] == 10960.0 and pp["capital_usd"] == 11000.0 and pp["curve"][-1] == [asof, 9960.0]
+    assert pp["flows"] == {"in_usd": 1000.0, "out_usd": 0.0, "net_usd": 1000.0, "n": 1, "last_t": tf}
+    assert pp["flows_note"] == "Пополнения и выводы не считаются результатом: +$1 000,00."
+    en = json.load(open(os.path.join(d, "app_home.en.json"), encoding="utf-8"))["public_portfolio"]
+    assert en["flows_note"] == "Deposits and withdrawals don't count as the result: +$1,000.00." and en["periods"] == P
+    from cnq.api import nova
+    assert "пополнения и выводы (+$1 000) не считаются результатом" in nova.Knowledge(os.path.join(ROOT, "data")).demo_block(doc)

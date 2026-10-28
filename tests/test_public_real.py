@@ -176,3 +176,50 @@ def test_one_writer_the_mac_mirror_or_the_server_service_never_both():
         assert s in doc, s
     for p in ("deploy/okx/cnq-okx.env.example", "scripts/okx_autopilot_server.sh"):
         assert os.path.exists(os.path.join(ROOT, p))
+
+
+def test_closed_swaps_futures_curve_and_the_desk_trade_behind_a_position():
+    """28.10 (build 46): the real account's own closed futures (OKX positions history, no ids), a futures curve at the curve's own
+    timestamps (spot = total − futures), and each open position names the desk trade it mirrors."""
+    e, fk, _log = TS._setup()
+    e = {**e, "OKX_PUBLIC_STATE": os.path.join(tempfile.mkdtemp(), "pr.json")}
+    fk.hist = [{"instId": "APT-USDT-SWAP", "direction": "long", "openAvgPx": "0.7747", "closeAvgPx": "0.7812", "realizedPnl": "0.27",
+                "lever": "2", "cTime": str(NOW + 500), "uTime": str(NOW + 2000), "posId": "P9", "type": "2"},
+               {"instId": "ETH-USDT-SWAP", "direction": "short", "openAvgPx": "4000", "closeAvgPx": "4100", "realizedPnl": "-5.5",
+                "lever": "2", "cTime": str(NOW + 100), "uTime": str(NOW + 1000), "posId": "P8"},
+               {"instId": "BTC-USDT-SWAP", "direction": "long", "openAvgPx": "1", "closeAvgPx": "2", "realizedPnl": "9",
+                "uTime": "1000", "posId": "P0"}]                                              # before the start: not ours
+    st = {}
+    doc, (pub,) = _run(e, fk, NOW + 60_000, st)
+    assert doc["closed_n"] == 2 and [c["inst"] for c in pub["closed"]] == ["APT-USDT-SWAP", "ETH-USDT-SWAP"]   # newest first
+    apt, eth = pub["closed"]
+    assert list(apt) == list(PR.CLOSED_KEYS) and apt["side"] == "long" and apt["pnl_usd"] == 0.27 and apt["lev"] == 2.0
+    assert apt["move_pct"] == round((0.7812 / 0.7747 - 1) * 100, 2) and eth["move_pct"] == -2.5 and eth["side"] == "short"
+    assert apt["opened"] == NOW + 500 and apt["closed"] == NOW + 2000 and apt["partial"] is False
+    assert "P9" not in json.dumps(pub) and "posId" not in json.dumps(pub)
+    (f,) = pub["futures"]
+    assert f["sig"] and f["sig"].startswith("bal:") and f["sig"].endswith("T1") and list(f) == list(PR.FUT_KEYS)
+    # the futures curve: the start (0 by definition) and every curve point from now on, at the same timestamps
+    assert pub["fut_curve"][0] == [doc["since"], 0.0] and {t for t, _ in pub["fut_curve"]} <= {t for t, _ in pub["curve"]}
+    assert pub["fut_curve"][-1] == [NOW + 60_000, pub["fut_pnl_usd"]]
+    doc2, _ = _run(e, fk, NOW + 60_000 + PR.STEP_MS, st)
+    assert len(doc2["fut_curve"]) == len(doc["fut_curve"]) + 1 and doc2["fut_curve"][-1][0] == doc2["curve"][-1][0]
+    # clean() keeps only the known shapes
+    bad = {**doc2, "closed": [{"inst": "<x>", "pnl_usd": 1}, {**apt, "posId": "P9", "pnl_usd": "1"}],
+           "futures": [{**f, "sig": "x; drop", "mark": "1", "lev": True}], "fut_curve": [[1, 2.0], ["a", 1], [2]]}
+    c = PR.clean(bad)
+    assert len(c["closed"]) == 1 and c["closed"][0]["pnl_usd"] is None and "posId" not in c["closed"][0]
+    assert c["futures"][0]["sig"] is None and c["futures"][0]["mark"] is None and c["futures"][0]["lev"] is None
+    assert c["fut_curve"] == [[1, 2.0]]
+
+
+def test_a_last_summary_from_before_28_10_is_republished_stale_with_the_new_keys_empty():
+    e, fk, _log = TS._setup()
+    e = {**e, "OKX_PUBLIC_STATE": os.path.join(tempfile.mkdtemp(), "pr.json")}
+    st = {}
+    doc, _ = _run(e, fk, NOW + 60_000, st)
+    st["last"] = {k: v for k, v in doc.items() if k not in ("closed", "fut_curve")}     # an older «last»
+    broken = lambda host, path, params=None, signed=True: {"code": "50110", "msg": "IP", "data": []}  # noqa: E731
+    sent = []
+    d = PR.run(e, broken, NOW + 40 * 60_000, put=lambda x: sent.append(x) or True, state=st)
+    assert d["stale"] and d["closed"] == [] and d["fut_curve"] == [] and list(d) == list(PR.KEYS) and len(sent) == 1

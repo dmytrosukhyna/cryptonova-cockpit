@@ -20,6 +20,13 @@ every 15 minutes. The owner's personal (main) account never goes there: this mod
    per 15 min, compact), "asof": ms, "stale": bool,
    "copiers": how many people copy the account on OKX (lead trader; null otherwise), "copy_url": the lead trader's public OKX
    profile https://www.okx.com/copy-trading/account/{uniqueCode} (public by design; null when not a lead trader)}
+28.10 (build 46, owner: the futures tab must show the real account's own trades, closed ones with their stats, and the spot tab its
+own result by period): "closed": the futures positions closed since the start, OKX's own positions history, newest first, at most
+CLOSED_MAX — [{"inst", "side", "open_px", "close_px", "move_pct" (the price move in the trade's direction, %), "pnl_usd" (OKX's
+realizedPnl: fees and funding included), "lev", "opened", "closed", "partial" (OKX type 1 / 4: part of it may still be open)}]; "fut_curve": [[ms, $ futures result since the start]] at the
+curve's own timestamps (from 28.10 on: points before it have no split — nothing is back-filled), so spot = curve − fut_curve; each
+open futures position also has "mark" (OKX mark price), "lev" (the leverage OKX applies), "opened" (OKX cTime) and "sig" (the desk
+trade it mirrors, «bal:<id>» — public in web/paper.json; null when not ours).
 USDT = trading + funding (no Earn: the account is the system 1:1). No key, IP, UID or order id is ever written. No fake numbers:
 when the autopilot is not running (no live holder of its lease, or the global stop) the numbers are real but "stale": true; when
 the account can not be read, the last published numbers stay, with "stale": true and their old asof (readers also treat an asof
@@ -32,6 +39,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import time
 
 from . import ivan_watch
@@ -40,9 +48,13 @@ from . import myspot_watch as ms
 
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
-        "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd")
+        "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve")
 SPOT_KEYS = ("sym", "share", "usd", "copy", "copy_reason", "copy_pct")
-FUT_KEYS = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason")
+FUT_KEYS = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason", "mark", "lev", "opened", "sig")
+CLOSED_KEYS = ("inst", "side", "open_px", "close_px", "move_pct", "pnl_usd", "lev", "opened", "closed", "partial")
+CLOSED_MAX = 50
+INST_RE = re.compile(r"^[A-Z0-9]{1,20}-(USDT|USDC|USD)-SWAP$")
+SIG_RE = re.compile(r"^[a-z]{2,8}:[A-Za-z0-9._-]{1,64}$")
 REASONS = ("usdc_only", "not_supported", "legacy", "ordinary")
 EVERY_S = 15 * 60
 STEP_MS = 15 * 60_000
@@ -92,7 +104,25 @@ def closed_count(fetch, host: str, since: int, pages: int = 10) -> int | None:
 
 def closed_stats(fetch, host: str, since: int, pages: int = 10) -> tuple[int | None, float | None]:
     """(closed swaps since the start, their realized P/L in $ — realizedPnl: fees and funding included). (None, None) unreadable."""
-    n, pnl, after = 0, 0.0, None
+    return closed_history(fetch, host, since, pages)[:2]
+
+
+def _closed_row(h: dict) -> dict:
+    """one closed swap of OKX's positions history in public words — no position or order id"""
+    op, cp = ms._f(h.get("openAvgPx")), ms._f(h.get("closeAvgPx"))
+    d = str(h.get("direction") or h.get("posSide") or "").lower()
+    side = d if d in ("long", "short") else None
+    move = ((cp / op - 1) * (1 if side == "long" else -1) * 100) if op and cp and side else None
+    v = ms._f(h.get("realizedPnl"))
+    return {"inst": str(h.get("instId") or ""), "side": side, "open_px": op, "close_px": cp, "move_pct": _r(move),
+            "pnl_usd": _r(v if v is not None else ms._f(h.get("pnl"))), "lev": ms._f(h.get("lever")),
+            "opened": int(ms._f(h.get("cTime")) or 0) or None, "closed": int(ms._f(h.get("uTime")) or 0) or None,
+            "partial": str(h.get("type") or "") in ("1", "4")}        # OKX: 1 partly closed, 4 partly liquidated — the rest may be open
+
+
+def closed_history(fetch, host: str, since: int, pages: int = 10) -> tuple[int | None, float | None, list]:
+    """closed_stats + the closed swaps themselves (newest first, ≤ CLOSED_MAX). (None, None, []) when unreadable."""
+    n, pnl, after, rows = 0, 0.0, None, []
     try:
         for _ in range(pages):
             d = ms._call(fetch, host, HISTORY, {"instType": "SWAP", "limit": "100", **({"after": after} if after else {})})
@@ -103,14 +133,17 @@ def closed_stats(fetch, host: str, since: int, pages: int = 10) -> tuple[int | N
                     n += 1
                     v = ms._f(h.get("realizedPnl"))
                     pnl += v if v is not None else (ms._f(h.get("pnl")) or 0.0)
+                    if len(rows) < CLOSED_MAX:
+                        rows.append(_closed_row(h))
                 else:
                     older = True
             if len(d) < 100 or older:
                 break
             after = str(min(int(h.get("uTime") or 0) for h in d))
     except Exception:  # noqa: BLE001
-        return None, None
-    return n, round(pnl, 2)
+        return None, None, []
+    rows.sort(key=lambda r: -(r["closed"] or 0))
+    return n, round(pnl, 2), rows
 
 
 def compact(curve: list, max_n: int = CURVE_MAX, recent: int = CURVE_RECENT) -> list:
@@ -138,18 +171,27 @@ def writer(env=None) -> bool:
     return bool(s) and not s.get("error") and s.get("node") == okx_lease.node_of(env)
 
 
-def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized: float | None = None) -> dict:
-    """The public summary from myspot_sub.read() (an ok read). Updates st["curve"]."""
+def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized: float | None = None,
+          closed_rows: list | None = None) -> dict:
+    """The public summary from myspot_sub.read() (an ok read). Updates st["curve"] and st["fut_curve"]."""
     start = s.get("start") or {}
     s0, since = float(start.get("usd") or sub.START_USD), int(start.get("t") or now)
     eq = float(s["total_usd"])
     pnl = eq - s0
+    fpnl = None if fut_realized is None else fut_realized + sum(float(p.get("upl") or 0.0) for p in (s.get("futures") or {}).get("positions") or [])
     curve = [p for p in st.get("curve") or [] if isinstance(p, list) and len(p) == 2 and p[0] >= since]
+    fcurve = [p for p in st.get("fut_curve") or [] if isinstance(p, list) and len(p) == 2 and p[0] >= since]
     if not curve:
         curve = [[since, 0.0]]
+        if not fcurve:
+            fcurve = [[since, 0.0]]            # at the start both results are 0 by definition
     if now - curve[-1][0] >= STEP_MS:
         curve.append([now, round(pnl, 2)])
+        if fpnl is not None:
+            fcurve.append([now, round(fpnl, 2)])
     st["curve"] = curve = compact(curve)
+    ts = {p[0] for p in curve}
+    st["fut_curve"] = fcurve = [p for p in fcurve if p[0] in ts]       # only at the curve's own (kept) timestamps
     day0 = now - now % DAY_MS
     ref = 0.0 if since >= day0 else next((v for t, v in reversed(curve) if t < day0), None)
     today = None if ref is None else pnl - ref
@@ -165,8 +207,8 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
         mv = ((p["mark"] / p["entry"] - 1) * (1 if long else -1) * 100) if p.get("mark") and p.get("entry") else None
         fut.append({"inst": p.get("inst"), "side": "long" if long else "short", "entry": p.get("entry"), "stop": p.get("stop"),
                     "target": p.get("tp"), "upnl_pct": _r(mv), "upnl_usd": _r(p.get("upl")), "copy": p.get("copy"),
-                    "copy_reason": p.get("copy_reason")})
-    fpnl = None if fut_realized is None else fut_realized + sum(float(p.get("upl") or 0.0) for p in (s.get("futures") or {}).get("positions") or [])
+                    "copy_reason": p.get("copy_reason"), "mark": p.get("mark"), "lev": p.get("lev"), "opened": p.get("ctime"),
+                    "sig": p.get("sig")})
     return {"exchange": "OKX", "since": since, "start_usd": _r(s0), "equity_usd": _r(eq), "pnl_usd": _r(pnl),
             "pnl_pct": _r(pnl / s0 * 100 if s0 else None), "today_usd": _r(today),
             "today_pct": _r(today / (s0 + ref) * 100) if today is not None and (s0 + ref) else None,
@@ -175,7 +217,8 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
             "spot_pnl_usd": _r(pnl - fpnl) if fpnl is not None else None, "fut_pnl_usd": _r(fpnl),
             "usdt_pct": _r(cash / eq * 100 if eq else 0.0), "usdt_usd": _r(cash), "alloc": dict(s.get("alloc") or {}), "futures": fut,
             "closed_n": int(closed_n or 0), "curve": [[int(t), _r(v)] for t, v in curve], "asof": now, "stale": not running(s.get("lease")),
-            "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url")}
+            "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url"),
+            "closed": list(closed_rows or [])[:CLOSED_MAX], "fut_curve": [[int(t), _r(v)] for t, v in fcurve]}
 
 
 def clean(doc: dict) -> dict:
@@ -188,6 +231,22 @@ def clean(doc: dict) -> dict:
     for x in out["spot"] + out["futures"]:            # only the known values: a bool (or null) and one of the codes
         x["copy"] = x["copy"] if isinstance(x.get("copy"), bool) else None
         x["copy_reason"] = x["copy_reason"] if x.get("copy_reason") in REASONS else None
+    num = lambda v: v if isinstance(v, (int, float)) and not isinstance(v, bool) else None      # noqa: E731
+    for x in out["futures"]:                           # 28.10: numbers only; «sig» only in the desk-trade shape
+        x["mark"], x["lev"] = num(x.get("mark")), num(x.get("lev"))
+        x["opened"] = int(x["opened"]) if num(x.get("opened")) else None
+        x["sig"] = x["sig"] if isinstance(x.get("sig"), str) and SIG_RE.match(x["sig"]) else None
+    out["closed"] = []
+    for x in (doc.get("closed") or [])[:CLOSED_MAX]:
+        if not isinstance(x, dict) or not INST_RE.match(str(x.get("inst") or "")):
+            continue
+        r = {k: num(x.get(k)) for k in CLOSED_KEYS}
+        r["inst"], r["side"] = x["inst"], x.get("side") if x.get("side") in ("long", "short") else None
+        r["opened"], r["closed"] = (int(r["opened"]) if r["opened"] else None), (int(r["closed"]) if r["closed"] else None)
+        r["partial"] = x.get("partial") is True
+        out["closed"].append(r)
+    out["fut_curve"] = [[int(p[0]), num(p[1])] for p in doc.get("fut_curve") or []
+                        if isinstance(p, (list, tuple)) and len(p) == 2 and num(p[0]) and num(p[1]) is not None]
     out["alloc"] = {k: (doc.get("alloc") or {}).get(k) for k in sub.ALLOC_KEYS}
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None
@@ -216,9 +275,10 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
     if s and s.get("ok"):
         if fetch is None:
             fetch = ms.make_fetch(*sub.creds(env))
-        doc = clean(build(s, state, now, *closed_stats(fetch, "https://" + s["host"], int(s["start"].get("t") or now))))
+        doc = clean(build(s, state, now, *closed_history(fetch, "https://" + s["host"], int(s["start"].get("t") or now))))
     elif state.get("last"):
-        doc = {**state["last"], "stale": True}           # the last real numbers, their own asof — never invented ones
+        # the last real numbers, their own asof — never invented ones (a «last» from before 28.10 gets the new keys empty)
+        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], **state["last"], "stale": True})
     else:
         return None
     if put is None:

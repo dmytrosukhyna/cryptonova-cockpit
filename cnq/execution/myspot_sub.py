@@ -112,7 +112,8 @@ def _positions(fetch, host: str) -> list:
                     "entry": ms._f(p.get("avgPx")), "mark": ms._f(p.get("markPx")) or ms._f(p.get("last")),
                     "upl": ms._f(p.get("upl")), "upl_pct": round(upr * 100, 2) if upr is not None else None,
                     "lev": ms._f(p.get("lever")), "notional": abs(ms._f(p.get("notionalUsd")) or 0.0),
-                    "margin": ms._f(p.get("margin")) or ms._f(p.get("imr")), "liq": ms._f(p.get("liqPx"))})
+                    "margin": ms._f(p.get("margin")) or ms._f(p.get("imr")), "liq": ms._f(p.get("liqPx")),
+                    "ctime": int(ms._f(p.get("cTime")) or 0) or None})
     return out
 
 
@@ -256,10 +257,12 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
     spot.sort(key=lambda x: -max(x["usd"], x["target_pct"] / 100 * total))
     active = [{"ccy": c, "qty": q, "usd": round(q * (px.get(c) or 0.0), 2) if px.get(c) else None, **cp.get(c, nocp)} for c, q in act.items()]
     ours = {m.get("inst") for m in (fst.get("trades") or {}).values()}
+    sigs = {m.get("inst"): str(tid) for tid, m in (fst.get("trades") or {}).items() if m.get("inst")}   # 28.10: the desk trade behind it
     futures = []
     for p in pos:
         sl, tp = _stop_tp(algos, p["inst"], p["side"] == "LONG")
-        futures.append({**p, "stop": sl, "tp": tp, "ours": p["inst"] in ours, **ld.swap_copy(p["inst"], lctx["role"]["fut"], lead_swaps)})
+        futures.append({**p, "stop": sl, "tp": tp, "ours": p["inst"] in ours, "sig": sigs.get(p["inst"]),
+                        **ld.swap_copy(p["inst"], lctx["role"]["fut"], lead_swaps)})
     quote = (st.get("last") or {}).get("quote") or "USDT"
     free = next((ms._f(d.get("availBal")) for d in raw.get("trading") or [] if str(d.get("ccy")) == quote), None)
     cash = [{"ccy": r["ccy"], "usd": r["usd"]} for r in rows if r["cash"]]

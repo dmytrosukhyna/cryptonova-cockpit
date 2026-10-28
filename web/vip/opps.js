@@ -31,13 +31,13 @@
     const items = [];
     if (TRI) items.push({ id: 'tri', name: 'Треугольный арбитраж', status: 'Monitoring', desc: TRI.explain_ru || '', since: V.ms(TRI.since), asof: V.asofOf(TRI),
       testUsd: V.n(TRI.week && TRI.week.virtual_pnl_usd), testNote: 'виртуально за 7 дней', ops: V.n(TRI.week && TRI.week.windows),
-      opsNote: 'окон за 7 дней', risks: [TRI.note || 'Окна живут секунды, в стакане по лучшей цене обычно почти нет объёма; застывшие треугольники — закрытый ввод/вывод или пустой стакан.'], why: NOT_REAL + ' Пока только наблюдение: ордера не ставятся.' });
+      opsNote: 'окон за 7 дней', risks: [TRI.note || 'Окна живут секунды, в стакане по лучшей цене обычно почти нет объёма; застывшие треугольники — закрытый ввод/вывод или пустой стакан.'], why: NOT_REAL + ' Пока только наблюдение: ордера не ставятся.', whyShort: 'Только наблюдение: ордера не ставятся, результат виртуальный.' });
     if (ARB) items.push({ id: 'arb', name: 'Межбиржевой арбитраж', status: 'Monitoring', desc: ARB.explain_ru || '', since: V.ms(ARB.since), asof: V.asofOf(ARB),
       testUsd: V.n(ARB.week && ARB.week.virtual_pnl_usd), testNote: 'виртуально за 7 дней' + (ARB.week && V.isNum(ARB.week.virtual_pnl_naive_usd) ? ` (без учёта стакана было бы ${V.smoney(ARB.week.virtual_pnl_naive_usd)})` : ''),
-      ops: V.n(ARB.week && ARB.week.windows), opsNote: 'окон за 7 дней', risks: [ARB.note || ''].filter(Boolean), why: NOT_REAL + ' Пока только наблюдение: ордера не ставятся.' });
+      ops: V.n(ARB.week && ARB.week.windows), opsNote: 'окон за 7 дней', risks: [ARB.note || ''].filter(Boolean), why: NOT_REAL + ' Пока только наблюдение: ордера не ставятся.', whyShort: 'Только наблюдение: большинство окон «застывшие» — забрать их нельзя.' });
     const demo = (D, id, name) => D && items.push({ id, name: D.name || name, status: 'Testing', desc: D.about || D.about_ru || '', since: V.ms(D.since), asof: V.asofOf(D),
       testUsd: V.n(D.pnl_usd), testPct: V.n(D.pnl_pct), testNote: 'демо-счёт $10 000', ops: V.n(D.breakdown && D.breakdown.entries), opsNote: 'входов',
-      risks: [D.note || ''].filter((x) => x && x.length < 400), why: NOT_REAL + ' Работает только на демо-счёте.' });
+      risks: [D.note || ''].filter((x) => x && x.length < 400), why: NOT_REAL + ' Работает только на демо-счёте.', whyShort: 'Только демо-счёт $10 000 — к реальному счёту не подключено.' });
     demo(FUN, 'funding', 'Фандинг без направления');
     demo(BAS, 'basis', 'Фикс-ставка на фьючерсах');
     demo(YLD, 'yield', 'Доходность стейблкоинов');
@@ -67,8 +67,8 @@
         <div><small>Реальный результат</small><span class="${V.cls(o.realUsd)}">${o.real && o.realUsd != null ? V.smoney(o.realUsd) : 'нет'}</span></div>
         <div><small>Тестовый результат</small><span class="${V.cls(o.testUsd)}">${o.testUsd != null ? V.smoney(o.testUsd) : '—'}</span></div>
         <div><small>Операций</small><span>${o.ops != null ? V.int(o.ops) : '—'}</span></div></div>
-      ${o.why ? `<div class="d">${esc(o.why)}</div>` : ''}
-      <div class="f">${o.since ? 'с ' + esc(V.date(o.since)) : ''}${o.asof ? ' · обновлено ' + esc(V.dt(o.asof)) : ''}</div>
+      ${o.whyShort || o.why ? `<div class="d">${esc(o.whyShort || o.why)}</div>` : ''}
+      <div class="f">${[o.since ? 'с ' + esc(V.date(o.since)) : '', o.asof ? 'обновлено ' + esc(V.dt(o.asof)) : ''].filter(Boolean).join(' · ')}</div>
     </button>`;
   }
 

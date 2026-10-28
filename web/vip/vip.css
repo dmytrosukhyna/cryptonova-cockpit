@@ -112,7 +112,7 @@ body.demo-on .col{margin-right:var(--demo-w)}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .kpis.k3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .kpis.k5{grid-template-columns:repeat(5,minmax(0,1fr))}
-@media (max-width:1100px){.kpis.k5{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:1440px){.kpis.k5{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:640px){.kpis,.kpis.k3,.kpis.k5{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;background:rgba(7,13,26,.35)}
 .kpi small{display:block;font-size:11.5px;color:var(--muted);line-height:1.3;margin-bottom:3px}

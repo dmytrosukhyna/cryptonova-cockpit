@@ -9,8 +9,9 @@
   /* ── public portfolio start (owner spec §6) ─────────────────────────── */
   V.PUBLIC_START_LABEL = '22.10.2026';
 
-  /* ── owner-only data through CNAuth.fetchOwner(path) — the paths in one place ── */
-  V.OWNER_PATHS = { ivan: 'ivan', myspot: 'myspot', admin: 'admin' };
+  /* ── owner-only data through CNAuth.fetchOwner(path) — the server decrypts for a signed-in owner (cnq/api/owner_data.py);
+        the panel never asks for the old per-section passphrases ── */
+  V.OWNER_PATHS = { ivan: '/v2/owner/ivan', myspot: '/v2/owner/myspot', overview: '/v2/owner/overview' };
 
   /* ── number format: ru, one style everywhere («$9 923,43», «−1,3%») ─── */
   const MINUS = '−';
@@ -136,6 +137,8 @@
       if (r.ok === false) throw new Error('HTTP ' + r.status);
       r = await r.json();
     }
+    // the API wraps the payload: {name, title, asof, age_sec, data}
+    if (r && typeof r === 'object' && r.data && typeof r.data === 'object' && ('age_sec' in r || 'name' in r)) r = Object.assign({ _asof: r.asof }, r.data);
     return r || null;
   };
   V.lockBox = (title, text) => `<div class="lock">${V.ico('lock')}<div><b>${esc(title)}</b><p>${text}</p>
@@ -191,8 +194,8 @@
       });
       return;
     }
-    V.sheet('Вход в CRYPTO NOVΛ VIP', '<div id="loginMount"></div>', (b) => {
-      try { window.CNAuth.mountLogin(b.querySelector('#loginMount')); }
+    V.sheet('Вход', '<div id="loginMount"></div>', (b) => {
+      try { window.CNAuth.mountLogin(b.querySelector('#loginMount'), { onSignedIn: () => V.sheetClose() }); }
       catch (e) { b.innerHTML = V.nodata('форма входа не загрузилась'); }
     });
   };
@@ -204,7 +207,7 @@
     const st = V.auth.st(), btn = document.getElementById('acctBtn'), lab = document.getElementById('acctLabel');
     if (!btn) return;
     btn.classList.toggle('on', !!st.signedIn);
-    lab.textContent = st.signedIn ? (st.email || 'Аккаунт') : 'Войти';
+    lab.textContent = st.signedIn ? (st.email || 'Аккаунт') : st.ready === false ? 'Вход…' : 'Войти';
     btn.title = st.signedIn ? 'Аккаунт: ' + (st.email || '') : 'Вход';
   }
 
@@ -337,6 +340,7 @@
     else if (act === 'go') { e.preventDefault(); V.go(a.dataset.to, a.dataset.arg || null); }
   });
 
+  const authSig = () => { const st = V.auth.st(); return [!!st.signedIn, !!st.isOwner, st.email || ''].join('|'); };
   V.start = function () {
     document.getElementById('acctBtn').addEventListener('click', V.openAccount);
     document.getElementById('sysPill').addEventListener('click', () => V.go('system'));
@@ -345,7 +349,9 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') V.sheetClose(); });
     window.addEventListener('hashchange', () => { V.sheetClose(); V.render(); });
     if (V.auth.has() && typeof window.CNAuth.onChange === 'function') {
-      try { window.CNAuth.onChange(() => { paintAccount(); V.render({ keepScroll: true }); }); } catch (e) { /* ignore */ }
+      // onChange fires at once and on every change (also from another tab): re-render only when access really changed
+      let sig = authSig();
+      try { window.CNAuth.onChange(() => { paintAccount(); const n = authSig(); if (n !== sig) { sig = n; V.sheetClose(); V.render({ keepScroll: true }); } }); } catch (e) { /* ignore */ }
     }
     paintAccount();
     paintPill();

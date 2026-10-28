@@ -17,12 +17,16 @@ def trade(sym="APT", side="LONG", opened=T0, qty=100.0, qty_left=None, tid=None,
             "qty_left": qty if qty_left is None else qty_left, "opened": opened, **kw}
 
 
-def paper(tmp, bal_open=(), bal_closed=(), imp_open=(), imp_closed=()):
+def paper(tmp, bal_open=(), bal_closed=(), imp_open=(), imp_closed=(), main="bal", aggr_open=()):
+    """bal_* = the trades of «Сбалансированная»; 28.10: the main desk of the header is the one web/desk_select.json chose (`main`)"""
     doc = {"profiles": {"bal": {"equity": 10000.0, "open": list(bal_open), "closed": list(bal_closed)},
                         "imp": {"equity": 10000.0, "open": list(imp_open), "closed": list(imp_closed)},
+                        "aggr": {"equity": 10000.0, "open": list(aggr_open), "closed": []},
                         "cons": {"equity": 10000.0, "open": [trade("SOL", opened=T0 + 1)], "closed": []}}}
     with open(os.path.join(tmp, "paper.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f)
+    with open(os.path.join(tmp, "desk_select.json"), "w", encoding="utf-8") as f:
+        json.dump({"current": main}, f)
 
 
 class Sender:
@@ -167,3 +171,22 @@ def test_token_and_url_never_in_published_json(tmp_path):
 def test_engine_runs_the_step_and_publishes_the_log():
     assert "okxsignal" in E.FAST and E.FAST.index("paper") < E.FAST.index("okxsignal") and "okxsignal" in E.STEP_TIMEOUT
     assert "okx_signal.json" in E.OWNED
+
+
+def test_a_switched_main_desk_keeps_exits_of_its_live_trades_and_opens_nothing_new(tmp_path):
+    """28.10: desk_select moved the main desk bal → aggr while a bal trade was live on the signal: its exit still goes out, a new
+    bal trade is not sent, aggr trades are"""
+    conn, s = sqlite3.connect(":memory:"), Sender()
+    paper(tmp_path)
+    go(conn, tmp_path, T0, s)                                              # switched on
+    t = trade("APT", opened=T0 + 10)
+    paper(tmp_path, bal_open=[t])
+    go(conn, tmp_path, T0 + 60_000, s)
+    assert [c[1]["action"] for c in s.calls] == ["ENTER_LONG"]
+    paper(tmp_path, bal_open=[t, trade("ETH", opened=T0 + 100_000)], aggr_open=[trade("SOL", opened=T0 + 110_000)], main="aggr")
+    d = go(conn, tmp_path, T0 + 120_000, s)
+    assert [(c[1]["action"], c[1]["instrument"]) for c in s.calls] == [("ENTER_LONG", "APT-USDT-SWAP"), ("ENTER_LONG", "SOL-USDT-SWAP")]
+    assert d["desks"] == ["aggr", "imp"]
+    paper(tmp_path, bal_closed=[dict(t, qty_left=0.0, closed=T0 + 150_000)], aggr_open=[trade("SOL", opened=T0 + 110_000)], main="aggr")
+    go(conn, tmp_path, T0 + 180_000, s)
+    assert [(c[1]["action"], c[1]["instrument"]) for c in s.calls][-1] == ("EXIT_LONG", "APT-USDT-SWAP")

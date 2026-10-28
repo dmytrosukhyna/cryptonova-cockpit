@@ -3,16 +3,22 @@ import os
 import sqlite3
 import tempfile
 
-from cnq.agents import capital as K
+import pytest
+
+from cnq.agents import capital as K, panel_header as ph
 
 T0 = 1_792_000_000_000   # a Saturday
 
 
 def world(d, spot=10_000.0, bal=10_000.0, imp=10_000.0, fund=10_000.0, hist=None, yld=10_000.0, susde=10_000.0, basis=10_000.0,
-          risk_off=False, bull=True, rates=(4.0, 6.0, 6.0), with_basis=True, act=10_000.0, cons=100.0):
+          risk_off=False, bull=True, rates=(4.0, 6.0, 6.0), with_basis=True, act=10_000.0, cons=100.0, main=None):
+    """`bal` = the equity of the MAIN futures desk: `main` written to desk_select.json (28.10), or the default main desk when None"""
+    key = main or ph.NOVA_BASE[0]
+    if main:
+        json.dump({"current": main}, open(os.path.join(d, "desk_select.json"), "w"))
     json.dump({"portfolios": {"ideas": {"equity_usd": spot, "history": hist or []}, "cons": {"equity_usd": None, "index": cons, "history": []}}},
               open(os.path.join(d, "portfolio.json"), "w"))
-    json.dump({"risk_off": risk_off, "profiles": {"bal": {"equity": bal, "open": [], "equity_history": []}, "imp": {"equity": imp, "open": [], "equity_history": []},
+    json.dump({"risk_off": risk_off, "profiles": {key: {"equity": bal, "open": [], "equity_history": []}, "imp": {"equity": imp, "open": [], "equity_history": []},
                                                   "imps": {"equity": act, "open": [], "equity_history": []}}},
               open(os.path.join(d, "paper.json"), "w"))
     json.dump({"risk": {"btc_bull": bull}}, open(os.path.join(d, "decision.json"), "w"))
@@ -26,10 +32,11 @@ def world(d, spot=10_000.0, bal=10_000.0, imp=10_000.0, fund=10_000.0, hist=None
         os.remove(os.path.join(d, "basis.json"))
 
 
-def test_allocator_splits_by_regime_and_rates_then_sleeves_follow_their_desks():
+@pytest.mark.parametrize("main", [None, "bal", "cons"])
+def test_allocator_splits_by_regime_and_rates_then_sleeves_follow_their_desks(main):
     d = tempfile.mkdtemp()
     conn = sqlite3.connect(":memory:")
-    world(d)
+    world(d, main=main)
     a = K.run(conn, d, T0)
     w = {s["key"]: s["weight"] for s in a["sleeves"]}
     # risk-on: 70 % directional (spot portfolio 42, active spot 10.5, futures 17.5); carry 30 %: lending ≥ 9 %, the rest ∝ rate −
@@ -38,7 +45,7 @@ def test_allocator_splits_by_regime_and_rates_then_sleeves_follow_their_desks():
     assert w["basis"] > w["susde"] > w["funding"] > 0 and w["yield"] >= 0.09 and abs(w["basis"] - 0.21 * 6 / 15) < 1e-3
     assert a["regime"]["key"] == "on" and any("Фикс-ставка" in x for x in a["why_ru"]) and a["value_usd"] == 10_000
     assert [x["key"] for x in a["watch_only"]] == ["arb", "tri"] and a["watch_only"][0]["week_virtual_usd"] == 24.0
-    world(d, spot=11_000, bal=10_400, imp=10_000, fund=9_900, yld=10_050, basis=10_020)
+    world(d, spot=11_000, bal=10_400, imp=10_000, fund=9_900, yld=10_050, basis=10_020, main=main)
     b = K.run(conn, d, T0 + 3_600_000)
     v = {s["key"]: s["value_usd"] for s in b["sleeves"]}
     assert abs(v["spot"] - 4620) < 0.1 and abs(v["futures"] - 1785) < 0.1 and abs(v["yield"] - 10_000 * w["yield"] * 1.005) < 0.1

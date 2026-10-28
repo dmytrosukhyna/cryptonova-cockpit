@@ -123,6 +123,14 @@ def own_gate(out: str) -> tuple[bool, dict]:
     return bool(n >= OWN_GATE["trades"] and avg is not None and avg >= OWN_GATE["avg_trade_pct"]), {"trades": n, "avg_trade_pct": avg}
 
 
+def fut_keys(out: str) -> tuple:
+    """The desks of FUTURES · CRYPTO NOVA as the panel header counts them (28.10): the main desk the selector chose
+    (web/desk_select.json → panel_header.nova_base; none → «Агрессивная») + «Импульс BTC», + the own signals after their gate."""
+    from . import panel_header as ph
+    base = ph.nova_base(ph.load_sel(out))
+    return base + (("own",) if own_gate(out)[0] and "own" not in base else ())
+
+
 def lst_gate(out: str) -> tuple[bool, dict]:
     """Has the listing-short demo desk earned real dollars? (≥ 20 closed trades, ≥ +1 % a trade on average)."""
     s = (((_load(out, "paper.json").get("profiles") or {}).get("lst") or {}).get("stats")) or {}
@@ -145,9 +153,8 @@ def desk_values(out: str) -> dict:
     d = prof.get("imps") or {}
     if d.get("equity") is not None:
         v["active"] = float(d["equity"]) + sum(float(o.get("open_pnl_usd") or 0) for o in d.get("open") or [])
-    fut_keys = ("bal", "imp", "own") if own_gate(out)[0] else ("bal", "imp")
     fut = [float(d["equity"]) + sum(float(o.get("open_pnl_usd") or 0) for o in d.get("open") or [])
-           for k in fut_keys if (d := prof.get(k)) and d.get("equity") is not None]
+           for k in fut_keys(out) if (d := prof.get(k)) and d.get("equity") is not None]
     if fut:
         v["futures"] = sum(fut) / len(fut)
     fd = _load(out, "funding.json")
@@ -187,7 +194,8 @@ def desk_30d(out: str, now: int) -> dict:
     x = _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get("lst") or {}).get("equity_history") or []], since)
     if x is not None:
         r["listings"] = x
-    xs = [y for k in ("bal", "imp") if (y := _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get(k) or {}).get("equity_history") or []], since)) is not None]
+    from . import panel_header as ph
+    xs = [y for k in ph.nova_base(ph.load_sel(out)) if (y := _ret([[p.get("time", 0), p.get("equity")] for p in (prof.get(k) or {}).get("equity_history") or []], since)) is not None]
     if xs:
         r["futures"] = sum(xs) / len(xs)
     for k, h in (("funding", _load(out, "funding.json").get("history")), ("basis", _load(out, "basis.json").get("history")),

@@ -6,7 +6,7 @@ on:
     paths-ignore: ["web/bybit.json", "web/public_real.json", "web/ivan.enc.json", "web/owner.enc.json", "web/paper.json", "web/signals_feed.json", "web/engine.json",
                    "web/calendar.json", "web/quality.json", "web/altseason.json", "web/app_home.json", "web/app_btc.json",
                    "web/app_home.en.json", "web/app_home.uk.json", "web/app_home.el.json", "web/app_home.es.json",
-                   "web/conveyor.json", "web/risk.json",
+                   "web/conveyor.json", "web/risk.json", "web/desk_select.json", "data/desk_select.jsonl",
                    "web/scorecard.json", "data/scorecard_ledger.jsonl", "data/scorecard_outcomes.jsonl", "data/scorecard/**"]
   schedule:
     - cron: "*/30 * * * *"      # данные + отдел новостей каждые 30 минут (UTC)

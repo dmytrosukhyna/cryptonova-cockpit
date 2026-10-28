@@ -4,7 +4,7 @@ import sqlite3
 
 import pytest
 
-from cnq.agents import app_home
+from cnq.agents import app_home, panel_header as ph
 
 
 def _w(d, name, obj):
@@ -12,16 +12,26 @@ def _w(d, name, obj):
         json.dump(obj, f)
 
 
-def test_app_home_numbers(tmp_path):
+def _main(d, key):
+    """28.10: the main futures desk is chosen by web/desk_select.json — a fixture says which one instead of relying on a default"""
+    _w(d, "desk_select.json", {"current": key})
+
+
+@pytest.mark.parametrize("main", [None, "cons", "bal", "aggr"])
+def test_app_home_numbers(tmp_path, main):
     d = str(tmp_path)
     t0 = 1792300000000
+    key = main or ph.NOVA_BASE[0]                              # 28.10: no desk_select.json → the default main desk
     hist = lambda k: [{"time": t0, "equity": 10000.0}, {"time": t0 + 60000, "equity": 10000.0 + 100 * k}]
+    ks = {p: (1.0 if p == key else 0.5 + 0.5 * i) for i, p in enumerate(("cons", "bal", "aggr"))}
     prof = {p: {"equity": 10000.0, "open_pnl_usd": 100.0 * k, "equity_history": hist(k), "open": [], "closed": [], "stats": {}}
-            for p, k in (("cons", 0.5), ("bal", 1.0), ("aggr", 1.5))}
+            for p, k in ks.items()}
     # 22.10: the open P&L is the panel's futEq — (price − entry) × qty_left + the realised part, like every desk row stores it
-    prof["bal"]["open"] = [{"symbol": "ARB", "side": "LONG", "entry": 0.2, "price": 0.22, "stop": 0.18, "tps": [0.3],
-                            "qty_left": 5000.0, "pnl_usd": 0.0, "open_pnl_usd": 100.0, "kind": "CLIMAX_LONG"}]
+    prof[key]["open"] = [{"symbol": "ARB", "side": "LONG", "entry": 0.2, "price": 0.22, "stop": 0.18, "tps": [0.3],
+                          "qty_left": 5000.0, "pnl_usd": 0.0, "open_pnl_usd": 100.0, "kind": "CLIMAX_LONG"}]
     _w(d, "paper.json", {"since": t0, "profiles": prof})
+    if main:
+        _main(d, main)
     _w(d, "app_portfolio.json", {"index": 99.0, "cash_pct": 15, "history": [{"t": t0, "v": 100.0}, {"t": t0 + 60000, "v": 99.0}],
                                  "positions": [{"symbol": "BTC", "weight": 0.5, "entry": 100, "price": 110, "kind_ru": "ядро"},
                                                {"symbol": "PENGU", "weight": 0.35, "entry": 1, "price": 0.9, "kind_ru": "мем"}],
@@ -29,7 +39,7 @@ def test_app_home_numbers(tmp_path):
     _w(d, "markets.json", {"top": [{"symbol": "BTC", "price": 81000, "chg24": 1.234}], "fng": {"value": 59, "label": "жадность"},
                            "btc_bull": True})
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=t0 + 120000)
-    assert doc["futures"]["usd"] == 100.0                      # the average of 50 / 100 / 150
+    assert doc["futures"]["usd"] == 100.0                      # only the main desk (+$100); the other two sizes of it are not counted
     assert doc["spot"]["usd"] == -100.0                        # index 99 → −1 % of $10 000
     assert doc["total"]["usd"] == 0.0
     assert doc["futures"]["open"][0]["pct"] == 10.0 and doc["futures"]["open"][0]["target"] == 0.3
@@ -170,6 +180,7 @@ def test_main_strategy_panic_buy_explains_itself(tmp_path):
     res = pd.PaperDesk(conn, "bal").step([{"symbol": "SOL-USDT", "candles": cs, "levels": [], "regime": {"long": "BULL"}}], True, cs[-1][0] + 1)
     assert res["open"][0]["grade"] == "E" and res["open"][0]["facts"]["scan"] == {"coins": 1, "rules": 4, "fired": 1}
     _w(d, "paper.json", {"profiles": {"bal": res}})
+    _main(d, "bal")
     row = app_home.run(conn, d, now=cs[-1][0] + 60_000)["futures"]["open"][0]
     _shape(row)
     assert row["why_title"] == "Откуп паники на большом объёме"
@@ -198,6 +209,7 @@ def test_missing_data_is_never_filled_in(tmp_path):
                               "opened": t0 + 2, "facts": {"age_h": 4.5, "move": 0.03, "skip_pump": 0.1, "min_qvol": 2e6}}],
                     "stats": {"trades": 0, "winrate": None}}}
     _w(d, "paper.json", {"profiles": prof})
+    _main(d, "bal")
     rows = {o["sym"]: o for o in app_home.run(sqlite3.connect(":memory:"), d, now=t0 + 60_000)["futures"]["open"]}
     for r in rows.values():
         _shape(r)

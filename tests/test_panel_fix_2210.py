@@ -174,6 +174,7 @@ let MEMES={account:{equity:10000,start_equity:10000,positions:[],stats:{trades:0
 let SIGS={recent:[{t:Date.UTC(2026,9,19,11,2)},{t:Date.UTC(2026,9,18,7)}],active:[1,2,3],accounts:{since_live:{smart:{pnl_usd:-354.52,start:10000,start_t:T,trades:12}}}};
 let WTOP=null, IVAN=null, NOVAF={mix:[{key:'bal'},{key:'imp'},{key:'own'},{key:'lst'},{key:'app_smart',in_mix:false}]};
 __BLOCK__
+DSEL={current:'bal'};   // 28.10: the main futures desk is whatever web/desk_select.json chose — this fixture's is «Сбалансированная»
 const R={rows:cmpRows().map(x=>[x.k,Math.round(x.usd),x.trades]), st:{}};
 ['imp','imps','lst','lstx','memes','app_smart','btcx','own'].forEach(k=>R.st[k]=deskStatus(k));
 R.html=cmpHtml();

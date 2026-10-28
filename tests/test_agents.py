@@ -96,19 +96,28 @@ def test_voice_brief_says_what_the_panel_shows(tmp_path):
     # 21.10 (owner: «голос робота снова»): the panel plays the server's neural audio only when the brief's keys match its own
     # (fut 'nova' = the AVERAGE of the mix, spot 'ideas', desks mode, total = futures + spot); funding/arb/tri are not in the keys' parts
     import json, time
-    from cnq.agents import voice
+    from cnq.agents import voice, panel_header as ph
     now = int(time.time() * 1000)
     hist = lambda t0, eq: [{"time": t0, "equity": 10_000.0}, {"time": t0 + 3_600_000, "equity": eq}]
-    paper = {"profiles": {"bal": {"equity": 10_200.0, "start_equity": 10_000.0, "open": [], "closed": [], "equity_history": hist(now - 4 * 86400_000, 10_200.0)},
-                          "imp": {"equity": 10_000.0, "start_equity": 10_000.0, "open": [], "closed": [], "equity_history": hist(now - 3 * 86400_000, 10_000.0)}}}
-    (tmp_path / "paper.json").write_text(json.dumps(paper))
-    (tmp_path / "portfolio.json").write_text(json.dumps({"portfolios": {"ideas": {"index": 103.0, "start_usd": 10_000}}}))
-    (tmp_path / "capital.json").write_text(json.dumps({"value_usd": 10_216, "pnl_usd": 216}))       # present, but the brief no longer switches to it
-    (tmp_path / "arb.json").write_text(json.dumps({"week": {"virtual_pnl_usd": 33.27}}))
-    text = voice.compose(str(tmp_path))
-    k = voice.compose.keys
-    assert k["fut"] == "nova" and k["spot"] == "ideas" and k["mode"] == "desks"
-    assert k["parts"] == {"fut": 100, "spot": 300} and k["total"] == 400      # (200 + 0) / 20 000 × 10 000 = 100, not the sum 200
-    assert "arb" not in k["parts"] and k["probation"]["arb"] == 33.27
-    assert "в плюсе на 100 доллар" in text and "Заработано всего — плюс 400" in text
+    # 28.10: the main desk is whatever web/desk_select.json chose (none → the default) — the brief follows it, not one fixed key
+    for sel, main in ((None, ph.NOVA_BASE[0]), ({"current": "bal"}, "bal"), ({"current": "cons"}, "cons")):
+        d = tmp_path / main
+        d.mkdir()
+        other = {"equity": 9_000.0, "start_equity": 10_000.0, "open": [{"open_pnl_usd": 1.0}], "closed": [],
+                 "equity_history": hist(now - 4 * 86400_000, 9_000.0)}          # a family desk that is NOT the main one: never counted
+        paper = {"profiles": {main: {"equity": 10_200.0, "start_equity": 10_000.0, "open": [], "closed": [], "equity_history": hist(now - 4 * 86400_000, 10_200.0)},
+                              "imp": {"equity": 10_000.0, "start_equity": 10_000.0, "open": [], "closed": [], "equity_history": hist(now - 3 * 86400_000, 10_000.0)},
+                              **{k: other for k in ph.FAMILY if k != main}}}
+        (d / "paper.json").write_text(json.dumps(paper))
+        if sel:
+            (d / "desk_select.json").write_text(json.dumps(sel))
+        (d / "portfolio.json").write_text(json.dumps({"portfolios": {"ideas": {"index": 103.0, "start_usd": 10_000}}}))
+        (d / "capital.json").write_text(json.dumps({"value_usd": 10_216, "pnl_usd": 216}))       # present, but the brief no longer switches to it
+        (d / "arb.json").write_text(json.dumps({"week": {"virtual_pnl_usd": 33.27}}))
+        text = voice.compose(str(d))
+        k = voice.compose.keys
+        assert k["fut"] == "nova" and k["spot"] == "ideas" and k["mode"] == "desks" and k["fut_open"] == 0
+        assert k["parts"] == {"fut": 100, "spot": 300} and k["total"] == 400      # (200 + 0) / 20 000 × 10 000 = 100, not the sum 200
+        assert "arb" not in k["parts"] and k["probation"]["arb"] == 33.27
+        assert "в плюсе на 100 доллар" in text and "Заработано всего — плюс 400" in text
     assert voice.spoken("CRYPTO NOVA портфель") == "Крипто Но́ва портфель"

@@ -10,7 +10,7 @@ import time
 import pytest
 
 from cnq import engine
-from cnq.agents import app_home, i18n
+from cnq.agents import app_home, i18n, panel_header as ph
 from cnq.api import nova
 from tests.test_api import call, make, token
 
@@ -67,8 +67,10 @@ def _w(d, name, obj):
         json.dump(obj, f)
 
 
-def _desks(t0):
-    """one open trade of every rule with the facts its desk stores, the own desk's daily scan, a closed trade"""
+def _desks(t0, main=None):
+    """one open trade of every rule with the facts its desk stores, the own desk's daily scan, a closed trade; the main strategy's
+    trades sit on the MAIN desk (28.10: the one web/desk_select.json chose — `main`, or the default main desk)"""
+    key = main or ph.NOVA_BASE[0]
     btc = {"close": 110.0, "sma200": 100.0, "c60": 95.0}
     own = {"P": {"close": 10.4, "sma50": 10.0, "sma50_5": 9.8, "rsi2": 4.2, "chg2": -0.031, "btc": btc, "vol": 1.8, "rank": 7, "of": 40,
                  "scan": {"coins": 40, "checks": 8, "signals": 2, "passed": 1, "day": t0 // 86_400_000 * 86_400_000}},
@@ -83,8 +85,8 @@ def _desks(t0):
                                       "opened": t0 + n, "facts": f, "open_pnl_usd": 10.0, **kw}
     prof = {p: {"equity": 10000.0, "open_pnl_usd": 0.0, "equity_history": [{"time": t0, "equity": 10000.0}], "open": [],
                 "closed": [{"symbol": "ARB", "side": "LONG", "pnl_usd": 191.6, "closed": t0}], "stats": {"trades": 1, "winrate": 1.0}}
-            for p in ("cons", "aggr")}
-    prof["bal"] = {"equity": 10000.0, "equity_history": [{"time": t0, "equity": 10000.0}], "stats": {"trades": 1, "winrate": 1.0},
+            for p in ph.FAMILY if p != key}
+    prof[key] = {"equity": 10000.0, "equity_history": [{"time": t0, "equity": 10000.0}], "stats": {"trades": 1, "winrate": 1.0},
                    "closed": [{"symbol": "ARB", "side": "LONG", "pnl_usd": 191.6, "closed": t0}],
                    "open": [row(s, g, f, i, kind="CLIMAX_LONG" if g == "E" else "") for i, (s, (g, f)) in
                             enumerate(zip(("SOL", "ETH", "LINK", "BNB"), bal.items()))]}
@@ -120,9 +122,12 @@ def _numbers(doc):
     return doc
 
 
-def test_app_home_in_every_language_from_the_same_data(tmp_path):
+@pytest.mark.parametrize("main", [None, "bal"])
+def test_app_home_in_every_language_from_the_same_data(tmp_path, main):
     d, t0 = str(tmp_path), 1792300000000
-    _w(d, "paper.json", _desks(t0))
+    _w(d, "paper.json", _desks(t0, main))
+    if main:
+        _w(d, "desk_select.json", {"current": main})
     _w(d, "app_portfolio.json", {"index": 99.0, "cash_pct": 15, "history": [{"t": t0, "v": 100.0}],
                                  "positions": [{"symbol": "BTC", "weight": 0.3, "entry": 100, "price": 110, "kind_ru": "ядро"},
                                                {"symbol": "PENGU", "weight": 0.1, "entry": 1, "price": 0.9, "kind_ru": "мем"},

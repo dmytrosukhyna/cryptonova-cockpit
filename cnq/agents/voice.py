@@ -55,11 +55,12 @@ def nova_result(paper: dict, out: str = "web") -> tuple[float | None, str]:
     """CRYPTO NOVA futures as the panel shows it (novaRes): the desks of the mix averaged into one $10 000 account, each desk counted since its own
     start (equity + open P&L − start), dated by the FIRST desk's start. Returns (result in $, «dd.mm»)."""
     pr = paper.get("profiles") or {}
+    from . import panel_header as ph
     try:
-        from .capital import own_gate
-        keys = ("bal", "imp", "own") if own_gate(out)[0] else ("bal", "imp")
+        from .capital import fut_keys
+        keys = fut_keys(out)            # 28.10: the main desk the selector chose (web/desk_select.json) + imp, + own after its gate
     except Exception:  # noqa: BLE001
-        keys = ("bal", "imp")
+        keys = ph.nova_base(ph.load_sel(out))
     res, base, first = 0.0, 0.0, None
     for k in keys:
         d = pr.get(k) or {}
@@ -88,7 +89,8 @@ def compose(out: str = "web") -> str:
     hello = "Доброй ночи" if hour < 5 else "Доброе утро" if hour < 12 else "Добрый день" if hour < 18 else "Добрый вечер"
     L = [f"{hello}, {NAME}. Система работает штатно."]
     paper = _load(out, "paper.json") or {}
-    prof = (paper.get("profiles") or {}).get("bal") or paper
+    from . import panel_header as ph
+    prof = (paper.get("profiles") or {}).get(ph.main_desk(ph.load_sel(out))) or paper      # 28.10: the main desk (panel: hdrVals P)
     fut_res = None
     if prof:
         opened = prof.get("open") or []

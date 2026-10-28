@@ -4,7 +4,8 @@ Why: the owner lives in Greece; OKX copy trading (lead trader) is closed to him,
 custom signal in OKX's Signal bot (MAIN account), gets a webhook URL and a signal token and sends TradingView-style alert messages;
 subscribers create their own signal bots that trade on their own accounts. Start: a FREE signal, no profit share.
 
-What it sends: the trades of the panel header's futures desks («отобранные сигналы», panel_header.NOVA_BASE = bal + imp), as OKX
+What it sends: the trades of the panel header's futures desks («отобранные сигналы», panel_header.nova_base = the main desk chosen by
+cnq/agents/desk_select.py + imp; 28.10 — a desk that leaves the set keeps sending the exits of its trades live on the signal), as OKX
 alert messages (OKX help «Trading Signal Bot Alert Message 2.0 Specifications», section B):
   • a desk opens a trade        → ENTER_LONG / ENTER_SHORT, market, investmentType percentage_investment, amount = the trade's share of
                                    the CRYPTO NOVA account (Σ equity of the header desks, as the header counts it as ONE account);
@@ -40,10 +41,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from . import panel_header as ph
 from .panel_header import NOVA_BASE
 
-DESKS = NOVA_BASE                                   # ("bal", "imp") — the header's «отобранные сигналы»
-DESK_RU = {"bal": "откуп падений", "imp": "Импульс BTC"}
+DESKS = NOVA_BASE                                   # the default; the live set is the header's: ph.nova_base(web/desk_select.json)
+DESK_RU = {"cons": "откуп падений", "bal": "откуп падений", "aggr": "откуп падений", "imp": "Импульс BTC", "own": "Сигналы CRYPTO NOVA"}
 ENV_ON, ENV_URL, ENV_TOKEN = "CNQ_OKX_SIGNAL", "CNQ_OKX_SIGNAL_URL", "CNQ_OKX_SIGNAL_TOKEN"
 MAX_LAG_S = 60                                      # OKX: [1, 3600], default 60 — a message older than this is not acted on
 MAX_AGE_MIN = 30                                    # a limit fill carries its 15-minute candle's open time → up to ~17 min old
@@ -227,9 +229,14 @@ def _live_on(conn, inst: str, except_tid: str | None = None) -> str | None:
 
 
 # ---------- 1. what the desks did → events ----------
-def detect(conn: sqlite3.Connection, profiles: dict, now: int, on_since: int, cfg: dict, swap_ids: set[str], swap_src: str) -> None:
-    desks = {k: profiles.get(k) for k in DESKS if profiles.get(k)}
-    for desk, v in desks.items():
+def detect(conn: sqlite3.Connection, profiles: dict, now: int, on_since: int, cfg: dict, swap_ids: set[str], swap_src: str,
+           keys: tuple | None = None) -> None:
+    desks = {k: profiles.get(k) for k in (keys or DESKS) if profiles.get(k)}
+    # 28.10: a desk that left the header's set (desk_select switched the main desk) — its trades already on the signal still get
+    # their exits; it opens nothing new
+    old = [d for (d,) in conn.execute("SELECT DISTINCT desk FROM okx_signal_events WHERE kind='enter' AND status IN ('pending','sent')")
+           .fetchall() if d not in desks]
+    for desk, v in [*desks.items(), *((d, profiles.get(d) or {}) for d in old)]:
         seen = set()
         for t in sorted(v.get("open") or [], key=lambda x: x.get("opened") or 0):
             if not t.get("id"):
@@ -240,6 +247,8 @@ def detect(conn: sqlite3.Connection, profiles: dict, now: int, on_since: int, cf
             side = "LONG" if t.get("side") == "LONG" else "SHORT"
             inst = inst_of(t.get("symbol"))
             if enter is None:
+                if desk not in desks:
+                    continue                                    # 28.10: not in the set any more — no new entries
                 if int(t.get("opened") or 0) < on_since:
                     continue                                    # opened before the sender was on — never sent
                 eid = f"{desk}:{t['id']}:enter"
@@ -415,7 +424,7 @@ def flush(conn: sqlite3.Connection, cfg: dict, now: int, sender=post, sleep=time
 
 
 # ---------- 3. the public log ----------
-def public(conn: sqlite3.Connection, cfg: dict, now: int, swap_src: str | None = None) -> dict:
+def public(conn: sqlite3.Connection, cfg: dict, now: int, swap_src: str | None = None, desk_keys: tuple | None = None) -> dict:
     keys = ("id", "desk", "symbol", "inst", "kind", "action", "inv_type", "amount", "created", "sent", "status", "note")
     rows = [dict(zip(keys, r)) for r in conn.execute(
         f"SELECT {', '.join(keys)} FROM okx_signal_events ORDER BY COALESCE(sent, created) DESC, rowid DESC LIMIT 100").fetchall()]
@@ -431,7 +440,7 @@ def public(conn: sqlite3.Connection, cfg: dict, now: int, swap_src: str | None =
     on_since = _meta(conn, "on_since")
     return {"asof": now, "on": bool(cfg["on"]), "why_off": None if cfg["on"] else cfg["why"],
             "configured": {"url": cfg["has_url"], "token": cfg["has_token"]}, "on_since": int(on_since) if on_since else None,
-            "desks": list(DESKS), "instruments": swap_src, "max_lag_s": MAX_LAG_S, "max_age_min": cfg["max_age_ms"] // 60_000,
+            "desks": list(desk_keys or DESKS), "instruments": swap_src, "max_lag_s": MAX_LAG_S, "max_age_min": cfg["max_age_ms"] // 60_000,
             "sent": cnt.get("sent", 0), "pending": cnt.get("pending", 0), "failed": cnt.get("failed", 0), "skipped": cnt.get("skipped", 0),
             "last": last, "items": items,
             "about_ru": ("Сигнал CRYPTO NOVA на OKX Signal Marketplace: сделки столов «отобранные сигналы» (откуп падений + Импульс BTC) "
@@ -446,6 +455,7 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, env=
     cfg = config(env)
     swap_src = None
     err = None
+    keys = ph.nova_base(ph.load_sel(out))              # 28.10: the header's desks (the main desk from web/desk_select.json + imp)
     try:
         ensure(conn)
         if not cfg["on"]:
@@ -467,9 +477,9 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None, env=
                 profiles, err = {}, f"paper.json: {type(e).__name__}"
             ids, swap_src = swaps(data_dir, now, fetch_swaps)
             if profiles:
-                detect(conn, profiles, now, on_since, cfg, ids, swap_src)
+                detect(conn, profiles, now, on_since, cfg, ids, swap_src, keys)
             done = flush(conn, cfg, now, sender, sleep)
-        doc = public(conn, cfg, now, swap_src)
+        doc = public(conn, cfg, now, swap_src, keys)
         doc["this_run"] = done
     except Exception as e:  # noqa: BLE001
         doc = {"asof": now, "on": bool(cfg["on"]), "why_off": cfg["why"], "error": _clean(f"{type(e).__name__}: {e}", cfg)}

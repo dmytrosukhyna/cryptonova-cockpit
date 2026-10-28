@@ -35,6 +35,76 @@ def test_desks_are_the_headers_crypto_nova_set():
     assert [k for k, _ in fu.pick_desks(paper, ["bal"])] == ["bal"]
 
 
+def test_main_desk_follows_desk_select_falls_back_to_aggr_and_env_overrides():
+    """28.10: the main desk = web/desk_select.json «current» (panel_header.main_desk, the header's own rule); missing / broken /
+    not a main-desk key → «Агрессивная»; OKX_FUT_PROFILES overrides everything; «Импульс BTC» is always the second half"""
+    paper = {"profiles": {k: {"open": []} for k in ("cons", "bal", "aggr", "imp", "lab", "own")}}
+    keys = lambda **kw: [k for k, _ in fu.pick_desks(paper, **kw)]                       # noqa: E731
+    assert keys(sel={"current": "bal"}) == ["bal", "imp"] and keys(sel={"current": "cons"}) == ["cons", "imp"]
+    assert keys(sel={"current": "own"}) == ["own", "imp"]
+    for bad in (None, {}, {"current": "lab"}, {"current": "imp"}, {"current": 5}, ["bal"], "bal"):
+        assert keys(sel=bad) == ["aggr", "imp"], bad
+    assert keys(forced=["bal"], sel={"current": "cons"}) == ["bal"]
+    paper["profiles"]["own"]["stats"] = {"trades": 31, "avg_trade_pct": 0.4}
+    assert keys(sel={"current": "own"}) == ["own", "imp"] and keys(sel={"current": "bal"}) == ["bal", "imp", "own"]
+    # an open position of the previous main desk is never moved: that desk stays the main one until the position is closed
+    assert keys(sel={"current": "bal"}, prev="aggr", held={"aggr", "imp"}) == ["aggr", "imp", "own"]
+    assert keys(sel={"current": "bal"}, prev="aggr", held={"imp"}) == ["bal", "imp", "own"]
+    assert keys(sel={"current": "bal"}, prev="own", held={"own"}) == ["bal", "imp", "own"]       # own is in the set anyway
+
+
+def test_fetch_reads_desk_select_next_to_paper_and_a_broken_file_means_aggr(monkeypatch):
+    paper = {"profiles": {k: {"open": []} for k in ("cons", "bal", "aggr", "imp")}}
+    files = {"paper.json": paper, "desk_select.json": {"current": "bal"}}
+    seen = []
+
+    def get(url):
+        seen.append(url)
+        v = files.get(url.rsplit("/", 1)[-1])
+        if isinstance(v, Exception):
+            raise v
+        return v
+    monkeypatch.setattr(fu, "_get_json", get)
+    assert [k for k, _ in fu.fetch_desks({})] == ["bal", "imp"]
+    assert seen == [fu.SRC, fu.SEL_SRC]
+    assert fu.sel_src({"OKX_FUT_SRC": "https://x.example/web/paper.json"}) == "https://x.example/web/desk_select.json"
+    for broken in (OSError("404"), {"current": "brk"}, ["x"], None):
+        files["desk_select.json"] = broken
+        assert [k for k, _ in fu.fetch_desks({})] == ["aggr", "imp"], broken
+    files["desk_select.json"] = {"current": "cons"}
+    assert [k for k, _ in fu.fetch_desks({"OKX_FUT_PROFILES": "bal,imp"})] == ["bal", "imp"]
+
+
+def test_a_switch_waits_until_the_old_desks_position_is_closed(monkeypatch):
+    """the selector moved the main desk aggr → bal while this account held an aggr trade: the aggr trade is neither closed nor moved,
+    no bal trade is opened; once aggr closes its trade on the desk (and here), bal becomes the main desk"""
+    fk = F.FakeOkx()
+    e = F.env()
+    cl = ap.connect(e, fk, {}, F.nosleep)
+    t1, t2 = F.trade("A1", "SOL"), F.trade("B1", "BTC", "SHORT", 100000.0, 102000.0, 90000.0)
+    files = {"paper.json": {"profiles": {"aggr": {"equity": 10000.0, "open": [t1]}, "bal": {"equity": 10000.0, "open": [t2]},
+                                         "imp": {"equity": 10000.0, "open": []}}},
+             "desk_select.json": {"current": "aggr"}}
+    monkeypatch.setattr(fu, "_get_json", lambda url: files[url.rsplit("/", 1)[-1]])
+    step = lambda now: fu.step(e, now=now, sleep=F.nosleep, cl=cl)                      # noqa: E731
+    assert step(NOW)["opened"] == 1 and list(fu.load_state(e)["trades"]) == ["aggr:A1"] and fu.load_state(e)["main"] == "aggr"
+    files["desk_select.json"] = {"current": "bal"}
+    r = step(NOW + 60_000)
+    st = fu.load_state(e)
+    assert r["opened"] == 0 and r["closed"] == 0 and list(st["trades"]) == ["aggr:A1"] and st["main"] == "aggr"
+    assert "SOL-USDT-SWAP" in fk.pos and "BTC-USDT-SWAP" not in fk.pos
+    files["paper.json"]["profiles"]["aggr"]["open"] = []                                  # aggr closed A1 → closed here too
+    r = step(NOW + 120_000)
+    assert r["closed"] == 1 and r["opened"] == 0 and "SOL-USDT-SWAP" not in fk.pos and not fu.load_state(e)["trades"]
+    r = step(NOW + 180_000)                                                               # nothing held any more → bal
+    st = fu.load_state(e)
+    assert r["opened"] == 1 and st["main"] == "bal" and list(st["trades"]) == ["bal:B1"] and "BTC-USDT-SWAP" in fk.pos
+    import json
+    with open(fu.LOG, encoding="utf-8") as f:
+        evs = [json.loads(x) for x in f if x.strip()]
+    assert [x for x in evs if x.get("ev") == "desk_main"][-1]["to"] == "bal"
+
+
 def test_size_from_desk_risk_scaled_to_budget_with_stop_attached_isolated_ioc():
     fk = F.FakeOkx()
     e = F.env()

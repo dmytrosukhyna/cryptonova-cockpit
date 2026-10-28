@@ -1,8 +1,13 @@
 """«Автопилот OKX · фьючерсы» (22.10.2026) — the futures sleeve of the owner's OKX sub-account follows FUTURES · CRYPTO NOVA
-(«отобранные сигналы»): the desks the closed system's header adds up — «Сбалансированная» (bal) and «Импульс BTC» (imp), plus
+(«отобранные сигналы»): the desks the closed system's header adds up — the MAIN desk and «Импульс BTC» (imp), plus
 «Сигналы CRYPTO NOVA» (own) once its live record passes the gate (≥ 30 trades, ≥ +0.3 % a trade) — the same open / close / stop /
 target events the Bybit demo mirror follows (web/paper.json; cnq/execution/mirror.py fetch_desk / step). The header shows them as
 ONE $10 000 account (their average), so each desk gets an equal part of the budget.
+The main desk (28.10, owner: «система должна автоматически определять самую эффективную систему и переключаться на нее»): «current» of
+web/desk_select.json (cnq/agents/desk_select.py — slow, evidence-based, at most once in 7 days, never with an open position of the
+current desk on this account), read through panel_header.main_desk like the panel header; missing / broken / unreachable →
+«Агрессивная» (the owner's 28.10 choice). OKX_FUT_PROFILES overrides everything. Guard: while this account still holds a position of
+the previous main desk (state «main»), that desk stays the main one until the position is closed — a position never changes desk.
 
 What it does, once a minute inside the autopilot window (okx_autopilot --loop) and once on --run:
   • a desk trade → a USDT-margined perpetual swap (instType SWAP,
@@ -53,6 +58,7 @@ import time
 import urllib.error
 import urllib.request
 
+from ..agents import panel_header as ph
 from . import myspot_watch as ms
 from . import okx_alloc as al
 from . import okx_autopilot as ap
@@ -72,6 +78,7 @@ VERIFY_MS = 10 * 60_000     # every open position's stop is re-checked on OKX at
 PX_TOL = 0.15               # OKX price vs the desk's entry (catches a wrong ticker mapping)
 MAX_TRIES = 3
 SRC = "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/paper.json"
+SEL_SRC = "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/desk_select.json"
 DAY = 86_400_000
 
 
@@ -162,24 +169,59 @@ def desk_src(env=None) -> tuple[str, list | None]:
     return (e.get("OKX_FUT_SRC") or e.get("CNQ_MIRROR_SRC") or SRC), (forced or None)
 
 
-def pick_desks(paper: dict, forced: list | None = None) -> list:
-    """[(key, desk)] — the desks of FUTURES · CRYPTO NOVA, as the header counts them (aggr + imp since 28.10, + own after its gate)."""
+def sel_src(env=None) -> str:
+    """where web/desk_select.json is read: OKX_FUT_SEL_SRC, else next to the desks' paper.json, else the repository's file"""
+    e = _env(env)
+    if e.get("OKX_FUT_SEL_SRC"):
+        return e["OKX_FUT_SEL_SRC"]
+    src = desk_src(env)[0]
+    return src[: -len("paper.json")] + ph.SEL_FILE if src.endswith("/paper.json") else SEL_SRC
+
+
+def pick_desks(paper: dict, forced: list | None = None, sel: dict | None = None, prev: str | None = None, held=()) -> list:
+    """[(key, desk)] — the desks of FUTURES · CRYPTO NOVA, as the header counts them: the main desk (desk_select.json «current» via
+    panel_header.main_desk; none → «Агрессивная») + imp, + own after its gate. `prev` = the main desk of the last pass, `held` = the
+    desks of this account's open positions: a previous main desk that still holds a position stays the main one until it closes."""
     pr = paper.get("profiles") or {}
     if not pr and paper.get("open") is not None:          # a single desk file
         return [(paper.get("profile") or "bal", paper)]
-    keys = forced or ["aggr", "imp"]        # 28.10 (owner): «Агрессивная» instead of «Сбалансированная» = panel_header.NOVA_BASE
-    if not forced:
+    if forced:
+        keys = list(forced)
+    else:
+        keys = list(ph.nova_base(sel))
         s = (pr.get("own") or {}).get("stats") or {}
-        if (s.get("trades") or 0) >= OWN_GATE[0] and s.get("avg_trade_pct") is not None and s["avg_trade_pct"] >= OWN_GATE[1]:
+        if "own" not in keys and (s.get("trades") or 0) >= OWN_GATE[0] and s.get("avg_trade_pct") is not None \
+                and s["avg_trade_pct"] >= OWN_GATE[1]:
             keys = keys + ["own"]
+        if prev and prev not in keys and prev in held and prev in ph.MAIN_KEYS and isinstance(pr.get(prev), dict):
+            keys[0] = prev                                  # never move an open position between desks: wait until it is closed
     return [(k, pr[k]) for k in keys if isinstance(pr.get(k), dict)]
 
 
-def fetch_desks(env=None) -> list:
-    src, forced = desk_src(env)
-    req = urllib.request.Request(src + f"?t={int(time.time())}", headers={"Cache-Control": "no-cache", "User-Agent": "cnq-okx-futures"})
+def _get_json(url: str):
+    req = urllib.request.Request(url + f"?t={int(time.time())}", headers={"Cache-Control": "no-cache", "User-Agent": "cnq-okx-futures"})
     with urllib.request.urlopen(req, timeout=20) as r:
-        return pick_desks(json.loads(r.read().decode()), forced)
+        return json.loads(r.read().decode())
+
+
+def fetch_sel(env=None) -> dict | None:
+    """web/desk_select.json — the main desk the selector chose; None when missing, broken or unreachable (→ the default desk)"""
+    try:
+        d = _get_json(sel_src(env))
+        return d if isinstance(d, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def held_desks(st: dict | None) -> set:
+    """the desks whose trades this account holds now (state «trades»: «<desk>:<id>»)"""
+    return {str((m or {}).get("desk") or tid.split(":")[0]) for tid, m in ((st or {}).get("trades") or {}).items()}
+
+
+def fetch_desks(env=None, st: dict | None = None) -> list:
+    src, forced = desk_src(env)
+    paper = _get_json(src)
+    return pick_desks(paper, forced, None if forced else fetch_sel(env), (st or {}).get("main"), held_desks(st))
 
 
 # ── OKX: the swap calls (through the autopilot's signed client — no transfer, no withdrawal exists here) ──────────────────
@@ -686,7 +728,12 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     st.setdefault(start_key(cl, env), now)
     start = int(st[start_key(cl, env)])
     ctx = Ctx(cl, cfg, env)
-    ds = desks if desks is not None else fetch_desks(env)
+    ds = desks if desks is not None else fetch_desks(env, st)
+    if desks is None and ds and not desk_src(env)[1] and ds[0][0] in ph.MAIN_KEYS and st.get("main") != ds[0][0]:   # 28.10: main desk
+        if st.get("main"):
+            log({"ev": "desk_main", "from": st["main"], "to": ds[0][0], "note": "основной стол фьючерсов сменился (web/desk_select.json)"},
+                log_path)
+        st["main"] = ds[0][0]
     want = want_map(ds)
     slip = ap.limits(env)["slip"]
     seq = 0
@@ -949,7 +996,7 @@ def check_lines(cl: ap.Okx, cfg: dict, env=None) -> list[str]:
     out.append("  свопы OKX: " + ("BTC-USDT-SWAP отвечает" if ctx.inst("BTC-USDT-SWAP") else "BTC-USDT-SWAP не ответил"))
     st = load_state(env)
     try:
-        names = ", ".join(k for k, _ in fetch_desks(env))
+        names = ", ".join(k for k, _ in fetch_desks(env, st))
     except Exception:  # noqa: BLE001
         names = "не загрузились"
     out.append(f"  сигналы: CRYPTO NOVA (столы {names}) · открыто автопилотом: {len(st.get('trades') or {})}"
@@ -972,7 +1019,7 @@ def plan_lines(cl: ap.Okx, cfg: dict, env=None, desks: list | None = None, now: 
     except Exception as e:  # noqa: BLE001
         return L + [f"  бюджет не посчитан: {str(e)[:120]}"]
     try:
-        ds = desks if desks is not None else fetch_desks(env)
+        ds = desks if desks is not None else fetch_desks(env, st)
     except Exception as e:  # noqa: BLE001
         return L + [f"  сигналы не загрузились: {str(e)[:120]} — новых позиций не будет"]
     part = b["usd"] / max(1, len(ds))

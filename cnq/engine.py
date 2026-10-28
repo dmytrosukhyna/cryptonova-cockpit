@@ -11,7 +11,8 @@ Every minute (cycle): new 15-minute candles of the 18 core coins (only the missi
 CNPTS desks (paper), listing shorts, our own signals, the neutral basket, turbo, the signal feed (Telegram; the app bridge on
 the same server reads run/web/signals_feed.json directly). Every 60 cycles: funding. Every 30: the quality card and «ядро +
 альтсезон» (each does its daily work once a day). The 11-minute full candle check runs only once, in start.sh.
-Every 60 (and on cycle 1 after a start): the strategy conveyor (stages LAB → PAPER → READY → RETIRED, demo only).
+Every 60 (and on cycle 1 after a start): the strategy conveyor (stages LAB → PAPER → READY → RETIRED, demo only), then the main
+futures desk selector (28.10, cnq/agents/desk_select.py → web/desk_select.json, read by the panel header and the real OKX futures).
 Every SYNC_S: sync with GitHub — pull what the GitHub pipeline makes (news, research, macro …) into run/web and run/data, push
 what the engine owns (OWNED + engine.json). The GitHub pipeline skips the engine's steps while the repository variable
 CNQ_ENGINE = server, so there is only one writer of each file.
@@ -42,7 +43,8 @@ FAST = ["risk", "paper", "listings", "own", "lsn", "turbo", "signalfeed",
 SLOW = ["quality", "altport", "buynow"]     # 22.10: «Если покупать сегодня» for the app (cnq/agents/buy_now.py), every 30 minutes
 # 20.10: strategy conveyor LAB → PAPER → READY → RETIRED (cnq/agents/conveyor.py): once an hour (cycle 1 = soon after a restart, then
 # every 60 cycles), after the desks; it writes data/conveyor_state.json (read by the risk gate) and web/conveyor.json
-HOURLY = ["conveyor"]
+HOURLY = ["conveyor",
+          "deskselect"]    # 28.10: the main futures desk (cnq/agents/desk_select.py) — after the conveyor, whose stages it reads
 OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "altseason.json", "engine.json", "app_home.json", "app_btc.json",
          # 20.10: the app home in the other languages of the app (cnq/agents/i18n.py LANGS), written in the same step as app_home.json
          "app_home.en.json", "app_home.uk.json", "app_home.el.json", "app_home.es.json",
@@ -50,16 +52,18 @@ OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "al
          "buy_now.json",                                                   # 22.10: the app's «Если покупать сегодня» (SLOW step)
          "risk.json",                                                      # 20.10: the risk layer's public summary
          "scorecard.json",                                                 # 20.10: the public prediction scorecard
-         "okx_signal.json"]                                                # 22.10: the OKX signal sender's public log (no token)
+         "okx_signal.json",                                                # 22.10: the OKX signal sender's public log (no token)
+         "desk_select.json"]                                               # 28.10: the main futures desk (state + decision; public)
 # the engine's own state — never overwritten by a pull (20.10: + the conveyor's state, the risk layer's kill switch, state, reset
 # request and log)
 DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json", "kill_switch.json", "risk_state.json", "risk_reset.json", "risk_log.jsonl"}
 STEP_TIMEOUT = {"risk": 60, "paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90, "buynow": 150,
-                "conveyor": 120, "scorecard": 60, "okxsignal": 60}
+                "conveyor": 120, "scorecard": 60, "okxsignal": 60, "deskselect": 60}
 # 20.10: the public scorecard's append-only, hash-chained ledgers (cnq/agents/scorecard.py) — two active files and the directory of
 # their closed segments. Unlike DB_OWNED they are public: the engine is their only writer, a pull never overwrites them, and every
 # sync commits them (like OWNED, but in data/). A fresh install starts from the repo's copy (prepare).
-DATA_OWNED = ["scorecard_ledger.jsonl", "scorecard_outcomes.jsonl", "scorecard"]
+DATA_OWNED = ["scorecard_ledger.jsonl", "scorecard_outcomes.jsonl", "scorecard",
+              "desk_select.jsonl"]           # 28.10: one line per switch of the main futures desk (cnq/agents/desk_select.py)
 
 
 def _now_ms() -> int:

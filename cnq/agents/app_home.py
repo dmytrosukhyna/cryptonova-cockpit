@@ -359,7 +359,7 @@ def _open_row(o: dict, src: str, desk: dict | None = None, now: int | None = Non
     return {"sym": o.get("symbol"), "side": side, "entry": entry, "price": price, "stop": stop, "target": tgt,
             "pnl_usd": _r(float(o.get("open_pnl_usd") or 0)), "pct": _r(pct, 1), "opened": o.get("opened"),
             "expires": o.get("expires"), "why": why, "src": src,
-            "src_ru": rule or t(lang, f"src.{src}" if src in SRC_KEYS else "src.default"),
+            "src_ru": rule or t(lang, f"src.{'bal' if src in ph.FAMILY else src}" if src in SRC_KEYS | set(ph.FAMILY) else "src.default"),
             **_explain(o, src, grade, entry, stop, tgt, desk, now, lang)}
 
 
@@ -397,9 +397,9 @@ FUT_D0, NOVA_BASE, OWN_GATE_N, OWN_GATE_AVG = ph.FUT_D0, ph.NOVA_BASE, ph.OWN_GA
 nova_keys, _base_d0, _fut_eq = ph.nova_keys, ph.base_d0, ph.fut_eq
 
 
-def nova_result(prof: dict, now: int) -> tuple[float, list[tuple[int, float]]]:
-    """(the CRYPTO NOVA account's $ result now, its curve [(t, $)] from 18.10 ending with the live point)"""
-    keys = nova_keys(prof)
+def nova_result(prof: dict, now: int, sel: dict | None = None) -> tuple[float, list[tuple[int, float]]]:
+    """(the CRYPTO NOVA account's $ result now, its curve [(t, $)] from 18.10 ending with the live point); sel = web/desk_select.json"""
+    keys = nova_keys(prof, sel)
     if not keys:
         return 0.0, []
     desks = [prof[k] for k in keys]
@@ -422,10 +422,10 @@ def nova_result(prof: dict, now: int) -> tuple[float, list[tuple[int, float]]]:
     return usd, curve
 
 
-def _futures(paper: dict, now: int, lang: str = DEFAULT) -> dict:
+def _futures(paper: dict, now: int, lang: str = DEFAULT, sel: dict | None = None) -> dict:
     prof = paper.get("profiles") or {}
-    keys = nova_keys(prof)
-    usd, curve = nova_result(prof, now)
+    keys = nova_keys(prof, sel)
+    usd, curve = nova_result(prof, now, sel)
     day0 = int(dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
                .timestamp() * 1000)
     before = [v for t_, v in curve if t_ < day0]
@@ -436,7 +436,10 @@ def _futures(paper: dict, now: int, lang: str = DEFAULT) -> dict:
         dd = min(dd, (START + v) / peak - 1)
     own_s = (prof.get("own") or {}).get("stats") or {}
     opened = []
-    for src in _mix_keys():
+    # 28.10: the desks of the result first (the main desk desk_select chose may be cons / bal / aggr — the same signals at three
+    # sizes, so only that one of the three is listed), then the rest of the mix
+    srcs = [*keys, *(k for k in _mix_keys() if k not in ph.FAMILY)] if prof else _mix_keys()     # (no profiles: an old single-desk file)
+    for src in dict.fromkeys(srcs):
         desk = prof.get(src) or (paper if src == "bal" else {})
         for o in desk.get("open") or []:
             row = _open_row(o, src, desk, now, lang)
@@ -884,9 +887,10 @@ def _public_curve(fut_curve: list, pf_app: dict, s0: float, since: int, now: int
     return [[t_, _r(v)] for t_, v in _sample_keep_last(out, PUB_CURVE_N)]
 
 
-def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, rows: dict, now: int, lang: str = DEFAULT) -> dict | None:
+def _public(paper: dict, ideas: dict, pf_app: dict, fut: dict, fut_curve: list, rows: dict, now: int, lang: str = DEFAULT,
+            sel: dict | None = None) -> dict | None:
     prof = paper.get("profiles") or {}
-    H = ph.header(prof, ideas)
+    H = ph.header(prof, ideas, None, sel)
     if not H or not H["fut"] or not H["spot"]:
         return None
     F, S = H["fut"], H["spot"]
@@ -1322,10 +1326,11 @@ def _market_view_safe(mk, pport, fut, now, lang):
 def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAULT, ex: dict | None = None) -> dict:
     """app_home in one language — the same numbers in every language, only the words differ"""
     ex = ex or {}
-    fut, spot = _futures(paper, now, lang), _spot(pf, lang, ex)
+    sel = ex["sel"] if "sel" in ex else ph.load_sel(out)              # 28.10: the main futures desk (web/desk_select.json)
+    fut, spot = _futures(paper, now, lang, sel), _spot(pf, lang, ex)
     pub = _public_portfolio(out)
     total = pub["pnl_usd"] if pub else round((fut["usd"] or 0) + (spot["usd"] or 0), 2)
-    public = _public(paper, ex.get("ideas_pf") or {}, pf, fut, ex.get("fut_curve") or [], ex.get("rows") or {}, now, lang)
+    public = _public(paper, ex.get("ideas_pf") or {}, pf, fut, ex.get("fut_curve") or [], ex.get("rows") or {}, now, lang, sel)
     real = _public_real(out, now)
     if public is not None and real is not None:
         public["real"] = real
@@ -1359,8 +1364,9 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
     now = now or int(time.time() * 1000)
     paper, pf, mk = _load(out, "paper.json"), _load(out, "app_portfolio.json"), _load(out, "markets.json")
     ideas = (_load(out, "portfolio.json").get("portfolios") or {}).get("ideas") or {}
+    sel = ph.load_sel(out)
     ex = {"ideas": ideas.get("positions") or [], "ideas_pf": ideas, "rows": _load(out, "ideas.json").get("statuses") or {},
-          "fut_curve": nova_result(paper.get("profiles") or {}, now)[1],
+          "fut_curve": nova_result(paper.get("profiles") or {}, now, sel)[1], "sel": sel,
           "tok": _load(out, "tokenomics.json"), "profiles": _load(out, "coin_profiles.json").get("coins") or {}}
     docs = {lang: build(paper, pf, mk, out, now, lang, ex) for lang in LANGS}
     for lang in [x for x in LANGS if x != DEFAULT] + [DEFAULT]:          # Russian last: its mtime says «all languages written»

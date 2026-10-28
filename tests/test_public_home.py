@@ -34,12 +34,12 @@ def _panel_js() -> str:
 
 
 HARNESS = r"""
-const STRATS={bal:{name:'Сбалансированная'},imp:{name:'Импульс BTC'},own:{name:'Сигналы CRYPTO NOVA'}};
+const STRATS={cons:{name:'Консервативная'},bal:{name:'Сбалансированная'},aggr:{name:'Агрессивная'},imp:{name:'Импульс BTC'},own:{name:'Сигналы CRYPTO NOVA'}};
 const HDR_MAN={f:false,s:false}; const PROF='bal', SPROF='ideas'; let cur=null, lastPx=null; const K={};
 let PAPER=null, PF=null; const PP=()=>PAPER.profiles[PROF], SP=()=>PF.portfolios[SPROF];
 __PANEL__
 const cases=JSON.parse(process.argv[1]), out=[];
-for(const c of cases){ PAPER=c.paper; PF={available:true,portfolios:{ideas:c.ideas}};
+for(const c of cases){ PAPER=c.paper; PF={available:true,portfolios:{ideas:c.ideas}}; DSEL=c.sel;   // 28.10: web/desk_select.json (null = none)
   for(const k of Object.keys(PXT)) delete PXT[k];
   for(const [s,p] of Object.entries(c.px||{})) pxMark(s,p);                     // a fresh live price for that symbol (22.10: PXT)
   const H=hdrVals(); out.push({f:H.f,f0:H.f0,fr:H.fr,sp:H.sp,s0:H.s0,sr:H.sr,tot:H.tot,fsince:H.fsince,ssince:sSince(H.S),
@@ -56,8 +56,10 @@ def _desk(start_eq, hist, equity, open_=(), stats=None):
 
 
 def _cases() -> list[dict]:
+    """28.10: the main futures desk is whatever web/desk_select.json chose — the fixtures put the main strategy's account under the
+    chosen key (none → the default main desk) and the other two sizes of it under the rest of the family, which never count"""
     h = 3_600_000
-    bal = _desk(10000.0, [(T0 - 5 * h, 10120.0), (T0 - h, 10150.0), (T0 + 2 * h, 10190.0), (T0 + 30 * h, 10331.5)], 10331.5,
+    main = _desk(10000.0, [(T0 - 5 * h, 10120.0), (T0 - h, 10150.0), (T0 + 2 * h, 10190.0), (T0 + 30 * h, 10331.5)], 10331.5,
                 [{"symbol": "APT", "side": "LONG", "entry": 0.7915, "price": 0.7811, "qty_left": 3217.71, "pnl_usd": 0.0},
                  {"symbol": "ETH", "side": "SHORT", "entry": 2400.0, "price": 2376.0, "qty_left": 0.8, "pnl_usd": 12.5}])
     imp = _desk(10000.0, [(T0 + 20 * h, 10000.0), (T0 + 40 * h, 9962.4)], 9962.4,
@@ -69,12 +71,19 @@ def _cases() -> list[dict]:
              "positions": [{"symbol": "BTC", "weight": 0.2476, "price": 108000.0, "status": "OPEN"},
                            {"symbol": "ZEC", "weight": 0.0835, "price": 1264.88, "status": "OPEN"},
                            {"symbol": "PENGU", "weight": 0.0255, "price": 0.0301, "status": "OPEN"}]}
-    paper = {"profiles": {"bal": bal, "imp": imp, "own": own, "cons": _desk(10000.0, [(T0, 10000.0)], 10050.0)}}
+    side = _desk(10000.0, [(T0, 10000.0)], 10050.0)
+
+    def paper_for(key):
+        return {"profiles": {key: main, "imp": imp, "own": own, **{k: side for k in ph.FAMILY if k != key}}}
+    paper = paper_for(ph.NOVA_BASE[0])
     own_in = json.loads(json.dumps(paper))
     own_in["profiles"]["own"]["stats"] = {"trades": 31, "avg_trade_pct": 0.42}         # the own signals passed the gate
-    return [{"paper": paper, "ideas": ideas, "px": {}},                                # the server: no live prices
-            {"paper": paper, "ideas": ideas, "px": {"APTUSDT": 0.80, "ETHUSDT": 2410.0, "BTCUSDT": 109500.0, "ZECUSDT": 1200.0}},
-            {"paper": own_in, "ideas": ideas, "px": {"AVAXUSDT": 9.9, "SUIUSDT": 3.0}}]
+    return [{"paper": paper, "ideas": ideas, "px": {}, "sel": None},                   # the server: no live prices; no desk_select.json
+            {"paper": paper, "ideas": ideas, "px": {"APTUSDT": 0.80, "ETHUSDT": 2410.0, "BTCUSDT": 109500.0, "ZECUSDT": 1200.0},
+             "sel": {"current": "lab"}},                                               # a key that is not a main desk → the default
+            {"paper": own_in, "ideas": ideas, "px": {"AVAXUSDT": 9.9, "SUIUSDT": 3.0}, "sel": None},
+            {"paper": paper_for("bal"), "ideas": ideas, "px": {}, "sel": {"current": "bal"}},
+            {"paper": paper_for("cons"), "ideas": ideas, "px": {"APTUSDT": 0.80, "ETHUSDT": 2410.0}, "sel": {"current": "cons", "by": "auto"}}]
 
 
 def _kyiv_ddmm(ms):
@@ -92,14 +101,17 @@ def test_server_header_equals_the_panel_formula():
     js = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else None
     assert js, r.stderr
     for c, J in zip(cases, js):
-        H = ph.header(c["paper"]["profiles"], c["ideas"], c["px"])
+        H = ph.header(c["paper"]["profiles"], c["ideas"], c["px"], c["sel"])
         F, S = H["fut"], H["spot"]
         assert J["fo"] and J["so"] and J["keys"] == F["keys"]
         for a, b in ((F["f"], J["f"]), (F["f0"], J["f0"]), (F["fr"], J["fr"]), (S["sp"], J["sp"]), (S["s0"], J["s0"]),
                      (S["sr"], J["sr"]), (H["tot"], J["tot"])):
             assert abs(a - b) < 1e-6, (a, b)
         assert _kyiv_ddmm(F["since"]) == J["fsince"] and _kyiv_ddmm(S["since"]) == J["ssince"]
-    assert js[0]["keys"] == ["bal", "imp"] and js[2]["keys"] == ["bal", "imp", "own"]
+    m = ph.NOVA_BASE[0]
+    assert js[0]["keys"] == js[1]["keys"] == [m, "imp"] and js[2]["keys"] == [m, "imp", "own"]
+    assert js[3]["keys"] == ["bal", "imp"] and js[4]["keys"] == ["cons", "imp"]
+    assert abs(js[3]["f"] - js[0]["f"]) < 1e-9 and abs(js[4]["f"] - js[1]["f"]) < 1e-9       # the chosen desk counts, nothing else
     assert abs(js[1]["f"] - js[0]["f"]) > 1                                               # the live prices really moved the futures part
     assert js[0]["sp"] == js[1]["sp"] == 10209.79                                           # 22.10: spot = the server's measurement, one number
 

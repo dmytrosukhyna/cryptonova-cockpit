@@ -54,6 +54,13 @@ jobs:
           # 28.10 (build 46): the PUBLIC mode's real account, the market in plain words, the spot actions, the demo stats
           b46=$(curl -sS -m 20 'https://app.crypto-capital.app/v2/home?lang=ru' | jq -c '{pp: (.public_portfolio | if . then {since, start_usd, value_usd, pnl_usd, stale, day: .periods.day, spot_day: .spot.periods.day.available, fut_open: .futures.open_n, fut_stats: .futures.stats, actions: (.actions | length), last: (.actions[0].text // null)} else null end), mv: (.market_view | if . then {now, short, system} else null end), spot_actions: ((.spot.actions // []) | length), demo_stats: .futures.stats}' 2>/dev/null || echo "not JSON")
           echo "::notice title=build 46 home::$(echo "$b46" | cut -c1-3800)"
+      - name: build 46 QA (28.10) — plain words, transfers, the real futures record, the FAQ
+        run: |
+          A=https://app.crypto-capital.app
+          q=$(curl -sS -m 20 "$A/v2/home?lang=ru" | jq -c '{spot: (.public_portfolio.spot | if . then {value_usd, moved_usd, moved_note} else null end), fut: (.public_portfolio.futures | if . then {value_usd, moved_usd} else null end), fut_why_tail: ((.public.calc.futures_why // "") | .[-120:]), coin: ((.spot.coins // [])[] | select(.sym == "SOL") | {live_share, why_ru, mark_ru, reco_ru}), last: .spot.last_action.text, buy: [(.buy_now.items // [])[0:2][] | .why]}' 2>/dev/null || echo "not JSON")
+          echo "::notice title=QA home ru::$(echo "$q" | cut -c1-3800)"
+          f=$(curl -sS -m 20 "$A/v2/feed/nova" | jq -c '{brand_nbsp: ((.topics[0].title // "") | test("CRYPTO\u00a0NOVA")), title: .topics[0].title}' 2>/dev/null || echo "?")
+          echo "::notice title=QA nova feed::$f"
       - name: NOVA's voice on the server (build 46 #6)
         run: |
           set -u

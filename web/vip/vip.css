@@ -326,3 +326,5 @@ body.compact .tbl td{padding:5px 8px}body.compact .li{padding:6px 0}body.compact
 .scard .m span{white-space:normal}
 .scard .m span small{display:inline;font-size:11.5px;color:var(--muted);font-weight:600}
 .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.demo-stage[aria-current="step"]{border-color:var(--accent);background:var(--accent-bg)}
+.demo-b .demo-stage{padding:7px 10px}

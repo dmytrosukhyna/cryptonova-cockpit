@@ -229,6 +229,8 @@
         <p class="xs muted" style="margin-top:6px">Цифры — на экране, они живые; в тексте их нет специально, чтобы рассказ не устаревал.</p>
         <h4>Пример для новичка</h4><div class="ex"><p>${esc(st.example)}</p></div>
         <h4>Переход</h4><div class="next"><p>${esc(st.next)}</p></div>
+        <h4>Все этапы</h4><div class="demo-stages">${STAGES.map((x, k) => `<button class="demo-stage" type="button" data-dm="jump" data-k="${k}" ${k === S.i ? 'aria-current="step"' : ''}>
+          <span class="no">${k + 1}</span><span><b>${esc(x.title)}</b>${S.skipped.includes(k) ? '<small>пропущен</small>' : ''}</span><span class="tm">${x.min} мин</span></button>`).join('')}</div>
       </div>
       <div class="demo-f">
         <button class="btn" type="button" data-dm="back" ${S.i === 0 ? 'disabled' : ''}>${V.ico('back')} Назад</button>

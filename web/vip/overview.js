@@ -73,9 +73,11 @@
       const [H, MK, CAL, IDEAS, PF, DS] = await V.feeds(['app_home.json', 'markets.json', 'calendar.json', 'ideas.json', 'portfolio.json', 'desk_select.json']);
       const [M, S, ST, OP] = await Promise.all([V.real(), V.sysStatus(), V.strategiesModel ? V.strategiesModel() : null, V.oppsModel ? V.oppsModel() : null]);
       const mv = (H && H.market_view) || null;
+      const X = V.spotModel ? await V.spotModel() : null;
+      const P = X && V.spotPipe ? V.spotPipe(M, X) : null;
       return `<div class="ph"><div><h2>Обзор</h2><p>Рынок, состояние системы и публичный портфель CRYPTO NOVA — на одном экране.</p></div></div>
       <div class="ov-grid">
-        ${marketCard(mv, MK, CAL)}${systemCard(S)}${financeCard(M)}${chartCard()}${positionsCard(M)}${recoCard(IDEAS, PF, DS)}${stratCard(ST)}${oppsCard(OP)}
+        ${marketCard(mv, MK, CAL)}${systemCard(S)}${financeCard(M)}${chartCard()}${positionsCard(M)}${recoCard(IDEAS, PF, DS, P, X)}${stratCard(ST)}${oppsCard(OP)}
       </div>`;
     },
     async mount(el) {
@@ -240,19 +242,24 @@
     </section>`;
   }
 
-  function recoCard(IDEAS, PF, DS) {
+  function recoCard(IDEAS, PF, DS, P, X) {
     const ideas = PF && PF.portfolios && PF.portfolios.ideas;
-    const nb = A(ideas && ideas.not_bought);
-    const cash = ideas && ideas.sleeves && ideas.sleeves.cash;
+    // one source with «Спот»: the pipeline's recommended-but-not-bought coins (spot_pipeline.json, else the model's own list)
+    const nb = P ? P.coins.filter((c) => c.reco && !c.held).map((c) => ({ symbol: c.sym, why_ru: shortWhy(c.why) })) : A(ideas && ideas.not_bought);
+    const PL = X && X.PL;
+    const cash = PL && V.isNum(PL.cash_pct_real) ? { now_pct: PL.cash_pct_real, target_pct: PL.cash_target_pct, real: true } : ideas && ideas.sleeves && ideas.sleeves.cash;
     return `<section class="card a-reco" data-demo="ov-reco">
       <div class="card-h"><span class="eyebrow">Ключевые рекомендации</span><span class="sp"></span>${IDEAS ? V.stamp(IDEAS.asof, 180) : ''}</div>
       ${IDEAS && IDEAS.summary_ru ? `<p class="para"><b>Спот, таблица отбора:</b> ${esc(IDEAS.summary_ru)}</p>` : V.nodata('таблица «Что брать на спот»')}
       ${nb.length ? `<p class="para"><b>Рекомендованы, но не куплены:</b> ${nb.slice(0, 4).map((x) => `${esc(x.symbol)} — ${esc(x.why_ru)}`).join('; ')}${nb.length > 4 ? '…' : ''}</p>` : ''}
-      ${cash && V.isNum(cash.now_pct) ? `<p class="para"><b>Кэш модели спота:</b> ${V.share(cash.now_pct)} при цели ${V.share(cash.target_pct)} — <button class="link" type="button" data-act="go" data-to="spot" data-arg="cash">почему</button>.</p>` : ''}
+      ${cash && V.isNum(cash.now_pct) ? `<p class="para"><b>${cash.real ? 'Кэш спот-портфеля на реальном счёте' : 'Кэш модели спота'}:</b> ${V.share(cash.now_pct)} при минимуме ${V.share(cash.target_pct, 0)} — <button class="link" type="button" data-act="go" data-to="spot" data-arg="cash">почему</button>.</p>` : ''}
       ${DS && DS.why_ru ? `<p class="para"><b>Фьючерсы, выбор стола:</b> ${esc(DS.why_ru)}</p>` : ''}
       <p class="note">${esc((IDEAS && IDEAS.disclaimer_ru) || 'Правила отбора, а не прогноз цены.')}</p>
     </section>`;
   }
+
+  // «Таблица: … Портфель не покупает: <reason>» → the reason only
+  const shortWhy = (w) => { w = String(w || 'причина не записана'); const i = w.indexOf('Портфель не покупает:'); return (i >= 0 ? w.slice(i + 21) : w).trim().replace(/\.$/, ''); };
 
   function stratCard(ST) {
     if (!ST) return `<section class="card" data-demo="ov-strats"><div class="card-h"><span class="eyebrow">Стратегии</span></div>${V.nodata()}</section>`;

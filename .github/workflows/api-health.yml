@@ -61,6 +61,15 @@ jobs:
           echo "::notice title=QA home ru::$(echo "$q" | cut -c1-3800)"
           f=$(curl -sS -m 20 "$A/v2/feed/nova" | jq -c '{brand_nbsp: ((.topics[0].title // "") | test("CRYPTO\u00a0NOVA")), title: .topics[0].title}' 2>/dev/null || echo "?")
           echo "::notice title=QA nova feed::$f"
+      - name: final QA 28.10 — the copy button everywhere, the part curves from 22.10
+        run: |
+          # okx_copy_barred empty (the copy button in every region, older builds too); public_portfolio futures / spot curves from
+          # 22.10 (futures = base + realized: $1 503,66 until the APT close 23.10 05:48 UTC, then $1 503,93), no split_note
+          A=https://app.crypto-capital.app
+          for l in ru es; do
+            h=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -c '{lang, asof, copy_barred: .config.okx_copy_barred, split_note: .public_portfolio.split_note, fut_first: .public_portfolio.futures.curve[0], fut_step: ([.public_portfolio.futures.curve[] | select(.[1] > 1503.7)][0]), fut_n: (.public_portfolio.futures.curve | length), spot_first: .public_portfolio.spot.curve[0], spot_n: (.public_portfolio.spot.curve | length), fut_week: .public_portfolio.futures.periods.week, base_note: .public_portfolio.futures.base_note, act: .public_portfolio.actions[0].text}' 2>/dev/null || echo "not JSON")
+            echo "::notice title=final QA home $l::$(echo "$h" | cut -c1-3800)"
+          done
       - name: NOVA's voice on the server (build 46 #6)
         run: |
           set -u

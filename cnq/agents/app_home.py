@@ -773,6 +773,8 @@ def connect_states(lang: str = DEFAULT) -> dict:
     «confirmed» exists only when the system can really check (can_verify) — today it cannot, so it is "available": false and the
     app shows «unverifiable» after the guide instead of «Не подтверждено»."""
     return {"can_verify": CONNECT_VERIFIABLE, "after_guide": "confirmed" if CONNECT_VERIFIABLE else "unverifiable",
+            # owner's decision of 28.10: one calm note (an «i») instead of any «unavailable in the EU / EEA / UK»
+            "info": t(lang, "cs.info"),
             "states": {k: {"title": t(lang, f"cs.{k}.title"), "text": t(lang, f"cs.{k}.text"), "next": t(lang, f"cs.{k}.next"),
                            "available": CONNECT_VERIFIABLE or k != "confirmed"} for k in CONNECT_STATES}}
 
@@ -798,7 +800,8 @@ def _config(out: str, lang: str = DEFAULT) -> dict:
         sorted({str(x).strip().upper() for x in regions if len(str(x).strip()) == 2}) if isinstance(regions, list) else "ALL")
     okx_barred = c.get("okx_barred")
     okx_barred = sorted({str(x).strip().upper() for x in okx_barred if len(str(x).strip()) == 2}) if isinstance(okx_barred, list) else None
-    # 22.10: where OKX serves no copy-trading pages (the EEA by default, null = the app's own list) — no «Копировать» there
+    # 22.10: where OKX serves no copy-trading pages (the EEA by default, null = the app's own list) — no «Копировать» there.
+    # 28.10 (owner's decision): the flag stays as data only; no text says copying is banned there (connect_states.info instead)
     copy_barred = c.get("okx_copy_barred")
     copy_barred = sorted({str(x).strip().upper() for x in copy_barred if len(str(x).strip()) == 2}) if isinstance(copy_barred, list) else None
     return {"exchange_name": c.get("exchange_name") or "BingX",
@@ -1010,7 +1013,8 @@ def _buy_now(out: str, now: int, lang: str = DEFAULT, real_syms: set | None = No
 # "public": total_usd, base_usd (the two $10 000 demo accounts), since, futures {usd, pct, since, open_n, in_result_n, closed_n,
 # wins}, spot {usd, pct, value_usd, start_usd, since, cash_pct, cash_usd, coins [{sym, name, weight %, usd, pct since buy, kind,
 # plan %, stop, why}]}, curve [[t, $ futures + spot]] from 17.10 ending with the live point, calc — «Рассчитать мой портфель»:
-# the split of the user's sum (spot 65 / futures 25 / active spot 10 %) and the plain «почему так» of each part.
+# the split of the user's sum (since the owner's decision of 28.10: spot 65 + extra core 10 / futures 15 / active spot 10 %) and the
+# plain «почему так» of each part.
 # owner's decision of 28.10 (real money): spot portfolio 65 % + extra core BTC / ETH / SOL 10 % + futures 15 % + «Импульс BTC» 10 %.
 # "spot" = the spot portfolio + the extra core (75) so spot + futures + active stay 100 for the app builds that add them up;
 # "core" = the part of "spot" that is the extra core.
@@ -1317,13 +1321,14 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
     # is the money really in it (spot + futures = the account), its result stays the trading result, and the difference is
     # the transfer: spot.moved_usd = −futures.moved_usd, with a plain note
     # build 47 (§6.4, audit 28.10): it is NOT a transfer — spot and futures share ONE USDT balance on OKX (acctLv 2, no code moves
-    # money between accounts, OKX bills show no transfer). The autopilot splits the account's CURRENT value 65 / 25 / 10
-    # (okx_alloc.shares; okx_futures.budget = 25 % of the total, refreshed every 15 min; myspot_sub.allocate hands the USDT out
-    # margin → spot cash → active spot → futures reserve), while each part's base is its share of the STARTING capital. So
+    # money between accounts, OKX bills show no transfer). Until 28.10 the autopilot split the account's CURRENT value 65 / 25 / 10
+    # (okx_futures.budget = 25 % of the total), while each part's base is its share of the STARTING capital. So
     #   moved = futures money now − (futures base + futures result) = rebase + drift,
     #   rebase = futures share × value now − (futures base + futures result)   (the futures' share of the whole account's change)
     #   drift  = futures money now − futures share × value now                 (spot coins / budget off their share between rebalances)
     # public_portfolio.moved says so in the app's languages; is_pnl is always false.
+    # Owner's decision of 28.10: the futures budget = 15 % of the starting capital + the futures' own result (okx_alloc.fut_budget,
+    # okx_futures.own_capital), so the futures money IS base + result → moved ≈ 0 → null and the line disappears.
     moved_doc = None
     if spot is not None and fut is not None and fpnl is not None and any(f"fut_{k}_usd" in al for k in ("margin", "reserve")):
         fut_hold = float(al.get("fut_margin_usd") or 0) + float(al.get("fut_reserve_usd") or 0)

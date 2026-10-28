@@ -378,7 +378,7 @@ _C_ORDER = {k: i for i, k in enumerate(("used", "validation", "testing", "paused
 _T_ORDER = {"futures": 0, "spot": 1, "other": 2}
 STATUS_RULES_RU = [
     "Active — по ней сейчас торгует реальный счёт CRYPTO NOVA на OKX (основной стол выбирает web/desk_select.json, «Импульс BTC» — "
-    "вторая половина фьючерсов, «Активный спот · Импульс BTC» — 10% счёта, «CRYPTO NOVA портфель» — спот 65%).",
+    "вторая половина фьючерсов, «Активный спот · Импульс BTC» — 10% счёта, «CRYPTO NOVA портфель» — спот 65% и доп. ядро BTC/ETH/SOL 10%).",
     "Approved — прошла ворота конвейера PAPER → READY (сейчас таких нет). На реальные деньги — только решением владельца или автовыбора.",
     "Validation — кандидат на реальные деньги, ждёт своих ворот: автовыбор основного стола (20 сделок, результат к просадке лучше на 20%) "
     "или ворота «Сигналов CRYPTO NOVA» (30 сделок, от +0,3% на сделку).",
@@ -443,7 +443,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
     try:
         from ..execution.okx_alloc import SHARES
     except Exception:  # noqa: BLE001
-        SHARES = {"spot": 0.65, "futures": 0.25, "active": 0.10}
+        SHARES = {"spot": 0.65, "core": 0.10, "futures": 0.15, "active": 0.10}      # owner's decision of 28.10
     sel_c = {c.get("key"): c for c in (sel or {}).get("candidates") or [] if isinstance(c, dict)}
     out = []
     # ---- the paper desks (web/paper.json) with the conveyor's record (web/conveyor.json) ----
@@ -457,7 +457,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
         elif k == second:
             status, why = "Active", "вторая половина фьючерсов реального счёта — всегда"
         elif k == "imps":
-            status, why = "Active", f"активный спот реального счёта ({SHARES.get('active', 0.1) * 100:.0f}% счёта; пока нет сделки — в USDT)"
+            status, why = "Active", f"активный спот реального счёта ({SHARES.get('active', 0.1) * 100:.0f}% счёта; между сделками — в BTC, после выхода до 3 дней в USDT)"
         elif c.get("paused") or c.get("stage") == "retired":
             status, why = "Paused", c.get("reason_ru") or "снят конвейером"
         elif c.get("stage") == "ready":
@@ -493,7 +493,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
                        next_step_ru=nxt, issues_ru=issues, sample_note_ru=_sample_note(n), about_ru=v.get("about"), source="paper.json + conveyor.json",
                        metrics_basis_ru="Демо-счёт $10 000 по ценам биржи: комиссии, проскальзывание и фандинг учтены; результат — с открытыми позициями по последней цене; сделки, выигрыши и средняя сделка — по журналу конвейера.",
                        real=({"sleeve": "spot_active" if spot else "futures",
-                              "share_pct": round((SHARES.get("active", 0.1) if spot else SHARES.get("futures", 0.25) / 2) * 100, 1)}
+                              "share_pct": round((SHARES.get("active", 0.1) if spot else SHARES.get("futures", 0.15) / 2) * 100, 1)}
                              if status == "Active" else None)))
     # ---- spot portfolios (web/portfolio.json) — the meme one is the meme desk below ----
     for k, p in ((pf or {}).get("portfolios") or {}).items():

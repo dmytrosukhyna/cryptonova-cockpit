@@ -240,7 +240,7 @@
             },
             {
               "title": "How the public portfolio is split",
-              "text": "In PUBLIC mode you'll see below how the real account is split: the spot portfolio 65%, futures 25%, active spot 10%. The money is real, and the numbers update about every 15 minutes.",
+              "text": "In PUBLIC mode you'll see below how the real account is split: the spot portfolio 65%, extra core BTC, ETH and SOL 10%, futures 15%, active spot 10%. The money is real, and the numbers update about every 15 minutes.",
               "example": "In real life: a family budget shows how much came from salary, how much from the vegetable garden, and how much from a side job.",
               "art": "coins",
               "screen": "Main",
@@ -784,7 +784,7 @@
             },
             {
               "title": "If you live in the EU",
-              "text": "In the EU and EEA, the MiCA rules have applied in full since 1 July 2026: only companies with an EU licence, such as OKX Europe, may provide crypto services there. Automatic copying isn't available there yet: every CRYPTO NOVA trade is visible in the app, and you can repeat them yourself. Lessons, demo, the Piggy bank and NOVA work fully there.",
+              "text": "In the EU and EEA, the MiCA rules have applied in full since 1 July 2026: only companies with an EU licence, such as OKX Europe, may provide crypto services there. The availability of copy trading and of some instruments depends on your country and region — OKX shows the terms. Every CRYPTO NOVA trade is visible in the app. Lessons, demo, the Piggy bank and NOVA work fully there.",
               "example": "In real life: every country has its own traffic rules. It's the same car, but in some places certain roads are still closed to you.",
               "art": "globe",
               "screen": "Live",

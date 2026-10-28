@@ -308,13 +308,15 @@ def test_turbo_mirror_copies_the_listing_watch(tmp_path):
 
 def test_connect_guide_is_the_build_45_flow_without_bot_or_uid():
     """22.10 (owner): no Telegram bot or channel in «Подключить», no UID — OKX by our link → identity check → USDT → «Копировать
-    CRYPTO NOVA» (lead-trader profile); EEA / UK: no copy button, the trades to repeat by hand; BingX only where OKX does not work."""
+    CRYPTO NOVA» (lead-trader profile); BingX only where OKX does not work. 28.10 (owner's decision): no text says copying is banned
+    or unavailable in the EEA / UK — the same copy step, with one calm «i» note."""
     html = _app()
     g = _slice(html, "// 18.10: «Подключить» opens a short step guide.", "ov.querySelector('#connYes').addEventListener('click',showSteps);")
-    for bad in ("t.me", "CONN_BOT", "UID боту", "Открыть бота", "Написать боту", "Оставьте UID", "готовим"):
+    for bad in ("t.me", "CONN_BOT", "UID боту", "Открыть бота", "Написать боту", "Оставьте UID", "готовим", "пока недоступно", "VPN"):
         assert bad not in g, bad
     for good in ("UID и API-ключи не нужны", "Копировать CRYPTO NOVA", "часть прибыли копирующего", "Убытки возможны", "okx_copy_url",
-                 "j.copy_url", "В ЕЭЗ и Великобритании автоматическое копирование на OKX пока недоступно", "откроется позже",
+                 "j.copy_url", "Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX",
+                 "откроется позже",
                  "Пройдите проверку личности", "Пополните счёт в USDT", "Все сделки CRYPTO NOVA видны в панели"):
         assert good in g, good
     js = (_slice(html, "const EEA_TZ=", "// the lead-trader profile") +
@@ -324,6 +326,6 @@ def test_connect_guide_is_the_build_45_flow_without_bot_or_uid():
     js = "const STORE={};const localStorage={getItem:k=>STORE[k]||null,setItem:(k,v)=>{STORE[k]=v;}};" + js
     out = _node(js)
     if out:
-        assert out["eu"] == ["OKX", False, "https://www.okx.com/join/X", "eu"]
+        assert out["eu"] == ["OKX", True, "https://www.okx.com/join/X", "eu"]       # owner 28.10: the same copy step, one calm note
         assert out["world"] == ["OKX", True, "https://www.okx.com/join/X", "world"]
         assert out["nookx"] == ["BingX", False, "https://bingx.com/r/Y", "nookx"]

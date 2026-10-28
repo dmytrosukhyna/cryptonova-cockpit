@@ -259,12 +259,13 @@ def test_knowledge_files():
     for f in facts:
         assert f["fact"] in system
     # 22.10 (build 45): the real way in is OKX copy trading (no UID, no application form); the EEA gets no automatic copying
-    for must in ("$10 000", "52 урока", "BingX", "копитрейдинг OKX", "Ключи API не нужны", "автоматическое копирование пока недоступно",
+    for must in ("$10 000", "52 урока", "BingX", "копитрейдинг OKX", "Ключи API не нужны", "Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX",  # owner 28.10
                  "долю для ведущего трейдера", "Публичный портфель", "реальный счёт CRYPTO NOVA на OKX", "ЕС", "«бесплатно» не используй",
                  "не храним", "5 вопросов",
                  "не финансовый совет", "120 слов", "без эмодзи", "«•»"):
         assert must in system, must
     assert "UID" not in system and "Оставить заявку" not in system
+    assert "копирование пока недоступно" not in system and "VPN" in system          # owner 28.10: no ban volunteered, never a VPN
 
 
 def test_tidy_plain_text_for_voice():

@@ -240,7 +240,7 @@
             },
             {
               "title": "Reparto de la cartera pública",
-              "text": "En modo PUBLIC verás más abajo cómo se reparte la cuenta real: cartera spot 65%, futuros 25%, spot activo 10%. El dinero es real y las cifras se actualizan más o menos cada 15 minutos.",
+              "text": "En modo PUBLIC verás más abajo cómo se reparte la cuenta real: cartera spot 65%, núcleo adicional BTC, ETH y SOL 10%, futuros 15%, spot activo 10%. El dinero es real y las cifras se actualizan más o menos cada 15 minutos.",
               "example": "En la vida real: en el presupuesto familiar ves cuánto vino del sueldo, cuánto del huerto y cuánto de un trabajo extra.",
               "art": "coins",
               "screen": "Main",
@@ -784,7 +784,7 @@
             },
             {
               "title": "Si vives en la UE",
-              "text": "En la UE y el EEE, las normas MiCA se aplican por completo desde el 1 de julio de 2026: allí solo pueden prestar servicios cripto las empresas con licencia de la UE, como OKX Europe. La copia automática aún no está disponible allí: todas las operaciones de CRYPTO NOVA se ven en la app y puedes repetirlas tú mismo. Las lecciones, la demo, la hucha y NOVA funcionan allí por completo.",
+              "text": "En la UE y el EEE, las normas MiCA se aplican por completo desde el 1 de julio de 2026: allí solo pueden prestar servicios cripto las empresas con licencia de la UE, como OKX Europe. La disponibilidad del copy trading y de algunos instrumentos depende del país y la región: OKX muestra las condiciones. Todas las operaciones de CRYPTO NOVA se ven en la app. Las lecciones, la demo, la hucha y NOVA funcionan allí por completo.",
               "example": "En la vida real: cada país tiene sus normas de tráfico. El auto es el mismo, pero por algunas carreteras todavía no se puede pasar.",
               "art": "globe",
               "screen": "Live",

@@ -1420,16 +1420,17 @@ T: dict[str, dict[str, str]] = {
                           "el": "Παρακολουθήστε τις συναλλαγές στην εφαρμογή. Μπορείτε να σταματήσετε την αντιγραφή στο OKX οποιαδήποτε στιγμή.",
                           "es": "Sigue las operaciones en la app. Puedes detener la copia en OKX en cualquier momento."},
     "cs.error.title": {"ru": "Ошибка", "en": "Error", "uk": "Помилка", "el": "Σφάλμα", "es": "Error"},
-    "cs.error.text": {"ru": "Шаг не удался: например, биржа отклонила проверку личности, пополнение не дошло или копирование недоступно в "
-                            "вашей стране.",
-                      "en": "A step didn't go through: for example, the exchange rejected the identity check, the deposit didn't arrive, or "
-                            "copying isn't available in your country.",
-                      "uk": "Крок не вдався: наприклад, біржа відхилила перевірку особи, поповнення не надійшло або копіювання недоступне у "
-                            "вашій країні.",
-                      "el": "Ένα βήμα δεν ολοκληρώθηκε: για παράδειγμα, το ανταλλακτήριο απέρριψε τον έλεγχο ταυτότητας, η κατάθεση δεν "
-                            "έφτασε ή η αντιγραφή δεν είναι διαθέσιμη στη χώρα σας.",
-                      "es": "Un paso no salió bien: por ejemplo, el exchange rechazó la verificación de identidad, el depósito no llegó o la "
-                            "copia no está disponible en tu país."},
+    "cs.error.text": {"ru": "Шаг не удался: например, биржа отклонила проверку личности или пополнение не дошло.",
+                      "en": "A step didn't go through: for example, the exchange rejected the identity check or the deposit didn't arrive.",
+                      "uk": "Крок не вдався: наприклад, біржа відхилила перевірку особи або поповнення не надійшло.",
+                      "el": "Ένα βήμα δεν ολοκληρώθηκε: για παράδειγμα, το ανταλλακτήριο απέρριψε τον έλεγχο ταυτότητας ή η κατάθεση δεν έφτασε.",
+                      "es": "Un paso no salió bien: por ejemplo, el exchange rechazó la verificación de identidad o el depósito no llegó."},
+    # owner's decision of 28.10: no statement that copying is banned / unavailable in the EU / EEA / UK — one calm note (an «i»)
+    "cs.info": {"ru": "Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX.",
+                "en": "The availability of copy trading and of some instruments depends on your country and region — OKX shows the terms.",
+                "uk": "Доступність копітрейдингу та окремих інструментів залежить від країни й регіону — умови показує OKX.",
+                "el": "Η διαθεσιμότητα του copy trading και ορισμένων εργαλείων εξαρτάται από τη χώρα και την περιοχή — τους όρους τους δείχνει το OKX.",
+                "es": "La disponibilidad del copy trading y de algunos instrumentos depende del país y la región: OKX muestra las condiciones."},
     "cs.error.next": {"ru": "Посмотрите причину в OKX, исправьте её там и повторите шаг. Если не получается — напишите в поддержку.",
                       "en": "Check the reason in OKX, fix it there and repeat the step. If it doesn't work, contact support.",
                       "uk": "Перегляньте причину в OKX, виправте її там і повторіть крок. Якщо не виходить — напишіть у підтримку.",

@@ -1049,8 +1049,9 @@ const OTAG={our:'НАША',engine:'ДВИЖОК',test:'НА ПРОВЕРКЕ',pi
 let APPCFG=null, ACAD=null;
 async function connCfg(){ if(APPCFG) return APPCFG; try{ const r=await fetch('./app_config.json',{cache:'no-store'}); APPCFG=r.ok?await r.json():{}; }catch(e){ APPCFG={}; } return APPCFG; }
 async function connLesson(id){ if(!ACAD){ try{ const r=await fetch('./academy.json',{cache:'no-store'}); ACAD=r.ok?await r.json():{levels:[]}; }catch(e){ ACAD={levels:[]}; } } for(const lv of (ACAD.levels||[])) for(const l of (lv.lessons||[])) if(l.id===id) return l; return null; }
-// 22.10 (owner, build 45): OKX for everyone (web/app_config.json okx_ref); in the EEA and the UK (okx_copy_barred) OKX has no copy
-// trading yet — no copy button there, the trades are on the panel to repeat by hand; BingX (exchange_ref) only where OKX does not
+// 22.10 (owner, build 45): OKX for everyone (web/app_config.json okx_ref); 28.10 (owner's decision): no text says copying is banned or
+// unavailable in the EEA / UK — the copy step is the same everywhere OKX works, with one calm «i» note (CONN_NOTE); okx_copy_barred
+// stays in app_config as data only. BingX (exchange_ref) only where OKX does not
 // work (okx_barred: the US, Canada, Singapore …), copying opens there later. Three choices: eu · world · nookx — the default from the
 // browser's time zone, the person can switch, remembered on this device.
 const EEA_TZ=new Set(['Europe/Amsterdam','Europe/Athens','Europe/Berlin','Europe/Bratislava','Europe/Brussels','Europe/Bucharest','Europe/Budapest','Europe/Copenhagen','Europe/Dublin','Europe/Helsinki','Europe/Lisbon','Europe/Ljubljana','Europe/Luxembourg','Europe/Madrid','Europe/Malta','Europe/Oslo','Europe/Paris','Europe/Prague','Europe/Riga','Europe/Rome','Europe/Sofia','Europe/Stockholm','Europe/Tallinn','Europe/Vaduz','Europe/Vienna','Europe/Vilnius','Europe/Warsaw','Europe/Zagreb','Europe/Mariehamn','Europe/Busingen','Atlantic/Reykjavik','Atlantic/Canary','Atlantic/Madeira','Atlantic/Azores','Asia/Nicosia','Asia/Famagusta','Africa/Ceuta']);
@@ -1059,11 +1060,12 @@ function tzZone(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone|
 function tzIsEEA(){ const z=tzZone(); return EEA_TZ.has(z)||z==='Europe/London'||z==='Europe/Guernsey'||z==='Europe/Jersey'||z==='Europe/Isle_of_Man'; }
 function connRegion(){ let v=''; try{ v=localStorage.getItem('cnq_region')||''; }catch(e){} return ['eu','world','nookx'].includes(v)?v:(tzIsEEA()?'eu':NOOKX_TZ.test(tzZone())?'nookx':'world'); }
 function setConnRegion(r){ try{ localStorage.setItem('cnq_region',['eu','world','nookx'].includes(r)?r:'world'); }catch(e){} }
-const CONN_REGN={eu:'OKX · в ЕЭЗ и Великобритании копирование пока недоступно',world:'OKX · копирование CRYPTO NOVA в один клик',nookx:'BingX — OKX в вашей стране не работает'};
+const CONN_NOTE='Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX.';
+const CONN_REGN={eu:'OKX · ⓘ '+CONN_NOTE,world:'OKX · копирование CRYPTO NOVA в один клик',nookx:'BingX — OKX в вашей стране не работает'};
 /* the exchange for the person's region: name, sign-up link (our referral), identity-check link, whether one-click copying exists there */
 function connEx(C){ C=C||{}; const R=connRegion();
   if(R==='nookx'){ const ref=C.exchange_ref?String(C.exchange_ref):''; return {eu:false,okx:false,copy:false,name:C.exchange_name||'BingX',ref,reg:ref||'https://bingx.com/',kyc:C.bingx_kyc_url||'',pair:s=>`https://bingx.com/en/perpetual/${encodeURIComponent(s)}-USDT`,cur:'USDT'}; }
-  const ref=C.okx_ref?String(C.okx_ref):''; return {eu:R==='eu',okx:true,copy:R!=='eu',name:'OKX',ref,reg:ref||'https://www.okx.com/',kyc:C.okx_kyc_url||'',pair:null,cur:R==='eu'?'USDC или евро':'USDT'}; }
+  const ref=C.okx_ref?String(C.okx_ref):''; return {eu:R==='eu',okx:true,copy:true,name:'OKX',ref,reg:ref||'https://www.okx.com/',kyc:C.okx_kyc_url||'',pair:null,cur:R==='eu'?'USDC или евро':'USDT'}; }
 // the lead-trader profile: app_config okx_copy_url, or public_real.json copy_url while that is empty; none → no button
 async function connCopyUrl(C){ if(C&&C.okx_copy_url) return String(C.okx_copy_url); try{ const r=await fetch('./public_real.json',{cache:'no-store'}); const j=r.ok?await r.json():null; return j&&j.copy_url?String(j.copy_url):''; }catch(e){ return ''; } }
 const CONN_SPOT=new Set(['portfolio','capital','altport','ideas','cons','mod','high','meme','bal','spot']);
@@ -1107,10 +1109,10 @@ function connOpen(key,name){ key=String(key||'cryptonova').toLowerCase().replace
           `<p>Начните с суммы, которую не страшно потерять. Сначала можно потренироваться на демо в приложении CRYPTO NOVA.</p>`)}
       ${X.copy?stp(4,'Нажмите «Копировать CRYPTO NOVA»',
           `<p>Кнопка открывает профиль ведущего трейдера CRYPTO NOVA на OKX. Там нажмите «Копировать» и укажите сумму — дальше биржа сама повторяет каждую сделку CRYPTO NOVA на вашем счёте.${cu?'':' Кнопка появится здесь, как только профиль откроется на OKX; до тех пор — '+byHand.charAt(0).toLowerCase()+byHand.slice(1)}</p>`,
-          `<p>UID и API-ключи не нужны: копирование включается в самой OKX, деньги остаются на вашем счёте. За это OKX отдаёт ведущему трейдеру часть прибыли копирующего — только с прибыли. Убытки возможны.</p>`,
+          `<p>UID и API-ключи не нужны: копирование включается в самой OKX, деньги остаются на вашем счёте. За это OKX отдаёт ведущему трейдеру часть прибыли копирующего — только с прибыли. Убытки возможны.</p><p class="muted" title="${CONN_NOTE}">ⓘ ${CONN_NOTE}</p>`,
           cu?`<a class="ib sm conna" href="${mypEsc(cu)}" target="_blank" rel="noopener">Копировать CRYPTO NOVA</a>`:'')
-        :stp(4,EU?'Повторяйте сделки сами':'Повторяйте сделки сами — копирование откроется позже',
-          `<p>${EU?'В ЕЭЗ и Великобритании автоматическое копирование на OKX пока недоступно.':'Копирование CRYPTO NOVA на '+mypEsc(ex)+' откроется позже.'} ${byHand}</p>`,
+        :stp(4,'Повторяйте сделки сами — копирование откроется позже',
+          `<p>${'Копирование CRYPTO NOVA на '+mypEsc(ex)+' откроется позже.'} ${byHand}</p>`,
           `<p>Ставьте стоп и цель сразу, вместе с ордером: сделка закроется сама, даже если вы не у телефона. Убытки возможны.</p>`)}
       ${spot?stp(5,'Портфель: доли CRYPTO NOVA',
           `<p>В приложении CRYPTO NOVA → «Спот»: какие монеты и в каких долях держать. На ${mypEsc(ex)} купите эти монеты на спот-счёте в тех же долях; когда система меняет доли, это видно в приложении.</p>`,

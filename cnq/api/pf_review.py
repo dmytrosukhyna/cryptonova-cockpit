@@ -414,6 +414,17 @@ TXT = {
                 "Весь реальний рахунок CRYPTO NOVA поділено так: спот-портфель {spot}, ф'ючерси {fut}, активний спот {act}.",
                 "Ολόκληρος ο πραγματικός λογαριασμός του CRYPTO NOVA μοιράζεται έτσι: χαρτοφυλάκιο spot {spot}, futures {fut}, ενεργό spot {act}.",
                 "Toda la cuenta real de CRYPTO NOVA se reparte así: cartera spot {spot}, futuros {fut}, spot activo {act}."),
+    # 28.10 (owner's decision): + the extra core BTC / ETH / SOL (alloc core_pct)
+    "split_core": _L("Весь реальный счёт CRYPTO NOVA делится так: спот-портфель {spot}, дополнительное ядро BTC, ETH и SOL {core}, "
+                     "фьючерсы {fut}, активный спот {act}.",
+                     "CRYPTO NOVA's whole real account is split like this: the spot portfolio {spot}, extra core BTC, ETH and SOL {core}, "
+                     "futures {fut}, active spot {act}.",
+                     "Весь реальний рахунок CRYPTO NOVA поділено так: спот-портфель {spot}, додаткове ядро BTC, ETH і SOL {core}, "
+                     "ф'ючерси {fut}, активний спот {act}.",
+                     "Ολόκληρος ο πραγματικός λογαριασμός του CRYPTO NOVA μοιράζεται έτσι: χαρτοφυλάκιο spot {spot}, επιπλέον πυρήνας "
+                     "BTC, ETH και SOL {core}, futures {fut}, ενεργό spot {act}.",
+                     "Toda la cuenta real de CRYPTO NOVA se reparte así: cartera spot {spot}, núcleo adicional BTC, ETH y SOL {core}, "
+                     "futuros {fut}, spot activo {act}."),
     "alt": _L("Модель «ядро + альтсезон» сейчас: ядро {core}, альт-корзина {alts} ({state}), кэш {cash}, фьючерсы-сигналы {fut}.",
               "The “core + altseason” model now: core {core}, alt basket {alts} ({state}), cash {cash}, futures signals {fut}.",
               "Модель «ядро + альтсезон» зараз: ядро {core}, альт-кошик {alts} ({state}), кеш {cash}, ф'ючерси-сигнали {fut}.",
@@ -685,6 +696,8 @@ def real_model(real: dict, statuses: dict) -> dict | None:
     split = None
     if al.get("spot_pct") is not None and al.get("fut_pct") is not None:
         split = {"spot": pct(float(al["spot_pct"])), "fut": pct(float(al["fut_pct"])), "act": pct(float(al.get("active_pct") or 0))}
+        if float(al.get("core_pct") or 0) > 0:                         # 28.10: the extra core
+            split["core"] = pct(float(al["core_pct"]))
     return {"model": model, "buckets": b, "cash": cash / hold * 100, "split": split, "asof": int(real["asof"])}
 
 
@@ -753,7 +766,7 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
         mcash = max(0.0, 100 - sum(model.values()))
     # 28.10 (build 46 QA: the model still showed coins the account had sold, «ядро 50% … датчик альтсезона», «на 22.10»): the model
     # is the spot part of the REAL CRYPTO NOVA account now (web/public_real.json — the same file and moment as the app's PUBLIC
-    # portfolio): each coin's share of the spot holdings, the spot dollars; the account's 65 / 25 / 10 split in a line of its own
+    # portfolio): each coin's share of the spot holdings, the spot dollars; the account's split (65 / 10 / 15 / 10 since the owner's decision of 28.10) in a line of its own
     rm = real_model(real, statuses)
     model_src, model_asof = "pf", ideas.get("asof")
     if rm:
@@ -850,8 +863,8 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
         "hold": _t(TXT["model_hold"], lang, total=usd(total), items=" · ".join(items)) if total > 0 else "",
         "match_pct": round(match, 1), "match": _t(TXT["match"], lang, p=pct(match)),
         # the old «ядро + альтсезон» line is gone; the key stays (build 45 shows it) with the real account's split
-        "alt": _t(TXT["split"], lang, **rm["split"]) if rm and rm.get("split") else "",
-        "split": _t(TXT["split"], lang, **rm["split"]) if rm and rm.get("split") else "",
+        "alt": _t(TXT["split_core" if "core" in (rm or {}).get("split", {}) else "split"], lang, **rm["split"]) if rm and rm.get("split") else "",
+        "split": _t(TXT["split_core" if "core" in (rm or {}).get("split", {}) else "split"], lang, **rm["split"]) if rm and rm.get("split") else "",
     }
     n_all = len(rows) + len(unpriced)
     return {

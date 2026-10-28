@@ -1,7 +1,7 @@
 {
   "v": 1,
   "updated": "2026-10-28",
-  "about": "What real people ask NOVA, with short honest answers (cnq/api/nova.py: the closest items go to the model as reference; when the model is down, a near-exact match is answered from here). Keep answers true to the app 2.0 and the terms (web/terms.html): no subscriptions (never the word «бесплатно»), demo, no money held, the real account = OKX copy trading (build 45): sign up on OKX by our link, identity check, USDT, «Копировать CRYPTO NOVA» in the app, OKX repeats the trades for the amount the user picks; no UID, no API keys, no application form; OKX keeps a share of the copier's profit for the lead trader (shown in the profile); a loss is possible; no automatic copying in the EEA (and GB) yet; where OKX doesn't serve — BingX by our link, copying there later (users never see the word «VIP»). NOVA is male. «alt» = other wordings of the same question (the app's own chips) that match exactly. Translations: nova_faq.<lang>.json (en, uk, el, es) — the same ids; change an answer in every language.",
+  "about": "What real people ask NOVA, with short honest answers (cnq/api/nova.py: the closest items go to the model as reference; when the model is down, a near-exact match is answered from here). Keep answers true to the app 2.0 and the terms (web/terms.html): no subscriptions (never the word «бесплатно»), demo, no money held, the real account = OKX copy trading (build 45): sign up on OKX by our link, identity check, USDT, «Копировать CRYPTO NOVA» in the app, OKX repeats the trades for the amount the user picks; no UID, no API keys, no application form; OKX keeps a share of the copier's profit for the lead trader (shown in the profile); a loss is possible; copy trading and some instruments depend on the country and region (OKX shows the terms); where OKX doesn't serve — BingX by our link, copying there later (users never see the word «VIP»). NOVA is male. «alt» = other wordings of the same question (the app's own chips) that match exactly. Translations: nova_faq.<lang>.json (en, uk, el, es) — the same ids; change an answer in every language.",
   "items": [
     {
       "id": "safe",
@@ -230,7 +230,7 @@
       "id": "vip",
       "topic": "how",
       "q": "Что такое реальный счёт?",
-      "a": "«Реальный счёт» — это копи-трейдинг на OKX: счёт CRYPTO NOVA там ведущий трейдер, а биржа сама повторяет его сделки у вас. Шаги: зарегистрируйтесь на OKX по нашей ссылке, пройдите проверку личности, пополните счёт в USDT и нажмите в приложении «Копировать CRYPTO NOVA». Сумму выбираете вы, остановить можно в OKX в любой момент, убыток возможен, только с 18 лет. В ЕС и ЕЭЗ автоматического копирования пока нет, а где OKX не работает — BingX, копирование там откроется позже.",
+      "a": "«Реальный счёт» — это копи-трейдинг на OKX: счёт CRYPTO NOVA там ведущий трейдер, а биржа сама повторяет его сделки у вас. Шаги: зарегистрируйтесь на OKX по нашей ссылке, пройдите проверку личности, пополните счёт в USDT и нажмите в приложении «Копировать CRYPTO NOVA». Сумму выбираете вы, остановить можно в OKX в любой момент, убыток возможен, только с 18 лет. Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX. Где OKX не работает — BingX, копирование позже.",
       "tags": [
         "реальный счёт",
         "реальный",
@@ -268,7 +268,7 @@
       "id": "copy",
       "topic": "how",
       "q": "Будет ли автоматическое копирование сделок?",
-      "a": "Да, оно уже есть — через копи-трейдинг OKX. Вы нажимаете в приложении «Копировать CRYPTO NOVA», выбираете сумму, и OKX сама повторяет сделки системы на вашем счёте; остановить можно в OKX в любой момент. Это продукт OKX: с прибыли биржа удерживает долю для ведущего трейдера, процент виден в профиле до подключения, и убыток возможен. В ЕС, ЕЭЗ и Великобритании автоматическое копирование пока недоступно, на BingX оно откроется позже — а пока сделки можно повторять самостоятельно.",
+      "a": "Да, оно уже есть — через копи-трейдинг OKX. Вы нажимаете в приложении «Копировать CRYPTO NOVA», выбираете сумму, и OKX сама повторяет сделки системы на вашем счёте; остановить можно в OKX в любой момент. Это продукт OKX: с прибыли биржа удерживает долю для ведущего трейдера, процент виден в профиле до подключения, и убыток возможен. Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX. На BingX копирование откроется позже.",
       "tags": [
         "автоматически",
         "копирование",
@@ -373,7 +373,7 @@
       "id": "eu",
       "topic": "how",
       "q": "Почему я не вижу ссылку на биржу?",
-      "a": "Если OKX и BingX не работают в вашей стране, например в США, приложение не показывает ссылку на биржу: мы не предлагаем то, что у вас не разрешено. Обучение, демо, копилка и я, NOVA, работают полностью, а сделки системы видны в приложении. В ЕС и ЕЭЗ ссылка на OKX есть, но автоматическое копирование там пока недоступно — сделки можно повторять самостоятельно.",
+      "a": "Если OKX и BingX не работают в вашей стране, например в США, приложение не показывает ссылку на биржу: мы не предлагаем то, что у вас не разрешено. Обучение, демо, копилка и я, NOVA, работают полностью, а сделки системы видны в приложении. Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX.",
       "tags": [
         "ес",
         "евросоюз",
@@ -601,7 +601,7 @@
       "id": "public",
       "topic": "how",
       "q": "Как работает публичный портфель?",
-      "a": "Это реальный счёт CRYPTO NOVA на OKX с настоящими деньгами: около $10 000, история начинается 22 октября 2026 года. Сделки ставит автопилот системы: спот-портфель — 65%, фьючерсы по отобранным сигналам — 25%, активный спот — 10%. В приложении видно стоимость, результат в долларах и процентах, график по периодам, монеты и сделки; данные обновляются примерно раз в 15 минут. Прошлый результат не гарантирует будущий.",
+      "a": "Это реальный счёт CRYPTO NOVA на OKX с настоящими деньгами: около $10 000, история начинается 22 октября 2026 года. Сделки ставит автопилот системы: спот-портфель — 65%, дополнительное ядро BTC, ETH и SOL — 10%, фьючерсы по отобранным сигналам — 15%, активный спот — 10%. В приложении видно стоимость, результат в долларах и процентах, график по периодам, монеты и сделки; данные обновляются примерно раз в 15 минут. Прошлый результат не гарантирует будущий.",
       "tags": [
         "публичный портфель",
         "публичный",
@@ -640,7 +640,7 @@
       "id": "connect",
       "topic": "money",
       "q": "Как подключиться к системе?",
-      "a": "Подключение к CRYPTO NOVA идёт через копитрейдинг OKX: зарегистрируйтесь на OKX по нашей ссылке, пройдите проверку личности, пополните счёт в USDT и нажмите в приложении «Копировать CRYPTO NOVA». Дальше OKX сама повторяет сделки системы на выбранную вами сумму. Пошаговая инструкция — по кнопке «Подключиться к системе CRYPTO NOVA». Остановить копирование можно в OKX в любой момент, убыток возможен, только с 18 лет; в ЕС и ЕЭЗ автоматического копирования пока нет.",
+      "a": "Подключение к CRYPTO NOVA идёт через копитрейдинг OKX: зарегистрируйтесь на OKX по нашей ссылке, пройдите проверку личности, пополните счёт в USDT и нажмите в приложении «Копировать CRYPTO NOVA». Дальше OKX сама повторяет сделки системы на выбранную сумму. Пошаговая инструкция — по кнопке «Подключиться к системе CRYPTO NOVA». Остановить копирование можно в OKX в любой момент, убыток возможен, только с 18 лет. Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX.",
       "tags": [
         "подключиться",
         "подключение к системе",

@@ -60,7 +60,7 @@
         ${V.kpi('Весь счёт', V.money(M.equity), `<span class="${V.cls(M.pnlPct)}">${V.pct(M.pnlPct)}</span> с начала`)}
         ${V.kpi('Начало публичного портфеля', V.PUBLIC_START_LABEL, 'старт ' + V.money(M.start))}
       </div>
-      <p class="note">${esc(S.base_note || 'База спота — его доля стартового капитала.')} ${S.moved_note ? esc(S.moved_note) + ' ' : ''}Спот-портфель повторяет модель «CRYPTO NOVA портфель» (65% счёта), активный спот — стол «Импульс BTC» (10%).</p>
+      <p class="note">${esc(S.base_note || 'База спота — его доля стартового капитала.')} ${S.moved_note ? esc(S.moved_note) + ' ' : ''}Спот-портфель повторяет модель «CRYPTO NOVA портфель» (65% счёта), ещё 10% — дополнительное ядро BTC, ETH и SOL (30 / 10 / 5), активный спот — стол «Импульс BTC» (10%; между сигналами — в BTC).</p>
     </section>`;
   }
 

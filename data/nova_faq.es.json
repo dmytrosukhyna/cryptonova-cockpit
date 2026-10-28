@@ -231,7 +231,7 @@
       "id": "vip",
       "topic": "how",
       "q": "¿Qué es la cuenta real?",
-      "a": "La «Cuenta real» es el copy trading de OKX: la cuenta de CRYPTO NOVA allí es trader líder y el exchange repite sus operaciones en tu cuenta. Los pasos: regístrate en OKX con nuestro enlace, verifica tu identidad, deposita USDT y pulsa «Copiar CRYPTO NOVA» en la app. Tú eliges el importe, puedes parar en OKX cuando quieras, puede haber pérdidas y es solo para mayores de 18 años. En la UE y el EEE la copia automática aún no está disponible; donde OKX no opera está BingX, con copia más adelante.",
+      "a": "La «Cuenta real» es el copy trading de OKX: la cuenta de CRYPTO NOVA allí es trader líder y el exchange repite sus operaciones en tu cuenta. Los pasos: regístrate en OKX con nuestro enlace, verifica tu identidad, deposita USDT y pulsa «Copiar CRYPTO NOVA» en la app. Tú eliges el importe, puedes parar en OKX cuando quieras, puede haber pérdidas y es solo para mayores de 18 años. La disponibilidad del copy trading y de algunos instrumentos depende del país y la región: OKX muestra las condiciones. Donde OKX no opera está BingX, con copia más adelante.",
       "tags": [
         "cuenta real",
         "real",
@@ -265,7 +265,7 @@
       "id": "copy",
       "topic": "how",
       "q": "¿Habrá copia automática de operaciones?",
-      "a": "Sí, ya existe, con el copy trading de OKX. Pulsas «Copiar CRYPTO NOVA» en la app, eliges el importe y OKX repite las operaciones del sistema en tu cuenta; puedes pararlo en OKX cuando quieras. Es un producto de OKX: retiene una parte de la ganancia para el trader líder, el porcentaje aparece en el perfil antes de empezar y puede haber pérdidas. En la UE, el EEE y el Reino Unido aún no está disponible, y en BingX se abrirá más adelante; mientras tanto, puedes repetir las operaciones tú mismo.",
+      "a": "Sí, ya existe, con el copy trading de OKX. Pulsas «Copiar CRYPTO NOVA» en la app, eliges el importe y OKX repite las operaciones del sistema en tu cuenta; puedes pararlo en OKX cuando quieras. Es un producto de OKX: retiene una parte de la ganancia para el trader líder, el porcentaje aparece en el perfil antes de empezar y puede haber pérdidas. La disponibilidad del copy trading y de algunos instrumentos depende del país y la región: OKX muestra las condiciones. En BingX la copia se abrirá más adelante.",
       "tags": [
         "automático",
         "automática",
@@ -370,7 +370,7 @@
       "id": "eu",
       "topic": "how",
       "q": "¿Por qué no veo el enlace al exchange?",
-      "a": "Si OKX y BingX no operan en tu país, por ejemplo en Estados Unidos, la app no muestra enlace a ningún exchange: no ofrecemos lo que allí no está permitido. Las lecciones, la demo, la hucha y yo, NOVA, funcionan por completo, y las operaciones del sistema se ven en la app. En la UE y el EEE sí hay enlace a OKX, pero la copia automática aún no está disponible: puedes repetir las operaciones tú mismo.",
+      "a": "Si OKX y BingX no operan en tu país, por ejemplo en Estados Unidos, la app no muestra enlace a ningún exchange: no ofrecemos lo que allí no está permitido. Las lecciones, la demo, la hucha y yo, NOVA, funcionan por completo, y las operaciones del sistema se ven en la app. La disponibilidad del copy trading y de algunos instrumentos depende del país y la región: OKX muestra las condiciones.",
       "tags": [
         "ue",
         "europa",
@@ -590,7 +590,7 @@
       "id": "public",
       "topic": "how",
       "q": "¿Cómo funciona la cartera pública?",
-      "a": "Es la cuenta real de CRYPTO NOVA en OKX con dinero real: unos $10 000, y su historial empieza el 22 de octubre de 2026. Las operaciones las abre el piloto automático del sistema: la cartera spot recibe el 65%, los futuros con señales seleccionadas el 25% y el spot activo el 10%. En la app ves el valor, el resultado en dólares y en porcentaje, un gráfico por periodos, las monedas y las operaciones; los datos se actualizan más o menos cada 15 minutos. Los resultados pasados no garantizan los futuros.",
+      "a": "Es la cuenta real de CRYPTO NOVA en OKX con dinero real: unos $10 000, y su historial empieza el 22 de octubre de 2026. Las operaciones las abre el piloto automático del sistema: la cartera spot recibe el 65%, el núcleo adicional BTC, ETH y SOL el 10%, los futuros con señales seleccionadas el 15% y el spot activo el 10%. En la app ves el valor, el resultado en dólares y en porcentaje, un gráfico por periodos, las monedas y las operaciones; los datos se actualizan más o menos cada 15 minutos. Los resultados pasados no garantizan los futuros.",
       "tags": [
         "cartera pública",
         "pública",
@@ -628,7 +628,7 @@
       "id": "connect",
       "topic": "money",
       "q": "¿Cómo me conecto al sistema?",
-      "a": "Te conectas a CRYPTO NOVA a través del copy trading de OKX: regístrate en OKX con nuestro enlace, pasa la verificación de identidad, recarga tu cuenta en USDT y toca «Copiar CRYPTO NOVA» en la app. A partir de ahí OKX repite las operaciones del sistema por el importe que elijas. La guía paso a paso está en el botón «Conectarse al sistema CRYPTO NOVA». Puedes dejar de copiar en OKX cuando quieras, las pérdidas son posibles y solo para mayores de 18 años; en la UE y el EEE la copia automática aún no está disponible.",
+      "a": "Te conectas a CRYPTO NOVA a través del copy trading de OKX: regístrate en OKX con nuestro enlace, pasa la verificación de identidad, recarga tu cuenta en USDT y toca «Copiar CRYPTO NOVA» en la app. A partir de ahí OKX repite las operaciones del sistema por el importe que elijas. La guía paso a paso está en el botón «Conectarse al sistema CRYPTO NOVA». Puedes dejar de copiar en OKX cuando quieras, las pérdidas son posibles y solo para mayores de 18 años. La disponibilidad del copy trading y de algunos instrumentos depende del país y la región: OKX muestra las condiciones.",
       "tags": [
         "conectarse",
         "conectarse al sistema",

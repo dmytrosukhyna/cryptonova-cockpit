@@ -190,6 +190,9 @@ def test_connect_states_every_language_and_no_confirmed_without_a_check(tmp_path
         assert list(cs["states"]) == ["not_started", "action_on_exchange", "waiting", "confirmed", "error", "unverifiable"]
         assert all(s["title"] and s["text"] and s["next"] for s in cs["states"].values())
         assert [k for k, s in cs["states"].items() if not s["available"]] == ["confirmed"]
+        # owner 28.10: no «unavailable in your country», one calm note instead
+        assert cs["info"] and "OKX" in cs["info"] and not any(w in json.dumps(cs, ensure_ascii=False).lower()
+                                                             for w in ("недоступ", "not available", "isn't available", "недоступн", "no está disponible"))
     ru = _lang(d, "ru")["config"]["connect_states"]["states"]["unverifiable"]
     assert "нет технической связи" in ru["text"] and "«Мои копирования»" in ru["next"]
 

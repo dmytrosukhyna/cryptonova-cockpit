@@ -235,7 +235,7 @@
       "id": "vip",
       "topic": "how",
       "q": "What is a real account?",
-      "a": "A “Real account” means copy trading on OKX: the CRYPTO NOVA account there is a lead trader, and the exchange repeats its trades in your account. The steps: sign up on OKX through our link, verify your identity, deposit USDT and tap «Copy CRYPTO NOVA» in the app. You choose the amount, can stop in OKX at any time, losses are possible, 18+ only. In the EU and EEA automatic copying isn't available yet; where OKX doesn't operate, it's BingX, with copying there later.",
+      "a": "A “Real account” means copy trading on OKX: the CRYPTO NOVA account there is a lead trader, and the exchange repeats its trades in your account. The steps: sign up on OKX through our link, verify your identity, deposit USDT and tap «Copy CRYPTO NOVA» in the app. You choose the amount, can stop in OKX at any time, losses are possible, 18+ only. The availability of copy trading and of some instruments depends on your country and region — OKX shows the terms. Where OKX doesn't operate, it's BingX, with copying there later.",
       "tags": [
         "real account",
         "real",
@@ -270,7 +270,7 @@
       "id": "copy",
       "topic": "how",
       "q": "Will there be automatic trade copying?",
-      "a": "Yes, it's already here — through OKX copy trading. You tap «Copy CRYPTO NOVA» in the app, choose the amount, and OKX repeats the system's trades in your account; you can stop in OKX at any time. It's OKX's product: OKX keeps a share of your profit for the lead trader, the percentage is shown in the profile before you start, and losses are possible. In the EU, EEA and UK automatic copying isn't available yet, and on BingX it opens later — for now you can repeat the trades yourself.",
+      "a": "Yes, it's already here — through OKX copy trading. You tap «Copy CRYPTO NOVA» in the app, choose the amount, and OKX repeats the system's trades in your account; you can stop in OKX at any time. It's OKX's product: OKX keeps a share of your profit for the lead trader, the percentage is shown in the profile before you start, and losses are possible. The availability of copy trading and of some instruments depends on your country and region — OKX shows the terms. On BingX copying opens later.",
       "tags": [
         "automatic",
         "auto",
@@ -377,7 +377,7 @@
       "id": "eu",
       "topic": "how",
       "q": "Why can't I see the exchange link?",
-      "a": "If OKX and BingX don't operate in your country, the US for example, the app shows no exchange link: we don't offer what isn't allowed where you are. Learning, demo, the Piggy bank and me, NOVA, work fully, and the system's trades are visible in the app. In the EU and EEA there is an OKX link, but automatic copying isn't available there yet — you can repeat the trades yourself.",
+      "a": "If OKX and BingX don't operate in your country, the US for example, the app shows no exchange link: we don't offer what isn't allowed where you are. Learning, demo, the Piggy bank and me, NOVA, work fully, and the system's trades are visible in the app. The availability of copy trading and of some instruments depends on your country and region — OKX shows the terms.",
       "tags": [
         "eu",
         "europe",
@@ -602,7 +602,7 @@
       "id": "public",
       "topic": "how",
       "q": "How does the public portfolio work?",
-      "a": "It's CRYPTO NOVA's real account on OKX with real money: about $10 000, and its history starts on October 22, 2026. The system's autopilot places the trades: the spot portfolio gets 65%, futures on selected signals 25%, active spot 10%. The app shows its value, the result in dollars and percent, a chart by period, the coins and the trades; the data updates about every 15 minutes. Past results don't guarantee future ones.",
+      "a": "It's CRYPTO NOVA's real account on OKX with real money: about $10 000, and its history starts on October 22, 2026. The system's autopilot places the trades: the spot portfolio gets 65%, extra core BTC, ETH and SOL 10%, futures on selected signals 15%, active spot 10%. The app shows its value, the result in dollars and percent, a chart by period, the coins and the trades; the data updates about every 15 minutes. Past results don't guarantee future ones.",
       "tags": [
         "public portfolio",
         "public",
@@ -640,7 +640,7 @@
       "id": "connect",
       "topic": "money",
       "q": "How do I connect to the system?",
-      "a": "You connect to CRYPTO NOVA through OKX copy trading: sign up on OKX with our link, pass the identity check, top up your account in USDT and tap “Copy CRYPTO NOVA” in the app. After that OKX itself repeats the system's trades for the amount you choose. The step-by-step guide is behind the “Connect to the CRYPTO NOVA system” button. You can stop copying in OKX at any time, losses are possible, 18+ only; in the EU and EEA automatic copying isn't available yet.",
+      "a": "You connect to CRYPTO NOVA through OKX copy trading: sign up on OKX with our link, pass the identity check, top up your account in USDT and tap “Copy CRYPTO NOVA” in the app. After that OKX itself repeats the system's trades for the amount you choose. The step-by-step guide is behind the “Connect to the CRYPTO NOVA system” button. You can stop copying in OKX at any time, losses are possible, 18+ only. The availability of copy trading and of some instruments depends on your country and region — OKX shows the terms.",
       "tags": [
         "connect",
         "connect to the system",

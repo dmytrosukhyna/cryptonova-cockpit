@@ -116,7 +116,7 @@ def _numbers(doc):
         return {k: _numbers(v) for k, v in doc.items() if (not isinstance(v, str) or k in ("sym", "side", "src", "action", "mode", "regime"))
                 and not (v is None and k.endswith("_ru"))}          # a Russian-only text left empty is a word, not a number
     if isinstance(doc, list):
-        return [_numbers(v) for v in doc]
+        return [_numbers(v) for v in doc if not isinstance(v, str)]          # a list of sentences is words too (market_view)
     return doc
 
 

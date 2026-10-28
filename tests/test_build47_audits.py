@@ -104,13 +104,15 @@ def test_buy_now_items_carry_their_real_state_never_recommended_when_watched(tmp
     since = T0 + 100 * H
     now = since + 6 * 24 * H
     _pp_files(d, _real(since, now))
-    _buy(d, now, ["BTC", "ETH", "BNB", "NEAR", "FIL", "XMR", "DOGE", "SUI", "TAO", "AVAX", "TON", "KAS", "APT"])
+    _buy(d, now, ["BTC", "ETH", "BNB", "NEAR", "FIL", "XMR", "DOGE", "SUI", "TAO", "AVAX", "TON", "KAS", "APT", "ADA", "LTC"])
     coin = lambda s, stage, **kw: {"sym": s, "stage": stage, "why_ru": "", "passed": [], "okx_pair": True, "in_real_account": False, **kw}  # noqa: E731
     _w(d, "spot_pipeline.json", {"asof": now - 10 * 60_000, "coins": [
         coin("BTC", "bought", in_real_account=True), coin("ETH", "bought"),
-        coin("BNB", "first_check", table_status="wait"),
+        coin("BNB", "first_check", table_status="wait", why_ru="Таблица: «ждём» — Токен биржи — наши портфели такие не берут."),
+        coin("ADA", "first_check", table_status="wait", why_ru="Таблица: «ждём» — Анкета 39/100 ниже порога 40 — ждём."),
         coin("NEAR", "waiting", why_ru="Таблица: «можно брать». Портфель не покупает: продана 24.10 — снова не раньше 07.11."),
-        coin("FIL", "rejected", table_status="avoid"),
+        coin("FIL", "rejected", table_status="avoid", why_ru="Таблица: «не брать» — −100% от исторического максимума — монета «мёртвая», не берём."),
+        coin("LTC", "rejected", table_status="avoid"),
         coin("XMR", "rejected", okx_pair=False, why_ru="Портфель не покупает: на споте OKX нет пары — портфель повторяет реальный счёт"),
         coin("SUI", "recommended"), coin("TAO", "all_filters"), coin("AVAX", "found"),
         coin("TON", "waiting", why_ru="Портфель не покупает: все 8 мест для «можно брать» заняты."),
@@ -121,8 +123,13 @@ def test_buy_now_items_carry_their_real_state_never_recommended_when_watched(tmp
     st = {x["sym"]: (x["status"], x["status_ru"], x["status_note"]) for x in b["items"]}
     assert st["BTC"][:2] == ("open", "позиция открыта") and st["ETH"][0] == "pending" and st["SUI"][:2] == ("signal", "сигнал сформирован")
     assert st["TAO"][:2] == ("analysis", "анализ") and st["APT"][:2] == ("pending", "ожидается исполнение")
-    assert {s for s, v in st.items() if v[0] == "not_met"} == {"BNB", "NEAR", "FIL", "XMR", "TON", "KAS"}
-    assert st["NEAR"][2].endswith("не раньше 07.11.") and "«не брать»" in st["FIL"][2] and "нет пары" in st["XMR"][2]
+    assert {s for s, v in st.items() if v[0] == "not_met"} == {"BNB", "NEAR", "FIL", "XMR", "TON", "KAS", "ADA", "LTC"}
+    assert st["NEAR"][2].endswith("не раньше 07.11.") and "нет пары" in st["XMR"][2]
+    # the table's own recorded reason in plain words; an unknown one stays general (never guessed)
+    assert st["BNB"][2] == "Таблица портфеля пишет «ждём»: токены бирж портфель не берёт."
+    assert st["ADA"][2] == "Таблица портфеля пишет «ждём»: оценка проекта 39 из 100 ниже порога 40."
+    assert st["FIL"][2] == "Таблица портфеля поставила «не брать»: монета потеряла почти всю цену от своего рекорда — такие портфель не берёт."
+    assert st["LTC"][2] == "Таблица портфеля поставила «не брать»."
     assert "заняты" in st["TON"][2] and "минимума 10%" in st["KAS"][2]
     assert st["DOGE"][:2] == ("watch", "наблюдение") and "только кандидат по графику" in st["DOGE"][2].lower()
     assert st["AVAX"][0] == "watch"

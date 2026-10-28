@@ -895,6 +895,28 @@ def _pipeline(out: str, now: int) -> tuple[dict | None, int | None]:
     return {str(c.get("sym") or "").upper(): c for c in d["coins"] if isinstance(c, dict) and c.get("sym")}, int(d["asof"])
 
 
+_TBL_RATING = re.compile(r"Анкета (\d+)/100 ниже порога (\d+)")
+_TBL_DEAD = re.compile(r"[−-](\d+)% от исторического максимума")
+
+
+def _table_reason(why: str, lang: str) -> str | None:
+    """the spot table's own recorded reason (Russian, written by the engine) as a plain fragment in this file's language;
+    None when it is one this function does not know (the note then stays general — never a guessed reason)"""
+    m = _TBL_RATING.search(why)
+    if m:
+        return t(lang, "bst.r.rating", r=m.group(1), p=m.group(2))
+    m = _TBL_DEAD.search(why)
+    if m and "мёртв" in why:              # «−100%» is a rounded −99.6 %: said as «almost all», never as a 100 % loss
+        return t(lang, "bst.r.dead", pct=m.group(1)) if int(m.group(1)) < 99 else t(lang, "bst.r.dead_all")
+    for words, key in ((("Токен биржи",), "exchange_token"), (("Оборот $", "мало оборота"), "turnover"),
+                       (("тренд не подтверждён",), "trend"), (("без проверки мем-деска",), "meme_unchecked"),
+                       (("красный флаг",), "red_flag"), (("разлоки",), "unlocks"),
+                       (("ждём просадку", "без просадки", "не догоняем"), "no_dip")):
+        if any(w in why for w in words):
+            return t(lang, f"bst.r.{key}")
+    return None
+
+
 def _ddmm(dd: str, mm: str, lang: str) -> str:
     return f"{int(dd)} {_MON_EN[int(mm) - 1]}" if lang == "en" and 1 <= int(mm) <= 12 else f"{dd}.{mm}"
 
@@ -934,12 +956,15 @@ def buy_status(sym: str, pipe: dict | None, real_syms: set, lang: str = DEFAULT)
         if c.get("okx_pair") is False or "нет пары" in why:
             return "not_met", t(lang, "bst.n.no_okx")
         if c.get("table_status") == "avoid":
-            return "not_met", t(lang, "bst.n.table_avoid")
+            r = _table_reason(why, lang)
+            return "not_met", t(lang, "bst.n.table_avoid_r", why=r) if r else t(lang, "bst.n.table_avoid")
         return "not_met", t(lang, "bst.n.rule")
     if st == "first_check":
-        return "not_met", t(lang, "bst.n.table_wait")
+        r = _table_reason(why, lang)
+        return "not_met", t(lang, "bst.n.table_wait_r", why=r) if r else t(lang, "bst.n.table_wait")
     if st == "found":
-        return "watch", t(lang, "bst.n.found")
+        r = _table_reason(why, lang)
+        return "watch", t(lang, "bst.n.found_r", why=r) if r else t(lang, "bst.n.found")
     return "watch", t(lang, "bst.n.chart")
 
 

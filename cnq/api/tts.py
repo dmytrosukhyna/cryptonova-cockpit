@@ -37,7 +37,7 @@ KEY_RE = re.compile(r"^[0-9a-f]{24}$")
 def spoken(text: str, lang: str) -> str:
     """what the voice reads: the Latin brand is read badly by the Russian / Ukrainian voices («Новa», letters), so they get the
     Cyrillic name with the stress (Но́ва); the other voices get «Crypto Nova» / «Nova AI» in normal case; Markdown stars go"""
-    s = str(text or "").replace("*", "").replace("NOVΛ", "NOVA")
+    s = re.sub(r"\s+", " ", str(text or "")).replace("*", "").replace("NOVΛ", "NOVA").replace("\u2212", "-")   # NBSP → space first
     if lang in ("ru", "uk"):
         s = s.replace("CRYPTO NOVA", f"Крипто Но{STRESS}ва").replace("NOVA AI", f"Но{STRESS}ва").replace("NOVA", f"Но{STRESS}ва")
     else:

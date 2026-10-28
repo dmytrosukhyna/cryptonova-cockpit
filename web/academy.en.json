@@ -1,23 +1,23 @@
 {
   "version": 2,
   "updated": "2026-10-21",
-  "title": "Learn with CRYPTO NOVA",
+  "title": "Learn with CRYPTO NOVA",
   "note": "Not financial advice. Past results don't guarantee future ones.",
   "levels": [
     {
       "level": "L0",
-      "level_title": "Getting to know CRYPTO NOVA",
+      "level_title": "Getting to know CRYPTO NOVA",
       "level_sub": "A guide to the app: what's where and how to use it, in plain words",
       "lessons": [
         {
           "id": "l0-what",
-          "title": "What CRYPTO NOVA is and how it can help",
+          "title": "What CRYPTO NOVA is and how it can help",
           "minutes": 4,
-          "goal": "By the end, you'll be able to explain in your own words what CRYPTO NOVA does — and what it doesn't promise.",
+          "goal": "By the end, you'll be able to explain in your own words what CRYPTO NOVA does — and what it doesn't promise.",
           "cards": [
             {
               "title": "A helper that never sleeps",
-              "text": "CRYPTO NOVA is a computer system powered by artificial intelligence (AI). It watches the crypto market around the clock. Crypto, short for cryptocurrency, is digital money — bitcoin, for example. The system looks for good moments to trade, following its own rules. You can see every trade it makes in the app.",
+              "text": "CRYPTO NOVA is a computer system powered by artificial intelligence (AI). It watches the crypto market around the clock. Crypto, short for cryptocurrency, is digital money — bitcoin, for example. The system looks for good moments to trade, following its own rules. You can see every trade it makes in the app.",
               "example": "In real life: a night guard watches a warehouse all night, but in the morning he needs to sleep. A program doesn't: it watches the market day and night.",
               "art": "robot"
             },
@@ -41,19 +41,19 @@
             },
             {
               "title": "Honest about risk",
-              "text": "Crypto is risky: prices swing hard. The system can be wrong, and it does have losing trades. Good results in the past don't promise the same in the future. CRYPTO NOVA teaches and shows, but it doesn't give financial advice. The decision is always yours.",
+              "text": "Crypto is risky: prices swing hard. The system can be wrong, and it does have losing trades. Good results in the past don't promise the same in the future. CRYPTO NOVA teaches and shows, but it doesn't give financial advice. The decision is always yours.",
               "example": "In real life: the forecast says sunshine, but you take an umbrella anyway. A forecast helps, but it doesn't control the weather.",
               "art": "umbrella"
             }
           ],
           "remember": [
-            "CRYPTO NOVA looks for trades around the clock, using rules tested on past prices.",
+            "CRYPTO NOVA looks for trades around the clock, using rules tested on past prices.",
             "You can start with the demo: virtual money, real prices.",
             "The system can be wrong, and past results don't promise future ones."
           ],
           "quiz": [
             {
-              "q": "What does CRYPTO NOVA do?",
+              "q": "What does CRYPTO NOVA do?",
               "options": [
                 "Promises your money will grow",
                 "Keeps your money, like a bank",
@@ -95,7 +95,7 @@
           "cards": [
             {
               "title": "Two paths in one app",
-              "text": "There are two ways to use CRYPTO NOVA. The calm path: save a little at a time and hold major coins for years. That's the “Piggy bank” and “Spot”. The active path: follow fast trades that bet on prices rising or falling. That's “Futures”. You can pick one path or combine both.",
+              "text": "There are two ways to use CRYPTO NOVA. The calm path: save a little at a time and hold major coins for years. That's the “Piggy bank” and “Spot”. The active path: follow fast trades that bet on prices rising or falling. That's “Futures”. You can pick one path or combine both.",
               "example": "In real life: you can get to the countryside by train — slow but relaxed. Or by motorbike — faster, but more dangerous.",
               "art": "compass"
             },
@@ -113,7 +113,7 @@
             },
             {
               "title": "Repeat or copy: you decide",
-              "text": "The system runs its own trades and shows them to you. You can repeat a trade in your own exchange account yourself, or turn on copying: OKX will then repeat CRYPTO NOVA's trades in your account automatically. An exchange is a marketplace where coins are bought and sold. Whether to repeat, copy or just watch is only your decision.",
+              "text": "The system runs its own trades and shows them to you. You can repeat a trade in your own exchange account yourself, or turn on copying: OKX will then repeat CRYPTO NOVA's trades in your account automatically. An exchange is a marketplace where coins are bought and sold. Whether to repeat, copy or just watch is only your decision.",
               "example": "In real life: an experienced gardener shows you how to prune an apple tree. You watch and do the same in your own garden — or decide to wait.",
               "art": "handshake"
             },
@@ -156,7 +156,7 @@
               "q": "Who decides whether to repeat the system's trade on your account?",
               "options": [
                 "You do",
-                "CRYPTO NOVA, without asking you",
+                "CRYPTO NOVA, without asking you",
                 "The exchange",
                 "NOVA, the AI assistant"
               ],
@@ -173,7 +173,7 @@
           "cards": [
             {
               "title": "At the top: PUBLIC, DEMO or REAL",
-              "text": "Under the name is the portfolio switch. PUBLIC is the CRYPTO NOVA public portfolio: the system's demo accounts at real prices. DEMO is your own demo portfolio with virtual money. REAL is your exchange account, once you've connected it. Your choice stays for Home, Spot and Futures. The profile icon at the top right opens “Account”.",
+              "text": "Under the name is the portfolio switch. PUBLIC is the CRYPTO NOVA public portfolio: the system's real account on OKX, with real money. DEMO is your own demo portfolio with virtual money. REAL is your exchange account, once you've connected it. Your choice stays for Home, Spot and Futures. The profile icon at the top right opens “Account”.",
               "example": "In real life: a “Learner” sign on a driving-school car. Everyone can see right away that it's practice.",
               "art": "phone_app",
               "screen": "Main",
@@ -192,7 +192,7 @@
             },
             {
               "title": "The main card: the chosen portfolio",
-              "text": "In PUBLIC mode the card shows “Total earned”: the public portfolio's result since the test began, with a chart. The “Day”, “Week”, “Month” and “All” buttons change the period. In DEMO mode you can create your own demo portfolio here for any amount and watch it change along with the system.",
+              "text": "In PUBLIC mode the card shows “Total earned”: the public portfolio's result since 22 October 2026, with a chart. The “Day”, “Week”, “Month” and “All” buttons change the period. In DEMO mode you can create your own demo portfolio here for any amount and watch it change along with the system.",
               "example": "In real life: you try on a jacket in a shop without buying it. Your own demo account is that kind of fitting: the money is virtual, but the prices are real.",
               "art": "chart_up",
               "screen": "Main",
@@ -240,7 +240,7 @@
             },
             {
               "title": "How the public portfolio is split",
-              "text": "In PUBLIC mode you'll see below how the public portfolio is spread across sources: spot, futures, dollar yield and others. The system moves the shares with the market trend and rebalances them on Mondays. All of it is a demo at real prices.",
+              "text": "In PUBLIC mode you'll see below how the real account is split: the spot portfolio 65%, futures 25%, active spot 10%. The money is real, and the numbers update about every 15 minutes.",
               "example": "In real life: a family budget shows how much came from salary, how much from the vegetable garden, and how much from a side job.",
               "art": "coins",
               "screen": "Main",
@@ -685,11 +685,11 @@
           "id": "l0-demo-live",
           "title": "Demo and real accounts: how it works",
           "minutes": 5,
-          "goal": "By the end, you'll know how demo differs from a real account, how to connect the system, and how CRYPTO NOVA makes money.",
+          "goal": "By the end, you'll know how demo differs from a real account, how to connect the system, and how CRYPTO NOVA makes money.",
           "cards": [
             {
               "title": "Demo: practice with no risk",
-              "text": "Demo means practice accounts with virtual money. The CRYPTO NOVA public portfolio (PUBLIC mode) is the system's own demo accounts. The prices are real, and every trade is visible, winners and losers alike. And in DEMO mode you can set up your own demo portfolio for any amount.",
+              "text": "Demo means practice accounts with virtual money. The CRYPTO NOVA public portfolio (PUBLIC mode) is not a demo: it's the system's real account on OKX since 22 October 2026, and every trade is visible, winners and losers alike. And in DEMO mode you can set up your own demo portfolio for any amount.",
               "example": "In real life: a friendly match before the championship. The teams play for real, but the points don't count in the table.",
               "art": "phone_app",
               "screen": "Main",
@@ -697,7 +697,7 @@
                 {
                   "n": 1,
                   "target": "total",
-                  "text": "PUBLIC: the system's demo accounts"
+                  "text": "PUBLIC: the system's real account"
                 },
                 {
                   "n": 2,
@@ -708,7 +708,7 @@
             },
             {
               "title": "A real account is your own",
-              "text": "A real account is your own account on the OKX exchange. You open it through the CRYPTO NOVA link and turn on copying: OKX itself repeats the system's trades in it. The money stays with you on the exchange the whole time. We don't accept it, hold it or have any way to withdraw it. Real money is for adults 18+ only.",
+              "text": "A real account is your own account on the OKX exchange. You open it through the CRYPTO NOVA link and turn on copying: OKX itself repeats the system's trades in it. The money stays with you on the exchange the whole time. We don't accept it, hold it or have any way to withdraw it. Real money is for adults 18+ only.",
               "example": "In real life: you hire a decorator to hang wallpaper. He works in your apartment, but the apartment is still yours, and so are the keys.",
               "art": "bank",
               "screen": "Live",
@@ -716,13 +716,13 @@
                 {
                   "n": 1,
                   "target": "how",
-                  "text": "The CRYPTO NOVA strategy — on your own account"
+                  "text": "The CRYPTO NOVA strategy — on your own account"
                 }
               ]
             },
             {
               "title": "Connecting in 4 steps",
-              "text": "Step 1: sign up on OKX through the link in the app. Step 2: verify your identity (KYC) in the exchange app — a document and a selfie, usually a few minutes. Step 3: deposit USDT — start with an amount you could lose without real harm. Step 4: tap «Copy CRYPTO NOVA» in the app and choose the amount — from then on OKX repeats the trades itself. No UID or API keys are needed.",
+              "text": "Step 1: sign up on OKX through the link in the app. Step 2: verify your identity (KYC) in the exchange app — a document and a selfie, usually a few minutes. Step 3: deposit USDT — start with an amount you could lose without real harm. Step 4: tap «Copy CRYPTO NOVA» in the app and choose the amount — from then on OKX repeats the trades itself. No UID or API keys are needed.",
               "example": "In real life: an automatic payment at your bank. You choose the amount and can switch it off at any time.",
               "art": "key_lock",
               "screen": "Live",
@@ -730,7 +730,7 @@
                 {
                   "n": 1,
                   "target": "step1",
-                  "text": "Sign up on OKX via the CRYPTO NOVA link"
+                  "text": "Sign up on OKX via the CRYPTO NOVA link"
                 },
                 {
                   "n": 2,
@@ -745,13 +745,13 @@
                 {
                   "n": 4,
                   "target": "step4",
-                  "text": "Tap «Copy CRYPTO NOVA»"
+                  "text": "Tap «Copy CRYPTO NOVA»"
                 }
               ]
             },
             {
               "title": "What connecting gives you",
-              "text": "Once connected, CRYPTO NOVA's trades open and close in your account on their own: OKX repeats them for the amount you choose. You can stop copying in OKX at any time, and losses are possible.",
+              "text": "Once connected, CRYPTO NOVA's trades open and close in your account on their own: OKX repeats them for the amount you choose. You can stop copying in OKX at any time, and losses are possible.",
               "example": "In real life: automatic watering in your garden. You choose how much water and can switch it off whenever you like, and the garden is still yours.",
               "art": "target",
               "screen": "Live",
@@ -769,8 +769,8 @@
               ]
             },
             {
-              "title": "How CRYPTO NOVA makes money",
-              "text": "When you open an account through our link, the exchange pays CRYPTO NOVA a reward out of its own fee — your fees don't change. If you copy CRYPTO NOVA, OKX keeps a share of your profit for the lead trader, that is CRYPTO NOVA, under its own rules. The percentage is shown in the profile before you start, and no profit means no fee.",
+              "title": "How CRYPTO NOVA makes money",
+              "text": "When you open an account through our link, the exchange pays CRYPTO NOVA a reward out of its own fee — your fees don't change. If you copy CRYPTO NOVA, OKX keeps a share of your profit for the lead trader, that is CRYPTO NOVA, under its own rules. The percentage is shown in the profile before you start, and no profit means no fee.",
               "example": "In real life: a shop pays a blogger for bringing in a customer. The price stays the same for the customer.",
               "art": "handshake",
               "screen": "Live",
@@ -784,7 +784,7 @@
             },
             {
               "title": "If you live in the EU",
-              "text": "In the EU and EEA, the MiCA rules have applied in full since 1 July 2026: only companies with an EU licence, such as OKX Europe, may provide crypto services there. Automatic copying isn't available there yet: every CRYPTO NOVA trade is visible in the app, and you can repeat them yourself. Lessons, demo, the Piggy bank and NOVA work fully there.",
+              "text": "In the EU and EEA, the MiCA rules have applied in full since 1 July 2026: only companies with an EU licence, such as OKX Europe, may provide crypto services there. Automatic copying isn't available there yet: every CRYPTO NOVA trade is visible in the app, and you can repeat them yourself. Lessons, demo, the Piggy bank and NOVA work fully there.",
               "example": "In real life: every country has its own traffic rules. It's the same car, but in some places certain roads are still closed to you.",
               "art": "globe",
               "screen": "Live",
@@ -799,23 +799,23 @@
           ],
           "remember": [
             "Demo: virtual money, real prices, and every trade in plain sight.",
-            "A real account is your own OKX account: the money is yours, and OKX repeats CRYPTO NOVA's trades itself.",
-            "CRYPTO NOVA gets a reward from the exchange and, when you copy, a share of the profit."
+            "A real account is your own OKX account: the money is yours, and OKX repeats CRYPTO NOVA's trades itself.",
+            "CRYPTO NOVA gets a reward from the exchange and, when you copy, a share of the profit."
           ],
           "quiz": [
             {
               "q": "Where is the money when the system is connected to a real account?",
               "options": [
-                "In a CRYPTO NOVA account",
+                "In a CRYPTO NOVA account",
                 "With NOVA, the AI assistant",
                 "In the app's Piggy bank",
                 "In your own exchange account"
               ],
               "answer": 3,
-              "why": "The money is always in your exchange account. CRYPTO NOVA doesn't accept it or hold it, and can't withdraw it."
+              "why": "The money is always in your exchange account. CRYPTO NOVA doesn't accept it or hold it, and can't withdraw it."
             },
             {
-              "q": "How does CRYPTO NOVA make money?",
+              "q": "How does CRYPTO NOVA make money?",
               "options": [
                 "It charges a subscription fee",
                 "The exchange pays it out of its own fee, and when you copy, it gets a share of the profit",
@@ -823,12 +823,12 @@
                 "It sells your data"
               ],
               "answer": 1,
-              "why": "The exchange pays CRYPTO NOVA out of its own fee, and when you copy, OKX keeps a share of the profit for the lead trader. There are no subscriptions, and we never take your money."
+              "why": "The exchange pays CRYPTO NOVA out of its own fee, and when you copy, OKX keeps a share of the profit for the lead trader. There are no subscriptions, and we never take your money."
             },
             {
               "q": "What do you need to connect a real account?",
               "options": [
-                "An OKX account via the CRYPTO NOVA link, identity verification, a deposit and the «Copy CRYPTO NOVA» button",
+                "An OKX account via the CRYPTO NOVA link, identity verification, a deposit and the «Copy CRYPTO NOVA» button",
                 "Your exchange password and an SMS code",
                 "Your wallet's secret phrase",
                 "A photo of your bank card"
@@ -846,19 +846,19 @@
           "cards": [
             {
               "title": "Your money stays with you",
-              "text": "CRYPTO NOVA doesn't accept, hold or withdraw money. In demo, everything is for practice. Real money sits only in your exchange account. You deposit and withdraw it yourself, in the exchange app. We can't take even a cent from your account.",
+              "text": "CRYPTO NOVA doesn't accept, hold or withdraw money. In demo, everything is for practice. Real money sits only in your exchange account. You deposit and withdraw it yourself, in the exchange app. We can't take even a cent from your account.",
               "example": "In real life: a gym trainer suggests exercises, but the key to your locker stays with you.",
               "art": "bank"
             },
             {
               "title": "We don't need your exchange keys",
-              "text": "Right now, the app needs neither your exchange password nor an API key. An API key is a special pass that lets a program connect to an exchange. Copying CRYPTO NOVA doesn't need one either: you turn copying on in OKX itself. Never give anyone a key that can withdraw money.",
+              "text": "Right now, the app needs neither your exchange password nor an API key. An API key is a special pass that lets a program connect to an exchange. Copying CRYPTO NOVA doesn't need one either: you turn copying on in OKX itself. Never give anyone a key that can withdraw money.",
               "example": "In real life: a mailbox key. You can use it to get your letters, but it won't open your front door.",
               "art": "key_lock"
             },
             {
               "title": "Passwords and your secret phrase are yours alone",
-              "text": "Never tell anyone your passwords, SMS codes or your wallet's secret phrase. The secret phrase, or seed phrase, is 12 or 24 words that open your wallet. CRYPTO NOVA will never ask for them. Anyone who does is a scammer.",
+              "text": "Never tell anyone your passwords, SMS codes or your wallet's secret phrase. The secret phrase, or seed phrase, is 12 or 24 words that open your wallet. CRYPTO NOVA will never ask for them. Anyone who does is a scammer.",
               "example": "In real life: a real bank never asks for your card PIN over the phone.",
               "art": "shield"
             },
@@ -882,13 +882,13 @@
             }
           ],
           "remember": [
-            "Your money is only in your exchange account. CRYPTO NOVA can't withdraw it.",
+            "Your money is only in your exchange account. CRYPTO NOVA can't withdraw it.",
             "Never share passwords, codes or your seed phrase with anyone — we don't ask for them.",
             "Rushing you, scaring you, promising risk-free income — that's a scammer."
           ],
           "quiz": [
             {
-              "q": "“CRYPTO NOVA support” messages you and asks for your seed phrase “for verification.” What should you do?",
+              "q": "“CRYPTO NOVA support” messages you and asks for your seed phrase “for verification.” What should you do?",
               "options": [
                 "Send it, since it's support",
                 "Send only half the words",
@@ -896,10 +896,10 @@
                 "Send nothing and end the conversation: it's a scammer"
               ],
               "answer": 3,
-              "why": "CRYPTO NOVA never asks for passwords, codes or your seed phrase. Even half the words would help a thief."
+              "why": "CRYPTO NOVA never asks for passwords, codes or your seed phrase. Even half the words would help a thief."
             },
             {
-              "q": "Can CRYPTO NOVA withdraw money from your exchange account?",
+              "q": "Can CRYPTO NOVA withdraw money from your exchange account?",
               "options": [
                 "Yes, if the system decides to",
                 "No: the money is with you, and we have no right to withdraw it",
@@ -915,7 +915,7 @@
                 "As a helpful explanation: NOVA can be wrong, and you decide",
                 "As an exact forecast",
                 "As financial advice you must act on right away",
-                "As a guarantee from CRYPTO NOVA"
+                "As a guarantee from CRYPTO NOVA"
               ],
               "answer": 0,
               "why": "NOVA explains things in plain words, but it can be wrong, and it doesn't know your whole situation."
@@ -1469,7 +1469,7 @@
             },
             {
               "title": "Practice first",
-              "text": "Before spending real money, you can practice. CRYPTO NOVA has a demo account: virtual money and real prices. Mistakes there cost nothing. And the Piggy bank will show you how regular purchases work.",
+              "text": "Before spending real money, you can practice. CRYPTO NOVA has a demo account: virtual money and real prices. Mistakes there cost nothing. And the Piggy bank will show you how regular purchases work.",
               "example": "In real life: before driving in the city, you learn on the driving school's practice lot.",
               "art": "seatbelt"
             }
@@ -1643,7 +1643,7 @@
             },
             {
               "title": "A reserve in the portfolio",
-              "text": "Keeping part of your money in dollars is like a rainy-day fund. For example, the CRYPTO NOVA spot portfolio keeps about 15% in dollars. When the market falls, the dollar part barely changes. And you can use it to buy more coins at a lower price.",
+              "text": "Keeping part of your money in dollars is like a rainy-day fund. For example, the CRYPTO NOVA spot portfolio keeps about 15% in dollars. When the market falls, the dollar part barely changes. And you can use it to buy more coins at a lower price.",
               "example": "In real life: an umbrella in your bag won't stop the rain, but it helps you wait it out.",
               "art": "umbrella",
               "chart": {
@@ -1656,7 +1656,7 @@
                   "coins",
                   "dollars"
                 ],
-                "caption": "CRYPTO NOVA spot portfolio, October 2026"
+                "caption": "CRYPTO NOVA spot portfolio, October 2026"
               }
             }
           ],
@@ -2037,7 +2037,7 @@
             },
             {
               "title": "The main sign hasn't changed",
-              "text": "The technology is new, but the scheme is old: rushing you, income with no risk, and a request to send money or share a code. If you see that, it's a scam, however real the video looks. CRYPTO NOVA doesn't call you, doesn't ask you to send money and doesn't ask for codes.",
+              "text": "The technology is new, but the scheme is old: rushing you, income with no risk, and a request to send money or share a code. If you see that, it's a scam, however real the video looks. CRYPTO NOVA doesn't call you, doesn't ask you to send money and doesn't ask for codes.",
               "example": "In real life: a fake banknote can look beautiful. But if someone is rushing to pay with it in the dark, be on your guard.",
               "art": "shield"
             }
@@ -2091,7 +2091,7 @@
           "cards": [
             {
               "title": "Only you withdraw",
-              "text": "The money in your exchange account is yours. You withdraw it yourself, in the exchange app. CRYPTO NOVA can't withdraw it and doesn't ask for withdrawal access. Before a withdrawal, the exchange may ask for a code from an app or an SMS — that protects your account.",
+              "text": "The money in your exchange account is yours. You withdraw it yourself, in the exchange app. CRYPTO NOVA can't withdraw it and doesn't ask for withdrawal access. Before a withdrawal, the exchange may ask for a code from an app or an SMS — that protects your account.",
               "example": "In real life: only you can take cash from an ATM — with your card and your PIN.",
               "art": "bank"
             },
@@ -2123,7 +2123,7 @@
             {
               "q": "Who can withdraw money from your exchange account?",
               "options": [
-                "CRYPTO NOVA",
+                "CRYPTO NOVA",
                 "Only you",
                 "Anyone who knows your UID",
                 "“Support” from a messenger app"
@@ -2215,7 +2215,7 @@
               "art": "shield"
             },
             {
-              "title": "How it works in CRYPTO NOVA",
+              "title": "How it works in CRYPTO NOVA",
               "text": "In the “Spot” section, the system holds a portfolio of several coins: bitcoin, ether, solana and other major ones. About 15% sits in dollars as a reserve. When the shares get out of balance, the system sells what's grown too big and buys more of what has shrunk.",
               "example": "In real life: a gardener trims branches that have grown too big and plants new ones where there's a gap. The garden stays even.",
               "art": "phone_app"
@@ -2277,7 +2277,7 @@
             {
               "title": "How the Piggy bank works",
               "text": "You choose an amount and how often to buy. For example, $10 every week. And you buy on that day, whatever the price. No news, no worry. This is called averaging: you end up paying an average price — not the lowest, but not the highest either.",
-              "example": "That's how the “Piggy bank” works in CRYPTO NOVA: from $5 to $50, weekly or monthly. It reminds you on buy day.",
+              "example": "That's how the “Piggy bank” works in CRYPTO NOVA: from $5 to $50, weekly or monthly. It reminds you on buy day.",
               "art": "piggy"
             },
             {
@@ -3096,7 +3096,7 @@
             },
             {
               "title": "What to remember",
-              "text": "CRYPTO NOVA never asks for or stores your passwords and seed phrases — and no honest service will ask. Update the plan once a year: a new account — add it. This is not legal advice: for inheritance in your country, talk to a notary or a lawyer.",
+              "text": "CRYPTO NOVA never asks for or stores your passwords and seed phrases — and no honest service will ask. Update the plan once a year: a new account — add it. This is not legal advice: for inheritance in your country, talk to a notary or a lawyer.",
               "example": "In real life: you check your insurance and documents once a year. Same with your inheritance plan.",
               "art": "shield"
             }
@@ -3574,7 +3574,7 @@
             },
             {
               "title": "What it means for you",
-              "text": "Only use services that are allowed in your country, and don't get around bans: you lose the protection of the law, and your account can be closed. Laws don't protect you from a price fall — market risk stays yours. That's why CRYPTO NOVA names only an exchange that works in your country: in the EU it is OKX Europe, licensed under MiCA.",
+              "text": "Only use services that are allowed in your country, and don't get around bans: you lose the protection of the law, and your account can be closed. Laws don't protect you from a price fall — market risk stays yours. That's why CRYPTO NOVA names only an exchange that works in your country: in the EU it is OKX Europe, licensed under MiCA.",
               "example": "In real life: car insurance doesn't save you from black ice. It helps if someone else is at fault, but you still need to drive carefully.",
               "art": "shield"
             }
@@ -3659,7 +3659,7 @@
             },
             {
               "title": "Calmer and bolder",
-              "text": "Spot is simpler: the coin is yours, and the trade won't close on its own. Futures suit people who understand the risk and always set a stop. CRYPTO NOVA has both: “Spot” with no leverage, and “Futures,” where every trade has a stop set in advance. Real money is for 18+ only.",
+              "text": "Spot is simpler: the coin is yours, and the trade won't close on its own. Futures suit people who understand the risk and always set a stop. CRYPTO NOVA has both: “Spot” with no leverage, and “Futures,” where every trade has a stop set in advance. Real money is for 18+ only.",
               "example": "You can try it with no risk on a demo account: virtual money, real prices.",
               "art": "compass"
             }
@@ -3737,7 +3737,7 @@
             },
             {
               "title": "What it looks like in the app",
-              "text": "CRYPTO NOVA trades show the direction plainly: “UP (LONG)” or “DOWN (SHORT)”. LONG means the system expects the price to rise. SHORT means it expects it to fall. It's a calculated bet, not a promise: the price can go the other way.",
+              "text": "CRYPTO NOVA trades show the direction plainly: “UP (LONG)” or “DOWN (SHORT)”. LONG means the system expects the price to rise. SHORT means it expects it to fall. It's a calculated bet, not a promise: the price can go the other way.",
               "example": "In real life: a forecast of “rain tomorrow” doesn't promise rain. It says rain is more likely. A system trade is the same kind of forecast.",
               "art": "phone_app"
             }
@@ -3771,7 +3771,7 @@
               "why": "With a short, a rising price means a loss. You sold at $20 but have to buy back at $30: $30 − $20 = $10 in the red."
             },
             {
-              "q": "What does LONG mean in a CRYPTO NOVA trade?",
+              "q": "What does LONG mean in a CRYPTO NOVA trade?",
               "options": [
                 "The system expects the price to rise",
                 "The trade is for the long haul, many years",
@@ -3829,7 +3829,7 @@
             },
             {
               "title": "How to handle leverage",
-              "text": "Leverage is like a sharp knife: useful if you're careful. Small leverage, a stop every time, a small trade size. The stop closes the trade before liquidation, with a small loss. In CRYPTO NOVA trades, leverage is shown in the “Risk” block, for example “leverage ×2”.",
+              "text": "Leverage is like a sharp knife: useful if you're careful. Small leverage, a stop every time, a small trade size. The stop closes the trade before liquidation, with a small loss. In CRYPTO NOVA trades, leverage is shown in the “Risk” block, for example “leverage ×2”.",
               "example": "In real life: a kitchen knife is for slicing bread, not for waving around. Leverage only works for you when you handle it with care.",
               "art": "shield"
             }
@@ -4122,7 +4122,7 @@
               "art": "ruler"
             },
             {
-              "title": "Risk in CRYPTO NOVA trades",
+              "title": "Risk in CRYPTO NOVA trades",
               "text": "Every system trade has a “Risk” block that shows how much money is at risk. For example: “$50 of $10,000 at risk.” That's 0.5% of the account: what the demo account will lose if the stop is hit. If you repeat the trade, work out the risk from your own amount.",
               "example": "Example: your account is $1,000, and the risk is 0.5% — that's $1,000 × 0.5% = $5 per trade.",
               "art": "phone_app"
@@ -4265,7 +4265,7 @@
         },
         {
           "id": "l3-signal",
-          "title": "How to read a CRYPTO NOVA trade: a real example",
+          "title": "How to read a CRYPTO NOVA trade: a real example",
           "minutes": 5,
           "goal": "By the end, you'll be able to read a system trade and understand what every number means.",
           "cards": [
@@ -4544,7 +4544,7 @@
               "art": "chart_up"
             },
             {
-              "title": "How CRYPTO NOVA uses them",
+              "title": "How CRYPTO NOVA uses them",
               "text": "In the app the zones are drawn on the chart. The stop goes beyond a zone, the target at the next zone. That way the risk is known before entering the trade.",
               "example": "In real life: a route is planned by landmarks, not at random.",
               "art": "target"
@@ -4672,7 +4672,7 @@
             },
             {
               "title": "Few trades, little truth",
-              "text": "Flip a coin 10 times, and it lands heads 7 times. That doesn't mean the coin is special. It's the same with a system: 10 trades is too few. Look at hundreds of trades. In CRYPTO NOVA, a trade's “Rule history” block shows how many trades there were, how many were in profit, and the average result.",
+              "text": "Flip a coin 10 times, and it lands heads 7 times. That doesn't mean the coin is special. It's the same with a system: 10 trades is too few. Look at hundreds of trades. In CRYPTO NOVA, a trade's “Rule history” block shows how many trades there were, how many were in profit, and the average result.",
               "example": "In real life: you don't judge a café by one lunch. You need to go back many times.",
               "art": "magnifier"
             }
@@ -4824,7 +4824,7 @@
           "cards": [
             {
               "title": "Testing on history",
-              "text": "Before trading by a rule, you test it on past prices. You take years of history and see what would have happened if the rule had been in use back then. This is called a backtest. CRYPTO NOVA tests new versions of its rules this way every night.",
+              "text": "Before trading by a rule, you test it on past prices. You take years of history and see what would have happened if the rule had been in use back then. This is called a backtest. CRYPTO NOVA tests new versions of its rules this way every night.",
               "example": "In real life: before cooking dinner for guests, you think back to how the dish turned out before.",
               "art": "books"
             },
@@ -4848,7 +4848,7 @@
             },
             {
               "title": "Why we show losses too",
-              "text": "The market changes like the weather. What worked yesterday may stop working tomorrow. That's why it's important to see the whole truth. In CRYPTO NOVA, you can see every closed trade, including the losing ones, and the account's drawdown. And “Rule history” separately shows how the rule has done live.",
+              "text": "The market changes like the weather. What worked yesterday may stop working tomorrow. That's why it's important to see the whole truth. In CRYPTO NOVA, you can see every closed trade, including the losing ones, and the account's drawdown. And “Rule history” separately shows how the rule has done live.",
               "example": "In real life: an honest doctor tells you not only about a medicine's benefits, but also about its side effects.",
               "art": "handshake"
             }
@@ -5437,7 +5437,7 @@
               "art": "weather"
             },
             {
-              "title": "How CRYPTO NOVA does it",
+              "title": "How CRYPTO NOVA does it",
               "text": "The autopilot sizes each trade to volatility and keeps the total risk within the risk shield's limits. That does not cancel losses, but one wild coin does not decide the fate of the whole account.",
               "example": "In real life: the load is spread across the whole boat, not put on one side.",
               "art": "shield"
@@ -5509,8 +5509,8 @@
               "art": "warning"
             },
             {
-              "title": "How CRYPTO NOVA does it",
-              "text": "The CRYPTO NOVA public portfolio has a “Dollar yield” source: lending USDC and USDT through Aave and Sky. As of October 2026, that's about 15% of the portfolio, plus about 5% in Ethena sUSDe. It's a demo at real rates. The shares are capped so that trouble with one service doesn't hit the whole portfolio.",
+              "title": "How CRYPTO NOVA does it",
+              "text": "The CRYPTO NOVA public portfolio has a “Dollar yield” source: lending USDC and USDT through Aave and Sky. As of October 2026, that's about 15% of the portfolio, plus about 5% in Ethena sUSDe. It's a demo at real rates. The shares are capped so that trouble with one service doesn't hit the whole portfolio.",
               "example": "In real life: eggs go in different baskets. Even if one falls, the others are fine.",
               "art": "scale"
             }
@@ -5526,7 +5526,7 @@
               "options": [
                 "The government",
                 "Borrowers who need dollars",
-                "CRYPTO NOVA",
+                "CRYPTO NOVA",
                 "Nobody: the interest appears by itself"
               ],
               "answer": 1,

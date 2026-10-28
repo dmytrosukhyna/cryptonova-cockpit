@@ -43,7 +43,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from xml.etree import ElementTree as ET
 from urllib.parse import parse_qs, urlsplit
 
-from cnq.agents.i18n import DEFAULT, LANGS, file_name, norm_lang
+from cnq.agents.i18n import DEFAULT, LANGS, file_name, norm_lang, polish, polish_doc
 from cnq.agents.llm import LLM, PROVIDERS
 
 from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, pf_parse, pf_review, spot_top, tts
@@ -323,7 +323,7 @@ class Api:
                 print("home news error:", repr(e)[:200], file=sys.stderr, flush=True)
                 news = []
             if news:
-                d = {**d, "news": news}
+                d = {**d, "news": polish_doc(news, lang)}
             d = self._with_report_audio(d)
             return 200, d
         if method == "POST" and path == "/v2/tts":                       # build 46 #6: text → NOVA's male voice (public, per-IP limit)
@@ -348,7 +348,7 @@ class Api:
             return 200, {"image": bool(self.vision), "csv": True, "xlsx": True, "pdf": True,
                          "max_mb": pf_parse.MAX_FILE // (1024 * 1024), "exchanges": ["okx", "bingx", "binance"]}
         if method == "GET" and path == "/v2/spot/top":                  # build 45: «Топ-10 монет на заметку» (Spot tab)
-            d = spot_top.top(self.pf_data, lang, self.listings.get())
+            d = polish_doc(spot_top.top(self.pf_data, lang, self.listings.get()), lang)
             return (200, d) if d["rows"] or self.pf_data.get("ideas") else (503, {"error": "feed_unavailable"})
         if method == "POST" and path == "/v2/access/verify":             # 22.10: a guest's access code for cryptonova.vip
             try:
@@ -414,7 +414,10 @@ class Api:
         if method == "POST" and path == "/v2/agent":
             lang = norm_lang(data.get("lang") or lang)
             try:
-                return self._agent(uid, data, lang)
+                c_, d_ = self._agent(uid, data, lang)
+                if isinstance(d_, dict) and isinstance(d_.get("answer"), str):
+                    d_ = {**d_, "answer": polish(d_["answer"], lang)}        # build 46 QA: the language's numbers, «CRYPTO NOVA» whole
+                return c_, d_
             except Exception as e:  # noqa: BLE001 — NOVA never answers with a bare 500
                 print("agent error:", repr(e)[:300], file=sys.stderr, flush=True)
                 self.agent_last = {"result": "server_error", "ms": None, "at": int(time.time()), "lang": lang}
@@ -432,6 +435,7 @@ class Api:
         t0 = time.time()
         try:
             code, doc = fn()
+            doc = polish_doc(doc, lang)                  # build 46 QA: the language's numbers, «CRYPTO NOVA» whole
         except Exception as e:  # noqa: BLE001
             print(f"portfolio {what}: {type(e).__name__}", file=sys.stderr, flush=True)
             code, doc = 200, {"error": "server", "message": pf_review.message("server", lang)}

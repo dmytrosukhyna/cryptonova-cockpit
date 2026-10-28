@@ -187,7 +187,9 @@ def test_reasons_are_translated():
             txt, key, _f = R.reason(s, "wait", lang)
             assert key is not None, s
             assert not (CYR.search(txt) and lang != "uk"), (s, lang, txt)
-        assert R.reason(s, "wait", "ru")[0] == s
+        ru = R.reason(s, "wait", "ru")[0]                  # 28.10 (build 46 QA): Russian in plain words too, not the table's jargon
+        assert ru and not any(w in ru.lower() for w in ("анкета", "мёртв", "не берём", "/100")), (s, ru)
+    assert R.reason(samples[0], "wait", "ru")[0] == "Оценка проекта 16 из 100 — ниже минимума системы (40), пока не покупаем"
     assert R.reason("Уже +130% за 30 дней — не догоняем, ждём отката", "wait", "en")[2] == "overheat"
     assert R.reason("В обращении ~40% токенов — впереди разлоки, ждём", "wait", "en")[2] == "dilution"
     assert R.reason("−93% от исторического максимума — монета «мёртвая», не берём", "avoid", "en")[2] == "ath"

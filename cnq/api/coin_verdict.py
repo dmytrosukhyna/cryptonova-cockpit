@@ -41,8 +41,8 @@ T = {
     "verdict": _L("{coin}: по правилам CRYPTO NOVA сейчас — {label}.", "{coin}: by CRYPTO NOVA's rules, right now — {label}.",
                   "{coin}: за правилами CRYPTO NOVA зараз — {label}.", "{coin}: με τους κανόνες του CRYPTO NOVA, τώρα — {label}.",
                   "{coin}: según las reglas de CRYPTO NOVA, ahora — {label}."),
-    "dead": _L("{coin}: {label}. Цена на {p} ниже исторического максимума — по правилам CRYPTO NOVA это «мёртвая» монета, и "
-               "обещать её возврат я не буду.",
+    "dead": _L("{coin}: {label}. Цена на {p} ниже исторического максимума — по правилам CRYPTO NOVA такие монеты система не "
+               "покупает, и обещать возврат цены я не буду.",
                "{coin}: {label}. The price is {p} below its all-time high — by CRYPTO NOVA's rules that's a “dead” coin, and I "
                "won't promise it comes back.",
                "{coin}: {label}. Ціна на {p} нижча за історичний максимум — за правилами CRYPTO NOVA це «мертва» монета, і "
@@ -58,7 +58,7 @@ T = {
     "why": _L("Почему: {r}", "Why: {r}", "Чому: {r}", "Γιατί: {r}", "Por qué: {r}"),
     "passed": _L("Пройдено: {x}.", "Passed: {x}.", "Пройдено: {x}.", "Πέρασε: {x}.", "Superado: {x}."),
     "failed": _L("Не пройдено: {x}.", "Not passed: {x}.", "Не пройдено: {x}.", "Δεν πέρασε: {x}.", "No superado: {x}."),
-    "held": _L("В портфеле CRYPTO NOVA: доля {w}, вход {e}, {s}, {t}.", "In the CRYPTO NOVA portfolio: {w} share, entry {e}, {s}, {t}.",
+    "held": _L("В споте CRYPTO NOVA: доля {w}, вход {e}, {s}, {t}.", "In the CRYPTO NOVA portfolio: {w} share, entry {e}, {s}, {t}.",
                "У портфелі CRYPTO NOVA: частка {w}, вхід {e}, {s}, {t}.", "Στο χαρτοφυλάκιο CRYPTO NOVA: μερίδιο {w}, είσοδος {e}, {s}, {t}.",
                "En la cartera de CRYPTO NOVA: peso {w}, entrada {e}, {s}, {t}."),
     "stop": _L("стоп {v}", "stop {v}", "стоп {v}", "stop {v}", "stop {v}"),
@@ -67,10 +67,33 @@ T = {
                  "στόχος {v} (εκεί κλειδώνουμε το μισό)", "objetivo {v} (ahí se toma la mitad)"),
     "no_target": _L("цели нет — держим надолго", "no target — a long hold", "цілі немає — тримаємо надовго",
                     "χωρίς στόχο — μακροπρόθεσμη διακράτηση", "sin objetivo: se mantiene a largo plazo"),
+    # 28.10 (build 46 QA): a core coin (BTC, ETH, SOL) — the system's plan for it, no stop line (the core is held without one)
+    "core_label": _L("в ядре портфеля", "in the portfolio's core", "у ядрі портфеля", "στον πυρήνα του χαρτοφυλακίου",
+                     "en el núcleo de la cartera"),
+    "core_hold": _L("{coin} — в ядре портфеля: система держит монету и сейчас не докупает.",
+                    "{coin} is in the portfolio's core: the system holds it and isn't buying more right now.",
+                    "{coin} — у ядрі портфеля: система тримає монету й зараз не докуповує.",
+                    "Το {coin} είναι στον πυρήνα του χαρτοφυλακίου: το σύστημα το κρατά και αυτή τη στιγμή δεν αγοράζει άλλο.",
+                    "{coin} está en el núcleo de la cartera: el sistema la mantiene y ahora no compra más."),
+    "core_add": _L("{coin} — в ядре портфеля: доля ниже плана, система докупит монету по своим правилам.",
+                   "{coin} is in the portfolio's core: its share is below the plan, so the system will top it up by its rules.",
+                   "{coin} — у ядрі портфеля: частка нижча за план, система докупить монету за своїми правилами.",
+                   "Το {coin} είναι στον πυρήνα του χαρτοφυλακίου: το μερίδιο είναι κάτω από το σχέδιο, το σύστημα θα το συμπληρώσει με τους κανόνες του.",
+                   "{coin} está en el núcleo de la cartera: su peso está por debajo del plan y el sistema la completará según sus reglas."),
+    "core_trim": _L("{coin} — в ядре портфеля: доля выше плана, лишнее система продаст на пересмотре.",
+                    "{coin} is in the portfolio's core: its share is above the plan, so the system will sell the extra at the review.",
+                    "{coin} — у ядрі портфеля: частка вища за план, зайве система продасть на перегляді.",
+                    "Το {coin} είναι στον πυρήνα του χαρτοφυλακίου: το μερίδιο είναι πάνω από το σχέδιο, το σύστημα θα πουλήσει το επιπλέον στην αναθεώρηση.",
+                    "{coin} está en el núcleo de la cartera: su peso supera el plan y el sistema venderá lo que sobra en la revisión."),
+    "core_held": _L("Доля в споте CRYPTO NOVA: {w} (план {p}); ядро система держит без стопа и без цели.",
+                    "Share of CRYPTO NOVA's spot: {w} (plan {p}); the system holds the core with no stop and no target.",
+                    "Частка в споті CRYPTO NOVA: {w} (план {p}); ядро система тримає без стопа й без цілі.",
+                    "Μερίδιο στο spot του CRYPTO NOVA: {w} (σχέδιο {p})· τον πυρήνα το σύστημα τον κρατά χωρίς stop και χωρίς στόχο.",
+                    "Peso en el spot de CRYPTO NOVA: {w} (plan {p}); el sistema mantiene el núcleo sin stop y sin objetivo."),
     "not_held": _L("В портфеле CRYPTO NOVA её сейчас нет.", "The CRYPTO NOVA portfolio doesn't hold it now.",
                    "У портфелі CRYPTO NOVA її зараз немає.", "Το χαρτοφυλάκιο CRYPTO NOVA δεν το έχει τώρα.",
                    "La cartera de CRYPTO NOVA no la tiene ahora."),
-    "support": _L("Поддержка проекта: {s}/100.", "Project support: {s}/100.", "Підтримка проєкту: {s}/100.",
+    "support": _L("Поддержка проекта: {s} из 100.", "Project support: {s}/100.", "Підтримка проєкту: {s} зі 100.",
                   "Υποστήριξη έργου: {s}/100.", "Respaldo del proyecto: {s}/100."),
     "futures": _L("Фьючерсы: открыта сделка {side}, вход {e}, стоп {s}, цель {t}, сейчас {p}.",
                   "Futures: an open {side} trade, entry {e}, stop {s}, target {t}, now {p}.",
@@ -98,13 +121,13 @@ T = {
     "ask": _L("Вы про {a} или про {b}?", "Do you mean {a} or {b}?", "Ви про {a} чи про {b}?", "Εννοείτε το {a} ή το {b};",
               "¿Te refieres a {a} o a {b}?"),
     # the checks, in the app's language (the numbers come from the table's own Russian text)
-    "rating": _L("анкета {r}/100 (нужно от {m})", "quality rating {r}/100 (needs {m}+)", "анкета {r}/100 (потрібно від {m})",
+    "rating": _L("оценка проекта {r} из 100 (минимум {m})", "quality rating {r}/100 (needs {m}+)", "оцінка проєкту {r} зі 100 (мінімум {m})",
                  "βαθμολογία {r}/100 (χρειάζεται {m}+)", "puntuación {r}/100 (mínimo {m})"),
-    "rating_nom": _L("анкета {r}/100", "quality rating {r}/100", "анкета {r}/100", "βαθμολογία {r}/100", "puntuación {r}/100"),
-    "consultant": _L("консультант: тренд {a}/100, фундамент {b}/100", "advisor: trend {a}/100, fundamentals {b}/100",
-                     "консультант: тренд {a}/100, фундамент {b}/100", "σύμβουλος: τάση {a}/100, θεμελιώδη {b}/100",
+    "rating_nom": _L("оценка проекта {r} из 100", "quality rating {r}/100", "оцінка проєкту {r} зі 100", "βαθμολογία {r}/100", "puntuación {r}/100"),
+    "consultant": _L("консультант системы: тренд {a} из 100, фундамент {b} из 100", "advisor: trend {a}/100, fundamentals {b}/100",
+                     "консультант системи: тренд {a} зі 100, фундамент {b} зі 100", "σύμβουλος: τάση {a}/100, θεμελιώδη {b}/100",
                      "asesor: tendencia {a}/100, fundamentos {b}/100"),
-    "consultant_none": _L("консультант монету не выделил", "the advisor didn't pick it", "консультант монету не виділив",
+    "consultant_none": _L("консультант системы монету не выделил", "the advisor didn't pick it", "консультант монету не виділив",
                           "ο σύμβουλος δεν το επέλεξε", "el asesor no la eligió"),
     "overheat": _L("перегрев: за 7 дней {a}, за 30 дней {b}", "overheating: {a} in 7 days, {b} in 30 days",
                    "перегрів: за 7 днів {a}, за 30 днів {b}", "υπερθέρμανση: {a} σε 7 ημέρες, {b} σε 30 ημέρες",
@@ -120,7 +143,7 @@ SYSTEM = """Ты — NOVA, AI-помощник приложения CRYPTO NOVA.
 ПРАВИЛА:
 • Структура как в черновике: первая строка — короткий вердикт, в ней дословно status_label монеты; затем 3–5 строк, каждая начинается с «• »; последняя строка — ровно disclaimer из JSON. Монет две — так для каждой, disclaimer один в конце.
 • Числа — только из JSON и только как они там записаны. Ничего не считай, не округляй по-своему, не добавляй своих чисел, дат и прогнозов цены.
-• Статус не меняй и не смягчай: «не брать» — значит не брать; «мёртвую» монету (dead: true) называй прямо, без обещаний, что она вернётся.
+• Статус не меняй и не смягчай: «не брать» — значит не брать; монету с dead: true называй прямо — система такие не покупает, без обещаний, что цена вернётся.
 • Не говори «гарантированно», не обещай рост или доход, не называй сумму вложений.
 • Без заголовков, без **жирного**, без эмодзи и ссылок.
 {how}
@@ -260,13 +283,25 @@ def _ath(row: dict | None, mk: dict | None) -> float | None:
     return round(v) if v is not None else None
 
 
+def _live_share(sym: str, home: dict) -> float | None:
+    """28.10 (build 46 QA): the coin's share of the REAL account's spot now (app_home public_portfolio.spot.coins share_spot)"""
+    for c in (((home or {}).get("public_portfolio") or {}).get("spot") or {}).get("coins") or []:
+        if isinstance(c, dict) and str(c.get("sym") or "").upper() == sym:
+            return _num(c.get("share_spot"))
+    return None
+
+
 def _held(sym: str, data, home: dict) -> dict | None:
     pf = ((data.get("portfolio").get("portfolios") or {}).get("ideas") or {}) if data is not None else {}
+    live = _live_share(sym, home)
     for p in pf.get("positions") or []:
         if isinstance(p, dict) and str(p.get("symbol") or "").upper() == sym and str(p.get("status") or "OPEN").upper() == "OPEN":
             lv = p.get("levels") or {}
-            return {"weight": round((_num(p.get("weight")) or 0) * 100, 1), "entry": _num(p.get("entry")),
-                    "stop": _num(lv.get("stop")), "target": _num(lv.get("take_half"))}
+            core = sym in pf_review.CORE or p.get("bucket") == "core"
+            return {"weight": round(live, 1) if live is not None else round((_num(p.get("weight")) or 0) * 100, 1), "entry": _num(p.get("entry")),
+                    "stop": None if core else _num(lv.get("stop")), "target": None if core else _num(lv.get("take_half")),
+                    "core": core, "plan": round((_num(p.get("target_weight")) or 0) * 100, 1) if p.get("target_weight") is not None else None,
+                    "live": live is not None}
     if pf.get("positions"):
         return None
     for c in ((home or {}).get("spot") or {}).get("coins") or []:
@@ -331,17 +366,31 @@ def card(sym: str, data, home: dict, lang: str, u: C.Universe) -> dict | None:
     ath = _ath(row, mk)
     sup = _support(sym, row, ideas)
     price = _num(src.get("price")) or _num((mk or {}).get("price"))
-    return {"sym": sym, "name": name, "status": status, "status_label": pf_review._t(pf_review.STATUS_LABEL[status], lang),
+    label = pf_review._t(pf_review.STATUS_LABEL[status], lang)
+    if held and held.get("core"):
+        label = T["core_label"][lang]                     # a core coin's verdict is the core rule, not the table's «можно брать»
+    return {"sym": sym, "name": name, "status": status, "status_label": label,
             "reason": reason, "reason_key": key, "decided_by": flag, "checks": checks,
             "from_ath": fmt_pct(ath) if ath is not None else None,
             "dead": bool(status == "avoid" and ath is not None and ath <= DEAD_ATH),
             "price": fmt_price(price) if price else None,
             "held": None if not held else {"share": fmt_pct(held["weight"], sign=False), "entry": fmt_price(held["entry"]),
                                            "stop": fmt_price(held["stop"]) if held["stop"] else None,
-                                           "target": fmt_price(held["target"]) if held["target"] else None},
+                                           "target": fmt_price(held["target"]) if held["target"] else None,
+                                           "core": bool(held.get("core")),
+                                           "plan": fmt_pct(held["plan"], sign=False) if held.get("plan") else None,
+                                           "band": _band(held)},
             "support": sup,
             "futures": None if not fut else {"side": fut["side"], "entry": fmt_price(fut["entry"]), "stop": fmt_price(fut["stop"]),
                                              "target": fmt_price(fut["target"]), "now": fmt_pct(fut["pct"])}}
+
+
+def _band(h: dict) -> str | None:
+    """a core coin against its plan (the portfolio's own rule: below ¾ of the plan → it tops up, above 1.5× → it sells the extra)"""
+    if not h.get("core") or not h.get("plan") or h.get("weight") is None:
+        return None
+    w, p = float(h["weight"]), float(h["plan"])
+    return "add" if w < 0.75 * p else "trim" if w > 1.5 * p else "hold"
 
 
 def coin_label(sym: str, name: str | None) -> str:
@@ -352,14 +401,17 @@ def coin_label(sym: str, name: str | None) -> str:
 def draft(c: dict, lang: str, bullets_max: int = 5) -> list[str]:
     tl = {k: v[lang] for k, v in T.items()}
     coin = coin_label(c["sym"], c["name"])
-    if c["dead"]:
+    h0 = c.get("held") or {}
+    if h0.get("core") and h0.get("band"):
+        head = tl["core_" + h0["band"]].format(coin=coin)
+    elif c["dead"]:
         head = tl["dead"].format(coin=coin, label=c["status_label"], p=(c["from_ath"] or "").lstrip("−-"))
     elif c["status"] == "unknown":
         head = tl["unrated"].format(coin=coin)
     else:
         head = tl["verdict"].format(coin=coin, label=c["status_label"])
     b: dict[str, str] = {}
-    if c["reason"] and not (c["dead"] and c["decided_by"] == "ath"):
+    if c["reason"] and not (c["dead"] and c["decided_by"] == "ath") and not h0.get("core"):   # a core coin: the core rule, not the table
         r = c["reason"].rstrip(".")
         b["why"] = tl["why"].format(r=r[:1].lower() + r[1:] if lang != "el" else r) + "."
     good = [x["text"] for x in c["checks"] if x["ok"] is True]
@@ -369,7 +421,9 @@ def draft(c: dict, lang: str, bullets_max: int = 5) -> list[str]:
     if bad:
         b["failed"] = tl["failed"].format(x="; ".join(bad))
     h = c["held"]
-    if h:
+    if h and h.get("core"):
+        b["held"] = tl["core_held"].format(w=h["share"], p=h.get("plan") or "—")
+    elif h:
         b["held"] = tl["held"].format(w=h["share"], e=h["entry"], s=tl["stop"].format(v=h["stop"]) if h["stop"] else tl["no_stop"],
                                       t=tl["target"].format(v=h["target"]) if h["target"] else tl["no_target"])
     elif c["status"] != "unknown":

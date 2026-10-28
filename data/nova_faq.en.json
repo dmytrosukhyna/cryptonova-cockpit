@@ -8,7 +8,7 @@
       "id": "safe",
       "topic": "money",
       "q": "Is it safe?",
-      "a": "In demo, completely: the money is virtual, so there is nothing to lose. With real money, the main rule is this: it always stays in your own exchange account — CRYPTO NOVA doesn't hold it and can't withdraw it. We never ask for passwords, SMS codes or your seed phrase. The crypto market itself is risky, though — only invest what you could lose without real harm.",
+      "a": "In demo, completely: the money is virtual, so there is nothing to lose. With real money, the main rule is this: it always stays in your own exchange account — CRYPTO NOVA doesn't hold it and can't withdraw it. We never ask for passwords, SMS codes or your seed phrase. The crypto market itself is risky, though — only invest what you could lose without real harm.",
       "tags": [
         "safe",
         "safety",
@@ -41,7 +41,7 @@
       "id": "where_money",
       "topic": "money",
       "q": "Where is my money?",
-      "a": "In demo the money is virtual — it exists only in the app. If you trade for real, your money sits in your own exchange account (OKX, or BingX where OKX doesn't operate), not with us. Even when you copy, the exchange only repeats CRYPTO NOVA's trades in your account. We don't accept, hold or withdraw money — only you control it.",
+      "a": "In demo the money is virtual — it exists only in the app. If you trade for real, your money sits in your own exchange account (OKX, or BingX where OKX doesn't operate), not with us. Even when you copy, the exchange only repeats CRYPTO NOVA's trades in your account. We don't accept, hold or withdraw money — only you control it.",
       "tags": [
         "money",
         "kept",
@@ -72,7 +72,7 @@
       "id": "my_result",
       "topic": "money",
       "q": "How much have I earned?",
-      "a": "Your personal result is on the “My demo account” card on the Home screen: your amount and start date are there. And I can tell you how CRYPTO NOVA's own demo accounts are doing.",
+      "a": "Your personal result is on the “My demo account” card on the Home screen: your amount and start date are there. And the result of CRYPTO NOVA's real account is in PUBLIC mode — with all the gains and losses.",
       "tags": [
         "earned",
         "made",
@@ -87,7 +87,7 @@
       "id": "how_much",
       "topic": "money",
       "q": "How much can I earn?",
-      "a": "Honestly, nobody knows that in advance, and there are no guarantees. But you can look at the facts: the result of CRYPTO NOVA's demo accounts is on the Home screen — with all the gains and losses. There are losing weeks too, and past results don't guarantee future ones. This is not financial advice.",
+      "a": "Honestly, nobody knows that in advance, and there are no guarantees. But you can look at the facts: the result of CRYPTO NOVA's real account (PUBLIC mode) is on the Home screen — with all the gains and losses. There are losing weeks too, and past results don't guarantee future ones. This is not financial advice.",
       "tags": [
         "earn",
         "income",
@@ -117,7 +117,7 @@
     {
       "id": "shutdown",
       "topic": "money",
-      "q": "What happens if CRYPTO NOVA shuts down?",
+      "q": "What happens if CRYPTO NOVA shuts down?",
       "a": "Your money won't be affected: it's in your exchange account, not with us. You would simply stop seeing the signals and lessons in the app. That's exactly why we don't hold other people's money.",
       "tags": [
         "shut down",
@@ -133,7 +133,7 @@
       "id": "referral",
       "topic": "money",
       "q": "Why the exchange and the referral link?",
-      "a": "To be honest: if you open an account on OKX through our link (or on BingX where OKX doesn't operate), the exchange gives CRYPTO NOVA part of its own fee. Your fees and the exchange's terms don't change. If you copy CRYPTO NOVA, OKX keeps a share of your profit for the lead trader, that is CRYPTO NOVA, under its own rules — the percentage is shown in the profile before you start. And the exchange is needed because your money always stays in your own account, not with us.",
+      "a": "To be honest: if you open an account on OKX through our link (or on BingX where OKX doesn't operate), the exchange gives CRYPTO NOVA part of its own fee. Your fees and the exchange's terms don't change. If you copy CRYPTO NOVA, OKX keeps a share of your profit for the lead trader, that is CRYPTO NOVA, under its own rules — the percentage is shown in the profile before you start. And the exchange is needed because your money always stays in your own account, not with us.",
       "tags": [
         "referral",
         "ref",
@@ -149,7 +149,7 @@
       "id": "price",
       "topic": "money",
       "q": "How much does it cost?",
-      "a": "Demo, the Piggy bank, 52 lessons and me, NOVA — no subscriptions or in-app purchases. If you copy CRYPTO NOVA on OKX, the exchange keeps a share of your profit for the lead trader, that is CRYPTO NOVA: the percentage is shown in the profile before you start, and no profit means no fee. For an account opened through our link, the exchange gives us part of its own fee, and your fees don't change. If paid features ever appear, we'll show the terms and price in advance.",
+      "a": "Demo, the Piggy bank, 52 lessons and me, NOVA — no subscriptions or in-app purchases. If you copy CRYPTO NOVA on OKX, the exchange keeps a share of your profit for the lead trader, that is CRYPTO NOVA: the percentage is shown in the profile before you start, and no profit means no fee. For an account opened through our link, the exchange gives us part of its own fee, and your fees don't change. If paid features ever appear, we'll show the terms and price in advance.",
       "tags": [
         "cost",
         "price",
@@ -166,7 +166,7 @@
       "id": "passwords",
       "topic": "money",
       "q": "Do you need my passwords or keys?",
-      "a": "No! Never share your passwords, SMS codes or your wallet's seed phrase — CRYPTO NOVA never asks for them. If someone writes in our name and asks for that, it's a scammer. The app doesn't need any keys to your exchange.",
+      "a": "No! Never share your passwords, SMS codes or your wallet's seed phrase — CRYPTO NOVA never asks for them. If someone writes in our name and asks for that, it's a scammer. The app doesn't need any keys to your exchange.",
       "tags": [
         "password",
         "passwords",
@@ -198,8 +198,8 @@
     {
       "id": "how_works",
       "topic": "how",
-      "q": "How does CRYPTO NOVA work?",
-      "a": "CRYPTO NOVA is an AI system: it watches the crypto market 24/7 and looks for trades using rules tested on price history. Since October 22, 2026 it has been running a real account on OKX with about $10 000 — that's the “Public portfolio”: you see the coins, the trades, the entry, the stop and a simple “why we entered”. Next to it there's your demo portfolio, a bitcoin Piggy bank, 52 lessons and me, NOVA. It isn't an exchange and isn't financial advice.",
+      "q": "How does CRYPTO NOVA work?",
+      "a": "CRYPTO NOVA is an AI system: it watches the crypto market 24/7 and looks for trades using rules tested on price history. Since October 22, 2026 it has been running a real account on OKX with about $10 000 — that's the “Public portfolio”: you see the coins, the trades, the entry, the stop and a simple “why we entered”. Next to it there's your demo portfolio, a bitcoin Piggy bank, 52 lessons and me, NOVA. It isn't an exchange and isn't financial advice.",
       "tags": [
         "work",
         "works",
@@ -210,15 +210,15 @@
         "cryptonova"
       ],
       "alt": [
-        "Tell me about CRYPTO NOVA",
-        "How CRYPTO NOVA works"
+        "Tell me about CRYPTO NOVA",
+        "How CRYPTO NOVA works"
       ]
     },
     {
       "id": "demo",
       "topic": "how",
       "q": "What is demo?",
-      "a": "Demo is practice: virtual money, but real market prices. The CRYPTO NOVA system runs its trades on a $10 000 demo account, and you have your own “My demo account” that shows what would have happened to your amount. You can't lose anything. But a demo result isn't real returns yet.",
+      "a": "Demo is practice: virtual money, but real market prices. Your “My demo account” shows what would have happened to your amount — you can't lose anything. But a demo result isn't real returns yet. CRYPTO NOVA itself has run a real account on OKX since 22 October 2026 — its result is in PUBLIC mode.",
       "tags": [
         "demo",
         "practice",
@@ -235,7 +235,7 @@
       "id": "vip",
       "topic": "how",
       "q": "What is a real account?",
-      "a": "A “Real account” means copy trading on OKX: the CRYPTO NOVA account there is a lead trader, and the exchange repeats its trades in your account. The steps: sign up on OKX through our link, verify your identity, deposit USDT and tap «Copy CRYPTO NOVA» in the app. You choose the amount, can stop in OKX at any time, losses are possible, 18+ only. In the EU and EEA automatic copying isn't available yet; where OKX doesn't operate, it's BingX, with copying there later.",
+      "a": "A “Real account” means copy trading on OKX: the CRYPTO NOVA account there is a lead trader, and the exchange repeats its trades in your account. The steps: sign up on OKX through our link, verify your identity, deposit USDT and tap «Copy CRYPTO NOVA» in the app. You choose the amount, can stop in OKX at any time, losses are possible, 18+ only. In the EU and EEA automatic copying isn't available yet; where OKX doesn't operate, it's BingX, with copying there later.",
       "tags": [
         "real account",
         "real",
@@ -254,7 +254,7 @@
       "id": "uid",
       "topic": "how",
       "q": "Do I need a UID?",
-      "a": "No, you don't. A UID is your account number on the exchange, but you don't enter it to copy CRYPTO NOVA: an OKX account opened through our link and the «Copy CRYPTO NOVA» button in the app are enough. You don't need API keys either, and we never ask for passwords, SMS codes or your seed phrase.",
+      "a": "No, you don't. A UID is your account number on the exchange, but you don't enter it to copy CRYPTO NOVA: an OKX account opened through our link and the «Copy CRYPTO NOVA» button in the app are enough. You don't need API keys either, and we never ask for passwords, SMS codes or your seed phrase.",
       "tags": [
         "uid",
         "number",
@@ -270,7 +270,7 @@
       "id": "copy",
       "topic": "how",
       "q": "Will there be automatic trade copying?",
-      "a": "Yes, it's already here — through OKX copy trading. You tap «Copy CRYPTO NOVA» in the app, choose the amount, and OKX repeats the system's trades in your account; you can stop in OKX at any time. It's OKX's product: OKX keeps a share of your profit for the lead trader, the percentage is shown in the profile before you start, and losses are possible. In the EU, EEA and UK automatic copying isn't available yet, and on BingX it opens later — for now you can repeat the trades yourself.",
+      "a": "Yes, it's already here — through OKX copy trading. You tap «Copy CRYPTO NOVA» in the app, choose the amount, and OKX repeats the system's trades in your account; you can stop in OKX at any time. It's OKX's product: OKX keeps a share of your profit for the lead trader, the percentage is shown in the profile before you start, and losses are possible. In the EU, EEA and UK automatic copying isn't available yet, and on BingX it opens later — for now you can repeat the trades yourself.",
       "tags": [
         "automatic",
         "auto",
@@ -351,7 +351,7 @@
       "id": "spot",
       "topic": "how",
       "q": "What is spot?",
-      "a": "Spot means buying the coins themselves, with no borrowing and no leverage: what you buy is yours. The “Spot” tab has CRYPTO NOVA's long-term spot portfolio: a core of bitcoin, ether and solana, large altcoins and a reserve in dollars; in PUBLIC mode these are the coins of the real account on OKX. The system itself keeps the shares from getting lopsided.",
+      "a": "Spot means buying the coins themselves, with no borrowing and no leverage: what you buy is yours. The “Spot” tab has CRYPTO NOVA's long-term spot portfolio: a core of bitcoin, ether and solana, large altcoins and a reserve in dollars; in PUBLIC mode these are the coins of the real account on OKX. The system itself keeps the shares from getting lopsided.",
       "tags": [
         "spot",
         "portfolio",
@@ -406,7 +406,7 @@
       "id": "stop",
       "topic": "learn",
       "q": "What is a stop?",
-      "a": "A stop, or stop-loss, is a price chosen in advance where the trade closes with a small loss so it doesn't grow. Like a seat belt: it won't save you from scratches, but it keeps a crash from hurting too much. Every CRYPTO NOVA trade has a stop. In a sharp jump it sometimes fills a little worse than the set price.",
+      "a": "A stop, or stop-loss, is a price chosen in advance where the trade closes with a small loss so it doesn't grow. Like a seat belt: it won't save you from scratches, but it keeps a crash from hurting too much. Every CRYPTO NOVA trade has a stop. In a sharp jump it sometimes fills a little worse than the set price.",
       "tags": [
         "stop",
         "stop-loss",
@@ -555,7 +555,7 @@
       "id": "who",
       "topic": "learn",
       "q": "Who are you, NOVA?",
-      "a": "I'm NOVA, the CRYPTO NOVA AI assistant. I explain crypto in plain words and tell you how the system's trades, the Piggy bank and the lessons work. I can make mistakes, and I don't give personal advice to buy or sell — the decision is always yours.",
+      "a": "I'm NOVA, the CRYPTO NOVA AI assistant. I explain crypto in plain words and tell you how the system's trades, the Piggy bank and the lessons work. I can make mistakes, and I don't give personal advice to buy or sell — the decision is always yours.",
       "tags": [
         "who are you",
         "nova",
@@ -567,8 +567,8 @@
     {
       "id": "what_is",
       "topic": "how",
-      "q": "What is CRYPTO NOVA?",
-      "a": "CRYPTO NOVA is a system that watches the crypto market around the clock and works by rules tested in advance on the history of prices. Since October 22, 2026 it has been running a real account on OKX with about $10 000 — that's the “Public portfolio” on the Home screen. In the app you can follow it, try your own demo portfolio, learn and ask me. It isn't an exchange and isn't financial advice: your money always stays in your own exchange account.",
+      "q": "What is CRYPTO NOVA?",
+      "a": "CRYPTO NOVA is a system that watches the crypto market around the clock and works by rules tested in advance on the history of prices. Since October 22, 2026 it has been running a real account on OKX with about $10 000 — that's the “Public portfolio” on the Home screen. In the app you can follow it, try your own demo portfolio, learn and ask me. It isn't an exchange and isn't financial advice: your money always stays in your own exchange account.",
       "tags": [
         "what is crypto nova",
         "cryptonova",
@@ -581,7 +581,7 @@
       "id": "public",
       "topic": "how",
       "q": "How does the public portfolio work?",
-      "a": "It's CRYPTO NOVA's real account on OKX with real money: about $10 000, and its history starts on October 22, 2026. The system's autopilot places the trades: the spot portfolio gets 65%, futures on selected signals 25%, active spot 10%. The app shows its value, the result in dollars and percent, a chart by period, the coins and the trades; the data updates about every 15 minutes. Past results don't guarantee future ones.",
+      "a": "It's CRYPTO NOVA's real account on OKX with real money: about $10 000, and its history starts on October 22, 2026. The system's autopilot places the trades: the spot portfolio gets 65%, futures on selected signals 25%, active spot 10%. The app shows its value, the result in dollars and percent, a chart by period, the coins and the trades; the data updates about every 15 minutes. Past results don't guarantee future ones.",
       "tags": [
         "public portfolio",
         "public",
@@ -607,7 +607,7 @@
       "id": "spot_futures",
       "topic": "learn",
       "q": "What are spot and futures?",
-      "a": "Spot means buying the coins themselves, with no debt: what you buy is yours, and you can hold it as long as you like. A futures trade is a bet on the price move: you can earn on a rise (long) or on a fall (short), often with leverage, so profits and losses both grow faster. In CRYPTO NOVA spot is the base of the portfolio, futures are the smaller part, and every futures trade has a stop.",
+      "a": "Spot means buying the coins themselves, with no debt: what you buy is yours, and you can hold it as long as you like. A futures trade is a bet on the price move: you can earn on a rise (long) or on a fall (short), often with leverage, so profits and losses both grow faster. In CRYPTO NOVA spot is the base of the portfolio, futures are the smaller part, and every futures trade has a stop.",
       "tags": [
         "spot and futures",
         "difference spot futures",
@@ -619,7 +619,7 @@
       "id": "connect",
       "topic": "money",
       "q": "How do I connect to the system?",
-      "a": "You connect to CRYPTO NOVA through OKX copy trading: sign up on OKX with our link, pass the identity check, top up your account in USDT and tap “Copy CRYPTO NOVA” in the app. After that OKX itself repeats the system's trades for the amount you choose. The step-by-step guide is behind the “Connect to the CRYPTO NOVA system” button. You can stop copying in OKX at any time, losses are possible, 18+ only; in the EU and EEA automatic copying isn't available yet.",
+      "a": "You connect to CRYPTO NOVA through OKX copy trading: sign up on OKX with our link, pass the identity check, top up your account in USDT and tap “Copy CRYPTO NOVA” in the app. After that OKX itself repeats the system's trades for the amount you choose. The step-by-step guide is behind the “Connect to the CRYPTO NOVA system” button. You can stop copying in OKX at any time, losses are possible, 18+ only; in the EU and EEA automatic copying isn't available yet.",
       "tags": [
         "connect",
         "connect to the system",

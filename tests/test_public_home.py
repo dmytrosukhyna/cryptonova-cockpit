@@ -146,8 +146,8 @@ def test_app_home_public_block_is_the_panel_header(tmp_path):
     assert [x["sym"] for x in p["spot"]["coins"]] == ["BTC", "ZEC", "PENGU"] and coins["BTC"]["weight"] == 24.76
     assert abs(sum(x["usd"] for x in coins.values()) + p["spot"]["cash_usd"] - p["spot"]["value_usd"]) < 0.05
     assert "ядро" in coins["BTC"]["why"] and "30%" in coins["BTC"]["why"]
-    assert "анкета 51 из 100, консультант 99 из 100" in coins["ZEC"]["why"] and "7,5%" in coins["ZEC"]["why"]
-    assert "26%" in coins["PENGU"]["why"] and "«ждём»" in coins["PENGU"]["why"]
+    assert "оценка проекта 51 из 100, оценка консультанта 99 из 100" in coins["ZEC"]["why"] and "7,5%" in coins["ZEC"]["why"]
+    assert "26%" in coins["PENGU"]["why"] and "новых покупок не делает" in coins["PENGU"]["why"]
     calc = p["calc"]
     assert (calc["spot"], calc["futures"], calc["active"]) == (65, 25, 10) and "1% счёта" in calc["futures_why"]
     en = json.load(open(os.path.join(d, "app_home.en.json"), encoding="utf-8"))["public"]

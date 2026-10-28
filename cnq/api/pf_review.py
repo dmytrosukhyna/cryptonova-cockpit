@@ -43,18 +43,20 @@ SRC = {
     "ideas": _L("таблица «Что брать на спот»", "the “What to buy on spot” table", "таблиця «Що брати на спот»",
                 "πίνακας «Τι να αγοράσω στο spot»", "la tabla «Qué comprar en spot»"),
     "pf": _L("CRYPTO NOVA портфель", "CRYPTO NOVA portfolio", "Портфель CRYPTO NOVA", "Χαρτοφυλάκιο CRYPTO NOVA", "Cartera CRYPTO NOVA"),
+    "real": _L("спот реального счёта CRYPTO NOVA", "the spot part of CRYPTO NOVA's real account", "спот реального рахунку CRYPTO NOVA",
+               "το spot του πραγματικού λογαριασμού του CRYPTO NOVA", "el spot de la cuenta real de CRYPTO NOVA"),
     "alt": _L("модель «ядро + альтсезон»", "the “core + altseason” model", "модель «ядро + альтсезон»",
               "μοντέλο «πυρήνας + altseason»", "modelo «núcleo + altseason»"),
-    "q": _L("анкета качества альтов", "the altcoin quality check", "анкета якості альтів", "έλεγχος ποιότητας altcoins",
+    "q": _L("оценка качества альткоинов", "the altcoin quality check", "анкета якості альтів", "έλεγχος ποιότητας altcoins",
             "la ficha de calidad de altcoins"),
 }
 
 STATUS_LABEL = {
-    "buy": _L("можно брать", "worth buying", "можна брати", "για αγορά", "para comprar"),
-    "add": _L("можно добрать", "worth adding to", "можна докупити", "για συμπλήρωση", "para ampliar"),
-    "small": _L("небольшой суммой", "small amount only", "невеликою сумою", "μόνο μικρό ποσό", "solo poca cantidad"),
-    "wait": _L("ждём", "wait", "чекаємо", "αναμονή", "esperar"),
-    "avoid": _L("не брать", "avoid", "не брати", "αποφυγή", "evitar"),
+    "buy": _L("подходит для покупки", "worth buying", "можна брати", "για αγορά", "para comprar"),
+    "add": _L("можно докупить", "worth adding to", "можна докупити", "για συμπλήρωση", "para ampliar"),
+    "small": _L("только небольшой суммой", "small amount only", "невеликою сумою", "μόνο μικρό ποσό", "solo poca cantidad"),
+    "wait": _L("пока ждём", "wait", "чекаємо", "αναμονή", "esperar"),
+    "avoid": _L("не покупаем", "avoid", "не брати", "αποφυγή", "evitar"),
     "cash": _L("доллары", "dollars", "долари", "δολάρια", "dólares"),
     "unknown": _L("нет оценки", "not rated", "немає оцінки", "χωρίς αξιολόγηση", "sin evaluar"),
 }
@@ -177,10 +179,49 @@ REASONS: list[tuple[str, str, str | None, dict]] = [
 ]
 _REASONS = [(k, re.compile(p), f, tr) for k, p, f, tr in REASONS]
 
+# 28.10 (build 46 QA): the Russian reasons in plain words too (the table's own sentence was jargon: «Анкета 32/100 ниже порога 40 —
+# ждём», «Ядро, анкета 54/100, BTC бычий — можно брать частями»); the numbers are the table's own
+REASONS_RU = {
+    "vol_low": "Торгуется всего на {v} в сутки — цену легко сдвинуть",
+    "vol_buy": "Торгуется на {v} в сутки — для покупки этого мало",
+    "buy_mid": "Оценка проекта {r} из 100, оценка консультанта {c} из 100, тренд вверх, биткоин в росте — проверки пройдены",
+    "ath": "Цена {p} от исторического максимума — такие монеты система не покупает",
+    "dilution": "В обращении только около {p}% токенов — впереди разлоки, пока не покупаем",
+    "dip_ok": "Цена {p} от максимума за 30 дней, проверки пройдены",
+    "rating": "Оценка проекта {r} из 100 — ниже минимума системы ({m}), пока не покупаем",
+    "desk_okx": "Мем-монета: нет на OKX и Hyperliquid, а пул на Solana меньше {v} — не покупаем",
+    "desk_vol": "Мем-монета торгуется всего на {v} в сутки — цену легко сдвинуть",
+    "desk_whale": "Мем-монета: один кошелёк держит большую долю — это красный флаг",
+    "desk_top10": "Мем-монета: 10 крупнейших кошельков держат {p} — это красный флаг",
+    "desk_mint": "Мем-монета: токены могут допечатать — это красный флаг",
+    "desk": "Мем-монета не прошла проверки системы",
+    "cex": "Токен биржи — такие система не покупает",
+    "core_buy": "Монета ядра, оценка проекта {r} из 100, биткоин в росте — система покупает её частями",
+    "core_bear": "Монета ядра, оценка проекта {r} из 100; биткоин в спаде — только частями",
+    "meme_wait": "Цена {p} от максимума за 30 дней — система ждёт снижения от {n}",
+    "high_wait": "Рискованная монета без просадки: {p} от максимума за 30 дней, система ждёт {n}",
+    "cons_low": "Оценка консультанта {c} из 100 — ниже минимума системы ({m}), пока не покупаем",
+    "add_support": "Уже в портфеле, цена у поддержки — система может докупить",
+    "add_plan": "Портфель системы сам докупает её до плановой доли",
+    "cons_none": "Консультант системы её не выделил — тренд не подтверждён",
+    "meme_blind": "Мем-монета без проверки — вслепую система не покупает",
+    "overheat": "Уже {p} за {d} дней — не догоняем, ждём отката",
+    "overheat_core": "Рывок {p} — даже монеты ядра не догоняем, ждём",
+    "stop": "В портфеле системы монета у стопа ({p}) — не докупаем",
+    "bear": "Биткоин в спаде — система покупает только ядро",
+    "no_rating": "Оценки проекта пока нет — ждём данных",
+    "trend200": "Цена ниже, чем 200 дней назад ({p}) — тренда нет",
+    "trim": "В портфеле системы монета у точки фиксации прибыли — не докупаем",
+    "no_hi30": "Нет данных о максимуме за 30 дней — ждём",
+    "high_small": "Рискованная монета, {p} от максимума за 30 дней — только небольшой суммой",
+    "unlock": "Скоро разлок {p}% монет в обращении — до него не покупаем",
+    "dip_none": "Проверки пройдены, но просадки нет — ждём",
+}
+
 GENERIC = {
     "buy": _L("Проходит проверки таблицы", "Passes the table's checks", "Проходить перевірки таблиці", "Περνά τους ελέγχους του πίνακα",
               "Supera los controles de la tabla"),
-    "add": _L("Проходит проверки — можно добрать", "Passes the checks — worth adding to", "Проходить перевірки — можна докупити",
+    "add": _L("Проходит проверки — система может докупить", "Passes the checks — worth adding to", "Проходить перевірки — можна докупити",
               "Περνά τους ελέγχους — για συμπλήρωση", "Supera los controles: para ampliar"),
     "small": _L("По правилам — только небольшой суммой", "By the rules — a small amount only", "За правилами — лише невеликою сумою",
                 "Με τους κανόνες — μόνο μικρό ποσό", "Según las reglas: solo poca cantidad"),
@@ -231,7 +272,7 @@ RULE = {   # the rule a recommendation comes from: «its name» · where it is w
                             "«Μόνο ελεγμένα νομίσματα»", "«Solo monedas revisadas»")),
     "count": ("pf", _L("«Не больше 8 монет вместе с ядром»", "“No more than 8 coins, core included”", "«Не більше 8 монет разом із ядром»",
                        "«Έως 8 νομίσματα μαζί με τον πυρήνα»", "«No más de 8 monedas con el núcleo»")),
-    "quality": ("q", _L("«Нижняя треть анкеты качества»", "“The bottom third of the quality check”", "«Нижня третина анкети якості»",
+    "quality": ("q", _L("«Нижняя треть оценки качества»", "“The bottom third of the quality check”", "«Нижня третина анкети якості»",
                         "«Το κάτω τρίτο του ελέγχου ποιότητας»", "«El tercio inferior de la ficha de calidad»")),
     "buy": ("ideas", _L("«Можно брать»", "“Worth buying”", "«Можна брати»", "«Για αγορά»", "«Para comprar»")),
 }
@@ -250,11 +291,11 @@ REC = {
         "Την ένδειξη «αποφυγή» έχει τώρα το {top} — {you} του χαρτοφυλακίου: {reason}. Το χαρτοφυλάκιο CRYPTO NOVA δεν κρατά τέτοια νομίσματα και τα πουλά στον επόμενο κύκλο.",
         "{top} está ahora en «evitar», el {you} de la cartera: {reason}. La cartera CRYPTO NOVA no tiene estas monedas y las vende en su siguiente pasada."),
     "core_low": _L(
-        "Ядро — BTC, ETH и SOL — у вас {you}. В портфеле CRYPTO NOVA ядро по плану 45%, сейчас {model}; в модели «ядро + альтсезон» — {alt}. Ядро система держит без стопа.",
-        "Your core — BTC, ETH and SOL — is {you}. In the CRYPTO NOVA portfolio the core is 45% by plan, {model} now; in the “core + altseason” model it is {alt}. The system holds the core without a stop.",
-        "Ядро — BTC, ETH і SOL — у вас {you}. У портфелі CRYPTO NOVA ядро за планом 45%, зараз {model}; у моделі «ядро + альтсезон» — {alt}. Ядро система тримає без стопу.",
-        "Ο πυρήνας σας — BTC, ETH και SOL — είναι {you}. Στο χαρτοφυλάκιο CRYPTO NOVA ο πυρήνας είναι 45% με βάση το πλάνο, τώρα {model}· στο μοντέλο «πυρήνας + altseason» είναι {alt}. Το σύστημα κρατά τον πυρήνα χωρίς stop.",
-        "Tu núcleo — BTC, ETH y SOL — es el {you}. En la cartera CRYPTO NOVA el núcleo es del 45% según el plan, ahora {model}; en el modelo «núcleo + altseason», {alt}. El sistema mantiene el núcleo sin stop."),
+        "Ядро — BTC, ETH и SOL — у вас {you}. В портфеле CRYPTO NOVA ядро по плану 45%, сейчас {model}. Ядро система держит без стопа.",
+        "Your core — BTC, ETH and SOL — is {you}. In the CRYPTO NOVA portfolio the core is 45% by plan, {model} now. The system holds the core without a stop.",
+        "Ядро — BTC, ETH і SOL — у вас {you}. У портфелі CRYPTO NOVA ядро за планом 45%, зараз {model}. Ядро система тримає без стопу.",
+        "Ο πυρήνας σας — BTC, ETH και SOL — είναι {you}. Στο χαρτοφυλάκιο CRYPTO NOVA ο πυρήνας είναι 45% με βάση το πλάνο, τώρα {model}. Το σύστημα κρατά τον πυρήνα χωρίς stop.",
+        "Tu núcleo — BTC, ETH y SOL — es el {you}. En la cartera CRYPTO NOVA el núcleo es del 45% según el plan, ahora {model}. El sistema mantiene el núcleo sin stop."),
     "core_high": _L(
         "{coin} — {you} портфеля. В портфеле CRYPTO NOVA план для {coin} — {plan}, и лишнее продают, когда доля больше плановой в 1.5 раза: одна монета не должна решать судьбу всего счёта.",
         "{coin} is {you} of the portfolio. The CRYPTO NOVA portfolio plans {plan} for {coin} and sells the excess when the share passes 1.5× the plan: one coin shouldn't decide the whole account.",
@@ -310,7 +351,7 @@ REC = {
         "Έχετε {count}. Το χαρτοφυλάκιο CRYPTO NOVA κρατά έως 8 μαζί με τον πυρήνα — έτσι παρακολουθείται το καθένα.",
         "Tienes {count}. La cartera CRYPTO NOVA tiene como mucho 8 con el núcleo: así se puede seguir cada una."),
     "quality": _L(
-        "В нижней трети анкеты качества из {n} альтов: {coins}. На истории 2022–2026 лучше были альты с выручкой и долгой историей торгов; прошлое не обещает будущего.",
+        "В нижней трети оценки качества из {n} альткоинов: {coins}. На истории 2022–2026 лучше были альты с выручкой и долгой историей торгов; прошлое не обещает будущего.",
         "In the bottom third of the quality check of {n} altcoins: {coins}. In 2022–2026, alts with revenue and a long trading history did better; the past promises nothing.",
         "У нижній третині анкети якості з {n} альтів: {coins}. На історії 2022–2026 кращими були альти з виручкою та довгою історією торгів; минуле не обіцяє майбутнього.",
         "Στο κάτω τρίτο του ελέγχου ποιότητας {n} altcoins: {coins}. Το 2022–2026 τα πήγαν καλύτερα τα altcoins με έσοδα και μεγάλο ιστορικό συναλλαγών· το παρελθόν δεν υπόσχεται τίποτα.",
@@ -328,7 +369,7 @@ REC = {
         "Το αποθεματικό σε δολάρια είναι {you} — τουλάχιστον 10%, όπως στο χαρτοφυλάκιο CRYPTO NOVA.",
         "Tu reserva en dólares es del {you}: al menos un 10%, como en la cartera CRYPTO NOVA."),
     "buy_ok": _L(
-        "В статусе «можно брать» или «можно добрать»: {coins} — они проходят все проверки таблицы.",
+        "Подходят для покупки по правилам системы: {coins} — они проходят все её проверки.",
         "Marked “worth buying” or “worth adding to”: {coins} — they pass all the table's checks.",
         "Зі статусом «можна брати» або «можна докупити»: {coins} — вони проходять усі перевірки таблиці.",
         "Με ένδειξη «για αγορά» ή «για συμπλήρωση»: {coins} — περνούν όλους τους ελέγχους του πίνακα.",
@@ -355,7 +396,7 @@ TXT = {
     "you": _L("у вас", "you", "у вас", "εσείς", "tú"),
     "model": _L("модель", "model", "модель", "μοντέλο", "modelo"),
     "b_core": _L("Ядро BTC · ETH · SOL", "Core BTC · ETH · SOL", "Ядро BTC · ETH · SOL", "Πυρήνας BTC · ETH · SOL", "Núcleo BTC · ETH · SOL"),
-    "b_buy": _L("«Можно брать» и «добрать»", "“Worth buying” and “adding”", "«Можна брати» і «докупити»", "«Για αγορά» και «συμπλήρωση»",
+    "b_buy": _L("Подходят для покупки", "“Worth buying” and “adding”", "«Можна брати» і «докупити»", "«Για αγορά» και «συμπλήρωση»",
                 "«Para comprar» y «ampliar»"),
     "b_small": _L("Небольшой суммой", "Small amounts", "Невеликою сумою", "Μικρά ποσά", "Poca cantidad"),
     "b_other": _L("«Ждём», «не брать», без оценки", "“Wait”, “avoid”, not rated", "«Чекаємо», «не брати», без оцінки",
@@ -367,6 +408,12 @@ TXT = {
                      "Con tus {total}, la cartera CRYPTO NOVA tendría: {items}."),
     "match": _L("Совпадение с портфелем CRYPTO NOVA: {p}", "Overlap with the CRYPTO NOVA portfolio: {p}", "Збіг із портфелем CRYPTO NOVA: {p}",
                 "Επικάλυψη με το χαρτοφυλάκιο CRYPTO NOVA: {p}", "Coincidencia con la cartera CRYPTO NOVA: {p}"),
+    # 28.10 (build 46 QA): the model is the real account now — how its money is split (okx_alloc shares), not «ядро + альтсезон»
+    "split": _L("Весь реальный счёт CRYPTO NOVA делится так: спот-портфель {spot}, фьючерсы {fut}, активный спот {act}.",
+                "CRYPTO NOVA's whole real account is split like this: the spot portfolio {spot}, futures {fut}, active spot {act}.",
+                "Весь реальний рахунок CRYPTO NOVA поділено так: спот-портфель {spot}, ф'ючерси {fut}, активний спот {act}.",
+                "Ολόκληρος ο πραγματικός λογαριασμός του CRYPTO NOVA μοιράζεται έτσι: χαρτοφυλάκιο spot {spot}, futures {fut}, ενεργό spot {act}.",
+                "Toda la cuenta real de CRYPTO NOVA se reparte así: cartera spot {spot}, futuros {fut}, spot activo {act}."),
     "alt": _L("Модель «ядро + альтсезон» сейчас: ядро {core}, альт-корзина {alts} ({state}), кэш {cash}, фьючерсы-сигналы {fut}.",
               "The “core + altseason” model now: core {core}, alt basket {alts} ({state}), cash {cash}, futures signals {fut}.",
               "Модель «ядро + альтсезон» зараз: ядро {core}, альт-кошик {alts} ({state}), кеш {cash}, ф'ючерси-сигнали {fut}.",
@@ -506,7 +553,7 @@ def _list(syms: list[str], lang: str, k: int = 3) -> str:
 
 # ------------------------------------------------------------------------------------------------ the system's data
 class Data:
-    FILES = ("ideas", "quality", "altseason", "portfolio", "markets")
+    FILES = ("ideas", "quality", "altseason", "portfolio", "markets", "public_real")
 
     def __init__(self, web_dir: str):
         self.web = web_dir
@@ -570,13 +617,11 @@ def reason(why_ru: str, status: str, lang: str) -> tuple[str, str | None, str | 
     for key, rx, flag, tr in _REASONS:
         m = rx.match(s)
         if m:
-            if lang == DEFAULT:
-                return s, key, flag
             vals = {k: v for k, v in m.groupdict().items() if v is not None}
+            if lang == DEFAULT:
+                return (REASONS_RU[key].format(**vals) if key in REASONS_RU else s), key, flag
             return tr[lang].format(**vals), key, flag
-    if lang == DEFAULT and s:
-        return s, None, None
-    return _t(GENERIC.get(status, GENERIC["wait"]), lang), None, None
+    return _t(GENERIC.get(status, GENERIC["wait"]), lang), None, None      # an unknown sentence: the plain status, never jargon
 
 
 def _date(ms) -> str:
@@ -614,10 +659,39 @@ def clean_holdings(items, cap: int = 100) -> list[dict]:
     return list(agg.values())
 
 
+# ------------------------------------------------------------------------------------------------ the model: the real account
+def real_model(real: dict, statuses: dict) -> dict | None:
+    """the spot part of the real CRYPTO NOVA account (web/public_real.json) as the review's model: {"model": {sym: % of the spot
+    holdings}, "buckets", "cash" (%), "split": the account's spot / futures / active shares as text, "asof"}; None without it"""
+    if not isinstance(real, dict) or not real.get("asof") or not isinstance(real.get("spot"), list):
+        return None
+    al = real.get("alloc") if isinstance(real.get("alloc"), dict) else {}
+    coins = {}
+    for x in real["spot"]:
+        try:
+            if x.get("sym") and float(x.get("usd") or 0) > 0:
+                coins[str(x["sym"]).upper()] = coins.get(str(x["sym"]).upper(), 0.0) + float(x["usd"])
+        except (TypeError, ValueError):
+            continue
+    cash = sum(float(al.get(k) or 0) for k in ("spot_cash_usd", "active_wait_usd", "other_usd")) if al else 0.0
+    hold = sum(coins.values()) + cash
+    if hold <= 0:
+        return None
+    model = {s: v / hold * 100 for s, v in coins.items()}
+    b = {"core": 0.0, "buy": 0.0, "small": 0.0, "other": 0.0, "cash": 0.0}
+    for s, w in model.items():
+        st = (statuses.get(s) or {}).get("status")
+        b["core" if s in CORE else "small" if st == "small" else "buy" if st in ("buy", "add") else "other"] += w
+    split = None
+    if al.get("spot_pct") is not None and al.get("fut_pct") is not None:
+        split = {"spot": pct(float(al["spot_pct"])), "fut": pct(float(al["fut_pct"])), "act": pct(float(al.get("active_pct") or 0))}
+    return {"model": model, "buckets": b, "cash": cash / hold * 100, "split": split, "asof": int(real["asof"])}
+
+
 # ------------------------------------------------------------------------------------------------ the review
 def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
     lang = norm_lang(lang)
-    ideas, quality, alts, pfdoc, markets = (data.get(n) for n in Data.FILES)
+    ideas, quality, alts, pfdoc, markets, real = (data.get(n) for n in Data.FILES)
     statuses = ideas.get("statuses") or {}
     if not statuses:
         return {"error": "no_data", "message": message("no_data", lang)}
@@ -677,6 +751,14 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
         mcash = float(pf.get("cash_pct")) if pf.get("cash_pct") is not None else max(0.0, 100 - sum(model.values()))
     except (TypeError, ValueError):
         mcash = max(0.0, 100 - sum(model.values()))
+    # 28.10 (build 46 QA: the model still showed coins the account had sold, «ядро 50% … датчик альтсезона», «на 22.10»): the model
+    # is the spot part of the REAL CRYPTO NOVA account now (web/public_real.json — the same file and moment as the app's PUBLIC
+    # portfolio): each coin's share of the spot holdings, the spot dollars; the account's 65 / 25 / 10 split in a line of its own
+    rm = real_model(real, statuses)
+    model_src, model_asof = "pf", ideas.get("asof")
+    if rm:
+        model, mbuck, mcash = rm["model"], rm["buckets"], rm["cash"]
+        model_src, model_asof = "real", rm["asof"]
     mbuck["cash"] = mcash
     model_core = mbuck["core"]
     tg = alts.get("targets_pct") or {}
@@ -760,21 +842,22 @@ def review(holdings: list[dict], data: Data, lang: str = DEFAULT) -> dict:
     items.append(f"{_t(TXT['cash_word'], lang)} {usd(total * mcash / 100)}")
     compare = {
         "title": _t(TXT["cmp_title"], lang), "you": _t(TXT["you"], lang), "model": _t(TXT["model"], lang),
-        "model_name": _t(SRC["pf"], lang),
+        "model_name": _t(SRC[model_src], lang),
         "rows": [{"key": k, "label": _t(TXT["b_" + k], lang), "you_pct": round(ub[k], 1), "model_pct": round(mbuck[k], 1),
                   "you": pct(ub[k]), "model_txt": pct(mbuck[k])} for k in ("core", "buy", "small", "other", "cash")],
         "coins": [{"sym": s, "pct": round(w, 1), "usd": round(total * w / 100, 2)} for s, w in sorted(model.items(), key=lambda x: -x[1])],
         "cash_pct": round(mcash, 1),
         "hold": _t(TXT["model_hold"], lang, total=usd(total), items=" · ".join(items)) if total > 0 else "",
         "match_pct": round(match, 1), "match": _t(TXT["match"], lang, p=pct(match)),
-        "alt": _t(TXT["alt"], lang, core=pct(a_core), alts=pct(a_alts), cash=pct(a_cash), fut=pct(a_fut),
-                  state=_t(TXT["alt_on" if (alts.get("gauge") or {}).get("on") else "alt_off"], lang)) if tg else "",
+        # the old «ядро + альтсезон» line is gone; the key stays (build 45 shows it) with the real account's split
+        "alt": _t(TXT["split"], lang, **rm["split"]) if rm and rm.get("split") else "",
+        "split": _t(TXT["split"], lang, **rm["split"]) if rm and rm.get("split") else "",
     }
     n_all = len(rows) + len(unpriced)
     return {
         "lang": lang, "title": _t(TXT["title"], lang),
-        "intro": _t(TXT["intro"], lang, n=coins_word(n_all, lang), date=_date(ideas.get("asof"))),
-        "asof": ideas.get("asof"), "total_usd": round(total, 2), "total": usd(total), "total_label": _t(TXT["total"], lang),
+        "intro": _t(TXT["intro"], lang, n=coins_word(n_all, lang), date=_date(model_asof or time.time() * 1000)),
+        "asof": model_asof, "total_usd": round(total, 2), "total": usd(total), "total_label": _t(TXT["total"], lang),
         "count": n_all,
         "rows": [{**r, "share": pct(r["share_pct"]) if r["share_pct"] is not None else "—"} for r in rows + unpriced],
         "unpriced": [r["sym"] for r in unpriced],

@@ -67,9 +67,10 @@ def test_app_home_carries_buy_now_in_every_language(tmp_path):
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
     b = doc["buy_now"]
     assert b["checked"] == 40 and b["items"][0]["grade_text"] == "хороший"
-    assert b["items"][0]["why"] == ["выше 200-дневной средней", "у поддержки 12.31 (касаний: 4)", "RSI 38 — не перегрета"]
+    assert b["items"][0]["why"] == ["цена выше средней за 200 дней", "у поддержки 12,31: цена 4 раза отскакивала от этого уровня",
+                                    "RSI 38 — не перегрета"]
     with open(os.path.join(d, "app_home.en.json"), encoding="utf-8") as f:
         en = json.load(f)
-    assert en["buy_now"]["items"][0]["why"][0] == "above its 200-day average"
+    assert en["buy_now"]["items"][0]["why"][:2] == ["above its 200-day average", "at support 12.31: the price bounced off this level 4 times"]
     # stale (> 3 h) → hidden
     assert app_home.run(sqlite3.connect(":memory:"), d, now=now + 4 * 3_600_000)["buy_now"] is None

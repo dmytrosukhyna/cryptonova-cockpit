@@ -2,12 +2,12 @@
   "v": 1,
   "updated": "2026-10-28",
   "lang": "es",
-  "greeting": "¡Hola! Soy NOVA AI, tu asistente en el mundo cripto. Te ayudo a entender cómo funciona CRYPTO NOVA, te explico los datos de la cartera y respondo a tus preguntas sobre lo básico del mercado cripto. En el modo demo tienes 5 preguntas al día. Escribe tu pregunta o elige un tema abajo.",
+  "greeting": "¡Hola! Soy NOVA AI, tu asistente en el mundo cripto. Te ayudo a entender cómo funciona CRYPTO NOVA, te explico los datos de la cartera y respondo a tus preguntas sobre lo básico del mercado cripto. En el modo demo tienes 5 preguntas al día. Escribe tu pregunta o elige un tema abajo.",
   "greeting_vip": "¡Hola! Soy NOVA AI. Tu cuenta real está conectada: ahora tienes hasta 100 preguntas al día. Pregúntame lo que quieras: sobre las operaciones del sistema, tu cuenta, la hucha y el futuro de las cripto. Escribe tu pregunta o elige una abajo.",
   "suggest": [
     "¿Es seguro?",
     "¿Cuánto he ganado?",
-    "¿Cómo funciona CRYPTO NOVA?",
+    "¿Cómo funciona CRYPTO NOVA?",
     "¿Qué es la cuenta real?",
     "¿Cuánto cuesta?",
     "¿Qué es una stablecoin?"
@@ -15,9 +15,9 @@
   "topics": [
     {
       "id": "how",
-      "title": "Cómo funciona CRYPTO NOVA",
+      "title": "Cómo funciona CRYPTO NOVA",
       "qs": [
-        "¿Qué es CRYPTO NOVA?",
+        "¿Qué es CRYPTO NOVA?",
         "¿Cómo funciona la cartera pública?",
         "¿Cómo prueban las estrategias?",
         "¿Y si el sistema se equivoca?"

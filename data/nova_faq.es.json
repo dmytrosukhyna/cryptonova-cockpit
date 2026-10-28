@@ -8,7 +8,7 @@
       "id": "safe",
       "topic": "money",
       "q": "¿Es seguro?",
-      "a": "En la demo, totalmente: el dinero es virtual y no hay nada que perder. Con dinero real, la regla principal es esta: siempre está en tu propia cuenta del exchange; CRYPTO NOVA no lo guarda y no puede retirarlo. Nunca pedimos contraseñas, códigos SMS ni tu frase semilla. Pero el mercado cripto en sí tiene riesgo: invierte solo lo que podrías perder sin problema.",
+      "a": "En la demo, totalmente: el dinero es virtual y no hay nada que perder. Con dinero real, la regla principal es esta: siempre está en tu propia cuenta del exchange; CRYPTO NOVA no lo guarda y no puede retirarlo. Nunca pedimos contraseñas, códigos SMS ni tu frase semilla. Pero el mercado cripto en sí tiene riesgo: invierte solo lo que podrías perder sin problema.",
       "tags": [
         "seguro",
         "seguridad",
@@ -43,7 +43,7 @@
       "id": "where_money",
       "topic": "money",
       "q": "¿Dónde está mi dinero?",
-      "a": "En la demo el dinero es de práctica: solo existe en la app. Si operas de verdad, tu dinero está en tu propia cuenta del exchange (OKX o, donde OKX no opera, BingX), no con nosotros. Incluso al copiar, el exchange solo repite las operaciones de CRYPTO NOVA en tu cuenta. No aceptamos, no guardamos ni retiramos dinero: solo tú lo controlas.",
+      "a": "En la demo el dinero es de práctica: solo existe en la app. Si operas de verdad, tu dinero está en tu propia cuenta del exchange (OKX o, donde OKX no opera, BingX), no con nosotros. Incluso al copiar, el exchange solo repite las operaciones de CRYPTO NOVA en tu cuenta. No aceptamos, no guardamos ni retiramos dinero: solo tú lo controlas.",
       "tags": [
         "dinero",
         "guardado",
@@ -74,7 +74,7 @@
       "id": "my_result",
       "topic": "money",
       "q": "¿Cuánto he ganado?",
-      "a": "Tu resultado personal está en la tarjeta «Mi cuenta demo» de la pantalla de inicio: ahí ves tu importe y la fecha de inicio. Y yo te puedo contar cómo van las cuentas demo de la propia CRYPTO NOVA.",
+      "a": "Tu resultado personal está en la tarjeta «Mi cuenta demo» de la pantalla de inicio: ahí ves tu importe y la fecha de inicio. Y el resultado de la cuenta real de CRYPTO NOVA se ve en el modo PUBLIC, con todas sus ganancias y pérdidas.",
       "tags": [
         "ganado",
         "gané",
@@ -89,7 +89,7 @@
       "id": "how_much",
       "topic": "money",
       "q": "¿Cuánto se puede ganar?",
-      "a": "Sinceramente: nadie lo sabe de antemano, y no hay garantías. Pero puedes mirar los hechos: el resultado de las cuentas demo de CRYPTO NOVA se ve en la pantalla de inicio, con todas sus ganancias y pérdidas. También hay semanas con pérdidas, y los resultados pasados no garantizan los futuros. No es asesoramiento financiero.",
+      "a": "Sinceramente: nadie lo sabe de antemano, y no hay garantías. Pero puedes mirar los hechos: el resultado de la cuenta real de CRYPTO NOVA (modo PUBLIC) se ve en la pantalla de inicio, con todas sus ganancias y pérdidas. También hay semanas con pérdidas, y los resultados pasados no garantizan los futuros. No es asesoramiento financiero.",
       "tags": [
         "ganar",
         "ingresos",
@@ -117,7 +117,7 @@
     {
       "id": "shutdown",
       "topic": "money",
-      "q": "¿Qué pasa si CRYPTO NOVA cierra?",
+      "q": "¿Qué pasa si CRYPTO NOVA cierra?",
       "a": "Tu dinero no se verá afectado: está en tu cuenta del exchange, no con nosotros. Simplemente dejarías de ver las señales y las lecciones en la app. Justo por eso no guardamos el dinero de nadie.",
       "tags": [
         "cierra",
@@ -131,7 +131,7 @@
       "id": "referral",
       "topic": "money",
       "q": "¿Para qué el exchange y el enlace de referido?",
-      "a": "Te lo decimos claro: si abres una cuenta en OKX con nuestro enlace (o en BingX donde OKX no opera), el exchange le da a CRYPTO NOVA parte de su propia comisión. Tus comisiones y las condiciones del exchange no cambian. Si copias a CRYPTO NOVA, OKX retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA; el porcentaje aparece en el perfil antes de empezar. Y el exchange hace falta porque tu dinero siempre está en tu propia cuenta, no con nosotros.",
+      "a": "Te lo decimos claro: si abres una cuenta en OKX con nuestro enlace (o en BingX donde OKX no opera), el exchange le da a CRYPTO NOVA parte de su propia comisión. Tus comisiones y las condiciones del exchange no cambian. Si copias a CRYPTO NOVA, OKX retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA; el porcentaje aparece en el perfil antes de empezar. Y el exchange hace falta porque tu dinero siempre está en tu propia cuenta, no con nosotros.",
       "tags": [
         "referido",
         "referidos",
@@ -147,7 +147,7 @@
       "id": "price",
       "topic": "money",
       "q": "¿Cuánto cuesta?",
-      "a": "La demo, la hucha, 52 lecciones y yo, NOVA, sin suscripciones ni compras dentro de la app. Si copias a CRYPTO NOVA en OKX, el exchange retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA: el porcentaje aparece en el perfil antes de empezar, y sin ganancia no hay pago. Por una cuenta abierta con nuestro enlace, el exchange nos da parte de su comisión; tus comisiones no cambian. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
+      "a": "La demo, la hucha, 52 lecciones y yo, NOVA, sin suscripciones ni compras dentro de la app. Si copias a CRYPTO NOVA en OKX, el exchange retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA: el porcentaje aparece en el perfil antes de empezar, y sin ganancia no hay pago. Por una cuenta abierta con nuestro enlace, el exchange nos da parte de su comisión; tus comisiones no cambian. Si algún día hay funciones de pago, te mostraremos las condiciones y el precio de antemano.",
       "tags": [
         "cuesta",
         "precio",
@@ -164,7 +164,7 @@
       "id": "passwords",
       "topic": "money",
       "q": "¿Necesitan mis contraseñas o claves?",
-      "a": "¡No! Nunca compartas tus contraseñas, códigos SMS ni la frase semilla de tu billetera: CRYPTO NOVA nunca los pide. Si alguien escribe en nuestro nombre y te los pide, es un estafador. La app no necesita ninguna clave de tu exchange.",
+      "a": "¡No! Nunca compartas tus contraseñas, códigos SMS ni la frase semilla de tu billetera: CRYPTO NOVA nunca los pide. Si alguien escribe en nuestro nombre y te los pide, es un estafador. La app no necesita ninguna clave de tu exchange.",
       "tags": [
         "contraseña",
         "contraseñas",
@@ -196,8 +196,8 @@
     {
       "id": "how_works",
       "topic": "how",
-      "q": "¿Cómo funciona CRYPTO NOVA?",
-      "a": "CRYPTO NOVA es un sistema de IA: vigila el mercado cripto 24/7 y busca operaciones con reglas probadas en el histórico de precios. Desde el 22 de octubre de 2026 lleva una cuenta real en OKX con unos $10 000: es la «Cartera pública», donde ves las monedas, las operaciones, la entrada, el stop y un sencillo «por qué entramos». Al lado están tu cartera demo, una hucha en bitcoin, 52 lecciones y yo, NOVA. No es un exchange ni asesoramiento financiero.",
+      "q": "¿Cómo funciona CRYPTO NOVA?",
+      "a": "CRYPTO NOVA es un sistema de IA: vigila el mercado cripto 24/7 y busca operaciones con reglas probadas en el histórico de precios. Desde el 22 de octubre de 2026 lleva una cuenta real en OKX con unos $10 000: es la «Cartera pública», donde ves las monedas, las operaciones, la entrada, el stop y un sencillo «por qué entramos». Al lado están tu cartera demo, una hucha en bitcoin, 52 lecciones y yo, NOVA. No es un exchange ni asesoramiento financiero.",
       "tags": [
         "funciona",
         "sistema",
@@ -207,14 +207,14 @@
         "criptonova"
       ],
       "alt": [
-        "Háblame de CRYPTO NOVA"
+        "Háblame de CRYPTO NOVA"
       ]
     },
     {
       "id": "demo",
       "topic": "how",
       "q": "¿Qué es la demo?",
-      "a": "La demo es práctica: dinero virtual, pero precios reales del mercado. El sistema CRYPTO NOVA hace sus operaciones en una cuenta demo de $10 000, y tú tienes tu propia «Mi cuenta demo», donde ves qué habría pasado con tu importe. No puedes perder nada. Pero el resultado de la demo todavía no es rentabilidad real.",
+      "a": "La demo es práctica: dinero virtual, pero precios reales del mercado. En «Mi cuenta demo» ves qué habría pasado con tu importe; no puedes perder nada. Pero el resultado de la demo todavía no es rentabilidad real. La propia CRYPTO NOVA lleva desde el 22 de octubre de 2026 una cuenta real en OKX: su resultado se ve en el modo PUBLIC.",
       "tags": [
         "demo",
         "práctica",
@@ -231,7 +231,7 @@
       "id": "vip",
       "topic": "how",
       "q": "¿Qué es la cuenta real?",
-      "a": "La «Cuenta real» es el copy trading de OKX: la cuenta de CRYPTO NOVA allí es trader líder y el exchange repite sus operaciones en tu cuenta. Los pasos: regístrate en OKX con nuestro enlace, verifica tu identidad, deposita USDT y pulsa «Copiar CRYPTO NOVA» en la app. Tú eliges el importe, puedes parar en OKX cuando quieras, puede haber pérdidas y es solo para mayores de 18 años. En la UE y el EEE la copia automática aún no está disponible; donde OKX no opera está BingX, con copia más adelante.",
+      "a": "La «Cuenta real» es el copy trading de OKX: la cuenta de CRYPTO NOVA allí es trader líder y el exchange repite sus operaciones en tu cuenta. Los pasos: regístrate en OKX con nuestro enlace, verifica tu identidad, deposita USDT y pulsa «Copiar CRYPTO NOVA» en la app. Tú eliges el importe, puedes parar en OKX cuando quieras, puede haber pérdidas y es solo para mayores de 18 años. En la UE y el EEE la copia automática aún no está disponible; donde OKX no opera está BingX, con copia más adelante.",
       "tags": [
         "cuenta real",
         "real",
@@ -249,7 +249,7 @@
       "id": "uid",
       "topic": "how",
       "q": "¿Hace falta el UID?",
-      "a": "No, no hace falta. El UID es el número de tu cuenta en el exchange, pero para copiar a CRYPTO NOVA no tienes que introducirlo: basta una cuenta en OKX abierta con nuestro enlace y el botón «Copiar CRYPTO NOVA» de la app. Tampoco hacen falta claves API, y nunca pedimos contraseñas, códigos SMS ni tu frase semilla.",
+      "a": "No, no hace falta. El UID es el número de tu cuenta en el exchange, pero para copiar a CRYPTO NOVA no tienes que introducirlo: basta una cuenta en OKX abierta con nuestro enlace y el botón «Copiar CRYPTO NOVA» de la app. Tampoco hacen falta claves API, y nunca pedimos contraseñas, códigos SMS ni tu frase semilla.",
       "tags": [
         "uid",
         "número",
@@ -265,7 +265,7 @@
       "id": "copy",
       "topic": "how",
       "q": "¿Habrá copia automática de operaciones?",
-      "a": "Sí, ya existe, con el copy trading de OKX. Pulsas «Copiar CRYPTO NOVA» en la app, eliges el importe y OKX repite las operaciones del sistema en tu cuenta; puedes pararlo en OKX cuando quieras. Es un producto de OKX: retiene una parte de la ganancia para el trader líder, el porcentaje aparece en el perfil antes de empezar y puede haber pérdidas. En la UE, el EEE y el Reino Unido aún no está disponible, y en BingX se abrirá más adelante; mientras tanto, puedes repetir las operaciones tú mismo.",
+      "a": "Sí, ya existe, con el copy trading de OKX. Pulsas «Copiar CRYPTO NOVA» en la app, eliges el importe y OKX repite las operaciones del sistema en tu cuenta; puedes pararlo en OKX cuando quieras. Es un producto de OKX: retiene una parte de la ganancia para el trader líder, el porcentaje aparece en el perfil antes de empezar y puede haber pérdidas. En la UE, el EEE y el Reino Unido aún no está disponible, y en BingX se abrirá más adelante; mientras tanto, puedes repetir las operaciones tú mismo.",
       "tags": [
         "automático",
         "automática",
@@ -344,7 +344,7 @@
       "id": "spot",
       "topic": "how",
       "q": "¿Qué es el spot?",
-      "a": "Spot es comprar las monedas en sí, sin préstamos ni apalancamiento: lo que compras es tuyo. En la pestaña «Spot» está la cartera spot de largo plazo de CRYPTO NOVA: un núcleo de bitcoin, ether y solana, altcoins grandes y una reserva en dólares; en el modo PUBLIC son las monedas de la cuenta real en OKX. El sistema se encarga de que los pesos no se desequilibren.",
+      "a": "Spot es comprar las monedas en sí, sin préstamos ni apalancamiento: lo que compras es tuyo. En la pestaña «Spot» está la cartera spot de largo plazo de CRYPTO NOVA: un núcleo de bitcoin, ether y solana, altcoins grandes y una reserva en dólares; en el modo PUBLIC son las monedas de la cuenta real en OKX. El sistema se encarga de que los pesos no se desequilibren.",
       "tags": [
         "spot",
         "cartera",
@@ -399,7 +399,7 @@
       "id": "stop",
       "topic": "learn",
       "q": "¿Qué es un stop?",
-      "a": "Un stop, o stop-loss, es un precio elegido de antemano en el que la operación se cierra con una pérdida pequeña para que no crezca. Como el cinturón de seguridad: no te libra de los rasguños, pero evita que el golpe sea demasiado fuerte. Cada operación de CRYPTO NOVA tiene su stop. En un salto brusco, a veces se ejecuta un poco peor que el precio fijado.",
+      "a": "Un stop, o stop-loss, es un precio elegido de antemano en el que la operación se cierra con una pérdida pequeña para que no crezca. Como el cinturón de seguridad: no te libra de los rasguños, pero evita que el golpe sea demasiado fuerte. Cada operación de CRYPTO NOVA tiene su stop. En un salto brusco, a veces se ejecuta un poco peor que el precio fijado.",
       "tags": [
         "stop",
         "stop-loss",
@@ -485,7 +485,7 @@
       "id": "etf",
       "topic": "future",
       "q": "¿Qué es un ETF de bitcoin?",
-      "a": "Un ETF es un fondo que cotiza en bolsa como una acción normal. Un ETF de bitcoin al contado guarda bitcoins reales, y el inversor lo compra a través de un bróker normal. En Estados Unidos estos fondos se aprobaron el 10 de enero de 2024, y en octubre de 2026 tenían cerca de 1 293 000 BTC. Así llegaron a las cripto los grandes fondos y los inversores prudentes.",
+      "a": "Un ETF es un fondo que cotiza en bolsa como una acción normal. Un ETF de bitcoin al contado guarda bitcoins reales, y el inversor lo compra a través de un bróker normal. En Estados Unidos estos fondos se aprobaron el 10 de enero de 2024, y en octubre de 2026 tenían cerca de 1 293 000 BTC. Así llegaron a las cripto los grandes fondos y los inversores prudentes.",
       "tags": [
         "etf",
         "fondo",
@@ -515,7 +515,7 @@
       "id": "too_late",
       "topic": "future",
       "q": "¿Es tarde para comprar bitcoin?",
-      "a": "Esa pregunta ya se hacía con bitcoin a $13 en 2013, a $1 000 y a $20 000. Nadie sabe el precio futuro, pero el mundo se mueve claramente hacia las cripto: fondos cotizados, acciones tokenizadas, dólares digitales en las billeteras. Para no tener que adivinar el momento, mucha gente compra poco a poco y con regularidad, como en la hucha. No es asesoramiento financiero.",
+      "a": "Esa pregunta ya se hacía con bitcoin a $13 en 2013, a $1 000 y a $20 000. Nadie sabe el precio futuro, pero el mundo se mueve claramente hacia las cripto: fondos cotizados, acciones tokenizadas, dólares digitales en las billeteras. Para no tener que adivinar el momento, mucha gente compra poco a poco y con regularidad, como en la hucha. No es asesoramiento financiero.",
       "tags": [
         "tarde",
         "demasiado tarde",
@@ -529,7 +529,7 @@
       "id": "crash",
       "topic": "future",
       "q": "Bitcoin cayó, ¿es el final?",
-      "a": "La historia de bitcoin está llena de caídas fuertes: tras los máximos de 2011, 2013, 2017 y 2021 perdió entre un 75% y un 93%, y cada vez marcó después un nuevo récord. El último récord es de $126 210, el 6 de octubre de 2025. Las caídas son parte del camino, pero el pasado no garantiza el futuro, así que invierte solo lo que puedas mantener mucho tiempo.",
+      "a": "La historia de bitcoin está llena de caídas fuertes: tras los máximos de 2011, 2013, 2017 y 2021 perdió entre un 75% y un 93%, y cada vez marcó después un nuevo récord. El último récord es de $126 210, el 6 de octubre de 2025. Las caídas son parte del camino, pero el pasado no garantiza el futuro, así que invierte solo lo que puedas mantener mucho tiempo.",
       "tags": [
         "cayó",
         "caída",
@@ -544,7 +544,7 @@
       "id": "who",
       "topic": "learn",
       "q": "¿Quién eres, NOVA?",
-      "a": "Soy NOVA, el asistente de IA de CRYPTO NOVA. Explico las cripto con palabras sencillas y te cuento cómo funcionan las operaciones del sistema, la hucha y las lecciones. Puedo equivocarme y no doy consejos personales de comprar o vender: la decisión siempre es tuya.",
+      "a": "Soy NOVA, el asistente de IA de CRYPTO NOVA. Explico las cripto con palabras sencillas y te cuento cómo funcionan las operaciones del sistema, la hucha y las lecciones. Puedo equivocarme y no doy consejos personales de comprar o vender: la decisión siempre es tuya.",
       "tags": [
         "quién eres",
         "nova",
@@ -556,8 +556,8 @@
     {
       "id": "what_is",
       "topic": "how",
-      "q": "¿Qué es CRYPTO NOVA?",
-      "a": "CRYPTO NOVA es un sistema que vigila el mercado cripto las 24 horas y funciona con reglas probadas de antemano en el historial de precios. Desde el 22 de octubre de 2026 lleva una cuenta real en OKX con unos $10 000: es la «Cartera pública» de la pantalla de inicio. En la app puedes seguirla, probar tu propia cartera demo, aprender y preguntarme. No es un exchange ni asesoramiento financiero: tu dinero siempre se queda en tu propia cuenta del exchange.",
+      "q": "¿Qué es CRYPTO NOVA?",
+      "a": "CRYPTO NOVA es un sistema que vigila el mercado cripto las 24 horas y funciona con reglas probadas de antemano en el historial de precios. Desde el 22 de octubre de 2026 lleva una cuenta real en OKX con unos $10 000: es la «Cartera pública» de la pantalla de inicio. En la app puedes seguirla, probar tu propia cartera demo, aprender y preguntarme. No es un exchange ni asesoramiento financiero: tu dinero siempre se queda en tu propia cuenta del exchange.",
       "tags": [
         "qué es crypto nova",
         "cryptonova",
@@ -570,7 +570,7 @@
       "id": "public",
       "topic": "how",
       "q": "¿Cómo funciona la cartera pública?",
-      "a": "Es la cuenta real de CRYPTO NOVA en OKX con dinero real: unos $10 000, y su historial empieza el 22 de octubre de 2026. Las operaciones las abre el piloto automático del sistema: la cartera spot recibe el 65%, los futuros con señales seleccionadas el 25% y el spot activo el 10%. En la app ves el valor, el resultado en dólares y en porcentaje, un gráfico por periodos, las monedas y las operaciones; los datos se actualizan más o menos cada 15 minutos. Los resultados pasados no garantizan los futuros.",
+      "a": "Es la cuenta real de CRYPTO NOVA en OKX con dinero real: unos $10 000, y su historial empieza el 22 de octubre de 2026. Las operaciones las abre el piloto automático del sistema: la cartera spot recibe el 65%, los futuros con señales seleccionadas el 25% y el spot activo el 10%. En la app ves el valor, el resultado en dólares y en porcentaje, un gráfico por periodos, las monedas y las operaciones; los datos se actualizan más o menos cada 15 minutos. Los resultados pasados no garantizan los futuros.",
       "tags": [
         "cartera pública",
         "pública",
@@ -597,7 +597,7 @@
       "id": "spot_futures",
       "topic": "learn",
       "q": "¿Qué son el spot y los futuros?",
-      "a": "El spot es comprar las propias monedas, sin deuda: lo que compras es tuyo y puedes mantenerlo el tiempo que quieras. Los futuros son operaciones sobre el movimiento del precio: puedes ganar con la subida (long) o con la bajada (short), a menudo con apalancamiento, así que las ganancias y las pérdidas crecen más rápido. En CRYPTO NOVA el spot es la base de la cartera, los futuros son la parte más pequeña y cada operación de futuros tiene stop.",
+      "a": "El spot es comprar las propias monedas, sin deuda: lo que compras es tuyo y puedes mantenerlo el tiempo que quieras. Los futuros son operaciones sobre el movimiento del precio: puedes ganar con la subida (long) o con la bajada (short), a menudo con apalancamiento, así que las ganancias y las pérdidas crecen más rápido. En CRYPTO NOVA el spot es la base de la cartera, los futuros son la parte más pequeña y cada operación de futuros tiene stop.",
       "tags": [
         "spot y futuros",
         "diferencia spot futuros",
@@ -608,7 +608,7 @@
       "id": "connect",
       "topic": "money",
       "q": "¿Cómo me conecto al sistema?",
-      "a": "Te conectas a CRYPTO NOVA a través del copy trading de OKX: regístrate en OKX con nuestro enlace, pasa la verificación de identidad, recarga tu cuenta en USDT y toca «Copiar CRYPTO NOVA» en la app. A partir de ahí OKX repite las operaciones del sistema por el importe que elijas. La guía paso a paso está en el botón «Conectarse al sistema CRYPTO NOVA». Puedes dejar de copiar en OKX cuando quieras, las pérdidas son posibles y solo para mayores de 18 años; en la UE y el EEE la copia automática aún no está disponible.",
+      "a": "Te conectas a CRYPTO NOVA a través del copy trading de OKX: regístrate en OKX con nuestro enlace, pasa la verificación de identidad, recarga tu cuenta en USDT y toca «Copiar CRYPTO NOVA» en la app. A partir de ahí OKX repite las operaciones del sistema por el importe que elijas. La guía paso a paso está en el botón «Conectarse al sistema CRYPTO NOVA». Puedes dejar de copiar en OKX cuando quieras, las pérdidas son posibles y solo para mayores de 18 años; en la UE y el EEE la copia automática aún no está disponible.",
       "tags": [
         "conectarse",
         "conectarse al sistema",

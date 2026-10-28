@@ -148,7 +148,7 @@ def test_app_home_spoken_report_in_every_language(tmp_path):
         json.dump({"btc_bull": True, "top": [{"symbol": "BTC", "price": 80900, "chg24": 1.7}]}, f)
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
     r = doc["report"]
-    assert r["text"].startswith("Публичный портфель CRYPTO NOVA сейчас — 9 871 доллар.") and "$" not in r["text"]
+    assert r["text"].startswith("Публичный портфель CRYPTO\u00a0NOVA сейчас — 9 871 доллар.") and "$" not in r["text"]
     assert "С 22 октября — минус 129 долларов, это минус 1,3 процента." in r["text"] or "минус 129 долларов" in r["text"]
     assert "продажа AAVE" in r["text"] and r["text"].endswith("Биткоин стоит 80 900 долларов, за сутки плюс 1,7 процента.")
     assert r["key"] == tts.key(r["text"], "ru") and r["audio_url"] is None                  # the API adds the address

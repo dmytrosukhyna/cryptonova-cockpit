@@ -133,33 +133,34 @@ def test_verdict_buy_held(data, web):
     out = V.answer("стоит ли брать ниар?", "ru", data, home(web))
     assert out["source"] == "coin" and out["coins"] == ["NEAR"] and out["llm"] is False
     lines = _shape(out["answer"])
-    assert lines[0] == "NEAR (NEAR Protocol): по правилам CRYPTO NOVA сейчас — можно брать."
+    assert lines[0] == "NEAR (NEAR Protocol): по правилам CRYPTO NOVA сейчас — подходит для покупки."
     body = out["answer"]
-    assert "анкета 45/100 (нужно от 40)" in body and "консультант: тренд 92/100, фундамент 93/100" in body
-    assert "В портфеле CRYPTO NOVA: доля 7.5%, вход $4.98, стоп $3.98, цель $7.5" in body
-    assert "Поддержка проекта: 66/100." in body
+    assert "оценка проекта 45 из 100 (минимум 40)" in body and "консультант системы: тренд 92 из 100, фундамент 93 из 100" in body
+    assert "В споте CRYPTO NOVA: доля 7.5%, вход $4.98, стоп $3.98, цель $7.5" in body
+    assert "Поддержка проекта: 66 из 100." in body and "анкета" not in body.lower() and "можно брать" not in body
 
 
 def test_verdict_wait(data, web):
     out = V.answer("что ты думаешь о монете Саи", "ru", data, home(web))
     lines = _shape(out["answer"])
-    assert lines[0] == "SUI: по правилам CRYPTO NOVA сейчас — ждём."
+    assert lines[0] == "SUI: по правилам CRYPTO NOVA сейчас — пока ждём."
     body = out["answer"]
-    assert "Не пройдено: анкета 25/100 (нужно от 40); разлоки: в обращении ~38% токенов." in body
-    assert "В портфеле CRYPTO NOVA её сейчас нет." in body and "Поддержка проекта: 70/100." in body
+    assert "Не пройдено: оценка проекта 25 из 100 (минимум 40); разлоки: в обращении ~38% токенов." in body
+    assert "• Почему: оценка проекта 25 из 100 — ниже минимума системы (40), пока не покупаем." in body
+    assert "В портфеле CRYPTO NOVA её сейчас нет." in body and "Поддержка проекта: 70 из 100." in body
 
 
 def test_verdict_avoid_dead_coin(data, web):
     out = V.answer("апт стоит покупать?", "ru", data, home(web))
     lines = _shape(out["answer"])
-    assert lines[0].startswith("APT (Aptos): не брать. Цена на 96% ниже исторического максимума") and "«мёртвая»" in lines[0]
-    assert "обещать её возврат я не буду" in lines[0]
+    assert lines[0].startswith("APT (Aptos): не покупаем. Цена на 96% ниже исторического максимума") and "мёртв" not in lines[0]
+    assert "обещать возврат цены я не буду" in lines[0]
     assert "• Фьючерсы: открыта сделка лонг (на рост), вход $0.7916, стоп $0.7439, цель $0.9345, сейчас −2.6%." in lines
     for w in ("вырастет", "вернётся", "отскоч", "гарант"):
         assert w not in out["answer"].lower()
     # a coin the table rates only by its status (no row): the ATH comes from web/markets.json
     av = V.answer("авакс?", "ru", data, home(web))["answer"]
-    assert av.startswith("AVAX (Avalanche): не брать. Цена на 94% ниже") and av.endswith(NFA["ru"])
+    assert av.startswith("AVAX (Avalanche): не покупаем. Цена на 94% ниже") and av.endswith(NFA["ru"])
 
 
 def test_no_data_said_honestly(data, web):
@@ -197,22 +198,22 @@ def _nice(p):
 def test_model_phrases_but_never_invents_numbers(data, web):
     good = Phrase(_nice)
     out = V.answer("стоит ли брать ниар?", "ru", data, home(web), llm=good)
-    assert out["llm"] is True and "смотрите, по нашим правилам сейчас — можно брать" in out["answer"]
+    assert out["llm"] is True and "смотрите, по нашим правилам сейчас — подходит для покупки" in out["answer"]
     assert out["answer"].endswith("\n\n" + NFA["ru"]) and "Это не финансовый совет от CRYPTO NOVA." not in out["answer"]
     system, user = good.seen[-1]
-    assert "только из JSON" in system and json.loads(user.split("JSON:\n", 1)[1])["coins"][0]["status_label"] == "можно брать"
+    assert "только из JSON" in system and json.loads(user.split("JSON:\n", 1)[1])["coins"][0]["status_label"] == "подходит для покупки"
 
     def invents(p):
         return _nice(p).replace("• Причина простая:", "• К 2027 году может стоить $12. Причина простая:")
     out = V.answer("стоит ли брать ниар?", "ru", data, home(web), llm=Phrase(invents))
     assert out["llm"] is False and "$12" not in out["answer"] and out["answer"] == V.template(
         [V.card("NEAR", data, home(web), "ru", C.Universe.build(data))], "ru")
-    for bad in (lambda p: _nice(p).replace("можно брать", "отличная покупка"),           # the status changed
+    for bad in (lambda p: _nice(p).replace("подходит для покупки", "отличная покупка"),           # the status changed
                 lambda p: _nice(p).replace("Причина простая:", "Гарантированно растёт:"),    # a promise
                 lambda p: p["draft"].split("\n")[0],                                       # no bullets
                 lambda p: (_ for _ in ()).throw(RuntimeError("timeout"))):                  # the model failed
         out = V.answer("стоит ли брать ниар?", "ru", data, home(web), llm=Phrase(bad))
-        assert out["llm"] is False and out["answer"].startswith("NEAR (NEAR Protocol): по правилам CRYPTO NOVA сейчас — можно брать.")
+        assert out["llm"] is False and out["answer"].startswith("NEAR (NEAR Protocol): по правилам CRYPTO NOVA сейчас — подходит для покупки.")
 
 
 def test_number_check():
@@ -229,7 +230,7 @@ def test_number_check():
     ("uk", "чи варто брати ніар", "NEAR (NEAR Protocol): за правилами CRYPTO NOVA зараз — можна брати.", "У портфелі CRYPTO NOVA: частка 7.5%"),
     ("el", "αξίζει το NEAR;", "NEAR (NEAR Protocol): με τους κανόνες του CRYPTO NOVA, τώρα — για αγορά.", "Στο χαρτοφυλάκιο CRYPTO NOVA: μερίδιο 7.5%"),
     ("es", "¿vale la pena comprar NEAR?", "NEAR (NEAR Protocol): según las reglas de CRYPTO NOVA, ahora — para comprar.", "En la cartera de CRYPTO NOVA: peso 7.5%"),
-    ("ru", "стоит ли брать NEAR", "NEAR (NEAR Protocol): по правилам CRYPTO NOVA сейчас — можно брать.", "В портфеле CRYPTO NOVA: доля 7.5%"),
+    ("ru", "стоит ли брать NEAR", "NEAR (NEAR Protocol): по правилам CRYPTO NOVA сейчас — подходит для покупки.", "В споте CRYPTO NOVA: доля 7.5%"),
 ])
 def test_reply_language(lang, q, head, label, data, web):
     out = V.answer(q, lang, data, home(web))
@@ -255,7 +256,7 @@ def test_agent_route_answers_a_coin(tmp_path, web):
     api.pf_data = pf_review.Data(str(web))
     t = token("coin")
     c, d = call(api, "POST", "/v2/agent", {"q": "что ты думаешь о монете Саи", "lang": "ru"}, t)
-    assert c == 200 and d["source"] == "coin" and d["answer"].startswith("SUI: по правилам CRYPTO NOVA сейчас — ждём.")
+    assert c == 200 and d["source"] == "coin" and d["answer"].startswith("SUI: по правилам CRYPTO\u00a0NOVA сейчас — пока ждём.")
     assert d["agent"]["left"] == 5 and api.agent_last["result"] == "coin_coin"         # the draft (the fake model refused) is free
     api.llm = Phrase(_nice)
     c, d = call(api, "POST", "/v2/agent", {"q": "стоит ли брать ниар", "lang": "ru"}, t)
@@ -278,8 +279,26 @@ def test_admin_nova_answers_a_coin(tmp_path, web):
     try:
         body = json.dumps({"system": "sys", "user": 'Контекст панели (JSON):\n{"coins": []}\n\nВопрос: апт стоит брать?'}).encode()
         c, d = api.handle("POST", "/v2/admin/nova", {"authorization": "Bearer " + "t" * 40}, body)
-        assert c == 200 and d["source"] == "coin" and d["answer"].startswith("APT (Aptos): не брать.") and isinstance(d["ms"], int)
+        assert c == 200 and d["source"] == "coin" and d["answer"].startswith("APT (Aptos): не покупаем.") and isinstance(d["ms"], int)
     finally:
         os.environ.pop("CNQ_ADMIN_TOKEN", None)
         if keep is not None:
             os.environ["CNQ_ADMIN_TOKEN"] = keep
+
+
+def test_core_coin_verdict_uses_the_real_accounts_live_share(data, web):
+    """28.10 (build 46 QA): a core coin (BTC, ETH, SOL) is the core rule — no stop line, held and topped up by its plan — and the
+    share is the coin's share of the REAL account's spot now (app_home public_portfolio), not the model's old weight"""
+    h = home(web)
+    pf = json.loads((web / "portfolio.json").read_text())
+    pf["portfolios"]["ideas"]["positions"][0].update({"target_weight": 0.3, "bucket": "core"})
+    (web / "portfolio.json").write_text(json.dumps(pf))
+    h["public_portfolio"] = {"spot": {"coins": [{"sym": "BTC", "share_spot": 29.27}, {"sym": "SOL", "share_spot": 5.42}]}}
+    out = V.answer("стоит ли брать биткоин", "ru", pf_review.Data(str(web)), h)
+    lines = _shape(out["answer"])
+    assert lines[0] == "BTC (Bitcoin) — в ядре портфеля: система держит монету и сейчас не докупает."
+    assert "Доля в споте CRYPTO NOVA: 29.3% (план 30%); ядро система держит без стопа и без цели." in out["answer"]
+    assert "стоп $" not in out["answer"] and "можно брать" not in out["answer"]
+    h["public_portfolio"]["spot"]["coins"][0]["share_spot"] = 12.0                  # far below ¾ of the plan → the system tops it up
+    assert _shape(V.answer("биткоин?", "ru", pf_review.Data(str(web)), h)["answer"])[0] == \
+        "BTC (Bitcoin) — в ядре портфеля: доля ниже плана, система докупит монету по своим правилам."

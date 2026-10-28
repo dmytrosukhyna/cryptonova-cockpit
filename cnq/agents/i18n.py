@@ -12,6 +12,7 @@ Spanish neutral with «tú», English plain. The app's own labels (its i18n file
 Скарбничка / Κουμπαράς / Hucha, demo account, «Реальный счёт» = Real account … Stdlib only."""
 from __future__ import annotations
 
+import re
 import string
 
 LANGS = ("ru", "en", "uk", "el", "es")
@@ -506,20 +507,22 @@ T: dict[str, dict[str, str]] = {
                       "es": "Una cuenta demo de $10 000 a precios reales: el sistema la reparte solo entre estrategias probadas. "
                             "Las operaciones «en prueba» entran en el resultado tras 30 operaciones cerradas."},
     # ---------------------------------------------------------------- «Если покупать сегодня» (buy_now.items[].why / grade_text)
-    "buy.sma200": {"ru": "выше 200-дневной средней", "en": "above its 200-day average", "uk": "вище 200-денної середньої",
+    "buy.sma200": {"ru": "цена выше средней за 200 дней", "en": "above its 200-day average", "uk": "вище 200-денної середньої",
                    "el": "πάνω από τον μέσο όρο 200 ημερών", "es": "por encima de su media de 200 días"},
-    "buy.support": {"ru": "у поддержки {p} (касаний: {n})", "en": "at support {p} ({n} touches)",
-                    "uk": "біля підтримки {p} (дотиків: {n})", "el": "κοντά στη στήριξη {p} ({n} αγγίγματα)",
-                    "es": "en el soporte {p} ({n} toques)"},
+    "buy.support": {"ru": "у поддержки {p}: цена {n} {times} отскакивала от этого уровня",
+                    "en": "at support {p}: the price bounced off this level {n} {times}",
+                    "uk": "біля підтримки {p}: ціна {n} {times} відскакувала від цього рівня",
+                    "el": "κοντά στη στήριξη {p}: η τιμή αναπήδησε {n} {times} από αυτό το επίπεδο",
+                    "es": "en el soporte {p}: el precio rebotó {n} {times} en este nivel"},
     "buy.rsi": {"ru": "RSI {v} — не перегрета", "en": "RSI {v}: not overheated", "uk": "RSI {v} — не перегріта",
                 "el": "RSI {v}: όχι υπερθερμασμένο", "es": "RSI {v}: no sobrecalentada"},
-    "buy.quality": {"ru": "анкета качества {v}/100", "en": "quality score {v}/100", "uk": "анкета якості {v}/100",
+    "buy.quality": {"ru": "оценка качества {v} из 100", "en": "quality score {v}/100", "uk": "оцінка якості {v} зі 100",
                     "el": "βαθμός ποιότητας {v}/100", "es": "puntuación de calidad {v}/100"},
     "buy.whales": {"ru": "крупные трейдеры в лонге", "en": "the largest traders are long", "uk": "великі трейдери в лонгу",
                    "el": "οι μεγαλύτεροι traders είναι long", "es": "los grandes traders están en largo"},
     "buy.grade.strong": {"ru": "сильный", "en": "strong", "uk": "сильний", "el": "ισχυρός", "es": "fuerte"},
     "buy.grade.good": {"ru": "хороший", "en": "good", "uk": "добрий", "el": "καλός", "es": "bueno"},
-    "buy.grade.possible": {"ru": "возможный", "en": "possible", "uk": "можливий", "el": "πιθανός", "es": "posible"},
+    "buy.grade.possible": {"ru": "можно рассмотреть", "en": "possible", "uk": "можливий", "el": "πιθανός", "es": "posible"},
     "sources.soon": {"ru": "арбитраж, рынки прогнозов", "en": "arbitrage, prediction markets", "uk": "арбітраж, ринки прогнозів",
                      "el": "αρμπιτράζ, αγορές προβλέψεων", "es": "arbitraje, mercados de predicción"},
     "home.note": {"ru": "Демо-счета CRYPTO NOVA. Прошлые результаты не гарантируют будущих. Не финансовый совет.",
@@ -532,23 +535,21 @@ T: dict[str, dict[str, str]] = {
 
     # ---------------------------------------------------------------- the spot portfolio's last action (spot.last_action.text)
     # Russian keeps the portfolio's own sentence (why_ru); the other languages get these, with the numbers read from it
-    "act.trim_plan": {"ru": "{sym}: {w}% счёта — больше плана {p}%; лишнее продаём.",
+    "act.trim_plan": {"ru": "{sym} выросла до {w}% счёта — больше плановых {p}%; лишнее продаём.",
                       "en": "{sym} grew to {w}% of the portfolio, above its {p}% plan — the excess is sold.",
                       "uk": "{sym}: {w}% портфеля — більше за план {p}%; зайве продаємо.",
                       "el": "Το {sym} έφτασε το {w}% του χαρτοφυλακίου, πάνω από το πλάνο του {p}% — πουλάμε το επιπλέον.",
                       "es": "{sym} llegó al {w}% de la cartera, por encima de su plan del {p}%: vendemos el exceso."},
-    "act.add_core": {"ru": "Ядро: {sym} {w}% счёта — доливаем до {p}% (ядро держим крупным).",
-                     "en": "Core: {sym} is {w}% of the portfolio — topping up to {p}% (the core is kept large).",
-                     "uk": "Ядро: {sym} {w}% портфеля — доливаємо до {p}% (ядро тримаємо великим).",
-                     "el": "Πυρήνας: το {sym} είναι το {w}% του χαρτοφυλακίου — συμπληρώνουμε έως το {p}% (κρατάμε τον πυρήνα "
-                           "μεγάλο).",
-                     "es": "Núcleo: {sym} es el {w}% de la cartera; completamos hasta el {p}% (mantenemos el núcleo grande)."},
-    "act.buy_table": {"ru": "Купили {sym}: таблица монет системы дала статус «можно брать»; {w}% счёта.",
-                      "en": "Bought {sym}: the system's coin table rated it “can buy”; {w}% of the portfolio.",
-                      "uk": "Купили {sym}: таблиця монет системи дала статус «можна брати»; {w}% портфеля.",
-                      "el": "Αγοράσαμε {sym}: ο πίνακας νομισμάτων του συστήματος το χαρακτήρισε «για αγορά»· {w}% του "
-                            "χαρτοφυλακίου.",
-                      "es": "Compramos {sym}: la tabla de monedas del sistema le dio «se puede comprar»; {w}% de la cartera."},
+    "act.add_core": {"ru": "{sym} — монета ядра: сейчас {w}% счёта, система докупает её до {p}%.",
+                     "en": "{sym} is a core coin: {w}% of the portfolio now, the system tops it up to {p}%.",
+                     "uk": "{sym} — монета ядра: зараз {w}% портфеля, система докуповує її до {p}%.",
+                     "el": "Το {sym} είναι νόμισμα του πυρήνα: τώρα {w}% του χαρτοφυλακίου, το σύστημα το συμπληρώνει έως το {p}%.",
+                     "es": "{sym} es una moneda del núcleo: ahora el {w}% de la cartera; el sistema la completa hasta el {p}%."},
+    "act.buy_table": {"ru": "Купили {sym}: монета прошла все проверки системы; {w}% счёта.",
+                      "en": "Bought {sym}: the coin passed all of the system's checks; {w}% of the portfolio.",
+                      "uk": "Купили {sym}: монета пройшла всі перевірки системи; {w}% портфеля.",
+                      "el": "Αγοράσαμε {sym}: το νόμισμα πέρασε όλους τους ελέγχους του συστήματος· {w}% του χαρτοφυλακίου.",
+                      "es": "Compramos {sym}: la moneda pasó todos los controles del sistema; {w}% de la cartera."},
     "act.BUY": {"ru": "Купили {sym}: монета прошла проверки портфеля.", "en": "Bought {sym}: the coin passed the portfolio's checks.",
                 "uk": "Купили {sym}: монета пройшла перевірки портфеля.",
                 "el": "Αγοράσαμε {sym}: το νόμισμα πέρασε τους ελέγχους του χαρτοφυλακίου.",
@@ -624,7 +625,7 @@ T: dict[str, dict[str, str]] = {
                     "uk": "Біткоїн — найбільша частка: у 2025–2026 він падав менше, ніж ефір і солана.",
                     "el": "Το Bitcoin έχει το μεγαλύτερο μερίδιο: το 2025–2026 έπεσε λιγότερο από το Ether και το Solana.",
                     "es": "Bitcoin tiene la parte más grande: en 2025–2026 cayó menos que Ether y Solana."},
-    "pub.why.alt": {"ru": "{sym} прошла отбор системы: анкета {rating} из 100, консультант {cons} из 100.",
+    "pub.why.alt": {"ru": "{sym} прошла отбор системы: оценка проекта {rating} из 100, оценка консультанта {cons} из 100.",
                     "en": "{sym} passed the system's selection: questionnaire {rating} of 100, consultant {cons} of 100.",
                     "uk": "{sym} пройшла відбір системи: анкета {rating} зі 100, консультант {cons} зі 100.",
                     "el": "Το {sym} πέρασε την επιλογή του συστήματος: ερωτηματολόγιο {rating} στα 100, σύμβουλος {cons} στα 100.",
@@ -667,12 +668,12 @@ T: dict[str, dict[str, str]] = {
                             "el": "Το μερίδιο είναι {plan}%, με stop στο −35%· αν η τιμή διπλασιαστεί, το σύστημα πουλά τη μισή "
                                   "θέση.",
                             "es": "La parte es el {plan}%, con stop en −35%; si el precio se duplica, el sistema vende la mitad."},
-    "pub.why.wait": {"ru": "Сейчас таблица говорит «ждём»: новых покупок нет, позицию держим по правилам.",
+    "pub.why.wait": {"ru": "Сейчас система новых покупок не делает: монета пока не проходит все проверки, позицию держим по правилам.",
                      "en": "Right now the table says «wait»: no new buys, the position is held by the rules.",
                      "uk": "Зараз таблиця каже «чекаємо»: нових купівель немає, позицію тримаємо за правилами.",
                      "el": "Τώρα ο πίνακας λέει «περιμένουμε»: καμία νέα αγορά, η θέση κρατιέται με τους κανόνες.",
                      "es": "Ahora la tabla dice «esperamos»: no hay compras nuevas, la posición se mantiene según las reglas."},
-    "pub.why.avoid": {"ru": "Таблица поставила «не брать»: система продаст монету на следующем прогоне.",
+    "pub.why.avoid": {"ru": "Монета больше не проходит проверки системы: система продаст её при следующем пересчёте.",
                       "en": "The table marked it «don't buy»: the system sells the coin on its next run.",
                       "uk": "Таблиця поставила «не брати»: система продасть монету на наступному прогоні.",
                       "el": "Ο πίνακας το σημείωσε «δεν αγοράζουμε»: το σύστημα πουλά το νόμισμα στον επόμενο κύκλο.",
@@ -686,7 +687,7 @@ T: dict[str, dict[str, str]] = {
                      "es": "El sistema siempre guarda al menos el 10% de la cartera en dólares: con ellos refuerza el núcleo en "
                            "las caídas."},
     "pub.why.spot": {"ru": "Спот — портфель CRYPTO NOVA, без плеча. Ядро — биткоин 30%, эфир 10%, солана 5% — держим долго; монеты "
-                           "с отметкой таблицы «можно брать» — по 7,5% со стопом −20%; рискованные — по 2,5%; не меньше 10% — "
+                           "которые проходят проверки системы, — по 7,5% со стопом −20%; рискованные — по 2,5%; не меньше 10% — "
                            "в долларах. Всего не больше 8 монет вместе с ядром.",
                      "en": "Spot is the CRYPTO NOVA portfolio, with no leverage. The core — Bitcoin 30%, Ether 10%, Solana 5% — is "
                            "held for the long run; coins the table marks «can buy» get 7.5% each with a −20% stop; risky ones "
@@ -704,25 +705,24 @@ T: dict[str, dict[str, str]] = {
                            "monedas con el núcleo."},
     "pub.why.futures": {"ru": "Фьючерсы — отобранные сигналы CRYPTO NOVA: в счёт идут только стратегии, прошедшие проверку на "
                               "истории. У каждой сделки есть стоп; риск — {risk}% счёта на сделку, у основной стратегии не больше "
-                              "{max_open} сделок одновременно. Сделок закрыто с {since}: {n}, из них в плюсе {w}. Минус тоже бывает: "
+                              "{max_open} сделок одновременно. Минус тоже бывает: "
                               "убыточную сделку закрывает стоп.",
                         "en": "Futures are CRYPTO NOVA's selected signals: only strategies that passed the test on history trade "
                               "this account. Every trade has a stop; the risk is {risk}% of the account per trade, and the main "
-                              "strategy holds no more than {max_open} trades at once. Trades closed since {since}: {n}, {w} of them "
-                              "in profit. Losses happen too: the stop closes a losing trade.",
+                              "strategy holds no more than {max_open} trades at once. Losses happen too: the stop closes a losing trade.",
                         "uk": "Ф’ючерси — відібрані сигнали CRYPTO NOVA: у рахунок ідуть лише стратегії, що пройшли перевірку на "
                               "історії. У кожної угоди є стоп; ризик — {risk}% рахунку на угоду, в основної стратегії не більше "
-                              "{max_open} угод одночасно. Угод закрито з {since}: {n}, з них у плюсі {w}. Мінус теж буває: збиткову "
+                              "{max_open} угод одночасно. Мінус теж буває: збиткову "
                               "угоду закриває стоп.",
                         "el": "Τα futures είναι τα επιλεγμένα σήματα του CRYPTO NOVA: στον λογαριασμό μπαίνουν μόνο στρατηγικές "
                               "που πέρασαν τον έλεγχο στο ιστορικό. Κάθε συναλλαγή έχει stop· το ρίσκο είναι {risk}% του "
                               "λογαριασμού ανά συναλλαγή και η κύρια στρατηγική κρατά έως {max_open} συναλλαγές ταυτόχρονα. "
-                              "Συναλλαγές που έκλεισαν από τις {since}: {n}, κερδοφόρες οι {w}. Συμβαίνουν και απώλειες: τη "
+                              "Συμβαίνουν και απώλειες: τη "
                               "ζημιογόνα συναλλαγή την κλείνει το stop.",
                         "es": "Los futuros son las señales seleccionadas de CRYPTO NOVA: en la cuenta solo operan estrategias que "
                               "pasaron la prueba con el histórico. Cada operación tiene stop; el riesgo es el {risk}% de la cuenta "
                               "por operación, y la estrategia principal no tiene más de {max_open} operaciones a la vez. "
-                              "Operaciones cerradas desde el {since}: {n}, {w} de ellas con ganancia. También hay pérdidas: el "
+                              "También hay pérdidas: el "
                               "stop cierra la operación perdedora."},
     "pub.why.active": {"ru": "Активный спот — «Импульс BTC»: когда биткоин за час вырос на 2,5% и больше, система покупает на споте "
                              "самые ликвидные альткоины — они обычно догоняют. Без плеча, до 5 позиций, выход через 12 часов.",
@@ -777,6 +777,32 @@ T: dict[str, dict[str, str]] = {
                  "uk": "Поповнення й виведення не рахуються результатом: {usd}.",
                  "el": "Οι καταθέσεις και οι αναλήψεις δεν μετράνε ως αποτέλεσμα: {usd}.",
                  "es": "Los depósitos y retiros no cuentan como resultado: {usd}."},
+    "pub.why.fut_rec": {"ru": "Реальный счёт CRYPTO NOVA с {since}: закрыто фьючерсных сделок — {n}, из них в плюсе {w}.",
+                        "en": "CRYPTO NOVA's real account since {since}: {n} futures trades closed, {w} of them in profit.",
+                        "uk": "Реальний рахунок CRYPTO NOVA з {since}: закрито ф'ючерсних угод — {n}, з них у плюсі {w}.",
+                        "el": "Πραγματικός λογαριασμός CRYPTO NOVA από τις {since}: έκλεισαν {n} συναλλαγές futures, κερδοφόρες οι {w}.",
+                        "es": "Cuenta real de CRYPTO NOVA desde el {since}: {n} operaciones de futuros cerradas, {w} de ellas con ganancia."},
+    "pp.moved": {"ru": "Перевод между спотом и фьючерсами: {usd}.", "en": "Moved between spot and futures: {usd}.",
+                 "uk": "Переказ між спотом і ф'ючерсами: {usd}.", "el": "Μεταφορά μεταξύ spot και futures: {usd}.",
+                 "es": "Traspaso entre spot y futuros: {usd}."},
+    "coin.live": {"ru": "Сейчас — {w}% спота реального счёта.", "en": "Now: {w}% of the real account's spot.",
+                  "uk": "Зараз — {w}% спота реального рахунку.", "el": "Τώρα: {w}% του spot του πραγματικού λογαριασμού.",
+                  "es": "Ahora: el {w}% del spot de la cuenta real."},
+    "reco.core": {"ru": "{t}: монета ядра — держим без стопа; продадим, только если система перестанет её рекомендовать.",
+                  "en": "{t}: a core coin — held with no stop; it is sold only if the system stops recommending it.",
+                  "uk": "{t}: монета ядра — тримаємо без стопа; продамо, лише якщо система перестане її рекомендувати.",
+                  "el": "{t}: νόμισμα του πυρήνα — το κρατάμε χωρίς stop· πουλιέται μόνο αν το σύστημα πάψει να το προτείνει.",
+                  "es": "{t}: moneda del núcleo — se mantiene sin stop; se vende solo si el sistema deja de recomendarla."},
+    "reco.stop": {"ru": "{t}: стоп {stop} от покупки; продадим и тогда, когда монета перестанет проходить проверки системы.",
+                  "en": "{t}: stop at {stop} from the buy; it is also sold when the coin stops passing the system's checks.",
+                  "uk": "{t}: стоп {stop} від купівлі; продамо й тоді, коли монета перестане проходити перевірки системи.",
+                  "el": "{t}: stop στο {stop} από την αγορά· πουλιέται και όταν το νόμισμα πάψει να περνά τους ελέγχους του συστήματος.",
+                  "es": "{t}: stop en {stop} desde la compra; también se vende cuando la moneda deja de pasar los controles del sistema."},
+    "reco.small": {"ru": "{t}: небольшая доля, стоп {stop}; когда цена вырастет вдвое, система заберёт вложенное.",
+                   "en": "{t}: a small share, stop at {stop}; when the price doubles, the system takes back what it put in.",
+                   "uk": "{t}: невелика частка, стоп {stop}; коли ціна зросте вдвічі, система забере вкладене.",
+                   "el": "{t}: μικρό μερίδιο, stop στο {stop}· όταν η τιμή διπλασιαστεί, το σύστημα παίρνει πίσω ό,τι έβαλε.",
+                   "es": "{t}: una parte pequeña, stop en {stop}; cuando el precio se duplique, el sistema recupera lo invertido."},
     "pp.g.spot_coins": {"ru": "Монеты спот-портфеля", "en": "Spot portfolio coins", "uk": "Монети спот-портфеля",
                         "el": "Νομίσματα του χαρτοφυλακίου spot", "es": "Monedas de la cartera spot"},
     "pp.g.spot_cash": {"ru": "Доллары спот-портфеля", "en": "Spot portfolio dollars", "uk": "Долари спот-портфеля",
@@ -1054,6 +1080,8 @@ T: dict[str, dict[str, str]] = {
 # plural words: ru / uk — (1, 2–4, 5+) in the case the sentence needs; en / el / es — (1, other)
 P: dict[str, dict[str, tuple[str, ...]]] = {
     # 28.10 (build 46 #6): the spoken report — amounts and whole percents in words
+    "times": {"ru": ("раз", "раза", "раз"), "uk": ("раз", "рази", "разів"), "en": ("time", "times"), "el": ("φορά", "φορές"),
+              "es": ("vez", "veces")},
     "dollar": {"ru": ("доллар", "доллара", "долларов"), "uk": ("долар", "долари", "доларів"), "en": ("dollar", "dollars"),
                "el": ("δολάριο", "δολάρια"), "es": ("dólar", "dólares")},
     "percent": {"ru": ("процент", "процента", "процентов"), "uk": ("відсоток", "відсотки", "відсотків"), "en": ("percent", "percent"),
@@ -1074,6 +1102,56 @@ P: dict[str, dict[str, tuple[str, ...]]] = {
     "trade": {"ru": ("сделка", "сделки", "сделок"), "uk": ("угода", "угоди", "угод"), "en": ("trade", "trades"),
               "el": ("συναλλαγή", "συναλλαγές"), "es": ("operación", "operaciones")},
 }
+
+
+# ------------------------------------------------------------------------------------------------ 28.10 (build 46 QA): text polish
+# Every server text the app shows: «CRYPTO NOVA» never wraps (U+00A0), a negative amount has the true minus (U+2212), and in ru / uk /
+# el / es a decimal number has a comma and its thousands a non-breaking space (en keeps 2.5 and 10,000). A date (22.10, 06.10.2025),
+# a version (2.0), a year range (2023–2026), a ticker pair (BTC-USDT) and a URL are left as they are.
+NBSP, MINUS = "\u00a0", "\u2212"
+_BRAND = re.compile(r"CRYPTO[ \u00a0]+NOV[AΛ]")
+_MINUS = re.compile(r"(?<![\w)\]])-(?=\$?\d)")
+_DEC = re.compile(r"(?<![\d.,])(?P<cur>[$€]\s?)?(?P<a>\d+)\.(?P<b>\d+)(?!\d)(?!\.\d)(?P<suf>\s?[%×x])?")
+_THOU = re.compile(r"(?<![\d.,])(\d{1,3})((?:[ \u00a0]\d{3})+)(?![\d])")
+
+
+def _dec_ok(m) -> bool:
+    """a decimal number to convert, not a date / a version: with $ or %, or not shaped like dd.mm"""
+    a, b = m.group("a"), m.group("b")
+    if m.group("cur") or m.group("suf"):
+        return True
+    if len(b) == 1 and b == "0" and len(a) == 1:          # «2.0» — an app version, a multiplier like ×2.0 has its ×
+        return False
+    if len(b) == 2 and 1 <= int(a) <= 31 and 1 <= int(b) <= 12:   # «22.10» — a date
+        return False
+    return True
+
+
+def polish(text, lang: str = DEFAULT):
+    """one text as the app shows it (see above); anything that is not a str, and URLs, come back unchanged"""
+    if not isinstance(text, str) or not text or "://" in text:
+        return text
+    s = _BRAND.sub(lambda m: m.group(0).replace(" ", NBSP).replace(NBSP + NBSP, NBSP), text)
+    s = re.sub(r"CRYPTO[ \u00a0]+(NOV[AΛ])", "CRYPTO" + NBSP + r"\1", s)
+    s = _MINUS.sub(MINUS, s)
+    if lang != "en":
+        s = _DEC.sub(lambda m: (m.group("cur") or "") + m.group("a") + "," + m.group("b") + (m.group("suf") or "") if _dec_ok(m) else m.group(0), s)
+        s = _THOU.sub(lambda m: m.group(1) + m.group(2).replace(" ", NBSP), s)
+    return s
+
+
+NO_POLISH = {"sym", "inst", "sig", "key", "kind", "lang", "src", "action", "side", "mode", "regime", "grade", "id", "image", "link",
+             "url", "audio_url", "copy_url", "status", "rule_id", "rule_source", "art", "screen", "target", "level", "updated",
+             "version", "v"}
+
+
+def polish_doc(doc, lang: str = DEFAULT, _key: str | None = None):
+    """polish() over every text of a JSON document — not over identifiers (NO_POLISH keys) and not over numbers"""
+    if isinstance(doc, dict):
+        return {k: (v if k in NO_POLISH and isinstance(v, str) else polish_doc(v, lang, k)) for k, v in doc.items()}
+    if isinstance(doc, list):
+        return [polish_doc(v, lang, _key) for v in doc]
+    return polish(doc, lang) if isinstance(doc, str) else doc
 
 
 def t(lang: str, key: str, **params) -> str:

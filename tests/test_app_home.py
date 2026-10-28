@@ -64,7 +64,7 @@ def test_app_home_shows_every_mix_source(tmp_path):
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=t0 + 120000)
     f = doc["futures"]
     assert len(f["open"]) == 1 and f["open"][0]["src"] == "own" and f["open"][0]["src_ru"] == "откат в тренде"
-    assert f["open"][0]["target"] == 14.5 and f["open"][0]["pct"] == 5.0 and "×1.8" in f["open"][0]["why"]
+    assert f["open"][0]["target"] == 14.5 and f["open"][0]["pct"] == 5.0 and "×1,8" in f["open"][0]["why"]
     assert f["trades"] == 1                                          # the main account's count, not the other desks'
     assert "ARB" in f["status_ru"] and "1 сделка других" in f["status_ru"]
 
@@ -283,13 +283,19 @@ def test_spot_coins_explain_themselves_in_russian_only(tmp_path):
     (w / "app_portfolio.json").write_text(json.dumps({"index": 103, "cash_pct": 10, "positions": [
         {"symbol": "ZEC", "name": "Zcash", "weight": 0.08, "entry": 1150.0, "price": 1260.0, "kind_ru": "крупный альт", "horizon_ru": "1–3 месяца"}]}))
     (w / "portfolio.json").write_text(json.dumps({"portfolios": {"ideas": {"positions": [
-        {"symbol": "ZEC", "reason": "План: ZEC 8% счёта.", "table_status_ru": "можно брать", "table_why_ru": "анкета 51",
-         "levels": {"stop": 920.7}, "reco": {"t": "Держать", "why": "стоп −20%"}}]}}}))
+        {"symbol": "ZEC", "reason": "План: ZEC 8% счёта.", "table_status": "buy", "table_status_ru": "можно брать",
+         "table_why_ru": "Анкета 51, консультант 99, тренд вверх, BTC бычий — можно брать", "target_weight": 0.075,
+         "levels": {"stop": 920.7}, "reco": {"t": "Держать", "why": "Стоп −20% от входа, продаём и при «не брать»"}}]}}}))
     (w / "tokenomics.json").write_text(json.dumps({"tokens": {}, "unlocks_next": {"ZEC": {"date": "2026-11-02", "pct_circ": 1.5}}}))
     (w / "coin_profiles.json").write_text(json.dumps({"coins": {"ZEC": {"what_ru": "Приватные платежи.", "risks_ru": "Регуляторы ЕС."}}}))
     ru = app_home.run(None, str(w))
     c = ru["spot"]["coins"][0]
     assert c["sym"] == "ZEC" and c["weight"] == 8.0 and c["stop"] == 920.7 and abs(c["pct"] - 9.6) < 0.1
-    assert c["why_ru"].startswith("План") and "можно брать" in c["mark_ru"] and "2026-11-02" in c["unlock_ru"] and c["about_ru"]
+    # 28.10 (build 46 QA): plain words — not the engine's «План: ZEC 8% счёта», «анкета 51 … — можно брать»
+    assert c["why_ru"].startswith("ZEC прошла отбор системы: оценка проекта 51 из 100, оценка консультанта 99 из 100.")
+    assert "7,5%" in c["why_ru"] and "План" not in c["why_ru"] and "анкета" not in c["mark_ru"].lower()
+    assert c["mark_ru"].startswith("Подходит для покупки: оценка проекта 51 из 100") and "можно брать" not in c["mark_ru"]
+    assert c["reco_ru"] == "Держать: стоп −20% от покупки; продадим и тогда, когда монета перестанет проходить проверки системы."
+    assert "2026-11-02" in c["unlock_ru"] and c["about_ru"] and c["live_share"] is None
     en = json.loads((w / "app_home.en.json").read_text())["spot"]["coins"][0]
     assert en["sym"] == "ZEC" and en["weight"] == 8.0 and not any(k.endswith("_ru") for k in en)

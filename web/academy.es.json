@@ -1,23 +1,23 @@
 {
   "version": 2,
   "updated": "2026-10-21",
-  "title": "Aprender con CRYPTO NOVA",
+  "title": "Aprender con CRYPTO NOVA",
   "note": "No es asesoramiento financiero. Los resultados pasados no garantizan los futuros.",
   "levels": [
     {
       "level": "L0",
-      "level_title": "Conoce CRYPTO NOVA",
+      "level_title": "Conoce CRYPTO NOVA",
       "level_sub": "Guía de la app: qué hay, dónde está y cómo usarlo, en palabras sencillas",
       "lessons": [
         {
           "id": "l0-what",
-          "title": "Qué es CRYPTO NOVA y cómo te ayuda",
+          "title": "Qué es CRYPTO NOVA y cómo te ayuda",
           "minutes": 4,
-          "goal": "Al terminar, podrás explicar con tus palabras qué hace CRYPTO NOVA y qué no promete.",
+          "goal": "Al terminar, podrás explicar con tus palabras qué hace CRYPTO NOVA y qué no promete.",
           "cards": [
             {
               "title": "Un asistente que nunca duerme",
-              "text": "CRYPTO NOVA es un sistema informático con inteligencia artificial (IA). Vigila el mercado de criptomonedas las 24 horas. Las criptomonedas son dinero digital, como bitcoin. El sistema busca buenos momentos para operar según sus propias reglas. Cada una de sus operaciones la ves en la app.",
+              "text": "CRYPTO NOVA es un sistema informático con inteligencia artificial (IA). Vigila el mercado de criptomonedas las 24 horas. Las criptomonedas son dinero digital, como bitcoin. El sistema busca buenos momentos para operar según sus propias reglas. Cada una de sus operaciones la ves en la app.",
               "example": "En la vida real: un vigilante cuida un almacén de noche, pero por la mañana necesita dormir. Un programa no necesita dormir: mira el mercado de día y de noche.",
               "art": "robot"
             },
@@ -41,19 +41,19 @@
             },
             {
               "title": "Riesgos, sin rodeos",
-              "text": "Las cripto son un riesgo: los precios suben y bajan con fuerza. El sistema puede equivocarse, y a veces tiene operaciones con pérdidas. Los buenos resultados del pasado no prometen lo mismo en el futuro. CRYPTO NOVA enseña y muestra, pero no da asesoramiento financiero. La decisión siempre es tuya.",
+              "text": "Las cripto son un riesgo: los precios suben y bajan con fuerza. El sistema puede equivocarse, y a veces tiene operaciones con pérdidas. Los buenos resultados del pasado no prometen lo mismo en el futuro. CRYPTO NOVA enseña y muestra, pero no da asesoramiento financiero. La decisión siempre es tuya.",
               "example": "En la vida real: el pronóstico anuncia sol, pero igual llevas paraguas. El pronóstico ayuda, pero no manda sobre el clima.",
               "art": "umbrella"
             }
           ],
           "remember": [
-            "CRYPTO NOVA busca operaciones las 24 horas con reglas probadas en el pasado.",
+            "CRYPTO NOVA busca operaciones las 24 horas con reglas probadas en el pasado.",
             "Puedes empezar con la demo: dinero virtual, precios reales.",
             "El sistema puede equivocarse, y los resultados pasados no prometen los futuros."
           ],
           "quiz": [
             {
-              "q": "¿Qué hace CRYPTO NOVA?",
+              "q": "¿Qué hace CRYPTO NOVA?",
               "options": [
                 "Promete que tu dinero crecerá",
                 "Guarda tu dinero, como un banco",
@@ -95,7 +95,7 @@
           "cards": [
             {
               "title": "Dos caminos en una sola app",
-              "text": "Puedes usar CRYPTO NOVA de dos maneras. Tranquila: ahorrar poco a poco y mantener grandes monedas durante años. Eso son la «Hucha» y el «Spot». Activa: seguir operaciones rápidas al alza y a la baja del precio. Eso son los «Futuros». Puedes elegir un camino o combinar los dos.",
+              "text": "Puedes usar CRYPTO NOVA de dos maneras. Tranquila: ahorrar poco a poco y mantener grandes monedas durante años. Eso son la «Hucha» y el «Spot». Activa: seguir operaciones rápidas al alza y a la baja del precio. Eso son los «Futuros». Puedes elegir un camino o combinar los dos.",
               "example": "En la vida real: a la casa de campo puedes ir en tren, despacio pero tranquilo. O en moto: más rápido, pero más peligroso.",
               "art": "compass"
             },
@@ -113,7 +113,7 @@
             },
             {
               "title": "Replicar o copiar: decides tú",
-              "text": "El sistema hace sus propias operaciones y te las muestra. Puedes replicar una operación en tu cuenta del exchange tú mismo o activar la copia: así OKX repetirá automáticamente las operaciones de CRYPTO NOVA en tu cuenta. Un exchange es un mercado donde se compran y venden monedas. Replicar, copiar o solo mirar es únicamente decisión tuya.",
+              "text": "El sistema hace sus propias operaciones y te las muestra. Puedes replicar una operación en tu cuenta del exchange tú mismo o activar la copia: así OKX repetirá automáticamente las operaciones de CRYPTO NOVA en tu cuenta. Un exchange es un mercado donde se compran y venden monedas. Replicar, copiar o solo mirar es únicamente decisión tuya.",
               "example": "En la vida real: un jardinero con experiencia te enseña a podar un manzano. Tú miras y lo repites en tu jardín, o decides esperar.",
               "art": "handshake"
             },
@@ -156,7 +156,7 @@
               "q": "¿Quién decide si replicas una operación del sistema en tu cuenta?",
               "options": [
                 "Tú",
-                "CRYPTO NOVA, sin tu permiso",
+                "CRYPTO NOVA, sin tu permiso",
                 "El exchange",
                 "NOVA, el asistente de IA"
               ],
@@ -173,7 +173,7 @@
           "cards": [
             {
               "title": "Arriba: PUBLIC, DEMO o REAL",
-              "text": "Debajo del nombre está el selector de cartera. PUBLIC es la cartera pública de CRYPTO NOVA: las cuentas demo del sistema con precios reales. DEMO es tu propia cartera demo con dinero virtual. REAL es tu cuenta del exchange, cuando ya la has conectado. Tu elección se mantiene en Inicio, Spot y Futuros. Arriba a la derecha, el icono de perfil abre «Mi cuenta».",
+              "text": "Debajo del nombre está el selector de cartera. PUBLIC es la cartera pública de CRYPTO NOVA: la cuenta real del sistema en OKX, con dinero real. DEMO es tu propia cartera demo con dinero virtual. REAL es tu cuenta del exchange, cuando ya la has conectado. Tu elección se mantiene en Inicio, Spot y Futuros. Arriba a la derecha, el icono de perfil abre «Mi cuenta».",
               "example": "En la vida real: el cartel de «Autoescuela» en un auto de prácticas. Todos ven enseguida que es un entrenamiento.",
               "art": "phone_app",
               "screen": "Main",
@@ -192,7 +192,7 @@
             },
             {
               "title": "La tarjeta principal: la cartera elegida",
-              "text": "En modo PUBLIC la tarjeta muestra la «Ganancia total»: el resultado de la cartera pública desde el inicio de la prueba y un gráfico. Los botones «Día», «Semana», «Mes» y «Todo» cambian el periodo. En modo DEMO puedes crear aquí tu propia cartera demo con cualquier cantidad y ver cómo cambia junto con el sistema.",
+              "text": "En modo PUBLIC la tarjeta muestra la «Ganancia total»: el resultado de la cartera pública desde el 22 de octubre de 2026 y un gráfico. Los botones «Día», «Semana», «Mes» y «Todo» cambian el periodo. En modo DEMO puedes crear aquí tu propia cartera demo con cualquier cantidad y ver cómo cambia junto con el sistema.",
               "example": "En la vida real: te pruebas una chaqueta en la tienda sin comprarla. Tu cuenta demo es esa prueba: el dinero es virtual, pero los precios son reales.",
               "art": "chart_up",
               "screen": "Main",
@@ -240,7 +240,7 @@
             },
             {
               "title": "Reparto de la cartera pública",
-              "text": "En modo PUBLIC verás más abajo cómo se reparte la cartera pública entre fuentes: spot, futuros, rendimiento en dólares y otras. El sistema mueve las proporciones según la tendencia del mercado y las reajusta cada lunes. Todo es una demo con precios reales.",
+              "text": "En modo PUBLIC verás más abajo cómo se reparte la cuenta real: cartera spot 65%, futuros 25%, spot activo 10%. El dinero es real y las cifras se actualizan más o menos cada 15 minutos.",
               "example": "En la vida real: en el presupuesto familiar ves cuánto vino del sueldo, cuánto del huerto y cuánto de un trabajo extra.",
               "art": "coins",
               "screen": "Main",
@@ -394,7 +394,7 @@
             {
               "title": "El camino del stop al objetivo",
               "text": "La barra de precio es como un camino. En un extremo está el stop: si el precio llega ahí, la operación se cierra con una pequeña pérdida. En el otro extremo está el objetivo: ahí se recoge la ganancia. Entre los dos están el precio de entrada y el punto «ahora». Cuanto más cerca esté el punto del objetivo, mejor van las cosas.",
-              "example": "Ejemplo: entrada $10, stop $9, objetivo $13. Con el precio en $11, el punto está más cerca del objetivo y la operación va en positivo. Con el precio en $9.50, el punto se arrastra hacia el stop.",
+              "example": "Ejemplo: entrada $10, stop $9, objetivo $13. Con el precio en $11, el punto está más cerca del objetivo y la operación va en positivo. Con el precio en $9,50, el punto se arrastra hacia el stop.",
               "art": "seatbelt",
               "screen": "Futures",
               "callouts": [
@@ -685,11 +685,11 @@
           "id": "l0-demo-live",
           "title": "Demo y cuenta real: cómo funciona",
           "minutes": 5,
-          "goal": "Al terminar, sabrás en qué se diferencia la demo de la cuenta real, cómo conectar el sistema y cómo gana dinero CRYPTO NOVA.",
+          "goal": "Al terminar, sabrás en qué se diferencia la demo de la cuenta real, cómo conectar el sistema y cómo gana dinero CRYPTO NOVA.",
           "cards": [
             {
               "title": "Demo: entrenar sin riesgo",
-              "text": "La demo son cuentas de práctica con dinero virtual. La cartera pública de CRYPTO NOVA (modo PUBLIC) son las cuentas demo del propio sistema. Los precios son reales y se ve cada operación, con ganancia y con pérdida. Y en modo DEMO puedes crear tu propia cartera demo con cualquier cantidad.",
+              "text": "La demo son cuentas de práctica con dinero virtual. La cartera pública de CRYPTO NOVA (modo PUBLIC) no es una demo: es la cuenta real del sistema en OKX desde el 22 de octubre de 2026, y se ve cada operación, con ganancia y con pérdida. Y en modo DEMO puedes crear tu propia cartera demo con cualquier cantidad.",
               "example": "En la vida real: un partido amistoso antes del campeonato. Se juega en serio, pero los puntos no cuentan para la tabla.",
               "art": "phone_app",
               "screen": "Main",
@@ -697,7 +697,7 @@
                 {
                   "n": 1,
                   "target": "total",
-                  "text": "PUBLIC: las cuentas demo del sistema"
+                  "text": "PUBLIC: la cuenta real del sistema"
                 },
                 {
                   "n": 2,
@@ -708,7 +708,7 @@
             },
             {
               "title": "La cuenta real es tuya",
-              "text": "La cuenta real es tu propia cuenta en el exchange OKX. La abres con el enlace de CRYPTO NOVA y activas la copia: el propio OKX repite en ella las operaciones del sistema. El dinero se queda contigo en el exchange todo el tiempo. Nosotros no lo recibimos, no lo guardamos y no podemos retirarlo. El dinero real es solo para mayores de 18 años.",
+              "text": "La cuenta real es tu propia cuenta en el exchange OKX. La abres con el enlace de CRYPTO NOVA y activas la copia: el propio OKX repite en ella las operaciones del sistema. El dinero se queda contigo en el exchange todo el tiempo. Nosotros no lo recibimos, no lo guardamos y no podemos retirarlo. El dinero real es solo para mayores de 18 años.",
               "example": "En la vida real: llamas a alguien para que te pinte la casa. Trabaja en tu casa, pero la casa sigue siendo tuya, y las llaves también.",
               "art": "bank",
               "screen": "Live",
@@ -716,13 +716,13 @@
                 {
                   "n": 1,
                   "target": "how",
-                  "text": "La estrategia de CRYPTO NOVA, en tu propia cuenta"
+                  "text": "La estrategia de CRYPTO NOVA, en tu propia cuenta"
                 }
               ]
             },
             {
               "title": "Conexión en 4 pasos",
-              "text": "Paso 1: regístrate en OKX con el enlace de la app. Paso 2: verifica tu identidad (KYC) en la app del exchange: un documento y un selfie, normalmente unos minutos. Paso 3: deposita USDT; empieza con una cantidad que puedas perder sin problema. Paso 4: pulsa «Copiar CRYPTO NOVA» en la app y elige el importe; a partir de ahí, OKX repite las operaciones sola. No hacen falta UID ni claves API.",
+              "text": "Paso 1: regístrate en OKX con el enlace de la app. Paso 2: verifica tu identidad (KYC) en la app del exchange: un documento y un selfie, normalmente unos minutos. Paso 3: deposita USDT; empieza con una cantidad que puedas perder sin problema. Paso 4: pulsa «Copiar CRYPTO NOVA» en la app y elige el importe; a partir de ahí, OKX repite las operaciones sola. No hacen falta UID ni claves API.",
               "example": "En la vida real: una domiciliación en el banco. Tú eliges el importe y puedes cancelarla cuando quieras.",
               "art": "key_lock",
               "screen": "Live",
@@ -730,7 +730,7 @@
                 {
                   "n": 1,
                   "target": "step1",
-                  "text": "Regístrate en OKX con el enlace de CRYPTO NOVA"
+                  "text": "Regístrate en OKX con el enlace de CRYPTO NOVA"
                 },
                 {
                   "n": 2,
@@ -745,13 +745,13 @@
                 {
                   "n": 4,
                   "target": "step4",
-                  "text": "Pulsa «Copiar CRYPTO NOVA»"
+                  "text": "Pulsa «Copiar CRYPTO NOVA»"
                 }
               ]
             },
             {
               "title": "Qué te da la conexión",
-              "text": "Una vez conectada, las operaciones de CRYPTO NOVA se abren y se cierran solas en tu cuenta: OKX las repite por el importe que elijas. Puedes dejar de copiar en OKX en cualquier momento, y puede haber pérdidas.",
+              "text": "Una vez conectada, las operaciones de CRYPTO NOVA se abren y se cierran solas en tu cuenta: OKX las repite por el importe que elijas. Puedes dejar de copiar en OKX en cualquier momento, y puede haber pérdidas.",
               "example": "En la vida real: el riego automático del huerto. Tú eliges cuánta agua y lo apagas cuando quieras, y el huerto sigue siendo tuyo.",
               "art": "target",
               "screen": "Live",
@@ -769,8 +769,8 @@
               ]
             },
             {
-              "title": "Cómo gana dinero CRYPTO NOVA",
-              "text": "Cuando abres una cuenta con nuestro enlace, el exchange paga a CRYPTO NOVA una recompensa de su propia comisión; tus comisiones no cambian. Si copias a CRYPTO NOVA, OKX, según sus reglas, retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA. El porcentaje aparece en el perfil antes de empezar, y sin ganancia no hay pago.",
+              "title": "Cómo gana dinero CRYPTO NOVA",
+              "text": "Cuando abres una cuenta con nuestro enlace, el exchange paga a CRYPTO NOVA una recompensa de su propia comisión; tus comisiones no cambian. Si copias a CRYPTO NOVA, OKX, según sus reglas, retiene de tu ganancia una parte para el trader líder, es decir, CRYPTO NOVA. El porcentaje aparece en el perfil antes de empezar, y sin ganancia no hay pago.",
               "example": "En la vida real: una tienda le paga a un influencer por traerle un cliente. El precio del producto para el cliente no cambia.",
               "art": "handshake",
               "screen": "Live",
@@ -784,7 +784,7 @@
             },
             {
               "title": "Si vives en la UE",
-              "text": "En la UE y el EEE, las normas MiCA se aplican por completo desde el 1 de julio de 2026: allí solo pueden prestar servicios cripto las empresas con licencia de la UE, como OKX Europe. La copia automática aún no está disponible allí: todas las operaciones de CRYPTO NOVA se ven en la app y puedes repetirlas tú mismo. Las lecciones, la demo, la hucha y NOVA funcionan allí por completo.",
+              "text": "En la UE y el EEE, las normas MiCA se aplican por completo desde el 1 de julio de 2026: allí solo pueden prestar servicios cripto las empresas con licencia de la UE, como OKX Europe. La copia automática aún no está disponible allí: todas las operaciones de CRYPTO NOVA se ven en la app y puedes repetirlas tú mismo. Las lecciones, la demo, la hucha y NOVA funcionan allí por completo.",
               "example": "En la vida real: cada país tiene sus normas de tráfico. El auto es el mismo, pero por algunas carreteras todavía no se puede pasar.",
               "art": "globe",
               "screen": "Live",
@@ -799,23 +799,23 @@
           ],
           "remember": [
             "Demo: dinero virtual, precios reales y todas las operaciones a la vista.",
-            "La cuenta real es tu propia cuenta de OKX: el dinero es tuyo y OKX repite sola las operaciones de CRYPTO NOVA.",
-            "CRYPTO NOVA recibe una recompensa del exchange y, si copias, una parte de la ganancia."
+            "La cuenta real es tu propia cuenta de OKX: el dinero es tuyo y OKX repite sola las operaciones de CRYPTO NOVA.",
+            "CRYPTO NOVA recibe una recompensa del exchange y, si copias, una parte de la ganancia."
           ],
           "quiz": [
             {
               "q": "¿Dónde está el dinero cuando el sistema está conectado a la cuenta real?",
               "options": [
-                "En la cuenta de CRYPTO NOVA",
+                "En la cuenta de CRYPTO NOVA",
                 "Lo tiene NOVA, el asistente de IA",
                 "En la hucha de la app",
                 "En tu propia cuenta del exchange"
               ],
               "answer": 3,
-              "why": "El dinero siempre está en tu cuenta del exchange. CRYPTO NOVA no lo recibe, no lo guarda y no puede retirarlo."
+              "why": "El dinero siempre está en tu cuenta del exchange. CRYPTO NOVA no lo recibe, no lo guarda y no puede retirarlo."
             },
             {
-              "q": "¿Cómo gana dinero CRYPTO NOVA?",
+              "q": "¿Cómo gana dinero CRYPTO NOVA?",
               "options": [
                 "Cobra una suscripción",
                 "El exchange le paga de su propia comisión y, si copias, recibe una parte de la ganancia",
@@ -823,12 +823,12 @@
                 "Vende tus datos"
               ],
               "answer": 1,
-              "why": "El exchange paga a CRYPTO NOVA de su propia comisión y, si copias, OKX retiene una parte de la ganancia para el trader líder. No hay suscripciones y no tomamos tu dinero."
+              "why": "El exchange paga a CRYPTO NOVA de su propia comisión y, si copias, OKX retiene una parte de la ganancia para el trader líder. No hay suscripciones y no tomamos tu dinero."
             },
             {
               "q": "¿Qué necesitas para conectar la cuenta real?",
               "options": [
-                "Una cuenta en OKX con el enlace de CRYPTO NOVA, verificación de identidad, un depósito y el botón «Copiar CRYPTO NOVA»",
+                "Una cuenta en OKX con el enlace de CRYPTO NOVA, verificación de identidad, un depósito y el botón «Copiar CRYPTO NOVA»",
                 "La contraseña del exchange y el código del SMS",
                 "La frase secreta de tu billetera",
                 "Una foto de tu tarjeta bancaria"
@@ -846,19 +846,19 @@
           "cards": [
             {
               "title": "El dinero lo tienes tú",
-              "text": "CRYPTO NOVA no recibe, no guarda y no retira dinero. En la demo todo es de práctica. El dinero real está solo en tu cuenta del exchange. Lo depositas y lo retiras tú, desde la app del exchange. No podemos sacar de tu cuenta ni un centavo.",
+              "text": "CRYPTO NOVA no recibe, no guarda y no retira dinero. En la demo todo es de práctica. El dinero real está solo en tu cuenta del exchange. Lo depositas y lo retiras tú, desde la app del exchange. No podemos sacar de tu cuenta ni un centavo.",
               "example": "En la vida real: el entrenador del gimnasio te indica los ejercicios, pero la llave de tu casillero la tienes tú.",
               "art": "bank"
             },
             {
               "title": "No necesitamos las llaves de tu exchange",
-              "text": "Ahora la app no necesita ni la contraseña del exchange ni una clave API. Una clave API es un pase especial con el que un programa se conecta al exchange. Tampoco hace falta para copiar a CRYPTO NOVA: la copia se activa en el propio OKX. No le des a nadie una clave con permiso para retirar dinero.",
+              "text": "Ahora la app no necesita ni la contraseña del exchange ni una clave API. Una clave API es un pase especial con el que un programa se conecta al exchange. Tampoco hace falta para copiar a CRYPTO NOVA: la copia se activa en el propio OKX. No le des a nadie una clave con permiso para retirar dinero.",
               "example": "En la vida real: la llave del buzón. Con ella sacas las cartas, pero no abres tu casa.",
               "art": "key_lock"
             },
             {
               "title": "Contraseñas y frase secreta: solo tuyas",
-              "text": "No le digas a nadie tus contraseñas, los códigos de SMS ni la frase secreta de tu billetera. La frase secreta, o frase semilla, son 12 o 24 palabras que abren la billetera. CRYPTO NOVA nunca te las pedirá. Quien te las pida es un estafador.",
+              "text": "No le digas a nadie tus contraseñas, los códigos de SMS ni la frase secreta de tu billetera. La frase secreta, o frase semilla, son 12 o 24 palabras que abren la billetera. CRYPTO NOVA nunca te las pedirá. Quien te las pida es un estafador.",
               "example": "En la vida real: un banco de verdad nunca te pide el PIN de tu tarjeta por teléfono.",
               "art": "shield"
             },
@@ -882,13 +882,13 @@
             }
           ],
           "remember": [
-            "El dinero está solo en tu cuenta del exchange. CRYPTO NOVA no puede sacarlo.",
+            "El dinero está solo en tu cuenta del exchange. CRYPTO NOVA no puede sacarlo.",
             "No compartas con nadie contraseñas, códigos ni la frase semilla: nosotros no los pedimos.",
             "Si te meten prisa, te asustan o te prometen ganancias sin riesgo, es un estafador."
           ],
           "quiz": [
             {
-              "q": "Te escribe el «soporte de CRYPTO NOVA» y te pide la frase semilla «para verificar». ¿Qué haces?",
+              "q": "Te escribe el «soporte de CRYPTO NOVA» y te pide la frase semilla «para verificar». ¿Qué haces?",
               "options": [
                 "Enviarla, si es el soporte",
                 "Enviar solo la mitad de las palabras",
@@ -896,10 +896,10 @@
                 "No enviar nada y cortar la conversación: es un estafador"
               ],
               "answer": 3,
-              "why": "CRYPTO NOVA nunca pide contraseñas, códigos ni la frase semilla. Hasta la mitad de las palabras le sirve a un ladrón."
+              "why": "CRYPTO NOVA nunca pide contraseñas, códigos ni la frase semilla. Hasta la mitad de las palabras le sirve a un ladrón."
             },
             {
-              "q": "¿Puede CRYPTO NOVA retirar dinero de tu cuenta del exchange?",
+              "q": "¿Puede CRYPTO NOVA retirar dinero de tu cuenta del exchange?",
               "options": [
                 "Sí, si el sistema lo decide",
                 "No: el dinero es tuyo y no tenemos permiso para retirarlo",
@@ -915,7 +915,7 @@
                 "Como una explicación útil: NOVA puede equivocarse, y decides tú",
                 "Como un pronóstico exacto",
                 "Como un consejo financiero: hay que actuar ya",
-                "Como una garantía de CRYPTO NOVA"
+                "Como una garantía de CRYPTO NOVA"
               ],
               "answer": 0,
               "why": "NOVA explica con palabras sencillas, pero puede equivocarse y no conoce toda tu situación."
@@ -965,7 +965,7 @@
             },
             {
               "title": "El mismo dinero, menos compras",
-              "text": "Digamos que tienes $100 y una barra de pan cuesta $2. Te alcanza para $100 ÷ $2 = 50 barras. 5 años después, el pan cuesta $2.50. Ahora $100 ÷ $2.50 = 40 barras. El billete es el mismo, pero tienes 10 barras menos.",
+              "text": "Digamos que tienes $100 y una barra de pan cuesta $2. Te alcanza para $100 ÷ $2 = 50 barras. 5 años después, el pan cuesta $2,50. Ahora $100 ÷ $2,50 = 40 barras. El billete es el mismo, pero tienes 10 barras menos.",
               "example": "En la vida real: el sueldo es el mismo, pero la bolsa del súper pesa cada año un poco menos.",
               "art": "calculator",
               "chart": {
@@ -1015,7 +1015,7 @@
           ],
           "quiz": [
             {
-              "q": "Tienes $100. El pan subió de $2 a $2.50. ¿Cuántas barras puedes comprar ahora?",
+              "q": "Tienes $100. El pan subió de $2 a $2,50. ¿Cuántas barras puedes comprar ahora?",
               "options": [
                 "50",
                 "45",
@@ -1023,7 +1023,7 @@
                 "25"
               ],
               "answer": 2,
-              "why": "$100 ÷ $2.50 = 40. Antes era $100 ÷ $2 = 50. El dinero es el mismo, pero el pan es menos: eso es la inflación."
+              "why": "$100 ÷ $2,50 = 40. Antes era $100 ÷ $2 = 50. El dinero es el mismo, pero el pan es menos: eso es la inflación."
             },
             {
               "q": "¿Qué es la inflación?",
@@ -1361,7 +1361,7 @@
             },
             {
               "title": "Capitalización = precio × cantidad",
-              "text": "Para ver cuánto vale toda la moneda, multiplica el precio por las monedas en circulación. Eso es la capitalización. Bitcoin en octubre de 2026: unos $83 000 × unos 20 M de monedas ≈ $1,66 billones. El gráfico muestra dos monedas: la «barata» A a $0.001 y la «cara» B a $50.",
+              "text": "Para ver cuánto vale toda la moneda, multiplica el precio por las monedas en circulación. Eso es la capitalización. Bitcoin en octubre de 2026: unos $83 000 × unos 20 M de monedas ≈ $1,66 billones. El gráfico muestra dos monedas: la «barata» A a $0,001 y la «cara» B a $50.",
               "example": "En la vida: una acción de $1 no es necesariamente más barata que una de $500. Lo que importa es cuánto vale toda la empresa.",
               "art": "calculator",
               "chart": {
@@ -1371,7 +1371,7 @@
                   500
                 ],
                 "labels": [
-                  "A · $0.001 × 1 billón",
+                  "A · $0,001 × 1 billón",
                   "B · $50 × 10 M"
                 ],
                 "caption": "Capitalización, $ M. La «barata» A vale el doble que B"
@@ -1379,8 +1379,8 @@
             },
             {
               "title": "La trampa de la moneda «barata»",
-              "text": "«Una moneda de $0.001 seguro que llegará a $1» es un sueño habitual. Eso es subir 1 000 veces. Si hay 1 billón de esas monedas, a $1 toda la moneda valdría $1 billón: casi tanto como todo el bitcoin. Calcula la capitalización y el cuento se ve enseguida.",
-              "example": "En la vida: «un piso por solo $1 000»: lo miras y es el precio por metro cuadrado, no por todo el piso.",
+              "text": "«Una moneda de $0,001 seguro que llegará a $1» es un sueño habitual. Eso es subir 1 000 veces. Si hay 1 billón de esas monedas, a $1 toda la moneda valdría $1 billón: casi tanto como todo el bitcoin. Calcula la capitalización y el cuento se ve enseguida.",
+              "example": "En la vida: «un piso por solo $1 000»: lo miras y es el precio por metro cuadrado, no por todo el piso.",
               "art": "magnifier"
             },
             {
@@ -1397,15 +1397,15 @@
           ],
           "quiz": [
             {
-              "q": "La moneda A cuesta $0.001 y hay 1 billón. La moneda B cuesta $50 y hay 10 M. ¿Cuál tiene mayor capitalización?",
+              "q": "La moneda A cuesta $0,001 y hay 1 billón. La moneda B cuesta $50 y hay 10 M. ¿Cuál tiene mayor capitalización?",
               "options": [
-                "A: $1 000 M",
+                "A: $1 000 M",
                 "B: $500 M",
                 "Igual",
                 "No se puede calcular"
               ],
               "answer": 0,
-              "why": "A: $0.001 × 1 000 000 000 000 = $1 000 000 000. B: $50 × 10 000 000 = $500 000 000. La «barata» A vale el doble."
+              "why": "A: $0,001 × 1 000 000 000 000 = $1 000 000 000. B: $50 × 10 000 000 = $500 000 000. La «barata» A vale el doble."
             },
             {
               "q": "¿Cómo se calcula la capitalización?",
@@ -1419,15 +1419,15 @@
               "why": "La capitalización es el precio de una moneda por el número de monedas en circulación. Muestra cuánto vale toda la moneda."
             },
             {
-              "q": "Una moneda cuesta $0.01 y hay 100 000 M. ¿Qué capitalización tendría si el precio llegara a $1?",
+              "q": "Una moneda cuesta $0,01 y hay 100 000 M. ¿Qué capitalización tendría si el precio llegara a $1?",
               "options": [
-                "$1 000 M",
-                "$10 000 M",
-                "$100 000 M",
+                "$1 000 M",
+                "$10 000 M",
+                "$100 000 M",
                 "$1 billón"
               ],
               "answer": 2,
-              "why": "100 000 000 000 × $1 = $100 000 M. Hoy 100 000 M × $0.01 = $1 000 M: haría falta subir 100 veces."
+              "why": "100 000 000 000 × $1 = $100 000 M. Hoy 100 000 M × $0,01 = $1 000 M: haría falta subir 100 veces."
             }
           ]
         },
@@ -1451,13 +1451,13 @@
             },
             {
               "title": "Un pedacito por $10",
-              "text": "No hace falta comprar un bitcoin entero. Supongamos que 1 bitcoin cuesta $80 000 y tú tienes $10. Hacemos la cuenta: $10 ÷ $80 000 = 0.000125 bitcoin. Es poco, pero es una parte real de bitcoin. Su precio cambia junto con él.",
+              "text": "No hace falta comprar un bitcoin entero. Supongamos que 1 bitcoin cuesta $80 000 y tú tienes $10. Hacemos la cuenta: $10 ÷ $80 000 = 0,000125 bitcoin. Es poco, pero es una parte real de bitcoin. Su precio cambia junto con él.",
               "example": "En la vida real: no hace falta comprar el pastel entero. Puedes llevarte una porción, y es del mismo pastel.",
               "art": "coins"
             },
             {
               "title": "La comisión",
-              "text": "Por cada compra y cada venta, el exchange cobra un pequeño pago: la comisión. Suele ser una fracción de un por ciento. Ejemplo: comisión del 0.1%. Compras $100 y pagas $100 × 0.1% = $0.10. Si pagas con tarjeta bancaria, el cargo puede ser mayor.",
+              "text": "Por cada compra y cada venta, el exchange cobra un pequeño pago: la comisión. Suele ser una fracción de un por ciento. Ejemplo: comisión del 0,1%. Compras $100 y pagas $100 × 0,1% = $0,10. Si pagas con tarjeta bancaria, el cargo puede ser mayor.",
               "example": "En la vida real: la casa de cambio también gana: vende los dólares un poco más caros de lo que los compra.",
               "art": "calculator"
             },
@@ -1469,7 +1469,7 @@
             },
             {
               "title": "Primero, practica",
-              "text": "Antes de gastar dinero real, puedes practicar. CRYPTO NOVA tiene una cuenta demo: dinero virtual y precios reales. Ahí los errores no cuestan nada. Y la hucha te muestra cómo funcionan las compras regulares.",
+              "text": "Antes de gastar dinero real, puedes practicar. CRYPTO NOVA tiene una cuenta demo: dinero virtual y precios reales. Ahí los errores no cuestan nada. Y la hucha te muestra cómo funcionan las compras regulares.",
               "example": "En la vida real: antes de salir a la ciudad, se aprende a conducir en la pista de la autoescuela.",
               "art": "seatbelt"
             }
@@ -1489,18 +1489,18 @@
                 "Sí, puedes comprar una parte pequeña"
               ],
               "answer": 3,
-              "why": "$10 ÷ $80 000 = 0.000125 bitcoin. Es una parte real de bitcoin, y su precio cambia junto con él."
+              "why": "$10 ÷ $80 000 = 0,000125 bitcoin. Es una parte real de bitcoin, y su precio cambia junto con él."
             },
             {
-              "q": "La comisión del exchange es del 0.1%. Compras $200. ¿Cuánto se va en comisión?",
+              "q": "La comisión del exchange es del 0,1%. Compras $200. ¿Cuánto se va en comisión?",
               "options": [
                 "$2",
-                "$0.20",
+                "$0,20",
                 "$20",
-                "$0.02"
+                "$0,02"
               ],
               "answer": 1,
-              "why": "$200 × 0.1% = $0.20. Más fácil de recordar: 0.1% son 10 centavos por cada $100."
+              "why": "$200 × 0,1% = $0,20. Más fácil de recordar: 0,1% son 10 centavos por cada $100."
             },
             {
               "q": "¿A partir de qué edad se pueden comprar cripto en un exchange con dinero real?",
@@ -1643,7 +1643,7 @@
             },
             {
               "title": "Una reserva en la cartera",
-              "text": "Tener parte del dinero en dólares es como un ahorro para imprevistos. Por ejemplo, en la cartera spot de CRYPTO NOVA cerca del 15% está en dólares. Cuando el mercado cae, la parte en dólares casi no cambia. Y además, con ella puedes comprar monedas más baratas.",
+              "text": "Tener parte del dinero en dólares es como un ahorro para imprevistos. Por ejemplo, en la cartera spot de CRYPTO NOVA cerca del 15% está en dólares. Cuando el mercado cae, la parte en dólares casi no cambia. Y además, con ella puedes comprar monedas más baratas.",
               "example": "En la vida real: el paraguas en el bolso no detiene la lluvia, pero te ayuda a esperar a que pase.",
               "art": "umbrella",
               "chart": {
@@ -1656,7 +1656,7 @@
                   "monedas",
                   "dólares"
                 ],
-                "caption": "Cartera spot de CRYPTO NOVA, octubre de 2026"
+                "caption": "Cartera spot de CRYPTO NOVA, octubre de 2026"
               }
             }
           ],
@@ -1767,7 +1767,7 @@
               "why": "Donde hay ganancia, hay riesgo. Prometer «sin riesgo» es la principal señal de engaño. Lo más probable es que ni siquiera una cantidad pequeña vuelva."
             },
             {
-              "q": "Un video: un empresario famoso regala bitcoins. «Envía 0.1 y recibe 0.2». ¿Qué haces?",
+              "q": "Un video: un empresario famoso regala bitcoins. «Envía 0,1 y recibe 0,2». ¿Qué haces?",
               "options": [
                 "Enviar un poco para probar",
                 "Enviar, porque es alguien famoso",
@@ -1887,7 +1887,7 @@
             },
             {
               "title": "La comisión de red al retirar",
-              "text": "Cuando retiras monedas del exchange a tu propio monedero, pagas una comisión de red. Suele ser una cantidad fija, no un porcentaje: retirar $20 o $2.000 cuesta lo mismo. Por eso retirar a poquitos no compensa.",
+              "text": "Cuando retiras monedas del exchange a tu propio monedero, pagas una comisión de red. Suele ser una cantidad fija, no un porcentaje: retirar $20 o $2,000 cuesta lo mismo. Por eso retirar a poquitos no compensa.",
               "example": "En la vida real: enviar un paquete cuesta lo mismo lleve lo que lleve dentro.",
               "art": "chain"
             },
@@ -1935,7 +1935,7 @@
                 "Retirar no cuesta nada"
               ],
               "answer": 0,
-              "why": "La comisión de retiro suele ser la misma. $5 son el 25 % de $20, pero el 0,25 % de $2.000."
+              "why": "La comisión de retiro suele ser la misma. $5 son el 25 % de $20, pero el 0,25 % de $2,000."
             }
           ]
         },
@@ -2037,7 +2037,7 @@
             },
             {
               "title": "La señal principal es la misma",
-              "text": "La tecnología es nueva, pero el truco es viejo: prisa, ganancias sin riesgo y la petición de enviar dinero o dar un código. Si ves eso, es un engaño, por muy real que parezca el video. CRYPTO NOVA no te llama, no te pide que envíes dinero y no te pregunta códigos.",
+              "text": "La tecnología es nueva, pero el truco es viejo: prisa, ganancias sin riesgo y la petición de enviar dinero o dar un código. Si ves eso, es un engaño, por muy real que parezca el video. CRYPTO NOVA no te llama, no te pide que envíes dinero y no te pregunta códigos.",
               "example": "En la vida real: un billete falso puede ser bonito. Pero si alguien tiene prisa por pagar con él a oscuras, desconfía.",
               "art": "shield"
             }
@@ -2091,7 +2091,7 @@
           "cards": [
             {
               "title": "Solo retiras tú",
-              "text": "El dinero de tu cuenta del exchange es tuyo. Lo retiras tú mismo, en la app del exchange. CRYPTO NOVA no puede retirarlo ni pide acceso a retiros. Antes de un retiro, el exchange puede pedirte un código de una app o un SMS: eso protege tu cuenta.",
+              "text": "El dinero de tu cuenta del exchange es tuyo. Lo retiras tú mismo, en la app del exchange. CRYPTO NOVA no puede retirarlo ni pide acceso a retiros. Antes de un retiro, el exchange puede pedirte un código de una app o un SMS: eso protege tu cuenta.",
               "example": "En la vida real: sacar dinero del cajero solo puedes tú, con tu tarjeta y tu PIN.",
               "art": "bank"
             },
@@ -2123,7 +2123,7 @@
             {
               "q": "¿Quién puede retirar dinero de tu cuenta del exchange?",
               "options": [
-                "CRYPTO NOVA",
+                "CRYPTO NOVA",
                 "Solo tú",
                 "Cualquiera que sepa tu UID",
                 "El «soporte» de una app de mensajería"
@@ -2215,7 +2215,7 @@
               "art": "shield"
             },
             {
-              "title": "Cómo es en CRYPTO NOVA",
+              "title": "Cómo es en CRYPTO NOVA",
               "text": "En la sección «Spot», el sistema mantiene una cartera de varias monedas: bitcoin, ether, solana y otras grandes. Cerca del 15% está en dólares, como reserva. Cuando las proporciones se descuadran, el sistema vende por su cuenta lo que sobra y compra más de lo que falta.",
               "example": "En la vida real: un jardinero poda las ramas que crecieron de más y planta donde hay huecos. Así el jardín se mantiene parejo.",
               "art": "phone_app"
@@ -2277,7 +2277,7 @@
             {
               "title": "Cómo funciona la hucha",
               "text": "Eliges una cantidad y cada cuánto comprar. Por ejemplo, $10 cada semana. Y compras ese día, esté como esté el precio. Sin noticias ni nervios. A esto se le llama promediar: el precio de compra sale en un punto medio, ni el más bajo ni el más alto.",
-              "example": "En CRYPTO NOVA así funciona la «Hucha»: de $5 a $50, cada semana o cada mes. Te avisa el día de compra.",
+              "example": "En CRYPTO NOVA así funciona la «Hucha»: de $5 a $50, cada semana o cada mes. Te avisa el día de compra.",
               "art": "piggy"
             },
             {
@@ -2302,14 +2302,14 @@
             },
             {
               "title": "Hagamos la cuenta",
-              "text": "En 3 semanas invertiste $50 × 3 = $150. Recibiste 5 + 10 + 5 = 20 monedas. Precio medio: $150 ÷ 20 = $7.50. Si lo hubieras comprado todo la primera semana, tendrías $150 ÷ $10 = 15 monedas. La constancia te dio 5 monedas más.",
+              "text": "En 3 semanas invertiste $50 × 3 = $150. Recibiste 5 + 10 + 5 = 20 monedas. Precio medio: $150 ÷ 20 = $7,50. Si lo hubieras comprado todo la primera semana, tendrías $150 ÷ $10 = 15 monedas. La constancia te dio 5 monedas más.",
               "example": "Sin rodeos: si el precio no para de subir, comprar todo de una vez sale mejor. La hucha no siempre gana. Pero te quita las adivinanzas y los nervios.",
               "art": "calculator"
             },
             {
               "title": "Qué pasó en el pasado",
-              "text": "Probamos la hucha con precios reales de bitcoin y una comisión del 0.1%: la misma cantidad cada semana. Con precios al 19.10.2026, cada $100 apartados se habrían convertido en unos $115 en 3 años y en unos $191 en 5 años. Así fue en el pasado; no hay garantías.",
-              "example": "Ejemplo: $10 a la semana durante 5 años son 261 compras y $2 610 de tus aportes. Se habrían convertido en unos $2 610 × 1.91 ≈ $4 985.",
+              "text": "Probamos la hucha con precios reales de bitcoin y una comisión del 0,1%: la misma cantidad cada semana. Con precios al 19.10.2026, cada $100 apartados se habrían convertido en unos $115 en 3 años y en unos $191 en 5 años. Así fue en el pasado; no hay garantías.",
+              "example": "Ejemplo: $10 a la semana durante 5 años son 261 compras y $2 610 de tus aportes. Se habrían convertido en unos $2 610 × 1,91 ≈ $4 985.",
               "art": "calendar"
             },
             {
@@ -2905,7 +2905,7 @@
             {
               "title": "Qué anotar",
               "text": "El registro es un simple cuaderno o una hoja de cálculo. Por cada compra, una línea: fecha, qué moneda, cuánto dinero gastaste, a qué precio y cuántas monedas recibiste. Si vendes, también lo anotas. Cada anotación lleva un minuto.",
-              "example": "Ejemplo de línea: 12.10.2026, bitcoin, $80 a un precio de $80 000, recibido 0.001 bitcoin. Comprobación: $80 ÷ $80 000 = 0.001.",
+              "example": "Ejemplo de línea: 12.10.2026, bitcoin, $80 a un precio de $80 000, recibido 0,001 bitcoin. Comprobación: $80 ÷ $80 000 = 0,001.",
               "art": "books"
             },
             {
@@ -2917,7 +2917,7 @@
             {
               "title": "Tu precio medio",
               "text": "El registro te muestra tu precio medio de compra. Divide todo el dinero invertido entre todas las monedas recibidas. Si el precio actual está por encima de tu precio medio, vas en positivo. Si está por debajo, en negativo. Un solo número en lugar de decenas de compras.",
-              "example": "Ejemplo: $50 a $10 son 5 monedas. $25 a $5, otras 5. En total, $75 por 10 monedas: $75 ÷ 10 = $7.50 por moneda.",
+              "example": "Ejemplo: $50 a $10 son 5 monedas. $25 a $5, otras 5. En total, $75 por 10 monedas: $75 ÷ 10 = $7,50 por moneda.",
               "art": "scale"
             },
             {
@@ -2989,7 +2989,7 @@
             {
               "title": "Cuándo lo necesitas",
               "text": "Si en el exchange tienes una cantidad que no te importa perder, puedes no comprarlo. Si perderla te haría mucho daño, el monedero frío vale la pena. Suele costar entre $60 y $200.",
-              "example": "Ejemplo: tienes $3 000 en bitcoin para años. Un dispositivo de $100 es cerca del 3% de esa cantidad: $100 ÷ $3 000 ≈ 3%.",
+              "example": "Ejemplo: tienes $3 000 en bitcoin para años. Un dispositivo de $100 es cerca del 3% de esa cantidad: $100 ÷ $3 000 ≈ 3%.",
               "art": "scale"
             },
             {
@@ -3046,7 +3046,7 @@
               "why": "Todo lo que está en internet se puede robar. Papel o metal en dos lugares seguros protegen de ladrones y de incendios."
             },
             {
-              "q": "Vas a pasar $2 000 a un monedero nuevo. ¿Cómo se hace bien?",
+              "q": "Vas a pasar $2 000 a un monedero nuevo. ¿Cómo se hace bien?",
               "options": [
                 "Todo de una vez",
                 "Primero $10, comprobar que llegaron y luego el resto",
@@ -3054,7 +3054,7 @@
                 "A través de un conocido"
               ],
               "answer": 1,
-              "why": "La transferencia pequeña comprueba que la dirección y la red son correctas. Un error costará $10, no $2 000."
+              "why": "La transferencia pequeña comprueba que la dirección y la red son correctas. Un error costará $10, no $2 000."
             }
           ]
         },
@@ -3096,7 +3096,7 @@
             },
             {
               "title": "Qué recordar",
-              "text": "CRYPTO NOVA nunca pide ni guarda tus contraseñas ni frases semilla, y ningún servicio honesto te las pedirá. Actualiza el plan una vez al año: si abres una cuenta nueva, añádela. Esto no es asesoramiento legal: para la herencia en tu país, consulta a un notario o a un abogado.",
+              "text": "CRYPTO NOVA nunca pide ni guarda tus contraseñas ni frases semilla, y ningún servicio honesto te las pedirá. Actualiza el plan una vez al año: si abres una cuenta nueva, añádela. Esto no es asesoramiento legal: para la herencia en tu país, consulta a un notario o a un abogado.",
               "example": "Como en la vida: el seguro y los documentos se revisan una vez al año. Con el plan de herencia, igual.",
               "art": "shield"
             }
@@ -3150,7 +3150,7 @@
           "cards": [
             {
               "title": "Interés sobre interés",
-              "text": "Lo que ganas y sigue invertido también genera ganancias. Eso es el interés compuesto. $1.000 al +10 % anual son $1.100 al cabo de un año y $1.210 a los dos, no $1.200.",
+              "text": "Lo que ganas y sigue invertido también genera ganancias. Eso es el interés compuesto. $1,000 al +10 % anual son $1,100 al cabo de un año y $1,210 a los dos, no $1,200.",
               "example": "En la vida real: una bola de nieve: cuanto más rueda, más rápido crece.",
               "art": "chart_up",
               "chart": {
@@ -3173,12 +3173,12 @@
                   "25 años",
                   "30 años"
                 ],
-                "caption": "Ejemplo ilustrativo: $1.000 a un +10 % anual constante, $"
+                "caption": "Ejemplo ilustrativo: $1,000 a un +10 % anual constante, $"
               }
             },
             {
               "title": "El tiempo gana a la cantidad",
-              "text": "Cuanto antes empiezas, más tiempo trabaja el rendimiento. Al 7 % anual, $10.000 se convierten en unos $19.700 en 10 años y en unos $76.000 en 30. La misma suma: la diferencia es solo el tiempo.",
+              "text": "Cuanto antes empiezas, más tiempo trabaja el rendimiento. Al 7 % anual, $10,000 se convierten en unos $19,700 en 10 años y en unos $76,000 en 30. La misma suma: la diferencia es solo el tiempo.",
               "example": "En la vida real: un árbol plantado 20 años antes da una sombra que no se compra con dinero.",
               "art": "clock"
             },
@@ -3202,15 +3202,15 @@
           ],
           "quiz": [
             {
-              "q": "$1.000 al +10 % anual. ¿Cuánto habrá en 2 años con interés compuesto?",
+              "q": "$1,000 al +10 % anual. ¿Cuánto habrá en 2 años con interés compuesto?",
               "options": [
-                "$1.200",
-                "$1.210",
-                "$1.100",
-                "$2.000"
+                "$1,200",
+                "$1,210",
+                "$1,100",
+                "$2,000"
               ],
               "answer": 1,
-              "why": "$1.000 × 1,1 = $1.100, y luego $1.100 × 1,1 = $1.210. El segundo año también sumó interés sobre la ganancia anterior."
+              "why": "$1,000 × 1,1 = $1,100, y luego $1,100 × 1,1 = $1,210. El segundo año también sumó interés sobre la ganancia anterior."
             },
             {
               "q": "Según la regla del 72, ¿en cuántos años se duplica el dinero al 6 % anual?",
@@ -3244,7 +3244,7 @@
           "cards": [
             {
               "title": "Las proporciones se mueven solas",
-              "text": "Decidiste tener un 60 % en bitcoin y un 40 % en dólares: $6.000 y $4.000. Bitcoin se duplicó: ahora son $12.000 y $4.000, es decir, 75 % y 25 %. El riesgo creció solo, sin que lo decidieras.",
+              "text": "Decidiste tener un 60 % en bitcoin y un 40 % en dólares: $6,000 y $4,000. Bitcoin se duplicó: ahora son $12,000 y $4,000, es decir, 75 % y 25 %. El riesgo creció solo, sin que lo decidieras.",
               "example": "En la vida real: un huerto sin desherbar: las malas hierbas ahogan todo lo demás.",
               "art": "scale",
               "chart": {
@@ -3262,7 +3262,7 @@
             },
             {
               "title": "Volver a como estaba",
-              "text": "Rebalancear es vender parte de lo que subió y comprar más de lo que se quedó atrás. Total $16.000; el objetivo 60/40 son $9.600 y $6.400. Se vende bitcoin por $12.000 − $9.600 = $2.400.",
+              "text": "Rebalancear es vender parte de lo que subió y comprar más de lo que se quedó atrás. Total $16,000; el objetivo 60/40 son $9,600 y $6,400. Se vende bitcoin por $12,000 − $9,600 = $2,400.",
               "example": "En la vida real: podar los arbustos del jardín para que uno no les quite el sol a los demás.",
               "art": "calculator"
             },
@@ -3286,15 +3286,15 @@
           ],
           "quiz": [
             {
-              "q": "Plan 50/50. Ahora hay $15.000 en bitcoin y $5.000 en dólares. ¿Cuánto bitcoin vender para volver al 50/50?",
+              "q": "Plan 50/50. Ahora hay $15,000 en bitcoin y $5,000 en dólares. ¿Cuánto bitcoin vender para volver al 50/50?",
               "options": [
-                "$5.000",
-                "$10.000",
-                "$2.500",
-                "$7.500"
+                "$5,000",
+                "$10,000",
+                "$2,500",
+                "$7,500"
               ],
               "answer": 0,
-              "why": "El total es $20.000; la mitad, $10.000. Se venden $15.000 − $10.000 = $5.000 y los dólares suben a $10.000."
+              "why": "El total es $20,000; la mitad, $10,000. Se venden $15,000 − $10,000 = $5,000 y los dólares suben a $10,000."
             },
             {
               "q": "¿Para qué sirve el rebalanceo?",
@@ -3340,7 +3340,7 @@
             },
             {
               "title": "Cuánto y dónde",
-              "text": "Calcula tus gastos de un mes y multiplícalos por 3–6. Si gastas $800 al mes, el colchón es de $2.400–4.800. Se guarda en un lugar seguro y de acceso rápido: un depósito o una cuenta de la que puedas sacar el dinero en un día.",
+              "text": "Calcula tus gastos de un mes y multiplícalos por 3–6. Si gastas $800 al mes, el colchón es de $2,400–4,800. Se guarda en un lugar seguro y de acceso rápido: un depósito o una cuenta de la que puedas sacar el dinero en un día.",
               "example": "En la vida real: el botiquín se tiene en casa, no en la casa del pueblo.",
               "art": "bank",
               "chart": {
@@ -3370,15 +3370,15 @@
           ],
           "quiz": [
             {
-              "q": "Gastas $1.000 al mes. ¿Cuál es un colchón de 3–6 meses?",
+              "q": "Gastas $1,000 al mes. ¿Cuál es un colchón de 3–6 meses?",
               "options": [
                 "$300–600",
-                "$3.000–6.000",
-                "$10.000–20.000",
-                "$1.000"
+                "$3,000–6,000",
+                "$10,000–20,000",
+                "$1,000"
               ],
               "answer": 1,
-              "why": "$1.000 × 3 = $3.000 y $1.000 × 6 = $6.000."
+              "why": "$1,000 × 3 = $3,000 y $1,000 × 6 = $6,000."
             },
             {
               "q": "¿Dónde se guarda el colchón?",
@@ -3419,7 +3419,7 @@
             {
               "title": "Qué fondos hay",
               "text": "En EE. UU., los fondos de bitcoin funcionan desde enero de 2024, y los de ether, desde julio de 2024. Desde el otoño de 2025 han aparecido fondos de solana, XRP y otras monedas: el regulador simplificó las reglas para lanzarlos. En Europa, productos cotizados parecidos se llaman ETP. A octubre de 2026, a través de estos fondos tienen bitcoin tanto particulares como grandes empresas.",
-              "example": "Ejemplo: el mayor fondo de bitcoin cobra alrededor de un 0.25% al año. Sobre $1 000, son $2.50 al año.",
+              "example": "Ejemplo: el mayor fondo de bitcoin cobra alrededor de un 0,25% al año. Sobre $1 000, son $2,50 al año.",
               "art": "globe"
             },
             {
@@ -3464,15 +3464,15 @@
               "why": "Los primeros ETF de bitcoin empezaron a cotizar en EE. UU. en enero de 2024, y los de ether, en julio de 2024."
             },
             {
-              "q": "El fondo cobra un 0.25% al año. ¿Cuánto es sobre $2 000?",
+              "q": "El fondo cobra un 0,25% al año. ¿Cuánto es sobre $2 000?",
               "options": [
-                "$0.25",
+                "$0,25",
                 "$50",
                 "$5",
                 "$25"
               ],
               "answer": 2,
-              "why": "$2 000 × 0.25% = $5 al año. Es poco, pero se cobra cada año mientras tengas el fondo."
+              "why": "$2 000 × 0,25% = $5 al año. Es poco, pero se cobra cada año mientras tengas el fondo."
             }
           ]
         },
@@ -3574,7 +3574,7 @@
             },
             {
               "title": "Qué significa para ti",
-              "text": "Usa solo servicios permitidos en tu país y no te saltes las prohibiciones: pierdes la protección de la ley y pueden cerrarte la cuenta. Las leyes no te protegen de una caída del precio: el riesgo de mercado sigue siendo tuyo. Por eso CRYPTO NOVA solo nombra un exchange que funciona en tu país: en la UE es OKX Europe, con licencia MiCA.",
+              "text": "Usa solo servicios permitidos en tu país y no te saltes las prohibiciones: pierdes la protección de la ley y pueden cerrarte la cuenta. Las leyes no te protegen de una caída del precio: el riesgo de mercado sigue siendo tuyo. Por eso CRYPTO NOVA solo nombra un exchange que funciona en tu país: en la UE es OKX Europe, con licencia MiCA.",
               "example": "En la vida real: el seguro del coche no te salva del hielo en la carretera. Ayuda si la culpa es de otro, pero igual hay que conducir con cuidado.",
               "art": "shield"
             }
@@ -3659,7 +3659,7 @@
             },
             {
               "title": "Más tranquilo o más atrevido",
-              "text": "Spot es más sencillo: la moneda es tuya y la operación no se cierra sola. Los futuros son para quien entiende el riesgo y siempre pone un stop. En CRYPTO NOVA hay de los dos: «Spot» sin apalancamiento y «Futuros», donde cada operación tiene su stop desde el principio. Dinero real: solo a partir de 18 años.",
+              "text": "Spot es más sencillo: la moneda es tuya y la operación no se cierra sola. Los futuros son para quien entiende el riesgo y siempre pone un stop. En CRYPTO NOVA hay de los dos: «Spot» sin apalancamiento y «Futuros», donde cada operación tiene su stop desde el principio. Dinero real: solo a partir de 18 años.",
               "example": "Puedes probar sin riesgo en la cuenta demo: dinero virtual, precios reales.",
               "art": "compass"
             }
@@ -3737,7 +3737,7 @@
             },
             {
               "title": "Cómo se ve en la app",
-              "text": "En las operaciones de CRYPTO NOVA la dirección está escrita claramente: «ALCISTA (LONG)» o «BAJISTA (SHORT)». LONG: el sistema espera que el precio suba. SHORT: espera que baje. Es un cálculo, no una promesa: el precio puede ir hacia el otro lado.",
+              "text": "En las operaciones de CRYPTO NOVA la dirección está escrita claramente: «ALCISTA (LONG)» o «BAJISTA (SHORT)». LONG: el sistema espera que el precio suba. SHORT: espera que baje. Es un cálculo, no una promesa: el precio puede ir hacia el otro lado.",
               "example": "En la vida real: el pronóstico «mañana lloverá» no promete lluvia. Dice que la lluvia es más probable. Una operación del sistema es un pronóstico así.",
               "art": "phone_app"
             }
@@ -3771,7 +3771,7 @@
               "why": "En un short, si el precio sube, pierdes. Vendiste a $20 y tendrás que recomprar a $30: $30 − $20 = $10 de pérdida."
             },
             {
-              "q": "¿Qué significa LONG en una operación de CRYPTO NOVA?",
+              "q": "¿Qué significa LONG en una operación de CRYPTO NOVA?",
               "options": [
                 "El sistema espera que el precio suba",
                 "La operación es a largo plazo, para muchos años",
@@ -3829,7 +3829,7 @@
             },
             {
               "title": "Cómo tratar el apalancamiento",
-              "text": "El apalancamiento es como un cuchillo afilado: útil si lo usas con cuidado. Apalancamiento bajo, stop obligatorio y operación pequeña. El stop cierra la operación antes de la liquidación, con una pérdida pequeña. En las operaciones de CRYPTO NOVA, el apalancamiento se ve en el bloque «Riesgo», por ejemplo «apalancamiento ×2».",
+              "text": "El apalancamiento es como un cuchillo afilado: útil si lo usas con cuidado. Apalancamiento bajo, stop obligatorio y operación pequeña. El stop cierra la operación antes de la liquidación, con una pérdida pequeña. En las operaciones de CRYPTO NOVA, el apalancamiento se ve en el bloque «Riesgo», por ejemplo «apalancamiento ×2».",
               "example": "En la vida real: con un cuchillo de cocina se corta pan, no se juega. El apalancamiento también trabaja a tu favor solo si lo manejas con cuidado.",
               "art": "shield"
             }
@@ -4122,9 +4122,9 @@
               "art": "ruler"
             },
             {
-              "title": "El riesgo en las operaciones de CRYPTO NOVA",
-              "text": "En cada operación del sistema, el bloque «Riesgo» dice cuánto dinero está en riesgo. Por ejemplo: «$50 en riesgo de $10 000». Es el 0.5% de la cuenta: lo que perdería la cuenta demo si salta el stop. Si replicas la operación, calcula el riesgo sobre tu propia cantidad.",
-              "example": "Ejemplo: tu cuenta es de $1 000, y un riesgo del 0.5% son $1 000 × 0.5% = $5 por operación.",
+              "title": "El riesgo en las operaciones de CRYPTO NOVA",
+              "text": "En cada operación del sistema, el bloque «Riesgo» dice cuánto dinero está en riesgo. Por ejemplo: «$50 en riesgo de $10 000». Es el 0,5% de la cuenta: lo que perdería la cuenta demo si salta el stop. Si replicas la operación, calcula el riesgo sobre tu propia cantidad.",
+              "example": "Ejemplo: tu cuenta es de $1 000, y un riesgo del 0,5% son $1 000 × 0,5% = $5 por operación.",
               "art": "phone_app"
             }
           ],
@@ -4195,7 +4195,7 @@
             },
             {
               "title": "Cuánto es en dinero",
-              "text": "Normalmente el funding es una fracción de un por ciento del tamaño de la operación. Ejemplo: operación de $1 000, funding del 0.01%. Son $1 000 × 0.01% = 10 centavos por cada pago. Solo pagan o reciben quienes tienen la operación abierta en el momento del pago.",
+              "text": "Normalmente el funding es una fracción de un por ciento del tamaño de la operación. Ejemplo: operación de $1 000, funding del 0,01%. Son $1 000 × 0,01% = 10 centavos por cada pago. Solo pagan o reciben quienes tienen la operación abierta en el momento del pago.",
               "example": "Ejemplo: 3 pagos al día. En un día, 3 × 10 centavos = 30 centavos. En un mes, unos 30 × 30 centavos = $9.",
               "art": "calculator",
               "chart": {
@@ -4240,7 +4240,7 @@
               "why": "Cuando el lugar en la «fila de la subida» está muy solicitado, se encarece. Los longs les pagan un extra a los shorts."
             },
             {
-              "q": "Operación de $1 000, funding del 0.01%. ¿Cuánto es por cada pago?",
+              "q": "Operación de $1 000, funding del 0,01%. ¿Cuánto es por cada pago?",
               "options": [
                 "$1",
                 "$10",
@@ -4248,7 +4248,7 @@
                 "10 centavos"
               ],
               "answer": 3,
-              "why": "El 1% de $1 000 son $10, y el 0.01% es 100 veces menos: 10 centavos."
+              "why": "El 1% de $1 000 son $10, y el 0,01% es 100 veces menos: 10 centavos."
             },
             {
               "q": "¿Para qué sirve el funding?",
@@ -4265,13 +4265,13 @@
         },
         {
           "id": "l3-signal",
-          "title": "Cómo leer una operación de CRYPTO NOVA: un ejemplo real",
+          "title": "Cómo leer una operación de CRYPTO NOVA: un ejemplo real",
           "minutes": 5,
           "goal": "Al terminar, podrás leer una operación del sistema y entender qué significa cada número.",
           "cards": [
             {
               "title": "Un ejemplo real: ARB",
-              "text": "Veamos una operación real del sistema en la cuenta demo. Moneda: ARB. Dirección: alcista (LONG). Entrada: $0.1755. Stop: $0.1544. Objetivo: $0.2632. La operación se abrió la noche del 18.10.2026. Había además otra regla: si en un día no saltaban ni el stop ni el objetivo, salir por tiempo.",
+              "text": "Veamos una operación real del sistema en la cuenta demo. Moneda: ARB. Dirección: alcista (LONG). Entrada: $0,1755. Stop: $0,1544. Objetivo: $0,2632. La operación se abrió la noche del 18.10.2026. Había además otra regla: si en un día no saltaban ni el stop ni el objetivo, salir por tiempo.",
               "example": "En la vida real: metes un pastel al horno y decides: en 40 minutos lo saco, aunque todavía no esté dorado. La salida por tiempo es ese temporizador.",
               "art": "target",
               "chart": {
@@ -4291,25 +4291,25 @@
             },
             {
               "title": "Por qué entró el sistema",
-              "text": "El motivo: una venta brusca. El precio cayó rápido un 1.5%, y se negoció casi 3 veces más de lo normal. En el historial, caídas así a menudo se recompraban en menos de un día. A menudo, pero no siempre. En la app, esto aparece en el bloque «Por qué entramos».",
+              "text": "El motivo: una venta brusca. El precio cayó rápido un 1,5%, y se negoció casi 3 veces más de lo normal. En el historial, caídas así a menudo se recompraban en menos de un día. A menudo, pero no siempre. En la app, esto aparece en el bloque «Por qué entramos».",
               "example": "En la vida real: al final del día en el mercado, un vendedor con prisa remata barata una caja de fresas. Los compradores se la llevan enseguida, y el precio vuelve a lo normal.",
               "art": "magnifier"
             },
             {
               "title": "Riesgo y objetivo en porcentajes",
-              "text": "De la entrada al stop: $0.1755 − $0.1544 = $0.0211. Es cerca de un 12%. De la entrada al objetivo: $0.2632 − $0.1755 = $0.0877, cerca de un 50%. El objetivo está unas 4 veces más lejos que el stop. En la app, estos números están en el bloque «Riesgo»: «al stop», «al objetivo», «objetivo / riesgo».",
+              "text": "De la entrada al stop: $0,1755 − $0,1544 = $0,0211. Es cerca de un 12%. De la entrada al objetivo: $0,2632 − $0,1755 = $0,0877, cerca de un 50%. El objetivo está unas 4 veces más lejos que el stop. En la app, estos números están en el bloque «Riesgo»: «al stop», «al objetivo», «objetivo / riesgo».",
               "example": "En la vida real: estás dispuesto a arriesgar $12 para intentar ganar $50. Esa apuesta es más sensata que al revés.",
               "art": "calculator"
             },
             {
               "title": "Cómo terminó",
-              "text": "En un día no saltaron ni el stop ni el objetivo. La noche del 19.10.2026 la operación se cerró por tiempo, cerca de $0.192: un 9.6% por encima de la entrada. Es un ejemplo, no una promesa: la siguiente operación puede cerrarse en el stop.",
-              "example": "Hagamos la cuenta: en la operación se pusieron unos $2 000 de $10 000. $2 000 × 9.6% ≈ $192, cerca del 1.9% de toda la cuenta demo.",
+              "text": "En un día no saltaron ni el stop ni el objetivo. La noche del 19.10.2026 la operación se cerró por tiempo, cerca de $0,192: un 9,6% por encima de la entrada. Es un ejemplo, no una promesa: la siguiente operación puede cerrarse en el stop.",
+              "example": "Hagamos la cuenta: en la operación se pusieron unos $2 000 de $10 000. $2 000 × 9,6% ≈ $192, cerca del 1,9% de toda la cuenta demo.",
               "art": "clock"
             },
             {
               "title": "Si la entrada ya quedó atrás",
-              "text": "Supongamos que viste la operación tarde, con el precio ya en $0.1937. El stop sigue en $0.1544: ahora está a cerca de un 20%, no a un 12%. El objetivo, a cerca de un 36%, no a un 50%. El riesgo creció y el margen se achicó. Es más tranquilo dejarla pasar y esperar la siguiente operación.",
+              "text": "Supongamos que viste la operación tarde, con el precio ya en $0,1937. El stop sigue en $0,1544: ahora está a cerca de un 20%, no a un 12%. El objetivo, a cerca de un 36%, no a un 50%. El riesgo creció y el margen se achicó. Es más tranquilo dejarla pasar y esperar la siguiente operación.",
               "example": "En la vida real: el autobús ya salió. Correr detrás de él por la calle es peligroso. Es más tranquilo esperar el siguiente.",
               "art": "ladder"
             },
@@ -4335,10 +4335,10 @@
                 "La hora en que termina la operación"
               ],
               "answer": 1,
-              "why": "El stop es la salida decidida de antemano si la idea no funcionó. En ARB era $0.1544, cerca de un 12% por debajo de la entrada."
+              "why": "El stop es la salida decidida de antemano si la idea no funcionó. En ARB era $0,1544, cerca de un 12% por debajo de la entrada."
             },
             {
-              "q": "La entrada de la operación es $0.1755, pero el precio ya está en $0.1937. ¿Qué es más sensato?",
+              "q": "La entrada de la operación es $0,1755, pero el precio ya está en $0,1937. ¿Qué es más sensato?",
               "options": [
                 "Entrar rápido, antes de que suba más",
                 "Entrar y quitar el stop",
@@ -4461,7 +4461,7 @@
             },
             {
               "title": "Orden limitada",
-              "text": "Tú fijas el precio: «comprar bitcoin a no más de $80.000». La orden espera a que el precio llegue y puede no ejecutarse nunca. Su comisión suele ser más baja.",
+              "text": "Tú fijas el precio: «comprar bitcoin a no más de $80,000». La orden espera a que el precio llegue y puede no ejecutarse nunca. Su comisión suele ser más baja.",
               "example": "En la vida real: pides al vendedor que te avise cuando el producto baje a tu precio.",
               "art": "clock"
             },
@@ -4485,7 +4485,7 @@
           ],
           "quiz": [
             {
-              "q": "Quieres comprar solo a $80.000 o más barato. ¿Qué orden?",
+              "q": "Quieres comprar solo a $80,000 o más barato. ¿Qué orden?",
               "options": [
                 "De mercado",
                 "Limitada",
@@ -4544,7 +4544,7 @@
               "art": "chart_up"
             },
             {
-              "title": "Cómo las usa CRYPTO NOVA",
+              "title": "Cómo las usa CRYPTO NOVA",
               "text": "En la app las zonas se dibujan en el gráfico. El stop va más allá de una zona y el objetivo, en la siguiente. Así el riesgo se conoce antes de entrar en la operación.",
               "example": "En la vida real: una ruta se traza por puntos de referencia, no al azar.",
               "art": "target"
@@ -4672,7 +4672,7 @@
             },
             {
               "title": "Pocas operaciones, poca verdad",
-              "text": "Lanzas una moneda 10 veces y sale cara 7. Eso no significa que la moneda sea especial. Con un sistema pasa igual: 10 operaciones son pocas. Mira cientos de operaciones. En CRYPTO NOVA, en el bloque «Historial de la regla» de cada operación ves cuántas operaciones hubo, cuántas en positivo y el resultado promedio.",
+              "text": "Lanzas una moneda 10 veces y sale cara 7. Eso no significa que la moneda sea especial. Con un sistema pasa igual: 10 operaciones son pocas. Mira cientos de operaciones. En CRYPTO NOVA, en el bloque «Historial de la regla» de cada operación ves cuántas operaciones hubo, cuántas en positivo y el resultado promedio.",
               "example": "En la vida real: un restaurante no se juzga por una sola comida. Hay que ir muchas veces.",
               "art": "magnifier"
             }
@@ -4738,7 +4738,7 @@
             },
             {
               "title": "Una tabla que vale la pena recordar",
-              "text": "−10% → hace falta +11.1% para volver. −25% → hace falta +33.3%. −50% → hace falta +100%. −90% → hace falta +900%. Cuanto más hondo el pozo, más empinada la subida. Tras un −90%, de $1 000 quedan $100. Para volver a $1 000, hay que multiplicar por 10.",
+              "text": "−10% → hace falta +11,1% para volver. −25% → hace falta +33,3%. −50% → hace falta +100%. −90% → hace falta +900%. Cuanto más hondo el pozo, más empinada la subida. Tras un −90%, de $1 000 quedan $100. Para volver a $1 000, hay que multiplicar por 10.",
               "example": "En la vida real: de un hoyo de 1 metro sales de un paso. De uno de 10 metros no sales sin una escalera larga.",
               "art": "ladder",
               "chart": {
@@ -4824,7 +4824,7 @@
           "cards": [
             {
               "title": "La prueba con el pasado",
-              "text": "Antes de operar con una regla, se prueba con precios del pasado. Se toman años de historia y se mira qué habría pasado si la regla hubiera funcionado entonces. A esto se le llama backtest. CRYPTO NOVA prueba así cada noche nuevas variantes de sus reglas.",
+              "text": "Antes de operar con una regla, se prueba con precios del pasado. Se toman años de historia y se mira qué habría pasado si la regla hubiera funcionado entonces. A esto se le llama backtest. CRYPTO NOVA prueba así cada noche nuevas variantes de sus reglas.",
               "example": "En la vida real: antes de una cena con invitados, recuerdas cómo te ha salido ese plato otras veces.",
               "art": "books"
             },
@@ -4848,7 +4848,7 @@
             },
             {
               "title": "Por qué mostramos también las pérdidas",
-              "text": "El mercado cambia, como el clima. Lo que funcionaba ayer puede dejar de funcionar mañana. Por eso es importante ver toda la verdad. En CRYPTO NOVA se ven todas las operaciones cerradas, también las perdedoras, y la caída de la cuenta. Y en «Historial de la regla» se ve aparte cómo le fue a la regla en vivo.",
+              "text": "El mercado cambia, como el clima. Lo que funcionaba ayer puede dejar de funcionar mañana. Por eso es importante ver toda la verdad. En CRYPTO NOVA se ven todas las operaciones cerradas, también las perdedoras, y la caída de la cuenta. Y en «Historial de la regla» se ve aparte cómo le fue a la regla en vivo.",
               "example": "En la vida real: un médico honesto no solo te cuenta los beneficios del medicamento, sino también los efectos secundarios.",
               "art": "handshake"
             }
@@ -4908,7 +4908,7 @@
             },
             {
               "title": "La tasa de interés: el precio del dinero",
-              "text": "El banco central de cada país fija la tasa de interés principal. De ella depende a qué interés prestan los bancos. La tasa es el precio del dinero. Tasa alta: el dinero es caro. Tasa baja: es barato. Al banco central de EE. UU. se le llama la Fed (Reserva Federal). Datos de octubre de 2026: en septiembre de 2026 la Fed subió su tasa al 3.75–4% anual, la primera subida desde 2023.",
+              "text": "El banco central de cada país fija la tasa de interés principal. De ella depende a qué interés prestan los bancos. La tasa es el precio del dinero. Tasa alta: el dinero es caro. Tasa baja: es barato. Al banco central de EE. UU. se le llama la Fed (Reserva Federal). Datos de octubre de 2026: en septiembre de 2026 la Fed subió su tasa al 3,75–4% anual, la primera subida desde 2023.",
               "example": "Ejemplo: un crédito de $10 000 al 5% anual cuesta $500 de intereses. Al 20%, ya $2 000. Cuando el crédito es caro, se pide menos.",
               "art": "bank"
             },
@@ -5414,7 +5414,7 @@
             },
             {
               "title": "Mismo riesgo, distinto tamaño",
-              "text": "Si el stop se pone según la volatilidad, una moneda agitada lo tiene más lejos. Para arriesgar los mismos $50, la posición en la moneda agitada es menor: stop del 2 %, posición de $2.500; stop del 10 %, $500.",
+              "text": "Si el stop se pone según la volatilidad, una moneda agitada lo tiene más lejos. Para arriesgar los mismos $50, la posición en la moneda agitada es menor: stop del 2 %, posición de $2,500; stop del 10 %, $500.",
               "example": "En la vida real: sobre el hielo se dan pasos cortos; sobre el asfalto, normales.",
               "art": "ruler",
               "chart": {
@@ -5437,7 +5437,7 @@
               "art": "weather"
             },
             {
-              "title": "Cómo lo hace CRYPTO NOVA",
+              "title": "Cómo lo hace CRYPTO NOVA",
               "text": "El piloto automático ajusta el tamaño de cada operación a la volatilidad y mantiene el riesgo total dentro de los límites del escudo de riesgo. Eso no anula las pérdidas, pero una moneda agitada no decide el destino de toda la cuenta.",
               "example": "En la vida real: la carga se reparte por toda la barca, no se pone en un costado.",
               "art": "shield"
@@ -5453,12 +5453,12 @@
               "q": "Riesgo $30, stop del 3 %. ¿Qué tamaño de posición?",
               "options": [
                 "$100",
-                "$1.000",
-                "$3.000",
+                "$1,000",
+                "$3,000",
                 "$90"
               ],
               "answer": 1,
-              "why": "$30 ÷ 3 % = $1.000. Si salta el stop, la pérdida es $1.000 × 3 % = $30."
+              "why": "$30 ÷ 3 % = $1,000. Si salta el stop, la pérdida es $1,000 × 3 % = $30."
             },
             {
               "q": "Una moneda se volvió el doble de agitada y el stop se alejó el doble. ¿Qué hacer con el tamaño para mantener el riesgo?",
@@ -5509,8 +5509,8 @@
               "art": "warning"
             },
             {
-              "title": "Cómo lo hace CRYPTO NOVA",
-              "text": "La cartera pública de CRYPTO NOVA tiene la fuente «Rendimiento en dólares»: préstamo de USDC y USDT a través de Aave y Sky. A octubre de 2026 es cerca del 15% de la cartera, y otro 5% aproximadamente está en sUSDe de Ethena. Es una demo con tasas reales. Las proporciones tienen un límite para que un problema en un servicio no golpee toda la cartera.",
+              "title": "Cómo lo hace CRYPTO NOVA",
+              "text": "La cartera pública de CRYPTO NOVA tiene la fuente «Rendimiento en dólares»: préstamo de USDC y USDT a través de Aave y Sky. A octubre de 2026 es cerca del 15% de la cartera, y otro 5% aproximadamente está en sUSDe de Ethena. Es una demo con tasas reales. Las proporciones tienen un límite para que un problema en un servicio no golpee toda la cartera.",
               "example": "En la vida real: los huevos se reparten en distintas cestas. Aunque se caiga una, las demás siguen enteras.",
               "art": "scale"
             }
@@ -5526,7 +5526,7 @@
               "options": [
                 "El Estado",
                 "Los prestatarios que necesitan dólares",
-                "CRYPTO NOVA",
+                "CRYPTO NOVA",
                 "Nadie: el interés aparece solo"
               ],
               "answer": 1,

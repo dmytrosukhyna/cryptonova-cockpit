@@ -88,7 +88,7 @@ def test_earned_question_regression(tmp_path, monkeypatch):
     c, d = call(api, "POST", "/v2/agent", {"q": EARNED}, t)
     sent = fake.bodies[-1]
     assert sent["reasoning_effort"] == "low" and sent["max_tokens"] >= 700 and sent["_timeout"] <= 25
-    assert c == 200 and "error" not in d and "source" not in d and d["answer"] == GroqGptOss.ANSWER
+    assert c == 200 and "error" not in d and "source" not in d and d["answer"] == GroqGptOss.ANSWER.replace("CRYPTO NOVA", "CRYPTO\u00a0NOVA")
     assert d["agent"]["left"] == left - 1 and api.agent_last["finish"] == "stop" and api.agent_last["result"] == "ok"
     assert api.agent_last["reasoning_tokens"] == 90 and api.agent_last["prompt_tokens"] == 2500
     assert call(api, "GET", "/v2/health")[1]["agent_last"]["result"] == "ok"
@@ -226,11 +226,11 @@ def test_nova_feed_is_public(tmp_path):
     assert "VIP" not in d["greeting_vip"] and "реальный счёт подключён" in d["greeting_vip"] and "100" in d["greeting_vip"]
     assert 6 <= len(d["suggest"]) <= 8 and all(isinstance(q, str) and len(q) <= 60 for q in d["suggest"])
     # 28.10 (build 46 §11.5): five tidy categories, the long list folded by the app
-    assert [t["title"] for t in d["topics"]] == ["Как работает CRYPTO NOVA", "Портфель и сделки", "Деньги и безопасность",
+    assert [t["title"] for t in d["topics"]] == ["Как работает CRYPTO\u00a0NOVA", "Портфель и сделки", "Деньги и безопасность",
                                                   "Криптовалюты и рынок", "Обучение"]
     assert [t["id"] for t in d["topics"]] == ["how", "portfolio", "money", "market", "learn"]
     assert all(3 <= len(t["qs"]) <= 4 for t in d["topics"])
-    for q in ("Что такое CRYPTO NOVA?", "Как работает публичный портфель?", "Что означает результат сделки?", "Что такое спот и фьючерсы?",
+    for q in ("Что такое CRYPTO\u00a0NOVA?", "Как работает публичный портфель?", "Что означает результат сделки?", "Что такое спот и фьючерсы?",
               "Как подключиться к системе?", "Какие риски существуют?"):                    # the owner's own list of frequent questions
         assert q in [x for t in d["topics"] for x in t["qs"]], q
     assert d["greeting"].startswith("Здравствуйте! Я NOVA AI — ваш помощник в мире криптовалют.") and "гарант" not in d["greeting"]
@@ -274,6 +274,7 @@ def test_tidy_plain_text_for_voice():
     assert nova.tidy("Обрыв без единой точки и на сере", cut=True) == ""
     assert len(nova.tidy("Слово. " * 400)) <= nova.ANSWER_MAX
     assert nova.tidy("Futures +\u200b$186, Spot \u2212\u200b$90.") == "Futures +$186, Spot \u2212$90."     # zero-width (seen 20.10)
+    assert nova.tidy("Счёт CRYPTO NOVA: -3% за 2025-2026.") == "Счёт CRYPTO\u00a0NOVA: \u22123% за 2025-2026."   # 28.10: never wraps
 
 
 def test_nova_can_have_its_own_key(monkeypatch):

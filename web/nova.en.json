@@ -2,12 +2,12 @@
   "v": 1,
   "updated": "2026-10-28",
   "lang": "en",
-  "greeting": "Hello! I'm NOVA AI, your assistant in the world of crypto. I'll help you understand how CRYPTO NOVA works, explain the portfolio's numbers and answer questions about crypto market basics. In demo mode you have 5 questions a day. Type your question or pick a topic below.",
+  "greeting": "Hello! I'm NOVA AI, your assistant in the world of crypto. I'll help you understand how CRYPTO NOVA works, explain the portfolio's numbers and answer questions about crypto market basics. In demo mode you have 5 questions a day. Type your question or pick a topic below.",
   "greeting_vip": "Hi! I'm NOVA AI. Your real account is connected — now you have up to 100 questions a day. Ask me anything: about the system's trades, your account, the Piggy bank and the future of crypto. Type your question or pick one below.",
   "suggest": [
     "Is it safe?",
     "How much have I earned?",
-    "How does CRYPTO NOVA work?",
+    "How does CRYPTO NOVA work?",
     "What is a real account?",
     "How much does it cost?",
     "What is a stablecoin?"
@@ -15,9 +15,9 @@
   "topics": [
     {
       "id": "how",
-      "title": "How CRYPTO NOVA works",
+      "title": "How CRYPTO NOVA works",
       "qs": [
-        "What is CRYPTO NOVA?",
+        "What is CRYPTO NOVA?",
         "How does the public portfolio work?",
         "How do you test strategies?",
         "What if the system is wrong?"

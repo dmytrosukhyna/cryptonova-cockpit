@@ -294,7 +294,7 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     pp = doc["public_portfolio"]
     assert pp["kind"] == "real" and pp["since"] == since and pp["start_usd"] == 10000.0 and pp["value_usd"] == 9970.0
     assert doc["public"]["base_usd"] == 20000.0                       # the demo header stays as it was (older builds, DEMO mode)
-    assert "22" not in pp["title"] and pp["note"].startswith("Реальный счёт CRYPTO NOVA на OKX")
+    assert "22" not in pp["title"] and pp["note"].startswith("Реальный счёт CRYPTO\u00a0NOVA на OKX")
     P = pp["periods"]
     assert P["all"] == {"from": since, "clipped": False, "available": True, "base_usd": 10000.0, "usd": -30.0, "pct": -0.3}
     assert P["day"]["from"] == day0 and P["day"]["usd"] == 30.0 and P["day"]["base_usd"] == 9940.0          # = today_usd
@@ -312,6 +312,15 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     assert S["periods"]["day"]["usd"] == round(-28.0 - (-60.0 + 5.0), 2)                         # spot = total − futures
     assert pp["split_note"] and S["curve"][-1] == [now - 60_000, 7500.0 - 28.0]
     assert abs(sum(c["share_spot"] for c in S["coins"]) + (S["cash_usd"] / S["holdings_usd"] * 100) - 100) < 0.1
+    # 28.10 (build 46 QA): money moved between spot and futures is no one's result — each part's «now» is the money in it
+    assert F["value_usd"] == 2492.5 and S["value_usd"] == S["holdings_usd"] == 7477.5 and S["cash_usd"] == 2492.5
+    assert S["moved_usd"] == 5.5 and F["moved_usd"] == -5.5
+    for X in (S, F):
+        assert abs(X["start_usd"] + X["pnl_usd"] + X["moved_usd"] - X["value_usd"]) < 0.01
+    assert S["moved_note"] == "Перевод между спотом и фьючерсами: +$5,50." and F["moved_note"] == "Перевод между спотом и фьючерсами: −$5,50."
+    # «Рассчитать мой портфель»: the real account's own futures record, not the 17.10 demo desks'
+    assert doc["public"]["calc"]["futures_why"].endswith(
+        f"Реальный счёт CRYPTO\u00a0NOVA с {app_home._date_text(since, 'ru')}: закрыто фьючерсных сделок — 3, из них в плюсе 1.")
     # futures: the open SOL with the desk's own «why», the partly closed SOL stays under «open», stats from the closed ones
     (o,) = F["open"]
     assert o["sym"] == "SOL" and o["price"] == 201.0 and o["lev"] == 2.0 and o["why"] and o["why_title"] and o["closed_part_usd"] == 0.5
@@ -320,10 +329,11 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     assert (st["n"], st["wins"], st["losses"], st["win_rate"], st["complete"]) == (3, 1, 1, 50.0, True)
     assert st["realized_usd"] == -3.5 and st["avg_usd"] == round(-3.5 / 3, 2)                     # fut result − open P/L
     # actions in plain words, in every language
-    assert pp["actions"][0]["text"] == "Открыта фьючерсная сделка SOL на рост (LONG) по цене 200.00; стоп сразу стоит на бирже."
+    assert pp["actions"][0]["text"] == "Открыта фьючерсная сделка SOL на рост (LONG) по цене 200,00; стоп сразу стоит на бирже."
     assert pp["actions"][1]["text"] == "Куплено BTC на $1 234,50: спот-портфель приведён к плану системы."
     en = json.load(open(os.path.join(d, "app_home.en.json"), encoding="utf-8"))["public_portfolio"]
     assert en["actions"][1]["text"].startswith("Bought BTC for $1,234.50") and " Oct 2026 " in en["note"]
+    assert en["spot"]["moved_note"] == "Moved between spot and futures: +$5.50." and en["futures"]["moved_usd"] == -5.5
     for lang in ("uk", "el", "es"):
         other = json.load(open(os.path.join(d, f"app_home.{lang}.json"), encoding="utf-8"))["public_portfolio"]
         assert other["periods"] == pp["periods"] and other["alloc"]["groups"][0]["usd"] == al["groups"][0]["usd"], lang
@@ -371,7 +381,7 @@ def test_market_view_spot_actions_and_demo_stats_in_plain_words(tmp_path):
     A = [a["text"] for a in doc["spot"]["actions"]]
     assert A[0].startswith("Продано AAVE: монета перестала проходить проверку качества системы (оценка 38 из 100 при пороге 40)")
     assert A[1].startswith("Куплено HYPE на небольшую долю (2,5% портфеля) по решению владельца") and A[1].endswith("Стоп −35%.")
-    assert A[2] == "Продано XMR: этой монеты нет на споте OKX, а портфель повторяет реальный счёт CRYPTO NOVA на OKX. Итог +9% от входа."
+    assert A[2] == "Продано XMR: этой монеты нет на споте OKX, а портфель повторяет реальный счёт CRYPTO\u00a0NOVA на OKX. Итог +9% от входа."
     assert A[3] == "Докуплено BTC (+8,4% портфеля): деньги проданных монет переложены в ядро портфеля."
     for t_ in A:
         for jargon in ("Исключение владельца", "списка доверия", "Анкета", "ниже порога 40 — ждём"):

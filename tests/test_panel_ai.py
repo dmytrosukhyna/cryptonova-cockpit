@@ -132,7 +132,7 @@ def test_agent_selftest_real_call_rate_limited(tmp_path):
     llm = _LLM()
     api = Api(Store(str(tmp_path / "api.sqlite")), FirebaseVerifier("crypto-nova", keys={}), str(web), llm)
     c, d = api.handle("GET", "/v2/agent/selftest", {}, b"")
-    assert c == 200 and d["result"] == "ok" and d["cached"] is False and d["answer_head"].startswith("CRYPTO NOVA")
+    assert c == 200 and d["result"] == "ok" and d["cached"] is False and d["answer_head"].startswith("CRYPTO\u00a0NOVA")
     assert d["model"] == "openai/gpt-oss-120b" and isinstance(d["ms"], int) and "Что такое CRYPTO NOVA" in llm.seen[0]
     c, d = api.handle("GET", "/v2/agent/selftest?lang=en", {}, b"")
     assert d["cached"] is True and llm.calls == 1                      # at most one real call per 10 minutes

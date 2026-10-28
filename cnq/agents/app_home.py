@@ -552,9 +552,15 @@ def _action_plain(a: dict, lang: str) -> str | None:
     m = _TRIM_PLAN.match(txt)
     if act == "TRIM" and m:
         return t(lang, "act.trim_plan", sym=m.group(1), w=_dec(float(m.group(2)), lang), p=_dec(float(m.group(3)), lang))
-    if lang == DEFAULT and txt:
-        return txt
-    return _action_text(a, lang) if lang != DEFAULT else (t(lang, f"act.{act}", sym=sym) if act in ("BUY", "ADD", "TRIM", "SELL") and sym else None)
+    m = _ADD_CORE.match(txt)
+    if act == "ADD" and m:
+        return t(lang, "act.add_core", sym=m.group(1), w=_dec(float(m.group(2)), lang), p=_dec(float(m.group(3)), lang))
+    m = _BUY_TABLE.match(txt)
+    if act == "BUY" and m:
+        return t(lang, "act.buy_table", sym=sym, w=_dec(float(m.group(1)), lang))
+    if not sym:                                  # build 46 QA: never the engine's own jargon, in any language
+        return None
+    return t(lang, f"act.{act}" if act in ("BUY", "ADD", "TRIM", "SELL") else "act.other", sym=sym)
 
 
 def _money(x) -> str:
@@ -580,9 +586,10 @@ def _coins(pf: dict, ex: dict, lang: str) -> list[dict]:
              "entry": entry and _r(entry, 6 if entry < 1 else 4 if entry < 100 else 2), "price": price,
              "pct": _r((price / entry - 1) * 100, 1) if entry and price else None,
              "stop": (q.get("levels") or {}).get("stop"), "image": p.get("image")}
+        live = (ex.get("live") or {}).get(sym)                 # % of the real account's spot now (public_real), every language
+        c["live_share"] = _r(live, 2) if live is not None else None
         if lang == DEFAULT:
             reco = q.get("reco") or {}
-            mark = " — ".join(x for x in (q.get("table_status_ru"), q.get("table_why_ru")) if x)
             hold = tokens.get(sym) or {}
             tparts = [prof.get("tokenomics_ru")] if prof.get("tokenomics_ru") else []
             if hold.get("holders_rev_30d_usd"):
@@ -590,12 +597,68 @@ def _coins(pf: dict, ex: dict, lang: str) -> list[dict]:
             un = unlocks.get(sym) or {}
             unlock = (f"Ближайший разлок {un['date']}: {un.get('pct_circ')}% монет в обращении"
                       + (f" (≈${un['usd_m']} млн)" if un.get("usd_m") else "") + ".") if un.get("date") else "Крупных разлоков в ближайшие 60 дней нет."
-            c.update({"kind_ru": p.get("kind_ru"), "horizon_ru": p.get("horizon_ru"), "why_ru": q.get("reason"), "mark_ru": mark or None,
-                      "reco_ru": (f"{reco.get('t')}: {reco.get('why')}" if reco.get("t") else None),
+            # 28.10 (build 46 QA): plain words, the same rules the other languages show (pub.why.*), and the coin's LIVE share of
+            # the real account's spot — the engine's own sentences («Замена: монет без спот-пары…», «анкета 54/100, BTC бычий —
+            # можно брать частями», «План: ZEC 9.7% счёта…» from 17.10) stay out of the app
+            kind = _coin_kind(q or p)
+            why = _coin_why(q or p, kind, (ex.get("rows") or {}).get(sym) or {}, lang)
+            if live is not None:
+                why += " " + t(lang, "coin.live", w=_dec(live, lang))
+            c.update({"kind_ru": p.get("kind_ru"), "horizon_ru": p.get("horizon_ru"), "why_ru": why, "mark_ru": _mark_plain(q, lang),
+                      "reco_ru": _reco_plain(reco, kind, lang),
                       "token_ru": " ".join(tparts) or None, "unlock_ru": unlock, "risk_ru": prof.get("risks_ru"),
                       "about_ru": prof.get("what_ru"), "ahead_ru": prof.get("catalysts_ru")})
         out.append(c)
     return out
+
+
+def _mark_plain(q: dict, lang: str) -> str | None:
+    """the table's verdict on the coin in plain words: «подходит для покупки: оценка проекта 51 из 100, …»"""
+    st = q.get("table_status")
+    if not st:
+        return None
+    try:
+        from ..api import pf_review as R
+        label = R._t(R.STATUS_LABEL[st], lang) if st in R.STATUS_LABEL else None
+        reason = R.reason(str(q.get("table_why_ru") or ""), st, lang)[0]
+    except Exception:  # noqa: BLE001
+        return None
+    if not label:
+        return None
+    return label[:1].upper() + label[1:] + (": " + reason[:1].lower() + reason[1:] if reason else "")
+
+
+_STOP_IN = re.compile(r"[Сс]топ ([−-]\d+%)")
+
+
+def _reco_plain(reco: dict, kind: str, lang: str) -> str | None:
+    """what the portfolio does with the coin, plain: hold / add …, and its exit rule (core: no stop)"""
+    if not reco.get("t"):
+        return None
+    why = str(reco.get("why") or "")
+    if kind == "core":
+        return t(lang, "reco.core", t=reco["t"])
+    m = _STOP_IN.search(why)
+    if m and "×2" in why:
+        return t(lang, "reco.small", t=reco["t"], stop=m.group(1).replace("-", "−"))
+    if m:
+        return t(lang, "reco.stop", t=reco["t"], stop=m.group(1).replace("-", "−"))
+    return reco["t"]
+
+
+def _live_shares(out: str, now: int) -> dict:
+    """{sym: % of the real account's spot holdings now} (web/public_real.json — the same numbers as public_portfolio)"""
+    try:
+        r = _public_real(out, now) or {}
+    except Exception:  # noqa: BLE001 — never breaks the feed
+        return {}
+    al = r.get("alloc") or {}
+    coins = {}
+    for x in r.get("spot") or []:
+        if x.get("sym") and isinstance(x.get("usd"), (int, float)):
+            coins[x["sym"]] = coins.get(x["sym"], 0.0) + float(x["usd"])
+    hold = sum(coins.values()) + sum(float(al.get(k) or 0) for k in ("spot_cash_usd", "active_wait_usd", "other_usd"))
+    return {k: v / hold * 100 for k, v in coins.items()} if hold > 0 else {}
 
 
 def _spot(pf: dict, lang: str = DEFAULT, ex: dict | None = None) -> dict:
@@ -628,7 +691,7 @@ def _spot(pf: dict, lang: str = DEFAULT, ex: dict | None = None) -> dict:
     return {"usd": _r(usd), "pct": _r(None if idx is None else float(idx) - 100.0), "index": idx, "n_coins": len(pos),
             "cash_pct": pf.get("cash_pct"), "alloc": groups, "movers": movers,
             "curve": [[h["t"], _r((float(h["v"]) - 100.0) * START / 100.0)] for h in _sample(hist) if h.get("v") is not None],
-            "last_action": None if not last else {"t": last.get("time"), "text": _action_text(last, lang), "sym": last.get("symbol"),
+            "last_action": None if not last else {"t": last.get("time"), "text": _action_plain(last, lang), "sym": last.get("symbol"),
                                                   "action": last.get("action")},
             # build 46 (§12.4): the last actions in plain words (newest first); every one is a real order of the demo portfolio
             "actions": [{"t": a.get("time"), "sym": a.get("symbol"), "action": str(a.get("action") or "").upper(), "price": a.get("price"),
@@ -789,7 +852,8 @@ def _buy_now(out: str, now: int, lang: str = DEFAULT) -> dict | None:
             if k not in BUY_KEYS:
                 continue
             if k == "support":
-                why.append(t(lang, "buy.support", p=_price(float(w.get("p") or 0)), n=int(w.get("n") or 0)))
+                n_ = int(w.get("n") or 0)
+                why.append(t(lang, "buy.support", p=_price(float(w.get("p") or 0)), n=n_, times=plural(lang, n_, "times")))
             elif k in ("rsi", "quality"):
                 why.append(t(lang, f"buy.{k}", v=int(w.get("v") or 0)))
             else:
@@ -841,6 +905,7 @@ def _coin_kind(p: dict) -> str:
 def _coin_why(p: dict, kind: str, status_row: dict, lang: str) -> str:
     """«почему» of one spot coin in plain words: the portfolio's rule for its kind + the table's own numbers for this coin"""
     sym = str(p.get("symbol") or "")
+    known = p.get("target_weight") is not None
     plan = _dec(float(p.get("target_weight") or 0) * 100, lang)
     src = " ".join(str(x) for x in (p.get("table_why_ru"), status_row.get("why_ru")) if x)
     parts = []
@@ -851,7 +916,8 @@ def _coin_why(p: dict, kind: str, status_row: dict, lang: str) -> str:
     elif kind == "small":
         m = _DD30.search(src)
         parts.append(t(lang, "pub.why.small", sym=sym, dd=_dec(float(m.group(1)), lang)) if m else t(lang, "pub.why.small0", sym=sym))
-        parts.append(t(lang, "pub.why.small_rules", plan=plan))
+        if known:
+            parts.append(t(lang, "pub.why.small_rules", plan=plan))
     else:
         r, c = _RATING.search(src), _CONS.search(src)
         parts.append(t(lang, "pub.why.alt", sym=sym, rating=r.group(1), cons=c.group(1)) if r and c else t(lang, "pub.why.alt0", sym=sym))
@@ -859,7 +925,8 @@ def _coin_why(p: dict, kind: str, status_row: dict, lang: str) -> str:
             parts.append(t(lang, "pub.why.trend"))
         if "BTC бычий" in src:
             parts.append(t(lang, "pub.why.bull"))
-        parts.append(t(lang, "pub.why.alt_rules", plan=plan))
+        if known:
+            parts.append(t(lang, "pub.why.alt_rules", plan=plan))
     st = p.get("table_status") or status_row.get("status")
     if st == "wait":
         parts.append(t(lang, "pub.why.wait"))
@@ -1101,12 +1168,22 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
                 "periods": _periods(crv, res, base, since, asof, split_from)}
     spot = part(spot_share, spnl, scurve, "spot")
     fut = part(fut_share, fpnl, fcurve, "fut")
-    holdings = sum(float(al.get(f"{k}_usd") or 0) for k in ("spot_coins", "spot_cash", "active_coins", "active_wait"))
+    holdings = sum(float(al.get(f"{k}_usd") or 0) for k in ("spot_coins", "spot_cash", "active_coins", "active_wait", "other"))
+    # 28.10 (build 46 QA): money moved inside the account between spot and futures is neither side's profit — each part's «now»
+    # is the money really in it (spot + futures = the account), its result stays the trading result, and the difference is
+    # the transfer: spot.moved_usd = −futures.moved_usd, with a plain note
+    if spot is not None and fut is not None and fpnl is not None and any(f"fut_{k}_usd" in al for k in ("margin", "reserve")):
+        fut_hold = float(al.get("fut_margin_usd") or 0) + float(al.get("fut_reserve_usd") or 0)
+        moved = fut_hold - (cap0 * float(fut_share) / 100 + float(fpnl))
+        for prt, x, hold in ((fut, moved, fut_hold), (spot, -moved, eq - fut_hold)):
+            prt.update({"value_usd": _r(hold), "moved_usd": _r(x),
+                        "moved_note": t(lang, "pp.moved", usd=("+" if x > 0 else "−") + _usd_text(abs(x), lang)) if abs(x) >= 0.5 else None})
+        holdings = eq - fut_hold
     if spot is not None:
         spot.update({"holdings_usd": _r(holdings),
                      "coins": [{**a, "share_spot": _r(float(a["usd"] or 0) / holdings * 100) if holdings else None}
                                for a in assets if a["kind"] != "cash"],
-                     "cash_usd": _r((al.get("spot_cash_usd") or 0) + (al.get("active_wait_usd") or 0))})
+                     "cash_usd": _r(sum(float(al.get(f"{k}_usd") or 0) for k in ("spot_cash", "active_wait", "other")))})
     # ---- futures: open (with the desk's own «why»), closed (OKX history), stats
     open_rows, open_inst = [], set()
     for x in real.get("futures") or []:
@@ -1339,6 +1416,11 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
     except Exception as e:  # noqa: BLE001 — the feed never breaks because of the real account's file
         print("app_home public_portfolio:", repr(e)[:200], flush=True)
         pport = None
+    # 28.10 (build 46 QA): «Рассчитать мой портфель» never quotes the 17.10 demo desks' record — the real account's own, when known
+    st_ = ((pport or {}).get("futures") or {}).get("stats") or {}
+    if public is not None and public.get("calc") and st_.get("n") is not None:
+        public["calc"]["futures_why"] += " " + t(lang, "pub.why.fut_rec", since=_date_text(pport["since"], lang), n=int(st_["n"]),
+                                                 w=int(st_.get("wins") or 0))
     mv = _market_view_safe(mk, pport, fut, now, lang)
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
             "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub, "public": public,
@@ -1348,6 +1430,21 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
             "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),
             "buy_now": _buy_now(out, now, lang),
             "note_ru": t(lang, "home.note")}
+
+
+def _polished(doc: dict, lang: str) -> dict:
+    """28.10 (build 46 QA): every text of the feed as the app shows it — «CRYPTO NOVA» never wraps, the true minus, and the
+    language's own decimal comma and thousands space (i18n.polish); the spoken report's key follows its final text"""
+    from .i18n import polish_doc
+    d = polish_doc(doc, lang)
+    r = d.get("report")
+    if isinstance(r, dict) and r.get("text"):
+        try:
+            from ..api.tts import key as tts_key
+            r["key"] = tts_key(r["text"], lang)
+        except Exception:  # noqa: BLE001
+            pass
+    return d
 
 
 def _write(out: str, name: str, doc: dict) -> None:
@@ -1367,8 +1464,9 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
     sel = ph.load_sel(out)
     ex = {"ideas": ideas.get("positions") or [], "ideas_pf": ideas, "rows": _load(out, "ideas.json").get("statuses") or {},
           "fut_curve": nova_result(paper.get("profiles") or {}, now, sel)[1], "sel": sel,
-          "tok": _load(out, "tokenomics.json"), "profiles": _load(out, "coin_profiles.json").get("coins") or {}}
-    docs = {lang: build(paper, pf, mk, out, now, lang, ex) for lang in LANGS}
+          "tok": _load(out, "tokenomics.json"), "profiles": _load(out, "coin_profiles.json").get("coins") or {},
+          "live": _live_shares(out, now)}
+    docs = {lang: _polished(build(paper, pf, mk, out, now, lang, ex), lang) for lang in LANGS}
     for lang in [x for x in LANGS if x != DEFAULT] + [DEFAULT]:          # Russian last: its mtime says «all languages written»
         _write(out, file_name("app_home", lang), docs[lang])
     if int(now / 60000) % 60 == 0 or not os.path.exists(os.path.join(out, "app_btc.json")):

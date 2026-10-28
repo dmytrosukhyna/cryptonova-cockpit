@@ -17,12 +17,13 @@
       return { src: 'opportunities.json', asof: V.asofOf(O), items: list.map((x) => {
         const r = x.result || x.results || {};
         const status = norm(x.status);
-        const realUsd = V.n(r.real_usd != null ? r.real_usd : x.real_usd);
+        const realUsd = V.n(r.real_usd != null ? r.real_usd : x.result_real_usd != null ? x.result_real_usd : x.real_usd);
         return {
-          id: String(x.id || x.key || x.name), name: x.name_ru || x.name, desc: x.description_ru || x.about_ru || x.description || '', status, statusRu: ST[status] || status,
-          real: x.real_money === true || (status === 'Active' && realUsd != null), realUsd, realPct: V.n(r.real_pct),
-          testUsd: V.n(r.test_usd != null ? r.test_usd : x.test_usd), testPct: V.n(r.test_pct), testNote: r.test_note_ru || r.note_ru || '',
-          ops: V.n(r.ops != null ? r.ops : r.n != null ? r.n : x.ops), risks: A(x.risks_ru || x.risks), why: x.why_not_used_ru || x.why_not_used || '',
+          id: String(x.id || x.key || x.name), name: x.name_ru || x.name, desc: x.about_ru || x.description_ru || x.description || '', status, statusRu: x.status_ru || ST[status] || status,
+          real: x.real_money === true || status === 'Active', realUsd, realPct: V.n(r.real_pct),
+          testUsd: V.n(r.test_usd != null ? r.test_usd : x.result_test_usd != null ? x.result_test_usd : x.test_usd), testPct: V.n(r.test_pct != null ? r.test_pct : x.result_test_pct),
+          testNote: r.test_note_ru || x.result_test_note_ru || '', ops: V.n(r.ops != null ? r.ops : r.n != null ? r.n : x.ops), opsNote: x.ops_ru || '',
+          risks: A(x.risks_ru || x.risks), why: x.why_not_used_ru || x.why_not_used || '', whyShort: x.why_short_ru || '',
           since: V.ms(x.since), asof: V.ms(x.asof || x.updated),
         };
       }) };
@@ -64,7 +65,7 @@
     return `<button class="scard ${o.real ? 'realm' : ''}" type="button" data-oid="${esc(o.id)}">
       <div class="scard-h"><b>${esc(o.name)}</b><span class="chips">${V.chip(o.statusRu, 'test')}${o.real ? V.chip('реальные деньги', 'real') : V.chip('тест', 'test')}</span></div>
       <div class="m">
-        <div><small>Реальный результат</small><span class="${V.cls(o.realUsd)}">${o.real && o.realUsd != null ? V.smoney(o.realUsd) : 'нет'}</span></div>
+        <div><small>Реальный результат</small><span class="${V.cls(o.realUsd)}">${o.realUsd != null ? V.smoney(o.realUsd) : o.real ? '—' : 'нет'}</span></div>
         <div><small>Тестовый результат</small><span class="${V.cls(o.testUsd)}">${o.testUsd != null ? V.smoney(o.testUsd) : '—'}</span></div>
         <div><small>Операций</small><span>${o.ops != null ? V.int(o.ops) : '—'}</span></div></div>
       ${o.whyShort || o.why ? `<div class="d">${esc(o.whyShort || o.why)}</div>` : ''}
@@ -76,11 +77,11 @@
     const o = (V.ui.opps && V.ui.opps.items.find((x) => x.id === id)); if (!o) return;
     V.sheet(o.name, `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${V.chip(o.statusRu, 'test')}${o.real ? V.chip('реальные деньги', 'real') : V.chip('не реальные деньги', 'test')}</div>
       ${o.desc ? `<p class="para">${esc(o.desc)}</p>` : ''}
-      <div class="kpis k3" style="margin-top:12px">${V.kpi('Реальный результат', o.real && o.realUsd != null ? `<span class="${V.cls(o.realUsd)}">${V.smoney(o.realUsd)}</span>` : 'нет', o.real ? '' : 'реальными деньгами не торгуется')}
+      <div class="kpis k3" style="margin-top:12px">${V.kpi('Реальный результат', o.realUsd != null ? `<span class="${V.cls(o.realUsd)}">${V.smoney(o.realUsd)}</span>` : o.real ? '—' : 'нет', o.real ? (o.realUsd != null ? '' : 'нет данных') : 'реальными деньгами не торгуется')}
         ${V.kpi('Тестовый результат', o.testUsd != null ? `<span class="${V.cls(o.testUsd)}">${V.smoney(o.testUsd)}</span>` : '—', esc(o.testNote || '') + (o.testPct != null ? ' · ' + V.pct(o.testPct) : ''))}
         ${V.kpi('Операций', o.ops != null ? V.int(o.ops) : '—', esc(o.opsNote || ''))}</div>
       ${o.risks.length ? `<div class="sec-t"><h3>Основные риски</h3></div><ul class="bul">${o.risks.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
-      <div class="sec-t"><h3>Почему не используется</h3></div><p class="para">${esc(o.why || 'Причина не записана.')}</p>
+      <div class="sec-t"><h3>${o.real ? 'Состояние' : 'Почему не используется'}</h3></div><p class="para">${esc(o.why || 'Причина не записана.')}</p>
       <p class="note">Тестовый результат — виртуальный (демо-счёт или наблюдение) и не входит в результат публичного портфеля.</p>`);
   }
 })();

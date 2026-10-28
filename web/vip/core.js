@@ -232,9 +232,13 @@
       const entries = Array.isArray(list) ? list.map((c) => [c.key || c.id || c.name, c]) : Object.entries(list);
       comps = entries.filter(([, c]) => c && typeof c === 'object').map(([k, c]) => ({
         key: k, name: V.compName(k, c), status: ['ok', 'stale', 'error', 'stopped'].includes(c.status) ? c.status : 'unknown',
-        last_ok: ms(c.last_ok), age_min: isNum(c.age_min) ? +c.age_min : V.ageMin(c.last_ok), note: c.note_ru || c.note || c.why_ru || '',
+        last_ok: ms(c.last_ok), age_min: c.last_ok ? V.ageMin(c.last_ok) : isNum(c.age_min) ? +c.age_min : null, note: c.note_ru || c.note || c.why_ru || '',
       }));
       errors = V.arr(SS.errors || SS.error_log);
+      // the status file itself must be fresh, otherwise its «ok» is old news
+      const sa = V.ageMin(V.asofOf(SS));
+      if (sa != null && sa > 90) comps.unshift({ key: 'system_status', name: 'Файл состояния системы', status: 'stale', last_ok: V.asofOf(SS), age_min: sa, note: 'статусы ниже — на ' + V.dt(V.asofOf(SS)) });
+      if (!errors.length) errors = comps.filter((c) => c.status !== 'ok').map((c) => ({ t: c.last_ok || V.asofOf(SS), component: c.name, type: V.statusRu(c.status), status: 'open', text: c.note }));
     } else {
       src = 'fallback';
       await V.feeds(FALLBACK.map((f) => f[1]));

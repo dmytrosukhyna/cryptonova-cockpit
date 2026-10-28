@@ -60,7 +60,7 @@
       <div class="card-h"><h3>Компоненты</h3><span class="sp"></span><span class="dot ${S.overall}"></span><b>${esc(S.label)}</b>
         <button class="btn sm ghost" type="button" data-sys="refresh">Обновить</button></div>
       ${S.comps.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Компонент</th><th class="l">Статус</th><th>Последний успех</th><th class="hide-sm">Возраст</th></tr></thead><tbody>
-        ${S.comps.map((c) => `<tr><td class="l wrap">${esc(c.name)}${c.note ? `<br><span class="xs muted">${esc(c.note)}</span>` : ''}</td>
+        ${S.comps.map((c) => `<tr><td class="l wrap">${esc(c.name)}${c.note ? `<br><span class="xs muted clamp2" title="${esc(c.note)}">${esc(c.note)}</span>` : ''}</td>
           <td class="l"><span class="dot ${c.status}"></span> ${esc(V.statusRu(c.status))}</td>
           <td>${c.last_ok ? esc(V.dt(c.last_ok)) : '—'}</td><td class="hide-sm">${V.isNum(c.age_min) ? esc(ageTxt(c.age_min)) : '—'}</td></tr>`).join('')}</tbody></table></div>` : V.nodata()}
       <p class="note">${S.src === 'fallback' ? 'Статус собран по времени обновления опубликованных файлов: «работает» только если файл обновился вовремя. system_status.json ещё не опубликован.' : 'Источник: system_status.json' + (S.asof ? ' · ' + esc(V.dt(S.asof)) : '') + '.'}</p>
@@ -95,7 +95,7 @@
   }
 
   function errorsCard(S) {
-    const rows = S.errors.map((e) => ({ t: V.ms(e.t || e.time || e.ts), comp: e.component || e.comp || '—', type: e.type_ru || e.type || e.kind || '—', status: e.status_ru || e.status || 'open', text: e.text_ru || e.message_ru || '' }));
+    const rows = S.errors.map((e) => ({ t: V.ms(e.t || e.time || e.ts), comp: e.component || e.comp || '—', type: e.type_ru || e.type || e.kind || '—', status: e.status_ru || e.status || 'open', text: e.text_ru || e.message_ru || e.text || '' }));
     for (const r of Object.values(V.feedLog)) if (!r.ok && !(r.err === 'missing' && V.PENDING_FEEDS.includes(r.name)))
       rows.push({ t: r.t, comp: 'панель · ' + r.name, type: r.err === 'missing' ? 'файл не найден' : r.err === 'parse' ? 'файл не читается' : 'ошибка загрузки', status: 'open', text: '' });
     rows.sort((a, b) => (b.t || 0) - (a.t || 0));

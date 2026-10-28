@@ -163,17 +163,23 @@
 
   /* the pipeline: found → passed → recommended → bought / waiting / rejected, with the reason per coin */
   function pipeModel(M, X) {
-    const held = new Set((M ? M.spot : []).map((s) => s.sym));
+    const held = new Set((M ? M.spot : []).map((s) => s.sym)), held0 = held;
     const PL = X.PL;
     if (PL && (PL.stages || PL.coins || PL.items)) {
-      const st = Array.isArray(PL.stages) ? PL.stages : Object.entries(PL.stages || {}).map(([k, v]) => Object.assign({ key: k }, typeof v === 'object' ? v : { n: v }));
       const coins = A(PL.coins || PL.items || PL.rows).map((c) => {
         const sym = c.sym || c.symbol || c.ccy;
-        const stage = c.stage || c.status || '';
-        return { sym, stage, statusRu: c.stage_ru || c.status_ru || stage, why: c.why_not_ru || c.why_ru || c.reason_ru || c.reason || '', held: c.bought === true || held.has(sym),
-          reco: c.recommended === true || /recommend|buy|small|approved|pending/i.test(stage), rejected: /reject|avoid/i.test(stage) };
+        const stage = String(c.stage || c.status || '');
+        const held = stage === 'bought' || c.in_real_account === true || c.bought === true || held0.has(sym);
+        return { sym, name: c.name && c.name !== sym ? c.name : '', stage, statusRu: c.stage_ru || c.status_ru || stage,
+          why: c.why_not_ru || c.why_ru || c.reason_ru || c.reason || '', held, last: c.last_action || null,
+          reco: ['all_filters', 'recommended', 'waiting', 'bought'].includes(stage) || ['buy', 'add', 'small'].includes(c.table_status) || c.recommended === true,
+          rejected: stage === 'rejected' };
       });
-      return { src: 'spot_pipeline.json', asof: V.asofOf(PL), stages: st.map((s) => ({ name: s.name_ru || s.name || s.label || s.key, n: V.n(s.n != null ? s.n : s.count != null ? s.count : A(s.coins).length), rej: /reject|avoid/i.test(s.key || '') })), coins };
+      const st = Array.isArray(PL.stages) ? PL.stages : Object.entries(PL.stages || {}).map(([k, v]) => Object.assign({ key: k }, typeof v === 'object' ? v : { n: v }));
+      return { src: 'spot_pipeline.json', asof: V.asofOf(PL), coins, stages: st.map((s) => {
+        const n = V.n(s.reached != null ? s.reached : s.n != null ? s.n : s.count != null ? s.count : s.now);
+        return { name: cap(s.name_ru || s.name || s.label || s.key), n, now: V.n(s.now), about: s.about_ru || '', rej: /reject|avoid/i.test(s.key || ''), side: s.reached == null && s.now != null };
+      }) };
     }
     const I = X.IDEAS, ca = (I && (I.counts_all || I.counts)) || {};
     const nb = {};
@@ -195,6 +201,15 @@
     ] : [] };
   }
   V.spotPipe = pipeModel;
+  // the first sentences answer the question; the rest (every sale and candidate) opens on demand
+  function splitWhy(t) {
+    const parts = String(t).split(/(?<=[.!?»])\s+(?=[А-ЯЁA-Z])/);
+    let head = '', i = 0;
+    while (i < parts.length && (head.length < 260 || i < 2)) head += (head ? ' ' : '') + parts[i++];
+    const rest = parts.slice(i).join(' ');
+    return `<p class="para">${esc(head)}</p>` + (rest ? `<details class="more"><summary>Подробно: продажи и кандидаты</summary><p class="para">${esc(rest)}</p></details>` : '');
+  }
+  const cap = (t) => { t = String(t || ''); return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; };
 
   function pipeline(M, X) {
     const P = pipeModel(M, X);
@@ -205,7 +220,7 @@
       <td class="wrap">${c.held ? '<span class="muted">в портфеле</span>' : esc(c.why || 'Причина не записана — неизвестно.')}</td></tr>`;
     return `<section class="card" style="margin-top:var(--gap)" data-demo="spot-pipeline">
       <div class="card-h"><h3>Воронка отбора монет</h3><span class="sub">от «найдено» до «куплено» или «отклонено»</span><span class="sp"></span>${V.stamp(P.asof, 180)}</div>
-      ${P.stages.length ? `<div class="funnel">${P.stages.map((s) => `<div class="fstage"><span>${esc(s.name)}</span><div class="fb"><i class="${s.rej ? 'rej' : ''}" style="width:${s.n ? Math.max(2, (s.n / max) * 100) : 0}%"></i></div><b>${s.n != null ? V.int(s.n) : '—'}</b></div>`).join('')}</div>` : V.nodata('воронка')}
+      ${P.stages.length ? `<div class="funnel">${P.stages.map((s) => `<div class="fstage" title="${esc(s.about || '')}"><span>${esc(s.name)}${s.side ? ' <span class="xs muted">сейчас</span>' : s.now != null && s.now !== s.n ? ` <span class="xs muted">· сейчас ${V.int(s.now)}</span>` : ''}</span><div class="fb"><i class="${s.rej ? 'rej' : ''}" style="width:${s.n ? Math.max(2, (s.n / max) * 100) : 0}%"></i></div><b>${s.n != null ? V.int(s.n) : '—'}</b></div>`).join('')}</div>` : V.nodata('воронка')}
       <div class="sec-t"><h3>Почему не куплено</h3><span class="sub">рекомендованные монеты и ответ системы по каждой</span></div>
       ${reco.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Монета</th><th class="l">Стадия</th><th class="l">Ответ системы</th></tr></thead><tbody>${reco.map(row).join('')}</tbody></table></div>` : V.empty('Рекомендованных монет сейчас нет.')}
       ${other.length ? `<details class="more"><summary>Остальные ${V.int(other.length)} из таблицы: ждём и «не брать»</summary>
@@ -223,7 +238,7 @@
     const groups = {};
     for (const x of nb) (groups[x.why_ru] = groups[x.why_ru] || []).push(x.symbol);
     let why;
-    if (PL && PL.cash_why_ru) why = `<p class="para">${esc(PL.cash_why_ru)}</p>`;
+    if (PL && PL.cash_why_ru) why = splitWhy(PL.cash_why_ru) + `<p class="note">Источник: spot_pipeline.json${PL.real_stale ? ' · данные реального счёта устарели' : ''}. Защитные фильтры не ослабляются ради заполнения портфеля; доля кэша не меняется без решения владельца.</p>`;
     else {
       why = `<p class="para">Правило модели: кэш <b>не меньше</b> ${target != null ? V.share(target, 0) : '10%'} — это нижняя граница, а не обязанность потратить всё сверх неё. Свободные деньги идут только в монеты, которые прошли фильтры таблицы и правила портфеля.</p>`;
       if (sl && sl.buy) why += `<p class="para">Сейчас модель держит в монетах «можно брать» ${V.share(sl.buy.now_pct)} при плане ${V.share(sl.buy.target_pct)}${sl.small ? `, на небольшую сумму — ${V.share(sl.small.now_pct)} при плане ${V.share(sl.small.target_pct)}` : ''}. Недобор остаётся в кэше, потому что рекомендованные монеты не прошли правила покупки:</p>`;
@@ -234,7 +249,8 @@
       <div class="card-h"><h3>Почему система не тратит свободный капитал</h3></div>
       <div class="kpis k3">${V.kpi('Кэш спот-портфеля, реальный счёт', real != null ? V.share(real) : '—', M ? V.money(a.spot_cash_usd) : '')}
         ${V.kpi('Цель модели', target != null ? 'не меньше ' + V.share(target, 0) : '—', 'минимум кэша')}
-        ${V.kpi('Кэш модели', sl && sl.cash ? V.share(sl.cash.now_pct) : '—', 'portfolio.json')}</div>
+        ${PL && PL.cash_free_slots ? V.kpi('Свободных мест', `${V.int(PL.cash_free_slots.buy)} из ${V.int(PL.cash_free_slots.buy_total)}`, `«можно брать»; на небольшую сумму ${V.int(PL.cash_free_slots.small)} из ${V.int(PL.cash_free_slots.small_total)}`)
+          : V.kpi('Кэш модели', sl && sl.cash ? V.share(sl.cash.now_pct) : '—', 'portfolio.json')}</div>
       ${why}</section>`;
   }
 })();

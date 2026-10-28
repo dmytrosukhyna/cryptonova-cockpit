@@ -15,7 +15,7 @@
     return { active: 'Active', approved: 'Approved', validation: 'Validation', testing: 'Testing', test: 'Testing', indevelopment: 'InDevelopment', development: 'InDevelopment', dev: 'InDevelopment', paused: 'Paused', rejected: 'Rejected', archived: 'Archived', archive: 'Archived' }[k] || 'Testing';
   };
   V.stRu = (s) => (ST[s] ? ST[s].ru : s);
-  V.stChip = (s) => `<span class="chip st-${esc(s)}" title="${esc(EN[s] || s)}">${esc(V.stRu(s))}</span>`;
+  V.stChip = (s, ru) => `<span class="chip st-${esc(s)}" title="${esc(EN[s] || s)}">${esc(ru || V.stRu(s))}</span>`;
   const CAT = { spot: 'Спот', futures: 'Фьючерсы', other: 'Другое', perp: 'Фьючерсы', swap: 'Фьючерсы' };
   const catRu = (c) => CAT[String(c || '').toLowerCase()] || c || '—';
   const GROUPS = [
@@ -36,20 +36,27 @@
     const list = S && (Array.isArray(S) ? S : S.strategies || S.items);
     if (A(list).length) {
       asof = V.asofOf(S);
+      const CATG = { used: 'real', validation: 'valid', testing: 'test', paused: 'paused', rejected: 'archive', archived: 'archive' };
       items = list.map((x) => {
-        const m = x.metrics || x.stats || {};
+        const m = x.metrics || x.stats || x;           // strategies.json keeps the metrics flat on the item
+        const wr = m.win_rate != null ? V.n(m.win_rate) : m.winrate != null ? pctOf(m.winrate) : null;   // win_rate: percent
+        const rs = x.real && typeof x.real === 'object' ? x.real : null;
         const it = {
-          id: String(x.id || x.key || x.name), name: x.name_ru || x.name || x.id, status: normStatus(x.status), real: x.real_money === true,
-          cat: catRu(x.category || x.type), desc: x.description_ru || x.about_ru || x.description || x.about || '',
-          since: V.ms(x.since || x.test_since || x.started), updated: V.ms(x.updated || x.asof || m.asof),
-          trades: V.n(m.trades != null ? m.trades : m.n != null ? m.n : m.closed_n), wr: pctOf(m.win_rate != null ? m.win_rate : m.winrate),
-          net: V.n(m.net_pct != null ? m.net_pct : m.result_pct != null ? m.result_pct : m.pnl_pct), netUsd: V.n(m.net_usd != null ? m.net_usd : m.pnl_usd),
+          id: String(x.id || x.key || x.name), name: x.name_ru || x.name || x.key, status: normStatus(x.status), statusRu: x.status_ru || null,
+          real: x.real_money === true, cat: catRu(x.type || x.kind), desc: x.about_ru || x.description_ru || x.description || x.about || '',
+          since: V.ms(x.since || x.test_since || x.started), updated: V.ms(x.updated || x.asof),
+          trades: V.n(m.trades != null ? m.trades : m.n != null ? m.n : m.closed_n), wr,
+          net: V.n(m.net_pct != null ? m.net_pct : m.result_pct), netUsd: V.n(m.net_usd != null ? m.net_usd : m.pnl_usd),
           dd: V.n(m.max_dd_pct), avg: V.n(m.avg_trade_pct != null ? m.avg_trade_pct : m.avg_pct), open: V.n(m.open != null ? m.open : m.open_n),
-          sample: m.sample_note || x.sample_note || '', decision: x.decision_ru || x.admission_ru || x.decision || '', next: x.next_ru || x.next_stage_ru || '',
-          criteria: x.criteria_ru || '', issues: A(x.issues_ru || x.issues), env: x.env_ru || x.env || '', owner: isIvan(x),
+          sample: x.sample_note_ru || m.sample_note || x.sample_note || '', decision: x.status_why_ru || x.decision_ru || x.admission_ru || '',
+          next: x.next_step_ru || x.next_ru || '', criteria: x.criteria_ru || '', issues: A(x.issues_ru || x.issues), basis: x.metrics_basis_ru || '',
+          backtest: x.backtest_ru || '', sub: x.group || null, grp: CATG[x.category] || null,
+          env: rs ? `реальный счёт · ${rs.sleeve === 'spot' ? 'спот' : rs.sleeve === 'futures' ? 'фьючерсы' : rs.sleeve === 'active' ? 'активный спот' : esc(rs.sleeve || '')}${V.isNum(rs.share_pct) ? ' ' + V.share(rs.share_pct) : ''}` : x.env_ru || '',
+          owner: isIvan(x),
         };
         return it;
       });
+      V.ui.stratMeta = { realAccount: S.real_account || null, sortRu: S.sort_ru || '', rules: A(S.status_rules_ru) };
     } else {
       src = 'fallback';
       asof = V.asofOf(P);
@@ -89,11 +96,13 @@
     if (!items.some((x) => x.owner)) items.push({ id: 'ivan', name: 'Ivan · внешняя платформа', status: 'Testing', real: false, cat: 'Фьючерсы', owner: true,
       desc: 'Сторонняя платформа, которая заявляет 100% win rate. Система только наблюдает за счётом в режиме чтения и считает честную статистику.',
       env: 'наблюдение, ключ только для чтения', decision: 'Тестовая: к реальному исполнению не подключается.', since: null, updated: null });
-    for (const it of items) it.group = groupOf(it);
+    for (const it of items) it.group = it.real ? 'real' : it.grp && it.grp !== 'real' ? it.grp : groupOf(it);
     const rank = (s) => (ST[s.status] ? ST[s.status].rank : 9);
-    // stable: status → recently updated (by day, so a minute-by-minute refresh never reshuffles the list) → name
+    const TY = { 'Фьючерсы': 0, 'Спот': 1 };
+    // stable: status → type → recently updated (by day, so a minute-by-minute refresh never reshuffles the list) → name
     const day = (t) => (t ? Math.floor(t / 86400000) : 0);
-    items.sort((a, b) => rank(a) - rank(b) || day(b.updated) - day(a.updated) || String(a.name).localeCompare(String(b.name), 'ru'));
+    items.sort((a, b) => rank(a) - rank(b) || (TY[a.cat] != null ? TY[a.cat] : 2) - (TY[b.cat] != null ? TY[b.cat] : 2)
+      || day(b.updated) - day(a.updated) || String(a.name).localeCompare(String(b.name), 'ru'));
     const groups = GROUPS.map((g) => Object.assign({}, g, { items: items.filter((s) => s.group === g.key) }));
     return { items, groups, src, asof, DS };
   };
@@ -122,7 +131,7 @@
     const locked = it.owner && !V.auth.owner();
     const m = (lbl, v, cls = '') => `<div><small>${esc(lbl)}</small><span class="${cls}">${v}</span></div>`;
     return `<button class="scard ${it.real ? 'realm' : ''} ${locked ? 'lockcard' : ''}" type="button" data-sid="${esc(it.id)}">
-      <div class="scard-h"><b>${esc(it.name)}</b><span class="chips">${V.stChip(it.status)}${it.real ? V.chip('реальные деньги', 'real') : V.chip(it.owner ? 'тест · владелец' : 'тест', it.owner ? 'owner' : 'test')}</span></div>
+      <div class="scard-h"><b>${esc(it.name)}</b><span class="chips">${V.stChip(it.status, it.statusRu)}${it.real ? V.chip('реальные деньги', 'real') : V.chip(it.owner ? 'тест · владелец' : 'тест', it.owner ? 'owner' : 'test')}</span></div>
       <div class="f">${esc(it.cat)}${it.since ? ' · с ' + esc(V.date(it.since)) : ''}${it.env ? ' · ' + esc(it.env) : ''}</div>
       ${locked ? `<div class="d">${V.ico('lock')} Статистика доступна владельцу после входа.</div>` : `
       <div class="m">${m('Win rate', V.wrHtml(it.wr, it.trades))}${m('Результат', it.net != null ? V.pct(it.net) : it.netUsd != null ? V.smoney(it.netUsd) : '—', V.cls(it.net != null ? it.net : it.netUsd))}${m('Макс. просадка', it.dd != null ? V.pct(-Math.abs(it.dd)) : '—')}</div>
@@ -140,14 +149,29 @@
       return `<div class="ph"><div><h2>Стратегии</h2><p>Все стратегии с едиными статусами. «Реальные деньги» — только те, за которыми следует реальный счёт; остальное — тесты.</p></div>
           <span class="sp"></span>${SM.asof ? V.stamp(SM.asof, 30) : ''}</div>
         ${SM.src === 'fallback' ? `<div class="card flat" style="margin-bottom:var(--gap)"><p class="note" style="margin:0">Сейчас список собран из демо-столов (paper.json) и модельных портфелей (portfolio.json): всё, к чему не подключены реальные деньги, — «Тестирование». Единые статусы со всеми стадиями появятся, когда будет опубликован strategies.json.</p></div>` : ''}
+        ${await realBlock()}
         ${SM.groups.map((g) => `<section class="sgroup" data-demo="st-${g.key}"><h3>${esc(g.name)} <span class="n">${V.int(g.items.length)}</span></h3>
-          ${g.items.length ? `<div class="scards">${g.items.map(card).join('')}</div>` : V.empty('Нет стратегий в этой группе.')}</section>`).join('')}
+          ${g.items.length ? groupBody(g.items) : V.empty('Нет стратегий в этой группе.')}</section>`).join('')}
         ${DS ? selCard(DS) : ''}`;
     },
     mount(el) {
       el.querySelectorAll('[data-sid]').forEach((b) => b.addEventListener('click', () => openStrat(b.dataset.sid)));
     },
   };
+
+  const SUB = { lab: 'Лаборатория: идеи, проверенные только на истории', app_signals: 'Сигналы приложения на демо-счёте' };
+  function groupBody(list) {
+    const main = list.filter((x) => !x.sub), subs = {};
+    for (const x of list) if (x.sub) (subs[x.sub] = subs[x.sub] || []).push(x);
+    return (main.length ? `<div class="scards">${main.map(card).join('')}</div>` : '')
+      + Object.entries(subs).map(([k, xs]) => `<details class="more"><summary>${esc(SUB[k] || k)} · ${V.int(xs.length)}</summary>
+        <div class="scards" style="margin-top:10px">${xs.map(card).join('')}</div></details>`).join('');
+  }
+  async function realBlock() {
+    const M = await V.real(); if (!M) return '';
+    return `<div class="card flat" style="margin-bottom:var(--gap)" data-demo="st-account"><div class="card-h" style="margin-bottom:6px"><span class="eyebrow">Реальный счёт CRYPTO NOVA</span>${V.chip('реальный счёт OKX', 'real')}<span class="sp"></span>${V.stamp(M.asof, 60)}</div>
+      <p class="para" style="margin:0">С ${V.PUBLIC_START_LABEL}: <b>${V.money(M.equity)}</b> · <b class="${V.cls(M.pnl)}">${V.smoney(M.pnl)}</b> (<span class="${V.cls(M.pnlPct)}">${V.pct(M.pnlPct)}</span>). Это результат счёта; ниже — демо-результаты стратегий, за которыми он следует, и тесты. Они не складываются.</p></div>`;
+  }
 
   function selCard(DS) {
     return `<section class="card" data-demo="st-select"><div class="card-h"><h3>Как выбирается основной стол</h3><span class="sp"></span>${V.stamp(DS.asof, 24 * 60)}</div>
@@ -180,7 +204,7 @@
             ${d.closed.slice(0, 30).map((c) => `<tr><td>${esc(V.dt(c.close_time))}</td><td class="l">${esc(c.symbol || '—')} ${esc(c.side || '')}</td><td><span class="${V.cls(c.pnl)}">${V.smoney(c.pnl)}</span></td></tr>`).join('')}</tbody></table></div>` : ''}`;
       }
     }
-    V.sheet(it.name, `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${V.stChip(it.status)}${it.real ? V.chip('реальные деньги', 'real') : V.chip('без реальных денег', 'test')}${V.chip(it.cat, 'test')}</div>
+    V.sheet(it.name, `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${V.stChip(it.status, it.statusRu)}${it.real ? V.chip('реальные деньги', 'real') : V.chip('без реальных денег', 'test')}${V.chip(it.cat, 'test')}</div>
       ${it.desc ? `<p class="para">${esc(it.desc)}</p>` : ''}
       <div class="kpis" style="margin-top:12px">${V.kpi('Сделок', V.int(it.trades), it.open != null ? `открыто ${V.int(it.open)}` : '')}${V.kpi('Win rate', V.isNum(it.wr) ? V.share(it.wr, 0) : '—', V.isNum(it.trades) ? `по ${V.int(it.trades)} ${V.plural(it.trades, 'закрытой сделке', 'закрытым сделкам', 'закрытым сделкам')}` : '')}
         ${V.kpi('Результат', it.net != null ? `<span class="${V.cls(it.net)}">${V.pct(it.net)}</span>` : `<span class="${V.cls(it.netUsd)}">${V.smoney(it.netUsd)}</span>`, it.net != null && it.netUsd != null ? V.smoney(it.netUsd) : '')}
@@ -192,6 +216,8 @@
       ${it.criteria ? `<div class="sec-t"><h3>Критерии завершения проверки</h3></div><p class="para">${esc(it.criteria)}</p>` : ''}
       ${it.issues && it.issues.length ? `<div class="sec-t"><h3>Обнаруженные проблемы</h3></div><ul class="bul">${it.issues.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
       ${it.next ? `<div class="sec-t"><h3>Следующий этап</h3></div><p class="para">${esc(it.next)}</p>` : ''}
+      ${it.basis ? `<p class="note">Как считаются показатели: ${esc(it.basis)}</p>` : ''}
+      ${it.backtest ? `<div class="sec-t"><h3>Проверка на истории</h3></div><p class="para">${esc(it.backtest)}</p>` : ''}
       ${it.rules ? `<details class="more"><summary>Правила</summary><p class="para">${esc(it.rules)}</p></details>` : ''}
       ${it.err ? `<p class="note">Последняя ошибка стола: ${esc(String(it.err).slice(0, 160))}</p>` : ''}
       ${extra}`);

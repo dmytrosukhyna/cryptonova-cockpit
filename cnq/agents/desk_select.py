@@ -17,9 +17,17 @@ ranks by result ÷ max drawdown (scale-free) and switches only when ALL of these
   • the current desk has no open position on the real account (web/public_real.json «sig» = «<desk>:<id>»; a position without
     «sig» counts as the current desk's; the file must be fresher than 2 hours) — an open position is never moved between desks;
   • at least 7 days have passed since the last switch (the owner's choice counts as a switch).
+28.10 (owner's decisions on the data agent's proposals, real money) — two more conditions:
+  • READY: a challenger may become the main desk only when the strategy conveyor (web/conveyor.json) has moved it to READY —
+    ≥ 30 closed trades, ≥ 21 days, profit factor ≥ 1.2, average trade ≥ +0.3 % after costs (and the conveyor's own drawdown and
+    t-test gates); the numbers are checked here too, so a missing or stale conveyor record never lets a desk through;
+  • families, not sizes: «Консервативная», «Сбалансированная» and «Агрессивная» are ONE family («Автопилот») — the same signals at
+    three sizes. The selector compares families; the family is represented by the size the owner chose by hand on 28.10
+    («Агрессивная», FAMILY_SIZE) — or by the family member that is the main desk now — and never switches between its sizes.
 Every run writes web/desk_select.json:
   {"current", "name", "since", "by": "owner" | "auto", "candidates": [{"key", "name", "trades", "result_pct", "dd_pct", "ratio",
-   "cur_ratio" (the current desk's ratio over the same window), "eligible", "why"}], "decision": "hold" | "wait" | "switch",
+   "cur_ratio" (the current desk's ratio over the same window), "family", "members", "ready", "eligible", "why"}],
+   "family", "family_ru" (the current desk's family), "decision": "hold" | "wait" | "switch",
    "why_ru", "short_ru" (the panel's «автовыбор: …»), "asof"};
 a switch also appends one line to data/desk_select.jsonl and prints it. The previous web/desk_select.json is the state (current,
 since, by); missing or broken → the owner's choice. Readers (panel_header.main_desk) fall back to «Агрессивная» on a missing or
@@ -46,6 +54,14 @@ DD_FLOOR = 1.0                         # % — the drawdown a ratio divides by i
 MIN_GAP_MS = 7 * DAY                   # ≥ 7 days between switches
 REAL_FRESH_MS = 2 * 3_600_000          # public_real.json older than this does not prove «no open position»
 OWNER = {"current": "aggr", "since": 1793164774000, "by": "owner"}   # 28.10 07:19 Kyiv — commit 036f1bb09 (owner: «переключайся»)
+# 28.10 (owner): the conveyor's READY gate is required too (conveyor.READY_* — the same numbers, checked again here)
+READY_TRADES, READY_DAYS, READY_PF, READY_MEAN = cv.READY_MIN_TRADES, cv.READY_MIN_DAYS, cv.READY_MIN_PF, cv.READY_MIN_MEAN_PCT
+# 28.10 (owner): one family of three sizes — compared as one candidate; its size is the owner's hand choice of 28.10
+FAMILIES = {"autopilot": ("cons", "bal", "aggr")}
+FAMILY_SIZE = {"autopilot": "aggr"}
+FAMILY_RU = {"autopilot": "Автопилот"}
+FAMILY_ABOUT_RU = {"autopilot": "«Консервативная», «Сбалансированная» и «Агрессивная» — одни и те же сигналы разного размера; "
+                                "размер — «Агрессивная» (выбор владельца 28.10)"}
 
 
 def _num(x, d: float = 0.0) -> float:
@@ -71,6 +87,10 @@ def _ddmm(ms: int) -> str:
     except Exception:  # noqa: BLE001
         tz = dt.timezone(dt.timedelta(hours=2))
     return dt.datetime.fromtimestamp(ms / 1000, tz).strftime("%d.%m")
+
+
+def _g(x: float) -> str:
+    return f"{x:g}".replace(".", ",")
 
 
 def _f(x: float, nd: int = 2) -> str:
@@ -128,6 +148,43 @@ def metrics(v: dict, t0: int) -> dict:
     return {"result_pct": round(res, 2), "dd_pct": round(dd, 2), "ratio": round(res / max(dd, DD_FLOOR), 3)}
 
 
+def family_of(k: str) -> str:
+    """the desk's family key: «autopilot» for cons / bal / aggr, the desk itself otherwise"""
+    return next((f for f, ks in FAMILIES.items() if k in ks), k)
+
+
+def ready_check(stage: dict | None) -> tuple[bool, str]:
+    """(READY by the conveyor, why not) — the conveyor's stage AND its numbers; no record → not ready"""
+    s = stage or {}
+    miss = []
+    if s.get("stage") != "ready":
+        miss.append(f"конвейер: стадия «{s.get('stage') or 'нет данных'}», нужна READY")
+    n, d, pf, mean = _num(s.get("trades")), _num(s.get("days")), s.get("pf"), s.get("mean_pct")
+    if n < READY_TRADES:
+        miss.append(f"сделок {int(n)} из {READY_TRADES}")
+    if d < READY_DAYS:
+        miss.append(f"дней {d:.1f} из {READY_DAYS}".replace(".", ","))
+    if pf is None or _num(pf) < READY_PF:
+        miss.append(f"профит-фактор {'—' if pf is None else f'{_num(pf):.2f}'.replace('.', ',')} (нужно от {_g(READY_PF)})")
+    if mean is None or _num(mean) < READY_MEAN:
+        miss.append(f"средняя сделка {'—' if mean is None else _f(_num(mean)) + '%'} (нужно от +{_g(READY_MEAN)}%)")
+    return not miss, "; ".join(miss)
+
+
+def family_reps(keys: list, cur: str) -> list:
+    """one desk per family: the current desk for its own family, else the family's size (FAMILY_SIZE), else its first member"""
+    out, seen = [], set()
+    for k in keys:
+        f = family_of(k)
+        if f in seen:
+            continue
+        seen.add(f)
+        members = [x for x in FAMILIES.get(f, (k,)) if x in keys]
+        rep = cur if cur in members else FAMILY_SIZE.get(f) if FAMILY_SIZE.get(f) in members else members[0]
+        out.append(rep)
+    return out
+
+
 # ── the real account ─────────────────────────────────────────────────────────────────────────────────────────────────
 def real_holds(real, desk: str, now: int) -> tuple[bool | None, str]:
     """(True / False = does the real account hold a futures position of `desk`; None = unknown), and why"""
@@ -157,17 +214,24 @@ def decide(prof: dict, prev, real, stages: dict | None, now: int) -> dict:
     vc = prof.get(cur) or {}
     stages = stages or {}
     cands = []
-    for k in candidate_keys(prof):
+    cur_fam = family_of(cur)
+    for k in family_reps(candidate_keys(prof), cur):
         v = prof[k]
+        fam = family_of(k)
         t0 = max(ph.FUT_D0, start_of(v), start_of(vc) if vc else ph.FUT_D0)
         m = metrics(v, t0)
         mc = metrics(vc, t0) if vc else {"ratio": 0.0}
         n = trades_since(v)
         exp_dd = cv.expected_dd(k)
         why = []
+        ready, why_ready = ready_check(stages.get(k))
         if k == cur:
             why.append("текущий основной стол")
+        elif fam == cur_fam:
+            why.append("то же семейство, что и текущий стол — размеры не переключаем")
         else:
+            if not ready:
+                why.append(why_ready)
             if n < MIN_TRADES:
                 why.append(f"мало сделок: {n} из {MIN_TRADES}")
             dd_live = max(m["dd_pct"], _num((v.get("stats") or {}).get("max_dd_pct")))   # the desk's own (finer) record, if deeper
@@ -181,12 +245,24 @@ def decide(prof: dict, prev, real, stages: dict | None, now: int) -> dict:
             elif m["ratio"] < need:
                 why.append(f"результат к просадке {_f(m['ratio'])} против {_f(mc['ratio'])} у текущего — нужно на 20% лучше")
         cands.append({"key": k, "name": name(k), "trades": n, **m, "cur_ratio": mc["ratio"], "exp_dd_pct": exp_dd,
+                      "family": fam, "family_ru": FAMILY_RU.get(fam), "members": list(FAMILIES.get(fam, (k,))),
+                      "ready": ready, "ready_why": why_ready or "READY по конвейеру",
                       "eligible": not why, "why": "; ".join(why) if why else "все условия выполнены"})
     best = max((c for c in cands if c["eligible"]), key=lambda c: c["ratio"], default=None)
     others = [c for c in cands if c["key"] != cur]
-    doc = {"current": cur, "name": name(cur), "since": st["since"], "by": st["by"], "candidates": cands, "asof": now}
+    doc = {"current": cur, "name": name(cur), "since": st["since"], "by": st["by"], "candidates": cands, "asof": now,
+           "family": cur_fam, "family_ru": (f"{FAMILY_RU[cur_fam]}: {FAMILY_ABOUT_RU[cur_fam]}" if cur_fam in FAMILY_RU else None),
+           "rules_ru": (f"Претендент должен быть READY по конвейеру ({READY_TRADES} сделок, {READY_DAYS} дн., профит-фактор от "
+                        f"{_g(READY_PF)}, средняя сделка от +{_g(READY_MEAN)}%), иметь от {MIN_TRADES} сделок с 17.10, просадку в пределах "
+                        "истории и результат к просадке на 20% лучше текущего; не чаще раза в 7 дней и не при открытой позиции. "
+                        "Сравниваются семейства, а не размеры одного семейства (решение владельца 28.10).")}
     if best is None:
-        if others and all(c["trades"] < MIN_TRADES for c in others):
+        if others and not any(c["ready"] for c in others):
+            short = "ждёт READY конвейера"
+            why = (f"Держим «{name(cur)}»: ни у одного другого семейства нет готовности по конвейеру ({READY_TRADES} сделок, "
+                   f"{READY_DAYS} дн., профит-фактор от {_g(READY_PF)}, средняя сделка от +{_g(READY_MEAN)}%) — "
+                   + "; ".join(f"«{c['name']}»: {c['ready_why']}" for c in others) + ".")
+        elif others and all(c["trades"] < MIN_TRADES for c in others):
             mx = max(c["trades"] for c in others)
             short = f"ждёт {MIN_TRADES} сделок"
             why = (f"Держим «{name(cur)}»: у других столов меньше {MIN_TRADES} закрытых сделок с 17.10 (больше всех — {mx}); "
@@ -207,7 +283,7 @@ def decide(prof: dict, prev, real, stages: dict | None, now: int) -> dict:
         return {**doc, "decision": "wait", "short_ru": f"на «{best['name']}» — после закрытия позиции" if held else "ждёт данных реального счёта",
                 "why_ru": f"«{best['name']}» проходит все условия, но {why_real}: позицию между столами не переносим — ждём."}
     ddt = f"{best['dd_pct']:.1f}".replace(".", ",")
-    why = (f"Переключено с «{name(cur)}» на «{best['name']}»: {best['trades']} сделок с 17.10, результат к просадке {_f(best['ratio'])} "
+    why = (f"Переключено с «{name(cur)}» на «{best['name']}» (READY по конвейеру): {best['trades']} сделок с 17.10, результат к просадке {_f(best['ratio'])} "
            f"против {_f(best['cur_ratio'])} (лучше на 20% и больше), просадка {ddt}% в пределах истории {best['exp_dd_pct']:g}%, "
            f"{why_real}.")
     return {**doc, "current": best["key"], "name": best["name"], "since": now, "by": "auto", "decision": "switch", "from": cur,

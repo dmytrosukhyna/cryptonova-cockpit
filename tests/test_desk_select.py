@@ -1,6 +1,7 @@
 """«Автовыбор основного стола» (cnq/agents/desk_select.py, 28.10.2026): slow and evidence-based — result ÷ drawdown, ≥ 20 trades,
-drawdown within the history, ≥ 20 % better, no open position of the current desk on the real account, ≥ 7 days between switches.
-Every desk and number here is made-up test data."""
+drawdown within the history, ≥ 20 % better, no open position of the current desk on the real account, ≥ 7 days between switches;
+28.10 (owner): plus READY by the conveyor (30 trades, 21 days, PF ≥ 1.2, mean ≥ +0.3 %), and cons / bal / aggr are ONE family
+compared as one candidate whose size is the owner's choice («Агрессивная»). Every desk and number here is made-up test data."""
 import json
 import os
 
@@ -28,6 +29,14 @@ def world(aggr=(10000, 10300, 9900, 10200), bal=(10000, 10200, 10050, 10300), co
 
 
 REAL_FLAT = {"asof": NOW - 60_000, "futures": [{"inst": "SUI-USDT-SWAP", "sig": "imp:K1"}]}     # only the second half holds a position
+READY = {k: {"key": k, "stage": "ready", "trades": 35, "days": 25.0, "pf": 1.6, "mean_pct": 0.5} for k in ("cons", "bal", "aggr", "own")}
+
+
+def strong(**kw):
+    """a world where «Сигналы CRYPTO NOVA» clearly beat the autopilot family by result ÷ drawdown with 25 trades"""
+    w = world(**kw)
+    w["own"] = desk((10000, 10200, 10150, 10400), 25, "Сигналы CRYPTO NOVA")
+    return w
 
 
 def test_candidates_are_the_main_desk_keys_of_the_header_and_the_panel():
@@ -38,62 +47,77 @@ def test_candidates_are_the_main_desk_keys_of_the_header_and_the_panel():
     assert cv.DESKS["lab"]["ev"] == "none" and cv.DESKS["brk"]["ev"] == "failed"
 
 
-def test_today_the_owners_aggr_holds_and_waits_for_20_trades():
+def test_today_the_owners_aggr_holds_and_waits_for_ready():
     prof = world(n=8)
     d = ds.decide(prof, None, REAL_FLAT, {}, ds.OWNER["since"] + 3_600_000)
     assert (d["current"], d["by"], d["since"], d["decision"]) == ("aggr", "owner", ds.OWNER["since"], "hold")
-    assert d["short_ru"] == "ждёт 20 сделок" and "меньше 20 закрытых сделок" in d["why_ru"]
+    assert d["short_ru"] == "ждёт READY конвейера" and "готовности по конвейеру" in d["why_ru"]
+    assert d["family"] == "autopilot" and "Агрессивная" in d["family_ru"]
     keys = [c["key"] for c in d["candidates"]]
-    assert set(keys) == {"cons", "bal", "aggr", "own"}
+    assert keys == ["aggr", "own"]                                              # one autopilot family, its size = the owner's choice
     c = {x["key"]: x for x in d["candidates"]}
-    assert set(c["bal"]) >= {"key", "trades", "result_pct", "dd_pct", "ratio", "eligible", "why"}
-    assert c["aggr"]["why"] == "текущий основной стол" and not c["aggr"]["eligible"] and "мало сделок: 8 из 20" in c["bal"]["why"]
+    assert set(c["own"]) >= {"key", "trades", "result_pct", "dd_pct", "ratio", "eligible", "why", "family", "members", "ready"}
+    assert c["aggr"]["why"] == "текущий основной стол" and not c["aggr"]["eligible"] and c["aggr"]["members"] == ["cons", "bal", "aggr"]
+    assert "нужна READY" in c["own"]["why"] and not c["own"]["ready"]
 
 
 def test_switch_when_every_condition_holds_and_it_is_logged(tmp_path):
-    prof = world()
-    d = ds.decide(prof, None, REAL_FLAT, {}, NOW)
-    assert d["decision"] == "switch" and d["current"] == "bal" and d["by"] == "auto" and d["since"] == NOW and d["from"] == "aggr"
+    prof = strong()
+    d = ds.decide(prof, None, REAL_FLAT, READY, NOW)
+    assert d["decision"] == "switch" and d["current"] == "own" and d["by"] == "auto" and d["since"] == NOW and d["from"] == "aggr"
     c = {x["key"]: x for x in d["candidates"]}
-    assert c["bal"]["eligible"] and c["bal"]["ratio"] >= 1.2 * c["bal"]["cur_ratio"] > 0
-    assert "Переключено с «Агрессивная» на «Сбалансированная»" in d["why_ru"]
+    assert c["own"]["eligible"] and c["own"]["ready"] and c["own"]["ratio"] >= 1.2 * c["own"]["cur_ratio"] > 0
+    assert "Переключено с «Агрессивная» на «Сигналы CRYPTO NOVA» (READY по конвейеру)" in d["why_ru"]
     # the same through run(): web/desk_select.json + one log line; the next run keeps the new desk and its date
     out = tmp_path / "web"
     out.mkdir()
     (out / "paper.json").write_text(json.dumps({"profiles": prof}), encoding="utf-8")
     (out / "public_real.json").write_text(json.dumps(REAL_FLAT), encoding="utf-8")
+    (out / "conveyor.json").write_text(json.dumps({"desks": list(READY.values())}), encoding="utf-8")
     log = tmp_path / "data" / "desk_select.jsonl"
     doc = ds.run(str(out), NOW, str(log))
     assert json.loads((out / "desk_select.json").read_text(encoding="utf-8")) == json.loads(json.dumps(doc, ensure_ascii=False))
     lines = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()]
-    assert len(lines) == 1 and (lines[0]["from"], lines[0]["to"], lines[0]["t"]) == ("aggr", "bal", NOW)
+    assert len(lines) == 1 and (lines[0]["from"], lines[0]["to"], lines[0]["t"]) == ("aggr", "own", NOW)
     again = ds.run(str(out), NOW + H, str(log))
-    assert (again["current"], again["since"], again["by"]) == ("bal", NOW, "auto") and again["decision"] in ("hold", "wait")
+    assert (again["current"], again["since"], again["by"]) == ("own", NOW, "auto") and again["decision"] in ("hold", "wait")
     assert len(log.read_text(encoding="utf-8").splitlines()) == 1
-    assert ph.main_desk(ph.load_sel(str(out))) == "bal"                      # the header and the real account read this file
+    assert ph.main_desk(ph.load_sel(str(out))) == "own"                      # the header and the real account read this file
 
 
 def test_every_guard_alone_stops_the_switch():
-    base = dict(prof=world(), prev=None, real=REAL_FLAT, stages={}, now=NOW)
+    base = dict(prof=strong(), prev=None, real=REAL_FLAT, stages=READY, now=NOW)
 
     def dec(**kw):
         a = {**base, **kw}
         return ds.decide(a["prof"], a["prev"], a["real"], a["stages"], a["now"])
+
+    def why(d, k="own"):
+        return {x["key"]: x for x in d["candidates"]}[k]["why"]
     assert dec()["decision"] == "switch"
+    # 28.10: not READY by the conveyor — no record, another stage, or one of the four numbers short
+    for st in ({}, {"own": {**READY["own"], "stage": "paper"}}, {"own": {**READY["own"], "trades": 29}},
+               {"own": {**READY["own"], "days": 20.9}}, {"own": {**READY["own"], "pf": 1.19}}, {"own": {**READY["own"], "mean_pct": 0.29}},
+               {"own": {**READY["own"], "pf": None}}):
+        d = dec(stages={**READY, **st} if st else {})
+        assert d["decision"] == "hold" and d["current"] == "aggr" and not {x["key"]: x for x in d["candidates"]}["own"]["ready"], st
     # fewer than 20 closed trades since 17.10
-    p = world()
-    p["bal"]["closed"] = p["bal"]["closed"][:19]
-    d = dec(prof=p)
-    assert d["decision"] == "hold" and d["current"] == "aggr"
-    # the drawdown deeper than the history promised (bal: 18 %), even with a far better result
-    d = dec(prof=world(bal=(10000, 12000, 9700, 13000)))
-    assert d["decision"] == "hold" and "глубже ожидаемой по истории 18%" in {x["key"]: x for x in d["candidates"]}["bal"]["why"]
-    p = world()
-    p["bal"]["stats"] = {"max_dd_pct": 18.5}                                 # the desk's own finer record is deeper than its curve
+    p = strong()
+    p["own"]["closed"] = p["own"]["closed"][:19]
     assert dec(prof=p)["decision"] == "hold"
-    # not 20 % better by result ÷ drawdown (here ≈ 15 %)
-    d = dec(prof=world(aggr=(10000, 10200, 10000, 10300), bal=(10000, 10230, 10000, 10345)))
-    assert d["decision"] == "hold" and "нужно на 20% лучше" in {x["key"]: x for x in d["candidates"]}["bal"]["why"]
+    # the drawdown deeper than the history promised (own: 23 %), even with a far better result
+    p = strong()
+    p["own"] = desk((10000, 13000, 9900, 14000), 25, "Сигналы CRYPTO NOVA")
+    d = dec(prof=p)
+    assert d["decision"] == "hold" and "глубже ожидаемой по истории 23%" in why(d)
+    p = strong()
+    p["own"]["stats"] = {"max_dd_pct": 23.5}                                 # the desk's own finer record is deeper than its curve
+    assert dec(prof=p)["decision"] == "hold"
+    # not 20 % better by result ÷ drawdown
+    p = world(aggr=(10000, 10200, 10000, 10300))
+    p["own"] = desk((10000, 10230, 10000, 10345), 25, "Сигналы CRYPTO NOVA")
+    d = dec(prof=p)
+    assert d["decision"] == "hold" and "нужно на 20% лучше" in why(d)
     # less than 7 days since the last switch
     d = dec(now=ds.OWNER["since"] + 6 * ds.DAY)
     assert d["decision"] == "wait" and d["current"] == "aggr" and "из 7" in d["why_ru"] and "04.11" in d["short_ru"]
@@ -104,29 +128,36 @@ def test_every_guard_alone_stops_the_switch():
         d = dec(real=real)
         assert d["decision"] == "wait" and d["current"] == "aggr" and "не переносим" in d["why_ru"], real
     # retired by the conveyor
-    d = dec(stages={"bal": {"key": "bal", "stage": "retired", "paused": True}})
-    assert d["decision"] == "hold" and "снят конвейером" in {x["key"]: x for x in d["candidates"]}["bal"]["why"]
+    d = dec(stages={**READY, "own": {**READY["own"], "stage": "retired", "paused": True}})
+    assert d["decision"] == "hold" and "снят конвейером" in why(d)
     # a losing challenger never wins, even against a worse current desk
-    d = dec(prof=world(aggr=(10000, 9500, 9000), bal=(10000, 9900, 9800), cons=(10000, 9950, 9900)))
-    assert d["decision"] == "hold" and "не в плюсе" in {x["key"]: x for x in d["candidates"]}["bal"]["why"]
+    p = world(aggr=(10000, 9500, 9000))
+    p["own"] = desk((10000, 9900, 9800), 25, "Сигналы CRYPTO NOVA")
+    d = dec(prof=p)
+    assert d["decision"] == "hold" and "не в плюсе" in why(d)
 
 
-def test_more_money_after_a_winning_stretch_is_not_a_reason():
+def test_sizes_of_one_family_are_never_switched():
     """cons / bal / aggr are the same signals at three sizes: the bigger one earns more in a good stretch and loses more in a bad
-    one. Ranked by profit the biggest would always win; by result ÷ drawdown they are equal — so nothing switches."""
+    one. 28.10 (owner): they are ONE family — the selector never switches between them, whatever their numbers."""
     k = lambda f: tuple(10000 + (x - 10000) * f for x in (10000, 10400, 10100, 10600, 10300, 10800))   # noqa: E731
-    d = ds.decide(world(cons=k(0.5), bal=k(1.0), aggr=k(1.5)), {"current": "bal", "since": 0, "by": "owner"}, REAL_FLAT, {}, NOW)
-    c = {x["key"]: x for x in d["candidates"]}
-    assert c["aggr"]["result_pct"] > c["bal"]["result_pct"] > c["cons"]["result_pct"]
-    assert d["decision"] == "hold" and d["current"] == "bal"
-    assert all(not c[x]["eligible"] for x in ("cons", "aggr"))
+    d = ds.decide(world(cons=k(3.0), bal=k(1.0), aggr=k(0.5)), {"current": "bal", "since": 0, "by": "owner"}, REAL_FLAT, READY, NOW)
+    keys = [x["key"] for x in d["candidates"]]
+    assert d["decision"] == "hold" and d["current"] == "bal" and "cons" not in keys and "aggr" not in keys     # the current size represents it
+    assert ds.family_reps(["cons", "bal", "aggr", "own"], "own") == ["aggr", "own"]                          # else the owner's size
+    assert ds.family_of("cons") == ds.family_of("aggr") == "autopilot" and ds.family_of("own") == "own"
 
 
-def test_the_best_ratio_wins_among_several_eligible_and_spot_lab_brk_never_count():
-    d = ds.decide(world(cons=(10000, 10300, 10250, 10500)), None, REAL_FLAT, {}, NOW)
+def test_back_to_the_family_takes_the_owners_size_not_the_best_size():
+    """own is the main desk and the autopilot family beats it: the switch goes to «Агрессивная» (the owner's size), even when
+    «Консервативная» has the better ratio."""
+    p = world(cons=(10000, 10300, 10250, 10500), aggr=(10000, 10300, 10200, 10450))
+    p["own"] = desk((10000, 10050, 9900, 10010), 25, "Сигналы CRYPTO NOVA")
+    d = ds.decide(p, {"current": "own", "since": 0, "by": "auto"}, {"asof": NOW, "futures": [{"inst": "SUI-USDT-SWAP", "sig": "imp:K1"}]},
+                  READY, NOW)
     c = {x["key"]: x for x in d["candidates"]}
-    assert c["cons"]["eligible"] and c["bal"]["eligible"] and c["cons"]["ratio"] > c["bal"]["ratio"]
-    assert d["current"] == "cons" and {"lab", "brk", "imps", "imp"}.isdisjoint(c)
+    assert d["decision"] == "switch" and d["current"] == "aggr" and set(c) == {"aggr", "own"}
+    assert {"lab", "brk", "imps", "imp"}.isdisjoint(c)
 
 
 def test_a_broken_state_file_starts_from_the_owners_choice_and_the_window_is_shared():
@@ -139,4 +170,4 @@ def test_a_broken_state_file_starts_from_the_owners_choice_and_the_window_is_sha
     prof["own"] = desk((10000, 10500, 10400, 10600), 25, "Сигналы CRYPTO NOVA", t0=T0 + 2 * H)
     c = {x["key"]: x for x in ds.decide(prof, None, REAL_FLAT, {}, NOW)["candidates"]}
     cur_same = ds.metrics(prof["aggr"], T0 + 2 * H)["ratio"]
-    assert c["own"]["cur_ratio"] == cur_same != c["bal"]["cur_ratio"]
+    assert c["own"]["cur_ratio"] == cur_same != ds.metrics(prof["aggr"], T0)["ratio"]

@@ -4218,7 +4218,9 @@ export MYSPOT_PASS=отдельная фраза из 12+ символов</pre>
   function dselLine(){ const D=MS.sel, k=D&&['cons','bal','aggr','own'].includes(D.current)?D.current:'aggr';
     const nm=D&&D.current===k&&D.name?D.name:NAMES[k], by=D&&D.current===k?(D.by==='auto'?'автоматически':'владельцем'):'';
     const tail=!D?'файл автовыбора не прочитался — стол по умолчанию':D.current!==k?'в файле автовыбора неизвестный стол — стол по умолчанию':D.short_ru?'автовыбор: '+esc(D.short_ru):'';
-    return `<div class="dsel" title="${esc((D&&D.why_ru)||'')}">Основной стол: <b>${esc(nm)}</b> (${by&&D.since?`выбран ${dday(D.since)} ${by}`:''}${by&&D.since&&tail?'; ':''}${tail})</div>`; }
+    // 28.10 (owner): cons / bal / aggr are one family («Автопилот») — the line names the family and its size; the selector needs READY
+    const fam=['cons','bal','aggr'].includes(k)?`Автопилот · размер «${esc(nm)}»`:esc(nm);
+    return `<div class="dsel" title="${esc([(D&&D.why_ru)||'',(D&&D.family_ru)||'',(D&&D.rules_ru)||''].filter(Boolean).join(' · '))}">Основной стол: <b>${fam}</b> (${by&&D.since?`выбран ${dday(D.since)} ${by}`:''}${by&&D.since&&tail?'; ':''}${tail})</div>`; }
   function totalHtml(A,S){ const B=S&&S.ok?S.total_usd:null, X=B!=null?A+B:null, pa=X?A/X*100:0;
     return `<div class="mstotal"><div class="tl">${X!=null?`Всего: <b class="big">${usd(X)}</b> = личный <b>${usd(A)}</b> + CRYPTO NOVA <b>${usd(B)}</b>`
       :`Всего: — · личный <b>${usd(A)}</b> + CRYPTO NOVA <b>не прочитался</b>`}</div>`

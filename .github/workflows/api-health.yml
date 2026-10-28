@@ -54,3 +54,22 @@ jobs:
           # 28.10 (build 46): the PUBLIC mode's real account, the market in plain words, the spot actions, the demo stats
           b46=$(curl -sS -m 20 'https://app.crypto-capital.app/v2/home?lang=ru' | jq -c '{pp: (.public_portfolio | if . then {since, start_usd, value_usd, pnl_usd, stale, day: .periods.day, spot_day: .spot.periods.day.available, fut_open: .futures.open_n, fut_stats: .futures.stats, actions: (.actions | length), last: (.actions[0].text // null)} else null end), mv: (.market_view | if . then {now, short, system} else null end), spot_actions: ((.spot.actions // []) | length), demo_stats: .futures.stats}' 2>/dev/null || echo "not JSON")
           echo "::notice title=build 46 home::$(echo "$b46" | cut -c1-3800)"
+      - name: NOVA's voice on the server (build 46 #6)
+        run: |
+          set -u
+          A=https://app.crypto-capital.app
+          ready=$(curl -sS -m 20 $A/v2/health | jq -c '{tts: .ready.tts, tts_last}' 2>/dev/null || echo "?")
+          echo "::notice title=tts ready::$ready"
+          for l in ru en; do
+            if [ "$l" = ru ]; then txt="Привет! Я NOVA AI. Публичный портфель CRYPTO NOVA сейчас — 9 896 долларов."; else txt="Hi! I'm NOVA AI. The CRYPTO NOVA public portfolio is now at 9,896 dollars."; fi
+            r=$(jq -nc --arg t "$txt" --arg l "$l" '{text: $t, lang: $l}' | curl -sS -m 40 -o tts_$l.bin -D h_$l.txt -w '%{http_code} %{time_total}s %{size_download}B' -X POST -H 'content-type: application/json' --data-binary @- $A/v2/tts || echo "000")
+            ct=$(tr -d '\r' < h_$l.txt | grep -i '^content-type' | head -1)
+            kind=$(file -b tts_$l.bin | cut -c1-60)
+            echo "::notice title=POST /v2/tts $l::HTTP $r · $ct · $kind · $(head -c 120 tts_$l.bin | tr -dc '[:print:]' | head -c 120)"
+          done
+          for l in ru en; do
+            u=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.audio_url // empty')
+            t=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.text // empty' | cut -c1-200)
+            if [ -n "$u" ]; then r=$(curl -sS -m 40 -o rep_$l.bin -w '%{http_code} %{time_total}s %{size_download}B' "$u" || echo 000); else r="no audio_url"; fi
+            echo "::notice title=report $l::$r · $u · $t"
+          done

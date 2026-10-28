@@ -209,7 +209,7 @@ def test_real_llm_property_and_health(tmp_path):
     api, _ = make(tmp_path)
     api.llm = LLM(api_key="")
     c, d = call(api, "GET", "/v2/health")
-    assert c == 200 and d["ready"] == {"llm": False, "firebase_admin": False, "bingx_partner": False}
+    assert c == 200 and {k: v for k, v in d["ready"].items() if k != "tts"} == {"llm": False, "firebase_admin": False, "bingx_partner": False} and "tts" in d["ready"]
     c, d = call(api, "POST", "/v2/agent", {"q": "Как прошёл ваш день, NOVA?"}, token("p1"))
     assert c == 200 and d["error"] == "busy" and d["answer"] and d["agent"]["left"] == 5
     c, d = call(api, "POST", "/v2/agent", {"q": "что такое биткоин?"}, token("p1"))     # a FAQ question: answered from the FAQ, not counted

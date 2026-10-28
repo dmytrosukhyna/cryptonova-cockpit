@@ -5,7 +5,7 @@
 # Safe: nginx is checked with `nginx -t`; on any error the old config is put back.
 set -euo pipefail
 REPO=/opt/cnq/repo
-/opt/cnq/venv/bin/pip install -q "pyjwt>=2.8" "cryptography>=42"
+/opt/cnq/venv/bin/pip install -q "pyjwt>=2.8" "cryptography>=42" "edge-tts>=7"   # edge-tts: NOVA's voice (build 46, cnq/api/tts.py)
 install -m 644 "$REPO/deploy/api/cnq-api.service" /etc/systemd/system/cnq-api.service
 systemctl daemon-reload
 systemctl enable --now cnq-api

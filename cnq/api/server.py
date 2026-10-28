@@ -3,6 +3,8 @@
 nginx: app.crypto-capital.app/v2/ → http://127.0.0.1:8090/v2/  (deploy/api/README.md). The old Java backend stays as it is.
 
 Public (no login):  GET /v2/health · GET /v2/agent/selftest (one real NOVA call per 10 min, see _selftest) · GET /v2/home (= app_home.json, fresh every minute) · GET /v2/feed/<name>
+                    · POST /v2/tts {text, lang} → audio/mpeg, GET /v2/tts/<key>.mp3 (build 46: NOVA's male voice on the server,
+                    /v2/home "report".audio_url — cnq/api/tts.py)
                     (/v2/home also carries "news": «Главные новости рынка» from web/decision.json in the request's language — cnq/api/home_news.py)
                     (/v2/feed/nova = web/nova.json: NOVA's greeting, starter questions and topics — see cnq/api/nova.py)
                     ?lang=en|ru|uk|el|es (20.10, the app's language): web/<name>.<lang>.json when it exists, else <name>.json
@@ -44,7 +46,7 @@ from urllib.parse import parse_qs, urlsplit
 from cnq.agents.i18n import DEFAULT, LANGS, file_name, norm_lang
 from cnq.agents.llm import LLM, PROVIDERS
 
-from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, pf_parse, pf_review, spot_top
+from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, pf_parse, pf_review, spot_top, tts
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -127,6 +129,8 @@ class Api:
         self.vision_reader = pf_parse.vision_holdings    # tests put a fake here
         self.pf_last: dict | None = None         # counts and timing only — never a coin or an amount
         self.listings = spot_top.Listings()      # build 45 «Топ-10 монет на заметку»: OKX / BingX spot coins (background, 12 h)
+        # build 46 #6: NOVA's voice on the server (the phone may have no male voice of its language) — cnq/api/tts.py
+        self.tts = tts.Tts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "tts_cache"))
 
     # ---------------------------------------------------------------- helpers
     def _read(self, path: str) -> dict | None:
@@ -150,6 +154,27 @@ class Api:
                 if d is not None:
                     return d
         return self._read(base)
+
+    def _reports(self) -> dict:
+        """{key: (text, lang)} of the spoken reports the home feeds carry now (app_home "report")"""
+        out = {}
+        for lang in LANGS:
+            r = (self._feed("app_home", lang) or {}).get("report") or {}
+            if r.get("key") and r.get("text"):
+                out[str(r["key"])] = (str(r["text"]), str(r.get("lang") or lang))
+        return out
+
+    def _with_report_audio(self, d: dict) -> dict:
+        """/v2/home: the report's mp3 address (made in the background now, so the first play is instant); null while the server
+        has no voice (the app then reads the text with the phone's voice)"""
+        r = d.get("report")
+        if not isinstance(r, dict) or not r.get("key") or not r.get("text"):
+            return d
+        ok = self.tts.available()
+        if ok:
+            self.tts.prewarm(r["text"], r.get("lang") or d.get("lang") or DEFAULT)
+        base = (os.environ.get("CNQ_API_PUBLIC") or "https://app.crypto-capital.app").rstrip("/")
+        return {**d, "report": {**r, "audio_url": f"{base}/v2/tts/{r['key']}.mp3" if ok else None}}
 
     def _llm_ready(self) -> bool:
         """cnq.agents.llm.LLM has `available` as a property; test fakes may have it as a method"""
@@ -273,9 +298,10 @@ class Api:
             age = None if not home.get("asof") else round(time.time() - home["asof"] / 1000)
             ready = {"llm": self._llm_ready(),
                      "firebase_admin": bool(getattr(self.admin, "ready", False)),
-                     "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET"))}
+                     "bingx_partner": bool(os.environ.get("CNQ_BINGX_AGENT_KEY") and os.environ.get("CNQ_BINGX_AGENT_SECRET")),
+                     "tts": self.tts.available()}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last,
-                         "panel_last": self.panel_last, "news_last": self.news.last,
+                         "panel_last": self.panel_last, "news_last": self.news.last, "tts_last": self.tts.last,
                          "portfolio": {"vision": bool(self.vision), "last": self.pf_last}}
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()
@@ -298,7 +324,20 @@ class Api:
                 news = []
             if news:
                 d = {**d, "news": news}
+            d = self._with_report_audio(d)
             return 200, d
+        if method == "POST" and path == "/v2/tts":                       # build 46 #6: text → NOVA's male voice (public, per-IP limit)
+            try:
+                data = json.loads(body.decode() or "{}") if body else {}
+            except ValueError:
+                return 400, {"error": "bad_json"}
+            if not isinstance(data, dict):
+                return 400, {"error": "bad_json"}
+            ip = str(headers.get("x-real-ip") or headers.get("x-forwarded-for") or "local").split(",")[0].strip()[:64]
+            return self.tts.post(data, ip)
+        m = re.fullmatch(r"/v2/tts/([0-9a-f]{24})\.mp3", path)
+        if method == "GET" and m:
+            return self.tts.get_route(m.group(1), self._reports())
         m = re.fullmatch(r"/v2/feed/([a-z_]+)", path)
         if method == "GET" and m:
             if m.group(1) not in FEEDS:
@@ -678,7 +717,16 @@ def make_handler(api: Api):
             self.send_header("Access-Control-Allow-Origin", admin_console.origin())
             self.send_header("Vary", "Origin")
 
-        def _send(self, code: int, doc: dict) -> None:
+        def _send(self, code: int, doc) -> None:
+            if isinstance(doc, tts.Audio):               # build 46 #6: an mp3 — its address is its content, so it may be kept
+                self.send_response(code)
+                self.send_header("Content-Type", doc.ctype)
+                self.send_header("Content-Length", str(len(doc.body)))
+                self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+                self.send_header("X-TTS-Key", doc.key)
+                self.end_headers()
+                self.wfile.write(doc.body)
+                return
             raw = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode()
             self.send_response(code)
             self.send_header("Content-Type", "application/json; charset=utf-8")

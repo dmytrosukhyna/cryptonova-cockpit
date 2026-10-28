@@ -1218,6 +1218,85 @@ def _market_view(mk: dict, pport: dict | None, fut: dict, now: int, lang: str = 
     return out
 
 
+# 28.10 (build 46 #6, owner: «Доклад не говорит»): NOVA's spoken report on the PUBLIC portfolio, written for the ear (amounts and
+# percents in words, no $ sign) — the API reads it with the server's male voice (cnq/api/tts.py) and adds "audio_url"; the key is
+# the cache key of that mp3, so a new text means a new mp3. Every number comes from public_portfolio / market_view above.
+MONTHS = {"ru": ("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"),
+          "uk": ("січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"),
+          "en": ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"),
+          "el": ("Ιανουαρίου", "Φεβρουαρίου", "Μαρτίου", "Απριλίου", "Μαΐου", "Ιουνίου", "Ιουλίου", "Αυγούστου", "Σεπτεμβρίου", "Οκτωβρίου",
+                 "Νοεμβρίου", "Δεκεμβρίου"),
+          "es": ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")}
+REP_WHAT = {"spot_buy": "buy", "active_buy": "buy", "spot_sell": "sell", "active_sell": "sell", "fut_open": "fut_open",
+            "fut_close": "fut_close", "fut_reduce": "fut_close", "fut_gone": "fut_gone"}
+
+
+def _say_money(x, lang: str, sign: bool = False) -> str:
+    v = round(abs(float(x)))
+    num = f"{v:,}" if lang == "en" else f"{v:,}".replace(",", "\u00a0")
+    pre = (t(lang, "rep.plus") + " " if float(x) > 0 else t(lang, "rep.minus") + " " if float(x) < 0 else "") if sign and v else ""
+    return f"{pre}{num} {plural(lang, v, 'dollar')}"
+
+
+def _say_pct(x, lang: str, sign: bool = True) -> str:
+    v = round(float(x), 1)
+    if v == int(v):
+        n = int(abs(v))
+        body = f"{n} {plural(lang, n, 'percent')}"
+    else:
+        num = f"{abs(v):.1f}"
+        body = f"{num if lang == 'en' else num.replace('.', ',')} {t(lang, 'rep.pct_frac')}"
+    pre = (t(lang, "rep.plus") + " " if v > 0 else t(lang, "rep.minus") + " " if v < 0 else "") if sign else ""
+    return pre + body
+
+
+def _say_date(ms: int, lang: str) -> str:
+    d = dt.datetime.fromtimestamp(int(ms) / 1000, _kyiv())
+    m = MONTHS[lang if lang in MONTHS else DEFAULT][d.month - 1]
+    return f"{m} {d.day}" if lang == "en" else f"{d.day} de {m}" if lang == "es" else f"{d.day} {m}"
+
+
+def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT) -> dict:
+    out = []
+    if not pport:
+        out.append(t(lang, "rep.none"))
+    else:
+        out.append(t(lang, "rep.value", v=_say_money(pport["value_usd"], lang)))
+        day = (pport.get("periods") or {}).get("day") or {}
+        if day.get("available") and day.get("usd") is not None and day.get("pct") is not None:
+            out.append(t(lang, "rep.today", chg=_say_money(day["usd"], lang, True), pct=_say_pct(day["pct"], lang)))
+        if pport.get("pnl_usd") is not None and pport.get("pnl_pct") is not None:
+            out.append(t(lang, "rep.since", d=_say_date(pport["since"], lang), chg=_say_money(pport["pnl_usd"], lang, True),
+                         pct=_say_pct(pport["pnl_pct"], lang)))
+        f = pport.get("futures") or {}
+        if f:
+            out.append(t(lang, "rep.fut.open", n=f["open_n"]) if f.get("open_n") else t(lang, "rep.fut.none"))
+        acts = [a for a in pport.get("actions") or [] if a.get("kind") in REP_WHAT]
+        if acts:
+            a = acts[0]
+            out.append(t(lang, "rep.last", d=_say_date(a["t"], lang), what=t(lang, f"rep.w.{REP_WHAT[a['kind']]}"), sym=a["sym"]))
+        if pport.get("stale"):
+            out.append(t(lang, "rep.stale"))
+    b = (mv or {}).get("btc") or {}
+    if b.get("price") and b.get("chg24") is not None:
+        out.append(t(lang, "rep.btc", v=_say_money(b["price"], lang), pct=_say_pct(b["chg24"], lang)))
+    text = " ".join(out)
+    try:
+        from ..api.tts import key as tts_key
+        k = tts_key(text, lang)
+    except Exception:  # noqa: BLE001
+        k = None
+    return {"kind": "public", "lang": lang, "text": text, "key": k, "asof": now, "audio_url": None}
+
+
+def _report_safe(pport, mv, now, lang):
+    try:
+        return _report(pport, mv, now, lang)
+    except Exception as e:  # noqa: BLE001
+        print("app_home report:", repr(e)[:200], flush=True)
+        return None
+
+
 def _market_view_safe(mk, pport, fut, now, lang):
     try:
         return _market_view(mk, pport, fut, now, lang)
@@ -1241,9 +1320,10 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
     except Exception as e:  # noqa: BLE001 — the feed never breaks because of the real account's file
         print("app_home public_portfolio:", repr(e)[:200], flush=True)
         pport = None
+    mv = _market_view_safe(mk, pport, fut, now, lang)
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
             "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub, "public": public,
-            "public_portfolio": pport, "market_view": _market_view_safe(mk, pport, fut, now, lang),
+            "public_portfolio": pport, "market_view": mv, "report": _report_safe(pport, mv, now, lang),
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
             "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out),

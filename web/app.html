@@ -1163,6 +1163,7 @@ async function askServer(system,user,maxTokens,opt){ const tok=adminTok(); if(!t
     catch(e){ clearTimeout(tm); last=e.name==='AbortError'?`сервер не ответил за ${Math.round(lim/1000)} с`:'нет связи с сервером CRYPTO NOVA'; aiLog({ok:false,prov:'server',ms:Math.round(performance.now()-t0),err:last,attempt}); if(attempt===0&&e.name!=='AbortError'){ await new Promise(z=>setTimeout(z,1500)); continue; } throw new Error(last); }
     clearTimeout(tm); const ms=Math.round(performance.now()-t0);
     if(r.status===401||r.status===403){ last=r.status===403?'на сервере не задан токен «Управления»':'токен «Управления» не подошёл — войдите заново'; aiLog({ok:false,prov:'server',ms,status:r.status,err:last}); throw new Error(last); }
+    if(r.status===413){ last='запрос больше, чем принимает сервер — контекст панели слишком большой'; aiLog({ok:false,prov:'server',ms,status:413,err:last}); throw new Error(last); }
     if(!r.ok||!j){ last='сервер ответил '+r.status; aiLog({ok:false,prov:'server',ms,status:r.status,err:last,attempt}); if(attempt===0&&r.status>=500){ await new Promise(z=>setTimeout(z,2000)); continue; } throw new Error(last); }
     if(j.answer){ aiLog({ok:true,prov:'server',ms,status:200,attempt}); return String(j.answer).trim(); }
     last={timeout:'модель не успела ответить',rate_limit:'лимит запросов модели — через минуту',empty:'пустой ответ модели',not_configured:'на сервере нет ключа ИИ'}[j.error]||('ошибка модели'+(j.detail?': '+String(j.detail).slice(0,80):''));
@@ -3478,7 +3479,15 @@ function ruleTopic(ql){ const P=ctxPack();
 /* 21.10: the answer bubble shows «NOVA думает · N с» while waiting (never a bare «…» forever); a failure says why in plain words,
    offers «Повторить» and still gives the panel's rule-based answer, clearly labelled as such. The context sent to the model is
    kept small (15 coins) — the free tiers limit tokens per minute. */
-function ctxForAI(){ const C=ctxPack(); if(Array.isArray(C.coins)&&C.coins.length>15) C.coins=C.coins.slice(0,15); return C; }
+/* 28.10 (build 46): the request measured 12.7 KB (nova-panel-probe) against the server's old 16 KB cap — on a busy day the server answered 413 and the chat said «сервер ответил 413». The context now stays within CTX_AI_MAX bytes: fewer events, news, coins and the picks go first; the coin on the chart, its levels and the portfolio stay. */
+const CTX_AI_MAX=18000;
+function ctxBytes(o){ try{ return new TextEncoder().encode(JSON.stringify(o)).length; }catch(e){ return JSON.stringify(o).length*2; } }
+function ctxForAI(){ const C=ctxPack(); if(Array.isArray(C.coins)&&C.coins.length>15) C.coins=C.coins.slice(0,15);
+  const cuts=[()=>{ if(C.current&&Array.isArray(C.current.events)) C.current.events=C.current.events.slice(0,1); },()=>{ if(Array.isArray(C.news)) C.news=C.news.slice(0,3); },
+    ()=>{ if(C.portfolio) delete C.portfolio.picks; },()=>{ if(Array.isArray(C.coins)) C.coins=C.coins.slice(0,8); },()=>{ if(C.current&&C.current.advice) C.current.advice.why=(C.current.advice.why||[]).slice(0,2); },
+    ()=>{ if(Array.isArray(C.coins)) C.coins=C.coins.slice(0,4); if(Array.isArray(C.news)) C.news=C.news.slice(0,1); }];
+  for(const f of cuts){ if(ctxBytes(C)<=CTX_AI_MAX) break; try{ f(); }catch(e){} }
+  return C; }
 async function ask(q,bubble){ if(!bubble&&isGreeting(q)){ voiceCommand(q); return; } const m=$('#chatMsgs'); let a=bubble;
   if(!a){ const u=document.createElement('div'); u.className='u'; u.textContent=q; m.appendChild(u); a=document.createElement('div'); a.className='a'; m.appendChild(a); }
   m.scrollTop=m.scrollHeight;

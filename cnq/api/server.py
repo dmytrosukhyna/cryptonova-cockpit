@@ -52,6 +52,11 @@ VERSION = "2.0.0"
 FEEDS = {"app_home", "app_btc", "academy", "app_portfolio", "app_signals", "markets", "nova"}
 LIMIT = {"free": 5, "vip": 100}
 MAX_BODY = 16 * 1024
+# 28.10 (build 46, owner: «в закрытой системе AI не отвечает»): the panel's chat (POST /v2/admin/nova) sends the panel's context —
+# 12.7 KB measured on 28.10 (nova-panel-probe), so a busier market (more news, events, positions) crossed the 16 KB cap: the API
+# answered 413 with the portfolio-file sentence «Файл больше 10 МБ». Its own cap now, under nginx's 32 KB (above that nginx answers
+# an HTML 413 without CORS and the browser reports «нет связи»); the panel also trims its context to fit (web/app.html ctxForAI).
+PANEL_MAX_BODY = 30 * 1024
 # NOVA's model call (20.10: «Сколько я заработал?» failed — the reasoning model spent 506 of max_tokens=600 on hidden thinking,
 # the answer came back cut or empty → 503 → the app said «проверьте интернет»). Low reasoning effort + room for the answer, and a
 # time budget that fits the app (60 s) and nginx (proxy_read_timeout 60 s): ≤ 20 s per call, ≤ 6 s pause before one 429 retry.
@@ -641,8 +646,11 @@ def make_handler(api: Api):
         def _go(self, method: str) -> None:
             n = int(self.headers.get("Content-Length") or 0)
             p = self.path.split("?", 1)[0].rstrip("/")
-            limit = pf_parse.MAX_FILE if p == "/v2/portfolio/parse" else MAX_BODY     # build 45: a portfolio file ≤ 10 MB
+            limit = (pf_parse.MAX_FILE if p == "/v2/portfolio/parse" else          # build 45: a portfolio file ≤ 10 MB
+                     PANEL_MAX_BODY if p == "/v2/admin/nova" else MAX_BODY)
             if n > limit:
+                if p != "/v2/portfolio/parse":            # 28.10: the file sentence only for the file route
+                    return self._send(413, {"error": "too_large", "limit_kb": limit // 1024})
                 q = parse_qs(urlsplit(self.path).query)
                 return self._send(413, {"error": "too_large", "message": pf_review.message("too_large", norm_lang((q.get("lang") or [""])[0]))})
             body = self.rfile.read(n) if n else b""

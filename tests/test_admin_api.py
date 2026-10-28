@@ -287,5 +287,27 @@ def test_admin_cors_over_http(tmp_path):
                 assert e.code == 401 and e.headers["Access-Control-Allow-Origin"] == "https://cryptonova.vip"
             with urllib.request.urlopen(base + "/v2/home", timeout=5) as r:            # the app's routes get no CORS header
                 assert r.headers.get("Access-Control-Allow-Origin") is None
+            # 28.10 (build 46): the panel's chat body may be up to 30 KB (it was 16 KB, with the portfolio-file sentence on a 413)
+            body = json.dumps({"system": "s", "user": "Вопрос: " + "я" * 9000}, ensure_ascii=False).encode()   # ≈ 18 KB
+            req = urllib.request.Request(base + "/v2/admin/nova", data=body, method="POST",
+                                         headers={"Authorization": "Bearer wrong", "Content-Type": "application/json"})
+            try:
+                urllib.request.urlopen(req, timeout=5)
+            except urllib.error.HTTPError as e:
+                assert e.code == 401                                                 # read and checked, not refused by size
+            req = urllib.request.Request(base + "/v2/admin/nova", data=b"x" * (31 * 1024), method="POST",
+                                         headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"})
+            try:
+                urllib.request.urlopen(req, timeout=5)
+                assert False, "over 30 KB must be refused"
+            except urllib.error.HTTPError as e:
+                d = json.loads(e.read().decode())
+                assert e.code == 413 and d == {"error": "too_large", "limit_kb": 30} and e.headers["Access-Control-Allow-Origin"]
+            req = urllib.request.Request(base + "/v2/me", data=b"x" * (17 * 1024), method="POST")
+            try:
+                urllib.request.urlopen(req, timeout=5)
+                assert False
+            except urllib.error.HTTPError as e:
+                assert e.code == 413 and "message" not in json.loads(e.read().decode())   # no «Файл больше 10 МБ» outside the file route
     finally:
         srv.shutdown()

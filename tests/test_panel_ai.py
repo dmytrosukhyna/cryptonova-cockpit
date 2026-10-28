@@ -46,6 +46,7 @@ const ok=t=>({choices:[{message:{content:t},finish_reason:'stop'}]});
   await run('srv',[[200,{answer:'Через сервер',ms:900}]],'groq',{server:true});
   await run('srvRetry',[[200,{error:'rate_limit',ms:10}],[200,{answer:'Со второй',ms:900}]],'groq',{server:true});
   await run('srv403',[[403,{error:'admin_disabled'}]],'groq',{server:true});
+  await run('srv413',[[413,{error:'too_large',limit_kb:30}]],'groq',{server:true});
   await run('noServerFlag',[[200,{answer:'x'}]],'groq',{});
   // 21.10 owner: an invalid browser key + a working «Управление» token → the chat retries through the server, then keeps using it
   SET.anth='bad'; await run('fallback',[[401,{error:{message:'Invalid API Key'}}],[200,{answer:'Через сервер',ms:700}]],'groq',{server:true});
@@ -81,6 +82,7 @@ def test_panel_ai_call_states():
     assert R["srv"]["body"]["__auth"] == "Bearer tok123" and R["srv"]["body"]["user"] == "q"
     assert R["srvRetry"]["out"] == "Со второй" and R["srvRetry"]["n"] == 2
     assert "токен «Управления»" in R["srv403"]["err"]
+    assert "больше, чем принимает сервер" in R["srv413"]["err"] and R["srv413"]["n"] == 1     # 28.10: a 413 says so, no retry
     assert R["noServerFlag"]["err"] == "нет ключа" and R["noServerFlag"]["n"] == 0     # brief / translations never use the server key
     assert R["noRoute"]["err"] == "нет ключа"
     assert R["log"] >= 7
@@ -169,3 +171,31 @@ def test_admin_nova_route_owner_only(tmp_path, monkeypatch=None):
         os.environ.pop("CNQ_ADMIN_TOKEN", None)
         if keep is not None:
             os.environ["CNQ_ADMIN_TOKEN"] = keep
+
+
+def test_panel_context_fits_the_server_cap():
+    """28.10 (build 46): the chat's context stays within CTX_AI_MAX bytes (nova-panel-probe measured 12.7 KB against the server's
+    old 16 KB cap); the coin on the chart and the portfolio stay, extra news / events / coins go first."""
+    node = shutil.which("node")
+    if not node:
+        return
+    s = open(os.path.join(ROOT, "web", "app.html"), encoding="utf-8").read()
+    i = s.index("const CTX_AI_MAX=")
+    j = s.index("return C; }", i) + len("return C; }")
+    js = (s[i:j] + r"""
+const big=n=>'Ж'.repeat(n);
+function ctxPack(){ return {now:'x',current:{sym:'SOL',price:1,levels:[1,2],advice:{head:'h',text:big(400),why:[big(300),big(300),big(300)]},
+  events:Array.from({length:6},()=>({t:1,w:big(500),do:big(300)}))},coins:Array.from({length:20},(_,k)=>({sym:'C'+k,setup:{grade:big(200)}})),
+  news:Array.from({length:6},()=>({title:big(600)})),portfolio:{positions:[{sym:'BTC'}],picks:{short:[big(800)],mid:[big(800)],long:[big(800)]}}}; }
+const small=()=>({now:'x',current:{sym:'BTC'},coins:[{sym:'A'}],news:[{title:'n'}]});
+const C=ctxForAI(); const S=(()=>{ const keep=ctxPack; ctxPack=small; const r=ctxForAI(); ctxPack=keep; return r; })();
+console.log(JSON.stringify({bytes:ctxBytes(C),coins:C.coins.length,news:C.news.length,events:C.current.events.length,sym:C.current.sym,
+  pos:C.portfolio.positions.length,picks:'picks' in C.portfolio,small:S.coins.length+S.news.length}));""")
+    r = subprocess.run([node, "-e", js], capture_output=True, text=True, timeout=30)
+    R = json.loads(r.stdout.strip().splitlines()[-1])
+    assert R["bytes"] <= 18000 and R["sym"] == "SOL" and R["pos"] == 1 and not R["picks"], R
+    assert R["coins"] <= 15 and R["news"] <= 3 and R["events"] == 1, R
+    assert R["small"] == 2                                                    # a small context is sent as it is
+    # the server takes the panel's request up to 30 KB (nginx: 32 KB); the trimmed context (+ escaping + the system prompt) fits
+    from cnq.api.server import PANEL_MAX_BODY
+    assert PANEL_MAX_BODY == 30 * 1024 and 18000 * 1.25 + 4000 < PANEL_MAX_BODY

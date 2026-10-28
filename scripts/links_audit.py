@@ -78,11 +78,19 @@ def check(url: str, timeout: int = 20) -> dict:
 
 
 def main() -> int:
+    """GitHub shows at most 10 notices per step: the results go out in groups of 3 (and in full to the job summary)"""
     api = sys.argv[1] if len(sys.argv) > 1 else None
+    rows = []
     for name, url in links(".", api):
         r = check(url) if not url.startswith("ERROR") else {"verdict": url}
-        msg = f"{url or '—'} → {r.get('code', '')} {r.get('final', '')} · «{r.get('title', '')}» · {r['verdict']}"
-        print(f"::notice title={name}::{msg.replace('%', '%25')[:900]}", flush=True)
+        rows.append(f"{name}: {url or '—'} → {r.get('code', '')} {r.get('final', '')} · «{r.get('title', '')}» · {r['verdict']}")
+    for i in range(0, len(rows), 3):
+        msg = " ⏎ ".join(x[:600] for x in rows[i:i + 3])
+        print(f"::notice title=links {i + 1}–{min(i + 3, len(rows))}::{msg.replace('%', '%25')}", flush=True)
+    summ = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summ:
+        with open(summ, "a", encoding="utf-8") as f:
+            f.write("\n".join("- " + x for x in rows) + "\n")
     return 0
 
 

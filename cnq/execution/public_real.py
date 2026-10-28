@@ -27,6 +27,10 @@ realizedPnl: fees and funding included), "lev", "opened", "closed", "partial" (O
 curve's own timestamps (from 28.10 on: points before it have no split — nothing is back-filled), so spot = curve − fut_curve; each
 open futures position also has "mark" (OKX mark price), "lev" (the leverage OKX applies), "opened" (OKX cTime) and "sig" (the desk
 trade it mirrors, «bal:<id>» — public in web/paper.json; null when not ours).
+"actions": what the autopilot really did on this account since the start (its own logs on the writer's machine: spot portfolio
+orders, active spot buys / sells, futures opens / closes, positions OKX closed at the stop or target), newest first, at most
+ACTIONS_MAX, only filled orders — [{"t", "kind": spot_buy | spot_sell | active_buy | active_sell | fut_open | fut_close |
+fut_reduce | fut_gone, "sym", "side" (futures: long | short), "usd" (spot: the filled amount), "px" (average fill price), "sig"}].
 USDT = trading + funding (no Earn: the account is the system 1:1). No key, IP, UID or order id is ever written. No fake numbers:
 when the autopilot is not running (no live holder of its lease, or the global stop) the numbers are real but "stale": true; when
 the account can not be read, the last published numbers stay, with "stale": true and their old asof (readers also treat an asof
@@ -48,11 +52,17 @@ from . import myspot_watch as ms
 
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
-        "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve")
+        "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve",
+        "actions")
 SPOT_KEYS = ("sym", "share", "usd", "copy", "copy_reason", "copy_pct")
 FUT_KEYS = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason", "mark", "lev", "opened", "sig")
 CLOSED_KEYS = ("inst", "side", "open_px", "close_px", "move_pct", "pnl_usd", "lev", "opened", "closed", "partial")
 CLOSED_MAX = 50
+ACTION_KEYS = ("t", "kind", "sym", "side", "usd", "px", "sig")
+ACTION_KINDS = ("spot_buy", "spot_sell", "active_buy", "active_sell", "fut_open", "fut_close", "fut_reduce", "fut_gone")
+ACTIONS_MAX = 30
+TAIL_BYTES = 512 * 1024
+SYM_RE = re.compile(r"^[A-Z0-9]{1,20}$")
 INST_RE = re.compile(r"^[A-Z0-9]{1,20}-(USDT|USDC|USD)-SWAP$")
 SIG_RE = re.compile(r"^[a-z]{2,8}:[A-Za-z0-9._-]{1,64}$")
 REASONS = ("usdc_only", "not_supported", "legacy", "ordinary")
@@ -146,6 +156,59 @@ def closed_history(fetch, host: str, since: int, pages: int = 10) -> tuple[int |
     return n, round(pnl, 2), rows
 
 
+def _tail(path: str, n: int = TAIL_BYTES) -> list[dict]:
+    """the last events of a JSON-lines log (the end of the file only); [] when it is missing"""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - n))
+            raw = f.read().decode("utf-8", "replace")
+    except OSError:
+        return []
+    lines = raw.splitlines()[1:] if size > n else raw.splitlines()      # a cut first line is dropped
+    out = []
+    for ln in lines:
+        try:
+            ev = json.loads(ln)
+        except ValueError:
+            continue
+        if isinstance(ev, dict):
+            out.append(ev)
+    return out
+
+
+def actions(since: int, logs: dict | None = None) -> list[dict]:
+    """28.10 (build 46 §12.4 / §14): the autopilot's own filled orders on this account since the start, newest first — from its
+    logs (okx_autopilot / okx_active / okx_futures .LOG), never a guess. No order id leaves this function."""
+    from . import okx_active, okx_autopilot, okx_futures
+    logs = logs or {"spot": okx_autopilot.LOG, "active": okx_active.LOG, "fut": okx_futures.LOG}
+    out = []
+
+    def add(ev, kind, sym, side=None, usd=None, px=None):
+        t = int(ev.get("t") or 0)
+        sym = str(sym or "").split("-")[0].upper()
+        if t >= since and SYM_RE.match(sym):
+            out.append({"t": t, "kind": kind, "sym": sym, "side": side, "usd": _r(usd), "px": ms._f(px) or None, "sig": ev.get("id")})
+    for ev in _tail(logs["spot"]):
+        if ev.get("ev") == "order" and (ms._f(ev.get("filled")) or 0) > 0 and ev.get("side") in ("buy", "sell"):
+            add(ev, "spot_" + ev["side"], ev.get("ccy"), usd=ms._f(ev.get("usd")), px=ev.get("avg_px"))
+    for ev in _tail(logs["active"]):
+        if ev.get("ev") in ("buy", "sell") and (ms._f(ev.get("filled")) or 0) > 0:
+            add(ev, "active_" + ev["ev"], ev.get("ccy") or ev.get("inst"), usd=ms._f(ev.get("usd")), px=ev.get("avg_px"))
+    for ev in _tail(logs["fut"]):
+        e_ = ev.get("ev")
+        side = {"LONG": "long", "SHORT": "short"}.get(str(ev.get("side") or ""))
+        if e_ == "open" and (ms._f(ev.get("sz")) or 0) > 0:
+            add(ev, "fut_open", ev.get("inst"), side, px=ev.get("avg_px"))
+        elif e_ in ("close", "reduce") and ((ms._f(ev.get("filled")) or 0) > 0 or ev.get("lead")):
+            add(ev, "fut_" + e_, ev.get("inst"), px=ev.get("avg_px"))
+        elif e_ == "gone":
+            add(ev, "fut_gone", ev.get("inst"))
+    out.sort(key=lambda a: -a["t"])
+    return out[:ACTIONS_MAX]
+
+
 def compact(curve: list, max_n: int = CURVE_MAX, recent: int = CURVE_RECENT) -> list:
     if len(curve) <= max_n:
         return curve
@@ -172,7 +235,7 @@ def writer(env=None) -> bool:
 
 
 def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized: float | None = None,
-          closed_rows: list | None = None) -> dict:
+          closed_rows: list | None = None, acts: list | None = None) -> dict:
     """The public summary from myspot_sub.read() (an ok read). Updates st["curve"] and st["fut_curve"]."""
     start = s.get("start") or {}
     s0, since = float(start.get("usd") or sub.START_USD), int(start.get("t") or now)
@@ -218,7 +281,8 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
             "usdt_pct": _r(cash / eq * 100 if eq else 0.0), "usdt_usd": _r(cash), "alloc": dict(s.get("alloc") or {}), "futures": fut,
             "closed_n": int(closed_n or 0), "curve": [[int(t), _r(v)] for t, v in curve], "asof": now, "stale": not running(s.get("lease")),
             "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url"),
-            "closed": list(closed_rows or [])[:CLOSED_MAX], "fut_curve": [[int(t), _r(v)] for t, v in fcurve]}
+            "closed": list(closed_rows or [])[:CLOSED_MAX], "fut_curve": [[int(t), _r(v)] for t, v in fcurve],
+            "actions": list(acts or [])[:ACTIONS_MAX]}
 
 
 def clean(doc: dict) -> dict:
@@ -245,6 +309,14 @@ def clean(doc: dict) -> dict:
         r["opened"], r["closed"] = (int(r["opened"]) if r["opened"] else None), (int(r["closed"]) if r["closed"] else None)
         r["partial"] = x.get("partial") is True
         out["closed"].append(r)
+    out["actions"] = []
+    for x in (doc.get("actions") or [])[:ACTIONS_MAX]:
+        if not isinstance(x, dict) or x.get("kind") not in ACTION_KINDS or not SYM_RE.match(str(x.get("sym") or "")) or not num(x.get("t")):
+            continue
+        out["actions"].append({"t": int(x["t"]), "kind": x["kind"], "sym": x["sym"],
+                               "side": x.get("side") if x.get("side") in ("long", "short") else None,
+                               "usd": num(x.get("usd")), "px": num(x.get("px")),
+                               "sig": x["sig"] if isinstance(x.get("sig"), str) and SIG_RE.match(x["sig"]) else None})
     out["fut_curve"] = [[int(p[0]), num(p[1])] for p in doc.get("fut_curve") or []
                         if isinstance(p, (list, tuple)) and len(p) == 2 and num(p[0]) and num(p[1]) is not None]
     out["alloc"] = {k: (doc.get("alloc") or {}).get(k) for k in sub.ALLOC_KEYS}
@@ -275,10 +347,15 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
     if s and s.get("ok"):
         if fetch is None:
             fetch = ms.make_fetch(*sub.creds(env))
-        doc = clean(build(s, state, now, *closed_history(fetch, "https://" + s["host"], int(s["start"].get("t") or now))))
+        since = int(s["start"].get("t") or now)
+        try:
+            acts = actions(since)
+        except Exception:  # noqa: BLE001 — the summary never fails because of a log
+            acts = []
+        doc = clean(build(s, state, now, *closed_history(fetch, "https://" + s["host"], since), acts=acts))
     elif state.get("last"):
         # the last real numbers, their own asof — never invented ones (a «last» from before 28.10 gets the new keys empty)
-        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], **state["last"], "stale": True})
+        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], **state["last"], "stale": True})
     else:
         return None
     if put is None:

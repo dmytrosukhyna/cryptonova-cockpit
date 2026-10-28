@@ -1,0 +1,19 @@
+name: links-audit
+# 28.10.2026 (build 46 §16): every link the server gives the app (web/app_config.json, the OKX lead-trader profile, the news links
+# of /v2/home) opened like a phone browser — status, final address, page title, verdict. A GitHub runner is in the USA, where OKX
+# and BingX restrict visitors: their pages answer here as they would for a US visitor. Changes nothing.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/links_audit.py https://app.crypto-capital.app

@@ -17,32 +17,37 @@ VOICES = {"ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural", "uk": "uk-UA-O
           "es": "es-ES-AlvaroNeural"}
 # build 45 (owner 22.10): only the male NOVA AI voice — no female fallback; if the male voice fails, the run fails and the
 # greeting already on the server stays as it is
+# 28.10 build 46 (owner spec §5): the greeting introduces the product as it is now — the system, the PUBLIC portfolio (the real
+# account since 22.10), the demo portfolio, the lessons, NOVA and the connection guide — and says that crypto is a risk. No
+# «бесплатно» (the app's rule: no subscriptions, never the word «free»). Male voice → male forms (uk «помічник», el «ο βοηθός»,
+# es «el asistente»).
 TEXTS = {
-    "ru": (f"Привет! Я {NOVA} — помощник Крипто {NOVA}. "
-           "Наша система каждую минуту следит за рынком криптовалют и проверяет каждую идею на истории цен. "
-           "Здесь всё бесплатно: демо-счёт на десять тысяч долларов, копилка в биткоин и пятьдесят два коротких урока простыми словами. "
-           "Деньги в демо учебные, так что можно спокойно смотреть и учиться. "
-           "А если что-то непонятно — нажмите на светящийся шар внизу экрана и спросите меня. Поехали!"),
+    "ru": (f"Здравствуйте! Я {NOVA} — помощник Крипто {NOVA}. "
+           f"Крипто {NOVA} — это система, которая круглосуточно следит за рынком криптовалют и работает по правилам, проверенным на истории цен. "
+           "На главном экране — публичный портфель: реальный счёт системы, около десяти тысяч долларов, с двадцать второго октября. "
+           "Можно завести свой демо-портфель, учиться и спрашивать меня. "
+           "А если захотите подключиться к системе — в приложении есть пошаговая инструкция. Помните: крипта — это риск. Поехали!"),
     "en": ("Hi! I'm Nova AI, the assistant of Crypto Nova. "
-           "Our system watches the crypto market every minute and tests every idea on the history of prices. "
-           "Everything here is free: a ten-thousand-dollar demo account, a bitcoin piggy bank, and fifty-two short lessons in plain words. "
-           "The money in the demo is virtual, so you can calmly watch and learn. "
-           "And if something isn't clear, tap the glowing sphere at the bottom of the screen and ask me. Let's go!"),
-    "uk": (f"Привіт! Я {NOVA} — помічниця Крипто {NOVA}. "
-           "Наша система щохвилини стежить за ринком криптовалют і перевіряє кожну ідею на історії цін. "
-           "Тут усе безкоштовно: демо-рахунок на десять тисяч доларів, скарбничка в біткоїні та п'ятдесят два короткі уроки простими словами. "
-           "Гроші в демо навчальні, тож можна спокійно дивитися й навчатися. "
-           "А якщо щось незрозуміло — натисніть на сяючу кулю внизу екрана й запитайте мене. Поїхали!"),
-    "el": ("Γεια σου! Είμαι η Νόβα AI, η βοηθός του Crypto Nova. "
-           "Το σύστημά μας παρακολουθεί κάθε λεπτό την αγορά κρυπτονομισμάτων και ελέγχει κάθε ιδέα στο ιστορικό των τιμών. "
-           "Εδώ όλα είναι δωρεάν: ένας λογαριασμός demo δέκα χιλιάδων δολαρίων, ένας κουμπαράς σε bitcoin και πενήντα δύο σύντομα μαθήματα με απλά λόγια. "
-           "Τα χρήματα στο demo είναι εικονικά, οπότε μπορείς να παρακολουθείς και να μαθαίνεις με ηρεμία. "
-           "Κι αν κάτι δεν είναι ξεκάθαρο, πάτησε τη φωτεινή σφαίρα στο κάτω μέρος της οθόνης και ρώτα με. Πάμε!"),
-    "es": ("¡Hola! Soy Nova AI, la asistente de Crypto Nova. "
-           "Nuestro sistema vigila el mercado cripto cada minuto y pone a prueba cada idea con el historial de precios. "
-           "Aquí todo es gratis: una cuenta demo de diez mil dólares, una hucha en bitcoin y cincuenta y dos lecciones cortas con palabras sencillas. "
-           "El dinero de la demo es virtual, así que puedes mirar y aprender con calma. "
-           "Y si algo no está claro, toca la esfera brillante en la parte de abajo de la pantalla y pregúntame. ¡Vamos!"),
+           "Crypto Nova is a system that watches the crypto market around the clock and works by rules tested on the history of prices. "
+           "On the Home screen you'll find the public portfolio: the system's real account, about ten thousand dollars, since October "
+           "twenty-second. You can start your own demo portfolio, learn, and ask me anything. "
+           "And if you want to connect to the system, there's a step-by-step guide in the app. Remember: crypto is risky. Let's go!"),
+    "uk": (f"Вітаю! Я {NOVA} — помічник Крипто {NOVA}. "
+           f"Крипто {NOVA} — це система, яка цілодобово стежить за ринком криптовалют і працює за правилами, перевіреними на історії цін. "
+           "На головному екрані — публічний портфель: реальний рахунок системи, близько десяти тисяч доларів, з двадцять другого жовтня. "
+           "Можна завести свій демо-портфель, навчатися й питати мене. "
+           "А якщо захочете підключитися до системи — у застосунку є покрокова інструкція. Пам'ятайте: крипта — це ризик. Поїхали!"),
+    "el": ("Γεια σας! Είμαι ο Νόβα AI, ο βοηθός του Crypto Nova. "
+           "Το Crypto Nova είναι ένα σύστημα που παρακολουθεί συνεχώς την αγορά κρυπτονομισμάτων και λειτουργεί με κανόνες "
+           "ελεγμένους στο ιστορικό των τιμών. Στην αρχική οθόνη θα βρείτε το δημόσιο χαρτοφυλάκιο: τον πραγματικό λογαριασμό του "
+           "συστήματος, περίπου δέκα χιλιάδες δολάρια, από τις είκοσι δύο Οκτωβρίου. Μπορείτε να φτιάξετε το δικό σας χαρτοφυλάκιο demo, "
+           "να μαθαίνετε και να με ρωτάτε. Κι αν θέλετε να συνδεθείτε στο σύστημα, στην εφαρμογή "
+           "υπάρχουν οδηγίες βήμα προς βήμα. Να θυμάστε: τα κρύπτο έχουν ρίσκο. Πάμε!"),
+    "es": ("¡Hola! Soy Nova AI, el asistente de Crypto Nova. "
+           "Crypto Nova es un sistema que vigila el mercado cripto las veinticuatro horas y funciona con reglas probadas en el historial "
+           "de precios. En la pantalla de inicio está la cartera pública: la cuenta real del sistema, unos diez mil dólares, desde el "
+           "veintidós de octubre. Puedes crear tu propia cartera demo, aprender y preguntarme lo que quieras. "
+           "Y si quieres conectarte al sistema, en la app hay una guía paso a paso. Recuerda: las cripto tienen riesgo. ¡Vamos!"),
 }
 
 

@@ -83,7 +83,14 @@ STABLE = {"USDT", "USDC", "USDE", "FDUSD", "DAI", "TUSD", "PYUSD", "USD1", "USDS
 PAIRED = re.compile(r"\b([A-Z][A-Za-z0-9.\-]{1,24}(?: [A-Z][A-Za-z0-9.\-]{1,20})?)\s*\(\$?([A-Z0-9]{2,10})\)")
 NAME_STOP = set("""Binance Bybit OKX Bitget Gate Mexc MEXC KuCoin Kucoin Upbit Coinbase Bithumb Hyperliquid BingX HTX Kraken
 Telegram Twitter X Discord Launchpool Launchpad Megadrop HODLer Airdrop Airdrops Alpha Earn Wallet Web3 Spot Futures Pre-Market
-Trading The New Today Now Big Top Hot Новость Новости Срочно Листинг Лаунчпул Аирдроп Итог Итоги Монета Проект Токен Биржа""".split())
+Trading The New Today Now Big Top Hot Новость Новости Срочно Листинг Лаунчпул Аирдроп Итог Итоги Монета Проект Токен Биржа
+Bitcoin Ethereum Solana Ripple Tether Crypto Options Option Policy Market Markets Update Breaking Report Season Points Testnet Mainnet
+Galxe Zealy Layer3 Google Apple YouTube Youtube TradingView CoinMarketCap CoinGecko DefiLlama Dune Medium Notion Gitbook Docs App
+Monday Tuesday Wednesday Thursday Friday Saturday Sunday January February March April May June July August September October
+November December Long Short Buy Sell Price Volume Bull Bear Daily Weekly Monthly Total Free Join Click Link Here More Read Watch
+Ether Stablecoin Stablecoins Token Tokens Coin Coins Project Projects Exchange Chain Network Protocol Bridge Swap Stake Staking""".split())
+NAME_HINT = re.compile(r"(?:проект\w*|project|протокол\w*|testnet|тестнет\w*|аирдроп\w*|airdrop|ретродроп\w*|лаунчпул\w*|launchpool|"
+                       r"\bido\b|сейл\w*|\bот|\bу)\s+[«\"']?([A-Z][A-Za-z0-9.\-]{1,24})", re.I)
 
 
 def categorize(text: str, links=()) -> dict:
@@ -120,16 +127,22 @@ def tickers(text: str, known: set | None = None) -> list[str]:
 
 
 def project_name(text: str) -> str | None:
-    """«Plasma (XPL)» → «Plasma»; else the first capitalised Latin word that is not an exchange / program / common word
-    («Новый тестнет от Monad» → «Monad») — a guess, shown as the project's name, never as a ticker"""
+    """«Plasma (XPL)» → «Plasma»; else a capitalised Latin word right after a project word («тестнет от Monad» → «Monad») or one
+    the post repeats; else None — a guess, shown as the project's name, never as a ticker"""
     for m in PAIRED.finditer(text or ""):
         nm = m.group(1).strip()
         words = [w for w in nm.split() if w not in NAME_STOP]
         if words:
             return " ".join(words)[:32]
-    for w in re.findall(r"(?<![#$@/\w.])([A-Z][a-z][A-Za-z0-9]{1,20}(?:\.[a-z]{2,4})?)(?![\w/])", text or ""):
-        if w not in NAME_STOP and w.lower() not in VENUES:
-            return w[:32]
+    ok = lambda w: w not in NAME_STOP and w.lower() not in VENUES and w[:1].isupper()  # noqa: E731
+    m = next((m.group(1) for m in NAME_HINT.finditer(text or "") if ok(m.group(1))), None)
+    if m:                                    # «тестнет от Monad», «проект Plasma» — named right after a project word
+        return m[:32]
+    words = [w for w in re.findall(r"(?<![#$@/\w.])([A-Z][a-z][A-Za-z0-9]{1,20}(?:\.[a-z]{2,4})?)(?![\w/])", text or "") if ok(w)]
+    if words:                                # otherwise only a name the post repeats (a one-off capitalised word is too often noise)
+        best = max(dict.fromkeys(words), key=words.count)
+        if words.count(best) >= 2:
+            return best[:32]
     return None
 
 
@@ -215,6 +228,8 @@ def step(conn: sqlite3.Connection, posts_by_channel: dict, titles: dict, prices:
     """posts_by_channel: {channel: [{"id", "text", "t"(ms, optional), "links"(optional)}]} — the same page channel_watch reads"""
     now = int(now or time.time() * 1000)
     ensure(conn)
+    stop = sorted(NAME_STOP)                 # a word added to the stop list later stops showing as a «project» on old records too
+    conn.execute(f"UPDATE chop_items SET project=NULL WHERE project IN ({','.join('?' * len(stop))})", stop)
     prices = prices or {}
     btc = prices.get("BTC")
     known = set(known or ()) | set(prices) | set(okx or ())

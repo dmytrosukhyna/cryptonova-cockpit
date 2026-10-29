@@ -22,6 +22,9 @@ def test_categories_and_fields():
     e = O.extract("Новый тестнет от Monad — фармим поинты, возможен ретродроп", (), KNOWN, OKX)
     assert e["cat"] == "airdrop" and e["ticker"] is None and e["project"] == "Monad"
     assert O.extract("Проект привлёк $25M от a16z и Paradigm, токена пока нет", (), KNOWN, OKX)["cat"] == "early"
+    assert O.project_name("Bitcoin Policy Institute: новости рынка") is None                 # a one-off capitalised word is not a project
+    assert O.project_name("Аирдроп Linea: как фармить Linea до снапшота") == "Linea"         # repeated → the project
+    assert O.project_name("Проект Drosera запустил тестнет") == "Drosera"
     assert O.extract("SEC одобрила ETF, новости по #SOL", (), KNOWN, OKX)["cat"] == "news"
     ad = O.extract("Регистрируйся и забирай бонус до 5000$", ("https://partner.bybit.com/b/abc",), KNOWN, OKX)
     assert ad["cat"] is None and ad["promo"] and ad["ref_link"]

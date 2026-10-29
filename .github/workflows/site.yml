@@ -48,7 +48,7 @@ jobs:
         id: state
         run: python scripts/ci_state_guard.py
       - name: Pillow for post charts, edge-tts for the spoken brief
-        run: pip install -q pillow edge-tts gtts
+        run: pip install -q pillow edge-tts
       - name: Server engine alive? (web/engine.json fresher than 10 min → its desks are skipped here; quiet → taken back)
         id: engine
         run: python scripts/ci_engine_check.py | tee -a "$GITHUB_OUTPUT"

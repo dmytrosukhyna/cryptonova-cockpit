@@ -11,6 +11,7 @@ import re
 import time
 
 VOICE = os.environ.get("CNQ_TTS_VOICE", "ru-RU-DmitryNeural")
+RETRY_PAUSE_S = (2, 5, 8)          # after a refused attempt of a voice (1st, 2nd, 3rd)
 NAME = os.environ.get("CNQ_OWNER_NAME") or "Дмитрий"
 
 
@@ -189,41 +190,55 @@ def compose(out: str = "web") -> str:
     return " ".join(L)
 
 
+def male_voices() -> list[str]:
+    """29.10 (owner: male voices only, never a female / robotic one): Dmitry, then the API's male multilingual fallback for Russian
+    (cnq/api/tts.py FALLBACK["ru"], Brian — Dmitry is refused most of the time); never Svetlana, never gTTS"""
+    try:
+        from ..api.tts import FALLBACK
+        fb = FALLBACK.get("ru")
+    except Exception:  # noqa: BLE001
+        fb = "en-US-BrianMultilingualNeural"
+    return [VOICE] + [v for v in [fb] if v and v != VOICE]
+
+
 def run(out: str = "web") -> dict:
     text = compose(out)
     os.makedirs(out, exist_ok=True)
-    res = {"asof": int(time.time() * 1000), "text": text, "voice": VOICE, "audio": None, "keys": getattr(compose, "keys", None)}
-    # edge-tts sometimes answers «No audio was received» → retry, then the second Microsoft voice, then Google (gTTS).
-    # Without audio the panel falls back to the browser voice, which sounds robotic — so try hard.
+    res = {"asof": int(time.time() * 1000), "text": text, "voice": None, "audio": None, "keys": getattr(compose, "keys", None)}
+    # edge-tts sometimes answers «No audio was received» → retry, then the next MALE voice (29.10: Dmitry → Brian Multilingual; the
+    # female Svetlana and Google's gTTS are gone). The mp3 is written to a temp file and moved in only when a male voice spoke, so a
+    # failure leaves the previous brief.mp3 untouched; brief.json then has the new text with audio null — the panel never plays an mp3
+    # whose numbers differ from the text it shows.
     errs = []
     path = os.path.join(out, "brief.mp3")
+    tmp = path + ".tmp"
     try:
         import asyncio
         import edge_tts
-        for voice in (VOICE, "ru-RU-SvetlanaNeural"):
+        for voice in male_voices():
             for attempt in range(3):
                 try:
                     async def synth(v=voice):
                         c = edge_tts.Communicate(spoken(text), v, rate="+0%")   # 21.10: normal speed (was −4%, «еле-еле говорящая»)
-                        await c.save(path)
+                        await c.save(tmp)
                     asyncio.run(synth())
-                    if os.path.getsize(path) > 2000:
+                    if os.path.getsize(tmp) > 2000:
+                        os.replace(tmp, path)
                         res["audio"], res["voice"] = "brief.mp3", voice
                         break
+                    errs.append(f"{voice}#{attempt + 1}: short audio")
                 except Exception as e:  # noqa: BLE001
                     errs.append(f"{voice}#{attempt + 1}: {str(e)[:80]}")
-                    time.sleep(2 + 3 * attempt)
+                    time.sleep(RETRY_PAUSE_S[attempt])
             if res["audio"]:
                 break
     except Exception as e:  # noqa: BLE001
         errs.append(str(e)[:120])
-    if not res["audio"]:
+    finally:
         try:
-            from gtts import gTTS
-            gTTS(spoken(text), lang="ru").save(path)
-            res["audio"], res["voice"] = "brief.mp3", "google-ru"
-        except Exception as e:  # noqa: BLE001
-            errs.append("gtts: " + str(e)[:80])
+            os.remove(tmp)
+        except OSError:
+            pass
     if errs:
         res["error"] = " | ".join(errs)[:300]
     json.dump(res, open(os.path.join(out, "brief.json"), "w", encoding="utf-8"), ensure_ascii=False)

@@ -152,20 +152,20 @@ jobs:
           PY
       - name: synth the live daily reports (build 50 — the same words the app's «Доклад» plays, every language)
         run: |
+          for l in ru en uk el es; do curl -sS -m 20 "https://app.crypto-capital.app/v2/home?lang=$l" -o home_$l.json || echo '{}' > home_$l.json; done
           python - <<'PY'
-          import json, time, urllib.request
+          import json, time
           from cnq.api import tts
           out = []
           for lang in ("ru", "en", "uk", "el", "es"):
               text = ""
               try:
-                  with urllib.request.urlopen(f"https://app.crypto-capital.app/v2/home?lang={lang}", timeout=20) as r:
-                      rep = (json.load(r).get("report") or {})
+                  rep = json.load(open(f"home_{lang}.json", encoding="utf-8")).get("report") or {}
                   text = rep.get("text") or ""
                   t0 = time.time()
                   b = tts.synth(text, lang)
                   out.append(f"{lang}: ok {len(b)} B {time.time() - t0:.1f} s ({len(text)} chars, key {tts.key(text, lang) == rep.get('key')})")
               except Exception as e:
-                  out.append(f"{lang}: FAILED {str(e)[:160]} · spoken: {tts.spoken(text, lang)[:160]}")
+                  out.append(f"{lang}: FAILED {str(e)[:160]} · spoken: {tts.spoken(text, lang)[:400]}")
           print("::notice title=synth live reports::" + " · ".join(out))
           PY

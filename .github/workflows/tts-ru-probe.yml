@@ -10,6 +10,7 @@ on:
       rounds: { description: "rounds", default: "10" }
       pause: { description: "seconds between rounds", default: "20" }
       from_run: { description: "reuse the mp3s + synth.json of this earlier run (skip the synthesis)", default: "" }
+      skip_tx: { description: "skip the transcription (summary only)", default: "" }
 
 permissions:
   contents: read
@@ -104,9 +105,10 @@ jobs:
               print(f"::notice title=synth {v}::{len(ok)}/{len(rv)} ok · median {statistics.median(ok) if ok else '-'} ms · "
                     f"p90 {ok[int(0.9 * (len(ok) - 1))] if ok else '-'} ms · per sentence "
                     + " ".join(f"s{k}:{sum(1 for x in rv if x['ok'] and x['s'] == k)}/{sum(1 for x in rv if x['s'] == k)}" for k in (1, 2, 3))
-                    + f" · errors {errs[:2]}")
+                    + f" · errors {errs[:2]} · failed ms {sorted(x['ms'] for x in rv if not x['ok'])}")
           PY
       - name: transcribe (faster-whisper small, CPU) and score
+        if: inputs.skip_tx == ''
         run: |
           python - <<'PY' || { echo "::error title=transcribe::$(tail -c 900 tx.err | tr '\n' ' ')"; exit 1; }
           import sys

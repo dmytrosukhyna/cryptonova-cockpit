@@ -9,9 +9,11 @@ on:
     inputs:
       rounds: { description: "rounds", default: "10" }
       pause: { description: "seconds between rounds", default: "20" }
+      from_run: { description: "reuse the mp3s + synth.json of this earlier run (skip the synthesis)", default: "" }
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   probe:
@@ -22,7 +24,11 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -q "edge-tts>=7,<8" faster-whisper num2words
+      - uses: actions/download-artifact@v4
+        if: inputs.from_run != ''
+        with: { name: tts-ru-probe, path: out, run-id: "${{ inputs.from_run }}", github-token: "${{ github.token }}" }
       - name: synthesize (every voice × 3 sentences × rounds)
+        if: inputs.from_run == ''
         env: { ROUNDS: "${{ inputs.rounds }}", PAUSE: "${{ inputs.pause }}" }
         run: |
           python - <<'PY'
@@ -85,9 +91,26 @@ jobs:
                      "multilingual": [(v["ShortName"], v["Gender"], v.get("Locale")) for v in multi]},
                     open("out/synth.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
           PY
+      - name: synthesis summary
+        run: |
+          ls out out/mp3 | head -80
+          python - <<'PY'
+          import json, statistics
+          d = json.load(open("out/synth.json", encoding="utf-8"))
+          for v in d["voices"]:
+              rv = [x for x in d["rows"] if x["voice"] == v]
+              ok = sorted(x["ms"] for x in rv if x["ok"])
+              errs = sorted({x["err"] for x in rv if x["err"]})
+              print(f"::notice title=synth {v}::{len(ok)}/{len(rv)} ok · median {statistics.median(ok) if ok else '-'} ms · "
+                    f"p90 {ok[int(0.9 * (len(ok) - 1))] if ok else '-'} ms · per sentence "
+                    + " ".join(f"s{k}:{sum(1 for x in rv if x['ok'] and x['s'] == k)}/{sum(1 for x in rv if x['s'] == k)}" for k in (1, 2, 3))
+                    + f" · errors {errs[:2]}")
+          PY
       - name: transcribe (faster-whisper small, CPU) and score
         run: |
-          python - <<'PY'
+          python - <<'PY' || { echo "::error title=transcribe::$(tail -c 900 tx.err | tr '\n' ' ')"; exit 1; }
+          import sys
+          sys.stderr = open("tx.err", "w")
           import glob, json, os, re, statistics, time
           from faster_whisper import WhisperModel
           from num2words import num2words

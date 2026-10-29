@@ -167,7 +167,10 @@ def test_demo_block_from_app_home():
     assert "реальный счёт на OKX" in b and "«Фьючерсы» = фьючерсная часть этого реального счёта" in b and "«Спот» = спот-часть" in b
     assert "только LONG" in b and "Рынок: биткоин $" in b and "ниже рекорда $126 210" in b and len(b) < 4000
     assert "демо-счёт $10 000" not in b and "Система на демо-счетах" not in b and "17.10" not in b and "$20 000" not in b
-    for sym in [o.get("sym") for o in (home.get("futures") or {}).get("open") or []]:      # the demo desks' trades never reach the model
+    # 29.10: the real account follows the main demo desk, so the same coin can be open on both — only a coin that is open on the demo
+    # desks and NOT on the real account proves a demo trade leaked (this failed on live data whenever the two matched)
+    real = {o.get("sym") for o in ((home.get("public_portfolio") or {}).get("futures") or {}).get("open") or []}
+    for sym in [o.get("sym") for o in (home.get("futures") or {}).get("open") or [] if o.get("sym") not in real]:   # demo trades never reach the model
         assert f"– {sym} " not in b and f"открыта {sym} " not in b
     assert "сейчас недоступны" in k.demo_block({})
     assert "данные сейчас не пришли" in k.demo_block({k_: v for k_, v in home.items() if k_ != "public_portfolio"})

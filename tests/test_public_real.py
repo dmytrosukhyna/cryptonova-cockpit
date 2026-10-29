@@ -145,7 +145,8 @@ def test_panel_line_and_the_light_publish():
     R = {"since": 1792627200000, "equity_usd": 10012.5, "pnl_usd": 12.5, "pnl_pct": 0.13, "asof": 1792630000000, "stale": False,
          "alloc": {"spot_pct": 65.0, "fut_pct": 25.0, "active_pct": 10.0, "fut_margin_usd": 400.5}}
     out = subprocess.run([node, p, json.dumps(R), str(1792630000000 + 60_000)], capture_output=True, text=True, timeout=30).stdout
-    assert "Реальный счёт CRYPTO NOVA на OKX · с 22.10" in out and "+$12,5" in out and "+0,13%" in out and "устарели" not in out
+    # 29.10 (owner): one number format in the panel — «$9 896,34», «−1,3%»
+    assert "Реальный счёт CRYPTO NOVA на OKX · с 22.10" in out and "+$12,50" in out and "+0,1%" in out and "устарели" not in out
     assert "распределены: спот 65% · фьючерсы 25% (в позициях 4,0%) · активный спот 10%" in out
     out = subprocess.run([node, p, json.dumps(R), str(1792630000000 + 3 * 3_600_000)], capture_output=True, text=True, timeout=30).stdout
     assert "данные устарели" in out

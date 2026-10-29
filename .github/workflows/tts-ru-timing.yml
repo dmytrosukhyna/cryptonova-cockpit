@@ -1,0 +1,71 @@
+name: tts-ru-timing
+# TEMPORARY (29.10.2026): where the time goes in cnq/api/tts.py synth for Russian (Dmitry ×2 → Brian) — per attempt: voice, outcome,
+# first audio, end (incl. the stream's cleanup) — with the first-audio deadline (FIRST_AUDIO_S) and without it. Removed afterwards.
+on:
+  workflow_dispatch:
+    inputs:
+      rounds: { description: "rounds", default: "6" }
+
+permissions:
+  contents: read
+
+jobs:
+  timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q "edge-tts>=7,<8" && pip list 2>/dev/null | grep -iE "edge|aiohttp"
+      - run: curl -sS -m 20 "https://app.crypto-capital.app/v2/home?lang=ru" -o home_ru.json || echo '{}' > home_ru.json
+      - name: time synth (deadline on / off)
+        env: { ROUNDS: "${{ inputs.rounds }}" }
+        run: |
+          python - <<'PY'
+          import json, os, statistics, time
+          import edge_tts
+          from cnq.api import tts
+          log = []
+
+          class C(edge_tts.Communicate):
+              def __init__(self, text, voice, **kw):
+                  super().__init__(text, voice, **kw)
+                  self._v = voice
+
+              async def stream(self):
+                  t0, first = time.time(), None
+                  try:
+                      async for ch in super().stream():
+                          if first is None and ch.get("type") == "audio":
+                              first = round(time.time() - t0, 2)
+                          yield ch
+                      log.append((self._v.split("-")[2][:6], "ok", first, round(time.time() - t0, 2)))
+                  except BaseException as e:
+                      log.append((self._v.split("-")[2][:6], type(e).__name__[:14], first, round(time.time() - t0, 2)))
+                      raise
+          edge_tts.Communicate = C
+          rep = (json.load(open("home_ru.json", encoding="utf-8")).get("report") or {}).get("text") or ""
+          S = {"short": "Я NOVA AI. Если вложить $500 в BTC и $300 в ETH, при падении на 20% портфель потеряет около $160.",
+               "report": rep or "Публичный портфель CRYPTO NOVA сейчас — 9 773 доллара. За сегодня минус 139 долларов, это минус 1,4 процента."}
+          res = {}
+          for r in range(int(os.environ.get("ROUNDS") or 6)):
+              for mode, first_s in (("deadline", 2.0), ("none", None)):
+                  tts.FIRST_AUDIO_S = first_s
+                  for name, text in S.items():
+                      log.clear()
+                      t0 = time.time()
+                      try:
+                          tts.synth(text, "ru")
+                          v = (tts._used.voice or "?").split("-")[2][:6]
+                      except Exception as e:
+                          v = "FAILED"
+                      sec = round(time.time() - t0, 1)
+                      res.setdefault((mode, name), []).append((sec, v, list(log)))
+                      print(f"r{r + 1} {mode:8s} {name:6s} {sec:5.1f}s → {v:7s} {log}", flush=True)
+              time.sleep(15)
+          for (mode, name), xs in res.items():
+              secs = sorted(x[0] for x in xs)
+              print(f"::notice title={mode} {name}::total s {secs} · median {statistics.median(secs)} · voices {[x[1] for x in xs]} · "
+                    f"attempts {[x[2] for x in xs][:6]}"[:3900])
+          PY

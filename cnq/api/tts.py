@@ -47,6 +47,11 @@ RATE = "+0%"                 # 21.10 owner: the −4% of the greeting sounded «
 # Dmitry 12/30 (the report sentence 0/10), WER 0.053 where it spoke; en-US-BrianMultilingualNeural 30/30, median 0.8 s, WER 0.029.
 FALLBACK = {"ru": "en-US-BrianMultilingualNeural"}
 RETRY_PAUSE_S = 1.0
+# the app waits 8 s for the server's voice, then reads with the phone (NovaSpeech.kt). Dmitry's refusals take ~2.6 s each (probe) or
+# hang until TIMEOUT_S (seen live), so a voice with a fallback behind it that sends no audio within FIRST_AUDIO_S counts as refused:
+# Dmitry 2 × ≤ 2 s + 1 s pause + Brian ~1 s stays inside the 8 s. A healthy Dmitry made a whole sentence in ~0.9 s (median, probe);
+# only the wait for the FIRST audio is cut — once the voice speaks, it has the full TIMEOUT_S.
+FIRST_AUDIO_S = 2.0
 MAX_CHARS = 1500
 MAX_CACHE_MB = 200
 TIMEOUT_S = 25.0
@@ -111,20 +116,31 @@ def synth(text: str, lang: str, timeout: float = TIMEOUT_S) -> bytes:
     lang = norm_lang(lang)
     say = spoken(text, lang)
 
-    async def run(voice: str) -> bytes:
+    async def run(voice: str, first_s: float | None) -> bytes:
+        """the voice's mp3; first_s = no audio by then → refused (only for a voice with a fallback behind it)"""
         buf = bytearray()
-        async for chunk in edge_tts.Communicate(say, voice, rate=RATE).stream():
+        loop = asyncio.get_running_loop()
+        end = loop.time() + first_s if first_s else None
+        it = edge_tts.Communicate(say, voice, rate=RATE).stream().__aiter__()
+        while True:
+            try:
+                nxt = it.__anext__()
+                chunk = await (asyncio.wait_for(nxt, max(0.01, end - loop.time())) if end is not None and not buf else nxt)
+            except StopAsyncIteration:
+                break
             if chunk.get("type") == "audio" and chunk.get("data"):
                 buf += chunk["data"]
         return bytes(buf)
     err = None
     _used.voice = None
-    for voice in voices(lang):
+    vs = voices(lang)
+    for i, voice in enumerate(vs):
+        first_s = FIRST_AUDIO_S if i + 1 < len(vs) else None
         for attempt in range(2):
             if attempt:
                 time.sleep(RETRY_PAUSE_S)                    # a pause before the voice's second attempt; none before a new voice
             try:
-                data = asyncio.run(asyncio.wait_for(run(voice), timeout))
+                data = asyncio.run(asyncio.wait_for(run(voice, first_s), timeout))
                 if len(data) > 1000:
                     _used.voice = voice
                     return data

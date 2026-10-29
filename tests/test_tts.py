@@ -352,3 +352,44 @@ def test_russian_falls_back_to_a_male_multilingual_voice_never_a_female_one(tmp_
             sys.modules.pop("edge_tts", None)
         else:
             sys.modules["edge_tts"] = old_mod
+
+
+def test_a_silent_dmitry_hands_over_within_the_apps_8_seconds(tmp_path):
+    """29.10: the app waits 8 s for the server's voice. A voice with a fallback behind it (Dmitry) that sends no audio within
+    FIRST_AUDIO_S counts as refused, so a hanging Dmitry never eats the 8 s; once a voice speaks, it is never cut"""
+    import asyncio
+    import sys
+    import types
+    fb = tts.FALLBACK["ru"]
+    calls, mode = [], {"dmitry": "hang"}
+
+    class Communicate:
+        def __init__(self, text, voice, rate=None):
+            self.voice = voice
+            calls.append(voice)
+
+        async def stream(self):
+            if self.voice == "ru-RU-DmitryNeural" and mode["dmitry"] == "hang":
+                yield {"type": "WordBoundary", "offset": 0}                  # metadata is not audio
+                await asyncio.sleep(30)
+            if self.voice == "ru-RU-DmitryNeural" and mode["dmitry"] == "slow":
+                yield {"type": "audio", "data": MP3[:600]}                  # speaks at once, then takes its time
+                await asyncio.sleep(0.5)
+                yield {"type": "audio", "data": MP3[600:]}
+                return
+            yield {"type": "audio", "data": MP3}
+    old = sys.modules.get("edge_tts"), tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S
+    sys.modules["edge_tts"], tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S = types.SimpleNamespace(Communicate=Communicate), 0.0, 0.2
+    try:
+        t0 = time.time()
+        assert tts.synth("Я NOVA AI.", "ru") == MP3 and calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", fb]
+        assert time.time() - t0 < 2.0 and tts._used.voice == fb                    # 2 × 0.2 s, not 2 × 25 s
+        calls.clear()
+        mode["dmitry"] = "slow"
+        assert tts.synth("Я NOVA AI.", "ru") == MP3 and calls == ["ru-RU-DmitryNeural"] and tts._used.voice == "ru-RU-DmitryNeural"
+    finally:
+        tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S = old[1], old[2]
+        if old[0] is None:
+            sys.modules.pop("edge_tts", None)
+        else:
+            sys.modules["edge_tts"] = old[0]

@@ -472,7 +472,7 @@ def s_btc(ctx: dict, now_ms: int) -> dict | None:
         trig = f"; триггер — закрытие дня выше {fmt_price(reg['hh20'])}" if reg.get("mid") in ("UP_NO_BREAKOUT",) and reg.get("hh20") else ""
         B.append(f"Тренд 28 дней: {reg['mid_note']}{trig}")
         if trig:
-            S.append(f"Тренд вверх, но без нового максимума: правило тренда включится, если день закроется выше {fmt_price(reg['hh20'])}.")
+            S.append(f"Тренд вверх, но без нового максимума: наблюдение тренда включится, если день закроется выше {fmt_price(reg['hh20'])}.")
     facts = {"price": p, "low7": lo7, "high7": hi7, "support": sup, "resistance": res,
              "regime": {k: reg.get(k) for k in ("long", "mid", "mid_note", "sma200", "hh20", "ll20", "atr_pct")}}
     return slide("btc", "BTC: уровни и режим", "chartCard", B, S, facts,

@@ -175,28 +175,4 @@ jobs:
                       except Exception:
                           out.append(f"  refused: «{tts.spoken(sent, lang)}»")
           print("::notice title=synth live reports::" + " · ".join(out))
-          # build 50: what makes the Russian voice refuse a text (variants of the report's first sentence)
-          rep = json.load(open("home_ru.json", encoding="utf-8")).get("report") or {}
-          first = (rep.get("text") or "").split(". ")[0] + "."
-          import asyncio, edge_tts
-          def raw(say, voice="ru-RU-DmitryNeural"):
-              async def go():
-                  n = 0
-                  async for c in edge_tts.Communicate(say, voice, rate="+0%").stream():
-                      if c.get("type") == "audio": n += len(c.get("data") or b"")
-                  return n
-              try:
-                  return str(asyncio.run(go()))
-              except Exception as e:
-                  return "ERR " + str(e)[:60]
-          V = ["Публичный портфель сейчас — 9 886 долларов.", "Публичный портфель сейчас 9 759 долларов.", "Портфель стоит 9 759 долларов.",
-               "Сейчас — 9 759 долларов.", "Публичный портфель сейчас — 9759 долларов.", tts.spoken("Публичный портфель CRYPTO NOVA сейчас — 9 886 долларов. Я NOVA AI.", "ru"),
-               "За сегодня минус 154 доллара.", "Биткоин стоит восемьдесят тысяч долларов.", "Это минус 1,6 процента.", "Открытых сделок: 3.",
-               "Публичный портфель.", "Портфель вырос.", "Девять тысяч долларов.", "9 долларов.", "Привет. Это проверка голоса."]
-          res = []
-          for v in V:
-              r1 = raw(v)
-              r2 = raw(v) if r1.startswith("ERR") else ""
-              res.append(f"{'OK' if not r1.startswith('ERR') or not r2.startswith('ERR') else 'NO'} {v}")
-          print("::notice title=ru voice variants::" + " · ".join(res))
           PY

@@ -214,3 +214,41 @@ def test_a_failed_install_is_reported_without_credentials_and_tests_never_run_pi
     t2, _s = _tts(tmp_path, ok=False)
     assert t2.installer is None and t2.install_state() is None
     assert t2.post({"text": "Привет", "lang": "ru"}, "ip")[0] == 503
+
+
+def test_the_report_is_made_patiently_and_the_route_waits_for_it(tmp_path):
+    """build 50: the voice service refuses now and then — the background make tries again with pauses, failed words rest, and the
+    report's mp3 address waits for a make that is running instead of asking the service twice"""
+    class Flaky(Synth):
+        def __init__(self, fails):
+            super().__init__()
+            self.fails = fails
+
+        def __call__(self, text, lang):
+            self.calls.append((text, lang))
+            if len(self.calls) <= self.fails:
+                raise RuntimeError("No audio was received")
+            time.sleep(0.3)
+            return MP3 + text.encode()[:20]
+    s = Flaky(fails=2)
+    t = tts.Tts(str(tmp_path / "c1"), synth_fn=s, available_fn=lambda: True)
+    t.prewarm_pause = 0.01
+    text = "Публичный портфель CRYPTO NOVA сейчас — 9 759 долларов."
+    k = tts.key(text, "ru")
+    t.prewarm(text, "ru")
+    time.sleep(0.05)
+    c, a = t.get_route(k, {k: (text, "ru")})                       # waits for the running make, never a second request
+    assert c == 200 and a.key == k and len(s.calls) == 3
+    # words that fail every time rest after the last try (no hammering on every /v2/home)
+    bad = Synth(fail=True)
+    t2 = tts.Tts(str(tmp_path / "c2"), synth_fn=bad, available_fn=lambda: True)
+    t2.prewarm_pause = 0.0
+    t2.prewarm(text, "ru")
+    for _ in range(100):
+        if not t2._busy:
+            break
+        time.sleep(0.02)
+    assert len(bad.calls) == tts.PREWARM_TRIES and k in t2._failed
+    t2.prewarm(text, "ru")
+    time.sleep(0.05)
+    assert len(bad.calls) == tts.PREWARM_TRIES

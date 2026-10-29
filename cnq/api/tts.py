@@ -45,6 +45,14 @@ TIMEOUT_S = 25.0
 STRESS = "́"
 KEY_RE = re.compile(r"^[0-9a-f]{24}$")
 PIP_SPEC = "edge-tts>=7,<8"
+# 29.10 (build 50): Microsoft's free voice refuses about every other request now and then («No audio was received», seen on the
+# server and on a runner for plain Russian sentences that pass a minute later). The daily report is made in the background, so it
+# is tried patiently: up to PREWARM_TRIES makes (each = synth's own 2 attempts) with growing pauses; words that still fail rest
+# for PREWARM_REST_S (no hammering the service on every /v2/home). The report's mp3 address waits a little for a make that runs.
+PREWARM_TRIES = 4
+PREWARM_PAUSE_S = 4.0
+PREWARM_REST_S = 300
+ROUTE_WAIT_S = 6.0
 INSTALL_EVERY_S = 6 * 3600
 INSTALL_TIMEOUT_S = 600
 
@@ -193,6 +201,8 @@ class Tts:
             self.attach_installer(installer)
         self.limit = Limiter(per_window=30, window_s=600, per_day=300)
         self._busy: set[str] = set()
+        self._failed: dict[str, float] = {}      # key → when its background make last gave up (build 50)
+        self.prewarm_pause = PREWARM_PAUSE_S
         self._lock = threading.Lock()
         self.last: dict | None = None            # the last synthesis: result, ms, lang, chars — for /v2/health (no text)
 
@@ -286,20 +296,32 @@ class Tts:
         return k, data
 
     def prewarm(self, text: str, lang: str) -> None:
-        """make the report's mp3 in the background (once at a time per key) so the app's first play is instant"""
+        """make the report's mp3 in the background (once at a time per key) so the app's first play is instant; build 50: patient
+        retries with growing pauses, and words that still fail rest for PREWARM_REST_S"""
         k = key(text, lang)
         if self.get(k) is not None or not self.available():
             return
         with self._lock:
-            if k in self._busy:
+            if k in self._busy or time.time() - self._failed.get(k, 0.0) < PREWARM_REST_S:
                 return
             self._busy.add(k)
 
         def run():
             try:
-                self.make(text, lang)
-            except Exception:  # noqa: BLE001 — the GET makes it again on demand
-                pass
+                for i in range(PREWARM_TRIES):
+                    try:
+                        self.make(text, lang)
+                        with self._lock:
+                            self._failed.pop(k, None)
+                        return
+                    except Exception:  # noqa: BLE001 — the voice service refused: a pause, then again
+                        if i + 1 < PREWARM_TRIES:
+                            time.sleep(self.prewarm_pause * (i + 1))
+                with self._lock:
+                    self._failed[k] = time.time()
+                    if len(self._failed) > 200:
+                        for old in sorted(self._failed, key=self._failed.get)[:100]:
+                            self._failed.pop(old, None)
             finally:
                 with self._lock:
                     self._busy.discard(k)
@@ -337,6 +359,13 @@ class Tts:
             return 404, {"error": "not_found"}
         if not self.available():
             return 503, {"error": "tts_unavailable"}
+        # build 50: the background make of these words is running — wait a little for it instead of asking the service twice
+        end = time.time() + ROUTE_WAIT_S
+        while k in self._busy and time.time() < end:
+            time.sleep(0.25)
+            cached = self.get(k)
+            if cached is not None:
+                return 200, Audio(cached, k)
         text, lang = reports[k]
         try:
             k, mp3 = self.make(text, lang)

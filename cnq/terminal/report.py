@@ -47,7 +47,7 @@ def regime(cs15: list[Candle]) -> dict:
     rv30 = float(np.std(np.diff(np.log(c[-31:]))) * math.sqrt(365))
     short = "UP" if r3 > 0.5 * atr_d[-1] / last else ("DOWN" if r3 < -0.5 * atr_d[-1] / last else "FLAT")
     if r28 > 0 and last >= hh20:
-        mid, mid_note = "LONG", "28-дневный тренд вверх и цена выше максимума 20 дней — правило тренда активно"
+        mid, mid_note = "LONG", "28-дневный тренд вверх и цена выше максимума 20 дней — наблюдение тренда (не проверенное правило)"
     elif r28 < 0 and last <= ll20:
         mid, mid_note = "SHORT", "28-дневный тренд вниз и цена ниже минимума 20 дней"
     elif r28 > 0:
@@ -179,7 +179,7 @@ def coin_brief(sym: str, price: float, reg: dict, levels: list[dict], setups: li
     mid_map = {"LONG": "лонг-режим", "SHORT": "шорт-режим", "UP_NO_BREAKOUT": "рост без пробоя", "DOWN_NO_BREAKOUT": "снижение без пробоя"}
     m_txt = f"Среднесрок (1–4 недели): {mid_map.get(reg['mid'], reg['mid'])} — {reg['mid_note']}. За 28 дней {reg['r28']*100:+.1f}%."
     if reg["mid"] == "LONG":
-        m_txt += f" Сценарий: продолжение, пока цена выше {fmt_price(reg['ll20'])} (минимум 20 дней); стоп по правилу 2 ATR = {fmt_price(price - 2*reg['atr_d'])}."
+        m_txt += f" Сценарий: продолжение, пока цена выше {fmt_price(reg['ll20'])} (минимум 20 дней); ориентир стопа 2 ATR = {fmt_price(price - 2*reg['atr_d'])}."
     elif reg["mid"] == "SHORT":
         m_txt += f" Сценарий: продолжение вниз, пока цена ниже {fmt_price(reg['hh20'])}; стоп 2 ATR = {fmt_price(price + 2*reg['atr_d'])}."
     else:

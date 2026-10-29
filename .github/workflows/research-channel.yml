@@ -1,13 +1,15 @@
 name: research-channel
-# Manual only. An honest check of a PUBLIC Telegram trading channel (t.me/s/<channel> web preview, no login):
-# scripts/channel_audit.py → aggregate numbers only (annotations + job summary); no post texts are stored.
+# Manual only. An honest check of PUBLIC Telegram channels (t.me/s/<channel> web preview, no login) — scripts/channel_audit.py:
+# categories (launchpad / airdrop / listing / early project / news / ads), calls and forecasts, every coin a post names vs BTC and
+# vs the 30 coins closest in size, listings / launchpads vs the official announcement. Aggregates only: annotations, the job summary
+# and the release asset lab-data-channels/channel_audit.json (numbers, post numbers and tickers — no post texts).
 on:
   workflow_dispatch:
     inputs:
       channel:
-        description: "public channel username"
+        description: "public channel username(s), comma separated"
         required: true
-        default: "Mr_Trader_Pro"
+        default: "Mr_Trader_Pro,doubletop,trade001k,trade_ultra"
       days:
         description: "how many days back"
         required: false
@@ -19,10 +21,26 @@ permissions:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
+    permissions:
+      contents: write          # the release asset with the aggregates (the research container reads releases, not artifacts)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install numpy
-      - run: python scripts/channel_audit.py --channel "${{ inputs.channel }}" --days "${{ inputs.days }}"
+      - name: Daily closes + volume of every Binance spot USDT pair since March (fair-baseline universe)
+        run: python scripts/fetch_spot1d.py --start 2026-03 --out spot1d.npz
+      - run: python scripts/channel_audit.py --channel "${{ inputs.channel }}" --days "${{ inputs.days }}" --spot1d spot1d.npz --out channel_audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: channel_audit, path: channel_audit.json, retention-days: 14, if-no-files-found: ignore }
+      - name: Upload channel_audit.json to release lab-data-channels
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: lab-data-channels
+        run: |
+          test -f channel_audit.json || exit 0
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Research data (not code): aggregate audit of public Telegram channels (scripts/channel_audit.py) — numbers, post numbers and tickers, no post texts." --latest=false
+          gh release upload "$TAG" channel_audit.json --clobber

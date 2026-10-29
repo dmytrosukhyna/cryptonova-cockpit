@@ -163,3 +163,54 @@ def test_app_home_spoken_report_in_every_language(tmp_path):
     assert app_home._say_money(21, "ru") == "21 доллар" and app_home._say_money(-3, "uk", True) == "мінус 3 долари"
     assert app_home._say_pct(2.0, "ru") == "плюс 2 процента" and app_home._say_pct(-5, "ru") == "минус 5 процентов"
     assert app_home._say_pct(0.25, "es") in ("más 0,2 por ciento", "más 0,3 por ciento")
+
+
+def test_the_server_installs_its_own_voice_once_in_the_background(tmp_path):
+    """build 50: edge-tts missing → ONE background pip install (a fake here), at most once per 6 hours, also across a restart;
+    a request never waits for it; a finished install is looked at again at once"""
+    runs, done = [], threading.Event()
+    now = [1_000_000.0]
+
+    def run():
+        runs.append(1)
+        done.set()
+        return 0, "Successfully installed edge-tts-7.2.3"
+    state = str(tmp_path / "data" / "tts_install.json")
+    ins = tts.Installer(state, run_fn=run, now_fn=lambda: now[0])
+    t = tts.Tts(str(tmp_path / "data" / "tts_cache"), synth_fn=Synth(), available_fn=lambda: False, installer=ins)
+    t0 = time.time()
+    c, d = t.post({"text": "Привет, это NOVA AI.", "lang": "ru"}, "1.1.1.1")
+    assert c == 503 and d == {"error": "tts_unavailable"} and time.time() - t0 < 1.0       # never blocks the request
+    assert done.wait(5) and runs == [1]
+    for _ in range(50):
+        if not ins.running:
+            break
+        time.sleep(0.02)
+    st = t.install_state()
+    assert st["result"] == "ok" and st["code"] == 0 and st["spec"] == tts.PIP_SPEC and "error" not in st
+    assert t._avail_at == 0.0                                                          # looked at again on the next request
+    t.available()
+    assert runs == [1]                                                                 # once per 6 hours, not per request
+    # a restart: a new installer reads the last try from its file and does not run again before 6 hours
+    ins2 = tts.Installer(state, run_fn=run, now_fn=lambda: now[0] + 3600)
+    assert ins2.maybe_start() is False and runs == [1]
+    ins3 = tts.Installer(state, run_fn=run, now_fn=lambda: now[0] + tts.INSTALL_EVERY_S + 1)
+    done.clear()
+    assert ins3.maybe_start() is True and done.wait(5) and runs == [1, 1]
+
+
+def test_a_failed_install_is_reported_without_credentials_and_tests_never_run_pip(tmp_path):
+    ins = tts.Installer(str(tmp_path / "s.json"), run_fn=lambda: (1, "ERROR: could not reach https://user:secret@pypi.example/simple"),
+                        now_fn=lambda: 5.0)
+    t = tts.Tts(str(tmp_path / "cache"), synth_fn=Synth(), available_fn=lambda: False, installer=ins)
+    t.available()
+    for _ in range(100):
+        if ins.state.get("result") not in (None, "running"):
+            break
+        time.sleep(0.02)
+    st = t.install_state()
+    assert st["result"] == "failed" and st["code"] == 1 and "secret" not in st["error"] and "***@" in st["error"]
+    # a Tts with a fake availability and no installer never starts pip
+    t2, _s = _tts(tmp_path, ok=False)
+    assert t2.installer is None and t2.install_state() is None
+    assert t2.post({"text": "Привет", "lang": "ru"}, "ip")[0] == 503

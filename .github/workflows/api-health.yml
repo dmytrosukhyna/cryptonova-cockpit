@@ -70,19 +70,27 @@ jobs:
             h=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -c '{lang, asof, copy_barred: .config.okx_copy_barred, split_note: .public_portfolio.split_note, fut_first: .public_portfolio.futures.curve[0], fut_step: ([.public_portfolio.futures.curve[] | select(.[1] > 1503.7)][0]), fut_n: (.public_portfolio.futures.curve | length), spot_first: .public_portfolio.spot.curve[0], spot_n: (.public_portfolio.spot.curve | length), fut_week: .public_portfolio.futures.periods.week, base_note: .public_portfolio.futures.base_note, act: .public_portfolio.actions[0].text}' 2>/dev/null || echo "not JSON")
             echo "::notice title=final QA home $l::$(echo "$h" | cut -c1-3800)"
           done
-      - name: NOVA's voice on the server (build 46 #6)
+      - name: NOVA's voice on the server (build 46 #6; build 50 — every app language, the server's own install)
         run: |
           set -u
           A=https://app.crypto-capital.app
-          ready=$(curl -sS -m 20 $A/v2/health | jq -c '{tts: .ready.tts, tts_last}' 2>/dev/null || echo "?")
+          ready=$(curl -sS -m 20 $A/v2/health | jq -c '{tts: .ready.tts, tts_install, tts_last}' 2>/dev/null || echo "?")
           echo "::notice title=tts ready::$ready"
-          for l in ru en; do
-            if [ "$l" = ru ]; then txt="Привет! Я NOVA AI. Публичный портфель CRYPTO NOVA сейчас — 9 896 долларов."; else txt="Hi! I'm NOVA AI. The CRYPTO NOVA public portfolio is now at 9,896 dollars."; fi
-            r=$(jq -nc --arg t "$txt" --arg l "$l" '{text: $t, lang: $l}' | curl -sS -m 40 -o tts_$l.bin -D h_$l.txt -w '%{http_code} %{time_total}s %{size_download}B' -X POST -H 'content-type: application/json' --data-binary @- $A/v2/tts || echo "000")
-            ct=$(tr -d '\r' < h_$l.txt | grep -i '^content-type' | head -1)
-            kind=$(file -b tts_$l.bin | cut -c1-60)
-            echo "::notice title=POST /v2/tts $l::HTTP $r · $ct · $kind · $(head -c 120 tts_$l.bin | tr -dc '[:print:]' | head -c 120)"
+          declare -A T=(
+            [ru]="Привет! Я NOVA AI. Публичный портфель CRYPTO NOVA сейчас — 9 896 долларов."
+            [en]="Hi! I'm NOVA AI. The CRYPTO NOVA public portfolio is now at 9,896 dollars."
+            [uk]="Привіт! Я NOVA AI. Публічний портфель CRYPTO NOVA зараз — 9 896 доларів."
+            [el]="Γεια σας! Είμαι ο NOVA AI. Το δημόσιο χαρτοφυλάκιο του CRYPTO NOVA είναι τώρα στα 9 896 δολάρια."
+            [es]="¡Hola! Soy NOVA AI. La cartera pública de CRYPTO NOVA está ahora en 9 896 dólares."
+          )
+          out=""
+          for l in ru en uk el es; do
+            r=$(jq -nc --arg t "${T[$l]}" --arg l "$l" '{text: $t, lang: $l}' | curl -sS -m 40 -o tts_$l.bin -D h_$l.txt -w '%{http_code} %{time_total}s %{size_download}B' -X POST -H 'content-type: application/json' --data-binary @- $A/v2/tts || echo "000")
+            ct=$(tr -d '\r' < h_$l.txt 2>/dev/null | grep -i '^content-type' | head -1 | cut -d' ' -f2)
+            kind=$(file -b tts_$l.bin | cut -c1-40)
+            out="$out $l: HTTP $r $ct ($kind) ·"
           done
+          echo "::notice title=POST /v2/tts ru en uk el es::$out"
           for l in ru en; do
             u=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.audio_url // empty')
             t=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.text // empty' | cut -c1-200)

@@ -10,14 +10,26 @@ male Microsoft neural voices as the spoken greeting (scripts/welcome_voice.py VO
                                     writes the text and its key, the API adds the URL; a new text → a new key → a new mp3
 
 The cache: <run>/data/tts_cache/<key>.mp3, oldest files removed above MAX_CACHE_MB. The key is a hash of the voice, the rate and the
-spoken text, so the same words are made once. Nothing about the caller is stored. Stdlib + edge-tts (optional)."""
+spoken text, so the same words are made once. Nothing about the caller is stored. Stdlib + edge-tts (optional).
+
+29.10.2026 (build 50, owner: «если люди заходят с другим языком на телефоне, будет ли голосовой помощник говорить на другом
+языке?»): the server installs its voice by itself. The deploy (git pull) never runs pip, and edge-tts was never installed, so every
+/v2/tts answered 503 and the app fell back to the phone's voice. Now, when the voice is needed and edge-tts is not importable, the API
+starts ONE background `python -m pip install "edge-tts>=7,<8"` into its own Python (the venv; binary wheels only, nothing is
+compiled or run from a source package): at most once per 6 hours (the last try's time is kept in <run>/data/tts_install.json, so a
+restart never retries sooner), logged to the journal and shown in /v2/health "tts_install", never blocking a request. edge-tts
+needs aiohttp, certifi, tabulate, typing-extensions — none of them clash with the API's own packages (numpy, pillow, websockets,
+pyjwt, cryptography). The next availability check (≤ 60 s) picks the voice up without a restart."""
 from __future__ import annotations
 
 import hashlib
 import importlib
 import importlib.util
+import json
 import os
 import re
+import subprocess
+import sys
 import threading
 import time
 
@@ -32,6 +44,9 @@ MAX_CACHE_MB = 200
 TIMEOUT_S = 25.0
 STRESS = "́"
 KEY_RE = re.compile(r"^[0-9a-f]{24}$")
+PIP_SPEC = "edge-tts>=7,<8"
+INSTALL_EVERY_S = 6 * 3600
+INSTALL_TIMEOUT_S = 600
 
 
 def spoken(text: str, lang: str) -> str:
@@ -85,25 +100,136 @@ def synth(text: str, lang: str, timeout: float = TIMEOUT_S) -> bytes:
     raise RuntimeError(f"tts failed: {str(err)[:160]}")
 
 
+def _mask(text: str) -> str:
+    """credentials in a URL (an index with user:password@) never reach the journal or /v2/health"""
+    return re.sub(r"://[^/@\s]+@", "://***@", text)
+
+
+def _pip() -> tuple[int, str]:
+    """pip install the voice into this very Python (the API's venv): binary wheels only, quiet, no questions"""
+    cmd = [sys.executable, "-m", "pip", "install", "-q", "--disable-pip-version-check", "--no-input", "--only-binary=:all:", PIP_SPEC]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=INSTALL_TIMEOUT_S, env={**os.environ, "PIP_NO_INPUT": "1"})
+    return r.returncode, (r.stderr or r.stdout or "").strip()
+
+
+class Installer:
+    """edge-tts missing → ONE background pip install, at most once per INSTALL_EVERY_S (the last try is kept in a file, so a restart
+    does not retry sooner). Never blocks: maybe_start() only starts a thread. run_fn / now_fn are for the tests."""
+
+    def __init__(self, state_path: str, run_fn=None, now_fn=None, on_done=None, every_s: float = INSTALL_EVERY_S):
+        self.path, self._run, self._now, self.on_done, self.every = state_path, run_fn or _pip, now_fn or time.time, on_done, every_s
+        self._lock = threading.Lock()
+        self.running = False
+        self.state = self._load()
+
+    def _load(self) -> dict:
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                d = json.load(f)
+            return d if isinstance(d, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _save(self) -> None:
+        try:
+            os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+            tmp = self.path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self.state, f)
+            os.replace(tmp, self.path)
+        except OSError:
+            pass
+
+    def maybe_start(self) -> bool:
+        """start the install now unless one runs or the last try was less than `every` seconds ago; True = started"""
+        with self._lock:
+            if self.running:
+                return False
+            try:
+                last = float(self.state["at"]) if self.state.get("at") is not None else None
+            except (TypeError, ValueError):
+                last = None
+            if last is not None and self._now() - last < self.every:
+                return False
+            self.running = True
+            self.state = {"at": int(self._now()), "result": "running", "spec": PIP_SPEC}
+            self._save()
+        print(f"tts: edge-tts is not installed — pip install {PIP_SPEC} in the background", flush=True)
+        threading.Thread(target=self._go, daemon=True, name="tts-pip").start()
+        return True
+
+    def _go(self) -> None:
+        t0 = time.time()
+        try:
+            code, tail = self._run()
+            res = "ok" if code == 0 else "failed"
+        except Exception as e:  # noqa: BLE001 — a timeout, no pip, no network: logged, tried again after `every`
+            code, tail, res = -1, f"{type(e).__name__}: {e}", "failed"
+        importlib.invalidate_caches()
+        sec = round(time.time() - t0, 1)
+        with self._lock:
+            self.state = {**self.state, "result": res, "code": code, "sec": sec, "tail": _mask(str(tail))[-300:]}
+            self._save()
+            self.running = False
+        print(f"tts: pip install {PIP_SPEC} → {res} (exit {code}, {sec} s) {_mask(str(tail))[-200:]}", flush=True)
+        if self.on_done:
+            try:
+                self.on_done(res == "ok")
+            except Exception:  # noqa: BLE001
+                pass
+
+
 class Tts:
     """the cache, the per-IP limit and the background making of the report's mp3"""
 
-    def __init__(self, cache_dir: str, synth_fn=None, available_fn=None, max_mb: int = MAX_CACHE_MB):
+    def __init__(self, cache_dir: str, synth_fn=None, available_fn=None, max_mb: int = MAX_CACHE_MB, installer=None):
         from .pf_review import Limiter
         self.dir, self.max_bytes = cache_dir, max_mb * 1024 * 1024
         self.synth, self._avail = synth_fn or synth, available_fn or available
         self._avail_at, self._avail_v = 0.0, False
+        # build 50: the running server (cnq.api.server main) attaches the installer; tests and tools never run pip
+        self.installer = None
+        if installer is not None:
+            self.attach_installer(installer)
         self.limit = Limiter(per_window=30, window_s=600, per_day=300)
         self._busy: set[str] = set()
         self._lock = threading.Lock()
         self.last: dict | None = None            # the last synthesis: result, ms, lang, chars — for /v2/health (no text)
 
     def available(self) -> bool:
-        """edge-tts installed? Looked up at most once a minute (a pip install is picked up without a restart)"""
+        """edge-tts installed? Looked up at most once a minute (a pip install is picked up without a restart); missing → the
+        background install (build 50)"""
         now = time.time()
         if now - self._avail_at > 60:
             self._avail_at, self._avail_v = now, bool(self._avail())
+            if not self._avail_v and self.installer is not None:
+                self.installer.maybe_start()
         return self._avail_v
+
+    def attach_installer(self, installer: "Installer | None" = None) -> "Installer":
+        """the server's own voice install (build 50): state next to the cache (<run>/data/tts_install.json)"""
+        if installer is None:
+            installer = Installer(os.path.join(os.path.dirname(os.path.abspath(self.dir)), "tts_install.json"))
+        if installer.on_done is None:
+            installer.on_done = self._installed
+        self.installer = installer
+        return installer
+
+    def _installed(self, ok: bool) -> None:
+        """the install finished: look again at the next request instead of waiting for the minute"""
+        if ok:
+            self._avail_at = 0.0
+
+    def install_state(self) -> dict | None:
+        """for /v2/health: the last install try (when, result, exit code, seconds; pip's last words only when it failed, with any
+        credentials in a URL masked)"""
+        if self.installer is None:
+            return None
+        st = dict(self.installer.state)
+        tail = str(st.pop("tail", "") or "")
+        if st.get("result") == "failed" and tail:
+            st["error"] = _mask(tail)[-200:]
+        return st or None
 
     def path(self, k: str) -> str:
         return os.path.join(self.dir, f"{k}.mp3")

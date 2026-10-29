@@ -29,7 +29,7 @@
             },
             {
               "title": "Qué hay en la app",
-              "text": "Abajo de la pantalla están las pestañas: «Inicio», «Futuros», «Spot» y «Aprender». En el centro está el átomo de NOVA AI, el asistente para tus preguntas. En Inicio hay otros 6 botones, entre ellos «Hucha» y «Recorrido». «Mi cuenta» se abre con el icono redondo de perfil de arriba.",
+              "text": "Abajo de la pantalla están las pestañas: «Inicio», «Futuros», «Spot» y «Aprender». En el centro está el icono de NOVA AI, el asistente para tus preguntas. En Inicio hay otros 6 botones, entre ellos «Hucha» y «Recorrido». «Mi cuenta» se abre con el icono redondo de perfil de arriba.",
               "example": "En la vida real: es como un centro comercial con varias plantas. No hace falta recorrerlo todo de una vez: empieza por una tienda y las demás te esperan.",
               "art": "phone_app"
             },
@@ -283,7 +283,7 @@
             },
             {
               "title": "Las pestañas de abajo y NOVA",
-              "text": "Abajo del todo están las pestañas: Inicio, Futuros, Spot y Aprender. En el centro está el átomo de NOVA AI. Es el asistente: pregúntale con palabras sencillas, por ejemplo «¿Por qué el sistema entró en esta operación?». O elige una de las preguntas sugeridas.",
+              "text": "Abajo del todo están las pestañas: Inicio, Futuros, Spot y Aprender. En el centro está el icono de NOVA AI. Es el asistente: pregúntale con palabras sencillas, por ejemplo «¿Por qué el sistema entró en esta operación?». O elige una de las preguntas sugeridas.",
               "example": "En la vida real: NOVA es como un vendedor en una tienda. Te orienta y te explica. Pero un vendedor también se equivoca a veces.",
               "art": "robot",
               "screen": "Main",

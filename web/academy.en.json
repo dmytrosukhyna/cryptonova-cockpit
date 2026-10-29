@@ -29,7 +29,7 @@
             },
             {
               "title": "What's in the app",
-              "text": "At the bottom of the screen are the tabs: “Home”, “Futures”, “Spot” and “Learn”. In the middle is the NOVA AI atom, the assistant for your questions. Home has 6 more buttons, including “Piggy bank” and “Tour”. Tap the round profile icon at the top to open “Account”.",
+              "text": "At the bottom of the screen are the tabs: “Home”, “Futures”, “Spot” and “Learn”. In the middle is the NOVA AI icon, the assistant for your questions. Home has 6 more buttons, including “Piggy bank” and “Tour”. Tap the round profile icon at the top to open “Account”.",
               "example": "In real life: it's like a shopping mall with several floors. You don't have to see everything at once. Start with one shop — the rest will wait.",
               "art": "phone_app"
             },
@@ -283,7 +283,7 @@
             },
             {
               "title": "Tabs at the bottom, and NOVA",
-              "text": "At the very bottom are the tabs: Home, Futures, Spot, Learn. In the middle is the NOVA AI atom. It's the assistant: ask in plain words, for example, “Why did the system enter this trade?” Or pick a ready question from the list.",
+              "text": "At the very bottom are the tabs: Home, Futures, Spot, Learn. In the middle is the NOVA AI icon. It's the assistant: ask in plain words, for example, “Why did the system enter this trade?” Or pick a ready question from the list.",
               "example": "In real life: NOVA is like a helpful shop assistant. She'll give tips and explain things. But shop assistants sometimes get things wrong, too.",
               "art": "robot",
               "screen": "Main",

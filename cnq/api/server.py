@@ -314,6 +314,7 @@ class Api:
                      "tts": self.tts.available()}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last,
                          "panel_last": self.panel_last, "news_last": self.news.last, "tts_last": self.tts.last,
+                         "tts_install": self.tts.install_state(),
                          "portfolio": {"vision": bool(self.vision), "last": self.pf_last}}
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()
@@ -814,6 +815,8 @@ def main() -> int:
     api = Api(Store(os.path.join(run, "data", "api.sqlite")), FirebaseVerifier(os.environ.get("CNQ_FIREBASE_PROJECT", "crypto-nova")),
               os.path.join(run, "web"), agent_llm(), admin=FirebaseAdmin())
     port = int(os.environ.get("CNQ_API_PORT", "8090"))
+    # build 50: the server installs NOVA's voice (edge-tts) by itself when it is missing — once, in the background (cnq/api/tts.py)
+    api.tts.attach_installer()
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))
     print(f"cnq-api {VERSION} on 127.0.0.1:{port}", flush=True)
 

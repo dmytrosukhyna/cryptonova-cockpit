@@ -67,10 +67,12 @@ def test_app_home_carries_buy_now_in_every_language(tmp_path):
     doc = app_home.run(sqlite3.connect(":memory:"), d, now=now)
     b = doc["buy_now"]
     assert b["checked"] == 40 and b["items"][0]["grade_text"] == "хороший"
-    assert b["items"][0]["why"] == ["цена выше средней за 200 дней", "у поддержки 12,31: цена 4 раза отскакивала от этого уровня",
-                                    "RSI 38 — не перегрета"]
+    assert b["items"][0]["why"] == ["Тренд вверх: цена выше своей средней за 200 дней — долгий рост не сломан.",
+                                    "Цена у уровня поддержки 12,31: 4 раза от него уже отскакивала — здесь покупатели обычно активны.",
+                                    "Без перегрева: индикатор RSI 38 — после снижения монета не перекуплена."]
     with open(os.path.join(d, "app_home.en.json"), encoding="utf-8") as f:
         en = json.load(f)
-    assert en["buy_now"]["items"][0]["why"][:2] == ["above its 200-day average", "at support 12.31: the price bounced off this level 4 times"]
+    assert en["buy_now"]["items"][0]["why"][:2] == ["Uptrend: the price is above its 200-day average — the long rise is intact.",
+                                                   "The price is at the support level 12.31: it has bounced off it 4 times — buyers are usually active here."]
     # stale (> 3 h) → hidden
     assert app_home.run(sqlite3.connect(":memory:"), d, now=now + 4 * 3_600_000)["buy_now"] is None

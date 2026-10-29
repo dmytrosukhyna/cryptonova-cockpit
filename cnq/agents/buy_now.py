@@ -21,7 +21,8 @@ import time
 
 from .own_desk import COINS40
 
-MIN_SCORE, TOP = 45, 5
+# build 51 (owner 29.10): up to 10 candidates — the app shows 5 and «Показать ещё» for the rest
+MIN_SCORE, TOP = 45, 10
 STRONG, GOOD = 85, 65
 
 
@@ -121,6 +122,8 @@ def score(sym: str, b4: list, d1: list, card: dict | None, whale: dict | None) -
         if closes[-1] > sma200:
             pts += 20
             why.append({"k": "sma200"})
+        else:                                     # build 51: said honestly too (no points)
+            why.append({"k": "trend_down"})
     lv = levels(b4)
     sup = next((L for L in lv if L["center"] < last and L["touches"] >= 3), None)
     a = atr(b4)[-1] or last * 0.01
@@ -140,6 +143,13 @@ def score(sym: str, b4: list, d1: list, card: dict | None, whale: dict | None) -
     if (whale or {}).get("lean") == "LONG":
         pts += 10
         why.append({"k": "whales"})
+    # build 51 (owner: «почему» in plain words — trend, levels, volume): the last full day's volume against the 20 days before it
+    # (context only, no points)
+    if len(d1) >= 23:
+        vols = [x[5] for x in d1[-22:-2]]
+        avg = sum(vols) / len(vols) if vols else 0
+        if avg > 0 and d1[-2][5] / avg >= 1.5:
+            why.append({"k": "volume", "v": round(d1[-2][5] / avg, 1)})
     if pts < MIN_SCORE:
         return None
     grade = "strong" if pts >= STRONG else "good" if pts >= GOOD else "possible"

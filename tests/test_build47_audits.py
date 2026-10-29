@@ -164,17 +164,20 @@ def test_report_says_plainly_when_a_part_is_not_working(tmp_path):
     _status(d, now, public_real="error", engine="stale")
     r = app_home.run(sqlite3.connect(":memory:"), d, now=now)["report"]
     assert r["status"] == "degraded" and r["issues"] == ["account", "signals"]
-    assert r["text"].startswith("Внимание: сейчас есть перебои — данные и автопилот реального счёта, расчёт сигналов.")
+    # build 51 (owner 29.10): the spoken text never scares — no «перебои»; one calm «Цифры на …» closes it instead
+    assert r["text"].replace("\xa0", " ").startswith("Публичный портфель CRYPTO NOVA") and "Цифры на " in r["text"]
+    for bad in ("Внимание", "перебо", "неточн", "неактуальн", "не самой свежей"):
+        assert bad not in r["text"]
     en = _lang(d, "en")["report"]
-    assert en["status"] == "degraded" and en["text"].startswith("Heads-up: there are interruptions right now")
-    os.remove(os.path.join(d, "system_status.json"))                                   # nothing can be confirmed → said so
+    assert en["status"] == "degraded" and "interruptions" not in en["text"] and "Figures as of" in en["text"]
+    os.remove(os.path.join(d, "system_status.json"))                                   # nothing can be confirmed → status says so
     r = app_home.run(sqlite3.connect(":memory:"), d, now=now)["report"]
-    assert r["issues"] == ["check"] and "проверка состояния системы" in r["text"]
+    assert r["issues"] == ["check"] and "Цифры на " in r["text"]
     # a stale account: the amount is said as the last confirmed one, never as today's
     _status(d, now)
     _pp_files(d, _real(since, now, stale=True))
     r = app_home.run(sqlite3.connect(":memory:"), d, now=now)["report"]
-    assert r["status"] == "degraded" and r["issues"] == ["account"] and "По последним подтверждённым данным на" in r["text"]
+    assert r["status"] == "degraded" and r["issues"] == ["account"] and "Цифры на " in r["text"]
     assert "сейчас —" not in r["text"] and "За сегодня" not in r["text"]
 
 

@@ -880,7 +880,7 @@ def _public_portfolio(out: str) -> dict | None:
             "regime": (c.get("regime") or {}).get("key")}
 
 
-BUY_KEYS = {"sma200", "support", "rsi", "quality", "whales"}
+BUY_KEYS = {"sma200", "support", "rsi", "quality", "whales", "trend_down", "volume"}
 
 
 PIPE_STALE_MS = 3 * 3_600_000
@@ -993,6 +993,8 @@ def _buy_now(out: str, now: int, lang: str = DEFAULT, real_syms: set | None = No
                 why.append(t(lang, "buy.support", p=_price(float(w.get("p") or 0)), n=n_, times=plural(lang, n_, "times")))
             elif k in ("rsi", "quality"):
                 why.append(t(lang, f"buy.{k}", v=int(w.get("v") or 0)))
+            elif k == "volume":
+                why.append(t(lang, "buy.volume", x=_dec(float(w.get("v") or 0), lang)))
             else:
                 why.append(t(lang, f"buy.{k}"))
         g = x.get("grade") if x.get("grade") in ("strong", "good", "possible") else "possible"
@@ -1585,13 +1587,14 @@ def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, 
     if (not pport or pport.get("stale")) and "account" not in issues:
         issues.insert(0, "account")
     issues = [p for p in SYS_ORDER if p in issues]
-    if issues:                                    # first, in plain words — never a calm report over a broken part
-        out.append(t(lang, "rep.degraded", parts=", ".join(t(lang, f"rep.part.{p}") for p in issues)))
+    # build 51 (owner 29.10: «в докладе он говорит что-то страшное, непонятное — про неточные суммы, перебои. Этого не надо»): the
+    # spoken text has no alarm words any more. Still honest: report.status / report.issues keep naming the broken parts for the panel,
+    # an old amount is never said as today's, and when anything is late one calm sentence closes the report — «Цифры на {когда}.»
     if not pport:
         out.append(t(lang, "rep.none"))
     else:
         if pport.get("stale"):                    # an old amount is never said as today's
-            out.append(t(lang, "rep.value_stale", d=_say_when(pport["asof"], lang), v=_say_money(pport["value_usd"], lang)))
+            out.append(t(lang, "rep.value_asof", v=_say_money(pport["value_usd"], lang)))
         else:
             out.append(t(lang, "rep.value", v=_say_money(pport["value_usd"], lang)))
         day = (pport.get("periods") or {}).get("day") or {}
@@ -1610,6 +1613,8 @@ def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, 
     b = (mv or {}).get("btc") or {}
     if b.get("price") and b.get("chg24") is not None:
         out.append(t(lang, "rep.btc", v=_say_money(b["price"], lang), pct=_say_pct(b["chg24"], lang)))
+    if issues and pport and pport.get("asof"):
+        out.append(t(lang, "rep.asof", d=_say_when(pport["asof"], lang)))
     text = " ".join(out)
     try:
         from ..api.tts import key as tts_key

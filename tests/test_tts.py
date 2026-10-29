@@ -291,3 +291,64 @@ def test_home_serves_the_last_report_whose_voice_is_ready(tmp_path):
         time.sleep(0.02)
     d = api.handle("GET", "/v2/home?lang=ru", {}, b"")[1]["report"]
     assert d["key"] == b["key"] and d["text"] == b["text"]          # the newest words, once their voice is ready
+
+
+def test_russian_falls_back_to_a_male_multilingual_voice_never_a_female_one(tmp_path):
+    """29.10 (owner: male voices only, never a robotic female voice): ru-RU-DmitryNeural is refused most of the time — after its
+    2 attempts the Russian text is read by FALLBACK["ru"], a male multilingual voice; the other languages keep their one voice;
+    the cache key stays Dmitry's; /v2/health tts_last names the voice that spoke. The voice service is a fake here."""
+    import sys
+    import types
+    fb = tts.FALLBACK["ru"]
+    assert set(tts.FALLBACK) == {"ru"} and fb.endswith("MultilingualNeural")
+    assert tts.voices("ru") == ["ru-RU-DmitryNeural", fb] and tts.voices("uk") == ["uk-UA-OstapNeural"] and tts.voices("zz")[0] == "ru-RU-DmitryNeural"
+    female = ("Svetlana", "Dariya", "Polina", "Ava", "Emma", "Seraphina", "Vivienne", "Thalita", "Jenny", "Aria", "Katja", "Denise")
+    assert not [v for v in (*tts.VOICES.values(), *tts.FALLBACK.values()) if any(f in v for f in female)]
+    calls, refuse = [], {"ru-RU-DmitryNeural"}
+
+    class Communicate:
+        def __init__(self, text, voice, rate=None):
+            self.voice = voice
+            calls.append(voice)
+
+        async def stream(self):
+            if self.voice in refuse:
+                raise RuntimeError("No audio was received. Please verify that your parameters are correct.")
+            yield {"type": "audio", "data": MP3}
+    old_mod, old_pause = sys.modules.get("edge_tts"), tts.RETRY_PAUSE_S
+    sys.modules["edge_tts"], tts.RETRY_PAUSE_S = types.SimpleNamespace(Communicate=Communicate), 0.0
+    try:
+        assert tts.synth("Я NOVA AI. Биткоин стоит 80 058 долларов.", "ru") == MP3
+        assert calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", fb]          # Dmitry's 2 attempts first, then the fallback
+        calls.clear()
+        assert tts.synth("Привіт, я NOVA AI.", "uk") == MP3 and calls == ["uk-UA-OstapNeural"]
+        refuse.add("uk-UA-OstapNeural")
+        calls.clear()
+        try:
+            tts.synth("Привіт", "uk")
+            assert False
+        except RuntimeError:
+            assert calls == ["uk-UA-OstapNeural"] * 2                               # no fallback outside Russian
+        # through the API: Dmitry's cache key, the fallback's mp3, the voice in tts_last; a cached text is never made again
+        t = tts.Tts(str(tmp_path / "cache"), available_fn=lambda: True)
+        text = "Публичный портфель CRYPTO NOVA сейчас — 9 773 доллара."
+        calls.clear()
+        c, a = t.post({"text": text, "lang": "ru"}, "1.1.1.1")
+        assert c == 200 and a.key == tts.key(text, "ru") and t.has(a.key) and t.last["voice"] == fb and calls[-1] == fb
+        assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[0] == 200 and len(calls) == 3
+        # Dmitry answers → Dmitry speaks
+        refuse.discard("ru-RU-DmitryNeural")
+        calls.clear()
+        k, _mp3 = t.make("Биткоин стоит 80 058 долларов.", "ru")
+        assert calls == ["ru-RU-DmitryNeural"] and t.last["voice"] == "ru-RU-DmitryNeural"
+        # every male voice refuses → an error (the app reads the text itself), never a female voice
+        refuse.update({"ru-RU-DmitryNeural", fb})
+        calls.clear()
+        assert t.post({"text": "Новый текст", "lang": "ru"}, "1.1.1.1") == (502, {"error": "tts_failed"})
+        assert calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", fb, fb] and t.last["result"] == "failed"
+    finally:
+        tts.RETRY_PAUSE_S = old_pause
+        if old_mod is None:
+            sys.modules.pop("edge_tts", None)
+        else:
+            sys.modules["edge_tts"] = old_mod

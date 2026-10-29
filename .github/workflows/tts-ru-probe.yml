@@ -111,7 +111,8 @@ jobs:
           python - <<'PY' || { echo "::error title=transcribe::$(tail -c 900 tx.err | tr '\n' ' ')"; exit 1; }
           import sys
           sys.stderr = open("tx.err", "w")
-          import glob, json, os, re, statistics, time
+          import glob, json, os, re, statistics, subprocess, time
+          import numpy as np
           from faster_whisper import WhisperModel
           from num2words import num2words
           d = json.load(open("out/synth.json", encoding="utf-8"))
@@ -158,7 +159,10 @@ jobs:
           for p in sorted(glob.glob("out/mp3/*.mp3")):
               voice, s, h = os.path.basename(p)[:-4].split("__")
               t0 = time.time()
-              segs, info = m.transcribe(p, language="ru", beam_size=5, condition_on_previous_text=False)
+              # ffmpeg decodes (faster-whisper's own PyAV decoder breaks with the newest av: «metadata_errors»)
+              pcm = subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-i", p, "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
+                                   capture_output=True, check=True).stdout
+              segs, info = m.transcribe(np.frombuffer(pcm, np.float32), language="ru", beam_size=5, condition_on_previous_text=False)
               text = " ".join(x.text.strip() for x in segs)
               k = int(s[1:])
               tr[h] = {"voice": voice, "s": k, "text": text, "wer": round(wer(ref[k - 1], text), 3), "dur": round(info.duration, 1)}

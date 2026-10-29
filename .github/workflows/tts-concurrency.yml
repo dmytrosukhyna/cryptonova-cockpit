@@ -20,37 +20,32 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install -q "edge-tts>=7,<8"
       - run: for l in ru en uk el es; do curl -sS -m 20 "https://app.crypto-capital.app/v2/home?lang=$l" -o home_$l.json || echo '{}' > home_$l.json; done
-      - name: which texts make Brian slow (first audio, ms) — Brian only, no Dmitry before it
+      - name: every male multilingual voice now (first audio / total ms, a fresh Russian answer) — interleaved rounds
         env: { ROUNDS: "${{ inputs.rounds }}" }
         run: |
           python - <<'PY'
-          import json, os, statistics, time
+          import os, random, statistics, time
           from cnq.api import tts
-          rep = (json.load(open("home_ru.json", encoding="utf-8")).get("report") or {}).get("text") or "Публичный портфель CRYPTO NOVA сейчас — 9 793 доллара."
-          V = {
-              "A short first": "Я NOVA AI. Если вложить $500 в BTC и $300 в ETH, при падении на 20% портфель потеряет около $160.",
-              "B fresh": "Ответ NOVA AI номер {n} в 12:06:13 по Гринвичу: биткоин стоит 80 058 долларов, за сутки минус 1,7 процента.",
-              "C fresh no stress": "Ответ Нова номер {n} в 12:06:13 по Гринвичу: биткоин стоит 80 058 долларов, за сутки минус 1,7 процента.",
-              "D fresh no time": "Ответ NOVA AI номер {n}: биткоин стоит 80 058 долларов, за сутки минус 1,7 процента.",
-              "E fresh 2 sentences": "Ответ NOVA AI номер {n}. Биткоин стоит 80 058 долларов, за сутки минус 1,7 процента.",
-              "F no brand": "Биткоин стоит 80 058 долларов, за сутки минус 1,7 процента, а эфир около 3 900 долларов, номер {n}.",
-              "G report": rep,
-              "H answer like": "Биткоин сейчас растёт на {n} процента. Я NOVA AI и советую держать стоп: система рискует не больше 2% счёта в одной сделке.",
-          }
-          tts.VOICES["ru"] = tts.FALLBACK["ru"]                # Brian only
+          VS = ["en-US-BrianMultilingualNeural", "en-AU-WilliamMultilingualNeural", "en-US-AndrewMultilingualNeural", "de-DE-FlorianMultilingualNeural",
+                "fr-FR-RemyMultilingualNeural", "it-IT-GiuseppeMultilingualNeural", "ko-KR-HyunsuMultilingualNeural", "uk-UA-OstapNeural"]
           res = {}
           for r in range(int(os.environ.get("ROUNDS") or 6)):
-              for name, t in V.items():
-                  t0 = time.time()
+              order = VS[:]
+              random.shuffle(order)
+              for v in order:
+                  tts.VOICES["ru"] = v                       # this voice only (FALLBACK filtered when equal; others → patient fallback)
+                  tts.FALLBACK["ru"] = v
+                  t = f"Ответ NOVA AI номер {r + 1} {v[:5]}: биткоин стоит 80 058 долларов, за сутки минус 1,7 процента, а эфир около 3 900 долларов."
                   try:
-                      tts.synth(t.replace("{n}", str(r + 1)) + ("" if "{n}" in t else f" {r + 1}."), "ru", live=True)
+                      tts.synth(t, "ru", live=True)
                   except Exception:
                       pass
-                  a = (tts._used.attempts or [{}])[-1]
-                  res.setdefault(name, []).append((a.get("first_audio_ms"), a.get("ms"), a.get("outcome")))
-                  print(r, name, res[name][-1], flush=True)
-              time.sleep(3)
-          for name, xs in res.items():
+                  a = (tts._used.attempts or [{}])[0]
+                  res.setdefault(v, []).append((a.get("first_audio_ms"), a.get("ms"), a.get("outcome")))
+                  print(r, v, res[v][-1], flush=True)
+              time.sleep(4)
+          for v, xs in res.items():
               f = sorted(x[0] for x in xs if x[0] is not None)
-              print(f"::notice title={name}::first audio ms {f} · median {statistics.median(f) if f else None} · total ms {[x[1] for x in xs]} · {[x[2] for x in xs]} · «{tts.spoken(V[name], 'ru')[:90]}»")
+              tot = sorted(x[1] for x in xs if x[2] == "ok")
+              print(f"::notice title={v}::first audio median {statistics.median(f) if f else None} ms {f} · total median {statistics.median(tot) if tot else None} ms {tot} · {[x[2] for x in xs]}")
           PY

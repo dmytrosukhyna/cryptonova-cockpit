@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "all | regime (backlog #35) | cap (#46) | f36 (#36, live desk rules on all perps) | s50 (#50, short rules outside «рост») | c47 (#47, breakout C capped on liquid perps) | p48 (#48, pullback P by burst size) | m49 (#49, terminal trend rule M on its 18 coins, 2025–26 out of sample)"
+        description: "all | regime (backlog #35) | cap (#46) | f36 (#36, live desk rules on all perps) | s50 (#50, short rules outside «рост») | c47 (#47, breakout C capped on liquid perps) | p48 (#48, pullback P by burst size) | m49 (#49, terminal trend rule M on its 18 coins, 2025–26 out of sample) | d51 (#51, inverted D: long the breakdown outside «рост»)"
         required: false
         default: "all"
 
@@ -23,5 +23,5 @@ jobs:
       - run: pip install -q numpy
       - env: { MODE: "${{ inputs.mode }}" }
         run: |
-          case "$MODE" in all|regime|cap|f36|s50|c47|p48|m49) ;; *) echo "bad mode"; exit 1;; esac
-          if [ "$MODE" = f36 ]; then python scripts/families36_study.py; elif [ "$MODE" = s50 ]; then python scripts/shorts50_study.py; elif [ "$MODE" = c47 ]; then python scripts/c47_study.py; elif [ "$MODE" = p48 ]; then python scripts/p48_study.py; elif [ "$MODE" = m49 ]; then python scripts/m49_study.py; else python scripts/voltbreak_all_study.py "$MODE"; fi
+          case "$MODE" in all|regime|cap|f36|s50|c47|p48|m49|d51) ;; *) echo "bad mode"; exit 1;; esac
+          if [ "$MODE" = f36 ]; then python scripts/families36_study.py; elif [ "$MODE" = s50 ]; then python scripts/shorts50_study.py; elif [ "$MODE" = c47 ]; then python scripts/c47_study.py; elif [ "$MODE" = p48 ]; then python scripts/p48_study.py; elif [ "$MODE" = m49 ]; then python scripts/m49_study.py; elif [ "$MODE" = d51 ]; then python scripts/d51_study.py; else python scripts/voltbreak_all_study.py "$MODE"; fi

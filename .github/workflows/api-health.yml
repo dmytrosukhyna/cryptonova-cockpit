@@ -189,14 +189,14 @@ jobs:
                   return str(asyncio.run(go()))
               except Exception as e:
                   return "ERR " + str(e)[:60]
-          V = {"A known-ok": "Публичный портфель CRYPTO NOVA сейчас — 9 886 долларов. Я NOVA AI.",
-               "B report spoken": tts.spoken(first, "ru"),
-               "C no stress": tts.spoken(first, "ru").replace("\u0301", ""),
-               "D no brand": "Публичный портфель сейчас — 9 759 долларов.",
-               "E plain": "Привет. Это проверка голоса.",
-               "F Svetlana": "Привет. Это проверка голоса."}
+          V = ["Публичный портфель сейчас — 9 886 долларов.", "Публичный портфель сейчас 9 759 долларов.", "Портфель стоит 9 759 долларов.",
+               "Сейчас — 9 759 долларов.", "Публичный портфель сейчас — 9759 долларов.", tts.spoken("Публичный портфель CRYPTO NOVA сейчас — 9 886 долларов. Я NOVA AI.", "ru"),
+               "За сегодня минус 154 доллара.", "Биткоин стоит восемьдесят тысяч долларов.", "Это минус 1,6 процента.", "Открытых сделок: 3.",
+               "Публичный портфель.", "Портфель вырос.", "Девять тысяч долларов.", "9 долларов.", "Привет. Это проверка голоса."]
           res = []
-          for k, v in V.items():
-              res.append(f"{k}: {raw(v, 'ru-RU-SvetlanaNeural' if k.startswith('F') else 'ru-RU-DmitryNeural')} {v!r}"[:200])
+          for v in V:
+              r1 = raw(v)
+              r2 = raw(v) if r1.startswith("ERR") else ""
+              res.append(f"{'OK' if not r1.startswith('ERR') or not r2.startswith('ERR') else 'NO'} {v}")
           print("::notice title=ru voice variants::" + " · ".join(res))
           PY

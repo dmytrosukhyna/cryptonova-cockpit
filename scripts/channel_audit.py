@@ -558,6 +558,8 @@ def audit(channel: str, days: int, S: Spot1d | None, okx_set: set, anns: list[di
     out["forecasts"] = {"found": len(fcs), "checked": n, "hits": hits, "misses": miss, "flat": n - hits - miss,
                         "hit_rate_pct": round(hits / n * 100) if n else None, "always_up_pct": round(up / n * 100) if n else None,
                         "always_down_pct": round(dn / n * 100) if n else None,
+                        # a guesser with the channel's own up/down mix on the same windows
+                        "same_mix_guess_pct": round((sum(1 for (_, f), _ in done if f["side"] == "up") * up + sum(1 for (_, f), _ in done if f["side"] != "up") * dn) / n / n * 100) if n else None,
                         "up_share_pct": round(sum(1 for (_, f), _ in done if f["side"] == "up") / n * 100) if n else None,
                         "avg_move_in_direction_pct": round(float(np.mean([r["move"] if f["side"] == "up" else -r["move"] for (_, f), r in done])) * 100, 2) if n else None,
                         "coins": dict(sorted({c: sum(1 for (_, f), _ in done if f["coin"] == c) for c in {f["coin"] for (_, f), _ in done}}.items(), key=lambda x: -x[1])[:8])}

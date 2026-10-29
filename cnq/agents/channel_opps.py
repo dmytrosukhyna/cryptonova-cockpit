@@ -78,6 +78,7 @@ DEPIN MEME AMA UTC GMT MSK KYIV PM AM FUD FOMO HODL SAFU GG TBA TBD LP CL OI LS"
 BARE_STOP = set("""NOT ALT ONE FUN WIN KEY BIG ACT AND THE FOR YOU ALL ANY CAN GET NOW OUT BUT HAS ITS WAS CHECK NEWS MOVE PUMP
 BOOST GAME GOOD BEST REAL LIVE OPEN FREE EARN SAFE TRUE MORE MAX MIN HIGH LOW RISE DROP JUST LIKE SUN BIO PEOPLE ZERO MEME AIR
 CAT DOG SOON TIME DAY WEEK HOME BANK GAS FORM WELL STEP RED""".split())
+STAKE_ASSETS = {"BNB", "ETH", "SOL", "TON", "SUI", "TRX", "OKB", "MNT", "BGB", "GT", "KCS", "HT", "CAKE", "ARB", "OP", "BASE"}
 STABLE = {"USDT", "USDC", "USDE", "FDUSD", "DAI", "TUSD", "PYUSD", "USD1", "USDS", "BUSD", "RLUSD", "USDD", "USDG"}
 PAIRED = re.compile(r"\b([A-Z][A-Za-z0-9.\-]{1,24}(?: [A-Z][A-Za-z0-9.\-]{1,20})?)\s*\(\$?([A-Z0-9]{2,10})\)")
 NAME_STOP = set("""Binance Bybit OKX Bitget Gate Mexc MEXC KuCoin Kucoin Upbit Coinbase Bithumb Hyperliquid BingX HTX Kraken
@@ -150,6 +151,10 @@ def extract(text: str, links=(), known: set | None = None, okx: set | None = Non
     """one post → the record fields (no text). cat None = nothing for the opportunities list (still counted as a post)."""
     c = categorize(text, links)
     tk = [x for x in tickers(text, known) if x != "BTC"]
+    if c["primary"] in ("launchpad", "airdrop"):
+        # in a launchpool / airdrop post BNB, ETH, SOL… are what you stake or pay with, not the project (the 200-day audit: most
+        # «launchpad coins» were BNB / ETH / SOL) — the project is the name, or a ticker the post pairs with it
+        tk = [x for x in tk if x not in STAKE_ASSETS]
     tick = tk[0] if tk else None
     return {"cat": c["primary"], "cats": c["cats"], "promo": c["promo"], "ref_link": c["ref_link"], "ticker": tick,
             "tickers": tk[:5], "project": project_name(text), "venue": venue(text),

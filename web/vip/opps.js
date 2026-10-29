@@ -77,6 +77,7 @@
     const tr = (x) => {
       const a = x.audit || {}, f = x.live_forecasts || {}, m7 = A(x.live_mentions_vs_btc).find((s) => s.days === 7);
       return `<div class="scard" style="cursor:default"><div class="scard-h"><b>${esc(x.title)}</b><span class="chips">${V.chip('проверка', 'test')}</span></div>
+        ${a.verdict_ru ? `<div class="d">${esc(a.verdict_ru)}</div>` : ''}
         <div class="m"><div><small>Постов в день</small><span>${V.isNum(x.per_day) ? V.num(x.per_day, 1) : '—'}</span></div><div><small>Реклама</small><span>${V.isNum(x.promo_pct) ? V.share(x.promo_pct, 0) : '—'}</span></div>
           <div><small>Прогнозы с 29.10</small><span>${f.n ? V.share(f.hit_rate_pct, 0) + ' <small>/ вверх ' + V.share(f.always_up_pct, 0) + '</small>' : '—'}</span></div></div>
         ${a.summary_ru ? `<p class="para" style="margin:0;font-size:12.5px">История: ${esc(a.summary_ru)}</p>` : ''}

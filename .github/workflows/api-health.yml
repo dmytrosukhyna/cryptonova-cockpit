@@ -166,6 +166,13 @@ jobs:
                   b = tts.synth(text, lang)
                   out.append(f"{lang}: ok {len(b)} B {time.time() - t0:.1f} s ({len(text)} chars, key {tts.key(text, lang) == rep.get('key')})")
               except Exception as e:
-                  out.append(f"{lang}: FAILED {str(e)[:160]} · spoken: {tts.spoken(text, lang)[:400]}")
+                  out.append(f"{lang}: FAILED {str(e)[:100]}")
+                  # which sentence the voice refuses (each alone)
+                  import re
+                  for sent in re.split(r"(?<=[.!?])\s+", text):
+                      try:
+                          tts.synth(sent, lang)
+                      except Exception:
+                          out.append(f"  refused: «{tts.spoken(sent, lang)}»")
           print("::notice title=synth live reports::" + " · ".join(out))
           PY

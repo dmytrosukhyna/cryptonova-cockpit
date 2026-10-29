@@ -91,6 +91,13 @@ jobs:
             out="$out $l: HTTP $r $ct ($kind) ·"
           done
           echo "::notice title=POST /v2/tts ru en uk el es::$out"
+          # 29.10: a FRESH Russian sentence (the run's time in it, so never from the cache) — the voice answers now; tts_last names
+          # the voice that spoke (ru-RU-DmitryNeural, or its male multilingual fallback — cnq/api/tts.py FALLBACK)
+          fresh="Проверка голоса NOVA AI в $(date -u +%H:%M:%S) по Гринвичу: биткоин стоит 80 058 долларов, за сутки минус 1,7 процента, а ETH — около 3 900 долларов."
+          r=$(jq -nc --arg t "$fresh" '{text: $t, lang: "ru"}' | curl -sS -m 60 -o tts_fresh.bin -D h_fresh.txt -w '%{http_code} %{time_total}s %{size_download}B' -X POST -H 'content-type: application/json' --data-binary @- $A/v2/tts || echo "000")
+          ct=$(tr -d '\r' < h_fresh.txt 2>/dev/null | grep -i '^content-type' | head -1 | cut -d' ' -f2)
+          last=$(curl -sS -m 20 $A/v2/health | jq -c '.tts_last' 2>/dev/null || echo "?")
+          echo "::notice title=POST /v2/tts ru (fresh)::HTTP $r $ct ($(file -b tts_fresh.bin | cut -c1-40)) · tts_last $last · «$fresh»"
           for l in ru en; do
             u=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.audio_url // empty')
             t=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.text // empty' | cut -c1-200)
@@ -146,7 +153,7 @@ jobs:
               try:
                   b = tts.synth(text, lang)
                   ok = b[:3] == b"ID3" or b[:2] in (b"\xff\xf3", b"\xff\xfb", b"\xff\xf2")
-                  print(f"::notice title=synth {lang}::{tts.VOICES[lang]} · {len(b)} bytes · mp3 {ok} · {time.time() - t0:.1f} s")
+                  print(f"::notice title=synth {lang}::{getattr(tts._used, 'voice', None) or tts.VOICES[lang]} · {len(b)} bytes · mp3 {ok} · {time.time() - t0:.1f} s")
               except Exception as e:
                   print(f"::notice title=synth {lang}::FAILED {e}")
           PY
@@ -164,7 +171,7 @@ jobs:
                   text = rep.get("text") or ""
                   t0 = time.time()
                   b = tts.synth(text, lang)
-                  out.append(f"{lang}: ok {len(b)} B {time.time() - t0:.1f} s ({len(text)} chars, key {tts.key(text, lang) == rep.get('key')})")
+                  out.append(f"{lang}: ok {getattr(tts._used, 'voice', None)} {len(b)} B {time.time() - t0:.1f} s ({len(text)} chars, key {tts.key(text, lang) == rep.get('key')})")
               except Exception as e:
                   out.append(f"{lang}: FAILED {str(e)[:100]}")
                   # which sentence the voice refuses (each alone)

@@ -39,6 +39,14 @@ from cnq.agents.i18n import DEFAULT, norm_lang
 VOICES = {"ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural", "uk": "uk-UA-OstapNeural", "el": "el-GR-NestorasNeural",
           "es": "es-ES-AlvaroNeural"}
 RATE = "+0%"                 # 21.10 owner: the −4% of the greeting sounded «еле-еле» for reports
+# 29.10 (owner: male voices only, never a robotic female voice): ru-RU-DmitryNeural, the one Russian male voice, is refused most of
+# the time («No audio was received», on the server and on fresh runners). After Dmitry's 2 attempts the Russian text goes to a male
+# MULTILINGUAL voice, which reads Russian itself. Never Svetlana / Dariya, never gTTS. The cache key stays Dmitry's (key() below),
+# so an mp3 made by the fallback is kept and served like any other. The probe on a runner (29.10, 3 Russian sentences of the report
+# and of NOVA AI answers × 10 spaced rounds, one bare call each; faster-whisper small → word error rate vs the words given):
+# Dmitry 12/30 (the report sentence 0/10), WER 0.053 where it spoke; en-US-BrianMultilingualNeural 30/30, median 0.8 s, WER 0.029.
+FALLBACK = {"ru": "en-US-BrianMultilingualNeural"}
+RETRY_PAUSE_S = 1.0
 MAX_CHARS = 1500
 MAX_CACHE_MB = 200
 TIMEOUT_S = 25.0
@@ -86,29 +94,43 @@ def available() -> bool:
         return False
 
 
+def voices(lang: str) -> list[str]:
+    """the voices tried for a language, in order: its own male voice, then its male fallback (Russian only) — never a female one"""
+    lang = norm_lang(lang)
+    return [VOICES[lang]] + [v for v in [FALLBACK.get(lang)] if v and v != VOICES[lang]]
+
+
+_used = threading.local()        # the voice that made the last mp3 in this thread (for /v2/health "tts_last")
+
+
 def synth(text: str, lang: str, timeout: float = TIMEOUT_S) -> bytes:
-    """the mp3 of the text in that language's male voice; raises on failure (one retry)"""
+    """the mp3 of the text in that language's male voice (2 attempts), then in its male fallback voice (Russian, 29.10; 2 attempts);
+    raises when every voice failed"""
     import asyncio
     edge_tts = importlib.import_module("edge_tts")
     lang = norm_lang(lang)
     say = spoken(text, lang)
 
-    async def run() -> bytes:
+    async def run(voice: str) -> bytes:
         buf = bytearray()
-        async for chunk in edge_tts.Communicate(say, VOICES[lang], rate=RATE).stream():
+        async for chunk in edge_tts.Communicate(say, voice, rate=RATE).stream():
             if chunk.get("type") == "audio" and chunk.get("data"):
                 buf += chunk["data"]
         return bytes(buf)
     err = None
-    for attempt in range(2):
-        try:
-            data = asyncio.run(asyncio.wait_for(run(), timeout))
-            if len(data) > 1000:
-                return data
-            err = RuntimeError("no audio was received")
-        except Exception as e:  # noqa: BLE001
-            err = e
-        time.sleep(1.0 + attempt)
+    _used.voice = None
+    for voice in voices(lang):
+        for attempt in range(2):
+            if attempt:
+                time.sleep(RETRY_PAUSE_S)                    # a pause before the voice's second attempt; none before a new voice
+            try:
+                data = asyncio.run(asyncio.wait_for(run(voice), timeout))
+                if len(data) > 1000:
+                    _used.voice = voice
+                    return data
+                err = RuntimeError("no audio was received")
+            except Exception as e:  # noqa: BLE001
+                err = e
     raise RuntimeError(f"tts failed: {str(err)[:160]}")
 
 
@@ -294,6 +316,7 @@ class Tts:
         if data is not None:
             return k, data
         t0 = time.time()
+        _used.voice = None
         try:
             data = self.synth(text, lang)
         except Exception as e:  # noqa: BLE001
@@ -302,6 +325,8 @@ class Tts:
             raise
         self.last = {"result": "ok", "ms": round((time.time() - t0) * 1000), "lang": lang, "chars": len(text), "at": int(t0),
                      "bytes": len(data)}
+        if getattr(_used, "voice", None):                 # 29.10: which voice spoke (the Russian fallback shows here)
+            self.last["voice"] = _used.voice
         self.put(k, data)
         return k, data
 

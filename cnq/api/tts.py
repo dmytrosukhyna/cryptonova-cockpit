@@ -45,20 +45,26 @@ RATE = "+0%"                 # 21.10 owner: the −4% of the greeting sounded «
 # so an mp3 made by the fallback is kept and served like any other. The probe on a runner (29.10, 3 Russian sentences of the report
 # and of NOVA AI answers × 10 spaced rounds, one bare call each; faster-whisper small → word error rate vs the words given):
 # Dmitry 12/30 (the report sentence 0/10), WER 0.053 where it spoke; en-US-BrianMultilingualNeural 30/30, median 0.8 s, WER 0.029.
-FALLBACK = {"ru": "en-US-BrianMultilingualNeural"}
+# 29.10 15:42 (owner: «если женский голос хороший и правильно читает — не проблема … задержки хуже, чем пол диктора»): a good
+# Microsoft NEURAL voice of either gender is fine — never gTTS or the phone's robotic voice. Probe on a runner (13:45 UTC, the same
+# 3 sentences × 10): Svetlana 30/30, first audio 0.18 s, WER 0.034 — not refused like Dmitry; ru-RU-DariyaNeural is not in Edge's
+# list. The server's own timings (api-health): every voice is slower there (first audio 1.2–8.6 s), and en's Andrew took 10.6 s
+# (uk 3.3 s, el 3.9 s, es 2.3 s stay as they are). Each language's fallbacks, in order (the background order; live races them).
+FALLBACK = {"ru": ["ru-RU-SvetlanaNeural", "en-US-BrianMultilingualNeural"],
+            "en": ["en-US-ChristopherNeural", "en-US-JennyNeural"]}
 RETRY_PAUSE_S = 1.0
 # the app waits 8 s for the server's voice, then reads with the phone (NovaSpeech.kt). Dmitry's refusals take ~2.6 s each (probe) or
 # hang until TIMEOUT_S (seen live), so a voice with a fallback behind it that sends no audio within FIRST_AUDIO_S counts as refused:
-# a request the app waits for (POST /v2/tts, a report mp3 made on the spot) is LIVE: Dmitry ONCE (≤ 2 s) with Brian (see HEDGE_S); the
-# background report (prewarm) keeps the patient order, Dmitry 2 × ≤ 2 s + 1 s pause, then Brian. A healthy Dmitry made a whole
+# a request the app waits for (POST /v2/tts, a report mp3 made on the spot) is LIVE: the main voice ONCE (≤ 2 s) raced against all
+# its fallbacks; the background report (prewarm) keeps the patient order, each voice 2 × (≤ 2 s when another follows). A healthy Dmitry made a whole
 # sentence in ~0.9 s (median, probe); only the wait for the FIRST audio is cut — once the voice speaks, it has the full TIMEOUT_S.
 # /v2/health tts_last shows each attempt: voice, outcome (ok / no_audio / silent / timeout / …), start, connects, first audio, total.
 FIRST_AUDIO_S = 2.0
-# 29.10 (later): the server's timings showed DNS + TLS ~23 ms and the cache write ~1 ms — the time is Microsoft's: a multilingual
-# voice's first audio took 0.3 s in the morning and 2.4–10 s around midday (every multilingual voice, runners too). So a LIVE request
-# starts Dmitry and Brian together (no 2 s wait for Dmitry's verdict before Brian starts), and a Brian request still silent after
-# HEDGE_S gets a twin — the first to finish wins (at most FALLBACK_REQUESTS Brian requests; the extra load only when it is slow).
-HEDGE_S = 2.5
+# 29.10 (later): the server's timings showed DNS + TLS ~23 ms and the cache write ~1 ms — the time is Microsoft's (a voice's first
+# audio 0.2 s on a runner, 1.2–8.6 s on the server at the same minute). So a LIVE request starts the main voice and ALL its fallbacks
+# together; the main voice keeps priority when it speaks within FIRST_AUDIO_S, else the first fallback to finish wins. A fallback
+# request that fails gets one successor (FALLBACK_REQUESTS per voice). The twin of a silent Brian (12:30) is gone: with several voices
+# racing it rarely won.
 FALLBACK_REQUESTS = 2
 MAX_CHARS = 1500
 MAX_CACHE_MB = 200
@@ -108,9 +114,9 @@ def available() -> bool:
 
 
 def voices(lang: str) -> list[str]:
-    """the voices tried for a language, in order: its own male voice, then its male fallback (Russian only) — never a female one"""
+    """the voices tried for a language, in order: its own voice, then its fallbacks (FALLBACK) — Microsoft neural voices only"""
     lang = norm_lang(lang)
-    return [VOICES[lang]] + [v for v in [FALLBACK.get(lang)] if v and v != VOICES[lang]]
+    return [VOICES[lang]] + [v for v in FALLBACK.get(lang, []) if v and v != VOICES[lang]]
 
 
 _used = threading.local()        # the voice that made the last mp3 in this thread, and the attempts (for /v2/health "tts_last")
@@ -171,9 +177,9 @@ def _outcome(e: BaseException) -> str:
 
 
 def synth(text: str, lang: str, timeout: float = TIMEOUT_S, live: bool = False) -> bytes:
-    """the mp3 of the text in that language's male voice (2 attempts), then in its male fallback voice (Russian, 29.10; 2 attempts);
-    raises when every voice failed. live (29.10: a request the app waits for, 8 s at most) → the voice and its fallback start
-    together (race below): one attempt of the voice, up to FALLBACK_REQUESTS of the fallback. Every attempt is timed into _used.attempts (voice, outcome, connect / first audio / total ms)."""
+    """the mp3 of the text in that language's voice (2 attempts), then in each of its fallbacks (2 attempts each); raises when every
+    voice failed. live (29.10: a request the app waits for, 8 s at most) → the voice and all its fallbacks start together (race
+    below): one request of the voice, up to FALLBACK_REQUESTS of each fallback. Every attempt is timed into _used.attempts (voice, outcome, connect / first audio / total ms)."""
     t00 = time.perf_counter()
     edge_tts = importlib.import_module("edge_tts")
     lang = norm_lang(lang)
@@ -232,12 +238,11 @@ def _synth_attempts(edge_tts, say: str, lang: str, timeout: float, live: bool, a
                     await conn.shut()
                 except BaseException:  # noqa: BLE001
                     pass
-    async def race(first: str, fb: str) -> tuple[str, bytes]:
-        """live (29.10): the first voice and its fallback start TOGETHER. The first voice wins when it speaks (it is cut when silent
-        for FIRST_AUDIO_S; a fallback already done waits for that verdict, ≤ 2 s); else the first fallback request that completes.
-        A fallback request still silent after HEDGE_S gets a twin (or a failed one a successor): at most FALLBACK_REQUESTS."""
-        loop = asyncio.get_running_loop()
-        recs: dict = {}
+    async def race(first: str, fbs: list) -> tuple[str, bytes]:
+        """live (29.10): the main voice and ALL its fallbacks start TOGETHER. The main voice wins when it speaks (it is cut when
+        silent for FIRST_AUDIO_S; a fallback already done waits for that verdict, ≤ 2 s); else the fallback request that finished
+        first. A fallback voice whose requests all failed gets a successor (at most FALLBACK_REQUESTS a voice)."""
+        recs, voice_of, finished = {}, {}, []
 
         def start(voice: str, first_s: float | None):
             rec = {"voice": voice, "at_ms": ms(t00)}
@@ -260,33 +265,34 @@ def _synth_attempts(edge_tts, say: str, lang: str, timeout: float, live: bool, a
                 rec["outcome"] = "ok"
                 return data
             task = asyncio.ensure_future(go())
-            recs[task] = rec
+            task.add_done_callback(finished.append)           # the order they finished in
+            recs[task], voice_of[task] = rec, voice
             return task
 
         ok = lambda t: t.done() and not t.cancelled() and t.exception() is None  # noqa: E731
-        d, fbs = start(first, FIRST_AUDIO_S), [start(fb, None)]
-        hedge_at, err = loop.time() + HEDGE_S, None
+        d = start(first, FIRST_AUDIO_S)
+        reqs = {v: [start(v, None)] for v in fbs}
+        err = None
         try:
             while True:
                 if ok(d):
                     return first, d.result()
-                win = next((t for t in fbs if ok(t)), None)
+                win = next((t for t in finished if t is not d and ok(t)), None)
                 if win is not None and d.done():
-                    return fb, win.result()
-                for t in [d, *fbs]:
-                    if t.done() and not t.cancelled() and t.exception() is not None:
+                    return voice_of[win], win.result()
+                for t in finished:
+                    if not t.cancelled() and t.exception() is not None:
                         err = t.exception()
-                running = [t for t in fbs if not t.done()]
-                if win is None and len(fbs) < FALLBACK_REQUESTS and (
-                        not running or (loop.time() >= hedge_at and not any("first_audio_ms" in recs[t] for t in running))):
-                    fbs.append(start(fb, None))          # a failed fallback's successor, or a twin of a silent one
-                    continue
-                waiting = [t for t in [d, *fbs] if not t.done()]
+                if win is None:
+                    more = [v for v, ts in reqs.items() if len(ts) < FALLBACK_REQUESTS and all(t.done() for t in ts)]
+                    for v in more:
+                        reqs[v].append(start(v, None))        # a failed fallback voice's successor
+                    if more:
+                        continue
+                waiting = [t for t in recs if not t.done()]
                 if not waiting:
                     raise RuntimeError(f"tts failed: {str(err)[:160]}")
-                hedge_left = hedge_at - loop.time()
-                left = hedge_left if len(fbs) < FALLBACK_REQUESTS and win is None and hedge_left > 0 else None
-                await asyncio.wait(waiting, timeout=left, return_when=asyncio.FIRST_COMPLETED)
+                await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
         finally:
             rest = [t for t in recs if not t.done()]
             for t in rest:
@@ -297,7 +303,7 @@ def _synth_attempts(edge_tts, say: str, lang: str, timeout: float, live: bool, a
     err = None
     vs = voices(lang)
     if live and len(vs) > 1:
-        voice, data = asyncio.run(race(vs[0], vs[1]))
+        voice, data = asyncio.run(race(vs[0], vs[1:]))
         _used.voice = voice
         return data
     for i, voice in enumerate(vs):

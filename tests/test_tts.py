@@ -294,17 +294,19 @@ def test_home_serves_the_last_report_whose_voice_is_ready(tmp_path):
     assert d["key"] == b["key"] and d["text"] == b["text"]          # the newest words, once their voice is ready
 
 
-def test_russian_falls_back_to_a_male_multilingual_voice_never_a_female_one(tmp_path):
-    """29.10 (owner: male voices only, never a robotic female voice): ru-RU-DmitryNeural is refused most of the time — after its
-    2 attempts the Russian text is read by FALLBACK["ru"], a male multilingual voice; the other languages keep their one voice;
-    the cache key stays Dmitry's; /v2/health tts_last names the voice that spoke. The voice service is a fake here."""
+def test_russian_falls_back_to_neural_voices_never_gtts(tmp_path):
+    """29.10: ru-RU-DmitryNeural is refused most of the time — the Russian text then goes to FALLBACK["ru"] (owner 15:42: a good
+    Microsoft neural voice of either gender: Svetlana, then Brian Multilingual); en has its own fallbacks; the others keep their one
+    voice; only Microsoft neural voices (never gTTS); the cache key stays the main voice's; tts_last names the voice that spoke.
+    Background (patient): each voice twice, in order. Live: all at once (the race test below). The voice service is a fake here."""
     import sys
     import types
-    fb = tts.FALLBACK["ru"]
-    assert set(tts.FALLBACK) == {"ru"} and fb.endswith("MultilingualNeural")
-    assert tts.voices("ru") == ["ru-RU-DmitryNeural", fb] and tts.voices("uk") == ["uk-UA-OstapNeural"] and tts.voices("zz")[0] == "ru-RU-DmitryNeural"
-    female = ("Svetlana", "Dariya", "Polina", "Ava", "Emma", "Seraphina", "Vivienne", "Thalita", "Jenny", "Aria", "Katja", "Denise")
-    assert not [v for v in (*tts.VOICES.values(), *tts.FALLBACK.values()) if any(f in v for f in female)]
+    fbs = tts.FALLBACK["ru"]
+    assert fbs == ["ru-RU-SvetlanaNeural", "en-US-BrianMultilingualNeural"] and set(tts.FALLBACK) == {"ru", "en"}
+    assert tts.voices("ru") == ["ru-RU-DmitryNeural", *fbs] and tts.voices("en") == ["en-US-AndrewNeural", *tts.FALLBACK["en"]]
+    assert tts.voices("uk") == ["uk-UA-OstapNeural"] and tts.voices("zz")[0] == "ru-RU-DmitryNeural"
+    assert all(v.endswith("Neural") for lang in tts.VOICES for v in tts.voices(lang))         # Microsoft neural voices only
+    sv, br = fbs
     calls, refuse = [], {"ru-RU-DmitryNeural"}
 
     class Communicate:
@@ -320,7 +322,11 @@ def test_russian_falls_back_to_a_male_multilingual_voice_never_a_female_one(tmp_
     sys.modules["edge_tts"], tts.RETRY_PAUSE_S = types.SimpleNamespace(Communicate=Communicate), 0.0
     try:
         assert tts.synth("Я NOVA AI. Биткоин стоит 80 058 долларов.", "ru") == MP3
-        assert calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", fb]          # Dmitry's 2 attempts first, then the fallback
+        assert calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", sv] and tts._used.voice == sv   # patient: Dmitry ×2, then Svetlana
+        refuse.add(sv)
+        calls.clear()
+        assert tts.synth("Я NOVA AI.", "ru") == MP3 and calls == ["ru-RU-DmitryNeural"] * 2 + [sv] * 2 + [br]
+        refuse.discard(sv)
         calls.clear()
         assert tts.synth("Привіт, я NOVA AI.", "uk") == MP3 and calls == ["uk-UA-OstapNeural"]
         refuse.add("uk-UA-OstapNeural")
@@ -329,36 +335,37 @@ def test_russian_falls_back_to_a_male_multilingual_voice_never_a_female_one(tmp_
             tts.synth("Привіт", "uk")
             assert False
         except RuntimeError:
-            assert calls == ["uk-UA-OstapNeural"] * 2                               # no fallback outside Russian
-        # through the API: Dmitry's cache key, the fallback's mp3, the voice in tts_last; a cached text is never made again
+            assert calls == ["uk-UA-OstapNeural"] * 2                               # no fallback for uk
+        # through the API (live): the main voice's cache key, a fallback's mp3, the voice in tts_last; a cached text is never made again
         t = tts.Tts(str(tmp_path / "cache"), available_fn=lambda: True)
         text = "Публичный портфель CRYPTO NOVA сейчас — 9 773 доллара."
         calls.clear()
         c, a = t.post({"text": text, "lang": "ru"}, "1.1.1.1")
-        assert c == 200 and a.key == tts.key(text, "ru") and t.has(a.key) and t.last["voice"] == fb and t.last["live"] is True
-        assert calls == ["ru-RU-DmitryNeural", fb]                                  # live (the app waits 8 s): Dmitry once, then Brian
-        assert [(x["voice"], x["outcome"]) for x in t.last["attempts"]] == [("ru-RU-DmitryNeural", "RuntimeError"), (fb, "ok")]
+        assert c == 200 and a.key == tts.key(text, "ru") and t.has(a.key) and t.last["voice"] in fbs and t.last["live"] is True
+        assert calls == ["ru-RU-DmitryNeural", sv, br]                              # live: all three start together
+        out = {x["voice"]: x["outcome"] for x in t.last["attempts"]}
+        assert out["ru-RU-DmitryNeural"] == "RuntimeError" and out[t.last["voice"]] == "ok"
         assert t.last["prep_ms"] >= 0 and "put_ms" in t.last and all("ms" in x and "at_ms" in x for x in t.last["attempts"])
-        assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[0] == 200 and len(calls) == 2
-        # Dmitry answers → Dmitry speaks
+        assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[0] == 200 and len(calls) == 3
+        # Dmitry answers → Dmitry speaks (background order)
         refuse.discard("ru-RU-DmitryNeural")
         calls.clear()
         k, _mp3 = t.make("Биткоин стоит 80 058 долларов.", "ru")
         assert calls == ["ru-RU-DmitryNeural"] and t.last["voice"] == "ru-RU-DmitryNeural"
-        # every male voice refuses → an error (the app reads the text itself), never a female voice
-        refuse.update({"ru-RU-DmitryNeural", fb})
+        # every voice refuses → an error (the app reads the text itself); each fallback got one successor
+        refuse.update({"ru-RU-DmitryNeural", sv, br})
         calls.clear()
         assert t.post({"text": "Новый текст", "lang": "ru"}, "1.1.1.1") == (502, {"error": "tts_failed"})
-        assert calls == ["ru-RU-DmitryNeural", fb, fb] and t.last["result"] == "failed" and len(t.last["attempts"]) == 3
-        # the background report (prewarm) keeps the patient order: Dmitry twice, then Brian
-        refuse.discard(fb)
+        assert sorted(calls) == sorted(["ru-RU-DmitryNeural"] + [sv] * 2 + [br] * 2) and t.last["result"] == "failed"
+        # the background report (prewarm) keeps the patient order: Dmitry twice, then Svetlana
+        refuse.difference_update({sv, br})
         calls.clear()
         t.prewarm("Публичный портфель CRYPTO NOVA сейчас — 9 781 доллар.", "ru")
         for _ in range(200):
             if not t._busy and calls:
                 break
             time.sleep(0.02)
-        assert calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", fb] and t.last["live"] is False
+        assert calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", sv] and t.last["live"] is False
     finally:
         tts.RETRY_PAUSE_S = old_pause
         if old_mod is None:
@@ -373,7 +380,7 @@ def test_a_silent_dmitry_hands_over_within_the_apps_8_seconds(tmp_path):
     import asyncio
     import sys
     import types
-    fb = tts.FALLBACK["ru"]
+    fb = tts.FALLBACK["ru"][0]                                                  # Svetlana, the first fallback
     calls, mode = [], {"dmitry": "hang"}
 
     class Communicate:
@@ -410,11 +417,13 @@ def test_a_silent_dmitry_hands_over_within_the_apps_8_seconds(tmp_path):
 
 def test_live_requests_try_dmitry_once_and_every_attempt_is_timed(tmp_path):
     """29.10: a request the app waits for (8 s) — POST /v2/tts and a report mp3 made on the spot — is LIVE: Dmitry once (silent for
-    FIRST_AUDIO_S → cut), then Brian; /v2/health tts_last shows each attempt (voice, outcome, start, first audio, total)"""
+    FIRST_AUDIO_S → cut) raced against its fallbacks; /v2/health tts_last shows each attempt (voice, outcome, start, first audio,
+    total)"""
     import asyncio
     import sys
     import types
-    fb = tts.FALLBACK["ru"]
+    fbs = tts.FALLBACK["ru"]
+    fb = fbs[0]
     calls = []
 
     class NoAudioReceived(Exception):
@@ -437,18 +446,18 @@ def test_live_requests_try_dmitry_once_and_every_attempt_is_timed(tmp_path):
         t = tts.Tts(str(tmp_path / "cache"), available_fn=lambda: True)
         t0 = time.time()
         c, a = t.post({"text": "Я NOVA AI. Биткоин стоит 80 058 долларов.", "lang": "ru"}, "1.1.1.1")
-        assert c == 200 and calls == ["ru-RU-DmitryNeural", fb] and time.time() - t0 < 1.5
+        assert c == 200 and calls == ["ru-RU-DmitryNeural", *fbs] and time.time() - t0 < 1.5
         at = t.last["attempts"]
-        assert [(x["voice"], x["outcome"]) for x in at] == [("ru-RU-DmitryNeural", "silent"), (fb, "ok")]
+        assert [(x["voice"], x["outcome"]) for x in at][:2] == [("ru-RU-DmitryNeural", "silent"), (fb, "ok")]
         assert 150 <= at[0]["ms"] < 1000 and "first_audio_ms" not in at[0] and at[1]["first_audio_ms"] <= at[1]["ms"]
-        assert at[1]["at_ms"] < 100 and t.last["voice"] == fb and t.last["live"] is True       # Brian starts WITH Dmitry
+        assert all(x["at_ms"] < 100 for x in at) and t.last["voice"] == fb and t.last["live"] is True   # all start together
         assert t.last["inflight"] == 0 and tts._INFLIGHT[0] == 0                   # no other synthesis was running; none is left
         # the report's mp3 address, made on the spot, is live too
         text = "Публичный портфель CRYPTO NOVA сейчас — 9 781 доллар."
         k = tts.key(text, "ru")
         calls.clear()
         c, a = t.get_route(k, {k: (text, "ru")})
-        assert c == 200 and calls == ["ru-RU-DmitryNeural", fb]
+        assert c == 200 and calls == ["ru-RU-DmitryNeural", *fbs]
         # a language without a fallback keeps its 2 attempts; the outcome is named
         calls.clear()
         assert t.post({"text": "Привіт, я NOVA AI.", "lang": "uk"}, "1.1.1.1") == (502, {"error": "tts_failed"})
@@ -463,14 +472,15 @@ def test_live_requests_try_dmitry_once_and_every_attempt_is_timed(tmp_path):
             sys.modules["edge_tts"] = old[0]
 
 
-def test_live_race_dmitry_first_brian_together_and_a_twin_for_a_silent_brian(tmp_path):
-    """29.10: live — Dmitry and Brian start together; Dmitry wins when he speaks (Brian is cancelled), a finished Brian waits for
-    Dmitry's verdict (≤ FIRST_AUDIO_S); a Brian silent after HEDGE_S gets a twin and the first to finish wins; at most
-    FALLBACK_REQUESTS Brian requests; every male voice failing is an error"""
+def test_live_race_main_voice_first_then_the_first_fallback_to_finish(tmp_path):
+    """29.10: live — Dmitry, Svetlana and Brian start together; Dmitry wins when he speaks (the others are cancelled), a finished
+    fallback waits for Dmitry's verdict (≤ FIRST_AUDIO_S); else the first fallback to finish wins; a fallback voice whose request
+    failed gets a successor (at most FALLBACK_REQUESTS a voice); every voice failing is an error"""
     import asyncio
     import sys
     import types
-    fb = tts.FALLBACK["ru"]
+    sv, br = tts.FALLBACK["ru"]
+    D = "ru-RU-DmitryNeural"
     calls, plan = [], {}
 
     class Communicate:
@@ -485,9 +495,9 @@ def test_live_race_dmitry_first_brian_together_and_a_twin_for_a_silent_brian(tmp
                 raise RuntimeError("No audio was received.")
             await asyncio.sleep(how)                                           # seconds before the audio
             yield {"type": "audio", "data": MP3}
-    old = sys.modules.get("edge_tts"), tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S, tts.HEDGE_S
-    sys.modules["edge_tts"], tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S, tts.HEDGE_S = types.SimpleNamespace(Communicate=Communicate), 0.0, 0.4, 0.3
-    _out = lambda: [(a["voice"][:9], a["outcome"]) for a in tts._used.attempts]  # noqa: E731
+    old = sys.modules.get("edge_tts"), tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S
+    sys.modules["edge_tts"], tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S = types.SimpleNamespace(Communicate=Communicate), 0.0, 0.4
+    _out = lambda: {(a["voice"], a["outcome"]) for a in tts._used.attempts}  # noqa: E731
     try:
         def go(**p):
             plan.clear()
@@ -496,38 +506,40 @@ def test_live_race_dmitry_first_brian_together_and_a_twin_for_a_silent_brian(tmp
             t0 = time.time()
             data = tts.synth("Я NOVA AI.", "ru", live=True)
             return data, tts._used.voice, round(time.time() - t0, 2)
-        # Dmitry speaks at once → Dmitry; Brian (slower) is cancelled
-        _d, v, sec = go(**{"ru-RU-DmitryNeural": [0.05], fb: [0.2]})
-        assert v == "ru-RU-DmitryNeural" and sec < 0.2 and _out() == [("ru-RU-Dmi", "ok"), (fb[:9], "cancelled")]
-        # Brian is done first, Dmitry still speaks within his window → Dmitry (preferred)
-        _d, v, sec = go(**{"ru-RU-DmitryNeural": [0.2], fb: [0.05]})
-        assert v == "ru-RU-DmitryNeural" and _out() == [("ru-RU-Dmi", "ok"), (fb[:9], "ok")]
-        # Dmitry refuses at once → Brian as soon as Brian is done (no waiting for a 2 s window)
-        _d, v, sec = go(**{"ru-RU-DmitryNeural": ["refuse"], fb: [0.15]})
-        assert v == fb and sec < 0.35 and _out() == [("ru-RU-Dmi", "RuntimeError"), (fb[:9], "ok")]
-        # Dmitry silent → cut at FIRST_AUDIO_S; Brian already done waits for that verdict only
-        _d, v, sec = go(**{"ru-RU-DmitryNeural": [30], fb: [0.05]})
-        assert v == fb and 0.35 < sec < 0.6 and _out() == [("ru-RU-Dmi", "silent"), (fb[:9], "ok")]
-        # the first Brian is silent past HEDGE_S → a twin; the twin finishes first and wins
-        _d, v, sec = go(**{"ru-RU-DmitryNeural": ["refuse"], fb: [30, 0.05]})
-        assert v == fb and 0.3 <= sec < 0.6 and calls == ["ru-RU-DmitryNeural", fb, fb]
-        assert _out() == [("ru-RU-Dmi", "RuntimeError"), (fb[:9], "cancelled"), (fb[:9], "ok")]
-        # a Brian speaking (slowly) past HEDGE_S gets no twin
-        _d, v, sec = go(**{"ru-RU-DmitryNeural": ["refuse"], fb: [0.1]})
-        assert calls == ["ru-RU-DmitryNeural", fb]
-        # everything refuses → an error after FALLBACK_REQUESTS Brian requests
+        # Dmitry speaks at once → Dmitry; the slower fallbacks are cancelled
+        _d, v, sec = go(**{D: [0.05], sv: [0.2], br: [0.2]})
+        assert v == D and sec < 0.19 and _out() == {(D, "ok"), (sv, "cancelled"), (br, "cancelled")}
+        # a fallback is done first, Dmitry still speaks within his window → Dmitry (priority)
+        _d, v, sec = go(**{D: [0.2], sv: [0.05], br: [0.05]})
+        assert v == D and (sv, "ok") in _out()
+        # Dmitry refuses → the first fallback to finish, at once (Brian faster than Svetlana here)
+        _d, v, sec = go(**{D: ["refuse"], sv: [0.3], br: [0.1]})
+        assert v == br and sec < 0.25 and _out() == {(D, "RuntimeError"), (sv, "cancelled"), (br, "ok")}
+        # Dmitry silent → cut at FIRST_AUDIO_S; a fallback already done waits for that verdict only
+        _d, v, sec = go(**{D: [30], sv: [0.05], br: [0.1]})
+        assert v == sv and 0.35 < sec < 0.6 and (D, "silent") in _out()
+        # Svetlana refuses → her successor races on; Brian wins; at most FALLBACK_REQUESTS a voice
+        _d, v, sec = go(**{D: ["refuse"], sv: ["refuse"], br: [0.2]})
+        assert v == br and calls.count(sv) == tts.FALLBACK_REQUESTS and calls.count(br) == 1
+        # everything refuses → an error after FALLBACK_REQUESTS of each fallback
         try:
-            go(**{"ru-RU-DmitryNeural": ["refuse"], fb: ["refuse"]})
+            go(**{D: ["refuse"], sv: ["refuse"], br: ["refuse"]})
             assert False
         except RuntimeError as e:
-            assert "tts failed" in str(e) and calls == ["ru-RU-DmitryNeural"] + [fb] * tts.FALLBACK_REQUESTS
-        # the background (patient) order is unchanged: Dmitry, Dmitry, then Brian — one at a time
+            assert "tts failed" in str(e) and sorted(calls) == sorted([D] + [sv, br] * tts.FALLBACK_REQUESTS)
+        # the background (patient) order: Dmitry, Dmitry, then Svetlana — one at a time
         plan.clear()
-        plan.update({"ru-RU-DmitryNeural": ["refuse"], fb: [0.01]})
+        plan.update({D: ["refuse"], sv: [0.01], br: [0.01]})
         calls.clear()
-        assert tts.synth("Я NOVA AI.", "ru") == MP3 and calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", fb]
+        assert tts.synth("Я NOVA AI.", "ru") == MP3 and calls == [D, D, sv]
+        # en: Andrew raced against its own fallbacks
+        ea, ef = tts.VOICES["en"], tts.FALLBACK["en"]
+        plan.clear()
+        plan.update({ea: [30], ef[0]: [0.1], ef[1]: [0.05]})
+        calls.clear()
+        assert tts.synth("Hi, I am NOVA AI.", "en", live=True) == MP3 and calls == [ea, *ef] and tts._used.voice == ef[1]
     finally:
-        tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S, tts.HEDGE_S = old[1], old[2], old[3]
+        tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S = old[1], old[2]
         if old[0] is None:
             sys.modules.pop("edge_tts", None)
         else:

@@ -11,7 +11,7 @@ import re
 import time
 
 VOICE = os.environ.get("CNQ_TTS_VOICE", "ru-RU-DmitryNeural")
-RETRY_PAUSE_S = (2, 5, 8)          # after a refused attempt of a voice (1st, 2nd, 3rd)
+RETRY_PAUSE_S = (2, 5)             # after a refused attempt of a voice (1st, 2nd); 29.10: 2 attempts a voice, 4 voices
 NAME = os.environ.get("CNQ_OWNER_NAME") or "Дмитрий"
 
 
@@ -190,33 +190,34 @@ def compose(out: str = "web") -> str:
     return " ".join(L)
 
 
-def male_voices() -> list[str]:
-    """29.10 (owner: male voices only, never a female / robotic one): Dmitry, then the API's male multilingual fallback for Russian
-    (cnq/api/tts.py FALLBACK["ru"], Brian — Dmitry is refused most of the time); never Svetlana, never gTTS"""
+def brief_voices() -> list[str]:
+    """the voices tried for the brief, in order: Dmitry, then the API's Russian fallbacks (cnq/api/tts.py FALLBACK["ru"]: 29.10
+    owner 15:42 — a good Microsoft NEURAL voice of either gender is fine, delays are worse; Dmitry is refused most of the time).
+    Only Microsoft neural voices — never gTTS or the browser's robotic voice"""
     try:
         from ..api.tts import FALLBACK
-        fb = FALLBACK.get("ru")
+        fbs = list(FALLBACK.get("ru") or [])
     except Exception:  # noqa: BLE001
-        fb = "en-US-BrianMultilingualNeural"
-    return [VOICE] + [v for v in [fb] if v and v != VOICE]
+        fbs = ["en-US-BrianMultilingualNeural"]
+    return [VOICE] + [v for v in fbs if v and v != VOICE]
 
 
 def run(out: str = "web") -> dict:
     text = compose(out)
     os.makedirs(out, exist_ok=True)
     res = {"asof": int(time.time() * 1000), "text": text, "voice": None, "audio": None, "keys": getattr(compose, "keys", None)}
-    # edge-tts sometimes answers «No audio was received» → retry, then the next MALE voice (29.10: Dmitry → Brian Multilingual; the
-    # female Svetlana and Google's gTTS are gone). The mp3 is written to a temp file and moved in only when a male voice spoke, so a
-    # failure leaves the previous brief.mp3 untouched; brief.json then has the new text with audio null — the panel never plays an mp3
-    # whose numbers differ from the text it shows.
+    # edge-tts sometimes answers «No audio was received» → retry, then the next neural voice (brief_voices: Dmitry, then the API's
+    # Russian fallbacks; Google's gTTS is gone). The mp3 is written to a temp file and moved in only when a voice spoke, so a failure
+    # leaves the previous brief.mp3 untouched; brief.json then has the new text with audio null — the panel never plays an mp3 whose
+    # numbers differ from the text it shows.
     errs = []
     path = os.path.join(out, "brief.mp3")
     tmp = path + ".tmp"
     try:
         import asyncio
         import edge_tts
-        for voice in male_voices():
-            for attempt in range(3):
+        for voice in brief_voices():
+            for attempt in range(len(RETRY_PAUSE_S)):
                 try:
                     async def synth(v=voice):
                         c = edge_tts.Communicate(spoken(text), v, rate="+0%")   # 21.10: normal speed (was −4%, «еле-еле говорящая»)

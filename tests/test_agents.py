@@ -132,14 +132,16 @@ def test_voice_brief_says_what_the_panel_shows(tmp_path):
     assert voice.spoken("CRYPTO NOVA портфель") == "Крипто Но́ва портфель"
 
 
-def test_voice_brief_male_voices_only_and_a_failure_keeps_the_last_mp3(tmp_path, monkeypatch):
-    # 29.10 (owner: male voices only, never a female / robotic one): the panel's spoken brief (web/brief.mp3) is read by Dmitry, then
-    # by the API's male multilingual fallback (Brian); Svetlana and gTTS are gone. A failure of every male voice leaves the previous
-    # brief.mp3 untouched, and brief.json carries the new text with audio null (the panel never plays numbers that differ)
+def test_voice_brief_neural_voices_in_order_and_a_failure_keeps_the_last_mp3(tmp_path, monkeypatch):
+    # 29.10: the panel's spoken brief (web/brief.mp3) is read by Dmitry, then by the API's Russian fallbacks in order (owner 15:42: a
+    # good Microsoft neural voice of either gender — Svetlana, then Brian Multilingual); Google's gTTS is gone. A failure of every
+    # voice leaves the previous brief.mp3 untouched, and brief.json carries the new text with audio null (the panel never plays
+    # numbers that differ)
     import json, sys, types
     from cnq.agents import voice
     from cnq.api import tts
-    assert voice.male_voices() == ["ru-RU-DmitryNeural", tts.FALLBACK["ru"]]
+    sv, br = tts.FALLBACK["ru"]
+    assert voice.brief_voices() == ["ru-RU-DmitryNeural", sv, br] and all(v.endswith("Neural") for v in voice.brief_voices())
     calls, refuse = [], {"ru-RU-DmitryNeural"}
 
     class Communicate:
@@ -153,19 +155,23 @@ def test_voice_brief_male_voices_only_and_a_failure_keeps_the_last_mp3(tmp_path,
                 raise RuntimeError("No audio was received.")
             open(path, "wb").write(b"ID3" + self.voice.encode() * 200)
     monkeypatch.setitem(sys.modules, "edge_tts", types.SimpleNamespace(Communicate=Communicate))
-    monkeypatch.setattr(voice, "RETRY_PAUSE_S", (0, 0, 0))
+    monkeypatch.setattr(voice, "RETRY_PAUSE_S", (0, 0))
     d = str(tmp_path)
     r = voice.run(d)
-    fb = tts.FALLBACK["ru"]
-    assert calls == ["ru-RU-DmitryNeural"] * 3 + [fb] and r["audio"] == "brief.mp3" and r["voice"] == fb
+    assert calls == ["ru-RU-DmitryNeural"] * 2 + [sv] and r["audio"] == "brief.mp3" and r["voice"] == sv
     first = (tmp_path / "brief.mp3").read_bytes()
-    assert first.startswith(b"ID3") and fb.encode() in first and not (tmp_path / "brief.mp3.tmp").exists()
-    assert not any(f in v for v in calls for f in ("Svetlana", "Dariya", "google"))
-    # every male voice refuses → the previous mp3 stays, the text updates, audio null; nothing female, no gTTS
-    refuse.add(fb)
+    assert first.startswith(b"ID3") and sv.encode() in first and not (tmp_path / "brief.mp3.tmp").exists()
+    refuse.add(sv)
+    calls.clear()
+    r = voice.run(d)
+    assert calls == ["ru-RU-DmitryNeural"] * 2 + [sv] * 2 + [br] and r["voice"] == br
+    first = (tmp_path / "brief.mp3").read_bytes()
+    assert not any("google" in v for v in calls)
+    # every voice refuses → the previous mp3 stays, the text updates, audio null; no gTTS
+    refuse.add(br)
     calls.clear()
     r2 = voice.run(d)
-    assert calls == ["ru-RU-DmitryNeural"] * 3 + [fb] * 3 and r2["audio"] is None and r2["voice"] is None
+    assert calls == ["ru-RU-DmitryNeural"] * 2 + [sv] * 2 + [br] * 2 and r2["audio"] is None and r2["voice"] is None
     assert (tmp_path / "brief.mp3").read_bytes() == first and not (tmp_path / "brief.mp3.tmp").exists()
     j = json.load(open(tmp_path / "brief.json", encoding="utf-8"))
     assert j["text"] == r2["text"] and j["audio"] is None and "No audio" in j["error"]

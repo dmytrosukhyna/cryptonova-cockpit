@@ -102,6 +102,23 @@ jobs:
             echo "::notice title=POST /v2/tts ru (fresh $n)::HTTP $r $ct ($(file -b tts_fresh.bin | cut -c1-24)) · tts_last $last · «$fresh»"
             sleep 3
           done
+          # 29.10 (owner 15:42: delays are worse than the speaker's gender): a fresh sentence in each other language — its main voice's
+          # timings on the server (refused? slow?) in one notice
+          declare -A F=(
+            [en]="NOVA AI answer at TIME UTC: bitcoin is at 80,058 dollars, down 1.7 percent over the day."
+            [uk]="Відповідь NOVA AI о TIME за Гринвічем: біткоїн коштує 80 058 доларів, за добу мінус 1,7 відсотка."
+            [el]="Απάντηση του NOVA AI στις TIME UTC: το bitcoin είναι στα 80 058 δολάρια, μείον 1,7 τοις εκατό μέσα στην ημέρα."
+            [es]="Respuesta de NOVA AI a las TIME UTC: bitcoin está en 80 058 dólares, menos 1,7 por ciento en el día."
+          )
+          oth=""
+          for l in en uk el es; do
+            t="${F[$l]/TIME/$(date -u +%H:%M:%S)}"
+            r=$(jq -nc --arg t "$t" --arg l "$l" '{text: $t, lang: $l}' | curl -sS -m 60 -o tts_o.bin -w '%{http_code} %{time_total}s' -X POST -H 'content-type: application/json' --data-binary @- $A/v2/tts || echo "000")
+            last=$(curl -sS -m 20 $A/v2/health | jq -c '.tts_last | if . then {ms, voice: (.voice // "" | split("-")[2]), attempts: [(.attempts // [])[] | [.outcome, .at_ms, .first_audio_ms, .ms]]} else . end' 2>/dev/null || echo "?")
+            oth="$oth $l: HTTP $r $last ·"
+            sleep 2
+          done
+          echo "::notice title=POST /v2/tts en uk el es (fresh)::$oth"
           for l in ru en; do
             u=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.audio_url // empty')
             t=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.text // empty' | cut -c1-200)

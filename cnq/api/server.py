@@ -111,6 +111,9 @@ def _day() -> str:
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
 
 
+REPORT_KEEP_S = 20 * 60      # build 50: how long the last report with a ready voice is served while a newer one is being made
+
+
 class Api:
     def __init__(self, store: Store, verifier: FirebaseVerifier, web_dir: str, llm=None, bingx_fetch=None, admin=None,
                  knowledge: nova.Knowledge | None = None, console: admin_console.Console | None = None,
@@ -142,6 +145,7 @@ class Api:
         self.listings = spot_top.Listings()      # build 45 «Топ-10 монет на заметку»: OKX / BingX spot coins (background, 12 h)
         # build 46 #6: NOVA's voice on the server (the phone may have no male voice of its language) — cnq/api/tts.py
         self.tts = tts.Tts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "tts_cache"))
+        self._report_ready: dict[str, tuple[float, dict]] = {}       # build 50: language → (since when, the last report with its voice ready)
 
     # ---------------------------------------------------------------- helpers
     def _read(self, path: str) -> dict | None:
@@ -183,7 +187,20 @@ class Api:
             return d
         ok = self.tts.available()
         if ok:
-            self.tts.prewarm(r["text"], r.get("lang") or d.get("lang") or DEFAULT)
+            # build 50: the report's words change with the live numbers about every minute, and the free voice service refuses now
+            # and then — so the last report whose voice is ready is served, its own words with its own mp3, while the newest one is
+            # made in the background (for up to REPORT_KEEP_S; after that the newest words go out and the app asks for them)
+            lang = norm_lang(r.get("lang") or d.get("lang") or DEFAULT)
+            now = time.time()
+            if self.tts.has(str(r["key"])):
+                last = self._report_ready.get(lang)
+                if not last or last[1].get("key") != r["key"]:
+                    self._report_ready[lang] = (now, r)
+            else:
+                self.tts.prewarm(r["text"], lang)
+                last = self._report_ready.get(lang)
+                if last and now - last[0] < REPORT_KEEP_S and self.tts.has(str(last[1].get("key"))):
+                    r = last[1]
         base = (os.environ.get("CNQ_API_PUBLIC") or "https://app.crypto-capital.app").rstrip("/")
         return {**d, "report": {**r, "audio_url": f"{base}/v2/tts/{r['key']}.mp3" if ok else None}}
 

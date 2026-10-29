@@ -252,3 +252,42 @@ def test_the_report_is_made_patiently_and_the_route_waits_for_it(tmp_path):
     t2.prewarm(text, "ru")
     time.sleep(0.05)
     assert len(bad.calls) == tts.PREWARM_TRIES
+
+
+def test_home_serves_the_last_report_whose_voice_is_ready(tmp_path):
+    """build 50: the report's words change with the live numbers; while the newest one is being made (or the voice service refuses
+    it), /v2/home serves the last report whose mp3 is ready — its own words with its own mp3 — and one language is made at most
+    every 2 minutes in the background"""
+    web = tmp_path / "web"
+    web.mkdir()
+
+    def feed(text):
+        r = {"kind": "public", "lang": "ru", "text": text, "key": tts.key(text, "ru"), "audio_url": None}
+        (web / i18n.file_name("app_home", "ru")).write_text(json.dumps(_home("ru", r), ensure_ascii=False), encoding="utf-8")
+        return r
+    api = Api(Store(str(tmp_path / "api.sqlite")), FirebaseVerifier("crypto-nova", keys={}), str(web))
+    s = Synth()
+    api.tts = tts.Tts(str(tmp_path / "cache"), synth_fn=s, available_fn=lambda: True)
+    api.tts.prewarm_pause = 0.0
+    a = feed("Публичный портфель CRYPTO NOVA сейчас — 9 742 доллара.")
+    api.handle("GET", "/v2/home?lang=ru", {}, b"")
+    for _ in range(100):
+        if api.tts.has(a["key"]):
+            break
+        time.sleep(0.02)
+    d = api.handle("GET", "/v2/home?lang=ru", {}, b"")[1]["report"]
+    assert d["key"] == a["key"] and d["audio_url"].endswith(a["key"] + ".mp3")
+    s.fail = True                                                   # the service refuses the next words
+    b = feed("Публичный портфель CRYPTO NOVA сейчас — 9 759 долларов.")
+    d = api.handle("GET", "/v2/home?lang=ru", {}, b"")[1]["report"]
+    assert d["key"] == a["key"] and d["text"] == a["text"] and d["audio_url"].endswith(a["key"] + ".mp3")   # words and voice together
+    assert len(s.calls) == 1                                        # spacing: no second background make within 2 minutes
+    api.tts._lang_next.clear()
+    s.fail = False
+    api.handle("GET", "/v2/home?lang=ru", {}, b"")
+    for _ in range(100):
+        if api.tts.has(b["key"]):
+            break
+        time.sleep(0.02)
+    d = api.handle("GET", "/v2/home?lang=ru", {}, b"")[1]["report"]
+    assert d["key"] == b["key"] and d["text"] == b["text"]          # the newest words, once their voice is ready

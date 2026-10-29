@@ -53,6 +53,10 @@ PREWARM_TRIES = 4
 PREWARM_PAUSE_S = 4.0
 PREWARM_REST_S = 300
 ROUTE_WAIT_S = 6.0
+# the report's words change about every minute (the live numbers): one background make per language at most every 2 minutes, and
+# after a make that gave up the language waits 2, 4, 8 … up to 30 minutes (the API keeps serving the last report whose voice is ready)
+PREWARM_SPACING_S = 120
+PREWARM_BACKOFF_MAX_S = 1800
 INSTALL_EVERY_S = 6 * 3600
 INSTALL_TIMEOUT_S = 600
 
@@ -202,6 +206,8 @@ class Tts:
         self.limit = Limiter(per_window=30, window_s=600, per_day=300)
         self._busy: set[str] = set()
         self._failed: dict[str, float] = {}      # key → when its background make last gave up (build 50)
+        self._lang_next: dict[str, float] = {}   # language → no background make before this time (build 50)
+        self._lang_fails: dict[str, int] = {}    # language → background makes that gave up in a row
         self.prewarm_pause = PREWARM_PAUSE_S
         self._lock = threading.Lock()
         self.last: dict | None = None            # the last synthesis: result, ms, lang, chars — for /v2/health (no text)
@@ -243,6 +249,10 @@ class Tts:
 
     def path(self, k: str) -> str:
         return os.path.join(self.dir, f"{k}.mp3")
+
+    def has(self, k: str) -> bool:
+        """the mp3 of this key is in the cache (no read)"""
+        return bool(KEY_RE.match(k or "")) and os.path.exists(self.path(k))
 
     def get(self, k: str) -> bytes | None:
         if not KEY_RE.match(k or ""):
@@ -298,13 +308,16 @@ class Tts:
     def prewarm(self, text: str, lang: str) -> None:
         """make the report's mp3 in the background (once at a time per key) so the app's first play is instant; build 50: patient
         retries with growing pauses, and words that still fail rest for PREWARM_REST_S"""
+        lang = norm_lang(lang)
         k = key(text, lang)
-        if self.get(k) is not None or not self.available():
+        if self.has(k) or not self.available():
             return
+        now = time.time()
         with self._lock:
-            if k in self._busy or time.time() - self._failed.get(k, 0.0) < PREWARM_REST_S:
+            if k in self._busy or now - self._failed.get(k, 0.0) < PREWARM_REST_S or now < self._lang_next.get(lang, 0.0):
                 return
             self._busy.add(k)
+            self._lang_next[lang] = now + PREWARM_SPACING_S
 
         def run():
             try:
@@ -313,12 +326,16 @@ class Tts:
                         self.make(text, lang)
                         with self._lock:
                             self._failed.pop(k, None)
+                            self._lang_fails[lang] = 0
                         return
                     except Exception:  # noqa: BLE001 — the voice service refused: a pause, then again
                         if i + 1 < PREWARM_TRIES:
                             time.sleep(self.prewarm_pause * (i + 1))
                 with self._lock:
                     self._failed[k] = time.time()
+                    n = self._lang_fails.get(lang, 0) + 1
+                    self._lang_fails[lang] = n
+                    self._lang_next[lang] = time.time() + min(PREWARM_BACKOFF_MAX_S, PREWARM_SPACING_S * 2 ** (n - 1))
                     if len(self._failed) > 200:
                         for old in sorted(self._failed, key=self._failed.get)[:100]:
                             self._failed.pop(old, None)

@@ -50,7 +50,9 @@ RATE = "+0%"                 # 21.10 owner: the −4% of the greeting sounded «
 # 3 sentences × 10): Svetlana 30/30, first audio 0.18 s, WER 0.034 — not refused like Dmitry; ru-RU-DariyaNeural is not in Edge's
 # list. The server's own timings (api-health): every voice is slower there (first audio 1.2–8.6 s), and en's Andrew took 10.6 s
 # (uk 3.3 s, el 3.9 s, es 2.3 s stay as they are). Each language's fallbacks, in order (the background order; live races them).
-FALLBACK = {"ru": ["ru-RU-SvetlanaNeural", "en-US-BrianMultilingualNeural"],
+# 14:10: with Svetlana racing, 6 of 9 fresh Russian answers on the server came under 6 s (Svetlana's first audio 2.3–7.3 s there);
+# Florian Multilingual (probe 60/60, WER 0.04; the fastest multilingual voice at midday) races as a third fallback.
+FALLBACK = {"ru": ["ru-RU-SvetlanaNeural", "en-US-BrianMultilingualNeural", "de-DE-FlorianMultilingualNeural"],
             "en": ["en-US-ChristopherNeural", "en-US-JennyNeural"]}
 RETRY_PAUSE_S = 1.0
 # the app waits 8 s for the server's voice, then reads with the phone (NovaSpeech.kt). Dmitry's refusals take ~2.6 s each (probe) or

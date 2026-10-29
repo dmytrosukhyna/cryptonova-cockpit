@@ -140,8 +140,9 @@ def test_voice_brief_neural_voices_in_order_and_a_failure_keeps_the_last_mp3(tmp
     import json, sys, types
     from cnq.agents import voice
     from cnq.api import tts
-    sv, br = tts.FALLBACK["ru"]
-    assert voice.brief_voices() == ["ru-RU-DmitryNeural", sv, br] and all(v.endswith("Neural") for v in voice.brief_voices())
+    fbs = tts.FALLBACK["ru"]
+    sv, br = fbs[:2]
+    assert voice.brief_voices() == ["ru-RU-DmitryNeural", *fbs] and all(v.endswith("Neural") for v in voice.brief_voices())
     calls, refuse = [], {"ru-RU-DmitryNeural"}
 
     class Communicate:
@@ -168,10 +169,10 @@ def test_voice_brief_neural_voices_in_order_and_a_failure_keeps_the_last_mp3(tmp
     first = (tmp_path / "brief.mp3").read_bytes()
     assert not any("google" in v for v in calls)
     # every voice refuses → the previous mp3 stays, the text updates, audio null; no gTTS
-    refuse.add(br)
+    refuse.update(fbs)
     calls.clear()
     r2 = voice.run(d)
-    assert calls == ["ru-RU-DmitryNeural"] * 2 + [sv] * 2 + [br] * 2 and r2["audio"] is None and r2["voice"] is None
+    assert calls == ["ru-RU-DmitryNeural"] * 2 + [v for v in fbs for _ in (0, 1)] and r2["audio"] is None and r2["voice"] is None
     assert (tmp_path / "brief.mp3").read_bytes() == first and not (tmp_path / "brief.mp3.tmp").exists()
     j = json.load(open(tmp_path / "brief.json", encoding="utf-8"))
     assert j["text"] == r2["text"] and j["audio"] is None and "No audio" in j["error"]

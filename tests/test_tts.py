@@ -302,11 +302,11 @@ def test_russian_falls_back_to_neural_voices_never_gtts(tmp_path):
     import sys
     import types
     fbs = tts.FALLBACK["ru"]
-    assert fbs == ["ru-RU-SvetlanaNeural", "en-US-BrianMultilingualNeural"] and set(tts.FALLBACK) == {"ru", "en"}
+    assert fbs[:2] == ["ru-RU-SvetlanaNeural", "en-US-BrianMultilingualNeural"] and set(tts.FALLBACK) == {"ru", "en"}
     assert tts.voices("ru") == ["ru-RU-DmitryNeural", *fbs] and tts.voices("en") == ["en-US-AndrewNeural", *tts.FALLBACK["en"]]
     assert tts.voices("uk") == ["uk-UA-OstapNeural"] and tts.voices("zz")[0] == "ru-RU-DmitryNeural"
     assert all(v.endswith("Neural") for lang in tts.VOICES for v in tts.voices(lang))         # Microsoft neural voices only
-    sv, br = fbs
+    sv, br = fbs[:2]
     calls, refuse = [], {"ru-RU-DmitryNeural"}
 
     class Communicate:
@@ -342,23 +342,23 @@ def test_russian_falls_back_to_neural_voices_never_gtts(tmp_path):
         calls.clear()
         c, a = t.post({"text": text, "lang": "ru"}, "1.1.1.1")
         assert c == 200 and a.key == tts.key(text, "ru") and t.has(a.key) and t.last["voice"] in fbs and t.last["live"] is True
-        assert calls == ["ru-RU-DmitryNeural", sv, br]                              # live: all three start together
+        assert calls == ["ru-RU-DmitryNeural", *fbs]                                # live: all voices start together
         out = {x["voice"]: x["outcome"] for x in t.last["attempts"]}
         assert out["ru-RU-DmitryNeural"] == "RuntimeError" and out[t.last["voice"]] == "ok"
         assert t.last["prep_ms"] >= 0 and "put_ms" in t.last and all("ms" in x and "at_ms" in x for x in t.last["attempts"])
-        assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[0] == 200 and len(calls) == 3
+        assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[0] == 200 and len(calls) == 1 + len(fbs)
         # Dmitry answers → Dmitry speaks (background order)
         refuse.discard("ru-RU-DmitryNeural")
         calls.clear()
         k, _mp3 = t.make("Биткоин стоит 80 058 долларов.", "ru")
         assert calls == ["ru-RU-DmitryNeural"] and t.last["voice"] == "ru-RU-DmitryNeural"
         # every voice refuses → an error (the app reads the text itself); each fallback got one successor
-        refuse.update({"ru-RU-DmitryNeural", sv, br})
+        refuse.update({"ru-RU-DmitryNeural", *fbs})
         calls.clear()
         assert t.post({"text": "Новый текст", "lang": "ru"}, "1.1.1.1") == (502, {"error": "tts_failed"})
-        assert sorted(calls) == sorted(["ru-RU-DmitryNeural"] + [sv] * 2 + [br] * 2) and t.last["result"] == "failed"
+        assert sorted(calls) == sorted(["ru-RU-DmitryNeural"] + fbs * 2) and t.last["result"] == "failed"
         # the background report (prewarm) keeps the patient order: Dmitry twice, then Svetlana
-        refuse.difference_update({sv, br})
+        refuse.difference_update(fbs)
         calls.clear()
         t.prewarm("Публичный портфель CRYPTO NOVA сейчас — 9 781 доллар.", "ru")
         for _ in range(200):
@@ -479,7 +479,7 @@ def test_live_race_main_voice_first_then_the_first_fallback_to_finish(tmp_path):
     import asyncio
     import sys
     import types
-    sv, br = tts.FALLBACK["ru"]
+    sv, br, *rest = tts.FALLBACK["ru"]
     D = "ru-RU-DmitryNeural"
     calls, plan = [], {}
 
@@ -489,7 +489,8 @@ def test_live_race_main_voice_first_then_the_first_fallback_to_finish(tmp_path):
             calls.append(voice)
 
         async def stream(self):
-            how = plan[self.voice][min(self.n, len(plan[self.voice]) - 1)]
+            p = plan.get(self.voice) or plan["rest"]                           # the other fallbacks: plan["rest"]
+            how = p[min(self.n, len(p) - 1)]
             if how == "refuse":
                 await asyncio.sleep(0.05)
                 raise RuntimeError("No audio was received.")
@@ -497,11 +498,11 @@ def test_live_race_main_voice_first_then_the_first_fallback_to_finish(tmp_path):
             yield {"type": "audio", "data": MP3}
     old = sys.modules.get("edge_tts"), tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S
     sys.modules["edge_tts"], tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S = types.SimpleNamespace(Communicate=Communicate), 0.0, 0.4
-    _out = lambda: {(a["voice"], a["outcome"]) for a in tts._used.attempts}  # noqa: E731
+    _out = lambda: {(a["voice"], a["outcome"]) for a in tts._used.attempts if a["voice"] not in rest}  # noqa: E731
     try:
         def go(**p):
             plan.clear()
-            plan.update(p)
+            plan.update({"rest": [1.0], **p})
             calls.clear()
             t0 = time.time()
             data = tts.synth("Я NOVA AI.", "ru", live=True)
@@ -523,19 +524,19 @@ def test_live_race_main_voice_first_then_the_first_fallback_to_finish(tmp_path):
         assert v == br and calls.count(sv) == tts.FALLBACK_REQUESTS and calls.count(br) == 1
         # everything refuses → an error after FALLBACK_REQUESTS of each fallback
         try:
-            go(**{D: ["refuse"], sv: ["refuse"], br: ["refuse"]})
+            go(**{D: ["refuse"], sv: ["refuse"], br: ["refuse"], "rest": ["refuse"]})
             assert False
         except RuntimeError as e:
-            assert "tts failed" in str(e) and sorted(calls) == sorted([D] + [sv, br] * tts.FALLBACK_REQUESTS)
+            assert "tts failed" in str(e) and sorted(calls) == sorted([D] + [sv, br, *rest] * tts.FALLBACK_REQUESTS)
         # the background (patient) order: Dmitry, Dmitry, then Svetlana — one at a time
         plan.clear()
-        plan.update({D: ["refuse"], sv: [0.01], br: [0.01]})
+        plan.update({D: ["refuse"], sv: [0.01], br: [0.01], "rest": [0.01]})
         calls.clear()
         assert tts.synth("Я NOVA AI.", "ru") == MP3 and calls == [D, D, sv]
         # en: Andrew raced against its own fallbacks
         ea, ef = tts.VOICES["en"], tts.FALLBACK["en"]
         plan.clear()
-        plan.update({ea: [30], ef[0]: [0.1], ef[1]: [0.05]})
+        plan.update({ea: [30], ef[0]: [0.1], ef[1]: [0.05], "rest": [1.0]})
         calls.clear()
         assert tts.synth("Hi, I am NOVA AI.", "en", live=True) == MP3 and calls == [ea, *ef] and tts._used.voice == ef[1]
     finally:

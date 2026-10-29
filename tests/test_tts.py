@@ -335,12 +335,11 @@ def test_russian_falls_back_to_a_male_multilingual_voice_never_a_female_one(tmp_
         text = "Публичный портфель CRYPTO NOVA сейчас — 9 773 доллара."
         calls.clear()
         c, a = t.post({"text": text, "lang": "ru"}, "1.1.1.1")
-        assert c == 200 and a.key == tts.key(text, "ru") and t.has(a.key) and t.last["voice"] == fb and calls[-1] == fb
-        # 29.10: every attempt is timed into tts_last (voice, outcome, start, total; first audio when it spoke)
-        at = t.last["attempts"]
-        assert [(x["voice"], x["outcome"]) for x in at] == [("ru-RU-DmitryNeural", "RuntimeError")] * 2 + [(fb, "ok")]
-        assert all("ms" in x and "at_ms" in x for x in at) and "first_audio_ms" in at[-1] and "put_ms" in t.last and t.last["prep_ms"] >= 0
-        assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[0] == 200 and len(calls) == 3
+        assert c == 200 and a.key == tts.key(text, "ru") and t.has(a.key) and t.last["voice"] == fb and t.last["live"] is True
+        assert calls == ["ru-RU-DmitryNeural", fb]                                  # live (the app waits 8 s): Dmitry once, then Brian
+        assert [(x["voice"], x["outcome"]) for x in t.last["attempts"]] == [("ru-RU-DmitryNeural", "RuntimeError"), (fb, "ok")]
+        assert t.last["prep_ms"] >= 0 and "put_ms" in t.last and all("ms" in x and "at_ms" in x for x in t.last["attempts"])
+        assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[0] == 200 and len(calls) == 2
         # Dmitry answers → Dmitry speaks
         refuse.discard("ru-RU-DmitryNeural")
         calls.clear()
@@ -350,7 +349,16 @@ def test_russian_falls_back_to_a_male_multilingual_voice_never_a_female_one(tmp_
         refuse.update({"ru-RU-DmitryNeural", fb})
         calls.clear()
         assert t.post({"text": "Новый текст", "lang": "ru"}, "1.1.1.1") == (502, {"error": "tts_failed"})
-        assert calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", fb, fb] and t.last["result"] == "failed"
+        assert calls == ["ru-RU-DmitryNeural", fb, fb] and t.last["result"] == "failed" and len(t.last["attempts"]) == 3
+        # the background report (prewarm) keeps the patient order: Dmitry twice, then Brian
+        refuse.discard(fb)
+        calls.clear()
+        t.prewarm("Публичный портфель CRYPTO NOVA сейчас — 9 781 доллар.", "ru")
+        for _ in range(200):
+            if not t._busy and calls:
+                break
+            time.sleep(0.02)
+        assert calls == ["ru-RU-DmitryNeural", "ru-RU-DmitryNeural", fb] and t.last["live"] is False
     finally:
         tts.RETRY_PAUSE_S = old_pause
         if old_mod is None:
@@ -392,6 +400,61 @@ def test_a_silent_dmitry_hands_over_within_the_apps_8_seconds(tmp_path):
         calls.clear()
         mode["dmitry"] = "slow"
         assert tts.synth("Я NOVA AI.", "ru") == MP3 and calls == ["ru-RU-DmitryNeural"] and tts._used.voice == "ru-RU-DmitryNeural"
+    finally:
+        tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S = old[1], old[2]
+        if old[0] is None:
+            sys.modules.pop("edge_tts", None)
+        else:
+            sys.modules["edge_tts"] = old[0]
+
+
+def test_live_requests_try_dmitry_once_and_every_attempt_is_timed(tmp_path):
+    """29.10: a request the app waits for (8 s) — POST /v2/tts and a report mp3 made on the spot — is LIVE: Dmitry once (silent for
+    FIRST_AUDIO_S → cut), then Brian; /v2/health tts_last shows each attempt (voice, outcome, start, first audio, total)"""
+    import asyncio
+    import sys
+    import types
+    fb = tts.FALLBACK["ru"]
+    calls = []
+
+    class NoAudioReceived(Exception):
+        pass
+
+    class Communicate:
+        def __init__(self, text, voice, rate=None):
+            self.voice = voice
+            calls.append(voice)
+
+        async def stream(self):
+            if self.voice == "ru-RU-DmitryNeural":
+                await asyncio.sleep(30)                                         # hangs: cut at FIRST_AUDIO_S
+            if self.voice == "uk-UA-OstapNeural":
+                raise NoAudioReceived("No audio was received.")
+            yield {"type": "audio", "data": MP3}
+    old = sys.modules.get("edge_tts"), tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S
+    sys.modules["edge_tts"], tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S = types.SimpleNamespace(Communicate=Communicate), 0.0, 0.2
+    try:
+        t = tts.Tts(str(tmp_path / "cache"), available_fn=lambda: True)
+        t0 = time.time()
+        c, a = t.post({"text": "Я NOVA AI. Биткоин стоит 80 058 долларов.", "lang": "ru"}, "1.1.1.1")
+        assert c == 200 and calls == ["ru-RU-DmitryNeural", fb] and time.time() - t0 < 1.5
+        at = t.last["attempts"]
+        assert [(x["voice"], x["outcome"]) for x in at] == [("ru-RU-DmitryNeural", "silent"), (fb, "ok")]
+        assert 150 <= at[0]["ms"] < 1000 and "first_audio_ms" not in at[0] and at[1]["first_audio_ms"] <= at[1]["ms"]
+        assert at[1]["at_ms"] >= at[0]["ms"] and t.last["voice"] == fb and t.last["live"] is True
+        assert t.last["inflight"] == 0 and tts._INFLIGHT[0] == 0                   # no other synthesis was running; none is left
+        # the report's mp3 address, made on the spot, is live too
+        text = "Публичный портфель CRYPTO NOVA сейчас — 9 781 доллар."
+        k = tts.key(text, "ru")
+        calls.clear()
+        c, a = t.get_route(k, {k: (text, "ru")})
+        assert c == 200 and calls == ["ru-RU-DmitryNeural", fb]
+        # a language without a fallback keeps its 2 attempts; the outcome is named
+        calls.clear()
+        assert t.post({"text": "Привіт, я NOVA AI.", "lang": "uk"}, "1.1.1.1") == (502, {"error": "tts_failed"})
+        assert calls == ["uk-UA-OstapNeural"] * 2 and [x["outcome"] for x in t.last["attempts"]] == ["no_audio", "no_audio"]
+        h = json.dumps(t.last)                                                  # health stays JSON
+        assert "attempts" in h
     finally:
         tts.RETRY_PAUSE_S, tts.FIRST_AUDIO_S = old[1], old[2]
         if old[0] is None:

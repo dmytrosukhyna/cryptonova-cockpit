@@ -115,6 +115,8 @@ class _Silent(Exception):
 
 
 _CONNECTOR = None
+_INFLIGHT = [0]                  # syntheses running right now in this process (tts_last "inflight": how many others were running)
+_INFLIGHT_LOCK = threading.Lock()
 
 
 def _timed_connector():
@@ -166,14 +168,26 @@ def synth(text: str, lang: str, timeout: float = TIMEOUT_S, live: bool = False) 
     """the mp3 of the text in that language's male voice (2 attempts), then in its male fallback voice (Russian, 29.10; 2 attempts);
     raises when every voice failed. live (29.10: a request the app waits for, 8 s at most) → the voice with a fallback behind it gets
     ONE attempt, then the fallback. Every attempt is timed into _used.attempts (voice, outcome, connect / first audio / total ms)."""
-    import asyncio
     t00 = time.perf_counter()
     edge_tts = importlib.import_module("edge_tts")
     lang = norm_lang(lang)
     say = spoken(text, lang)
     ms = lambda t: round((time.perf_counter() - t) * 1000)  # noqa: E731
     attempts: list[dict] = []
+    with _INFLIGHT_LOCK:
+        _used.inflight = _INFLIGHT[0]
+        _INFLIGHT[0] += 1
     _used.voice, _used.attempts, _used.prep_ms = None, attempts, ms(t00)
+    try:
+        return _synth_attempts(edge_tts, say, lang, timeout, live, attempts, ms, t00)
+    finally:
+        with _INFLIGHT_LOCK:
+            _INFLIGHT[0] -= 1
+
+
+def _synth_attempts(edge_tts, say: str, lang: str, timeout: float, live: bool, attempts: list, ms, t00: float) -> bytes:
+    """synth's attempts (voice order, first-audio cut, timings) — split out so synth can count the syntheses in flight"""
+    import asyncio
 
     async def run(voice: str, first_s: float | None, rec: dict) -> bytes:
         """the voice's mp3; first_s = no audio by then → _Silent (only for a voice with a fallback behind it)"""
@@ -420,7 +434,7 @@ class Tts:
         if data is not None:
             return k, data
         t0 = time.time()
-        _used.voice, _used.attempts, _used.prep_ms = None, None, None
+        _used.voice, _used.attempts, _used.prep_ms, _used.inflight = None, None, None, None
         try:
             data = self.synth(text, lang, live=True) if live else self.synth(text, lang)
         except Exception as e:  # noqa: BLE001
@@ -444,6 +458,8 @@ class Tts:
         out = {}
         if getattr(_used, "prep_ms", None) is not None:
             out["prep_ms"] = _used.prep_ms
+        if getattr(_used, "inflight", None) is not None:
+            out["inflight"] = _used.inflight
         if getattr(_used, "attempts", None):
             out["attempts"] = [dict(a) for a in _used.attempts]
         return out
@@ -505,7 +521,7 @@ class Tts:
         if wait:
             return 429, {"error": "rate", "retry_after_min": wait}
         try:
-            k, mp3 = self.make(text, lang)
+            k, mp3 = self.make(text, lang, live=True)
         except Exception:  # noqa: BLE001
             return 502, {"error": "tts_failed"}
         return 200, Audio(mp3, k)
@@ -528,7 +544,7 @@ class Tts:
                 return 200, Audio(cached, k)
         text, lang = reports[k]
         try:
-            k, mp3 = self.make(text, lang)
+            k, mp3 = self.make(text, lang, live=True)
         except Exception:  # noqa: BLE001
             return 502, {"error": "tts_failed"}
         return 200, Audio(mp3, k)

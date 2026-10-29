@@ -411,6 +411,7 @@ textarea.in1{width:100%;min-height:84px;resize:vertical}
 <div class="modal" id="modal" role="dialog" aria-modal="true"><div class="box"><h3 id="mT"></h3><p id="mB"></p><div class="act"><button class="ib" id="mNo">Отмена</button><button class="ib pri" id="mYes">Да</button></div></div></div>
 <div class="toasts" id="toasts"></div>
 
+<script src="vip/auth.js"></script>
 <script>
 (function(){
 'use strict';
@@ -447,7 +448,12 @@ function ask(title,body,yes){ return new Promise(res=>{ $('#mT').textContent=tit
 
 /* ------------------------------------------------------------------ API */
 let TOKEN='';
+// 29.10: signed in as the owner in the panel (vip/auth.js, same site) → «Управление» uses that session (the server accepts it,
+// cnq/api/console.py); the pasted CNQ_ADMIN_TOKEN stays the fallback
+const OWNER_TOK='@owner-session';
 async function api(path,opt){ opt=opt||{};
+  if(TOKEN===OWNER_TOK&&window.CNAuth){ try{ const d=await CNAuth.fetchOwner(path,{method:opt.method||(opt.body?'POST':'GET'),body:opt.body}); setPulse('ok','сервер на связи · вход владельца'); return {code:200,d:d||{}}; }
+    catch(e){ const code=(e&&e.status)||0; if((code===401||code===403)&&!opt.login) signOut('Вход владельца не открыл «Управление» — войдите токеном.'); else if(!code) setPulse('bad','нет связи'); return {code,d:(e&&e.data)||{error:(e&&e.code)||'error'}}; } }
   let r; try{ r=await fetch(API+path,{method:opt.method||'GET',cache:'no-store',headers:Object.assign({'Authorization':'Bearer '+TOKEN},opt.body?{'Content-Type':'application/json'}:{}),body:opt.body?JSON.stringify(opt.body):undefined}); }
   catch(e){ setPulse('bad','нет связи'); return {code:0,d:{error:'network'}}; }
   let d={}; try{ d=await r.json(); }catch(e){}
@@ -784,6 +790,8 @@ $('#refresh').addEventListener('click',()=>{ if(CUR==='overview') OV=null; load(
 setInterval(()=>{ if(TOKEN&&CUR==='overview'&&!document.hidden) loaders.overview(); },60000);
 const saved=tokenStore.get();
 if(saved){ TOKEN=saved; $('#loginView').hidden=true; tryToken(saved,(()=>{ try{ return !!localStorage.getItem(KEY); }catch(e){ return false; } })()); }
+else if(window.CNAuth){ CNAuth.ready.then(st=>{ if(!(st&&st.signedIn)||TOKEN){ if(!TOKEN) signOut(''); return; } TOKEN=OWNER_TOK; $('#loginView').hidden=true;
+  api('/v2/admin/ping',{login:true}).then(r=>{ if(r.code===200) signIn(); else signOut('Вход владельца не открыл «Управление» — войдите токеном.'); }); }, ()=>signOut('')); }
 else signOut('');
 })();
 </script>

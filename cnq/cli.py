@@ -278,6 +278,12 @@ def main(argv: list[str] | None = None) -> int:
         d = channel_watch.run(sqlite3.connect("data/agents.sqlite"), args.out)
         print("channel_watch.json: " + "; ".join(f"{k}: done={c['forecasts']} open={c['open']} hit={c['hit_rate_pct']} up={c['always_up_pct']} err={c['error']}"
                                                   for k, c in d["channels"].items()))
+        try:                                                     # 29.10: «Из каналов» (information only)
+            o = json.load(open(os.path.join(args.out, "channel_opps.json"), encoding="utf-8"))
+            print(f"channel_opps.json: items={len(o.get('items') or [])} err={o.get('error') or d.get('opps_error')} " +
+                  "; ".join(f"{k}: posts30={c.get('posts_30d')} tracked={c.get('tracked')}" for k, c in (o.get("channels") or {}).items()))
+        except Exception as e:  # noqa: BLE001
+            print(f"channel_opps.json: not written ({d.get('opps_error') or e})")
     elif args.cmd == "tokenomics":
         import os, sqlite3
         from .agents import tokenomics

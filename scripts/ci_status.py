@@ -28,7 +28,7 @@ except Exception as e:  # noqa: BLE001
 # 18.10: every file the server should refresh each run — a step that fails «continue-on-error» leaves its file old (the signals
 # feed was silently stuck for 4 h); stale or erroring files are listed and raised as GitHub warnings
 WATCH = {"capital.json": 2, "yield.json": 2, "basis.json": 2, "signals_feed.json": 2, "paper.json": 2, "portfolio.json": 2,
-         "ideas.json": 2, "markets.json": 2, "research.json": 3, "funding.json": 2, "tokenomics.json": 26, "channel_watch.json": 2,
+         "ideas.json": 2, "markets.json": 2, "research.json": 3, "funding.json": 2, "tokenomics.json": 26, "channel_watch.json": 2, "channel_opps.json": 2,
          "app_signals.json": 3, "decision.json": 2}
 st["stale"] = []
 for f, max_h in WATCH.items():

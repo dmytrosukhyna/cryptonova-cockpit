@@ -11,7 +11,10 @@ correctly is null, a reason that was never recorded is «причина не з�
                            In Development / Paused / Rejected / Archived) and the demo record of each (never mixed with the real
                            account, which is a separate block); the main-desk selector's state and its review.
   web/opportunities.json   the other ways of earning (triangle / cross-exchange arbitrage, funding, fixed-rate carry, stablecoin
-                           yield, Polymarket, listing shorts, OKX copy trading / signal): test results and real results apart.
+                           yield, Polymarket, listing shorts, OKX copy trading / signal): test results and real results apart;
+                           + «from_channels» (29.10): what the owner's Telegram channels post about launchpads / airdrops / listings /
+                           early projects, and each channel's track record — information, not a signal (web/channel_opps.json,
+                           web/channel_watch.json, config/channel_audit.json).
   web/system_status.json   every background part with {key, name_ru, status ok|stale|error|stopped, last_ok, age_min, note_ru}
                            from real timestamps only (age_min is at «asof»; a reader recomputes it from last_ok).
 
@@ -657,8 +660,49 @@ def _opp(key, name, about, status, **kw) -> dict:
     return d
 
 
+CH_CATS = ("launchpad", "listing", "airdrop", "early", "news")
+CH_CAT_RU = {"launchpad": "Лаунчпад / IDO / пресейл", "listing": "Листинг", "airdrop": "Аирдроп / тестнет / поинты",
+             "early": "Ранний проект", "news": "Новость"}
+CH_LABEL_RU = "Информация, не сигнал; ранние проекты — высокий риск."
+
+
+def channels_block(chop: dict, chw: dict, now: int) -> dict | None:
+    """«Из каналов»: the newest launchpad / listing / airdrop / early-project / news-with-a-coin records of the owner's channels
+    (web/channel_opps.json — no post texts) and each channel's record: the 200-day audit (config/channel_audit.json, carried in
+    channel_opps.json), the live «mentioned coins vs BTC» and the live forecast hit rate vs «always up» (web/channel_watch.json).
+    Information only — nothing here is a signal or feeds a desk."""
+    chop, chw = chop or {}, chw or {}
+    if not chop.get("channels") and not chw.get("channels"):
+        return None
+    items = [x for x in chop.get("items") or [] if isinstance(x, dict)]
+    by_cat = []
+    for c in CH_CATS:
+        xs = [x for x in items if x.get("cat") == c]
+        by_cat.append({"cat": c, "name_ru": CH_CAT_RU[c], "n_7d": sum(1 for x in xs if (_ms(x.get("t")) or 0) >= now - 7 * DAY),
+                       "items": [{k: x.get(k) for k in ("t", "channel", "title", "url", "project", "ticker", "venue", "okx", "promo",
+                                                        "vs_btc_1d_pct", "vs_btc_7d_pct", "vs_btc_30d_pct")} for x in xs[:8]]})
+    track = []
+    names = list(dict.fromkeys(list((chop.get("channels") or {}).keys()) + list((chw.get("channels") or {}).keys())))
+    for ch in names:
+        c = (chop.get("channels") or {}).get(ch) or {}
+        w = (chw.get("channels") or {}).get(ch) or {}
+        track.append({"channel": ch, "title": c.get("title") or w.get("title") or ch, "link": c.get("link") or w.get("link") or f"https://t.me/{ch}",
+                      "per_day": c.get("per_day"), "posts_30d": c.get("posts_30d"), "promo_pct": c.get("promo_pct"),
+                      "by_cat_30d": c.get("by_cat_30d") or {},
+                      "live_mentions_vs_btc": c.get("vs_btc") or [], "live_tracked": c.get("tracked"),
+                      "live_forecasts": {"n": w.get("forecasts"), "open": w.get("open"), "hit_rate_pct": w.get("hit_rate_pct"),
+                                         "always_up_pct": w.get("always_up_pct"), "error": w.get("error")},
+                      "audit": c.get("audit")})
+    return {"asof": _ms(chop.get("asof")) or _ms(chw.get("asof")), "label_ru": CH_LABEL_RU, "by_cat": by_cat, "track": track,
+            "about_ru": "Публичные каналы, которые читает владелец: что нового про лаунчпады, листинги, аирдропы и ранние проекты "
+                        "(без текста постов — только дата, ссылка, категория, проект / тикер, биржа) и насколько каналам можно верить: "
+                        "как вели себя упомянутые монеты против биткоина и как сбывались прогнозы против «всегда вверх». "
+                        "Это не сигнал и не правило торговли.",
+            "source": "channel_opps.json"}
+
+
 def opportunities(tri: dict, arb: dict, funding: dict, basis: dict, yld: dict, paper: dict, real: dict, okx_sig: dict,
-                  now: int) -> dict:
+                  now: int, chan: dict | None = None) -> dict:
     out = []
     if tri:
         w = tri.get("week") or {}
@@ -736,6 +780,7 @@ def opportunities(tri: dict, arb: dict, funding: dict, basis: dict, yld: dict, p
     order = {"Active": 0, "Approved": 1, "Testing": 2, "Monitoring": 3, "Paused": 4, "Not Active": 5}
     out.sort(key=lambda d: (order[d["status"]], d["name_ru"]))
     return {"asof": now, "statuses": [{"key": k, "name_ru": v} for k, v in OPP_STATUS_RU.items()], "items": out,
+            "from_channels": chan,
             "about_ru": "Другие способы заработка. «result_real_usd» — только реальные деньги, «result_test_usd» — демо или виртуальная оценка; "
                         "они никогда не складываются и не входят в публичный портфель."}
 
@@ -886,7 +931,8 @@ def run(out: str = "web", conn=None, now: int | None = None, http: bool = True, 
                                          _load(out, "whales_top.json"), memes, _load(out, "capital.json"), _load(out, "altseason.json"),
                                          _load(out, "ivan.enc.json"), _ivan_stats(out), real, now, conn)
     docs["opportunities.json"] = opportunities(_load(out, "tri.json"), _load(out, "arb.json"), _load(out, "funding.json"), _load(out, "basis.json"),
-                                               _load(out, "yield.json"), paper, real, _load(out, "okx_signal.json"), now)
+                                               _load(out, "yield.json"), paper, real, _load(out, "okx_signal.json"), now,
+                                               channels_block(_load(out, "channel_opps.json"), _load(out, "channel_watch.json"), now))
     lease = api = None
     if http:
         try:

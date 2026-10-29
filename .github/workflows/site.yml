@@ -179,9 +179,9 @@ jobs:
       - name: CRYPTO NOVA Портфолио — one $10 000 demo sum split by the allocator between spot / futures / funding / fixed-rate carry / lending / sUSDe → web/capital.json
         continue-on-error: true
         run: python -m cnq.cli capital --out web
-      - name: Каналы трейдеров — forecasts of public channels written down when posted, checked 1–3 days later → web/channel_watch.json
+      - name: Каналы трейдеров — forecasts of public channels written down when posted, checked 1–3 days later → web/channel_watch.json; «Из каналов» (launchpads / listings / airdrops / early projects as information, no post texts) → web/channel_opps.json
         continue-on-error: true
-        timeout-minutes: 3
+        timeout-minutes: 5
         run: python -m cnq.cli chwatch --out web
       - name: Forecast calibration (A/B записывается и проверяется) → web/calibration.json
         continue-on-error: true
@@ -248,7 +248,7 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/tokenomics.json web/channel_watch.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 web/spot_pipeline.json web/strategies.json web/opportunities.json web/system_status.json; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/tokenomics.json web/channel_watch.json web/channel_opps.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 web/spot_pipeline.json web/strategies.json web/opportunities.json web/system_status.json; do [ -f "$f" ] && git add "$f"; done
           # 20.10: data/agents.sqlite reached GitHub's 100 MB file limit (whale study candles/fills) — every push after 09:44 UTC was
           # rejected, so no data reached main for hours. Past 95 MB the database stays in the Actions cache only (it is restored from there).
           sz=$(stat -c %s data/agents.sqlite 2>/dev/null || echo 0)

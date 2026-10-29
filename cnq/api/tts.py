@@ -49,11 +49,17 @@ FALLBACK = {"ru": "en-US-BrianMultilingualNeural"}
 RETRY_PAUSE_S = 1.0
 # the app waits 8 s for the server's voice, then reads with the phone (NovaSpeech.kt). Dmitry's refusals take ~2.6 s each (probe) or
 # hang until TIMEOUT_S (seen live), so a voice with a fallback behind it that sends no audio within FIRST_AUDIO_S counts as refused:
-# a request the app waits for (POST /v2/tts, a report mp3 made on the spot) is LIVE: Dmitry ONCE (≤ 2 s), then Brian (~1 s); the
+# a request the app waits for (POST /v2/tts, a report mp3 made on the spot) is LIVE: Dmitry ONCE (≤ 2 s) with Brian (see HEDGE_S); the
 # background report (prewarm) keeps the patient order, Dmitry 2 × ≤ 2 s + 1 s pause, then Brian. A healthy Dmitry made a whole
 # sentence in ~0.9 s (median, probe); only the wait for the FIRST audio is cut — once the voice speaks, it has the full TIMEOUT_S.
 # /v2/health tts_last shows each attempt: voice, outcome (ok / no_audio / silent / timeout / …), start, connects, first audio, total.
 FIRST_AUDIO_S = 2.0
+# 29.10 (later): the server's timings showed DNS + TLS ~23 ms and the cache write ~1 ms — the time is Microsoft's: a multilingual
+# voice's first audio took 0.3 s in the morning and 2.4–10 s around midday (every multilingual voice, runners too). So a LIVE request
+# starts Dmitry and Brian together (no 2 s wait for Dmitry's verdict before Brian starts), and a Brian request still silent after
+# HEDGE_S gets a twin — the first to finish wins (at most FALLBACK_REQUESTS Brian requests; the extra load only when it is slow).
+HEDGE_S = 2.5
+FALLBACK_REQUESTS = 2
 MAX_CHARS = 1500
 MAX_CACHE_MB = 200
 TIMEOUT_S = 25.0
@@ -166,8 +172,8 @@ def _outcome(e: BaseException) -> str:
 
 def synth(text: str, lang: str, timeout: float = TIMEOUT_S, live: bool = False) -> bytes:
     """the mp3 of the text in that language's male voice (2 attempts), then in its male fallback voice (Russian, 29.10; 2 attempts);
-    raises when every voice failed. live (29.10: a request the app waits for, 8 s at most) → the voice with a fallback behind it gets
-    ONE attempt, then the fallback. Every attempt is timed into _used.attempts (voice, outcome, connect / first audio / total ms)."""
+    raises when every voice failed. live (29.10: a request the app waits for, 8 s at most) → the voice and its fallback start
+    together (race below): one attempt of the voice, up to FALLBACK_REQUESTS of the fallback. Every attempt is timed into _used.attempts (voice, outcome, connect / first audio / total ms)."""
     t00 = time.perf_counter()
     edge_tts = importlib.import_module("edge_tts")
     lang = norm_lang(lang)
@@ -226,12 +232,78 @@ def _synth_attempts(edge_tts, say: str, lang: str, timeout: float, live: bool, a
                     await conn.shut()
                 except BaseException:  # noqa: BLE001
                     pass
+    async def race(first: str, fb: str) -> tuple[str, bytes]:
+        """live (29.10): the first voice and its fallback start TOGETHER. The first voice wins when it speaks (it is cut when silent
+        for FIRST_AUDIO_S; a fallback already done waits for that verdict, ≤ 2 s); else the first fallback request that completes.
+        A fallback request still silent after HEDGE_S gets a twin (or a failed one a successor): at most FALLBACK_REQUESTS."""
+        loop = asyncio.get_running_loop()
+        recs: dict = {}
+
+        def start(voice: str, first_s: float | None):
+            rec = {"voice": voice, "at_ms": ms(t00)}
+            attempts.append(rec)
+            t0 = time.perf_counter()
+
+            async def go() -> bytes:
+                try:
+                    data = await asyncio.wait_for(run(voice, first_s, rec), timeout)
+                except asyncio.CancelledError:
+                    rec["ms"], rec["outcome"] = ms(t0), "cancelled"
+                    raise
+                except Exception as e:  # noqa: BLE001
+                    rec["ms"], rec["outcome"] = ms(t0), _outcome(e)
+                    raise
+                rec["ms"] = ms(t0)
+                if len(data) <= 1000:
+                    rec["outcome"] = "short"
+                    raise RuntimeError("no audio was received")
+                rec["outcome"] = "ok"
+                return data
+            task = asyncio.ensure_future(go())
+            recs[task] = rec
+            return task
+
+        ok = lambda t: t.done() and not t.cancelled() and t.exception() is None  # noqa: E731
+        d, fbs = start(first, FIRST_AUDIO_S), [start(fb, None)]
+        hedge_at, err = loop.time() + HEDGE_S, None
+        try:
+            while True:
+                if ok(d):
+                    return first, d.result()
+                win = next((t for t in fbs if ok(t)), None)
+                if win is not None and d.done():
+                    return fb, win.result()
+                for t in [d, *fbs]:
+                    if t.done() and not t.cancelled() and t.exception() is not None:
+                        err = t.exception()
+                running = [t for t in fbs if not t.done()]
+                if win is None and len(fbs) < FALLBACK_REQUESTS and (
+                        not running or (loop.time() >= hedge_at and not any("first_audio_ms" in recs[t] for t in running))):
+                    fbs.append(start(fb, None))          # a failed fallback's successor, or a twin of a silent one
+                    continue
+                waiting = [t for t in [d, *fbs] if not t.done()]
+                if not waiting:
+                    raise RuntimeError(f"tts failed: {str(err)[:160]}")
+                hedge_left = hedge_at - loop.time()
+                left = hedge_left if len(fbs) < FALLBACK_REQUESTS and win is None and hedge_left > 0 else None
+                await asyncio.wait(waiting, timeout=left, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            rest = [t for t in recs if not t.done()]
+            for t in rest:
+                t.cancel()
+            if rest:
+                await asyncio.gather(*rest, return_exceptions=True)
+
     err = None
     vs = voices(lang)
+    if live and len(vs) > 1:
+        voice, data = asyncio.run(race(vs[0], vs[1]))
+        _used.voice = voice
+        return data
     for i, voice in enumerate(vs):
         has_fallback = i + 1 < len(vs)
         first_s = FIRST_AUDIO_S if has_fallback else None
-        for attempt in range(1 if live and has_fallback else 2):
+        for attempt in range(2):
             if attempt:
                 time.sleep(RETRY_PAUSE_S)                    # a pause before the voice's second attempt; none before a new voice
             rec = {"voice": voice, "at_ms": ms(t00)}

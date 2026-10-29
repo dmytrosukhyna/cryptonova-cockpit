@@ -1,0 +1,66 @@
+name: tts-concurrency
+# TEMPORARY (29.10.2026): on the server Brian's first audio takes 3.6–6.1 s (0.3 s on a runner) while the background report
+# makes of 5 languages run on the same IP. Does concurrency slow a live Russian answer? A live answer (cnq/api/tts.py synth,
+# live=True) alone vs with the 5 languages' reports made at the same time, and Brian alone. Removed afterwards.
+on:
+  workflow_dispatch:
+    inputs:
+      rounds: { description: "rounds", default: "6" }
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q "edge-tts>=7,<8"
+      - run: for l in ru en uk el es; do curl -sS -m 20 "https://app.crypto-capital.app/v2/home?lang=$l" -o home_$l.json || echo '{}' > home_$l.json; done
+      - name: live answer alone / with 5 reports in parallel / Brian only
+        env: { ROUNDS: "${{ inputs.rounds }}" }
+        run: |
+          python - <<'PY'
+          import json, os, statistics, threading, time
+          from cnq.api import tts
+          rep = {l: ((json.load(open(f"home_{l}.json", encoding="utf-8")).get("report") or {}).get("text") or "Report.") for l in ("ru", "en", "uk", "el", "es")}
+          fresh = lambda n, m: f"Ответ NOVA AI номер {n} {m}: биткоин стоит 80 058 долларов, за сутки минус 1,7 процента, а эфир около 3 900 долларов."
+          res = {}
+
+          def one(mode, n):
+              t0 = time.time()
+              try:
+                  tts.synth(fresh(n, mode), "ru", live=True)
+                  v = (tts._used.voice or "?").split("-")[2][:6]
+              except Exception as e:
+                  v = "FAILED"
+              at = [(a["voice"].split("-")[2][:6], a.get("outcome"), a.get("connect_ms"), a.get("first_audio_ms"), a.get("ms")) for a in (tts._used.attempts or [])]
+              res.setdefault(mode, []).append((round(time.time() - t0, 2), v, tts._used.inflight, at))
+              print(mode, res[mode][-1], flush=True)
+          orig = dict(tts.VOICES)
+          for n in range(int(os.environ.get("ROUNDS") or 6)):
+              one("alone", n)
+              bg = []
+              for l in ("ru", "en", "uk", "el", "es"):
+                  def go(l=l):
+                      try:
+                          tts.synth(rep[l] + f" {n}", l)
+                      except Exception:
+                          pass
+                  th = threading.Thread(target=go, daemon=True); th.start(); bg.append(th)
+              time.sleep(0.3)
+              one("with5", n)
+              for th in bg:
+                  th.join(60)
+              tts.VOICES["ru"] = tts.FALLBACK["ru"]           # Brian only (no Dmitry before it)
+              one("brian_only", n)
+              tts.VOICES.update(orig)
+              time.sleep(5)
+          for mode, xs in res.items():
+              secs = sorted(x[0] for x in xs)
+              br = sorted(a[3] for x in xs for a in x[3] if a[0] == "BrianM" and a[3] is not None)
+              print(f"::notice title={mode}::total s {secs} · median {statistics.median(secs)} · Brian first audio ms {br} · voices {[x[1] for x in xs]} · inflight {[x[2] for x in xs]} · e.g. {xs[0][3]}"[:3900])
+          PY

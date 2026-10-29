@@ -1,5 +1,4 @@
-successfully downloaded text file (SHA: 793cb564dff0de622aac79f6d01d1ce649d7b568)
-[Resource from github at repo://dmytrosukhyna/cryptonova-cockpit/sha/ec86717d36ed69d2d0257dec1b8ea495f8139a29/contents/docs/research/watch_log.md] # Журнал дежурств исследователя
+# Журнал дежурств исследователя
 
 Каждый час «Исследователь CRYPTO NOVA» дописывает 1–3 строки: время, что изменилось. Старые строки удаляются, когда файл
 длиннее 300 строк.

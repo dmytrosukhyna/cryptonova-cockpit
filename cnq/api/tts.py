@@ -49,8 +49,10 @@ FALLBACK = {"ru": "en-US-BrianMultilingualNeural"}
 RETRY_PAUSE_S = 1.0
 # the app waits 8 s for the server's voice, then reads with the phone (NovaSpeech.kt). Dmitry's refusals take ~2.6 s each (probe) or
 # hang until TIMEOUT_S (seen live), so a voice with a fallback behind it that sends no audio within FIRST_AUDIO_S counts as refused:
-# Dmitry 2 × ≤ 2 s + 1 s pause + Brian ~1 s stays inside the 8 s. A healthy Dmitry made a whole sentence in ~0.9 s (median, probe);
-# only the wait for the FIRST audio is cut — once the voice speaks, it has the full TIMEOUT_S.
+# a request the app waits for (POST /v2/tts, a report mp3 made on the spot) is LIVE: Dmitry ONCE (≤ 2 s), then Brian (~1 s); the
+# background report (prewarm) keeps the patient order, Dmitry 2 × ≤ 2 s + 1 s pause, then Brian. A healthy Dmitry made a whole
+# sentence in ~0.9 s (median, probe); only the wait for the FIRST audio is cut — once the voice speaks, it has the full TIMEOUT_S.
+# /v2/health tts_last shows each attempt: voice, outcome (ok / no_audio / silent / timeout / …), start, connects, first audio, total.
 FIRST_AUDIO_S = 2.0
 MAX_CHARS = 1500
 MAX_CACHE_MB = 200
@@ -105,47 +107,133 @@ def voices(lang: str) -> list[str]:
     return [VOICES[lang]] + [v for v in [FALLBACK.get(lang)] if v and v != VOICES[lang]]
 
 
-_used = threading.local()        # the voice that made the last mp3 in this thread (for /v2/health "tts_last")
+_used = threading.local()        # the voice that made the last mp3 in this thread, and the attempts (for /v2/health "tts_last")
 
 
-def synth(text: str, lang: str, timeout: float = TIMEOUT_S) -> bytes:
-    """the mp3 of the text in that language's male voice (2 attempts), then in its male fallback voice (Russian, 29.10; 2 attempts);
-    raises when every voice failed"""
+class _Silent(Exception):
+    """the voice sent no audio within its first-audio deadline (FIRST_AUDIO_S)"""
+
+
+_CONNECTOR = None
+
+
+def _timed_connector():
+    """29.10: an aiohttp connector that times its connects (DNS + TCP + TLS, a proxy if any) for tts_last; edge-tts opens a session
+    per text chunk and again on its 403 retry, so the session's close leaves it open and synth closes it (shut). None → none."""
+    global _CONNECTOR
+    if _CONNECTOR is None:
+        try:
+            import aiohttp
+
+            class Timed(aiohttp.TCPConnector):
+                def __init__(self, *a, **kw):
+                    super().__init__(*a, **kw)
+                    self.connect_ms: list[int] = []
+
+                async def connect(self, *a, **kw):
+                    t = time.perf_counter()
+                    try:
+                        return await super().connect(*a, **kw)
+                    finally:
+                        self.connect_ms.append(round((time.perf_counter() - t) * 1000))
+
+                def close(self, *a, **kw):             # the session's close: kept open for the next chunk / the 403 retry
+                    import asyncio
+                    return asyncio.sleep(0)
+
+                async def shut(self) -> None:
+                    await aiohttp.TCPConnector.close(self)
+            _CONNECTOR = Timed
+        except Exception:  # noqa: BLE001
+            _CONNECTOR = False
+    try:
+        return _CONNECTOR() if _CONNECTOR else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _outcome(e: BaseException) -> str:
     import asyncio
+    if isinstance(e, _Silent):
+        return "silent"                                      # cut: no audio within FIRST_AUDIO_S
+    if isinstance(e, (asyncio.TimeoutError, TimeoutError)):
+        return "timeout"                                     # TIMEOUT_S
+    n = type(e).__name__
+    return "no_audio" if n == "NoAudioReceived" else n[:24]
+
+
+def synth(text: str, lang: str, timeout: float = TIMEOUT_S, live: bool = False) -> bytes:
+    """the mp3 of the text in that language's male voice (2 attempts), then in its male fallback voice (Russian, 29.10; 2 attempts);
+    raises when every voice failed. live (29.10: a request the app waits for, 8 s at most) → the voice with a fallback behind it gets
+    ONE attempt, then the fallback. Every attempt is timed into _used.attempts (voice, outcome, connect / first audio / total ms)."""
+    import asyncio
+    t00 = time.perf_counter()
     edge_tts = importlib.import_module("edge_tts")
     lang = norm_lang(lang)
     say = spoken(text, lang)
+    ms = lambda t: round((time.perf_counter() - t) * 1000)  # noqa: E731
+    attempts: list[dict] = []
+    _used.voice, _used.attempts, _used.prep_ms = None, attempts, ms(t00)
 
-    async def run(voice: str, first_s: float | None) -> bytes:
-        """the voice's mp3; first_s = no audio by then → refused (only for a voice with a fallback behind it)"""
+    async def run(voice: str, first_s: float | None, rec: dict) -> bytes:
+        """the voice's mp3; first_s = no audio by then → _Silent (only for a voice with a fallback behind it)"""
         buf = bytearray()
         loop = asyncio.get_running_loop()
+        t0 = time.perf_counter()
         end = loop.time() + first_s if first_s else None
-        it = edge_tts.Communicate(say, voice, rate=RATE).stream().__aiter__()
-        while True:
+        conn = _timed_connector()
+        try:
             try:
-                nxt = it.__anext__()
-                chunk = await (asyncio.wait_for(nxt, max(0.01, end - loop.time())) if end is not None and not buf else nxt)
-            except StopAsyncIteration:
-                break
-            if chunk.get("type") == "audio" and chunk.get("data"):
-                buf += chunk["data"]
-        return bytes(buf)
+                comm = edge_tts.Communicate(say, voice, rate=RATE, **({"connector": conn} if conn is not None else {}))
+            except TypeError:                                # an edge-tts without the connector argument
+                if conn is not None:
+                    await conn.shut()
+                conn, comm = None, edge_tts.Communicate(say, voice, rate=RATE)
+            it = comm.stream().__aiter__()
+            while True:
+                try:
+                    nxt = it.__anext__()
+                    chunk = await (asyncio.wait_for(nxt, max(0.01, end - loop.time())) if end is not None and not buf else nxt)
+                except StopAsyncIteration:
+                    break
+                except asyncio.TimeoutError:
+                    if end is not None and not buf:
+                        raise _Silent(f"no audio within {first_s} s") from None
+                    raise
+                if chunk.get("type") == "audio" and chunk.get("data"):
+                    if not buf:
+                        rec["first_audio_ms"] = ms(t0)
+                    buf += chunk["data"]
+            return bytes(buf)
+        finally:
+            if conn is not None:
+                rec["connect_ms"] = list(conn.connect_ms)
+                try:
+                    await conn.shut()
+                except BaseException:  # noqa: BLE001
+                    pass
     err = None
-    _used.voice = None
     vs = voices(lang)
     for i, voice in enumerate(vs):
-        first_s = FIRST_AUDIO_S if i + 1 < len(vs) else None
-        for attempt in range(2):
+        has_fallback = i + 1 < len(vs)
+        first_s = FIRST_AUDIO_S if has_fallback else None
+        for attempt in range(1 if live and has_fallback else 2):
             if attempt:
                 time.sleep(RETRY_PAUSE_S)                    # a pause before the voice's second attempt; none before a new voice
+            rec = {"voice": voice, "at_ms": ms(t00)}
+            attempts.append(rec)
+            t0 = time.perf_counter()
             try:
-                data = asyncio.run(asyncio.wait_for(run(voice, first_s), timeout))
+                data = asyncio.run(asyncio.wait_for(run(voice, first_s, rec), timeout))
+                rec["ms"] = ms(t0)
                 if len(data) > 1000:
+                    rec["outcome"] = "ok"
                     _used.voice = voice
                     return data
+                rec["outcome"] = "short"
                 err = RuntimeError("no audio was received")
             except Exception as e:  # noqa: BLE001
+                rec["ms"], rec["outcome"] = ms(t0), _outcome(e)
                 err = e
     raise RuntimeError(f"tts failed: {str(err)[:160]}")
 
@@ -324,27 +412,41 @@ class Tts:
         except OSError:
             pass
 
-    def make(self, text: str, lang: str) -> tuple[str, bytes]:
-        """(key, mp3) from the cache or made now"""
+    def make(self, text: str, lang: str, live: bool = False) -> tuple[str, bytes]:
+        """(key, mp3) from the cache or made now; live = the app is waiting (8 s at most) → synth's quick order (29.10)"""
         lang = norm_lang(lang)
         k = key(text, lang)
         data = self.get(k)
         if data is not None:
             return k, data
         t0 = time.time()
-        _used.voice = None
+        _used.voice, _used.attempts, _used.prep_ms = None, None, None
         try:
-            data = self.synth(text, lang)
+            data = self.synth(text, lang, live=True) if live else self.synth(text, lang)
         except Exception as e:  # noqa: BLE001
             self.last = {"result": "failed", "ms": round((time.time() - t0) * 1000), "lang": lang, "chars": len(text), "at": int(t0),
-                         "error": str(e)[:120]}
+                         "live": live, "error": str(e)[:120], **self._timings()}
             raise
         self.last = {"result": "ok", "ms": round((time.time() - t0) * 1000), "lang": lang, "chars": len(text), "at": int(t0),
-                     "bytes": len(data)}
+                     "live": live, "bytes": len(data)}
         if getattr(_used, "voice", None):                 # 29.10: which voice spoke (the Russian fallback shows here)
             self.last["voice"] = _used.voice
+        self.last.update(self._timings())
+        t1 = time.perf_counter()
         self.put(k, data)
+        self.last["put_ms"] = round((time.perf_counter() - t1) * 1000)
         return k, data
+
+    @staticmethod
+    def _timings() -> dict:
+        """29.10: where the time went (for /v2/health tts_last): before the first attempt, and each attempt — voice, outcome, its start,
+        connects (DNS + TCP + TLS), first audio, total (ms)"""
+        out = {}
+        if getattr(_used, "prep_ms", None) is not None:
+            out["prep_ms"] = _used.prep_ms
+        if getattr(_used, "attempts", None):
+            out["attempts"] = [dict(a) for a in _used.attempts]
+        return out
 
     def prewarm(self, text: str, lang: str) -> None:
         """make the report's mp3 in the background (once at a time per key) so the app's first play is instant; build 50: patient

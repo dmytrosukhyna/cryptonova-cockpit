@@ -21,10 +21,11 @@ MP3 = b"ID3" + b"\x00" * 2000
 
 class Synth:
     def __init__(self, fail=False):
-        self.calls, self.fail = [], fail
+        self.calls, self.fail, self.live = [], fail, []
 
-    def __call__(self, text, lang):
+    def __call__(self, text, lang, live=False):
         self.calls.append((text, lang))
+        self.live.append(live)
         if self.fail:
             raise RuntimeError("no audio was received")
         return MP3 + text.encode()[:20]
@@ -224,7 +225,7 @@ def test_the_report_is_made_patiently_and_the_route_waits_for_it(tmp_path):
             super().__init__()
             self.fails = fails
 
-        def __call__(self, text, lang):
+        def __call__(self, text, lang, live=False):
             self.calls.append((text, lang))
             if len(self.calls) <= self.fails:
                 raise RuntimeError("No audio was received")
@@ -335,6 +336,10 @@ def test_russian_falls_back_to_a_male_multilingual_voice_never_a_female_one(tmp_
         calls.clear()
         c, a = t.post({"text": text, "lang": "ru"}, "1.1.1.1")
         assert c == 200 and a.key == tts.key(text, "ru") and t.has(a.key) and t.last["voice"] == fb and calls[-1] == fb
+        # 29.10: every attempt is timed into tts_last (voice, outcome, start, total; first audio when it spoke)
+        at = t.last["attempts"]
+        assert [(x["voice"], x["outcome"]) for x in at] == [("ru-RU-DmitryNeural", "RuntimeError")] * 2 + [(fb, "ok")]
+        assert all("ms" in x and "at_ms" in x for x in at) and "first_audio_ms" in at[-1] and "put_ms" in t.last and t.last["prep_ms"] >= 0
         assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[0] == 200 and len(calls) == 3
         # Dmitry answers → Dmitry speaks
         refuse.discard("ru-RU-DmitryNeural")

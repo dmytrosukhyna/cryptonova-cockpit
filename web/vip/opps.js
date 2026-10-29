@@ -14,7 +14,7 @@
     const [O] = await V.feeds(['opportunities.json']);
     const list = O && (Array.isArray(O) ? O : O.opportunities || O.items);
     if (A(list).length) {
-      return { src: 'opportunities.json', asof: V.asofOf(O), items: list.map((x) => {
+      return { src: 'opportunities.json', asof: V.asofOf(O), chan: (O && !Array.isArray(O) && O.from_channels) || null, items: list.map((x) => {
         const r = x.result || x.results || {};
         const status = norm(x.status);
         const realUsd = V.n(r.real_usd != null ? r.real_usd : x.result_real_usd != null ? x.result_real_usd : x.real_usd);
@@ -56,10 +56,39 @@
           ${real.length ? `<div class="scards">${real.map(card).join('')}</div>` : V.empty('Ни одно дополнительное направление сейчас не торгуется реальными деньгами.')}</section>
         <section class="sgroup" data-demo="op-test"><h3>Тест и наблюдение <span class="n">${V.int(test.length)}</span></h3>
           ${test.length ? `<div class="scards">${test.map(card).join('')}</div>` : V.empty('Нет данных.')}</section>
+        ${chanHtml(OP.chan)}
         ${OP.src === 'fallback' ? `<p class="note">Собрано из arb.json, tri.json, funding.json, basis.json и yield.json; opportunities.json с единым списком ещё не опубликован.</p>` : ''}`;
     },
     mount(el) { el.querySelectorAll('[data-oid]').forEach((b) => b.addEventListener('click', () => open(b.dataset.oid))); },
   };
+
+  /* 29.10 (owner: «вот ещё группы в ТГ … ранние проекты, лаунчпад, новости»): «Из каналов» — opportunities.json from_channels.
+     What the owner's channels post about launchpads / listings / airdrops / early projects (no post texts) and how far each
+     channel can be trusted. Information only — not a signal. */
+  function chanHtml(C) {
+    if (!C) return '';
+    const cats = A(C.by_cat).filter((k) => A(k.items).length);
+    const it = (x) => `<li><span class="muted">${esc(V.dshort(x.t))}</span> <b>${esc(x.project || x.ticker || '—')}</b>${x.ticker && x.project && x.ticker !== x.project ? ' <span class="muted">' + esc(x.ticker) + '</span>' : ''}`
+      + `${x.venue ? ' · ' + esc(x.venue) : ''}${x.okx === true ? ' · есть на OKX' : x.okx === false ? ' · нет на OKX' : ''}${x.promo ? ' · реклама' : ''}`
+      + `${V.isNum(x.vs_btc_7d_pct) ? ` · 7 дн к BTC <span class="${V.cls(x.vs_btc_7d_pct)}">${V.pct(x.vs_btc_7d_pct)}</span>` : ''}`
+      + ` · <a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title || x.channel)}</a></li>`;
+    const cat = (k) => `<div class="scard" style="cursor:default"><div class="scard-h"><b>${esc(k.name_ru)}</b><span class="chips">${V.chip('информация', 'test')}</span></div>
+      <ul class="bul">${A(k.items).slice(0, 6).map(it).join('')}</ul><div class="f">за 7 дней: ${V.int(k.n_7d)}</div></div>`;
+    const tr = (x) => {
+      const a = x.audit || {}, f = x.live_forecasts || {}, m7 = A(x.live_mentions_vs_btc).find((s) => s.days === 7);
+      return `<div class="scard" style="cursor:default"><div class="scard-h"><b>${esc(x.title)}</b><span class="chips">${V.chip('проверка', 'test')}</span></div>
+        <div class="m"><div><small>Постов в день</small><span>${V.isNum(x.per_day) ? V.num(x.per_day, 1) : '—'}</span></div><div><small>Реклама</small><span>${V.isNum(x.promo_pct) ? V.share(x.promo_pct, 0) : '—'}</span></div>
+          <div><small>Прогнозы с 29.10</small><span>${f.n ? V.share(f.hit_rate_pct, 0) + ' <small>/ вверх ' + V.share(f.always_up_pct, 0) + '</small>' : '—'}</span></div></div>
+        ${a.summary_ru ? `<p class="para" style="margin:0;font-size:12.5px">История: ${esc(a.summary_ru)}</p>` : ''}
+        ${m7 ? `<p class="para" style="margin:0;font-size:12.5px">С 29.10: монеты из постов через 7 дн к BTC — медиана ${V.pct(m7.median_vs_btc_pct)} (${V.int(m7.n)}).</p>` : ''}
+        <div class="f"><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.link)}</a></div></div>`;
+    };
+    return `<section class="sgroup" data-demo="op-chan"><h3>Из каналов <span class="n">${esc(C.label_ru || '')}</span></h3>
+      ${cats.length ? `<div class="scards">${cats.map(cat).join('')}</div>` : V.empty('Новых записей пока нет — сервер читает каналы каждые 30 минут.')}
+      <h3 style="margin-top:14px">Насколько верить каналам</h3>
+      ${A(C.track).length ? `<div class="scards">${A(C.track).map(tr).join('')}</div>` : V.empty('Нет данных.')}
+      ${C.about_ru ? `<p class="note">${esc(C.about_ru)}</p>` : ''}</section>`;
+  }
 
   function card(o) {
     return `<button class="scard ${o.real ? 'realm' : ''}" type="button" data-oid="${esc(o.id)}">

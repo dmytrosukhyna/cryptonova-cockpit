@@ -13,6 +13,12 @@ import time
 VOICE = os.environ.get("CNQ_TTS_VOICE", "ru-RU-DmitryNeural")
 RETRY_PAUSE_S = (2, 5)             # after a refused attempt of a voice (1st, 2nd); 29.10: 2 attempts a voice, 4 voices
 NAME = os.environ.get("CNQ_OWNER_NAME") or "Дмитрий"
+# 30.10 (owner, build 51: «голос говорит достаточно медленно — хотелось бы быстрее»): the one tempo of every spoken text — the brief,
+# NOVA AI answers and the app's report (cnq/api/tts.py RATE) and the app's bundled recordings (CryptoNova scripts/app_voice.py)
+try:
+    from cnq.api.tts import RATE
+except Exception:  # noqa: BLE001
+    RATE = "+12%"
 
 
 def _load(out: str, name: str):
@@ -220,7 +226,7 @@ def run(out: str = "web") -> dict:
             for attempt in range(len(RETRY_PAUSE_S)):
                 try:
                     async def synth(v=voice):
-                        c = edge_tts.Communicate(spoken(text), v, rate="+0%")   # 21.10: normal speed (was −4%, «еле-еле говорящая»)
+                        c = edge_tts.Communicate(spoken(text), v, rate=RATE)    # 30.10: the API's +12 % (owner: faster); 21.10: +0 % (was −4 %)
                         await c.save(tmp)
                     asyncio.run(synth())
                     if os.path.getsize(tmp) > 2000:

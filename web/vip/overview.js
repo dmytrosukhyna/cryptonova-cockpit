@@ -70,14 +70,14 @@
 
   V.views.overview = {
     async html() {
-      const [H, MK, CAL, IDEAS, PF, DS] = await V.feeds(['app_home.json', 'markets.json', 'calendar.json', 'ideas.json', 'portfolio.json', 'desk_select.json']);
+      const [H, MK, CAL, IDEAS, PF, DS, OM] = await V.feeds(['app_home.json', 'markets.json', 'calendar.json', 'ideas.json', 'portfolio.json', 'desk_select.json', 'options_mood.json']);
       const [M, S, ST, OP] = await Promise.all([V.real(), V.sysStatus(), V.strategiesModel ? V.strategiesModel() : null, V.oppsModel ? V.oppsModel() : null]);
       const mv = (H && H.market_view) || null;
       const X = V.spotModel ? await V.spotModel() : null;
       const P = X && V.spotPipe ? V.spotPipe(M, X) : null;
       return `<div class="ph"><div><h2>Обзор</h2><p>Рынок, состояние системы и публичный портфель CRYPTO NOVA — на одном экране.</p></div></div>
       <div class="ov-grid">
-        ${marketCard(mv, MK, CAL)}${systemCard(S)}${financeCard(M)}${chartCard()}${positionsCard(M)}${recoCard(IDEAS, PF, DS, P, X)}${stratCard(ST)}${oppsCard(OP)}
+        ${marketCard(mv, MK, CAL, OM)}${systemCard(S)}${financeCard(M)}${chartCard()}${positionsCard(M)}${recoCard(IDEAS, PF, DS, P, X)}${stratCard(ST)}${oppsCard(OP)}
       </div>`;
     },
     async mount(el) {
@@ -89,7 +89,7 @@
   };
   V.ovChart = (src, per) => { ui.src = src; ui.per = per; const el = document.getElementById('view'); if (el && el.querySelector('#ovChart')) return paintChart(el); };
 
-  function marketCard(mv, MK, CAL) {
+  function marketCard(mv, MK, CAL, OM) {
     if (!mv) return `<section class="card lead" data-demo="ov-market"><div class="card-h"><span class="eyebrow">Рынок</span></div>${V.nodata('сводка рынка (app_home.json → market_view) не загрузилась')}</section>`;
     const top = A(MK && MK.top), coin = (s) => top.find((c) => c.symbol === s);
     const c24 = (s) => { const c = coin(s); return c ? `<span class="${V.cls(c.chg24)}">${V.pct(c.chg24)}</span> за 24 ч` : 'нет данных'; };
@@ -109,6 +109,7 @@
         ${V.kpi('Страх и жадность', fng && V.isNum(fng.value) ? V.int(fng.value) : '—', fng ? esc(fng.label || '') + (V.isNum(fng.week) ? ' · неделю назад ' + V.int(fng.week) : '') : 'нет данных')}
         ${V.kpi('Доля BTC', g && V.isNum(g.btc_dom) ? V.share(g.btc_dom) : '—', g && V.isNum(g.mcap_chg24) ? 'рынок ' + V.pct(g.mcap_chg24) + ' за 24 ч' : '')}
       </div>
+      ${optionsMood(OM)}
       ${sys.length ? `<div style="margin-top:12px"><span class="eyebrow">Что делает система</span><ul class="bul">${sys.map((s) => `<li>${esc(s)}</li>`).join('')}</ul></div>` : ''}
       <details class="more"><summary>Подробнее: горизонты, факторы, риски, события</summary>
         <div class="grid g2" style="margin-top:10px">
@@ -122,6 +123,20 @@
         ${mv.limits ? `<p class="note">${esc(mv.limits)}</p>` : ''}
       </details>
     </section>`;
+  }
+
+  /* 30.10 owner: «Настроение опционов» — DVOL (Deribit 30-day implied vol of BTC) and put/call by open interest, INFORMATION only:
+     CRYPTO NOVA does not trade options (none on OKX Europe, not copied, no gain on history — docs/research/options-2026-10-30.md). */
+  function optionsMood(OM) {
+    if (!OM || !V.isNum(OM.dvol)) return '';
+    const cls = OM.label === 'fear' ? 'neg' : OM.label === 'calm' ? 'pos' : '';
+    const bits = ['DVOL ' + V.int(OM.dvol)];
+    if (V.isNum(OM.dvol_pct_1y)) bits.push(OM.dvol_pct_1y + '-й процентиль за год');
+    if (V.isNum(OM.put_call_oi)) bits.push('пут/колл ' + (+OM.put_call_oi).toFixed(2));
+    return `<div class="kpis k3" style="margin-top:10px" data-demo="ov-options">
+      ${V.kpi('Настроение опционов · информация, не сигнал', esc(OM.label_ru || '—'), esc(bits.join(' · ')) + (OM.stale ? ' · устарело' : ''), cls)}
+      <div class="kpi" style="grid-column:span 2"><small>Что это</small><em>${esc(OM.text_ru || '')} Подробнее — урок «Опционы простыми словами» в обучении приложения.</em></div>
+    </div>`;
   }
 
   function chartCard() {

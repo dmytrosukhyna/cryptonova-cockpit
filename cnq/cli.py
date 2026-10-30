@@ -30,6 +30,7 @@
   python -m cnq.cli deskselect      the main futures desk (slow, evidence-based) → web/desk_select.json (+ data/desk_select.jsonl on a switch)
   python -m cnq.cli vipfeeds        the closed panel's VIP feeds (read-only): web/spot_pipeline.json, web/strategies.json,
                                     web/opportunities.json, web/system_status.json (cnq/agents/vip_feeds.py)
+  python -m cnq.cli optmood [--out web]       «Настроение опционов» — DVOL + put/call OI from Deribit (OKX fallback), information only → web/options_mood.json
   python -m cnq.cli scorecard [--out web]     public prediction scorecard: every published forecast / signal → hash-chained
                                               data/scorecard_ledger.jsonl, checked on the engine's candles → web/scorecard.json
   python -m cnq.cli appsignals [--out web]    CRYPTO NOVΛ app signals (public /api/signals/active + /history) → agents.sqlite history,
@@ -54,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         from .risk import cli as risk_cli
         return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
     ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
     ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
@@ -389,6 +390,10 @@ def main(argv: list[str] | None = None) -> int:
         os.makedirs("data", exist_ok=True)
         d = basis_desk.run(sqlite3.connect("data/agents.sqlite"), args.out)
         print(f"basis.json: equity={d['equity']} rate_now={d['rate_now']} position={d['position']} rates={ {k: v['apy'] for k, v in d['rates'].items()} } error={d['error']}")
+    elif args.cmd == "optmood":
+        from .agents import options_mood
+        d = options_mood.run(args.out)
+        print(f"options_mood.json: source={d.get('source')} dvol={d.get('dvol')} pct={d.get('dvol_pct_1y')} put_call={d.get('put_call_oi')} label={d.get('label')} error={d.get('error')}")
     elif args.cmd == "capital":
         import os, sqlite3
         from .agents import capital

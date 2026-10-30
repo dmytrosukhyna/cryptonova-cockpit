@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-10-28",
+  "updated": "2026-10-30",
   "title": "Aprender con CRYPTO NOVA",
   "note": "No es asesoramiento financiero. Los resultados pasados no garantizan los futuros.",
   "levels": [
@@ -5553,6 +5553,97 @@
               ],
               "answer": 2,
               "why": "Estos servicios no tienen seguro de depósitos. Repartir entre servicios limita el daño."
+            }
+          ]
+        },
+        {
+          "id": "l4-options",
+          "title": "Opciones en palabras simples",
+          "minutes": 6,
+          "goal": "Tras la lección sabrá qué son un put y un call, por qué el seguro contra la caída cuesta dinero cada mes y por qué CRYPTO NOVA no opera con opciones.",
+          "cards": [
+            {
+              "title": "Put y call",
+              "text": "Una opción es una póliza de seguro sobre un precio. El put da el derecho a vender bitcoin a un precio elegido de antemano, aunque haya caído por debajo. El call es el derecho a comprar al precio elegido, aunque haya subido por encima. El derecho cuesta una prima. Si no hizo falta, la prima se pierde entera.",
+              "example": "En la vida: el seguro del coche. Paga cada año. Sin accidente, el dinero no vuelve. Con accidente, paga la aseguradora.",
+              "art": "umbrella"
+            },
+            {
+              "title": "Por qué el put gana en la caída",
+              "text": "Compró un put con derecho a vender BTC a 70 000 cuando costaba 78 000. BTC cayó a 55 000. El derecho a vender a 70 000 vale ahora unos 15 000 por BTC: la diferencia entre 70 000 y 55 000. Así «se gana en la caída». Si BTC se quedó por encima de 70 000, el put venció vacío y la prima se perdió.",
+              "example": "En la vida: el seguro de incendio de la casa. Se quemó, cobró la indemnización. No se quemó, simplemente pagó cada año.",
+              "art": "chart_down"
+            },
+            {
+              "title": "La prima es el precio del seguro",
+              "text": "Un put a 30 días que protege de una caída mayor del 10% suele costar un 2–5% del precio de BTC. Al mes hay que comprar el seguro de nuevo. En un año suma cerca del 17–25% del importe. Solo para quedar en cero, la caída debe ser fuerte y a tiempo, mientras la póliza está vigente.",
+              "example": "Ejemplo: BTC 78 000, un put con derecho a vender a 70 000 cuesta 2 000. La ganancia empieza solo por debajo de 68 000: 70 000 menos la prima de 2 000.",
+              "art": "calculator"
+            },
+            {
+              "title": "Por qué la mayoría de compradores pierde",
+              "text": "La opción se abarata cada día: es el paso del tiempo. El seguro se renueva una y otra vez, y las caídas fuertes son raras. En la historia de BTC 2023–2026, de 27 puts comprados solo 5 vencieron con ganancia. Las 3 grandes caídas empezaron cuando nuestro indicador aún marcaba «subida»: el put se compraba tras los primeros −15…−25%.",
+              "example": "En la vida: el paraguas se compra cuando ya está mojado. Para entonces la lluvia suele parar.",
+              "art": "clock"
+            },
+            {
+              "title": "Qué dice la historia",
+              "text": "Probado en BTC de 2023 a octubre de 2026. Solo mantener BTC: +369%, caída máxima −53%. Nuestra regla «régimen «caída» → USDT»: +218%, caída −18,5%. Mantener y comprar put en «caída»: +235%, la misma caída −53%, primas del 17% al año. El seguro no redujo la caída; pasar a USDT lo hizo sin primas.",
+              "example": "En la vida: en India millones de particulares operan opciones. El regulador contó un 89–93% con pérdidas al año. El vendedor de la prima gana más a menudo que el comprador.",
+              "art": "books"
+            },
+            {
+              "title": "Por qué CRYPTO NOVA no las opera",
+              "text": "3 razones. No hay opciones en OKX Europe: nuestra cuenta real en la UE no las ve. El copy trading de OKX copia solo futuros y spot: los suscriptores no recibirían operaciones con opciones. Y en la historia no mejoraron ni el resultado ni la caída. Por eso en CRYPTO NOVA las opciones son solo conocimiento y un indicador de ánimo.",
+              "example": "En la vida: una herramienta puede ser interesante, pero si su tienda no la vende y no ayuda, no hay motivo para comprarla.",
+              "art": "shield"
+            },
+            {
+              "title": "El indicador en el panel",
+              "text": "La tarjeta «Ánimo de las opciones». DVOL: cuánto movimiento de BTC en un año espera el mercado de opciones; el percentil, si eso es caro o barato para el año. Put/call: cuántos seguros contra la caída por cada 1 apuesta a la subida. Puts caros: miedo, a menudo cerca del suelo. Puts baratos en subida: exceso de confianza. Información, no señal.",
+              "example": "Ejemplo: DVOL 55 en el percentil 80: el mercado tiene más miedo que en el 80% de los días del año. Put/call 0,95: casi tantos seguros como apuestas a la subida.",
+              "art": "thermometer"
+            }
+          ],
+          "remember": [
+            "Put: derecho a vender a un precio elegido; call: derecho a comprar. El derecho cuesta una prima, que se pierde si no hizo falta.",
+            "El put gana en la caída, pero el seguro se compra cada mes: 2–5% al mes, cerca del 17–25% al año.",
+            "En la historia 2023–2026 los puts no redujeron la caída (−53%), mientras la regla «caída → USDT» la bajó a −18,5% sin primas.",
+            "CRYPTO NOVA no opera opciones: no hay en OKX Europe, no se copian, no ayudaron en la historia. En el panel solo hay un indicador de ánimo."
+          ],
+          "quiz": [
+            {
+              "q": "Compró un put con derecho a vender BTC a 70 000 por una prima de 2 000. Al vencimiento BTC vale 72 000. ¿Qué pasa con su dinero?",
+              "options": [
+                "Recupera los 2 000",
+                "La prima de 2 000 se pierde entera",
+                "Ganó 2 000",
+                "Recibe 70 000"
+              ],
+              "answer": 1,
+              "why": "BTC está por encima de 70 000, el derecho a vender a 70 000 no hizo falta. La póliza venció, la prima se perdió."
+            },
+            {
+              "q": "¿Por qué comprar puts cada mes suele acabar en pérdida?",
+              "options": [
+                "Los exchanges prohíben comprar puts",
+                "La opción se abarata cada día y las caídas fuertes son raras",
+                "Los puts solo suben en verano",
+                "La prima siempre se devuelve"
+              ],
+              "answer": 1,
+              "why": "Paso del tiempo y pago repetido: la prima del 2–5% mensual se quema, y solo 5 de 27 puts vencieron con ganancia en la historia 2023–2026."
+            },
+            {
+              "q": "¿Qué muestra la tarjeta «Ánimo de las opciones» en el panel?",
+              "options": [
+                "Una señal de compra o venta",
+                "El ánimo del mercado de opciones: DVOL y put/call, solo información",
+                "La ganancia de CRYPTO NOVA con opciones",
+                "El precio de bitcoin dentro de un mes"
+              ],
+              "answer": 1,
+              "why": "Es un indicador de miedo y calma. CRYPTO NOVA no opera opciones; de esta tarjeta no sale ninguna operación."
             }
           ]
         }

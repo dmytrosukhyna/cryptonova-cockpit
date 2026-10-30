@@ -300,6 +300,5 @@ if __name__ == "__main__":
                 lv["lessons"].insert(ids.index(AFTER) + 1, L[lang])
             d["updated"] = "2026-10-30"
             with open(p, "w", encoding="utf-8") as f:
-                json.dump(d, f, ensure_ascii=False, indent=1)
-                f.write("\n")
+                json.dump(d, f, ensure_ascii=False, indent=2)      # the files' own format: 2 spaces, no final newline
             print(lang, "ok", len(lv["lessons"]))

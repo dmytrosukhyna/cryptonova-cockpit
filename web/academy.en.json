@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-10-28",
+  "updated": "2026-10-30",
   "title": "Learn with CRYPTO NOVA",
   "note": "Not financial advice. Past results don't guarantee future ones.",
   "levels": [
@@ -5553,6 +5553,97 @@
               ],
               "answer": 2,
               "why": "These services have no deposit insurance. Spreading across services limits the damage."
+            }
+          ]
+        },
+        {
+          "id": "l4-options",
+          "title": "Options in plain words",
+          "minutes": 6,
+          "goal": "After this lesson you will know what a put and a call are, why insurance against a fall costs money every month and why CRYPTO NOVA does not trade options.",
+          "cards": [
+            {
+              "title": "Put and call",
+              "text": "An option is an insurance policy on a price. A put gives the right to sell bitcoin at a price chosen in advance, even if it has fallen below it. A call is the right to buy at the chosen price, even if it has risen above it. The right costs a premium. If the right was not needed, the premium is lost in full.",
+              "example": "In real life: car insurance. You pay every year. No accident — the money is not returned. An accident — the insurer pays.",
+              "art": "umbrella"
+            },
+            {
+              "title": "Why a put earns in a fall",
+              "text": "You bought a put with the right to sell BTC at 70,000 when it cost 78,000. BTC fell to 55,000. The right to sell at 70,000 is now worth about 15,000 per BTC: the gap between 70,000 and 55,000. That is how people «earn on a fall». BTC stayed above 70,000 — the put expired empty, the premium is gone.",
+              "example": "In real life: fire insurance on a house. The house burned — you got the payout. It did not — you simply paid every year.",
+              "art": "chart_down"
+            },
+            {
+              "title": "The premium is the price of insurance",
+              "text": "A 30-day put protecting against a fall deeper than 10% usually costs 2–5% of the BTC price. A month later the insurance must be bought again. Over a year that adds up to about 17–25% of the sum. Just to break even, the fall has to be strong and on time — while the policy is valid.",
+              "example": "Example: BTC 78,000, a put with the right to sell at 70,000 costs 2,000. The profit starts only below 68,000: 70,000 minus the 2,000 premium.",
+              "art": "calculator"
+            },
+            {
+              "title": "Why most buyers lose",
+              "text": "An option gets cheaper every day — this is time decay. The insurance is renewed again and again, while strong falls are rare. On BTC history 2023–2026, only 5 of 27 puts bought expired in the money. All 3 big falls began while our indicator still showed «growth»: the put was bought only after the first −15…−25%.",
+              "example": "In real life: people buy an umbrella once they are already wet. By then the rain often stops.",
+              "art": "clock"
+            },
+            {
+              "title": "What history says",
+              "text": "Tested on BTC from 2023 to October 2026. Just holding BTC: +369%, drawdown −53%. Our rule «regime «fall» → USDT»: +218%, drawdown −18.5%. Holding and buying a put in a «fall»: +235%, the same −53% drawdown, 17% a year in premiums. The insurance did not cut the drawdown; moving to USDT did, with no premiums.",
+              "example": "In real life: in India millions of private traders use options. The regulator counted 89–93% losing over a year. The seller of the premium earns more often than the buyer.",
+              "art": "books"
+            },
+            {
+              "title": "Why CRYPTO NOVA does not trade them",
+              "text": "3 reasons. There are no options on OKX Europe — our real account in the EU cannot see them. OKX copy trading copies only futures and spot: subscribers would not receive options trades. And on history they improved neither the result nor the drawdown. So for us options are knowledge and a mood indicator only.",
+              "example": "In real life: a tool may be interesting, but if your shop does not sell it and it does not help, there is no reason to buy it.",
+              "art": "shield"
+            },
+            {
+              "title": "The indicator on the panel",
+              "text": "The «Options mood» tile. DVOL — how much movement in BTC the options market expects over a year; the percentile — whether that is expensive or cheap by the year's standards. Put/call — how many hedges against a fall per 1 bet on a rise. Expensive puts mean fear, often near a bottom. Cheap puts in a rise mean complacency. Information, not a signal.",
+              "example": "Example: DVOL 55 at the 80th percentile — the market is more frightened than on 80% of the year's days. Put/call 0.95 — almost as many hedges as bets on a rise.",
+              "art": "thermometer"
+            }
+          ],
+          "remember": [
+            "A put is the right to sell at a chosen price, a call the right to buy. The right costs a premium, and it is lost if the right was not needed.",
+            "A put earns in a fall, but the insurance must be bought every month: 2–5% a month, about 17–25% a year.",
+            "On 2023–2026 history puts did not reduce the drawdown (−53%), while the rule «fall → USDT» cut it to −18.5% with no premiums.",
+            "CRYPTO NOVA does not trade options: none on OKX Europe, not copied, no help on history. The panel shows a mood indicator only."
+          ],
+          "quiz": [
+            {
+              "q": "You bought a put with the right to sell BTC at 70,000 for a 2,000 premium. At expiry BTC is 72,000. What happens to your money?",
+              "options": [
+                "You get the 2,000 back",
+                "The 2,000 premium is lost in full",
+                "You earned 2,000",
+                "You receive 70,000"
+              ],
+              "answer": 1,
+              "why": "BTC is above 70,000, so the right to sell at 70,000 was not needed. The policy expired, the premium is lost."
+            },
+            {
+              "q": "Why does buying puts every month usually end in a loss?",
+              "options": [
+                "Exchanges forbid buying puts",
+                "An option gets cheaper every day, and strong falls are rare",
+                "Puts only rise in summer",
+                "The premium is always refunded"
+              ],
+              "answer": 1,
+              "why": "Time decay plus repeated payment: a 2–5% monthly premium burns, and only 5 of 27 puts expired in the money on 2023–2026 history."
+            },
+            {
+              "q": "What does the «Options mood» tile on the panel show?",
+              "options": [
+                "A signal to buy or sell",
+                "The mood of the options market: DVOL and put/call, information only",
+                "CRYPTO NOVA's profit on options",
+                "The bitcoin price a month ahead"
+              ],
+              "answer": 1,
+              "why": "It is a fear-and-calm indicator. CRYPTO NOVA does not trade options; no trade follows from this tile."
             }
           ]
         }

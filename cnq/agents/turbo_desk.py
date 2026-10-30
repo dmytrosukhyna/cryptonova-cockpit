@@ -136,7 +136,10 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None, can
         docs["lstx"] = d
     # ---- btcx: BTC ×2 while the regime says «рост» ----
     px, bull = btc_state(out, candles_db)
+    fresh = "btcx" not in st
     b = st.get("btcx") or {"equity": START, "px": None, "on": False, "t": now}
+    if "day" not in b:           # 30.10: older state — keep the current position until the next daily close
+        b["day"], b["want"] = now // DAY, (None if fresh else b["on"])
     if px:
         dt_ms = max(0, now - b["t"])
         if b["on"] and b["px"]:
@@ -145,23 +148,29 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None, can
         else:
             b["equity"] *= 1 + CASH_APY * dt_ms / (365 * DAY)
         events = []
-        go = bull is not None and bull != b["on"]
-        if go and bull:          # 20.10: going into BTC ×2 is a new entry → the risk layer; refused → stays in dollars, tried again next run
+        # 30.10: the regime is decided ONCE per UTC day, on the first run after 00:00 (≈ the daily close), as in the tested history
+        # (scripts/turbo_study.py: daily closes). Deciding every minute on the live price flipped the desk in and out whenever BTC sat
+        # on the 60-day threshold (29–30.10: out at 00:20, back in at 05:10, 0.1 % fee per flip) — behaviour the history never had.
+        if bull is not None and (b["day"] != now // DAY or b.get("want") is None):
+            b["day"], b["want"] = now // DAY, bull
+        want = b.get("want")
+        go = want is not None and want != b["on"]
+        if go and want:          # 20.10: going into BTC ×2 is a new entry → the risk layer; refused → stays in dollars, tried again next run
             ok, why = risk_gate.allow_entry("btcx", "BTC", "LONG", BTC_LEV * b["equity"], now)
             if not ok:
                 go = False
                 if risk_gate.record_skip(conn, "btcx", f"BTCX-{now // DAY}", "BTC", "LONG", BTC_LEV * b["equity"], why, now):
                     events.append(f"Рынок «рост», но вход отложен — риск-слой: {why}")
         if go:                   # leaving to dollars (an exit) is never held back
-            events.append("Рынок «рост» — покупаем BTC с плечом 2." if bull else "Рынок «осторожно» — выходим в доллары.")
+            events.append("Рынок «рост» — покупаем BTC с плечом 2." if want else "Рынок «осторожно» — выходим в доллары.")
             b["equity"] *= 1 - 0.0005 * BTC_LEV                # taker fee on the switch
-            b["on"] = bull
+            b["on"] = want
         b["px"], b["t"] = px, now
         conn.execute("INSERT OR REPLACE INTO turbo_state VALUES(?, ?)", ("btcx", json.dumps(b)))
         conn.execute("INSERT OR REPLACE INTO turbo_hist VALUES(?,?,?)", ("btcx", now, b["equity"]))
         hist = [[t, e] for t, e in conn.execute("SELECT time, equity FROM turbo_hist WHERE desk='btcx' ORDER BY time")]
         d = _doc("btcx", b["equity"], hist, now, {"in_market": b["on"], "btc_price": px,
-                                                  "rules": "BTC ×2, пока BTC выше 200-дневной средней и за 60 дней в плюсе; иначе доллары под 4%"})
+                                                  "rules": "BTC ×2, пока BTC выше 200-дневной средней и за 60 дней в плюсе (решение раз в день, по дневному закрытию); иначе доллары под 4%"})
         d["events"] = events
         d["position_ru"] = "в BTC с плечом 2" if b["on"] else "в долларах под 4%"      # marked to market in `equity`; no open rows
         docs["btcx"] = d

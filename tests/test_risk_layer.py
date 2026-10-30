@@ -455,7 +455,7 @@ def test_btc_x2_stays_in_dollars_while_blocked_and_still_exits(tmp_path):
         assert b["btcx"]["in_market"] is True
         G.set_kill(True, "тест", "test")
         files(90_000.0)                                                                  # regime off → the exit is never held back
-        c = TD.step(conn, w, now + 2 * MIN)
+        c = TD.step(conn, w, now + 86_400_000)                                       # the regime is read at the next daily close
         assert c["btcx"]["in_market"] is False and "доллары" in c["btcx"]["events"][0]
 
 

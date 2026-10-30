@@ -38,7 +38,9 @@ from cnq.agents.i18n import DEFAULT, norm_lang
 # one male voice per language — the same as scripts/welcome_voice.py VOICES (tests/test_tts.py keeps them equal)
 VOICES = {"ru": "ru-RU-DmitryNeural", "en": "en-US-AndrewNeural", "uk": "uk-UA-OstapNeural", "el": "el-GR-NestorasNeural",
           "es": "es-ES-AlvaroNeural"}
-RATE = "+0%"                 # 21.10 owner: the −4% of the greeting sounded «еле-еле» for reports
+RATE = "+12%"                # 30.10 owner (build 51): «голос говорит достаточно медленно — хотелось бы быстрее» → brisk but clear, every
+                             # language and every voice in the race (the app's bundled recordings use the same +12 %); 21.10: +0 % (the −4 %
+                             # greeting sounded «еле-еле»)
 # 29.10 (owner: male voices only, never a robotic female voice): ru-RU-DmitryNeural, the one Russian male voice, is refused most of
 # the time («No audio was received», on the server and on fresh runners). After Dmitry's 2 attempts the Russian text goes to a male
 # MULTILINGUAL voice, which reads Russian itself. Never Svetlana / Dariya, never gTTS. The cache key stays Dmitry's (key() below),

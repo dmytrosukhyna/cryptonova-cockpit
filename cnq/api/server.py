@@ -331,7 +331,7 @@ class Api:
                      "tts": self.tts.available()}
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last,
                          "panel_last": self.panel_last, "news_last": self.news.last, "tts_last": self.tts.last,
-                         "tts_install": self.tts.install_state(),
+                         "tts_install": self.tts.install_state(), "tts_rate": tts.RATE,
                          "portfolio": {"vision": bool(self.vision), "last": self.pf_last}}
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()

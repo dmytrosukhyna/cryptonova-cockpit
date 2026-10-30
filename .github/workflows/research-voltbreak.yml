@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "all | regime (backlog #35) | cap (#46) | f36 (#36, live desk rules on all perps) | s50 (#50, short rules outside «рост») | c47 (#47, breakout C capped on liquid perps) | p48 (#48, pullback P by burst size) | m49 (#49, terminal trend rule M on its 18 coins, 2025–26 out of sample) | d51 (#51, inverted D: long the breakdown outside «рост») | f52 (#52, market-neutral funding carry, weekly terciles) | k53 (#53, do risk clusters crash together) | s65 (#65, buy the stress) | s57 (#57, breadth bounce: liquid basket after ≥10 P signals)"
+        description: "all | regime (backlog #35) | cap (#46) | f36 (#36, live desk rules on all perps) | s50 (#50, short rules outside «рост») | c47 (#47, breakout C capped on liquid perps) | p48 (#48, pullback P by burst size) | m49 (#49, terminal trend rule M on its 18 coins, 2025–26 out of sample) | d51 (#51, inverted D: long the breakdown outside «рост») | f52 (#52, market-neutral funding carry, weekly terciles) | k53 (#53, do risk clusters crash together) | s65 (#65, buy the stress) | s57 (#57, breadth bounce: liquid basket after ≥10 P signals) | f59 (#59, small illiquid calm wide-range factor, weekly quintiles)"
         required: false
         default: "all"
 
@@ -23,5 +23,5 @@ jobs:
       - run: pip install -q numpy
       - env: { MODE: "${{ inputs.mode }}" }
         run: |
-          case "$MODE" in all|regime|cap|f36|s50|c47|p48|m49|d51|f52|k53|s65|s57) ;; *) echo "bad mode"; exit 1;; esac
-          if [ "$MODE" = f36 ]; then python scripts/families36_study.py; elif [ "$MODE" = s50 ]; then python scripts/shorts50_study.py; elif [ "$MODE" = c47 ]; then python scripts/c47_study.py; elif [ "$MODE" = p48 ]; then python scripts/p48_study.py; elif [ "$MODE" = m49 ]; then python scripts/m49_study.py; elif [ "$MODE" = d51 ]; then python scripts/d51_study.py; elif [ "$MODE" = f52 ]; then python scripts/p52_study.py; elif [ "$MODE" = k53 ]; then python scripts/p53_study.py; elif [ "$MODE" = s65 ]; then python scripts/p65_study.py; elif [ "$MODE" = s57 ]; then python scripts/p57_study.py; else python scripts/voltbreak_all_study.py "$MODE"; fi
+          case "$MODE" in all|regime|cap|f36|s50|c47|p48|m49|d51|f52|k53|s65|s57|f59) ;; *) echo "bad mode"; exit 1;; esac
+          if [ "$MODE" = f36 ]; then python scripts/families36_study.py; elif [ "$MODE" = s50 ]; then python scripts/shorts50_study.py; elif [ "$MODE" = c47 ]; then python scripts/c47_study.py; elif [ "$MODE" = p48 ]; then python scripts/p48_study.py; elif [ "$MODE" = m49 ]; then python scripts/m49_study.py; elif [ "$MODE" = d51 ]; then python scripts/d51_study.py; elif [ "$MODE" = f52 ]; then python scripts/p52_study.py; elif [ "$MODE" = k53 ]; then python scripts/p53_study.py; elif [ "$MODE" = s65 ]; then python scripts/p65_study.py; elif [ "$MODE" = s57 ]; then python scripts/p57_study.py; elif [ "$MODE" = f59 ]; then python scripts/p59_study.py; else python scripts/voltbreak_all_study.py "$MODE"; fi

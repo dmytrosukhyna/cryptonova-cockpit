@@ -172,7 +172,7 @@ let PAPER={profiles:{bal:desk(10186,{closed:[{closed:T+5e6}]}),imp:desk(10000,{w
   lstx:desk(10000),btcx:desk(10179,{in_market:true,position_ru:'в BTC с плечом 2'})}};
 let MEMES={account:{equity:10000,start_equity:10000,positions:[],stats:{trades:0},history:[[T,10000]],watch:{closest:{coin:'CASHCAT',dd_pct:-11.55},deepest:{coin:'USELESS',dd_pct:-15.38,t:T+86400e3},since:T}}};
 let SIGS={recent:[{t:Date.UTC(2026,9,19,11,2)},{t:Date.UTC(2026,9,18,7)}],active:[1,2,3],accounts:{since_live:{smart:{pnl_usd:-354.52,start:10000,start_t:T,trades:12}}}};
-let WTOP=null, IVAN=null, NOVAF={mix:[{key:'bal'},{key:'imp'},{key:'own'},{key:'lst'},{key:'app_smart',in_mix:false}]};
+let WTOP=null, IVAN=null, IVST=null, CONVJ=null, NOVAF={mix:[{key:'bal'},{key:'imp'},{key:'own'},{key:'lst'},{key:'app_smart',in_mix:false}]};
 __BLOCK__
 DSEL={current:'bal'};   // 28.10: the main futures desk is whatever web/desk_select.json chose — this fixture's is «Сбалансированная»
 const R={rows:cmpRows().map(x=>[x.k,Math.round(x.usd),x.trades]), st:{}};
@@ -189,10 +189,13 @@ def test_futures_comparison_ours_first_then_tests_with_honest_statuses():
     if not R:
         return
     keys = [r[0] for r in R["rows"]]
-    assert keys[0] == "nova" and R["rows"][0][1] == 93                     # (186 + 0) / 2 desks → one $10 000 account
+    # 30.10 (owner): «Тесты стратегий» = every demo desk by result since its own start — the parts the real account follows are rows
+    # too (marked), there is no summed «nova» row any more
+    assert "nova" not in keys and keys[0] == "bal" and R["rows"][0][1] == 186 and R["rows"][0][2] == 1
     assert "research" not in keys and "chan" not in keys                    # no account → not in the table
-    assert keys.index("btcx") < keys.index("own") < keys.index("imp") and keys[-1] == "app_smart"   # tests by result, best first
-    assert R["rows"][0][2] == 1 and dict((k, t) for k, _, t in R["rows"])["own"] == 2
+    assert keys.index("bal") < keys.index("btcx") < keys.index("own") < keys.index("imp") and keys[-1] == "app_smart"   # by result, best first
+    assert dict((k, t) for k, _, t in R["rows"])["own"] == 2
+    assert "до READY: сделок 2 из 30" in R["html"] and "[real]" in R["html"]   # the approved READY rule, and the followed parts marked
     st = R["st"]
     assert st["imp"].startswith("ждёт условия: BTC за час +2,5%") and "сейчас −0.3%" in st["imp"] and "+2.3%" in st["imp"]
     assert "последний раз условие было 14.08.2026" in st["imp"]
@@ -202,7 +205,7 @@ def test_futures_comparison_ours_first_then_tests_with_honest_statuses():
     assert "ближе всего сейчас CASHCAT −11.6%" in st["memes"] and "USELESS −15.4%" in st["memes"]
     assert st["app_smart"].startswith("выключено 19.10") and "открыто 3" in st["app_smart"]
     assert st["btcx"].startswith("держит позицию: в BTC с плечом 2")
-    assert "Сравнение стратегий" in R["html"] and "[our]" in R["html"]
+    assert "Тесты стратегий" in R["html"] and "[demo]" in R["html"]
 
 
 def test_the_comparison_is_in_the_futures_desk_and_parts_show_their_status():
@@ -223,8 +226,8 @@ def test_archive_is_one_wide_table_in_its_own_row():
     assert '<div class="sview">' not in body and '<div class="saccs">' not in body       # no tiny boxes behind a switch
     assert '<details class="edet" open>' not in body                                      # details folded
     assert "function sigWide()" in s and "innerWidth>1150" in s and "try{ sigWide(); }catch(e){}" in s
-    assert "body.sig-wide main>#sigCard{grid-column:1/-1;order:50!important}" in s
-    assert "#sigCard>h2,#sigCard.collapsed>h2{white-space:normal}" in s and "cnq_fold_v3" in s
+    assert "body.sig-wide main>#sigCard{grid-column:1/-1;order:99!important}" in s      # 30.10 (owner): the archive is the last card, folded
+    assert "#sigCard>h2,#sigCard.collapsed>h2{white-space:normal}" in s and "cnq_fold_v4" in s and "LAY_FOLD_DEFAULT=['eCalcCard','sigCard']" in s
 
 
 # ---------------------------------------------------------------- 5. memes: visible again + the new-meme filter on paper

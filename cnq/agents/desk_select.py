@@ -29,6 +29,8 @@ Every run writes web/desk_select.json:
    "cur_ratio" (the current desk's ratio over the same window), "family", "members", "ready", "eligible", "why"}],
    "family", "family_ru" (the current desk's family), "decision": "hold" | "wait" | "switch",
    "why_ru", "short_ru" (the panel's «автовыбор: …»), "asof"};
+  30.10: plus "watch": [{"key": "whales", … trades, days, pf, mean_pct, dd_pct, ready, ready_why, eligible: false}] — desks shown
+  against the READY rule for the owner only (monitoring); nothing in it can be chosen.
 a switch also appends one line to data/desk_select.jsonl and prints it. The previous web/desk_select.json is the state (current,
 since, by); missing or broken → the owner's choice. Readers (panel_header.main_desk) fall back to «Агрессивная» on a missing or
 broken file; OKX_FUT_PROFILES on the autopilot still overrides everything. Demo numbers only; no orders here. Stdlib only."""
@@ -290,6 +292,42 @@ def decide(prof: dict, prev, real, stages: dict | None, now: int) -> dict:
             "why_ru": why, "short_ru": f"переключил с «{name(cur)}» {_ddmm(now)}"}
 
 
+# ── watch list (30.10, owner: «Киты … давайте думать, как её быстро включать») ──────────────────────────────────────
+# Desks that are NOT candidates (no history check, not in web/paper.json, not covered by the conveyor) but whose distance to the
+# approved READY rule the panel shows, so the owner sees the progress. Monitoring only: nothing here can become the main desk —
+# state_of / candidate_keys / decide never read it. Switching such a desk on is the owner's explicit decision, not this file's.
+WATCH_WHY = "наблюдение: не кандидат автовыбора — нет проверки на истории и конвейера; включение только решением владельца"
+
+
+def watch_whales(wtop, now: int) -> dict | None:
+    """«Киты · копирование топ-5» (web/whales_top.json desk) against the READY numbers: closed trades, days live, profit factor,
+    mean trade in % of the position's notional (as the conveyor counts it), max drawdown of the equity curve"""
+    d = (wtop or {}).get("desk") if isinstance(wtop, dict) else None
+    if not isinstance(d, dict) or not d.get("started"):
+        return None
+    cl = [t for t in d.get("closed") or [] if isinstance(t, dict)]
+    pn = [_num(t.get("pnl")) for t in cl]
+    gp, gl = sum(x for x in pn if x > 0), -sum(x for x in pn if x < 0)
+    pf = (gp / gl) if gl > 0 else (None if not pn else 99.0)
+    means = [_num(t.get("pnl")) / _num(t.get("notional")) * 100 for t in cl if _num(t.get("notional")) > 0]
+    mean = sum(means) / len(means) if means else None
+    hist = d.get("history") or []
+    vals = [_num(d.get("start"), ph.START)] + [_num(e[1] if isinstance(e, (list, tuple)) else (e or {}).get("equity")) for e in hist] \
+        + [_num(d.get("equity"))]
+    dd = max(cv._max_dd(vals), _num(d.get("max_dd_pct")))
+    n, days = len(cl) if not d.get("trades") else int(_num(d.get("trades"))), (now - int(_num(d.get("started")))) / DAY
+    stage = {"stage": "watch", "trades": n, "days": days, "pf": pf, "mean_pct": mean}
+    ready, why_ready = ready_check(stage)
+    why_ready = why_ready.replace("конвейер: стадия «watch», нужна READY", "вне конвейера (нет проверки на истории)")
+    base = _num(d.get("start"), ph.START)
+    return {"key": "whales", "name": d.get("name_ru") or "Киты · копирование топ-5", "trades": n, "days": round(days, 1),
+            "pf": None if pf is None else round(pf, 2), "mean_pct": None if mean is None else round(mean, 2),
+            "result_pct": round((_num(d.get("equity")) / base - 1) * 100, 2) if base else None, "dd_pct": round(dd, 2),
+            "since": int(_num(d.get("started"))), "open": len(d.get("open") or []), "ready": ready,
+            "ready_why": why_ready or "READY по числам, но вне конвейера", "eligible": False, "why": WATCH_WHY,
+            "whales": sorted({str(t.get("whale") or "") for t in cl} - {""}), "coins": sorted({str(t.get("coin") or "") for t in cl} - {""})}
+
+
 def run(out: str = "web", now: int | None = None, log_path: str = LOG) -> dict:
     """one engine step: read the desks, the last decision and the real account → web/desk_select.json (+ a log line on a switch)"""
     now = int(now or time.time() * 1000)
@@ -300,6 +338,12 @@ def run(out: str = "web", now: int | None = None, log_path: str = LOG) -> dict:
     conv = _load(out, "conveyor.json") or {}
     stages = {d.get("key"): d for d in conv.get("desks") or [] if isinstance(d, dict) and d.get("key")}
     doc = decide(prof, _load(out, FEED), _load(out, "public_real.json"), stages, now)
+    try:
+        w = watch_whales(_load(out, "whales_top.json"), now)
+    except Exception as e:  # noqa: BLE001 — the watch list never breaks the decision
+        print("desk_select watch:", e, flush=True)
+        w = None
+    doc["watch"] = [w] if w else []
     if doc["decision"] == "switch":
         line = {"t": now, "from": doc["from"], "to": doc["current"], "why_ru": doc["why_ru"]}
         print("desk_select:", json.dumps(line, ensure_ascii=False), flush=True)

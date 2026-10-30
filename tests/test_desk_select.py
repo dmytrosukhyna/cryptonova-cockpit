@@ -171,3 +171,24 @@ def test_a_broken_state_file_starts_from_the_owners_choice_and_the_window_is_sha
     c = {x["key"]: x for x in ds.decide(prof, None, REAL_FLAT, {}, NOW)["candidates"]}
     cur_same = ds.metrics(prof["aggr"], T0 + 2 * H)["ratio"]
     assert c["own"]["cur_ratio"] == cur_same != ds.metrics(prof["aggr"], T0)["ratio"]
+
+
+def test_whales_are_watched_but_never_a_candidate(tmp_path):
+    """30.10 (owner: «Киты … как её быстро включать»): the whale-copy desk shows its distance to READY in a separate `watch` list;
+    it is never in `candidates`, never eligible, and the decision does not read it"""
+    import time
+    wtop = {"desk": {"name_ru": "Киты · копирование топ-5", "start": 10000.0, "started": NOW - 12 * ds.DAY, "equity": 10800.0, "trades": 8,
+                     "max_dd_pct": 3.5, "open": [], "history": [[NOW - 11 * ds.DAY, 10100.0], [NOW - 5 * ds.DAY, 9950.0]],
+                     "closed": [{"whale": "okx:X", "coin": "BTC", "pnl": 200.0, "notional": 5000.0}, {"whale": "okx:X", "coin": "ETH", "pnl": -50.0, "notional": 5000.0}]}}
+    w = ds.watch_whales(wtop, NOW)
+    assert w["key"] == "whales" and w["trades"] == 8 and w["pf"] == 4.0 and w["mean_pct"] == 1.5 and not w["eligible"] and not w["ready"]
+    assert "сделок 8 из 30" in w["ready_why"] and "дней 12,0 из 21" in w["ready_why"] and "владельца" in w["why"]
+    assert ds.watch_whales(None, NOW) is None and ds.watch_whales({"desk": {}}, NOW) is None
+    assert "whales" not in ds.candidate_keys()
+    for name in ("paper.json", "conveyor.json", "whales_top.json"):
+        src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", name)
+        if os.path.exists(src):
+            (tmp_path / name).write_text(open(src, encoding="utf-8").read(), encoding="utf-8")
+    d = ds.run(str(tmp_path), NOW, str(tmp_path / "log.jsonl"))
+    assert [c["key"] for c in d["candidates"]] and "whales" not in [c["key"] for c in d["candidates"]]
+    assert isinstance(d["watch"], list) and all(x["key"] == "whales" and not x["eligible"] for x in d["watch"])

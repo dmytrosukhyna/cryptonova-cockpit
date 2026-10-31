@@ -361,3 +361,19 @@ def test_active_spot_follows_the_impulse_desk():
     r = ac.step(e, desk={"equity": 10000.0, "open": []}, now=NOW + 60_000, sleep=F.nosleep, cl=cl)
     assert r["sold"] == 1 and fk.orders[-1]["side"] == "sell" and ac.held(e) == {}
     assert "ждёт сигнала" in "\n".join(ac.plan_lines(e, {"open": []}, NOW, 10000.0))
+
+
+def test_staged_desks_get_their_share_of_the_budget_and_the_rest_is_split_equally():
+    """30.10 (owner's ladder): desk_select.json «stages.alloc» → a stage-1 desk gets 5 % of the futures budget, a stage-2 desk 15 %,
+    the main set shares the remainder; without the ladder every desk gets an equal part, as before"""
+    paper = {"profiles": {"aggr": {"open": []}, "imp": {"open": []}, "brk": {"open": []}, "lab": {"open": []},
+                          "own": {"open": [], "stats": {"trades": 1, "avg_trade_pct": 0.0}}}}
+    sel = {"current": "aggr", "stages": {"alloc": {"brk": 0.05, "lab": 0.0, "aggr": 0.475, "imp": 0.475}}}
+    ds = fu.pick_desks(paper, sel=sel)
+    assert [k for k, _ in ds] == ["aggr", "imp", "brk"]                       # lab is at stage 0 → not followed
+    parts = fu.desk_parts(ds, 1000.0, sel)
+    assert parts == {"aggr": 475.0, "imp": 475.0, "brk": 50.0}
+    assert fu.desk_parts(ds, 1000.0, None) == {"aggr": 1000 / 3, "imp": 1000 / 3, "brk": 1000 / 3}
+    assert [k for k, _ in fu.pick_desks(paper, sel={"current": "aggr"})] == ["aggr", "imp"]
+    # a rolled-back desk that still holds a position stays followed until it closes
+    assert [k for k, _ in fu.pick_desks(paper, sel={"current": "aggr", "stages": {"alloc": {"lab": 0.0}}}, held={"lab"})] == ["aggr", "imp", "lab"]

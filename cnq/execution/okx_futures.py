@@ -196,7 +196,39 @@ def pick_desks(paper: dict, forced: list | None = None, sel: dict | None = None,
             keys = keys + ["own"]
         if prev and prev not in keys and prev in held and prev in ph.MAIN_KEYS and isinstance(pr.get(prev), dict):
             keys[0] = prev                                  # never move an open position between desks: wait until it is closed
+        # 30.10 (owner's staged promotion, real money): desks on a stage get their share of the budget (desk_select.json
+        # «stages.alloc»); a desk the sleeve already holds a position of stays until it closes, even after a rollback to 0
+        for k, share in staged_alloc(sel).items():
+            if k not in keys and isinstance(pr.get(k), dict) and (share > 0 or k in held):
+                keys.append(k)
     return [(k, pr[k]) for k in keys if isinstance(pr.get(k), dict)]
+
+
+def staged_alloc(sel: dict | None) -> dict:
+    """{desk key: budget fraction} from desk_select.json «stages.alloc» (30.10 ladder); {} when absent → equal parts as before"""
+    try:
+        al = ((sel or {}).get("stages") or {}).get("alloc") or {}
+        return {str(k): float(v) for k, v in al.items() if isinstance(v, (int, float)) and 0 <= float(v) <= 1}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def desk_parts(ds: list, bud_usd: float, sel: dict | None) -> dict:
+    """{desk key: its part of the futures budget in $}: a staged desk its stage share (5 % / 15 %), the rest shared equally by the
+    other desks (the main desk, «Импульс BTC», «Сигналы», stage-3 desks); without the ladder every desk gets an equal part"""
+    keys = [k for k, _ in ds]
+    al = staged_alloc(sel)
+    if not al or not any(k in al for k in keys):
+        return {k: bud_usd / max(1, len(keys)) for k in keys}
+    out, used, rest = {}, 0.0, []
+    for k in keys:
+        if k in al:
+            out[k] = bud_usd * al[k]; used += al[k]
+        else:
+            rest.append(k)
+    for k in rest:
+        out[k] = bud_usd * max(0.0, 1 - used) / max(1, len(rest))
+    return out
 
 
 def _get_json(url: str):
@@ -222,7 +254,10 @@ def held_desks(st: dict | None) -> set:
 def fetch_desks(env=None, st: dict | None = None) -> list:
     src, forced = desk_src(env)
     paper = _get_json(src)
-    return pick_desks(paper, forced, None if forced else fetch_sel(env), (st or {}).get("main"), held_desks(st))
+    sel = None if forced else fetch_sel(env)
+    if isinstance(st, dict):
+        st["sel"] = {"stages": {"alloc": staged_alloc(sel)}} if sel else None     # the ladder's shares for desk_parts() this pass
+    return pick_desks(paper, forced, sel, (st or {}).get("main"), held_desks(st))
 
 
 # ── OKX: the swap calls (through the autopilot's signed client — no transfer, no withdrawal exists here) ──────────────────
@@ -877,8 +912,9 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             fresh = []
         pos = ctx.positions(fresh=True)
         avail = ctx.avail_usdt() if fresh else 0.0
-        part = bud["usd"] / max(1, len(ds))
+        parts = desk_parts(ds, bud["usd"], st.get("sel"))
         for tid, (t, deq, dk) in sorted(fresh, key=lambda x: int(x[1][0].get("opened") or 0)):
+            part = parts.get(dk, bud["usd"] / max(1, len(ds)))
             dcs = decide(ctx, t, deq, part, bud["usd"], cap, pos, avail, slip, start, now, join_gap(env))
             if dcs.get("skip"):
                 res["skipped"].append({"id": tid, "inst": dcs["inst"], "why": dcs["skip"]})
@@ -1071,8 +1107,9 @@ def plan_lines(cl: ap.Okx, cfg: dict, env=None, desks: list | None = None, now: 
         ds = desks if desks is not None else fetch_desks(env, st)
     except Exception as e:  # noqa: BLE001
         return L + [f"  сигналы не загрузились: {str(e)[:120]} — новых позиций не будет"]
+    parts = desk_parts(ds, b["usd"], fetch_sel(env) if desks is None else None)
     part = b["usd"] / max(1, len(ds))
-    L.append(f"  бюджет {budget_text(b)} · столы: {', '.join(k for k, _ in ds) or 'нет'} — по {ap.usd(part)} на стол"
+    L.append(f"  бюджет {budget_text(b)} · столы: {', '.join(f'{k} {ap.usd(parts[k])}' for k, _ in ds) or 'нет'}"
              f" · плечо ≤ {cap['lev']} (изолированная маржа) · риск ≤ {ap.usd(b['usd'] * cap['risk'])} на сделку · дневной стоп "
              f"{ap.usd(b['usd'] * cap['day_loss'])} · до {cap['max_pos']} позиций · стоп-лосс у каждой позиции на OKX")
     want = want_map(ds)

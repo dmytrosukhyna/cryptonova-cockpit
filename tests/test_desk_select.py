@@ -77,11 +77,11 @@ def test_switch_when_every_condition_holds_and_it_is_logged(tmp_path):
     log = tmp_path / "data" / "desk_select.jsonl"
     doc = ds.run(str(out), NOW, str(log))
     assert json.loads((out / "desk_select.json").read_text(encoding="utf-8")) == json.loads(json.dumps(doc, ensure_ascii=False))
-    lines = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()]
+    lines = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines() if json.loads(x).get("kind", "switch") == "switch"]
     assert len(lines) == 1 and (lines[0]["from"], lines[0]["to"], lines[0]["t"]) == ("aggr", "own", NOW)
     again = ds.run(str(out), NOW + H, str(log))
     assert (again["current"], again["since"], again["by"]) == ("own", NOW, "auto") and again["decision"] in ("hold", "wait")
-    assert len(log.read_text(encoding="utf-8").splitlines()) == 1
+    assert len([x for x in log.read_text(encoding="utf-8").splitlines() if json.loads(x).get("kind", "switch") == "switch"]) == 1
     assert ph.main_desk(ph.load_sel(str(out))) == "own"                      # the header and the real account read this file
 
 
@@ -192,3 +192,59 @@ def test_whales_are_watched_but_never_a_candidate(tmp_path):
     d = ds.run(str(tmp_path), NOW, str(tmp_path / "log.jsonl"))
     assert [c["key"] for c in d["candidates"]] and "whales" not in [c["key"] for c in d["candidates"]]
     assert isinstance(d["watch"], list) and all(x["key"] == "whales" and not x["eligible"] for x in d["watch"])
+
+
+def _stage_desk(days, n, wins=True, name="Пробой"):
+    """a demo desk live for `days` with `n` closed trades (all +$30 or all −$30) and a flat-up curve"""
+    t0 = NOW - int(days * ds.DAY)
+    pts = max(2, int(days * 24))
+    curve = [10000.0 + (i * 2.0 if wins else -i * 2.0) for i in range(pts)]
+    d = desk(curve, 0, name, t0=t0)
+    d["closed"] = [{"id": f"s{i}", "closed": t0 + ds.DAY // 2 + i * (int(days * ds.DAY) // max(1, n)), "net_usd": 30.0 if wins else -30.0} for i in range(n)]
+    d["stats"] = {"trades": n, "max_dd_pct": 0.5}
+    return d
+
+
+def test_staged_promotion_owner_numbers_and_rollback(tmp_path):
+    """30.10 (owner, real money): «3 дня и 5 сделок — 5%, 7 дней и 10 сделок — 15%, 14 дней и 15 сделок — полная доля». A desk climbs
+    one step per run, the real sleeve gets its share (stages.alloc), a run of losing days drops it a step and restarts its window."""
+    w = world()
+    w["own"] = _stage_desk(3.5, 6, name="Сигналы CRYPTO NOVA")   # ≥ 3 days, ≥ 5 trades, in profit → stage 1
+    prev = {"current": "aggr", "since": ds.OWNER["since"], "by": "owner"}
+    s1 = ds.stage_eval(w, prev, None, None, "aggr", NOW)
+    by = {d["key"]: d for d in s1["desks"]}
+    assert by["own"]["stage"] == 1 and by["own"]["share"] == 0.05 and "повышена сейчас" in by["own"]["next_ru"]
+    assert "whales" not in by and "gold" not in by                     # no feed → not listed
+    assert s1["staged_pct"] == 5.0 and any(x["to"] == 1 and x["key"] == "own" for x in s1["log"])
+    al = ds.alloc_shares(w, "aggr", s1)
+    assert al["own"] == 0.05 and abs(al["aggr"] - 0.475) < 1e-6 and abs(al["imp"] - 0.475) < 1e-6 and abs(sum(al.values()) - 1) < 1e-5
+    # one step per run: the same desk with 8 days / 12 trades passes stage 2 only on the next evaluation
+    w["own"] = _stage_desk(8, 12, name="Сигналы CRYPTO NOVA")
+    s2 = ds.stage_eval(w, {**prev, "stages": s1}, None, None, "aggr", NOW)
+    assert {d["key"]: d["stage"] for d in s2["desks"]}["own"] == 2 and ds.alloc_shares(w, "aggr", s2)["own"] == 0.15
+    w["own"] = _stage_desk(15, 16, name="Сигналы CRYPTO NOVA")
+    s3 = ds.stage_eval(w, {**prev, "stages": s2}, None, None, "aggr", NOW)
+    b3 = {d["key"]: d for d in s3["desks"]}["own"]
+    assert b3["stage"] == 3 and b3["share_ru"] == "полная доля" and ds.ready_check(b3) == (True, "")
+    al3 = ds.alloc_shares(w, "aggr", s3)
+    assert abs(al3["own"] - al3["aggr"]) < 1e-9 and abs(sum(al3.values()) - 1) < 1e-5
+    # rollback: 5 losing days in a row → one step down and the window restarts (days and trades from the rollback)
+    bad = _stage_desk(15, 16, name="Сигналы CRYPTO NOVA")
+    bad["closed"] = [{"id": f"l{i}", "closed": NOW - i * ds.DAY - 1000, "net_usd": -30.0} for i in range(5)]
+    w["own"] = bad
+    s4 = ds.stage_eval(w, {**prev, "stages": s3}, None, None, "aggr", NOW)
+    b4 = {d["key"]: d for d in s4["desks"]}["own"]
+    assert b4["stage"] == 2 and b4["t_reset"] == NOW and "откат" in b4["next_ru"] and any(x["to"] == 2 for x in s4["log"])
+    # whales and gold are staged candidates too, but the sleeve never gets their share (no executor / needs the owner's OK)
+    wtop = {"desk": {"name_ru": "Киты · копирование топ-5", "start": 10000.0, "started": NOW - 4 * ds.DAY, "equity": 10300.0, "trades": 6, "max_dd_pct": 1.0,
+                     "history": [[NOW - 3 * ds.DAY, 10100.0], [NOW - ds.DAY, 10250.0]],
+                     "closed": [{"whale": "okx:A", "coin": "BTC", "pnl": 50.0, "closed_t": NOW - 3 * ds.DAY + i * H} for i in range(6)]}}
+    s5 = ds.stage_eval(w, {**prev, "stages": s4}, wtop, None, "aggr", NOW)
+    wh = {d["key"]: d for d in s5["desks"]}["whales"]
+    assert wh["stage"] == 1 and not wh["real"] and "whales" not in ds.alloc_shares(w, "aggr", s5)
+    # the full run writes the ladder into the file and the log
+    json.dump({"profiles": w}, open(tmp_path / "paper.json", "w"))
+    json.dump(wtop, open(tmp_path / "whales_top.json", "w"))
+    d = ds.run(str(tmp_path), NOW, str(tmp_path / "log.jsonl"))
+    assert d["stages"]["desks"] and "alloc" in d["stages"] and abs(sum(d["stages"]["alloc"].values()) - 1) < 1e-5
+    assert d["stages"]["rules_ru"].startswith("Ступени")

@@ -33,7 +33,24 @@ Every run writes web/desk_select.json:
   against the READY rule for the owner only (monitoring); nothing in it can be chosen.
 a switch also appends one line to data/desk_select.jsonl and prints it. The previous web/desk_select.json is the state (current,
 since, by); missing or broken → the owner's choice. Readers (panel_header.main_desk) fall back to «Агрессивная» on a missing or
-broken file; OKX_FUT_PROFILES on the autopilot still overrides everything. Demo numbers only; no orders here. Stdlib only."""
+broken file; OKX_FUT_PROFILES on the autopilot still overrides everything. Demo numbers only; no orders here.
+
+30.10 (owner, real money, his numbers: «3 дня и 5 сделок — 5% бюджета, 7 дней и 10 сделок — 15%, 14 дней и 15 сделок — полная
+доля… можем попробовать»): STAGED PROMOTION replaces the READY 30/21 gate as the way a desk earns real money. Every hour each
+staged candidate (a family counts as one; «Киты» from web/whales_top.json and «Золото» from web/gold_desk.json too) is measured
+on its window — from its start, or from its last rollback — and climbs one step at a time:
+  ступень 1: ≥ 3 days live, ≥ 5 closed trades, result > 0, PF ≥ 1,3                → 5 % of the futures budget;
+  ступень 2: ≥ 7 days, ≥ 10 trades, still > 0, PF ≥ 1,3, drawdown ≤ 10 %          → 15 %;
+  ступень 3: ≥ 14 days, ≥ 15 trades (and the stage-2 numbers)                      → the full share: an equal part with the main desk.
+Rollback at once, one step down (to 0 from stage 1): 5 consecutive UTC days with closed trades all in the red, or the drawdown
+deeper than the desk's own max drawdown at its last promotion + 3 points, or PF < 1 over the last 10 trades. After a rollback
+the window restarts (days and trades count from the rollback), so re-promotion needs the stage test passed AGAIN. The sum of the
+stage-1/2 shares ≤ 40 % of the futures budget (a promotion that would break it waits); «Агрессивная» (the main desk, + «Импульс
+BTC», + «Сигналы» after their gate, + stage-3 desks) keeps the remainder in equal parts. Only desks of web/paper.json can be
+followed by the real OKX sleeve (okx_futures.pick_desks reads «stages.alloc»); a staged «Киты» or «Золото» keeps its stage but its
+share stays with the main desks until an executor exists («real»: false) — and gold needs the owner's separate OK anyway
+(«eligible_real»: false). The old main-desk switch now needs the challenger at stage 3 instead of READY (the rest unchanged).
+Every change writes a line to data/desk_select.jsonl and to «stages.log» of web/desk_select.json. Stdlib only."""
 from __future__ import annotations
 
 import json
@@ -156,8 +173,16 @@ def family_of(k: str) -> str:
 
 
 def ready_check(stage: dict | None) -> tuple[bool, str]:
-    """(READY by the conveyor, why not) — the conveyor's stage AND its numbers; no record → not ready"""
+    """(READY, why not). 30.10: a staged-promotion record ({"stage": 0–3, …}, see stage_eval) is READY at stage 3 — the full
+    share; a conveyor record (the old gate) needs its stage «ready» AND its numbers; no record → not ready"""
     s = stage or {}
+    if isinstance(s.get("stage"), int):
+        if s["stage"] >= 3:
+            return True, ""
+        conv_ok, conv_why = ready_check(s.get("conv")) if s.get("conv") else (False, "")
+        if conv_ok:                                     # the old gate still counts: READY by the conveyor is READY
+            return True, ""
+        return False, f"ступень {s['stage']} из 3 — нужна полная доля (ступень 3)"
     miss = []
     if s.get("stage") != "ready":
         miss.append(f"конвейер: стадия «{s.get('stage') or 'нет данных'}», нужна READY")
@@ -328,6 +353,229 @@ def watch_whales(wtop, now: int) -> dict | None:
             "whales": sorted({str(t.get("whale") or "") for t in cl} - {""}), "coins": sorted({str(t.get("coin") or "") for t in cl} - {""})}
 
 
+# ── staged promotion (30.10, owner: «3 дня и 5 сделок — 5%, 7 дней и 10 сделок — 15%, 14 дней и 15 сделок — полная доля») ─────
+STAGE_NEED = {1: (3, 5), 2: (7, 10), 3: (14, 15)}        # stage → (days live, closed trades) on the desk's window
+STAGE_SHARE = {0: 0.0, 1: 0.05, 2: 0.15}                 # stage 3 = the full share (an equal part with the main desk)
+STAGE_PF = 1.3                                            # profit factor on the window, every stage
+STAGE_DD = 10.0                                           # % — max drawdown on the window, stages 2 and 3
+STAGE_CAP = 0.40                                          # the stage-1/2 shares together never exceed this part of the futures budget
+ROLL_LOSING_DAYS = 5                                      # UTC days in a row with closed trades all summing below 0 → one step down
+ROLL_DD_PLUS = 3.0                                        # points over the desk's own max drawdown at its last promotion → one step down
+ROLL_LAST_N = 10                                          # PF < 1 over the last 10 trades → one step down
+EXTRA = ("whales", "gold")                                # staged candidates outside web/paper.json (their own feeds)
+EXTRA_NAME = {"whales": "Киты · копирование топ-5", "gold": "Золото · тест"}
+STAGE_RULES_RU = ("Ступени (решение владельца 30.10): 1 — от 3 дней и 5 сделок, результат в плюсе, профит-фактор от 1,3 → 5% бюджета "
+                  "фьючерсов; 2 — от 7 дней и 10 сделок, просадка до 10% → 15%; 3 — от 14 дней и 15 сделок → полная доля наравне с "
+                  "основным столом. Откат на ступень вниз сразу: 5 убыточных дней подряд, просадка глубже своей прошлой максимальной "
+                  "на 3 пункта или профит-фактор ниже 1 по последним 10 сделкам; после отката отсчёт дней и сделок начинается заново. "
+                  "Сумма долей ступеней 1–2 — не больше 40% бюджета; остаток — у «Агрессивной» и столов на ступени 3 поровну. "
+                  "Семейство «Консервативная / Сбалансированная / Агрессивная» — один стол.")
+
+
+def _pf(nets: list) -> float | None:
+    gp, gl = sum(x for x in nets if x > 0), -sum(x for x in nets if x < 0)
+    return (gp / gl) if gl > 0 else (99.0 if gp > 0 else None)
+
+
+def losing_days(trades: list, now: int) -> int:
+    """UTC calendar days in a row, newest first (ending today or yesterday), each WITH closed trades summing below 0; a day without
+    a closed trade ends the count. trades = [(closed ms, net usd)]"""
+    by = {}
+    for t, net in trades:
+        by[int(t) // DAY] = by.get(int(t) // DAY, 0.0) + net
+    d = int(now) // DAY
+    if d not in by:
+        d -= 1
+    n = 0
+    while d in by and by[d] < 0:
+        n += 1
+        d -= 1
+    return n
+
+
+def stage_source(key: str, prof: dict, wtop, gold) -> dict | None:
+    """one staged candidate as {name, start, trades [(closed, net)], curve [(t, eq)], eq_now, start_eq, dd_record, real, eligible_real}
+    — a web/paper.json desk, «Киты» (whales_top.json → desk) or «Золото» (gold_desk.json); None when the source is missing"""
+    if key == "whales":
+        d = (wtop or {}).get("desk") if isinstance(wtop, dict) else None
+        if not isinstance(d, dict) or not d.get("started"):
+            return None
+        cl = [t for t in d.get("closed") or [] if isinstance(t, dict)]
+        return {"key": key, "name": d.get("name_ru") or EXTRA_NAME[key], "start": int(_num(d.get("started"))),
+                "trades": [(int(_num(t.get("closed_t"))), _num(t.get("pnl"))) for t in cl], "n_all": int(_num(d.get("trades"), len(cl))),
+                "curve": [(int(_num(e[0] if isinstance(e, (list, tuple)) else (e or {}).get("t"))),
+                           _num(e[1] if isinstance(e, (list, tuple)) else (e or {}).get("equity"))) for e in d.get("history") or []],
+                "eq_now": _num(d.get("equity"), ph.START), "start_eq": _num(d.get("start"), ph.START), "dd_record": _num(d.get("max_dd_pct")),
+                "real": False, "real_why": "сделки «Китов» реальный счёт пока не повторяет — нет исполнителя; доля ступени остаётся у основных столов",
+                "eligible_real": True, "eligible_real_why": None,
+                "note": (f"все сделки — {len({str(t.get('whale')) for t in cl})} кит(а)" if cl else None)}
+    if key == "gold":
+        d = gold if isinstance(gold, dict) and gold.get("since") else None
+        if not d:
+            return None
+        v = d
+        return {"key": key, "name": v.get("name") or EXTRA_NAME[key], "start": int(_num(v.get("since"))),
+                "trades": [(int(_num(c.get("closed"))), _num(c.get("net_usd"))) for c in v.get("closed") or [] if c.get("closed")],
+                "n_all": int(_num((v.get("stats") or {}).get("trades"))),
+                "curve": [(int(_num(e.get("time"))), _num(e.get("equity"))) for e in v.get("equity_history") or []],
+                "eq_now": _num(v.get("equity_now"), _num(v.get("equity"), ph.START)), "start_eq": _num(v.get("start_equity"), ph.START),
+                "dd_record": _num((v.get("stats") or {}).get("max_dd_pct")), "real": False,
+                "real_why": "золото реальный счёт не торгует: нет исполнителя и нужно отдельное решение владельца",
+                "eligible_real": False, "eligible_real_why": v.get("eligible_real_why") or "нужно отдельное решение владельца", "note": None}
+    v = prof.get(key)
+    if not isinstance(v, dict):
+        return None
+    return {"key": key, "name": v.get("name") or key, "start": start_of(v),
+            "trades": [(int(_num(c.get("closed"))), _num(c.get("net_usd"))) for c in v.get("closed") or [] if c.get("closed")],
+            "n_all": int(_num((v.get("stats") or {}).get("trades"))),
+            "curve": [(int(_num(e.get("time"))), _num(e.get("equity"))) for e in v.get("equity_history") or []],
+            "eq_now": ph.fut_eq(v), "start_eq": _num(v.get("start_equity"), 0.0) or ph.START,
+            "dd_record": _num((v.get("stats") or {}).get("max_dd_pct")), "real": True, "real_why": None,
+            "eligible_real": True, "eligible_real_why": None, "note": None}
+
+
+def stage_metrics(src: dict, t0: int, now: int) -> dict:
+    """the stage numbers of one desk on [t0, now]: days, trades, result %, PF, max drawdown %, PF of the last 10 trades, losing days"""
+    curve = [(t, e) for t, e in src["curve"] if e > 0]
+    base = src["start_eq"]
+    for t, e in curve:
+        if t <= t0:
+            base = e
+        else:
+            break
+    vals = [base] + [e for t, e in curve if t > t0] + [src["eq_now"]]
+    tr = sorted((t, n) for t, n in src["trades"] if t >= t0)
+    n = len(tr)
+    if src["start"] >= t0:                                          # the feed keeps only the last trades: the desk's own count is fuller
+        n = max(n, src["n_all"])
+    nets = [x for _, x in tr]
+    dd = cv._max_dd(vals)
+    if src["start"] >= t0:
+        dd = max(dd, src["dd_record"])
+    pf10 = _pf(nets[-ROLL_LAST_N:]) if len(nets) >= ROLL_LAST_N else None
+    return {"days": round(max(0.0, (now - max(t0, src["start"])) / DAY), 1), "trades": n,
+            "result_pct": round((src["eq_now"] / base - 1) * 100, 2) if base else 0.0, "pf": None if _pf(nets) is None else round(_pf(nets), 2),
+            "dd_pct": round(dd, 2), "pf_last10": None if pf10 is None else round(pf10, 2), "losing_days": losing_days(tr, now)}
+
+
+def stage_test(level: int, m: dict) -> list:
+    """what the desk still lacks for `level` (empty = passes)"""
+    need_d, need_n = STAGE_NEED[level]
+    miss = []
+    if m["days"] < need_d:
+        miss.append(f"дней {m['days']:g} из {need_d}".replace(".", ","))
+    if m["trades"] < need_n:
+        miss.append(f"сделок {m['trades']} из {need_n}")
+    if m["result_pct"] <= 0:
+        miss.append(f"результат {_f(m['result_pct'])}% — не в плюсе")
+    if m["pf"] is None or m["pf"] < STAGE_PF:
+        miss.append(f"профит-фактор {'—' if m['pf'] is None else _g(round(m['pf'], 2))} (нужно от {_g(STAGE_PF)})")
+    if level >= 2 and m["dd_pct"] > STAGE_DD:
+        miss.append(f"просадка {_g(round(m['dd_pct'], 1))}% (нужно до {_g(STAGE_DD)}%)")
+    return miss
+
+
+def rollback_why(st: dict, m: dict) -> str | None:
+    if m["losing_days"] >= ROLL_LOSING_DAYS:
+        return f"{m['losing_days']} убыточных дней подряд"
+    ref = st.get("dd_ref")
+    if isinstance(ref, (int, float)) and m["dd_pct"] > ref + ROLL_DD_PLUS:
+        return f"просадка {_g(round(m['dd_pct'], 1))}% глубже прошлой максимальной {_g(round(ref, 1))}% на {_g(ROLL_DD_PLUS)} пункта"
+    if m["pf_last10"] is not None and m["pf_last10"] < 1.0:
+        return f"профит-фактор {_g(m['pf_last10'])} по последним {ROLL_LAST_N} сделкам"
+    return None
+
+
+def stage_keys(prof: dict, cur: str) -> list:
+    """the staged candidates: one per family of the main-desk candidates except the current desk's family, + «Киты» and «Золото»"""
+    cur_fam = family_of(cur)
+    return [k for k in family_reps(candidate_keys(prof), cur) if family_of(k) != cur_fam] + list(EXTRA)
+
+
+def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int) -> dict:
+    """the hourly step of the ladder: {desks: [...], alloc: {key: share}, staged_pct, main_pct, cap_pct, log: [...], rules_ru}.
+    prev = the last web/desk_select.json (its «stages.desks» is the state)"""
+    old = {d.get("key"): d for d in ((prev or {}).get("stages") or {}).get("desks") or [] if isinstance(d, dict) and d.get("key")} \
+        if isinstance(prev, dict) else {}
+    desks, log = [], []
+    for k in stage_keys(prof, cur):
+        src = stage_source(k, prof, wtop, gold)
+        if src is None:
+            continue
+        st = old.get(k) or {}
+        stage = int(_num(st.get("stage"))) if st.get("stage") in (0, 1, 2, 3) else 0
+        t_reset = int(_num(st.get("t_reset"))) if st.get("t_reset") else 0
+        t0 = max(ph.FUT_D0, src["start"], t_reset)
+        m = stage_metrics(src, t0, now)
+        since = int(_num(st.get("since"), now)) if st else now
+        dd_ref = st.get("dd_ref")
+        change = None
+        why = rollback_why(st, m) if stage > 0 else None
+        if why:
+            stage, since, t_reset, dd_ref = stage - 1, now, now, m["dd_pct"]
+            change = {"t": now, "key": k, "name": src["name"], "from": stage + 1, "to": stage, "why_ru": f"откат: {why}; отсчёт дней и сделок заново"}
+            t0 = max(ph.FUT_D0, src["start"], t_reset)
+            m = stage_metrics(src, t0, now)
+        desks.append({"key": k, "name": src["name"], "stage": stage, "since": since, "t_reset": t_reset or None, "dd_ref": dd_ref,
+                      **m, "window_from": t0, "real": src["real"], "real_why": src["real_why"],
+                      "eligible_real": src["eligible_real"], "eligible_real_why": src["eligible_real_why"], "note": src["note"],
+                      "family": family_of(k), "members": list(FAMILIES.get(family_of(k), (k,))), "_change": change})
+    # promotions, one step each, best-staged first, within the 40 % cap on the stage-1/2 shares
+    desks.sort(key=lambda d: (-d["stage"], d["since"]))
+    used = sum(STAGE_SHARE.get(d["stage"], 0.0) for d in desks)
+    for d in desks:
+        if d["_change"]:
+            d["next_ru"] = d["_change"]["why_ru"]
+            continue
+        nxt = d["stage"] + 1
+        if nxt > 3:
+            d["next_ru"] = "полная доля — выше ступени нет"
+            continue
+        miss = stage_test(nxt, d)
+        if miss:
+            d["next_ru"] = f"до ступени {nxt}: " + ", ".join(miss)
+            continue
+        add = STAGE_SHARE.get(nxt, 0.0) - STAGE_SHARE.get(d["stage"], 0.0)
+        if used + add > STAGE_CAP + 1e-9:
+            d["next_ru"] = f"ступень {nxt} готова, ждёт места: сумма долей ступеней {_g(round(used * 100))}% + {_g(round(add * 100))}% больше {_g(round(STAGE_CAP * 100))}%"
+            continue
+        used += add
+        d["_change"] = {"t": now, "key": d["key"], "name": d["name"], "from": d["stage"], "to": nxt,
+                        "why_ru": (f"ступень {nxt}: {str(d['days']).replace('.', ',')} дн., {d['trades']} сделок, результат {_f(d['result_pct'])}%, "
+                                   f"профит-фактор {_g(d['pf'])}, просадка {_g(round(d['dd_pct'], 1))}%")}
+        d["stage"], d["since"], d["dd_ref"] = nxt, now, d["dd_pct"]
+        d["next_ru"] = "повышена сейчас: " + d["_change"]["why_ru"]
+    for d in desks:
+        d["share"] = STAGE_SHARE.get(d["stage"]) if d["stage"] < 3 else None
+        d["share_ru"] = "полная доля" if d["stage"] == 3 else f"{_g(round(STAGE_SHARE[d['stage']] * 100))}%"
+        if d["_change"]:
+            log.append(d.pop("_change"))
+        else:
+            d.pop("_change")
+    staged = sum(STAGE_SHARE.get(d["stage"], 0.0) for d in desks if d["stage"] in (1, 2))
+    return {"rules_ru": STAGE_RULES_RU, "cap_pct": STAGE_CAP * 100, "desks": desks, "staged_pct": round(staged * 100, 2),
+            "main_pct": round((1 - staged) * 100, 2), "log": log}
+
+
+def alloc_shares(prof: dict, cur: str, stages: dict) -> dict:
+    """the real futures sleeve's budget shares {desk key: fraction, sum 1}: stage-1/2 desks the sleeve can follow (web/paper.json)
+    at their share; the main set (the main desk + «Импульс BTC» + «Сигналы» after their gate) and the followable stage-3 desks share
+    the rest equally. A staged desk the sleeve cannot follow («Киты», «Золото») leaves its share with the main set."""
+    main = list(ph.nova_keys(prof, {"current": cur}))
+    out, used = {}, 0.0
+    for d in stages.get("desks") or []:
+        if not d.get("real") or d["key"] in main:
+            continue
+        if d["stage"] in (1, 2):
+            out[d["key"]] = STAGE_SHARE[d["stage"]]
+            used += STAGE_SHARE[d["stage"]]
+        elif d["stage"] == 3:
+            main.append(d["key"])
+    for k in main:
+        out[k] = round((1 - used) / len(main), 6)
+    return out
+
+
 def run(out: str = "web", now: int | None = None, log_path: str = LOG) -> dict:
     """one engine step: read the desks, the last decision and the real account → web/desk_select.json (+ a log line on a switch)"""
     now = int(now or time.time() * 1000)
@@ -335,17 +583,29 @@ def run(out: str = "web", now: int | None = None, log_path: str = LOG) -> dict:
     prof = paper.get("profiles") or {}
     if not prof:
         raise RuntimeError("web/paper.json: нет столов — выбор не пересчитан")
+    prev = _load(out, FEED)
+    wtop, gold = _load(out, "whales_top.json"), _load(out, "gold_desk.json")
+    cur = state_of(prev)["current"]
+    stg = stage_eval(prof, prev, wtop, gold, cur, now)                 # 30.10: the ladder (its state = the previous file)
     conv = _load(out, "conveyor.json") or {}
-    stages = {d.get("key"): d for d in conv.get("desks") or [] if isinstance(d, dict) and d.get("key")}
-    doc = decide(prof, _load(out, FEED), _load(out, "public_real.json"), stages, now)
+    convd = {d.get("key"): d for d in conv.get("desks") or [] if isinstance(d, dict) and d.get("key")}
+    stages = {d["key"]: {**d, "conv": convd.get(d["key"])} for d in stg["desks"]}   # READY = stage 3 of the ladder OR the conveyor's gate
+    for k, c in convd.items():
+        stages.setdefault(k, c)
+    doc = decide(prof, prev, _load(out, "public_real.json"), stages, now)
+    stg["alloc"] = alloc_shares(prof, doc["current"], stg)
+    stg["short_ru"] = " · ".join(f"«{d['name']}» ступень {d['stage']} ({d['share_ru']})" for d in stg["desks"]) or "кандидатов нет"
+    doc["stages"] = stg
     try:
-        w = watch_whales(_load(out, "whales_top.json"), now)
+        w = watch_whales(wtop, now)
     except Exception as e:  # noqa: BLE001 — the watch list never breaks the decision
         print("desk_select watch:", e, flush=True)
         w = None
     doc["watch"] = [w] if w else []
+    lines = [{"kind": "stage", **x} for x in stg["log"]]
     if doc["decision"] == "switch":
-        line = {"t": now, "from": doc["from"], "to": doc["current"], "why_ru": doc["why_ru"]}
+        lines.append({"kind": "switch", "t": now, "from": doc["from"], "to": doc["current"], "why_ru": doc["why_ru"]})
+    for line in lines:
         print("desk_select:", json.dumps(line, ensure_ascii=False), flush=True)
         try:
             os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)

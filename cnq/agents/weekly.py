@@ -140,7 +140,32 @@ def verify_last(prev: dict | None, market: dict) -> dict | None:
     return {"week": prev.get("week"), "checks": checks, "paper_said": prev.get("paper", {}).get("sum_r"), "btc_then": (prev.get("market") or {}).get("btc")}
 
 
-def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: dict | None) -> tuple[str, str]:
+def real_week(real: dict, now_ms: int) -> dict | None:
+    """31.10: the Telegram weekly post speaks about the REAL CRYPTO NOVA account on OKX (public_real.json), never demo desks"""
+    if not real or real.get("stale") or real.get("equity_usd") is None:
+        return None
+    def change(curve):
+        if not curve:
+            return None
+        base = None
+        for t, v in curve:
+            if t <= now_ms - 7 * 86400_000:
+                base = v
+        if base is None:
+            base = curve[0][1]
+        return curve[-1][1] - base
+    tot = change(real.get("curve")); fut = change(real.get("fut_curve"))
+    closed = [t for t in real.get("closed") or [] if isinstance(t, dict) and not t.get("partial") and (t.get("closed") or 0) > now_ms - 7 * 86400_000]
+    return {"equity": real["equity_usd"], "week_usd": tot, "fut_usd": fut, "spot_usd": (tot - fut) if (tot is not None and fut is not None) else None,
+            "n": len(closed), "wins": sum(1 for t in closed if (t.get("pnl_usd") or 0) > 0), "open": len(real.get("futures") or []),
+            "since_usd": real.get("pnl_usd"), "since_pct": real.get("pnl_pct")}
+
+
+def _usd(v: float) -> str:
+    return (f"+${v:,.2f}" if v >= 0 else f"−${abs(v):,.2f}").replace(",", " ")
+
+
+def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: dict | None, real: dict | None = None) -> tuple[str, str]:
     L = []
     L.append(f"# CRYPTO NOVΛ — итоги недели {week['from']}–{week['to']}")
     L.append("")
@@ -205,14 +230,17 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
     P = [f"📊 CRYPTO NOVΛ — неделя {week['from']}–{week['to']}"]
     if market["btc"]:
         P.append(f"BTC {_pct(market['btc']['ret7'])}, в плюсе {market['up']}/{market['total']} монет" + (f", дни паники: {', '.join(market['stress_days'])}" if market["stress_days"] else ""))
-    P.append(f"Демо-фьючерсы: {paper['n']} сделок, {paper['sum_r']:+.2f}R" + (f", счёт {_fmt(paper['equity_end'])} $" if paper["equity_end"] else ""))
-    if spot["ret"] is not None:
-        P.append(f"Спот-портфель: {_pct(spot['ret'])} за неделю")
+    if real:
+        P.append(f"Реальный счёт CRYPTO NOVA на OKX: {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
+                 + (f" (фьючерсы {_usd(real['fut_usd'])}, спот {_usd(real['spot_usd'])})" if real.get("fut_usd") is not None and real.get("spot_usd") is not None else ""))
+        P.append(f"Закрыто сделок за неделю: {real['n']}, в плюсе {real['wins']}; в работе {real['open']}, у каждой стоп на бирже")
+        if real.get("since_usd") is not None:
+            P.append(f"С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%)")
     P.append("На неделю:")
     for n in nxt[:4]:
         if n["support"] and n["resistance"]:
             P.append(f"• {n['symbol']} {_fmt(n['price'])}: {_fmt(n['support']['lo'])} ⇄ {_fmt(n['resistance']['hi'])}")
-    P.append("Вход только от стенки, не гонимся за движением.")
+    P.append("Вход только от стенки, не гонимся за движением. Не финансовый совет.")
     return text, "\n".join(P)
 
 
@@ -247,7 +275,13 @@ def run(conn: sqlite3.Connection, rep: dict, out_path: str, now_ms: int | None =
     spot = spot_block(conn, now_ms)
     nxt = next_week(rep)
     last = verify_last(prev_doc, market) if prev_doc and prev_doc.get("week", {}).get("end_ms", 0) < now_ms - 3 * 86400000 else (prev_doc.get("said_last_time") if prev_doc else None)
-    text, post = compose(week, market, paper, spot, nxt, last)
+    real = None
+    try:
+        rp = os.path.join(os.path.dirname(out_path) or ".", "public_real.json")
+        real = real_week(json.load(open(rp, encoding="utf-8")), now_ms) if os.path.exists(rp) else None
+    except Exception:  # noqa: BLE001
+        real = None
+    text, post = compose(week, market, paper, spot, nxt, last, real)
     hist = (prev_doc or {}).get("history", [])
     if prev_doc and prev_doc.get("week") and prev_doc["week"].get("end_ms", 0) < now_ms - 3 * 86400000:
         hist = ([{"week": prev_doc["week"], "btc": (prev_doc.get("market") or {}).get("btc"), "paper_sum_r": (prev_doc.get("paper") or {}).get("sum_r"),

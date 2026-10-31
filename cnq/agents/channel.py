@@ -134,7 +134,7 @@ class Channel:
         o = self.out
         return {"terminal": _load(o, "terminal.json") or {}, "decision": _load(o, "decision.json") or {},
                 "markets": _load(o, "markets.json") or {}, "whales": _load(o, "whales.json") or {},
-                "calibration": _load(o, "calibration.json") or {}, "paper": _load(o, "paper.json") or {},
+                "calibration": _load(o, "calibration.json") or {}, "paper": _load(o, "paper.json") or {}, "real": _load(o, "public_real.json") or {},
                 "research": _load(o, "research.json") or {}, "portfolio": _load(o, "portfolio.json") or {}}
 
     @staticmethod
@@ -374,11 +374,11 @@ class Channel:
                               "impulse": {"UP": "импульс вверх", "DOWN": "импульс вниз", "FLAT": "боковик"}.get(r.get("short"), "")} if r else None,
                "market_stress": {0: "спокойный", 1: "нервный", 2: "распродажа — большинство монет падает", 3: "паника — падает почти всё"}.get(lvl, "спокойный") if lvl is not None else None}
         out["stress_share"] = share
-        bal = ((x["paper"].get("profiles") or {}).get("bal") or {})
-        opn = bal.get("open") or []
-        out["autopilot"] = {"n": len(opn), "coins": [o["symbol"] for o in opn if isinstance(o, dict) and o.get("symbol")]} if opn else None
-        prof = x["paper"].get("profiles") or {}
-        out["other_open"] = sum(len((prof.get(k) or {}).get("open") or []) for k in ("imp", "exp", "lst", "own"))
+        # 31.10: the channel speaks only about the REAL CRYPTO NOVA account on OKX (public_real.json), never the demo desks
+        real = x.get("real") or {}
+        opn = [o for o in real.get("futures") or [] if isinstance(o, dict)]
+        out["autopilot"] = {"n": len(opn), "coins": [str(o.get("inst") or "").replace("-USDT-SWAP", "") for o in opn]} if opn else None
+        out["other_open"] = 0
         out["system_line"] = self.system_line(out)
         if btc:
             sup, res = self.zones(btc)
@@ -399,14 +399,10 @@ class Channel:
         if sw.get("n_whales"):
             out["hyperliquid_whales"] = f"{sw['n_whales']} крупнейших счетов: лонги ${sw.get('total_long_usd', 0) / 1e6:.1f}M против шортов ${sw.get('total_short_usd', 0) / 1e6:.1f}M, перевес {'в лонг' if sw.get('bias') == 'LONG' else 'в шорт' if sw.get('bias') == 'SHORT' else 'ничей'}"
         out["news"] = self.impacts(x, 4)
-        prof = x["paper"].get("profiles") or {}
-        if prof:
-            names = {"cons": "консервативная", "bal": "сбалансированная", "aggr": "агрессивная"}
-            try:
-                out["day_result"] = self.day_result(x)
-            except Exception:  # noqa: BLE001
-                out["day_result"] = None
-            out["demo_desks"] = {names[k]: f"{(prof[k].get('pnl_pct') or 0):+.2f}%, позиций в работе {len(prof[k].get('open') or [])}" for k in ("cons", "bal", "aggr") if prof.get(k)}
+        try:
+            out["day_result"] = self.day_result(x)
+        except Exception:  # noqa: BLE001
+            out["day_result"] = None
         st = x["calibration"].get("stats") or {}
         if st.get("n"):
             out["forecast_track_record"] = f"проверено {st['n']} прогнозов, сценарий A сбылся в {round(st['hit_rate'] * 100)}%"
@@ -414,32 +410,40 @@ class Channel:
 
     @staticmethod
     def _usd(v: float) -> str:
-        return f"{'+' if v >= 0 else '−'}${abs(v):,.0f}".replace(",", " ")
+        """$ with a sign; cents under $10 so a real −$0.65 is never shown as «−$0» (31.10)"""
+        a = abs(v)
+        body = f"{a:,.2f}" if a < 10 else f"{a:,.0f}"
+        return ("+" if v >= 0 else "−") + "$" + body.replace(",", " ")
 
     def day_result(self, x: dict) -> dict | None:
-        """What the AI strategies earned or lost over the last 24 h: futures (autopilot «норма», incl. open positions) and spot."""
+        """31.10 (owner: «в канал ушли страшные минуса по демо-столу — не соответствует действительности»): the day's result
+        is the REAL CRYPTO NOVA account on OKX (public_real.json — the same numbers as the app's public card), never a demo desk.
+        Futures and spot parts over the last 24 h come from the account's curves; nothing is estimated."""
+        r = x.get("real") or {}
+        if not r or r.get("stale") or r.get("equity_usd") is None:
+            return None
         now = time.time() * 1000
-        def change(hist, cur, get):
-            if not hist or cur is None:
+        def change(curve):
+            if not curve:
                 return None
             base = None
-            for h in hist:
-                if h.get("time", 0) <= now - 86400_000:
-                    base = get(h)
-            base = get(hist[0]) if base is None else base
-            return cur - base
-        bal = (x["paper"].get("profiles") or {}).get("bal") or {}
-        fut_now = (bal.get("equity") or 0) + sum(o.get("open_pnl_usd") or 0 for o in bal.get("open") or []) if bal else None
-        fut = change(bal.get("equity_history"), fut_now, lambda h: h.get("equity"))
-        pf = x.get("portfolio") or {}
-        sp = (pf.get("portfolios") or {}).get("mod") or pf.get("portfolio") or {}
-        spot = change(sp.get("history"), 10_000 * (sp.get("index") or 100) / 100, lambda h: 10_000 * (h.get("v") if h.get("v") is not None else h.get("equity", 100)) / 100) if sp else None
-        if fut is None and spot is None:
+            for t, v in curve:
+                if t <= now - 86400_000:
+                    base = v
+            if base is None:
+                base = curve[0][1]
+            return curve[-1][1] - base
+        tot = change(r.get("curve"))
+        fut = change(r.get("fut_curve"))
+        if tot is None:
+            tot = r.get("today_usd")
+        if tot is None:
             return None
-        tot = (fut or 0) + (spot or 0)
-        closed = [t for t in bal.get("closed") or [] if (t.get("closed") or 0) > now - 86400_000]
+        spot = tot - fut if fut is not None else None
+        closed = [t for t in r.get("closed") or [] if (t.get("closed") or 0) > now - 86400_000]
         return {"futures": self._usd(fut) if fut is not None else None, "spot": self._usd(spot) if spot is not None else None, "total": self._usd(tot),
-                "futures_trades_closed": len(closed), "total_sign": "заработали" if tot >= 0 else "потеряли"}
+                "futures_trades_closed": len(closed), "total_sign": "заработали" if tot >= 0 else "потеряли",
+                "equity": self._usd(r["equity_usd"]).lstrip("+"), "since_pnl": self._usd(r.get("pnl_usd") or 0), "since_pct": r.get("pnl_pct")}
 
     # ------------------------------------------------------------------ trade results (owner 21.10)
     # «в новости наши, в канал, нужно ещё добавлять результаты сделок … выделять жирным дату … скриншот»: every closed trade of
@@ -471,24 +475,36 @@ class Channel:
                 "exit_ru": self.EXIT_RU.get(t.get("exit_kind"), "по правилу"), "why_ru": self.WHY_RU.get(t.get("grade")),
                 "date": cl.strftime("%d.%m.%Y") if cl else "", "date_ru": self.date_ru(cl) if cl else ""}
 
+    def real_trade_view(self, t: dict) -> dict:
+        """a closed futures trade of the real OKX account (public_real.json closed[]) in the card's shape"""
+        closed = t.get("closed"); cl = kyiv_now(closed) if closed else None
+        sym = str(t.get("inst") or "").replace("-USDT-SWAP", "").replace("-USDT", "")
+        side = "LONG" if str(t.get("side", "long")).lower() == "long" else "SHORT"
+        pnl = t.get("pnl_usd") or 0.0
+        return {"id": f"{sym}:{closed}", "symbol": sym, "side": side, "entry": t.get("open_px"), "exit": t.get("close_px"),
+                "pct": t.get("move_pct"), "net_usd": pnl, "opened": t.get("opened"), "closed": closed,
+                "exit_ru": "частично" if t.get("partial") else "по правилу", "why_ru": None,
+                "date": cl.strftime("%d.%m.%Y") if cl else "", "date_ru": self.date_ru(cl) if cl else ""}
+
     def closed_trades(self, x: dict, since_ms: float) -> list[dict]:
-        bal = (x["paper"].get("profiles") or {}).get("bal") or {}
-        return [self.trade_view(t) for t in sorted(bal.get("closed") or [], key=lambda t: t.get("closed") or 0)
-                if isinstance(t, dict) and (t.get("closed") or 0) > since_ms]
+        r = x.get("real") or {}
+        return [self.real_trade_view(t) for t in sorted(r.get("closed") or [], key=lambda t: t.get("closed") or 0)
+                if isinstance(t, dict) and (t.get("closed") or 0) > since_ms and not t.get("partial")]
 
     def trades_block(self, x: dict) -> str:
         """«Сделки за день» for the evening post: closed in the last 24 h, then the ones still open. Empty when there are none."""
-        bal = (x["paper"].get("profiles") or {}).get("bal") or {}
+        r = x.get("real") or {}
         lines = []
         for v in self.closed_trades(x, time.time() * 1000 - 86400_000)[-4:]:
             pc = f" ({v['pct']:+.1f}%)".replace("-", "−") if v.get("pct") is not None else ""
             lines.append(f"— <b>{v['date'][:5]}</b> · {v['symbol']} {'лонг' if str(v['side']).upper() == 'LONG' else 'шорт'}: "
                          f"<b>{self._usd(v['net_usd'])}{pc}</b>, закрыта {v['exit_ru']}")
-        for o in [o for o in bal.get("open") or [] if isinstance(o, dict)][: max(0, 5 - len(lines))]:
-            u = o.get("open_pnl_usd")
-            lines.append(f"— {o.get('symbol')} {'лонг' if str(o.get('side', 'LONG')).upper() == 'LONG' else 'шорт'}: в работе"
+        for o in [o for o in r.get("futures") or [] if isinstance(o, dict)][: max(0, 5 - len(lines))]:
+            u = o.get("upnl_usd")
+            sym = str(o.get("inst") or "").replace("-USDT-SWAP", "")
+            lines.append(f"— {sym} {'лонг' if str(o.get('side', 'long')).lower() == 'long' else 'шорт'}: в работе, стоп на бирже"
                          + (f", сейчас {self._usd(u)}" if u is not None else ""))
-        return ("<b>Сделки за день:</b>\n" + "\n".join(lines)) if lines else ""
+        return ("<b>Сделки за день (реальный счёт OKX):</b>\n" + "\n".join(lines)) if lines else ""
 
     @staticmethod
     def insert_block(text: str, block: str) -> str:
@@ -516,7 +532,7 @@ class Channel:
         if st.get("trades"):
             w = round((st.get("winrate") or 0) * st["trades"])
             parts.append(f"<b>С начала счёта:</b> {self._deals(st['trades'])}, в плюсе {w}, итог <b>{self._usd(bal.get('pnl_usd') or 0)}</b>.")
-        parts.append("Демо-счёт $10 000, время киевское. Прошлые результаты не гарантируют будущих, это не инвестиционный совет.")
+        parts.append("Реальный счёт CRYPTO NOVA на OKX с 22.10.2026, время киевское. Прошлые результаты не гарантируют будущих, это не инвестиционный совет.")
         return "\n\n".join(parts)
 
     def trade_posts(self, send_fn, photo_fn=None, now: dt.datetime | None = None) -> list[tuple[str, str]]:
@@ -525,7 +541,12 @@ class Channel:
         if not (self.TRADE_HOURS[0] <= now.hour < self.TRADE_HOURS[1]):
             return []
         x = self.ctx()
-        bal = (x["paper"].get("profiles") or {}).get("bal") or {}
+        r = x.get("real") or {}
+        if not r or r.get("stale"):
+            return []
+        closed_all = [t for t in r.get("closed") or [] if isinstance(t, dict) and not t.get("partial")]
+        bal = {"stats": {"trades": len(closed_all), "winrate": (sum(1 for t in closed_all if (t.get("pnl_usd") or 0) > 0) / len(closed_all)) if closed_all else 0},
+               "pnl_usd": r.get("fut_pnl_usd") or 0}
         out = []
         for v in self.closed_trades(x, now.timestamp() * 1000 - self.TRADE_WINDOW):
             key = f"trade:{v['id'] or (str(v['symbol']) + ':' + str(v['closed']))}"
@@ -537,7 +558,7 @@ class Channel:
                 try:
                     from . import postchart
                     coin = self.coin(x["terminal"], str(v["symbol"]))
-                    png = postchart.trade_card(coin, v, os.path.join(self.out, "post_trade.png"), when="автопилот · демо-счёт, сбалансированный риск")
+                    png = postchart.trade_card(coin, v, os.path.join(self.out, "post_trade.png"), when="реальный счёт CRYPTO NOVA на OKX")
                     ok = bool(png) and bool(photo_fn(png, t))
                 except Exception:  # noqa: BLE001
                     ok = False
@@ -575,7 +596,7 @@ class Channel:
     PROMPTS = {
         "morning": "Напиши утренний пост. Структура строго:\n<b>Доброе утро, дорогие подписчики!</b>\n<b>Утренний обзор рынка · {date}</b>\n\n<b>Рынок:</b> три строки через «— »: «— <b>Биткоин</b> $… (±…%)», то же для ETH и SOL; без индекса страха и жадности.\n\n<b>Аналитика:</b> один-два абзаца: что сейчас двигает рынок (новости из news с их механизмом, если они есть; если нет — режим и потоки), как ведёт себя биткоин относительно альтов.\n\n<b>Ключевые факторы:</b> 2–3 коротких пункта, каждый с новой строки через «— ».\n\n<b>Уровни на день:</b> две строки из btc_levels: «— Сопротивление: …» и «— Поддержка: …» (числа <b>жирным</b>); без вероятностей, без слов «сценарий», «основной», «запасной»; одной фразой — что будет значить пробой каждого уровня.\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения: защитный или рабочий режим, где ждём разворота (зоны), что делает система — возьми фразу из system_line по смыслу. Пиши как аналитик: что произошло на рынке, что мы сделали, чего ждём. Не упоминай «автопилот», правила и условия входа, не пиши, что новых сделок не будет; спот — частями. Не пиши «входим от сильных уровней» — система так не работает. Если в данных есть events — добавь блок <b>Календарь</b> с этими строками как есть. Пост идёт подписью к картинке, поэтому строго до 800 символов (картинка уже показывает цены, зоны и сценарии с вероятностями — в тексте только уровни, не дублируй всё подряд).",
         "news": "Напиши пост об одной новости. Влияние новости на цену — это возможность, а не факт: пиши «может», «если», а не «фиксирует», «происходит», «массовые продажи». Что сейчас на самом деле с ценой — только из market_now; что ждёт система — только из system_view (сценарии A и B). Если новость негативная, а цена не падает и system_view за рост — так и скажи честно: «на цене это пока не видно». Если новость мелкая для рынка (арест, частное мошенничество, небольшая сумма) — прямо напиши, что на биткоин она почти не влияет. Структура строго:\nПервая строка — твой заголовок: короткий и сильный, до 8 слов, по сути новости, в <b>…</b>; никаких слов «шапка», «заголовок» и т.п. Если в новости есть малоизвестная монета, проект, компания или человек — поясни одной фразой в скобках, что это (например, «HEX (токен проекта Ричарда Харта)»), чтобы понял новичок.\n\n<b>Что случилось:</b> 2–3 предложения по summary.\n\n<b>Почему это важно для рынка:</b> 2–4 предложения — механизм: кто вынужден покупать или продавать, на какие монеты влияет, что это меняет в настроении; упомяни текущую цену биткоина из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2 предложения: главный риск или шанс и что делает система — возьми фразу из system_line по смыслу. Пиши как аналитик: что произошло на рынке, что мы сделали, чего ждём. Не упоминай «автопилот», правила и условия входа, не пиши, что новых сделок не будет. Длина до 1200 символов. Ссылку НЕ вставляй — её добавят после.",
-        "evening": "Напиши вечерний пост. Структура строго:\n<b>Итоги дня · {date}</b>\n\n<b>Главные события:</b> 2–3 пункта с новой строки «1.», «2.», «3.» — из news (с механизмом одной фразой); если новостей нет — главные движения рынка.\n\n<b>Как вёл себя рынок:</b> пункты через «— »: биткоин, эфир, солана с ценой и изменением за сутки (цены <b>жирным</b>), одна строка — кто вырос и кто упал сильнее всех.\n\n<b>Итог дня по счетам:</b> три строки из day_result: «— Фьючерсы (автопилот): …», «— Спот: …», «— Всего за день: …» (суммы со знаком, <b>жирным</b>); если day_result нет — раздел пропусти.\n\n<b>Что дальше:</b> одна строка «— Уровни на завтра: сопротивление …, поддержка …» из btc_levels (числа <b>жирным</b>), без вероятностей и без слов «сценарий». Затем строки через «— »: «— Краткосрочно:» (по стрессу рынка и импульсу), «Среднесрочно:» (по тренду и зонам), «Долгосрочно:» (по режиму 200-дневной) — без новых чисел, только из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения: что произошло на рынке, что система делает завтра (не пиши о несбывшихся прогнозах) — возьми фразу из system_line по смыслу. Пиши как аналитик: что произошло на рынке, что мы сделали, чего ждём. Не упоминай «автопилот», правила и условия входа, не пиши, что новых сделок не будет. Уровни на завтра называй только из btc_levels; зоны из btc_zones — это дальние ориентиры, упоминай их только как «если пробьём …, следующая зона …», не как ожидание на завтра. Пост идёт подписью к картинке, поэтому строго до 800 символов: каждый раздел — 1–2 коротких предложения, «Главные события» — максимум 2 пункта."
+        "evening": "Напиши вечерний пост. Структура строго:\n<b>Итоги дня · {date}</b>\n\n<b>Главные события:</b> 2–3 пункта с новой строки «1.», «2.», «3.» — из news (с механизмом одной фразой); если новостей нет — главные движения рынка.\n\n<b>Как вёл себя рынок:</b> пункты через «— »: биткоин, эфир, солана с ценой и изменением за сутки (цены <b>жирным</b>), одна строка — кто вырос и кто упал сильнее всех.\n\n<b>Итог дня по счетам:</b> три строки из day_result: «— Фьючерсы: …», «— Спот: …», «— Всего за день: …» (суммы со знаком, <b>жирным</b>) — это реальный счёт CRYPTO NOVA на OKX; если day_result нет — раздел пропусти.\n\n<b>Что дальше:</b> одна строка «— Уровни на завтра: сопротивление …, поддержка …» из btc_levels (числа <b>жирным</b>), без вероятностей и без слов «сценарий». Затем строки через «— »: «— Краткосрочно:» (по стрессу рынка и импульсу), «Среднесрочно:» (по тренду и зонам), «Долгосрочно:» (по режиму 200-дневной) — без новых чисел, только из данных.\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения: что произошло на рынке, что система делает завтра (не пиши о несбывшихся прогнозах) — возьми фразу из system_line по смыслу. Пиши как аналитик: что произошло на рынке, что мы сделали, чего ждём. Не упоминай «автопилот», правила и условия входа, не пиши, что новых сделок не будет. Уровни на завтра называй только из btc_levels; зоны из btc_zones — это дальние ориентиры, упоминай их только как «если пробьём …, следующая зона …», не как ожидание на завтра. Пост идёт подписью к картинке, поэтому строго до 800 символов: каждый раздел — 1–2 коротких предложения, «Главные события» — максимум 2 пункта."
     }
 
     # ------------------------------------------------------------------ posts
@@ -725,7 +746,7 @@ class Channel:
             body.append(f"<b>Утренний сценарий</b>\n{facts['scenario_verdict'][0].upper() + facts['scenario_verdict'][1:]}.")
         dr = facts.get("day_result")
         if dr:
-            body.append("<b>Итог дня по счетам</b>\n" + "\n".join(x for x in (f"— Фьючерсы (автопилот): <b>{dr['futures']}</b>" if dr.get("futures") else "", f"— Спот: <b>{dr['spot']}</b>" if dr.get("spot") else "", f"— Всего за день: <b>{dr['total']}</b>") if x))
+            body.append("<b>Итог дня · реальный счёт CRYPTO NOVA на OKX</b>\n" + "\n".join(x for x in (f"— Фьючерсы: <b>{dr['futures']}</b>" if dr.get("futures") else "", f"— Спот: <b>{dr['spot']}</b>" if dr.get("spot") else "", f"— Всего за день: <b>{dr['total']}</b>") if x))
         r = facts.get("btc_regime") or {}
         lv = facts.get("btc_levels") or {}
         fc = ["— Рынок сейчас: " + (facts.get("market_stress") or "спокойный") + (f", {r.get('impulse')}" if r.get("impulse") else "") + "."]
@@ -876,7 +897,7 @@ class Channel:
                     for k, name in (("futures", "Фьючерсы"), ("spot", "Спот"), ("total", "Всего за день")):
                         if dr.get(k):
                             rows.append((name, dr[k], postchart.DOWN if str(dr[k]).startswith(("−", "-")) else postchart.UP))
-                    rtitle = "Итог дня по счетам"
+                    rtitle = "Итог дня · реальный счёт OKX"
                 else:
                     skip = {"BTC", "ETH", "SOL", "XAUT", "PAXG", "WBT", "LEO", "WBTC", "WETH", "STETH", "WSTETH", "WEETH", "CBBTC"}
                     movers = [t for t in x["markets"].get("top", [])[:60] if not t.get("stable") and not t.get("wrapped") and t.get("chg24") is not None

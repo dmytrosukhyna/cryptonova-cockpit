@@ -221,33 +221,46 @@ def test_send_photo_album_falls_back_to_one_picture():
 
 def test_closed_trade_gets_its_own_post_and_the_evening_lists_it():
     """Owner 21.10: results of the trades go to the channel — a post per closed trade (bold date, picture card) and a
-    «Сделки за день» block in the evening. Losses are posted like wins; old trades and night hours are skipped."""
+    «Сделки за день» block in the evening. Losses are posted like wins; old trades and night hours are skipped.
+    31.10 (owner: the channel showed demo-desk losses of −$200 a trade): the trades and the day's result come ONLY from the
+    real OKX account (public_real.json); the demo desks in paper.json are ignored."""
     tmp = tempfile.mkdtemp(); _web(tmp)
     now = dt.datetime.now(channel.KYIV).replace(hour=14, minute=5)
     ms = int(now.timestamp() * 1000)
-    win = {"id": "E-ARB-1", "symbol": "ARB", "side": "LONG", "grade": "E", "entry": 0.17552, "qty": 11396.0, "pnl_usd": 191.6, "net_usd": 190.59,
-           "opened": ms - 25 * 3600_000, "closed": ms - 3600_000, "exit_kind": "TIME"}
-    loss = {"id": "E-DOT-1", "symbol": "DOT", "side": "LONG", "grade": "E", "entry": 1.1121, "qty": 299.79, "pnl_usd": -7.64, "net_usd": -7.81,
-            "opened": ms - 26 * 3600_000, "closed": ms - 2 * 3600_000, "exit_kind": "STOP"}
-    old = dict(win, id="E-SOL-old", symbol="SOL", closed=ms - 3 * 86400_000)
+    win = {"inst": "ARB-USDT-SWAP", "side": "long", "open_px": 0.17552, "close_px": 0.19237, "move_pct": 9.6, "pnl_usd": 19.06, "lev": 2.0,
+           "opened": ms - 25 * 3600_000, "closed": ms - 3600_000, "partial": False}
+    loss = {"inst": "DOT-USDT-SWAP", "side": "long", "open_px": 1.1121, "close_px": 1.0865, "move_pct": -2.3, "pnl_usd": -0.78, "lev": 2.0,
+            "opened": ms - 26 * 3600_000, "closed": ms - 2 * 3600_000, "partial": False}
+    old = dict(win, inst="SOL-USDT-SWAP", closed=ms - 3 * 86400_000)
     pj = json.load(open(os.path.join(tmp, "paper.json")))
-    pj["profiles"]["bal"] = {"pnl_pct": 1.86, "pnl_usd": 186.34, "open": [], "closed": [old, loss, win], "stats": {"trades": 7, "winrate": 0.714}}
+    pj["profiles"]["bal"] = {"pnl_pct": 1.86, "pnl_usd": 186.34, "open": [], "stats": {"trades": 7, "winrate": 0.714},
+                             "closed": [{"id": "E-X-1", "symbol": "XRP", "side": "LONG", "entry": 1, "qty": 2000, "pnl_usd": -212.0, "net_usd": -213.0,
+                                         "opened": ms - 9 * 3600_000, "closed": ms - 3600_000, "exit_kind": "STOP"}]}   # demo loss: must never go out
     json.dump(pj, open(os.path.join(tmp, "paper.json"), "w"))
+    real = {"exchange": "okx", "since": ms - 9 * 86400_000, "start_usd": 10024.4, "equity_usd": 9515.04, "pnl_usd": -509.36, "pnl_pct": -5.08,
+            "stale": False, "closed": [old, loss, win], "futures": [{"inst": "OP-USDT-SWAP", "side": "long", "upnl_usd": -7.06}],
+            "fut_pnl_usd": 18.28, "curve": [[ms - 40 * 3600_000, -583.0], [ms - 26 * 3600_000, -560.0], [ms, -509.36]],
+            "fut_curve": [[ms - 40 * 3600_000, 0.0], [ms - 26 * 3600_000, 1.0], [ms, 18.28]]}
+    json.dump(real, open(os.path.join(tmp, "public_real.json"), "w"))
     conn = sqlite3.connect(":memory:"); ch = channel.Channel(conn, tmp)
     sent, photos = [], []
     out = ch.trade_posts(lambda t: sent.append(t) or True, lambda p, c: photos.append((p, c)) or True, now)
-    assert len(out) == 2 and not any("SOL" in t for _, t in out)
+    assert len(out) == 2 and not any("SOL" in t or "XRP" in t for _, t in out)
     t_loss, t_win = out[0][1], out[1][1]
     d = now.strftime("%d.%m.%Y")
-    assert f"<b>Сделка закрыта · {d}</b>" in t_win and "<b>+$191 (+9.6%)</b>" in t_win and "Демо-счёт $10 000" in t_win
-    assert "<b>−$8 (−2.3%)</b>" in t_loss and "по стопу" in t_loss
-    assert "в плюсе 5" in t_win and "+$186" in t_win
+    assert f"<b>Сделка закрыта · {d}</b>" in t_win and "<b>+$19 (+9.6%)</b>" in t_win and "Реальный счёт CRYPTO NOVA на OKX" in t_win
+    assert "Демо" not in t_win and "<b>−$0.78 (−2.3%)</b>" in t_loss
+    assert "в плюсе 2" in t_win and "+$18" in t_win
     assert len(photos) == 2 or len(sent) == 2                                # picture card when Pillow is there, text otherwise
     assert ch.trade_posts(lambda t: sent.append(t) or True, None, now) == []    # once per trade
     ch2 = channel.Channel(sqlite3.connect(":memory:"), tmp)
     assert ch2.trade_posts(lambda t: True, None, now.replace(hour=3)) == []     # no posts at night
     blk = ch.trades_block(ch.ctx())
-    assert blk.startswith("<b>Сделки за день:</b>") and "ARB лонг: <b>+$191 (+9.6%)</b>" in blk and "DOT" in blk and "SOL" not in blk
+    assert blk.startswith("<b>Сделки за день (реальный счёт OKX):</b>") and "ARB лонг: <b>+$19 (+9.6%)</b>" in blk and "DOT" in blk
+    assert "SOL" not in blk and "XRP" not in blk and "OP лонг: в работе, стоп на бирже" in blk
+    dr = ch.day_result(ch.ctx())
+    assert dr["total"] == "+$51" and dr["futures"] == "+$17" and dr["spot"] == "+$33" and dr["futures_trades_closed"] == 2
     ev = ch.post("evening", now=now.replace(hour=21, minute=40))
-    assert "<b>Сделки за день:</b>" in ev and ev.index("Сделки за день") < ev.index("Вывод CRYPTO NOVA")
+    assert "<b>Сделки за день (реальный счёт OKX):</b>" in ev and ev.index("Сделки за день") < ev.index("Вывод CRYPTO NOVA")
+    assert "−$212" not in ev and "−$213" not in ev and "реальный счёт CRYPTO NOVA на OKX" in ev
     assert ch.lint(ev, {}) == []

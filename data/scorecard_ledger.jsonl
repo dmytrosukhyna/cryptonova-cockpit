@@ -623,3 +623,4 @@
 {"ev":"close_up","hz":24,"id":"base:BTC:day:1793484073562","n":3960,"p":0.507,"px":77592.4,"rec":1793484240535,"src":"base","sym":"BTC","t":1793484073562,"h":"8e7a37a5532b452f1e525a92dd52d59bfa53dcb4fb64fd21948a05c944ef8395"}
 {"ev":"close_up","hz":24,"id":"base:ETH:day:1793484073562","n":3961,"p":0.514,"px":2252.94,"rec":1793484240535,"src":"base","sym":"ETH","t":1793484073562,"h":"6963f0f6c6e008dbdb8a295707b875a1a06cc0af7eb1c222ff5d4d76505cc410"}
 {"ev":"close_up","hz":24,"id":"base:SOL:day:1793484073562","n":3962,"p":0.513,"px":95.814,"rec":1793484240535,"src":"base","sym":"SOL","t":1793484073562,"h":"ecb798efc85eddd6ab56368c726683d4448f6cee0d6e412f12f962223e470bc1"}
+{"desk":"bal","entry":0.30081015,"id":"feed:D-TRX-498190","n":3963,"pub":0,"rec":1793486818420,"rule":"D","side":"LONG","src":"feed","stop":0.26466,"sym":"TRX","t":1793486802336,"tps":[0.33696,0.37311,0.409261],"h":"eb4ac31474389becf8d54eefdfc7590b8ee5332c4b06cda94506e1a46e19f618"}

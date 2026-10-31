@@ -507,6 +507,27 @@ class Channel:
         return ("<b>Сделки за день (реальный счёт OKX):</b>\n" + "\n".join(lines)) if lines else ""
 
     @staticmethod
+    def shrink(text: str, limit: int = 1024) -> str:
+        """Fit a morning/evening post into Telegram's photo caption: shorten section by section (calendar lines, extra news,
+        extra trades, the long-term line) until the visible text is within the limit; nothing is reworded."""
+        def visible(t: str) -> int:
+            return len(re.sub(r"<[^>]+>", "", t))
+        secs = text.split("\n\n")
+        caps = {"Главное за день": 1, "Сделки за день": 3, "Что дальше": 2, "Календарь": 1, "Что важно сегодня": 2, "Уровни на день": 2}
+        for title, cap in caps.items():
+            if visible("\n\n".join(secs)) <= limit:
+                break
+            for i, sec in enumerate(secs):
+                if sec.startswith(f"<b>{title}"):
+                    lines = sec.split("\n")
+                    secs[i] = "\n".join(lines[: 1 + cap])
+        out = "\n\n".join(secs)
+        if visible(out) > limit:                      # last resort: drop the calendar / levels sections entirely
+            secs = [x for x in secs if not x.startswith(("<b>Календарь", "<b>Уровни на день", "<b>Утренний сценарий"))]
+            out = "\n\n".join(secs)
+        return out
+
+    @staticmethod
     def insert_block(text: str, block: str) -> str:
         if not block:
             return text
@@ -976,6 +997,8 @@ class Channel:
             cx_ = self.ctx()
             png = self.chart(cx_, slot)
             ex = self.extra(cx_, slot) if png else None
+            if png and len(re.sub(r"<[^>]+>", "", t)) > 1024:
+                t = self.shrink(t)                   # 31.10 (owner): the picture and the text must be ONE message
             if png and len(re.sub(r"<[^>]+>", "", t)) <= 1024:
                 try:
                     if photo_fn([png, ex] if ex else png, t):

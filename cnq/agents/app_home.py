@@ -1581,7 +1581,14 @@ def _say_when(ms: int, lang: str) -> str:
     return f"{_say_date(ms, lang)}, {dt.datetime.fromtimestamp(int(ms) / 1000, _kyiv()):%H:%M}"
 
 
-def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, issues: list[str] | None = None) -> dict:
+REP_HOUR_MS = 3_600_000
+
+
+def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, issues: list[str] | None = None,
+            mk: dict | None = None) -> dict:
+    """build 53 (owner 30.10): the spoken report is a BRIEFING — 5–7 short calm sentences: the system works as usual (only when every
+    part is ok and the account is fresh), the portfolio in one short clause, the open trades, bitcoin with its day and the regime in
+    the system's own words, fear & greed, the system's last action, one closing line; the data's time when it is older than an hour."""
     out = []
     issues = list(issues or [])
     if (not pport or pport.get("stale")) and "account" not in issues:
@@ -1590,31 +1597,42 @@ def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, 
     # build 51 (owner 29.10: «в докладе он говорит что-то страшное, непонятное — про неточные суммы, перебои. Этого не надо»): the
     # spoken text has no alarm words any more. Still honest: report.status / report.issues keep naming the broken parts for the panel,
     # an old amount is never said as today's, and when anything is late one calm sentence closes the report — «Цифры на {когда}.»
+    if not issues:
+        out.append(t(lang, "rep.ok"))
     if not pport:
         out.append(t(lang, "rep.none"))
     else:
         if pport.get("stale"):                    # an old amount is never said as today's
             out.append(t(lang, "rep.value_asof", v=_say_money(pport["value_usd"], lang)))
+        elif pport.get("pnl_usd") is not None and abs(float(pport["pnl_usd"])) >= 0.5 and pport.get("since"):
+            out.append(t(lang, "rep.pf", v=_say_money(pport["value_usd"], lang), d=_say_date(pport["since"], lang),
+                         chg=_say_money(pport["pnl_usd"], lang, True)))
         else:
             out.append(t(lang, "rep.value", v=_say_money(pport["value_usd"], lang)))
-        day = (pport.get("periods") or {}).get("day") or {}
-        if not pport.get("stale") and day.get("available") and day.get("usd") is not None and day.get("pct") is not None:
-            out.append(t(lang, "rep.today", chg=_say_money(day["usd"], lang, True), pct=_say_pct(day["pct"], lang)))
-        if pport.get("pnl_usd") is not None and pport.get("pnl_pct") is not None:
-            out.append(t(lang, "rep.since", d=_say_date(pport["since"], lang), chg=_say_money(pport["pnl_usd"], lang, True),
-                         pct=_say_pct(pport["pnl_pct"], lang)))
         f = pport.get("futures") or {}
         if f:
             out.append(t(lang, "rep.fut.open", n=f["open_n"]) if f.get("open_n") else t(lang, "rep.fut.none"))
+    b = (mv or {}).get("btc") or {}
+    regime = (mv or {}).get("regime")
+    if b.get("price") and b.get("chg24") is not None:
+        if regime in ("up", "down"):
+            out.append(t(lang, "rep.btc_regime", v=_say_money(b["price"], lang), pct=_say_pct(b["chg24"], lang),
+                         regime=t(lang, "regime." + regime)))
+        else:
+            out.append(t(lang, "rep.btc", v=_say_money(b["price"], lang), pct=_say_pct(b["chg24"], lang)))
+    fng = (mk or {}).get("fng") or {}
+    if fng.get("value") is not None:
+        lab = _fng_label(fng, lang)
+        out.append(t(lang, "rep.fng", v=int(fng["value"]), label=lab) if lab else t(lang, "rep.fng0", v=int(fng["value"])))
+    if pport:
         acts = [a for a in pport.get("actions") or [] if a.get("kind") in REP_WHAT]
         if acts:
             a = acts[0]
             out.append(t(lang, "rep.last", d=_say_date(a["t"], lang), what=t(lang, f"rep.w.{REP_WHAT[a['kind']]}"), sym=a["sym"]))
-    b = (mv or {}).get("btc") or {}
-    if b.get("price") and b.get("chg24") is not None:
-        out.append(t(lang, "rep.btc", v=_say_money(b["price"], lang), pct=_say_pct(b["chg24"], lang)))
-    if issues and pport and pport.get("asof"):
-        out.append(t(lang, "rep.asof", d=_say_when(pport["asof"], lang)))
+    out.append(t(lang, "rep.bye"))
+    asof = (pport or {}).get("asof")
+    if asof and (issues or now - int(asof) > REP_HOUR_MS):
+        out.append(t(lang, "rep.asof", d=_say_when(asof, lang)))
     text = " ".join(out)
     try:
         from ..api.tts import key as tts_key
@@ -1625,9 +1643,9 @@ def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, 
             "status": "degraded" if issues else "ok", "issues": issues}
 
 
-def _report_safe(pport, mv, now, lang, issues=None):
+def _report_safe(pport, mv, now, lang, issues=None, mk=None):
     try:
-        return _report(pport, mv, now, lang, issues)
+        return _report(pport, mv, now, lang, issues, mk)
     except Exception as e:  # noqa: BLE001
         print("app_home report:", repr(e)[:200], flush=True)
         return None
@@ -1667,7 +1685,7 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
     real_syms = {str(x.get("sym") or "").upper() for x in (real or {}).get("spot") or [] if x.get("sym")}
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
             "total": {"usd": total, "futures_usd": fut["usd"], "spot_usd": spot["usd"]}, "portfolio": pub, "public": public,
-            "public_portfolio": pport, "market_view": mv, "report": _report_safe(pport, mv, now, lang, issues),
+            "public_portfolio": pport, "market_view": mv, "report": _report_safe(pport, mv, now, lang, issues, mk),
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
             "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out, lang),

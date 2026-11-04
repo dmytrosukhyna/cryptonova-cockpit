@@ -248,3 +248,25 @@ def test_staged_promotion_owner_numbers_and_rollback(tmp_path):
     d = ds.run(str(tmp_path), NOW, str(tmp_path / "log.jsonl"))
     assert d["stages"]["desks"] and "alloc" in d["stages"] and abs(sum(d["stages"]["alloc"].values()) - 1) < 1e-5
     assert d["stages"]["rules_ru"].startswith("Ступени")
+
+
+def test_whales_get_a_real_share_once_the_feed_carries_the_desk_shape_and_carry_is_tracked_only():
+    """04.11 (owner: «стол китов … срочно внедрять»): with whales_top.json «desk.paper» (the trades the real OKX sleeve follows) the
+    whales' stage share is real — stages.alloc gives it 5 % at stage 1; «Керри фандинга» (funding.json) is staged for tracking only"""
+    w = world()
+    prev = {"current": "aggr", "since": ds.OWNER["since"], "by": "owner"}
+    wtop = {"desk": {"name_ru": "Киты · копирование топ-5", "start": 10000.0, "started": NOW - 4 * ds.DAY, "equity": 10300.0, "trades": 6,
+                     "max_dd_pct": 1.0, "history": [[NOW - 3 * ds.DAY, 10100.0], [NOW - ds.DAY, 10250.0]],
+                     "closed": [{"whale": "okx:A", "coin": "BTC", "pnl": 50.0, "closed_t": NOW - 3 * ds.DAY + i * H} for i in range(6)],
+                     "paper": {"open": [], "closed": []}}}
+    carry = {"asof": NOW, "start_equity": 10000.0, "equity": 10019.0, "equity_mtm": 10016.0, "breakdown": {"since": NOW - 18 * ds.DAY},
+             "history": [[NOW - (18 - i) * ds.DAY, 10000.0 - 12.5 + i * 1.8] for i in range(18)]}
+    s = ds.stage_eval(w, prev, wtop, None, "aggr", NOW, carry)
+    by = {d["key"]: d for d in s["desks"]}
+    assert by["whales"]["stage"] == 1 and by["whales"]["real"] and by["whales"]["real_why"] is None
+    al = ds.alloc_shares(w, "aggr", s)
+    assert al["whales"] == 0.05 and abs(al["aggr"] - 0.475) < 1e-6 and abs(sum(al.values()) - 1) < 1e-5
+    c = by["carry"]
+    assert not c["real"] and not c["eligible_real"] and c["trades"] >= 5 and "carry" not in al and "день" in c["note"]
+    days = ds.carry_days([(NOW - 2 * ds.DAY, 100.0), (NOW - ds.DAY, 101.0), (NOW - 1000, 101.5)], 101.2, NOW)
+    assert days == [(NOW - ds.DAY, 1.0), (NOW, 0.2)]

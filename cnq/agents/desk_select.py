@@ -50,7 +50,15 @@ BTC», + «Сигналы» after their gate, + stage-3 desks) keeps the remaind
 followed by the real OKX sleeve (okx_futures.pick_desks reads «stages.alloc»); a staged «Киты» or «Золото» keeps its stage but its
 share stays with the main desks until an executor exists («real»: false) — and gold needs the owner's separate OK anyway
 («eligible_real»: false). The old main-desk switch now needs the challenger at stage 3 instead of READY (the rest unchanged).
-Every change writes a line to data/desk_select.jsonl and to «stages.log» of web/desk_select.json. Stdlib only."""
+Every change writes a line to data/desk_select.jsonl and to «stages.log» of web/desk_select.json.
+04.11 (owner, real money: «стол копирования китов … срочно внедрять»): «Киты» now HAS an executor — the real OKX sleeve follows
+whales_top.json «desk.paper» (cnq/execution/okx_futures.py fetch_desks / whales_desk; the whale's leverage ≤ 5×, a stop at OKX), so
+its stage share is real («real»: true) once the feed carries that shape; until then it stays «real»: false as before.
+04.11 (owner: «арбитраж в VIP приносит хорошие деньги — почему система его ещё не подключила?»): «Керри фандинга» (web/funding.json,
+cnq/agents/funding_desk.py — long spot + short perp, delta-neutral) is a staged candidate for tracking: it has no closed trades, so
+its «trades» are the UTC days of its record (each day's equity change). «real»: false — the sleeve has no two-leg (spot + swap)
+executor — and «eligible_real»: false until the owner decides. The VIP cross-exchange / triangle «arbitrage» (arb.json, tri.json)
+cannot be traded from one OKX account and is not a candidate. Stdlib only."""
 from __future__ import annotations
 
 import json
@@ -362,8 +370,8 @@ STAGE_CAP = 0.40                                          # the stage-1/2 shares
 ROLL_LOSING_DAYS = 5                                      # UTC days in a row with closed trades all summing below 0 → one step down
 ROLL_DD_PLUS = 3.0                                        # points over the desk's own max drawdown at its last promotion → one step down
 ROLL_LAST_N = 10                                          # PF < 1 over the last 10 trades → one step down
-EXTRA = ("whales", "gold")                                # staged candidates outside web/paper.json (their own feeds)
-EXTRA_NAME = {"whales": "Киты · копирование топ-5", "gold": "Золото · тест"}
+EXTRA = ("whales", "gold", "carry")                       # staged candidates outside web/paper.json (their own feeds)
+EXTRA_NAME = {"whales": "Киты · копирование топ-5", "gold": "Золото · тест", "carry": "Керри фандинга · спот + шорт свопа"}
 STAGE_RULES_RU = ("Ступени (решение владельца 30.10): 1 — от 3 дней и 5 сделок, результат в плюсе, профит-фактор от 1,3 → 5% бюджета "
                   "фьючерсов; 2 — от 7 дней и 10 сделок, просадка до 10% → 15%; 3 — от 14 дней и 15 сделок → полная доля наравне с "
                   "основным столом. Откат на ступень вниз сразу: 5 убыточных дней подряд, просадка глубже своей прошлой максимальной "
@@ -393,7 +401,24 @@ def losing_days(trades: list, now: int) -> int:
     return n
 
 
-def stage_source(key: str, prof: dict, wtop, gold) -> dict | None:
+def carry_days(curve: list, eq_now: float, now: int) -> list:
+    """the carry desk's «trades»: one per UTC day of its record = that day's equity change (the last day ends at eq_now)"""
+    ends = {}
+    for t, e in curve:
+        ends[int(t) // DAY] = (t, e)
+    out, prev = [], None
+    days = sorted(ends)
+    for i, d in enumerate(days):
+        t, e = ends[d]
+        if i == len(days) - 1 and d == int(now) // DAY:
+            t, e = now, eq_now
+        if prev is not None:
+            out.append((int(t), round(e - prev, 4)))
+        prev = e
+    return [x for x in out if x[1] != 0]
+
+
+def stage_source(key: str, prof: dict, wtop, gold, carry=None) -> dict | None:
     """one staged candidate as {name, start, trades [(closed, net)], curve [(t, eq)], eq_now, start_eq, dd_record, real, eligible_real}
     — a web/paper.json desk, «Киты» (whales_top.json → desk) or «Золото» (gold_desk.json); None when the source is missing"""
     if key == "whales":
@@ -401,14 +426,28 @@ def stage_source(key: str, prof: dict, wtop, gold) -> dict | None:
         if not isinstance(d, dict) or not d.get("started"):
             return None
         cl = [t for t in d.get("closed") or [] if isinstance(t, dict)]
+        real = isinstance(d.get("paper"), dict)                    # 04.11: the feed the real sleeve follows is there
         return {"key": key, "name": d.get("name_ru") or EXTRA_NAME[key], "start": int(_num(d.get("started"))),
                 "trades": [(int(_num(t.get("closed_t"))), _num(t.get("pnl"))) for t in cl], "n_all": int(_num(d.get("trades"), len(cl))),
                 "curve": [(int(_num(e[0] if isinstance(e, (list, tuple)) else (e or {}).get("t"))),
                            _num(e[1] if isinstance(e, (list, tuple)) else (e or {}).get("equity"))) for e in d.get("history") or []],
                 "eq_now": _num(d.get("equity"), ph.START), "start_eq": _num(d.get("start"), ph.START), "dd_record": _num(d.get("max_dd_pct")),
-                "real": False, "real_why": "сделки «Китов» реальный счёт пока не повторяет — нет исполнителя; доля ступени остаётся у основных столов",
+                "real": real, "real_why": None if real else "лента стола «Китов» ещё без сделок в формате стола (desk.paper) — реальный счёт ждёт её; доля ступени остаётся у основных столов",
                 "eligible_real": True, "eligible_real_why": None,
                 "note": (f"все сделки — {len({str(t.get('whale')) for t in cl})} кит(а)" if cl else None)}
+    if key == "carry":
+        d = carry if isinstance(carry, dict) and carry.get("history") else None
+        if not d:
+            return None
+        curve = [(int(_num(e[0])), _num(e[1])) for e in d.get("history") or [] if isinstance(e, (list, tuple)) and len(e) >= 2]
+        start = int(_num((d.get("breakdown") or {}).get("since"), curve[0][0] if curve else 0))
+        eq_now = _num(d.get("equity_mtm"), _num(d.get("equity"), ph.START))
+        days = carry_days(curve, eq_now, int(_num(d.get("asof"), time.time() * 1000)))
+        return {"key": key, "name": EXTRA_NAME[key], "start": start, "trades": days, "n_all": len(days), "curve": curve,
+                "eq_now": eq_now, "start_eq": _num(d.get("start_equity"), ph.START), "dd_record": 0.0, "real": False,
+                "real_why": "у реального счёта нет исполнителя двух ног (покупка спота + шорт свопа на OKX одновременно) — только наблюдение",
+                "eligible_real": False, "eligible_real_why": "нужно отдельное решение владельца (капитал под керри и исполнитель двух ног)",
+                "note": "у керри нет закрытых сделок: «сделка» здесь — день начислений фандинга (изменение счёта за день)"}
     if key == "gold":
         d = gold if isinstance(gold, dict) and gold.get("since") else None
         if not d:
@@ -492,14 +531,14 @@ def stage_keys(prof: dict, cur: str) -> list:
     return [k for k in family_reps(candidate_keys(prof), cur) if family_of(k) != cur_fam] + list(EXTRA)
 
 
-def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int) -> dict:
+def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int, carry=None) -> dict:
     """the hourly step of the ladder: {desks: [...], alloc: {key: share}, staged_pct, main_pct, cap_pct, log: [...], rules_ru}.
     prev = the last web/desk_select.json (its «stages.desks» is the state)"""
     old = {d.get("key"): d for d in ((prev or {}).get("stages") or {}).get("desks") or [] if isinstance(d, dict) and d.get("key")} \
         if isinstance(prev, dict) else {}
     desks, log = [], []
     for k in stage_keys(prof, cur):
-        src = stage_source(k, prof, wtop, gold)
+        src = stage_source(k, prof, wtop, gold, carry)
         if src is None:
             continue
         st = old.get(k) or {}
@@ -586,7 +625,7 @@ def run(out: str = "web", now: int | None = None, log_path: str = LOG) -> dict:
     prev = _load(out, FEED)
     wtop, gold = _load(out, "whales_top.json"), _load(out, "gold_desk.json")
     cur = state_of(prev)["current"]
-    stg = stage_eval(prof, prev, wtop, gold, cur, now)                 # 30.10: the ladder (its state = the previous file)
+    stg = stage_eval(prof, prev, wtop, gold, cur, now, _load(out, "funding.json"))   # 30.10: the ladder (its state = the previous file)
     conv = _load(out, "conveyor.json") or {}
     convd = {d.get("key"): d for d in conv.get("desks") or [] if isinstance(d, dict) and d.get("key")}
     stages = {d["key"]: {**d, "conv": convd.get(d["key"])} for d in stg["desks"]}   # READY = stage 3 of the ladder OR the conveyor's gate

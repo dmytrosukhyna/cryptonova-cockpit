@@ -52,6 +52,12 @@ DELAYS_MIN = (15, 30, 60)
 COST_PCT = 0.11                       # taker 0.045 % × 2 + slippage 0.02 %
 REFRESH_MS = DAY                      # study data per whale refreshed once a day
 DESK_START, DESK_MARGIN, DESK_LEV_CAP, DESK_MAX_OPEN = 10_000.0, 0.10, 5.0, 8
+# 04.11 (owner, real money: «стол копирования китов … срочно внедрять; повторяй их плечи; логику применять, но себя не ужимать»):
+# the desk now also trades the way the real OKX sleeve can follow it — every copy has a protective stop (the whale's own stop
+# when he has one on the exchange, else −8 % from our entry) and one whale never takes more than 30 % of the desk's equity as margin
+DESK_STOP = 0.08                      # protective stop, fraction of the entry price (5× → at most −40 % of the position's margin)
+WHALE_CAP = 0.30                      # one whale's open copies: margin ≤ 30 % of the desk's equity (= at most 3 copies of 10 %)
+STOP_MIN, STOP_MAX = 0.002, 0.15      # the whale's own stop is used only when it sits 0.2–15 % away on the protective side
 UA = {"Content-Type": "application/json", "User-Agent": "cryptonova-whale-study/1.0"}
 OKX = "https://www.okx.com"
 OKX_PRE_N = 20
@@ -658,6 +664,8 @@ def okx_positions(state: dict) -> list[dict]:
         a = agg.setdefault((coin, side), {"coin": coin, "side": side, "size": 0.0, "notional": 0.0, "entry": _f(x.get("openAvgPx")),
                                           "upnl": 0.0, "lev": lev})
         a["notional"] += _f(x.get("margin")) * lev; a["upnl"] += _f(x.get("upl")); a["size"] += abs(_f(x.get("subPos")))
+        if _f(x.get("slTriggerPx")) and not a.get("sl"):          # the lead trader's own stop on OKX (04.11), when he set one
+            a["sl"] = _f(x.get("slTriggerPx"))
     return sorted(({**v, "notional": round(v["notional"]), "upnl": round(v["upnl"])} for v in agg.values()), key=lambda x: -x["notional"])
 
 
@@ -676,11 +684,36 @@ def okx_trips(conn, addr: str, since: int) -> tuple[list[dict], float]:
 
 
 # ------------------------------------------------------------------------------------------------------------ copy desk
+def stop_for(side: str, entry: float, whale_sl: float | None = None) -> tuple[float, str]:
+    """(stop price, where it comes from): the whale's own stop when it is on the protective side 0.2–15 % away, else −8 % from
+    our entry (04.11, owner)"""
+    s = 1 if side == "LONG" else -1
+    w = _f(whale_sl)
+    if w and entry:
+        away = s * (1 - w / entry)                       # > 0 = below a long's entry / above a short's
+        if STOP_MIN <= away <= STOP_MAX:
+            return w, "стоп кита"
+    return entry * (1 - s * DESK_STOP), f"защитный стоп −{DESK_STOP * 100:g}%"
+
+
+def hidden(pos: list) -> bool:
+    """a whale whose open positions come without the instrument (OKX lead traders may hide their positions: instId, size and
+    entry are empty, only margin / leverage / P&L are shown) — 30.10 the top-7 OKX traders turned it on; copying them is blind"""
+    return any(not (p or {}).get("coin") for p in pos or [])
+
+
+def day_key(t: int) -> str:
+    return time.strftime("%Y-%m-%d", time.gmtime(int(t) / 1000))
+
+
 def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, now: int) -> dict:
     """One run of the paper copy desk. states = {addr: [positions]} for the whales fetched this run (missing addr = not
-    fetched → nothing changes for him). desk['seen'][addr] = {coin: side} from the previous run."""
+    fetched → nothing changes for him). desk['seen'][addr] = {coin: side} from the previous run.
+    04.11: every copy carries a stop (the whale's, else −8 %) checked every run at the current mid; one whale's copies never hold
+    more than 30 % of the equity as margin; every close adds to the whale's daily record (desk['by_whale_day'])."""
     d = desk or {"start": DESK_START, "cash": DESK_START, "open": [], "closed": [], "seen": {}, "history": [], "started": now}
     d.setdefault("events", [])
+    d.setdefault("by_whale_day", {})
     seen = d["seen"]
 
     def mark(o):
@@ -690,8 +723,8 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         s = 1 if o["side"] == "LONG" else -1
         return o["notional"] * s * (px / o["entry"] - 1)
 
-    def close(o, why):
-        px = _f(mids.get(o["coin"]))
+    def close(o, why, px=None):
+        px = px or _f(mids.get(o["coin"]))
         if not px:
             return False
         s = 1 if o["side"] == "LONG" else -1
@@ -702,9 +735,22 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         d["open"].remove(o)
         d["closed"].append({**o, "exit": px, "closed_t": now, "pnl": round(pnl, 2), "pnl_pct": round(pnl / o["margin"] * 100, 2), "why": why})
         d["events"].append({"t": now, "kind": "close", "coin": o["coin"], "side": o["side"], "whale": o["whale"], "pnl": round(pnl, 2), "why": why})
+        day = d["by_whale_day"].setdefault(day_key(now), {})
+        w = day.setdefault(o["whale"], {"n": 0, "wins": 0, "pnl": 0.0})
+        w["n"] += 1; w["wins"] += 1 if pnl > 0 else 0; w["pnl"] = round(w["pnl"] + pnl, 2)
         return True
 
+    # stops first (04.11): a copy whose price crossed its stop is closed at the current mid, whatever the whale does
+    for o in list(d["open"]):
+        px = _f(mids.get(o["coin"]))
+        stp = _f(o.get("stop"))
+        if px and stp and ((o["side"] == "LONG" and px <= stp) or (o["side"] == "SHORT" and px >= stp)):
+            close(o, f"стоп ({o.get('stop_src') or 'защитный'})", px)
     for addr, pos in states.items():
+        if hidden(pos):                    # 04.11: OKX hides this lead trader's instruments — we cannot tell what he holds: no
+            d["events"].append({"t": now, "kind": "hidden", "whale": addr})     # close and no open for him this run (stops still work)
+            d["events"] = d["events"][-200:]
+            continue
         cur = {p["coin"]: p for p in pos}
         prev = seen.get(addr)
         # closes: our copies of this whale whose coin is gone or flipped
@@ -714,6 +760,10 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                 close(o, "кит закрыл")
             elif p["side"] != o["side"]:
                 close(o, "кит развернулся")
+            elif p.get("sl"):                                  # the whale moved his stop → ours follows when it is usable
+                ns, src = stop_for(o["side"], o["entry"], p.get("sl"))
+                if src == "стоп кита":
+                    o["stop"], o["stop_src"] = round(ns, 8), src
         # opens: only positions that appeared since the previous look at this whale, and only for whales we follow
         if prev is not None and addr in follow:
             for coin, p in cur.items():
@@ -726,12 +776,23 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                     continue
                 eq = d["cash"] + sum(mark(o) for o in d["open"])
                 margin = round(eq * DESK_MARGIN, 2)
+                used = sum(_f(o.get("margin")) for o in d["open"] if o["whale"] == addr)
+                if used + margin > WHALE_CAP * eq + 0.01:
+                    d["events"].append({"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                        "why": f"у этого кита уже {used / eq * 100:.0f}% счёта — предел {WHALE_CAP * 100:.0f}% на кита"})
+                    continue
                 lev = min(max(1.0, p.get("lev") or 1.0), DESK_LEV_CAP)
+                stp, src = stop_for(p["side"], px, p.get("sl"))
                 o = {"whale": addr, "coin": coin, "side": p["side"], "entry": px, "opened_t": now, "margin": margin, "lev": lev,
-                     "notional": round(margin * lev, 2), "whale_entry": p.get("entry"), "whale_notional": p.get("notional")}
+                     "notional": round(margin * lev, 2), "whale_entry": p.get("entry"), "whale_notional": p.get("notional"),
+                     "whale_lev": p.get("lev"), "stop": round(stp, 8), "stop_src": src}
                 d["open"].append(o)
                 d["events"].append({"t": now, "kind": "open", "coin": coin, "side": p["side"], "whale": addr, "px": px})
         seen[addr] = {c: p["side"] for c, p in cur.items()}
+    for o in d["open"]:                                        # copies opened before 04.11 get their protective stop now
+        if not o.get("stop"):
+            stp, src = stop_for(o["side"], o["entry"])
+            o["stop"], o["stop_src"] = round(stp, 8), src
     eq = d["cash"] + sum(mark(o) for o in d["open"])
     for o in d["open"]:
         o["upnl"] = round(mark(o), 2)
@@ -742,7 +803,44 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         d["history"] = d["history"][::2]
     d["closed"] = d["closed"][-300:]
     d["events"] = d["events"][-200:]
+    d["by_whale_day"] = dict(sorted(d["by_whale_day"].items())[-60:])
     return d
+
+
+def okx_symbol(coin: str) -> str:
+    """the desk's coin (a Hyperliquid name) → the ticker the OKX sleeve maps (okx_alloc.okx_base): kPEPE → 1000PEPE"""
+    c = str(coin or "")
+    return "1000" + c[1:] if len(c) > 2 and c[0] == "k" and c[1:].isupper() else c.upper()
+
+
+def paper_trade(o: dict, closed: bool = False) -> dict:
+    """one copy in the shape of a web/paper.json desk trade — what the real OKX sleeve follows (okx_futures.want_map / size):
+    id, symbol, side, entry, stop, qty, risk_usd, opened; «copy_lev» = the whale's leverage capped at 5× (owner: «повторяй их плечи»)"""
+    e = _f(o.get("entry"))
+    stp = _f(o.get("stop")) or stop_for(o["side"], e)[0]
+    qty = _f(o.get("notional")) / e if e else 0.0
+    t = {"id": f"W-{okx_symbol(o['coin'])}-{o['side'][0]}-{int(_f(o.get('opened_t')))}", "symbol": okx_symbol(o["coin"]), "side": o["side"],
+         "grade": "W", "kind": "WHALE_COPY", "entry": e, "stop": round(stp, 8), "stop_now": round(stp, 8), "stop_src": o.get("stop_src"),
+         "tps": [], "parts": [], "qty": qty, "qty_left": qty, "risk_usd": round(qty * abs(e - stp), 2), "opened": int(_f(o.get("opened_t"))),
+         "copy_lev": min(DESK_LEV_CAP, max(1.0, _f(o.get("lev"), 1.0))), "whale": o.get("whale"), "notional": o.get("notional")}
+    if closed:
+        t.update(closed=int(_f(o.get("closed_t"))), exit=o.get("exit"), net_usd=o.get("pnl"), exit_kind=o.get("why"))
+    return t
+
+
+def by_whale(d: dict, names: dict) -> list[dict]:
+    """per whale: all closes on record (desk['closed'], last 300) and the last 14 UTC days of the daily record"""
+    lab = lambda a: names.get(a) or (a[:6] + "…" + a[-4:])          # noqa: E731
+    out = {}
+    for c in d.get("closed") or []:
+        w = out.setdefault(c["whale"], {"whale": c["whale"], "whale_ru": lab(c["whale"]), "trades": 0, "wins": 0, "pnl_usd": 0.0, "open": 0})
+        w["trades"] += 1; w["wins"] += 1 if c["pnl"] > 0 else 0; w["pnl_usd"] = round(w["pnl_usd"] + c["pnl"], 2)
+    for o in d.get("open") or []:
+        out.setdefault(o["whale"], {"whale": o["whale"], "whale_ru": lab(o["whale"]), "trades": 0, "wins": 0, "pnl_usd": 0.0, "open": 0})["open"] += 1
+    days = sorted((d.get("by_whale_day") or {}).items())[-14:]
+    for w in out.values():
+        w["days"] = [{"day": k, **v[w["whale"]]} for k, v in days if w["whale"] in v]
+    return sorted(out.values(), key=lambda w: -w["pnl_usd"])
 
 
 def desk_public(d: dict, names: dict) -> dict:
@@ -758,9 +856,16 @@ def desk_public(d: dict, names: dict) -> dict:
             "open": [{**o, "whale_ru": lab(o["whale"])} for o in d.get("open") or []],
             "closed": [{**c, "whale_ru": lab(c["whale"])} for c in sorted(cl, key=lambda c: -c["closed_t"])[:20]],
             "history": d.get("history", [])[-500:],
+            "by_whale": by_whale(d, names),
+            # 04.11: the same copies in the shape of a web/paper.json desk — the real OKX sleeve follows this at the desk's stage share
+            "paper": {"name": "Киты · копирование топ-5", "start_equity": d["start"], "equity": d.get("equity", d["start"]),
+                      "since": d.get("started"), "open": [paper_trade(o) for o in d.get("open") or []],
+                      "closed": [paper_trade(c, True) for c in sorted(cl, key=lambda c: -c["closed_t"])[:20]]},
             "rules_ru": f"Старт $10 000. Повторяем только новые позиции топ-5 китов, замеченные между двумя проверками (сервер смотрит раз в ~30 мин): "
                         f"вход по текущей цене, маржа {DESK_MARGIN * 100:.0f}% счёта, плечо как у кита, но не больше {DESK_LEV_CAP:.0f}×, не больше "
-                        f"{DESK_MAX_OPEN} позиций и одна на монету. Выходим, когда кит закрыл или развернул позицию. Комиссии {COST_PCT}% за сделку."}
+                        f"{DESK_MAX_OPEN} позиций и одна на монету, на одного кита — не больше {WHALE_CAP * 100:.0f}% счёта. Стоп у каждой копии: стоп кита, "
+                        f"если он стоит на бирже, иначе −{DESK_STOP * 100:g}% от входа. Выходим, когда кит закрыл или развернул позицию, или по стопу. "
+                        f"Комиссии {COST_PCT}% за сделку."}
 
 
 # ------------------------------------------------------------------------------------------------------------ entry point
@@ -923,7 +1028,11 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         p["rank"] = i + 1
         p["desc_ru"] = describe(p)
         p["copy_ok"] = (p["copy"].get("30") or {}).get("avg_pct", -1) > 0
-    follow_new = [{"addr": p["addr"], "short": p["short"], "name": p["name"]} for p in top if p["copy_ok"]][:FOLLOW_N]
+        p["hidden"] = hidden(p.get("positions") or [])          # 04.11: positions without instruments cannot be copied
+    # 04.11: the desk follows the best 5 whose copy test is positive AND whose open positions are visible (a hidden trader's
+    # entries cannot be seen, so «following» him only produced false «кит закрыл» exits on 30.10)
+    follow_new = [{"addr": p["addr"], "short": p["short"], "name": p["name"]} for p in elig if p.get("copy_ok", (p["copy"].get("30") or {}).get("avg_pct", -1) > 0)
+                  and not hidden(p.get("positions") or [])][:FOLLOW_N]
     if follow_new and (complete or not study.get("top")):
         kv_set(conn, "study", {"t": now, "top": follow_new, "partial": not complete})
     conn.commit()
@@ -944,6 +1053,9 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
            "others": [{k: p.get(k) for k in ("src", "addr", "short", "name", "pnl_30d", "trips", "win", "pf", "hold_med_h", "style_ru", "excluded_ru", "score")}
                       for p in sorted(profs, key=lambda p: -p["pnl_30d"]) if p not in top][:30],
            "desk": desk_public(desk, names) if desk else None,
+           "hidden": [{"addr": p["addr"], "name": p["name"] or p["short"], "rank": p.get("rank")} for p in top if p.get("hidden")],
+           "hidden_ru": "OKX скрывает открытые позиции этих лид-трейдеров (нет монеты, размера и цены входа — только маржа, плечо и "
+                        "результат): повторить их сделки вовремя нельзя, стол «Киты» их не копирует.",
            "not_covered_ru": "Binance и Bybit копитрейдинг пока не подключены: их данные с сервера в США закрыты. Чемпионаты (Bybit WSOT и другие) "
                              "публикуют только итоговые проценты без сделок — повторить такую торговлю нельзя, поэтому в рейтинг они не входят.",
            "method_ru": [

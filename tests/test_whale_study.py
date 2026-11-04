@@ -145,3 +145,43 @@ def test_run_end_to_end_with_fake_api():
     d2 = W.run(conn, now=now + 1800_000, post=post, get_lb=lambda: lb, okx_get=okx_get, max_requests=50, budget_s=60)
     assert d2["desk"] and d2["desk"]["open"] == [] and d2["desk"]["equity"] == 10_000
     json.dumps(d2)
+
+
+def test_desk_stops_per_whale_cap_paper_shape_and_daily_record():
+    """04.11 (owner, real money): every copy has a stop (the whale's own when usable, else −8 %), one whale ≤ 30 % of the equity as
+    margin, the copies are published in the paper-desk shape the real OKX sleeve follows, per-whale results by UTC day"""
+    mids = {"BTC": "100", "ETH": "2000", "SOL": "50", "XRP": "1", "kPEPE": "0.01"}
+    d = W.desk_step(None, ["0xa", "0xb"], {"0xa": [], "0xb": []}, mids, T0)
+    pos = [{"coin": c, "side": "LONG", "lev": 3} for c in ("BTC", "ETH", "SOL", "XRP")]
+    pos[0]["sl"] = 95.0                                                       # the whale's own stop, 5 % below
+    d = W.desk_step(d, ["0xa", "0xb"], {"0xa": pos, "0xb": [{"coin": "kPEPE", "side": "SHORT", "lev": 20}]}, mids, T0 + H)
+    mine = [o for o in d["open"] if o["whale"] == "0xa"]
+    assert len(mine) == 3 and any(e["kind"] == "skip" and "30%" in e["why"] for e in d["events"])     # 3 × 10 % = the cap
+    btc = next(o for o in d["open"] if o["coin"] == "BTC")
+    assert btc["stop"] == 95.0 and btc["stop_src"] == "стоп кита"
+    eth = next(o for o in d["open"] if o["coin"] == "ETH")
+    assert abs(eth["stop"] - 2000 * 0.92) < 1e-6 and "−8%" in eth["stop_src"]
+    pepe = next(o for o in d["open"] if o["coin"] == "kPEPE")
+    assert pepe["lev"] == 5.0 and abs(pepe["stop"] - 0.0108) < 1e-9
+    # the stop closes a copy at the current mid even while the whale still holds
+    d = W.desk_step(d, ["0xa", "0xb"], {"0xa": pos, "0xb": [{"coin": "kPEPE", "side": "SHORT", "lev": 20}]}, {**mids, "ETH": "1800"}, T0 + 2 * H)
+    assert not any(o["coin"] == "ETH" for o in d["open"]) and d["closed"][-1]["why"].startswith("стоп")
+    pub = W.desk_public(d, {"0xa": "Кит А"})
+    p = pub["paper"]
+    t = next(x for x in p["open"] if x["symbol"] == "1000PEPE")
+    assert t["side"] == "SHORT" and t["copy_lev"] == 5.0 and t["stop"] > t["entry"] and abs(t["risk_usd"] - t["qty"] * (t["stop"] - t["entry"])) < 0.01
+    assert all(x["id"].startswith("W-") and x["stop"] for x in p["open"]) and p["closed"][0]["net_usd"] < 0
+    bw = {w["whale"]: w for w in pub["by_whale"]}
+    assert bw["0xa"]["trades"] == 1 and bw["0xa"]["whale_ru"] == "Кит А" and bw["0xa"]["days"][0]["n"] == 1 and bw["0xb"]["open"] == 1
+
+
+def test_a_whale_whose_positions_okx_hides_is_neither_closed_nor_copied():
+    """04.11: 30.10 the top OKX lead traders hid their positions (no instId / size / entry): our copy must not be closed as
+    «кит закрыл» because the coin vanished from the feed, and nothing new is opened from a hidden feed"""
+    mids = {"BTC": "100"}
+    d = W.desk_step(None, ["0xa"], {"0xa": []}, mids, T0)
+    d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "BTC", "side": "SHORT", "lev": 20}]}, mids, T0 + H)
+    assert len(d["open"]) == 1
+    d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "", "side": "SHORT", "lev": 20, "notional": 5e5}]}, mids, T0 + 2 * H)
+    assert len(d["open"]) == 1 and d["closed"] == [] and d["events"][-1]["kind"] == "hidden"
+    assert W.hidden([{"coin": ""}]) and not W.hidden([{"coin": "BTC"}]) and not W.hidden([])

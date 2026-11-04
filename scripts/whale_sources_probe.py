@@ -162,8 +162,128 @@ def hyperliquid():
     print("hl", rec, flush=True)
 
 
+# ------------------------------------------------------------------------------------------------ round 4 (04.11 21:14, owner: more sources)
+def first_id(d, *keys):
+    for r in first_list(d) or []:
+        for k in keys:
+            if r.get(k):
+                return r.get(k)
+    return None
+
+
+def bybit4():
+    from urllib.parse import quote
+    for host in ("https://api2.bybit.com", "https://api2.bybitglobal.com", "https://www.bybit.com/x-api", "https://www.bybitglobal.com/x-api",
+                 "https://api2.bybit.eu", "https://api2.bybit.nl", "https://api2.bybit.kz", "https://www.bybit.com/fapi"):
+        lst = host + ("/beehive/public/v1/common/dynamic-leader-list" if host.endswith("/fapi") else "/fapi/beehive/public/v1/common/dynamic-leader-list")
+        d = probe(f"bybit.list.{host.split('//')[1][:22]}", lst + "?pageNo=1&pageSize=16&dataDuration=DATA_DURATION_NINETY_DAY&sortField=LEADER_SORT_FIELD_SORT_PNL")
+        mark = first_id(d, "leaderMark")
+        if not mark:
+            continue
+        m = quote(mark, safe="")
+        b = host + "/fapi/beehive/public/v1/common"
+        for nm, u in {"income": f"{b}/leader-income?leaderMark={m}", "pos": f"{b}/position/list?leaderMark={m}",
+                      "hist": f"{b}/leader-history?leaderMark={m}&pageSize=20&page=1",
+                      "hist2": f"{b}/order/list-detail?leaderMark={m}&pageSize=20&page=1",
+                      "hist3": f"{b}/leader-closed-position-list?leaderMark={m}&pageSize=20&pageNo=1"}.items():
+            probe(f"bybit.{nm}", u)
+        break
+
+
+def bitget4():
+    W = "https://www.bitget.com"
+    d = None
+    for nm, u, body in [("rank.v1", "/v1/trigger/trace/public/traderRankList", {"pageNo": 1, "pageSize": 20, "sortRule": 2, "sortFlag": "desc", "languageType": 0}),
+                        ("rank.v2", "/v1/trigger/trace/public/traderRankListV2", {"pageNo": 1, "pageSize": 20, "sortRule": 2, "sortFlag": "desc", "languageType": 0}),
+                        ("list.copy", "/v1/copy/mix/public/trader/list", {"pageNo": 1, "pageSize": 20, "sortRule": 2, "sortFlag": "desc", "languageType": 0}),
+                        ("list.trace", "/v1/trace/public/traderList", {"pageNo": 1, "pageSize": 20, "languageType": 0}),
+                        ("api.v2", "https://api.bitget.com/api/v2/copy/mix-trader/query-traders?limit=5", None)]:
+        r = probe(f"bitget.{nm}", u if u.startswith("http") else W + u, body)
+        if first_id(r, "traderUid", "traderId", "uid"):
+            d = r
+    uid = first_id(d, "traderUid", "traderId", "uid")
+    if uid:
+        for nm, u, body in [("cur", "/v1/trigger/trace/public/currentTrack", {"traderUid": uid, "pageNo": 1, "pageSize": 20, "languageType": 0}),
+                            ("hist", "/v1/trigger/trace/public/historyTrack", {"traderUid": uid, "pageNo": 1, "pageSize": 20, "languageType": 0}),
+                            ("cur2", "/v1/trigger/trace/public/getCurrentOrders", {"traderUid": uid, "pageNo": 1, "pageSize": 20}),
+                            ("hist2", "/v1/trigger/trace/public/getHistoryOrders", {"traderUid": uid, "pageNo": 1, "pageSize": 20}),
+                            ("detail", "/v1/trigger/trace/public/traderDetailPageV2", {"traderUid": uid, "languageType": 0})]:
+            probe(f"bitget.{nm}", W + u, body)
+
+
+def gate4():
+    d = None
+    for host in ("https://www.gate.io", "https://www.gate.com"):
+        for nm, u in [("l1", "/apiw/v2/copy/leader/list?page=1&page_size=20&order_by=profit&sort_by=desc&cycle=month"),
+                      ("l2", "/apiw/v2/futures/copy/leader/list?page=1&page_size=20"),
+                      ("l3", "/api/copytrade/copy_trading/trader/list?page=1&page_size=20&order_by=profit")]:
+            r = probe(f"gate.{host[12:16]}.{nm}", host + u)
+            if first_id(r, "leader_id", "user_id", "uid", "id"):
+                d = (host, r)
+        if d:
+            break
+    if d:
+        host, r = d
+        lid = first_id(r, "leader_id", "user_id", "uid", "id")
+        for nm, u in [("pos", f"/apiw/v2/copy/leader/position?leader_id={lid}"), ("pos2", f"/apiw/v2/copy/leader/current_position?leader_id={lid}"),
+                      ("hist", f"/apiw/v2/copy/leader/position_history?leader_id={lid}&page=1&page_size=20"),
+                      ("hist2", f"/apiw/v2/copy/leader/history_position?leader_id={lid}&page=1&page_size=20")]:
+            probe(f"gate.{nm}", host + u)
+
+
+def mexc4():
+    base = "https://futures.mexc.com/copyFutures/api/v1"
+    d = probe("mexc.list", f"{base}/traders/v2?condition=%5B%5D&limit=10&orderBy=PNL&page=1")
+    uid = first_id(d, "uid")
+    if not uid:
+        return
+    OUT["mexc.list"]["rows"] = (OUT["mexc.list"].get("rows") or [])[:1]
+    for nm, u in {"o_t1": f"{base}/trader/orders/v2?limit=20&page=1&uid={uid}&orderListType=1",
+                  "o_open": f"{base}/trader/orders/v2?limit=20&page=1&uid={uid}&type=open",
+                  "o_hist": f"{base}/trader/orders/v2?limit=20&page=1&uid={uid}&type=history",
+                  "cur": f"{base}/trader/currentOrders?uid={uid}&limit=20&page=1",
+                  "cur2": f"{base}/trader/positions?uid={uid}",
+                  "hist": f"{base}/trader/historyOrders?uid={uid}&limit=20&page=1",
+                  "hist3": f"{base}/trader/orders/history?uid={uid}&limit=20&page=1",
+                  "info": f"{base}/trader/info?uid={uid}", "info2": f"{base}/traders/detail?uid={uid}"}.items():
+        probe(f"mexc.{nm}", u)
+
+
+def bingx4():
+    for nm, u, body in [("l1", "https://bingx.com/api/copytrade/v1/public/trader/list?pageId=0&pageSize=20", None),
+                        ("l2", "https://api-app.qq-os.com/api/copy-trade/v1/public/trader/rank?pageId=0&pageSize=20", None),
+                        ("l3", "https://open-api.bingx.com/openApi/copyTrading/v1/public/traders?pageIndex=1&pageSize=20", None)]:
+        probe(f"bingx.{nm}", u, body)
+
+
+def okx_wide():
+    """how big the OKX public lead-trader pool is per sort (perpetuals, ≥ 90 days of leading)"""
+    for sort in ("overview", "pnl", "aum", "win_ratio", "pnl_ratio"):
+        s_, txt = call(f"https://www.okx.com/api/v5/copytrading/public-lead-traders?instType=SWAP&sortType={sort}&minLeadDays=3&page=1&limit=20")
+        try:
+            d = (json.loads(txt).get("data") or [{}])[0]
+            OUT[f"okx.{sort}"] = {"status": s_, "totalPage": d.get("totalPage"), "n": len(d.get("ranks") or []),
+                                  "first": [(r.get("nickName"), r.get("pnl"), r.get("winRatio")) for r in (d.get("ranks") or [])[:3]]}
+        except Exception as e:  # noqa: BLE001
+            OUT[f"okx.{sort}"] = {"status": s_, "err": str(e)[:100], "text": txt[:200]}
+
+
+def binance_wide():
+    bn = "https://www.binance.com/bapi/futures/v1/friendly/future/copy-trade/home-page/query-list"
+    for dt in ("PNL", "ROI", "COPIER_PNL", "SHARP_RATIO", "MDD", "AUM"):
+        for rng in ("30D", "90D"):
+            s_, txt = call(bn, {"pageNumber": 1, "pageSize": 20, "timeRange": rng, "dataType": dt, "favoriteOnly": False, "hideFull": False,
+                                "nickname": "", "order": "DESC", "userAsset": 0, "portfolioType": "PUBLIC"})
+            try:
+                d = json.loads(txt)
+                OUT[f"binance.{dt}.{rng}"] = {"status": s_, "code": d.get("code"), "total": (d.get("data") or {}).get("total"),
+                                               "n": len((d.get("data") or {}).get("list") or [])}
+            except Exception as e:  # noqa: BLE001
+                OUT[f"binance.{dt}.{rng}"] = {"status": s_, "err": str(e)[:100]}
+
+
 def main():
-    for f in (binance,):
+    for f in (bybit4, bitget4, gate4, mexc4, bingx4, okx_wide, binance_wide):
         try:
             f()
         except Exception as e:  # noqa: BLE001

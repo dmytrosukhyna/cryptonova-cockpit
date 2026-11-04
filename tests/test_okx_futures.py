@@ -116,7 +116,7 @@ def test_size_from_desk_risk_scaled_to_budget_with_stop_attached_isolated_ioc():
     part = budget / 2                                                        # two desks (bal + imp) share the budget
     worst = float(o["px"])
     risk = float(o["sz"]) * 1 * (worst - 190.0)                              # SOL ctVal 1
-    assert abs(risk - part * 0.005) <= 2.0 and risk <= budget * 0.01 + 1e-6   # the desk's own 0.5 % of this desk's part
+    assert abs(risk - part * 0.005 * fu.RISK_MULT) <= 2.0 and risk <= budget * fu.RISK_CAP + 1e-6   # the desk's own 0.5 % × 2 (owner 04.11) of this desk's part
     assert o["tdMode"] == "isolated" and o["ordType"] == "ioc" and o["side"] == "buy" and o["clOrdId"].startswith("cnqf")
     assert worst <= 200 * 1.001 * 1.0041                                     # never more than OKX_SLIP above the ask
     a = o["attachAlgoOrds"][0]
@@ -131,15 +131,15 @@ def test_risk_as_the_system_capped_at_one_percent_and_leverage_never_above_three
     """Owner 22.10: «риск фьючерсов как у системы» — the desk's own risk share × this desk's part; 1 % of the budget is the ceiling."""
     fk = F.FakeOkx()
     e = F.env(OKX_FUT_MAX_LEV="10", OKX_FUT_RISK="0.05")                   # env can't loosen the hard caps
-    assert fu.caps(e) == {"lev": 3, "copy_lev": 5, "risk": 0.01, "max_pos": 5, "day_loss": 0.03}
+    assert fu.caps(e) == {"lev": 3, "copy_lev": 5, "risk": 0.02, "max_pos": 5, "day_loss": 0.03}
     run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 1 % of the budget
     o = swap_orders(fk)[0]
-    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 1500 * 0.01 + 1e-6
+    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 1500 * 0.02 + 1e-6    # owner 04.11: the ceiling is 2 % of the budget
     fk2 = F.FakeOkx()
-    run(fk2, F.env(), F.desks(F.trade(risk=150.0)))                          # desk risked 1.5 % → 1.5 % of the $750 part = $11.25
+    run(fk2, F.env(), F.desks(F.trade(risk=150.0)))                          # desk risked 1.5 % → 1.5 % × 2 of the $750 part = $22.50
     o2 = swap_orders(fk2)[0]
     r2 = float(o2["sz"]) * (float(o2["px"]) - 190.0)
-    assert 10.0 <= r2 <= 11.25 + 1e-6
+    assert 20.0 <= r2 <= 22.5 + 1e-6
     assert fk.levers[0]["lever"] == "3"
     fk = F.FakeOkx()                                                         # a 0.3 % stop: the leverage room is the limit
     run(fk, F.env(), F.desks(F.trade(entry=200.0, stop=199.0, tp=210.0, risk=500.0)))
@@ -224,7 +224,7 @@ def test_late_join_guard_old_trade_only_near_the_desk_entry_and_risk_from_the_wo
         r = fu.step(e, desks=F.desks(old), now=NOW + 60_000, sleep=F.nosleep, cl=cl)
         assert r["opened"] == 1
         o = swap_orders(fk)[0]
-        assert float(o["sz"]) * (float(o["px"]) - 9.2) <= 2500 * 0.005 + 1e-6   # risk from the worst possible fill vs the desk stop
+        assert float(o["sz"]) * (float(o["px"]) - 9.2) <= 2500 * 0.005 * fu.RISK_MULT + 1e-6   # risk from the worst possible fill vs the desk stop
         new = F.trade("NW", "SOL", entry=195.0, stop=185.0, tp=230.0, opened=NOW + 90_000)   # opened after the first live start
         r = fu.step(e, desks=F.desks(old, new), now=NOW + 120_000, sleep=F.nosleep, cl=cl)
         assert r["opened"] == 1                                                  # new signal: joined though the price is 2.7 % away
@@ -387,7 +387,7 @@ def test_whales_copy_trades_the_whales_leverage_capped_at_five_with_a_stop_at_ok
     run(fk, F.env(), [("bal", {"equity": 10000.0, "open": []}), ("whales", {"equity": 10000.0, "open": [w]})])
     o = swap_orders(fk)[0]
     assert fk.levers[-1]["lever"] == "5" and o["attachAlgoOrds"][0]["slTriggerPx"] == "184.000"
-    assert float(o["sz"]) * (float(o["px"]) - 184.0) <= 1500 * 0.01 + 1e-6            # the same 1 % risk ceiling
+    assert float(o["sz"]) * (float(o["px"]) - 184.0) <= 1500 * fu.RISK_CAP + 1e-6        # the same risk ceiling (2 % since 04.11)
     # a wide stop: the leverage drops so the stop triggers well before liquidation (≤ 0.8 ÷ stop distance)
     fk2 = F.FakeOkx()
     w2 = {**w, "id": "W-SOL-L-2", "stop": 150.0, "stop_now": 150.0}

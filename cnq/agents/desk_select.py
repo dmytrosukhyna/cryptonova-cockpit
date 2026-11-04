@@ -596,22 +596,42 @@ def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int, carry=None) -> 
             "main_pct": round((1 - staged) * 100, 2), "log": log}
 
 
-def alloc_shares(prof: dict, cur: str, stages: dict) -> dict:
+# 04.11 17:24 (owner, real money, answered explicitly): «Киты» 25 % of the futures budget, «Агрессивная» 25 % until 30.11; the rest
+# goes to the other main desks equally. «Киты» keep their 25 % only while their ladder stage is ≥ 1 (a rollback to 0 drops them to 0).
+OWNER_SHARES = {"whales": 0.25, "aggr": 0.25}
+OWNER_SHARES_UNTIL = 1796075999000          # 30.11.2026 23:59:59 Kyiv
+
+
+def alloc_shares(prof: dict, cur: str, stages: dict, now: int | None = None) -> dict:
     """the real futures sleeve's budget shares {desk key: fraction, sum 1}: stage-1/2 desks the sleeve can follow (web/paper.json)
     at their share; the main set (the main desk + «Импульс BTC» + «Сигналы» after their gate) and the followable stage-3 desks share
-    the rest equally. A staged desk the sleeve cannot follow («Киты», «Золото») leaves its share with the main set."""
+    the rest equally. A staged desk the sleeve cannot follow («Киты», «Золото») leaves its share with the main set.
+    04.11: until OWNER_SHARES_UNTIL the owner's fixed shares win over the ladder for the desks they name."""
+    now = int(now or time.time() * 1000)
     main = list(ph.nova_keys(prof, {"current": cur}))
     out, used = {}, 0.0
+    fixed = {}
+    if now <= OWNER_SHARES_UNTIL:
+        st = {d["key"]: d for d in stages.get("desks") or []}
+        for k, v in OWNER_SHARES.items():
+            if k in main:
+                fixed[k] = v
+            elif k in st and st[k].get("real") and st[k].get("stage", 0) >= 1:
+                fixed[k] = v
     for d in stages.get("desks") or []:
-        if not d.get("real") or d["key"] in main:
+        if not d.get("real") or d["key"] in main or d["key"] in fixed:
             continue
         if d["stage"] in (1, 2):
             out[d["key"]] = STAGE_SHARE[d["stage"]]
             used += STAGE_SHARE[d["stage"]]
         elif d["stage"] == 3:
             main.append(d["key"])
-    for k in main:
-        out[k] = round((1 - used) / len(main), 6)
+    for k, v in fixed.items():
+        out[k] = v
+        used += v
+    rest = [k for k in main if k not in fixed]
+    for k in rest:
+        out[k] = round(max(0.0, 1 - used) / len(rest), 6)
     return out
 
 
@@ -632,7 +652,7 @@ def run(out: str = "web", now: int | None = None, log_path: str = LOG) -> dict:
     for k, c in convd.items():
         stages.setdefault(k, c)
     doc = decide(prof, prev, _load(out, "public_real.json"), stages, now)
-    stg["alloc"] = alloc_shares(prof, doc["current"], stg)
+    stg["alloc"] = alloc_shares(prof, doc["current"], stg, now)
     stg["short_ru"] = " · ".join(f"«{d['name']}» ступень {d['stage']} ({d['share_ru']})" for d in stg["desks"]) or "кандидатов нет"
     doc["stages"] = stg
     try:

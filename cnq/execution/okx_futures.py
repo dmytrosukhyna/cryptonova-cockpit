@@ -82,7 +82,8 @@ COPY_MAX_LEV = 5            # 04.11 (owner): copy desks («Киты») trade the
 LIQ_ROOM = 0.8              # leverage ≤ 0.8 ÷ stop distance: the stop always triggers well before an isolated position is liquidated
 WHALES = "whales"           # the copy desk's key (desk_select stages, the trade ids «whales:<id>»)
 WHALES_STALE_MS = 3 * 3_600_000
-RISK_CAP = 0.01             # hard ceiling: 1 % of the futures budget per trade (the desk's own risk, e.g. 1.5 % of a half budget = 0.75 %, fits)
+RISK_CAP = 0.02             # hard ceiling: 2 % of the futures budget per trade (owner 04.11 17:24: «Риск 2% на сделку»; was 1 %)
+RISK_MULT = 2.0            # owner 04.11: trades twice as large — the desk's own risk share × 2, still within RISK_CAP
 MAX_POS = 5
 DAY_LOSS = 0.03             # 3 % of the futures budget per UTC day
 OWN_GATE = (30, 0.3)        # «Сигналы CRYPTO NOVA» join the futures result after 30 closed trades at ≥ +0.3 % a trade (as the header)
@@ -567,7 +568,7 @@ def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict
     worst = ap.ceil_to(px * (1 + slip), tick) if long else ap.floor_to(px * (1 - slip), tick)
     d_risk = ms._f(t.get("risk_usd")) or (float(t.get("qty") or 0) * abs(float(t["entry"]) - float(t["stop"])))
     frac = d_risk / desk_eq if desk_eq and d_risk else cap["risk"]
-    risk_usd = min(frac * part, cap["risk"] * bud)
+    risk_usd = min(frac * part * RISK_MULT, cap["risk"] * bud)
     inst_max = int(float(inst.get("lever") or COPY_MAX_LEV))
     lev = max(1, min(cap["lev"], inst_max))
     room_lev = lev                                  # the whole sleeve's notional stays ≤ budget × the general cap

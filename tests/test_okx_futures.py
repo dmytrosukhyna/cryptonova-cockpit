@@ -131,7 +131,7 @@ def test_risk_as_the_system_capped_at_one_percent_and_leverage_never_above_three
     """Owner 22.10: «риск фьючерсов как у системы» — the desk's own risk share × this desk's part; 1 % of the budget is the ceiling."""
     fk = F.FakeOkx()
     e = F.env(OKX_FUT_MAX_LEV="10", OKX_FUT_RISK="0.05")                   # env can't loosen the hard caps
-    assert fu.caps(e) == {"lev": 3, "copy_lev": 5, "risk": 0.02, "max_pos": 5, "day_loss": 0.03}
+    assert fu.caps(e) == {"lev": 3, "copy_lev": 5, "risk": 0.02, "max_pos": 15, "day_loss": 0.03}
     run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 1 % of the budget
     o = swap_orders(fk)[0]
     assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 1500 * 0.02 + 1e-6    # owner 04.11: the ceiling is 2 % of the budget
@@ -196,7 +196,7 @@ def test_missing_stop_is_placed_for_the_whole_position_or_the_position_is_closed
 
 def test_max_five_positions_one_per_instrument_and_old_signals_not_chased():
     fk = F.FakeOkx(balances={"USDT": 100000.0})
-    e = F.env()
+    e = F.env(OKX_FUT_MAX_POS="5")                  # 04.11 22:35: the hard cap is 15 (5 whales × their positions); env may lower it
     coins = ["SOL", "APT", "XRP", "LINK", "AVAX", "ADA", "DOT"]
     ts = [F.trade(f"T{i}", c, entry=F.PX[c], stop=F.PX[c] * 0.95, tp=F.PX[c] * 1.2, risk=50.0) for i, c in enumerate(coins)]
     ts.append(F.trade("TOLD", "BTC", entry=95000.0, stop=90000.0, tp=120000.0, opened=NOW - 3 * 3600_000))   # price 5 % above
@@ -421,25 +421,50 @@ def test_whales_feed_joins_at_its_stage_share_and_never_closes_on_a_failed_load(
     monkeypatch.setattr(fu, "_get_json", get)
     monkeypatch.setattr(fu.time, "time", lambda: NOW / 1000)
     st = {"trades": {}}
-    ds = fu.fetch_desks({}, st)
+    OFF = {"OKX_WHALE_LIVE": "off"}                # the published desk.paper path (live off)
+    ds = fu.fetch_desks(OFF, st)
     assert [k for k, _ in ds] == ["aggr", "imp", "whales"] and dict(ds)["whales"]["open"][0]["id"] == "W-BTC-S-1"
     assert fu.desk_parts(ds, 1000.0, st["sel"]) == {"aggr": 475.0, "imp": 475.0, "whales": 50.0}
     # no share and nothing held → the whales file is not even read
     urls.clear()
     sel["stages"]["alloc"] = {"aggr": 0.5, "imp": 0.5}
-    assert [k for k, _ in fu.fetch_desks({}, {"trades": {}})] == ["aggr", "imp"] and not any("whales" in u for u in urls)
+    assert [k for k, _ in fu.fetch_desks(OFF, {"trades": {}})] == ["aggr", "imp"] and not any("whales" in u for u in urls)
     # a held copy + the file does not load → the pass is skipped (an exception), never «сигнал закрыт»
     get.wtop = OSError("timeout")
     held = {"trades": {"whales:W-BTC-S-1": {"desk": "whales", "inst": "BTC-USDT-SWAP"}}}
     try:
-        fu.fetch_desks({}, held)
+        fu.fetch_desks(OFF, held)
         raise AssertionError("must not continue")
     except RuntimeError as e:
         assert "проход пропущен" in str(e)
     # a frozen feed: the held copy stays wanted, a new one is not offered
     get.wtop = {**wtop, "asof": NOW - 4 * 3_600_000, "desk": {"paper": {**wtop["desk"]["paper"], "open": [wt, {**wt, "id": "W-ETH-L-2", "symbol": "ETH"}]}}}
-    ds = dict(fu.fetch_desks({}, held))
+    ds = dict(fu.fetch_desks(OFF, held))
     assert [t["id"] for t in ds["whales"]["open"]] == ["W-BTC-S-1"] and ds["whales"]["stale"]
+
+
+def test_whales_live_desk_is_read_every_pass_and_a_live_failure_with_a_held_copy_skips_the_pass(monkeypatch):
+    """04.11 22:35 (owner: «моментально копироваться»): with OKX_WHALE_LIVE on (default) the whales desk comes from whale_live.step
+    (the followed whales' positions polled in this pass); whales_top.json only says whom to follow"""
+    from cnq.execution import whale_live as WL
+    sel = {"stages": {"alloc": {"whales": 1.0}}}
+    paper = {"profiles": {"aggr": {"open": []}, "imp": {"open": []}}}
+    wtop = {"asof": NOW, "following": [{"addr": "okx:A"}]}
+    monkeypatch.setattr(fu, "_get_json", lambda url: paper if url.endswith("paper.json") else sel if url.endswith("desk_select.json") else wtop)
+    seen = []
+    live = {"name": "Киты", "equity": 10000.0, "start_equity": 10000.0, "open": [{**F.trade("W-ETH-L-9", sym="ETH"), "copy_lev": 3.0}], "closed": []}
+    monkeypatch.setattr(WL, "step", lambda w, env=None: seen.append(w) or live)
+    ds = dict(fu.fetch_desks({}, {"trades": {}}))
+    assert seen == [wtop] and ds["whales"]["open"][0]["id"] == "W-ETH-L-9"
+
+    def boom(w, env=None):
+        raise OSError("api down")
+    monkeypatch.setattr(WL, "step", boom)
+    try:
+        fu.fetch_desks({}, {"trades": {"whales:W-ETH-L-9": {"desk": "whales"}}})
+        raise AssertionError("must not continue")
+    except RuntimeError as e:
+        assert "проход пропущен" in str(e)
 
 
 def test_owner_override_closes_the_held_short_reduce_only_and_never_reopens_it(tmp_path):

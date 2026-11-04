@@ -413,3 +413,10 @@ def test_lab_is_called_test_of_new_ideas_for_people():
     out = pd.run(conn, {"coins": [c], "_no_network": True}, now=t0 + n * 900_000)
     assert conn.execute(f"SELECT reason FROM {lab.T_TR} WHERE id='N-SUI-1'").fetchone()[0] == "Тест новых идей: часовая поддержка 1.0"
     assert out["profiles"]["lab"]["name"] == "Тест новых идей" and "lab" in {p["key"] for p in out["profile_list"]}
+
+
+def test_impulse_target_is_two_r_not_the_far_guard():
+    """04.11 (owner: SOL target 292.80 / ETH 7316 — «дурдом, ошибка»): «Импульс BTC» futures target = tgt_r × R from the entry"""
+    from cnq.agents import paper_desk as PD
+    assert round(PD.k_target(96.52, 91.25, PD.PROFILES["imp"]), 2) == 107.06
+    assert PD.k_target(100.0, 90.0, PD.PROFILES["imps"]) == 300.0          # the spot desk keeps its time exit (far guard)

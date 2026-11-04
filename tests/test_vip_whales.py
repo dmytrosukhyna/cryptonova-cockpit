@@ -300,7 +300,7 @@ def test_crypto_watch_status_reasons_copies_and_links():
                     "closed": [{"whale": "okx:AAA", "coin": "SOL", "pnl": 7.0}], "by_whale": [{"whale": "okx:AAA", "trades": 1, "wins": 1, "pnl_usd": 7.0}]}}
     d = VW.crypto_watch(profs, top)
     by = {w["addr"]: w for w in d["whales"]}
-    assert d["counts"] == {"followed": 1, "candidate": 2, "dropped": 1}
+    assert d["counts"] == {"followed": 1, "candidate": 2, "dropped": 1, "failed": 0}
     assert [w["status"] for w in d["whales"]] == ["followed", "candidate", "candidate", "dropped"]
     assert by["okx:AAA"]["copies"]["trades"] == 1 and by["okx:AAA"]["copies"]["open"][0]["coin"] == "BTC"
     assert by["okx:AAA"]["link"].startswith("https://www.okx.com/copy-trading/account/AAA")
@@ -308,6 +308,19 @@ def test_crypto_watch_status_reasons_copies_and_links():
     assert by["0x" + "c" * 40]["why_ru"] == ["мало решений за 60 дней (7, нужно 20)"]
     assert by["bn:999"]["not_studied"] and by["bn:999"]["why_ru"] == ["держит слишком коротко"]
     assert len(by["okx:AAA"]["recent"]) == 10 and by["okx:AAA"]["positions_hidden"] == 1
+
+
+def test_losers_and_traders_without_decisions_are_not_candidates():
+    """04.11 22:35 (owner: «−108k», «Bobby Big Size −198k» were shown as candidates)"""
+    neg = {**_prof("okx:NEG", "okx", False, ["за 60 дней в минусе (с учётом открытых позиций)"]), "name": "Bobby Big Size", "pnl_60d": -198000}
+    zero = {**_prof("0x" + "d" * 40, "hl", False, ["мало решений за 60 дней (0, нужно 20)"]), "decisions": 0, "pnl_60d": 0}
+    far = {**_prof("bn:FAR", "bn", False, ["прибыльных решений 40%"]), "win": 0.40}
+    near = {**_prof("bn:NEAR", "bn", False, ["мало решений за 60 дней (15, нужно 20)"]), "decisions": 15}
+    d = VW.crypto_watch([neg, zero, far, near], {"asof": NOW})
+    by = {w["addr"]: w["status"] for w in d["whales"]}
+    assert by == {"okx:NEG": "failed", "0x" + "d" * 40: "failed", "bn:FAR": "failed", "bn:NEAR": "candidate"}
+    assert d["counts"]["candidate"] == 1 and d["counts"]["failed"] == 3 and d["whales"][0]["addr"] == "bn:NEAR"
+    assert all(w["why_ru"] for w in d["whales"] if w["status"] == "failed")
 
 
 def test_max_drawdown_of_decisions():

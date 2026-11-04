@@ -84,7 +84,7 @@ WHALES = "whales"           # the copy desk's key (desk_select stages, the trade
 WHALES_STALE_MS = 3 * 3_600_000
 RISK_CAP = 0.02             # hard ceiling: 2 % of the futures budget per trade (owner 04.11 17:24: «Риск 2% на сделку»; was 1 %)
 RISK_MULT = 2.0            # owner 04.11: trades twice as large — the desk's own risk share × 2, still within RISK_CAP
-MAX_POS = 5
+MAX_POS = 15                # 04.11 22:35 (owner): 5 followed whales × their positions must fit (was 5); margin stays ≤ the budget
 DAY_LOSS = 0.03             # 3 % of the futures budget per UTC day
 OWN_GATE = (30, 0.3)        # «Сигналы CRYPTO NOVA» join the futures result after 30 closed trades at ≥ +0.3 % a trade (as the header)
 MIN_STOP = 0.002            # a stop closer than 0.2 % to the price is not a trade
@@ -307,7 +307,14 @@ def fetch_desks(env=None, st: dict | None = None) -> list:
     held = held_desks(st)
     if not forced and (staged_alloc(sel).get(WHALES, 0) > 0 or WHALES in held):     # 04.11: the whales copy desk
         try:
-            wd = whales_desk(_get_json(whales_src(env)), set(((st or {}).get("trades") or {}).keys()))
+            wtop = _get_json(whales_src(env))
+            # 04.11 22:35 (owner: «моментально копироваться»): the followed whales' positions are read HERE, every pass (~60 s,
+            # cnq/execution/whale_live.py); whales_top.json only says whom to follow. OKX_WHALE_LIVE=off → the published desk.paper
+            from . import whale_live
+            if whale_live.enabled(env):
+                wd = whale_live.step(wtop, env)
+            else:
+                wd = whales_desk(wtop, set(((st or {}).get("trades") or {}).keys()))
         except Exception as e:  # noqa: BLE001
             if WHALES in held:          # a held copy must never be closed because the file did not load: skip the whole pass
                 raise RuntimeError(f"whales_top.json не загрузился, а позиция «Китов» открыта — проход пропущен: {e}") from e

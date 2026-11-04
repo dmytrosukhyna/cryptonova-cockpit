@@ -111,6 +111,15 @@ G_STOP = 0.03
 HOLD_D_H = 24          # class D (17.10): perp ≥ 0.20 % below its spot index on a 1-hour average → long 24 h, stop −12 % (docs/research/new_signals.md)
 D_BASIS = -0.0020
 D_STOP = 0.12
+def k_target(entry: float, stop: float, P: dict) -> float:
+    """class K exit target. 04.11 (owner): futures desks — tgt_r × R from the entry (2R: SOL 96.52 / stop 91.25 → 107.06), so the
+    take-profit on the exchange is a real price, not the old «never hit» guard entry × 3; the 12-hour time exit stays the main exit.
+    Spot desks («Активный спот») keep the far guard (their executor exits by time)."""
+    if P.get("spot"):
+        return entry * 3
+    return entry + float(P.get("tgt_r") or 2.0) * abs(entry - stop)
+
+
 HOLD_K_H = 12          # class K (18.10, lab): BTC +2.5 % in one hour → long the most traded alts, 12 h, stop 8 ATR(15m) (scripts/lab, «Альт догоняет BTC»)
 K_BTC = 0.025
 K_ATR = 8.0
@@ -412,7 +421,7 @@ class PaperDesk:
             entry = c15[-1][4]
             at = _atr(c15[-31:-1]) or entry * 0.003
             out.append({"id": f"K-{base}-{kb['bar'] // 14_400_000}", "symbol": base, "side": "LONG", "grade": "K", "kind": "BTC_IMPULSE",
-                        "entry": entry, "stop": entry - K_ATR * at, "tps": [entry * 3] * 3, "parts": [1.0, 0.0, 0.0],
+                        "entry": entry, "stop": entry - K_ATR * at, "tps": [k_target(entry, entry - K_ATR * at, self.P)] * 3, "parts": [1.0, 0.0, 0.0],
                         "order": "MARKET", "hold_h": HOLD_K_H,
                         "facts": {"btc_ret": _f6(kb["ret"]), "need_btc": K_BTC, "atr_x": K_ATR},
                         "reason": f"Рывок BTC: +{kb['ret'] * 100:.1f}% за час — ликвидные альткоины обычно догоняют. Из «Лаборатории»: на 2025–2026 "
@@ -712,6 +721,11 @@ class PaperDesk:
             if not coin:
                 continue
             tps, parts = json.loads(t["tps"]), json.loads(t["parts"])
+            # 04.11 (owner: SOL target 292.80 / ETH 7316 — «дурдом, ошибка»): an open K trade with the old far guard (entry × 3) gets
+            # the desk's real target (tgt_r × R); the real OKX sleeve follows the desk's target (okx_futures.target → amended TP)
+            if t["grade"] == "K" and tps and not self.P.get("spot") and tps[0] > t["entry"] * 2:
+                tps = [k_target(t["entry"], t["stop"], self.P)] * len(tps)
+                self.conn.execute(f"UPDATE {self.T_TR} SET tps=? WHERE id=?", (json.dumps(tps), t["id"]))
             sgn = 1 if t["side"] == "LONG" else -1
             r = abs(t["entry"] - t["stop"])
             qty_left, stop_now, hit, pnl = t["qty_left"], t["stop_now"], t["tps_hit"], t["pnl_usd"]

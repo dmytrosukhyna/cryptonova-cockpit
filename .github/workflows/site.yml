@@ -17,7 +17,9 @@ on:
                    # 04.11: the daily whale-trade history written by this pipeline itself
                    "data/whale_trades/**",
                    # 04.11: «Куда инвестируют киты» signal log and outcomes written by this pipeline itself
-                   "data/smart_money/**"]
+                   "data/smart_money/**",
+                   # 04.11 22:35: the server's live whale desk (cnq/execution/whale_live.py, on change, ≥ 2 min apart)
+                   "web/whales_live.json"]
   schedule:
     - cron: "*/30 * * * *"      # данные + отдел новостей каждые 30 минут (UTC)
     - cron: "13,43 * * * *"     # второе расписание со сдвигом: GitHub часто задерживает/пропускает запуски, два шанса в полчаса

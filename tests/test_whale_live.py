@@ -1,0 +1,121 @@
+"""04.11 22:35 (owner: «Фьючерсы должны моментально копироваться»): the server's live whale desk (cnq/execution/whale_live.py)."""
+import json
+
+from cnq.agents import whale_study as W
+from cnq.execution import whale_live as WL
+
+NOW = 1_793_820_000_000
+MIN = 60_000
+
+
+class Feed:
+    """fake sources: one Hyperliquid whale and one OKX lead trader whose positions the test changes between passes"""
+    def __init__(self):
+        self.hl = []
+        self.okx = []
+        self.calls = 0
+
+    def post(self, body):
+        self.calls += 1
+        if body["type"] == "allMids":
+            return {"BTC": "100000", "ETH": "2500", "SOL": "100"}
+        if body["type"] == "clearinghouseState":
+            return {"assetPositions": [{"position": {"coin": c, "szi": str(sz), "positionValue": str(abs(sz) * 100), "entryPx": str(e),
+                                                     "unrealizedPnl": "0", "leverage": {"value": 10}}} for c, sz, e in self.hl]}
+        raise AssertionError(body)
+
+    def okx_get(self, path, params):
+        assert path.endswith("public-current-subpositions")
+        return [{"instId": f"{c}-USDT-SWAP", "posSide": s, "openAvgPx": str(e), "markPx": str(e), "openTime": str(t), "margin": "100",
+                 "lever": "5", "upl": "0", "subPos": "1"} for c, s, e, t in self.okx]
+
+
+def wtop(asof=NOW, desk=None):
+    return {"asof": asof, "following": [{"addr": "0x" + "a" * 40, "name": "HL кит", "per_day": 4, "win": 0.8, "pf": 3.0},
+                                        {"addr": "okx:Q", "name": "Queen", "per_day": 2, "win": 0.75, "pf": 2.5}],
+            "desk": desk or {"start": 10000.0, "equity": 10000.0, "open": [], "closed": [], "history": []}}
+
+
+def test_a_new_whale_position_is_copied_on_the_next_pass_and_its_close_on_the_one_after(tmp_path):
+    f = Feed()
+    env = {"OKX_WHALE_LIVE_STATE": str(tmp_path / "live.json")}
+    kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
+    f.hl = [("BTC", 1.0, 99000)]
+    d = WL.step(wtop(), now=NOW, **kw)
+    assert d["open"] == [] and d["live"]["polled"] == 2                       # the first look is a baseline
+    f.okx = [("ETH", "long", 2500, NOW + 30_000)]                               # the OKX whale opens ETH 30 s after our pass
+    d = WL.step(wtop(), now=NOW + MIN, **kw)
+    assert [t["symbol"] for t in d["open"]] == ["ETH"] and d["live"]["lag_s_last"] == 30      # copied in the next pass, 30 s later
+    t = d["open"][0]
+    assert t["copy_lev"] == 5.0 and t["stop"] < t["entry"] and t["id"].startswith("W-ETH-L-")
+    f.okx = []                                                                   # the whale closes
+    d = WL.step(wtop(), now=NOW + 2 * MIN, **kw)
+    assert d["open"] == [] and d["closed"][0]["exit_kind"] == "кит закрыл"
+    st = json.loads((tmp_path / "live.json").read_text())
+    assert st["desk"]["closed"][0]["coin"] == "ETH" and st["lags"] == [30]
+
+
+def test_the_first_pass_keeps_the_published_copies_with_the_same_ids(tmp_path):
+    """the switch from the GitHub desk: positions already held on OKX keep their «whales:W-…» ids"""
+    o = {"whale": "okx:Q", "coin": "SOL", "side": "LONG", "entry": 100.0, "opened_t": NOW - 3_600_000, "margin": 1000.0, "lev": 5.0,
+         "notional": 5000.0, "stop": 92.0, "stop_src": "защитный стоп −8%", "upnl": 0.0, "whale_ru": "Queen"}
+    pub = {"start": 10000.0, "equity": 10500.0, "started": NOW - 86_400_000, "open": [o], "closed": [], "history": [[NOW - MIN, 10500.0]]}
+    f = Feed()
+    f.okx = [("SOL", "long", 99.0, NOW - 3_700_000)]
+    d = WL.step(wtop(desk=pub), now=NOW, env={"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}, post=f.post, okx_get=f.okx_get,
+                put=lambda doc: True, sleep=lambda s: None)
+    assert [t["id"] for t in d["open"]] == [W.paper_trade(o)["id"]] and d["equity"] == 10500.0
+
+
+def test_a_stale_follow_list_opens_nothing_but_closes_still_follow(tmp_path):
+    f = Feed()
+    env = {"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}
+    kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
+    WL.step(wtop(), now=NOW, **kw)
+    f.okx = [("ETH", "long", 2500, NOW + 1000)]
+    assert len(WL.step(wtop(), now=NOW + MIN, **kw)["open"]) == 1
+    f.okx = [("ETH", "long", 2500, NOW + 1000), ("SOL", "long", 100, NOW + MIN + 1000)]
+    old = wtop(asof=NOW - 7 * 3_600_000)
+    d = WL.step(old, now=NOW + 2 * MIN, **kw)
+    assert [t["symbol"] for t in d["open"]] == ["ETH"]                          # the held copy is still watched, no new SOL
+    f.okx = []
+    assert WL.step(old, now=NOW + 3 * MIN, **kw)["open"] == []
+
+
+def test_publish_only_on_change_and_at_most_every_two_minutes(tmp_path):
+    f = Feed()
+    docs = []
+    env = {"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}
+    kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: docs.append(doc) or True, sleep=lambda s: None)
+    WL.step(wtop(), now=NOW, **kw)
+    assert len(docs) == 1 and "seen" not in docs[0]["desk"]
+    WL.step(wtop(), now=NOW + MIN, **kw)
+    assert len(docs) == 1                                                        # nothing changed
+    f.okx = [("ETH", "long", 2500, NOW + MIN)]
+    WL.step(wtop(), now=NOW + 2 * MIN + 1000, **kw)
+    assert len(docs) == 2 and docs[-1]["desk"]["open"][0]["coin"] == "ETH"
+
+
+def test_a_failed_poll_changes_nothing_for_that_whale(tmp_path):
+    f = Feed()
+    env = {"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}
+    kw = dict(env=env, post=f.post, put=lambda doc: True, sleep=lambda s: None)
+    WL.step(wtop(), now=NOW, okx_get=f.okx_get, **kw)
+    f.okx = [("ETH", "long", 2500, NOW + 1000)]
+    WL.step(wtop(), now=NOW + MIN, okx_get=f.okx_get, **kw)
+
+    def down(path, params):
+        raise OSError("timeout")
+    d = WL.step(wtop(), now=NOW + 2 * MIN, okx_get=down, **kw)
+    assert [t["symbol"] for t in d["open"]] == ["ETH"] and d["live"]["errors"]
+
+
+def test_the_github_study_publishes_the_fresh_live_desk_instead_of_its_own(tmp_path):
+    p = tmp_path / "whales_live.json"
+    desk = {"start": 10000.0, "cash": 9000.0, "equity": 10100.0, "open": [{"whale": "okx:Q", "coin": "ETH", "side": "LONG", "entry": 2500.0,
+                                                                         "opened_t": NOW, "margin": 1000.0, "lev": 5.0, "notional": 5000.0,
+                                                                         "stop": 2300.0}], "closed": [], "history": [], "util_pct": 9.9}
+    p.write_text(json.dumps({"asof": NOW, "desk": desk}))
+    assert W.live_desk(str(p), NOW + 5 * MIN)["open"][0]["coin"] == "ETH"
+    assert W.live_desk(str(p), NOW + 20 * MIN) is None and W.live_desk(str(tmp_path / "none.json"), NOW) is None
+

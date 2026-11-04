@@ -10,7 +10,19 @@ from __future__ import annotations
 
 SRC_RU = {"hl": "Hyperliquid", "okx": "OKX", "bn": "Binance"}
 SRC_LONG_RU = {"hl": "Hyperliquid · сделки в блокчейне", "okx": "OKX · лид-трейдер копитрейдинга", "bn": "Binance · лид-портфель копитрейдинга"}
-STATUS_RU = {"followed": "копируем", "candidate": "кандидат", "dropped": "исключён"}
+STATUS_RU = {"followed": "копируем", "candidate": "кандидат", "dropped": "исключён", "failed": "не прошёл"}
+# 04.11 22:35 (owner: «−108k и Bobby Big Size −198k показаны кандидатами»): a «candidate» is only a trader who passes the bar or comes
+# close to it; a minus over 60 days, no decisions or a record far from the bar → «не прошёл» (folded on the panel, with the reason)
+NEAR = {"decisions": 10, "win": 0.60, "pf": 1.5}
+
+
+def near_bar(p: dict) -> bool:
+    """passes the 60-day bar, or is close: in profit, ≥ 10 decisions, ≥ 60 % wins and PF ≥ 1.5 (incl. open positions)"""
+    if p.get("eligible"):
+        return True
+    pnl, n = p.get("pnl_60d"), p.get("decisions", p.get("trips"))
+    return (pnl is not None and pnl > 0 and (n or 0) >= NEAR["decisions"] and (p.get("win") or 0) >= NEAR["win"]
+            and (p.get("pf") or 0) >= NEAR["pf"])
 
 
 def src_of(addr: str, src: str | None = None) -> str:
@@ -82,7 +94,7 @@ def crypto_watch(profs: list[dict], top: dict) -> dict:
         elif a in dropped:
             status, why = "dropped", list(dropped[a].get("why_ru") or []) or ["снят с копирования"]
         else:
-            status = "candidate"
+            status = "candidate" if near_bar(p) else "failed"
             why = list(p.get("excluded_ru") or [])
             if not why:
                 if rank.get(a) and p.get("hidden"):
@@ -111,17 +123,19 @@ def crypto_watch(profs: list[dict], top: dict) -> dict:
         rows.append({"addr": a, "src": src, "src_ru": SRC_RU.get(src, src), "src_long_ru": SRC_LONG_RU.get(src, src), "name": x.get("name") or a,
                      "link": link_of(a, src), "status": "dropped", "status_ru": STATUS_RU["dropped"], "why_ru": list(x.get("why_ru") or []),
                      "positions": [], "recent": [], "copies": _copies(desk, a), "not_studied": True})
-    order = {"followed": 0, "candidate": 1, "dropped": 2}
+    order = {"followed": 0, "candidate": 1, "dropped": 2, "failed": 3}
     rows.sort(key=lambda r: (order[r["status"]], not r.get("eligible"), -(r.get("pf") or -99) if r.get("eligible") else 0, -(r.get("pnl_60d") or 0)))
     counts = {k: sum(1 for r in rows if r["status"] == k) for k in order}
     by_src = {}
     for r in rows:
         by_src[r["src"]] = by_src.get(r["src"], 0) + 1
-    dk = {k: desk.get(k) for k in ("name_ru", "start", "started", "equity", "pnl_usd", "pnl_pct", "trades", "wins", "winrate", "max_dd_pct")} if desk else None
+    dk = {k: desk.get(k) for k in ("name_ru", "start", "started", "equity", "pnl_usd", "pnl_pct", "trades", "wins", "winrate", "max_dd_pct",
+                                   "util_pct", "live")} if desk else None
     return {"asof": top.get("asof"), "complete": top.get("complete"), "counts": counts, "by_src": by_src, "n": len(rows), "whales": rows,
             "desk": dk, "rule_ru": top.get("follow_rule_ru"), "not_covered_ru": top.get("not_covered_ru"), "hidden_ru": top.get("hidden_ru"),
             "funnel": top.get("funnel"),
             "about_ru": "Все киты, которых система изучает: из лидерборда Hyperliquid, лид-трейдеры копитрейдинга OKX и открытые лид-портфели "
                         "Binance. «Копируем» — стол «Киты» повторяет их новые сделки на демо-счёте; «кандидат» — изучаем, в копирование не взяли "
-                        "(причина рядом); «исключён» — раньше копировали, сняли. Процент прибыльных и PF считаются за 60 дней вместе с "
+                        "(причина рядом), показываем только тех, кто проходит отбор или близок к нему; «исключён» — раньше копировали, сняли; «не прошли» — "
+                        "в минусе за 60 дней, без сделок или далеко от отбора (свёрнуто, с причиной). Процент прибыльных и PF считаются за 60 дней вместе с "
                         "открытыми позициями по текущей цене. Только информация, не финансовый совет."}

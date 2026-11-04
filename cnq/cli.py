@@ -203,7 +203,8 @@ def main(argv: list[str] | None = None) -> int:
         from .terminal.report import write_report
         conn = sqlite3.connect("data/agents.sqlite")
         os.makedirs(args.out, exist_ok=True)
-        d = whale_study.run(conn, archive_dir=os.path.join("data", "whale_trades"))   # 04.11: + daily whale-trade history
+        d = whale_study.run(conn, archive_dir=os.path.join("data", "whale_trades"),   # 04.11: + daily whale-trade history
+                            live_path=os.path.join(args.out, "whales_live.json"))     # 04.11 22:35: the server's live desk, when fresh
         profs = d.pop("profiles", None) or []
         write_report(d, os.path.join(args.out, "whales_top.json"))
         try:                                    # 04.11: VIP «Киты · крипто» watchlist from the same profiles (no extra requests)

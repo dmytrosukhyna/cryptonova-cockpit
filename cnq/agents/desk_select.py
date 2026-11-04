@@ -357,6 +357,8 @@ def watch_whales(wtop, now: int) -> dict | None:
             "pf": None if pf is None else round(pf, 2), "mean_pct": None if mean is None else round(mean, 2),
             "result_pct": round((_num(d.get("equity")) / base - 1) * 100, 2) if base else None, "dd_pct": round(dd, 2),
             "since": int(_num(d.get("started"))), "open": len(d.get("open") or []), "ready": ready,
+            # 04.11 22:38 (owner: «в основном бюджет должен работать»): margin in the desk's positions ÷ its equity, % (whale_study.desk_step)
+            "util_pct": d.get("util_pct"), "live": d.get("live"),
             "ready_why": why_ready or "READY по числам, но вне конвейера", "eligible": False, "why": WATCH_WHY,
             "whales": sorted({str(t.get("whale") or "") for t in cl} - {""}), "coins": sorted({str(t.get("coin") or "") for t in cl} - {""})}
 

@@ -48,7 +48,9 @@
   /* ── crypto ─────────────────────────────────────────────────────────── */
   function crypto(W) {
     if (!W) return `<section class="card">${V.nodata('whale_watch.json ещё не опубликован — список появится после следующего прогона изучения китов')}</section>`;
-    const all = A(W.whales), c = W.counts || {}, bs = W.by_src || {}, dk = W.desk;
+    // 04.11 22:35 (owner): traders in a minus, without decisions or far from the bar are not candidates — folded «не прошли» below
+    const every = A(W.whales), all = every.filter((w) => w.status !== 'failed'), failed = every.filter((w) => w.status === 'failed');
+    const c = W.counts || {}, bs = W.by_src || {}, dk = W.desk;
     const list = all.filter((w) => (ui.st === 'all' || w.status === ui.st) && (ui.src === 'all' || w.src === ui.src));
     const shown = ui.all ? list : list.slice(0, 24);
     const seg = (attr, cur, opts) => `<div class="seg">${opts.map(([k, n]) => `<button type="button" data-${attr}="${k}" aria-pressed="${cur === k}">${esc(n)}</button>`).join('')}</div>`;
@@ -70,7 +72,10 @@
         ${seg('wsrc', ui.src, [['all', 'Все источники'], ...Object.keys(bs).map((k) => [k, SRC_NAME[k] || k])])}
       </div>
       ${shown.length ? `<div class="scards wh-cards">${shown.map(card).join('')}</div>` : V.empty('Под этот фильтр китов нет.')}
-      ${!ui.all && list.length > shown.length ? `<div style="margin-top:12px"><button class="btn" type="button" data-wall="1">Показать всех (${V.int(list.length)})</button></div>` : ''}`;
+      ${!ui.all && list.length > shown.length ? `<div style="margin-top:12px"><button class="btn" type="button" data-wall="1">Показать всех (${V.int(list.length)})</button></div>` : ''}
+      ${failed.length ? `<details class="more" style="margin-top:12px"><summary>Не прошли отбор (${V.int(failed.length)})</summary><div class="tbl-wrap"><table class="tbl"><tbody>
+        ${failed.map((w) => `<tr><td><span class="sym">${esc(w.name)}<small>${esc(w.src_ru || w.src)}</small></span></td><td class="${V.cls(w.pnl_60d)}">${V.isNum(w.pnl_60d) ? V.smoney(w.pnl_60d) : '—'}</td><td class="l">${esc(A(w.why_ru).join('; ') || '—')}</td></tr>`).join('')}
+      </tbody></table></div></details>` : ''}`;
   }
 
   function card(w) {

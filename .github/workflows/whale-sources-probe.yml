@@ -1,0 +1,28 @@
+name: whale-sources-probe
+# 04.11: which copy-trading sources (Binance lead portfolios, Bybit masters, Bitget, MEXC, Gate, Hyperliquid) answer from a runner
+# with live positions and history → data/research/whale_sources_probe.json (committed back). Runs when the probe changes.
+on:
+  push:
+    branches: [main]
+    paths: ["scripts/whale_sources_probe.py", ".github/workflows/whale-sources-probe.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/whale_sources_probe.py data/research/whale_sources_probe.json
+      - name: commit the answers
+        run: |
+          git config user.name "cryptonova-bot"; git config user.email "bot@users.noreply.github.com"
+          git add data/research/whale_sources_probe.json
+          git commit -m "research: whale sources probe $(date -u +%F' '%H:%M) UTC" || exit 0
+          for i in 1 2 3 4 5; do git pull --rebase -q origin main && git push -q origin HEAD:main && exit 0; sleep $((i*7)); done
+          exit 1

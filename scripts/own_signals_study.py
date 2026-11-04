@@ -1961,12 +1961,12 @@ def ls_neutral(iv=None, ret_out=None):
             tsh = 1 - len(set(sh) & ps_) / max(1, len(sh))
             fl = float(np.mean([FR.get((s, ym)) or 0.0 for s in lg])) if lg else 0.0
             fs = float(np.mean([FR.get((s, ym)) or 0.0 for s in sh])) if sh else 0.0
-            comp_[k].append((leg(lg, d, d1), leg(sh, d, d1), tl, tsh, fl, fs, d1))
+            comp_[k].append((leg(lg, d, d1), leg(sh, d, d1), tl, tsh, fl, fs, d1, d))
             prev[k] = (set(lg), set(sh))
 
-    def sim(k, g):
+    def sim(k, g, daily=None):
         V, curve, rets, fsum, csum = 1.0, [], [], 0.0, 0.0
-        for Lp, Sp, tl, tsh, fl, fs, d1 in comp_[k]:
+        for Lp, Sp, tl, tsh, fl, fs, d1, d0_ in comp_[k]:
             cost = 0.002 * g * 0.5 * (tl + tsh)
             fund = g * 0.5 * (-fl + fs)
             path = 1 + g * 0.5 * ((Lp - 1) - (Sp - 1)) - cost
@@ -1975,6 +1975,9 @@ def ls_neutral(iv=None, ret_out=None):
             curve += list(V0 * path)
             V = V0 * (path[-1] + fund)
             curve[-1] = V
+            if daily is not None:              # p63_study: daily marks (date ms, equity) of the same book
+                ts_ = [t for t in days if d0_ < t <= d1]
+                daily += list(zip(ts_, curve[-len(ts_):])) if ts_ else []
             rets.append((d1, V / V0 - 1))
             fsum += fund
             csum += cost
@@ -1983,6 +1986,8 @@ def ls_neutral(iv=None, ret_out=None):
         return V, dd, rets, fsum / max(1, len(rets)), csum / max(1, len(rets))
     if ret_out is not None:                    # blend_study: the live book (LS10, gross 0.75) as monthly returns, no note
         ret_out.update({g: sim("LS10", g)[2] for g in (0.75, 1.0)})
+        if "daily" in ret_out:
+            sim("LS10", 0.75, daily=ret_out["daily"])
         return
     out = {}
     for k in names:

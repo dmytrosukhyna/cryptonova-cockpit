@@ -282,8 +282,39 @@ def binance_wide():
                 OUT[f"binance.{dt}.{rng}"] = {"status": s_, "err": str(e)[:100]}
 
 
+def mexc5():
+    """round 5: which MEXC copy-trading call gives CLOSED positions (close price / realised P&L) — compact summary per variant"""
+    base = "https://futures.mexc.com/copyFutures/api/v1"
+    s_, txt = call(f"{base}/traders/v2?condition=%5B%5D&limit=20&orderBy=PNL&page=1")
+    rows = (json.loads(txt).get("data") or {}).get("content") or first_list(json.loads(txt)) or []
+    uids = [r.get("uid") for r in rows if r.get("uid")][:3]
+    OUT["mexc5.list_keys"] = {"n": len(rows), "keys": sorted((rows[0] if rows else {}).keys()), "data_keys": list((json.loads(txt).get("data") or {}).keys())
+                              if isinstance(json.loads(txt).get("data"), dict) else type(json.loads(txt).get("data")).__name__}
+    for uid in uids[:2]:
+        for nm, u in {"t_hist": f"orders/v2?limit=50&page=1&uid={uid}&type=history", "t_close": f"orders/v2?limit=50&page=1&uid={uid}&type=close",
+                      "t_closed": f"orders/v2?limit=50&page=1&uid={uid}&type=closed", "olt0": f"orders/v2?limit=50&page=1&uid={uid}&orderListType=0",
+                      "olt_h": f"orders/v2?limit=50&page=1&uid={uid}&orderListType=HISTORY", "st2": f"orders/v2?limit=50&page=1&uid={uid}&status=2",
+                      "p2": f"orders/v2?limit=50&page=2&uid={uid}", "plain": f"orders/v2?limit=50&page=1&uid={uid}",
+                      "hist_v2": f"historyOrders/v2?limit=50&page=1&uid={uid}", "closeOrders": f"closeOrders/v2?limit=50&page=1&uid={uid}",
+                      "hpos": f"historyPositions?uid={uid}&limit=50&page=1", "hpos2": f"positions/history?uid={uid}&limit=50&page=1",
+                      "hpos3": f"historyPositions/v2?uid={uid}&limit=50&page=1", "pos": f"positions?uid={uid}"}.items():
+            s_, txt = call(f"{base}/trader/{nm and u}")
+            rec = {"status": s_}
+            try:
+                d = json.loads(txt)
+                rr = first_list(d) or []
+                rec.update(code=d.get("code"), n=len(rr), closed=sum(1 for r in rr if float(r.get("closeAvgPrice") or 0) > 0),
+                           closing=sum(1 for r in rr if r.get("closing")), keys=sorted(rr[0].keys())[:40] if rr else None,
+                           ot_min=min((r.get("openTime") or 0 for r in rr), default=None),
+                           sample=next((r for r in rr if float(r.get("closeAvgPrice") or 0) > 0), None))
+            except Exception as e:  # noqa: BLE001
+                rec["err"] = txt[:100]
+            OUT[f"mexc5.{uid}.{nm}"] = rec
+            print(f"mexc5.{uid}.{nm}", json.dumps({k: v for k, v in rec.items() if k not in ("keys", "sample")}), flush=True)
+
+
 def main():
-    for f in (bybit4, bitget4, gate4, mexc4, bingx4, okx_wide, binance_wide):
+    for f in (mexc5,):
         try:
             f()
         except Exception as e:  # noqa: BLE001

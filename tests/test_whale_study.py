@@ -89,10 +89,10 @@ def test_run_end_to_end_with_fake_api():
     lb = {"leaderboardRows": [{"ethAddress": addr, "accountValue": "2000000", "displayName": "Ace",
                                "windowPerformances": [["day", {"pnl": "1"}], ["week", {"pnl": "1"}], ["month", {"pnl": "300000", "roi": "0.2", "vlm": "1e8"}],
                                                       ["allTime", {"pnl": "4000000"}]]}]}
-    # 10 winning 4-hour longs on BTC in an uptrend, one every 2 days
+    # 22 winning 4-hour longs on BTC in an uptrend, one every 2 days (04.11: ≥ 20 decisions in 60 days, hold ≥ 4 h)
     fl = []
-    for k in range(10):
-        t = now - 25 * W.DAY + k * 2 * W.DAY
+    for k in range(22):
+        t = now - 49 * W.DAY + k * 2 * W.DAY
         fl.append({"time": t, "coin": "BTC", "side": "B", "px": "100", "sz": "10", "startPosition": "0", "closedPnl": "0", "fee": "1", "tid": f"o{k}"})
         fl.append({"time": t + 4 * H, "coin": "BTC", "side": "A", "px": "103", "sz": "10", "startPosition": "10", "closedPnl": "30", "fee": "1", "tid": f"c{k}"})
     fl.append({"time": now - 3 * W.DAY, "coin": "@107", "side": "B", "px": "1", "sz": "1", "startPosition": "0", "closedPnl": "0", "fee": "0", "tid": "spot"})
@@ -132,15 +132,18 @@ def test_run_end_to_end_with_fake_api():
             return []
         raise AssertionError(path)
 
+    W.ensure_schema(conn)                                     # a whale followed under the old rules, gone from the candidates
+    W.kv_set(conn, "study", {"t": 0, "top": [{"addr": "0x" + "e" * 40, "short": "old", "name": "Old"}]})
     d = W.run(conn, now=now, post=post, get_lb=lambda: lb, okx_get=okx_get, max_requests=50, budget_s=60,
               src_get={"bn": lambda path, body=None: {"list": []}})
     assert d["complete"] and d["funnel"]["studied"] == 2
+    assert [x["name"] for x in d["follow_dropped"]] == ["Old"] and d["follow_dropped"][0]["why_ru"] == ["не изучен в этом прогоне"]
     top = d["top"]
-    assert len(top) == 1 and top[0]["addr"] == addr and top[0]["trips"] == 10 and top[0]["win"] == 1.0
+    assert len(top) == 1 and top[0]["addr"] == addr and top[0]["trips"] == 22 and top[0]["win"] == 1.0
     assert top[0]["style_ru"] == "интрадей" and top[0]["coins"][0]["coin"] == "BTC" and "BTC" in top[0]["desc_ru"]
-    assert top[0]["copy"]["30"]["n"] == 10 and top[0]["portfolio"]["months"] >= 3 and top[0]["lev_now"] == 3.0
+    assert top[0]["copy"]["30"]["n"] >= 10 and top[0]["portfolio"]["months"] >= 3 and top[0]["lev_now"] == 3.0
     okx = next(o for o in d["others"] if o["src"] == "okx")
-    assert okx["trips"] == 3 and "мало закрытых сделок" in okx["excluded_ru"][0]
+    assert okx["trips"] == 3 and "мало решений за 60 дней (3" in okx["excluded_ru"][0]
     assert d["following"] and d["following"][0]["addr"] == addr
     # next run: the desk starts watching the followed whale (no copy of positions it already had)
     d2 = W.run(conn, now=now + 1800_000, post=post, get_lb=lambda: lb, okx_get=okx_get, max_requests=50, budget_s=60,
@@ -282,3 +285,106 @@ def test_no_join_when_the_whale_is_down_more_than_3pct_on_price():
     assert [(o["coin"], o["gap_pct"]) for o in d["open"]] == [("SOL", -2.5)]
     w = [e for e in d["events"] if e["kind"] == "join_wait"]
     assert sorted(e["coin"] for e in w) == ["BTC", "ETH"] and all("в минусе" in e["why"] for e in w)
+
+
+# ------------------------------------------------------------------------------------------------ 04.11 17:46 whale selection (60 days)
+def _trip(t0, coin="BTC", side="LONG", hold_h=6.0, pnl=100.0, open_=False, now=None, hidden=False, notional=1000.0):
+    ct = now if open_ else t0 + int(hold_h * H)
+    x = {"coin": "" if hidden else coin, "side": side, "open_t": t0, "close_t": ct, "hold_h": round((ct - t0) / H, 2), "entry": 100.0,
+         "exit": 101.0 if pnl > 0 else 99.0, "ret_pct": None if hidden else (1.0 if pnl > 0 else -1.0), "notional": notional, "pnl": pnl, "fills": 1}
+    if open_:
+        x["open"] = True
+    if hidden:
+        x["hidden"] = True
+    return x
+
+
+def _prof(trips, now):
+    return W.profile({"addr": "okx:X", "src": "okx", "name": "X"}, trips, sum(t["pnl"] for t in trips if not t.get("open")), {}, [], {}, now, False)
+
+
+def test_parts_of_one_trade_within_4h_are_one_decision():
+    now = T0 + 70 * W.DAY
+    t0 = now - 10 * W.DAY
+    parts = [_trip(t0), _trip(t0 + 1 * H), _trip(t0 + 3 * H, pnl=-20.0), _trip(t0 + 5 * H)]   # 3 within 4 h of the first + 1 later
+    d = W.decisions(parts)
+    assert len(d) == 2 and d[0]["parts"] == 3 and d[0]["pnl"] == 180.0 and d[1]["parts"] == 1
+    assert len(W.decisions([_trip(t0), _trip(t0 + H, side="SHORT")])) == 2          # another side = another decision
+
+
+def test_a_good_record_passes_and_ranks_by_pf_including_open():
+    now = T0 + 70 * W.DAY
+    tr = [_trip(now - 55 * W.DAY + k * 2 * W.DAY, pnl=100.0 if k % 5 else -50.0) for k in range(25)]
+    p = _prof(tr, now)
+    assert p["decisions"] == 25 and p["win"] == 0.8 and p["pf"] == 8.0 and p["hold_med_h"] == 6.0 and p["eligible"], p["excluded_ru"]
+    assert p["score"] == p["pf"] and p["window_days"] == 60
+    # trades older than 60 days do not count
+    old = [_trip(now - 70 * W.DAY + k * H * 5, pnl=100.0) for k in range(5)]
+    assert _prof(tr + old, now)["decisions"] == 25
+
+
+def test_hidden_losers_in_open_positions_are_losses_and_exclude_the_whale():
+    """AGD88888 pattern (research 04.11): 90 % of closed trades in profit, but many open positions in loss"""
+    now = T0 + 70 * W.DAY
+    tr = [_trip(now - 50 * W.DAY + k * 2 * W.DAY, pnl=100.0 if k % 10 else -50.0) for k in range(20)]      # 18 wins, 2 losses
+    p0 = _prof(tr, now)
+    assert p0["eligible"] and p0["win"] == 0.9
+    hid = [_trip(now - 5 * W.DAY + k * H, pnl=-60.0, open_=True, now=now, hidden=True) for k in range(8)]
+    p = _prof(tr + hid, now)
+    assert p["decisions"] == 28 and abs(p["win"] - 18 / 28) < 1e-3 and p["win_closed"] == 0.9 and p["hidden_loss_n"] == 8
+    ex = " ".join(p["excluded_ru"])
+    assert not p["eligible"] and "прячет убытки" in ex and "нужно от 70%" in ex
+    # a hidden position in profit is not counted as a decision (we cannot see what it is)
+    assert _prof(tr + [_trip(now - W.DAY, pnl=50.0, open_=True, now=now, hidden=True)], now)["decisions"] == 20
+
+
+def test_visible_open_losses_over_20pct_of_closed_profit_exclude():
+    now = T0 + 70 * W.DAY
+    tr = [_trip(now - 50 * W.DAY + k * 2 * W.DAY, pnl=100.0) for k in range(22)]               # closed profit $2200
+    small = [_trip(now - 2 * W.DAY, coin="ETH", pnl=-400.0, open_=True, now=now)]              # 18 % → passes
+    big = [_trip(now - 2 * W.DAY, coin="ETH", pnl=-500.0, open_=True, now=now)]                # 23 % → out
+    assert _prof(tr + small, now)["eligible"]
+    p = _prof(tr + big, now)
+    assert not p["eligible"] and any("прячет убытки" in w for w in p["excluded_ru"]) and p["open_loss"] == 500.0
+
+
+def test_scalpers_and_thin_records_are_dropped():
+    now = T0 + 70 * W.DAY
+    sc = _prof([_trip(now - 50 * W.DAY + k * W.DAY, hold_h=1.5) for k in range(30)], now)
+    assert not sc["eligible"] and any("держит слишком коротко (медиана 1.5 ч" in w for w in sc["excluded_ru"])
+    th = _prof([_trip(now - 50 * W.DAY + k * 2 * W.DAY) for k in range(12)], now)
+    assert not th["eligible"] and any("мало решений за 60 дней (12" in w for w in th["excluded_ru"])
+    lowpf = _prof([_trip(now - 50 * W.DAY + k * 2 * W.DAY, pnl=100.0 if k % 4 else -200.0) for k in range(24)], now)  # 75 %, PF 1.5
+    assert not lowpf["eligible"] and any("прибыль/убыток 1.5" in w for w in lowpf["excluded_ru"])
+
+
+def test_okx_hidden_sub_positions_become_hidden_open_trips():
+    now = T0 + 70 * W.DAY
+    st_ = {"okx": [{"instId": "BTC-USDT-SWAP", "posSide": "long", "openAvgPx": "100", "markPx": "99", "openTime": str(now - 5 * H), "margin": "10",
+                    "lever": "10", "upl": "-1"},
+                   {"instId": "", "posSide": "long", "openAvgPx": "", "markPx": "", "openTime": "", "margin": "50", "lever": "20", "upl": "-30"}]}
+    tr = W.okx_open_trips(st_, now)
+    assert len(tr) == 2 and tr[0]["coin"] == "BTC" and not tr[0].get("hidden") and tr[1]["hidden"] and tr[1]["pnl"] == -30.0
+
+
+def test_daily_archive_writes_each_closed_trade_once(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    W.ensure_schema(conn)
+    now = T0 + 70 * W.DAY
+    rows = [("okx", "okx:A", f"s{k}", "BTC", "LONG", now - (10 - k) * W.DAY, now - (10 - k) * W.DAY + 6 * H, 100.0, 101.0, 10.0, 1000.0, 10.0)
+            for k in range(5)]
+    conn.executemany("INSERT INTO ws_trips VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    conn.execute("INSERT INTO ws_whale (addr, lb, state) VALUES (?,?,?)", ("okx:A", "{}", json.dumps(
+        {"okx": [{"instId": "ETH-USDT-SWAP", "posSide": "short", "openAvgPx": "2000", "margin": "100", "lever": "5", "upl": "3", "subPos": "-1"}]})))
+    cands = [{"addr": "okx:A", "name": "Alpha", "src": "okx"}]
+    a = W.archive_trades(conn, now, cands, str(tmp_path))
+    assert a["closed"] == 5 and a["open"] == 1
+    assert W.archive_trades(conn, now + H, cands, str(tmp_path)) is None                   # once per UTC day
+    conn.execute("INSERT INTO ws_trips VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                 ("okx", "okx:A", "s9", "SOL", "SHORT", now, now + 5 * H, 10.0, 9.0, 5.0, 100.0, 5.0))
+    b = W.archive_trades(conn, now + W.DAY, cands, str(tmp_path))
+    assert b["closed"] == 1                                                                  # only the new one
+    lines = [json.loads(x) for f in sorted(tmp_path.iterdir()) for x in f.read_text().splitlines()]
+    closed = [x for x in lines if x["kind"] == "closed"]
+    assert len(closed) == 6 and len({x["id"] for x in closed}) == 6 and closed[0]["name"] == "Alpha"
+    assert {x["coin"] for x in lines if x["kind"] == "open"} == {"ETH"} and len(list(tmp_path.iterdir())) == 2

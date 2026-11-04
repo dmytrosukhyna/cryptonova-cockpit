@@ -14,8 +14,11 @@ Pipeline (Hyperliquid public info API, no keys):
    size, result (closedPnl − fees). Spot and builder-dex markets are skipped.
 4. Copy test on 15m candles: enter at the price D minutes after the whale opened, exit D minutes after he closed
    (D = 15 / 30 / 60 min; trades held shorter than D are missed), costs 0.11 % per round trip.
-5. Eligible = ≥ 8 closed round trips in 30 days, median hold ≥ 30 min, 30-day P&L > 0, profit factor ≥ 1.2.
-   Rank = what copying with a 30-minute delay would have earned (mean / sd × √n). Top 5 → profiles in plain Russian.
+5. Eligible (04.11 17:46, owner + docs/research/whale-rules-2026-11-04.md) = over 60 days ≥ 20 decisions (parts within 4 h = one),
+   ≥ 70 % in profit and PF ≥ 2 counting open positions at the mark (hidden OKX positions in loss = losing decisions), median
+   hold ≥ 4 h, 60-day P&L > 0, open losses ≤ 20 % of the closed profit. Rank = PF incl. open, then 60-day P&L. The desk follows
+   the best 5 whose 30-min-delay copy test is positive and whose positions are visible. Closed trades are kept daily in
+   data/whale_trades/<day>.jsonl (archive_trades) so the selection can be re-tested on 6+ months of our own history.
 6. Copy desk (every run): $10 000 paper account follows the top 5 — a NEW position of a followed whale (seen appear
    between two runs) is opened at the current mid, margin 10 % of equity, leverage = whale's but ≤ 5×, at most 8 at
    once, one per coin; closed when the whale closes or flips. 04.11 17:37 (owner): a position he already holds is joined too
@@ -29,6 +32,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sqlite3
 import statistics as st
 import time
@@ -49,18 +53,27 @@ GOOD_WIN, GOOD_PF = 0.70, 1.5    # several candidates at once → whales with a 
 LB = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard"
 HL = "https://api.hyperliquid.xyz/info"
 M15, H1, DAY = 900_000, 3_600_000, 86_400_000
-WINDOW = 30 * DAY
+# 04.11 17:46 (owner: «отбери по всему миру лучших китов — у кого хорошая статистика за долгий период, это подтверждается»), research
+# docs/research/whale-rules-2026-11-04.md (blind test: picked on 60 days, copied the next 45 → 12 of 12 in profit): a whale is followed only
+# with ≥ 20 decisions in 60 days, ≥ 70 % of them in profit and PF ≥ 2 COUNTING OPEN POSITIONS at the mark (hidden OKX positions in loss
+# = losing decisions), median hold ≥ 4 h, and open losses ≤ 20 % of the closed profit (whales hide losers in open positions:
+# AGD88888 90 % closed wins → 62 % with the open ones). Rank: PF incl. open, then 60-day P&L.
+WINDOW = 60 * DAY
+DECISION_MS = 4 * 3_600_000            # parts of one coin + side opened within 4 h of the first = one decision
+MIN_DECISIONS, MIN_WIN, OPEN_LOSS_MAX = 20, 0.70, 0.20
+CANDLE_DAYS = 50                       # Hyperliquid serves the newest 5000 candles (52 days of 15m) — the copy test covers 50 days
 PRE_N = 30
 PRE_M = 20                            # 04.11: + the best 20 by 30-day P&L that the all-time top misses
 TOP_N = 10                            # «топ-10 трейдеров» on the panel
 FOLLOW_N = 5                          # the copy desk follows the best 5 whose copy test is positive
 MIN_AV, MIN_ALL = 300_000.0, 500_000.0
 MAX_VLM_X, MAX_ROI_M = 400.0, 10.0
-FETCH_WINDOW = 45 * DAY               # fills fetched for 45 days so positions opened before the 30-day window are known
-FILLS_PAGES = 4                       # up to 8000 fills (big traders slice orders); more than that = high-frequency
-FILLS_V = 2
+FETCH_WINDOW = 75 * DAY               # fills fetched for 75 days so positions opened before the 60-day window are known
+FILLS_PAGES = 5                       # up to 10000 fills (Hyperliquid keeps no more); a full set = high-frequency
+FILLS_V = 3                           # 04.11: 3 = the 60-day window — every HL / OKX history is fetched again once
+OKX_HIST_PAGES = 12                   # 100 closed sub-positions per page
 FILLS_PAGE = 2000
-MIN_TRIPS, MIN_HOLD_H, MIN_PF = 8, 0.5, 1.2
+MIN_TRIPS, MIN_HOLD_H, MIN_PF = MIN_DECISIONS, 4.0, 2.0
 DELAYS_MIN = (15, 30, 60)
 COST_PCT = 0.11                       # taker 0.045 % × 2 + slippage 0.02 %
 REFRESH_MS = DAY                      # study data per whale refreshed once a day
@@ -373,60 +386,120 @@ def copy_test(trips: list[dict], candles: dict, delay_min: int) -> dict:
     return out
 
 
+def decisions(trips: list[dict]) -> list[dict]:
+    """One decision = one entry (research 04.11): trips of the same coin + side opened within 4 h of the first one are merged
+    (entry / exit / return weighted by size, P&L summed, open if any part is still open). Hidden positions (no coin) stay apart."""
+    by: dict[tuple, list] = {}
+    for t in trips:
+        by.setdefault((t["coin"], t["side"]), []).append(t)
+    out = []
+    for ts in by.values():
+        ts.sort(key=lambda x: x["open_t"])
+        grp: list = []
+        for t in ts:
+            if grp and t["open_t"] - grp[0]["open_t"] <= DECISION_MS:
+                grp.append(t)
+            else:
+                if grp:
+                    out.append(grp)
+                grp = [t]
+        if grp:
+            out.append(grp)
+    res = []
+    for g in out:
+        if len(g) == 1:
+            res.append(dict(g[0], parts=1))
+            continue
+        w = [max(_f(x.get("notional")), 1e-9) for x in g]
+        W_ = sum(w)
+        rets = [(x["ret_pct"], wi) for x, wi in zip(g, w) if x.get("ret_pct") is not None]
+        ot, ct = min(x["open_t"] for x in g), max(x["close_t"] for x in g)
+        res.append({**g[0], "open_t": ot, "close_t": ct, "hold_h": round((ct - ot) / H1, 2),
+                    "entry": sum(_f(x["entry"]) * wi for x, wi in zip(g, w)) / W_, "exit": sum(_f(x["exit"]) * wi for x, wi in zip(g, w)) / W_,
+                    "ret_pct": round(sum(r * wi for r, wi in rets) / sum(wi for _, wi in rets), 3) if rets else None,
+                    "notional": round(W_, 2), "pnl": round(sum(x["pnl"] for x in g), 2), "fills": sum(x.get("fills") or 1 for x in g),
+                    "open": any(x.get("open") for x in g), "parts": len(g)})
+    res.sort(key=lambda t: t["open_t"])
+    return res
+
+
+def _wl(xs: list[dict]) -> tuple[float | None, float | None, float, float]:
+    """(win share, profit factor, gross profit, gross loss) of decisions"""
+    gp = sum(t["pnl"] for t in xs if t["pnl"] > 0); gl = -sum(t["pnl"] for t in xs if t["pnl"] <= 0)
+    win = round(sum(1 for t in xs if t["pnl"] > 0) / len(xs), 3) if xs else None
+    pf = round(gp / gl, 2) if gl > 0 else (None if not gp else 99.0)
+    return win, pf, gp, gl
+
+
 def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list, candles: dict, now: int, too_active: bool) -> dict:
-    trips = [t for t in trips if t["open_t"] >= now - WINDOW or t.get("open")]
-    n = len(trips)
-    open_tr = [t for t in trips if t.get("open")]
+    """60-day record of one whale in DECISIONS, open positions counted at the mark (04.11, owner + research): trips → decisions
+    closed in the window or still open; hidden open positions (OKX shows only their P&L) in loss = losing decisions."""
+    since = now - WINDOW
+    hid = [t for t in trips if t.get("hidden")]
+    dec = [t for t in decisions([t for t in trips if not t.get("hidden")]) if t.get("open") or t["close_t"] >= since]
+    hid_loss = [t for t in hid if t["pnl"] < 0]
+    allx = dec + hid_loss
+    n = len(allx)
+    closed = [t for t in dec if not t.get("open")]
+    open_tr = [t for t in dec if t.get("open")] + hid
     open_upnl = sum(t["pnl"] for t in open_tr)
-    total = total + sum(t["pnl"] for t in open_tr)
-    wins = [t for t in trips if t["pnl"] > 0]; losses = [t for t in trips if t["pnl"] <= 0]
-    gp, gl = sum(t["pnl"] for t in wins), -sum(t["pnl"] for t in losses)
-    holds = [t["hold_h"] for t in trips]
+    open_loss = -sum(t["pnl"] for t in open_tr if t["pnl"] < 0)
+    closed_pnl = sum(t["pnl"] for t in closed)
+    total = total + open_upnl
+    pnl_30 = sum(t["pnl"] for t in closed if t["close_t"] >= now - 30 * DAY) + open_upnl
+    win, pf, gp, gl = _wl(allx)
+    win_c, pf_c, _, _ = _wl(closed)
+    holds = [t["hold_h"] for t in dec]
     hold_med = round(st.median(holds), 2) if holds else None
     days = max(1.0, WINDOW / DAY)
     by_coin: dict[str, dict] = {}
-    for t in trips:
+    for t in dec:
         b = by_coin.setdefault(t["coin"], {"coin": t["coin"], "n": 0, "pnl": 0.0, "long": 0, "wins": 0})
         b["n"] += 1; b["pnl"] += t["pnl"]; b["long"] += t["side"] == "LONG"; b["wins"] += t["pnl"] > 0
     coins = sorted(by_coin.values(), key=lambda b: -b["pnl"])
     for b in coins:
         b["pnl"] = round(b["pnl"], 2)
-    long_n = sum(1 for t in trips if t["side"] == "LONG")
-    pnl_long = sum(t["pnl"] for t in trips if t["side"] == "LONG"); pnl_short = sum(t["pnl"] for t in trips if t["side"] == "SHORT")
-    best = max(trips, key=lambda t: t["pnl"]) if trips else None
-    worst = min(trips, key=lambda t: t["pnl"]) if trips else None
-    copies = {d: copy_test(trips, candles, d) for d in DELAYS_MIN}
+    nd = len(dec)
+    long_n = sum(1 for t in dec if t["side"] == "LONG")
+    pnl_long = sum(t["pnl"] for t in dec if t["side"] == "LONG"); pnl_short = sum(t["pnl"] for t in dec if t["side"] == "SHORT")
+    best = max(dec, key=lambda t: t["pnl"]) if dec else None
+    worst = min(dec, key=lambda t: t["pnl"]) if dec else None
+    copies = {d: copy_test(dec, candles, d) for d in DELAYS_MIN}
     levs = [p["lev"] for p in positions if p.get("lev")]
     src = c.get("src", "hl")
     p = {"src": src, "src_ru": SRC_RU.get(src, src), "addr": c["addr"], "short": c.get("short") or (c["addr"][:6] + "…" + c["addr"][-4:]), "name": c.get("name") or "",
          "account": round(c.get("account") or 0), "pnl_all": round(c.get("pnl_all") or 0), "pnl_m_lb": round(c.get("pnl_m") or 0),
          "roi_m": round((c.get("roi_m") or 0) * 100, 1), "pnl_w": round(c.get("pnl_w") or 0),
-         "pnl_30d": round(total, 2), "trips": n, "wins": len(wins), "win": round(len(wins) / n, 3) if n else None,
-         "pf": round(gp / gl, 2) if gl > 0 else (None if not gp else 99.0), "gross_profit": round(gp), "gross_loss": round(gl),
-         "hold_med_h": hold_med, "per_day": round(n / days, 2), "style_ru": style_ru(hold_med, n / days),
-         "long_share": round(long_n / n, 2) if n else None, "pnl_long": round(pnl_long), "pnl_short": round(pnl_short),
+         "window_days": int(WINDOW / DAY), "pnl_60d": round(total, 2), "pnl_30d": round(pnl_30, 2), "closed_pnl": round(closed_pnl, 2),
+         "trips": n, "decisions": n, "wins": sum(1 for t in allx if t["pnl"] > 0), "win": win, "pf": pf,
+         "win_closed": win_c, "pf_closed": pf_c, "gross_profit": round(gp), "gross_loss": round(gl),
+         "hold_med_h": hold_med, "per_day": round(nd / days, 2), "style_ru": style_ru(hold_med, nd / days),
+         "long_share": round(long_n / nd, 2) if nd else None, "pnl_long": round(pnl_long), "pnl_short": round(pnl_short),
          "coins": coins[:6], "n_coins": len(coins), "best": best, "worst": worst,
          "best_share": round(best["pnl"] / gp, 2) if best and gp > 0 else None,
          "lev_now": round(st.median(levs), 1) if levs else None, "positions": positions[:8],
-         "recent": sorted(trips, key=lambda t: -t["close_t"])[:12], "copy": {str(d): v for d, v in copies.items()},
-         "portfolio": pf_stats, "too_active": too_active, "open_trips": len(open_tr), "open_upnl": round(open_upnl, 2)}
+         "recent": sorted(dec, key=lambda t: -t["close_t"])[:12], "copy": {str(d): v for d, v in copies.items()},
+         "portfolio": pf_stats, "too_active": too_active, "open_trips": len(open_tr), "open_upnl": round(open_upnl, 2),
+         "open_loss": round(open_loss, 2), "hidden_open": len(hid), "hidden_loss_n": len(hid_loss)}
     why = []
     if too_active:
-        why.append("слишком частые сделки (больше 8000 исполнений за 45 дней) — скопировать нельзя")
-    if n < MIN_TRIPS:
-        why.append(f"мало закрытых сделок за 30 дней ({n})")
+        why.append("слишком частые сделки (больше 10000 исполнений за 75 дней) — скопировать нельзя")
+    if n < MIN_DECISIONS:
+        why.append(f"мало решений за 60 дней ({n}, нужно {MIN_DECISIONS})")
     if hold_med is not None and hold_med < MIN_HOLD_H:
-        why.append(f"держит слишком коротко (медиана {hold_med * 60:.0f} мин)")
+        why.append(f"держит слишком коротко (медиана {hold_med * 60:.0f} мин, нужно от {MIN_HOLD_H:g} ч)" if hold_med < 1 else
+                   f"держит слишком коротко (медиана {hold_med:.1f} ч, нужно от {MIN_HOLD_H:g} ч)")
     if total <= 0:
-        why.append("за 30 дней в минусе (с учётом открытых позиций)")
-    elif open_upnl < 0 and -open_upnl > 0.5 * (total - open_upnl):
-        why.append(f"держит открытые позиции в минусе ({_usd(open_upnl)}) — прибыль закрытых сделок обманчива")
-    if p["pf"] is not None and p["pf"] < MIN_PF:
-        why.append(f"прибыль/убыток {p['pf']} < {MIN_PF}")
+        why.append("за 60 дней в минусе (с учётом открытых позиций)")
+    if open_loss > 0 and open_loss > OPEN_LOSS_MAX * max(closed_pnl, 0.0):
+        why.append(f"прячет убытки в открытых позициях ({_usd(-open_loss)} — больше {OPEN_LOSS_MAX * 100:.0f}% прибыли закрытых {_usd(closed_pnl)})")
+    if win is None or win < MIN_WIN:
+        why.append(f"прибыльных решений {(win or 0) * 100:.0f}% (нужно от {MIN_WIN * 100:.0f}%, с открытыми)")
+    if pf is None or pf < MIN_PF:
+        why.append(f"прибыль/убыток {pf if pf is not None else '—'} (нужно от {MIN_PF:g}, с открытыми)")
     p["eligible"] = not why
     p["excluded_ru"] = why
-    c30 = copies[30]
-    p["score"] = c30.get("t") if c30.get("t") is not None else -99.0
+    p["score"] = pf if pf is not None else -99.0          # 04.11: rank = PF incl. open, then 60-day P&L
     return p
 
 
@@ -439,14 +512,16 @@ def describe(p: dict) -> str:
         parts.append(f"Лид-трейдер копитрейдинга OKX: за ним копируют {p['followers']} человек, ведёт сделки {p.get('lead_days') or '—'} дн.")
     if p["coins"]:
         top = p["coins"][0]
-        parts.append(f"Больше всего зарабатывает на {top['coin']}: {_usd(top['pnl'])} за 30 дней из {_usd(p['pnl_30d'])} всего"
+        parts.append(f"Больше всего зарабатывает на {top['coin']}: {_usd(top['pnl'])} за 60 дней из {_usd(p['pnl_60d'])} всего"
                      + (f", дальше {', '.join(c['coin'] for c in p['coins'][1:3] if c['pnl'] > 0)}" if any(c['pnl'] > 0 for c in p['coins'][1:3]) else "") + ".")
     if p["long_share"] is not None:
         side = "чаще в лонг" if p["long_share"] >= 0.6 else "чаще в шорт" if p["long_share"] <= 0.4 else "в обе стороны"
         parts.append(f"Торгует {side} ({p['long_share'] * 100:.0f}% сделок — лонги); на лонгах {_usd(p['pnl_long'])}, на шортах {_usd(p['pnl_short'])}.")
     if p["win"] is not None:
-        pf_s = "убыточных сделок не было" if (p["pf"] or 0) >= 99 else f"прибыль к убытку {p['pf']}"
-        parts.append(f"Прибыльных сделок {p['win'] * 100:.0f}%, {pf_s}." + (f" Плечо сейчас ~{p['lev_now']:.0f}×." if p["lev_now"] else ""))
+        pf_s = "убыточных решений не было" if (p["pf"] or 0) >= 99 else f"прибыль к убытку {p['pf']}"
+        parts.append(f"За 60 дней {p.get('decisions', p['trips'])} решений, в плюсе {p['win'] * 100:.0f}%, {pf_s} — с открытыми позициями по текущей цене"
+                     + (f" (по одним закрытым {p['win_closed'] * 100:.0f}%)" if p.get("win_closed") is not None and abs(p["win_closed"] - p["win"]) >= 0.05 else "")
+                     + "." + (f" Плечо сейчас ~{p['lev_now']:.0f}×." if p["lev_now"] else ""))
     if p.get("open_trips"):
         parts.append(f"Сейчас открыто {p['open_trips']} позиций, по ним {_usd(p['open_upnl'])} (уже учтено в результате).")
     if p["best_share"] is not None and p["best_share"] >= 0.5:
@@ -547,7 +622,7 @@ def refresh_candles(conn, coin: str, now: int, budget: Budget, post=_post) -> bo
     last_closed = now // M15 * M15 - M15
     if until is not None and now - until < 12 * H1:
         return True
-    start = max((until or 0) + M15, now - WINDOW - 2 * DAY)
+    start = max((until or 0) + M15, now - CANDLE_DAYS * DAY)
     if start > last_closed:
         return True
     if not budget.take():
@@ -625,7 +700,9 @@ def refresh_okx(conn, c: dict, now: int, budget: Budget, get=_okx_get, notes=Non
     hist_t, st_t = r
     if hist_t is None or now - hist_t >= REFRESH_MS:
         after, got = None, 0
-        for _ in range(6):
+        # newest first: a first look reads back to the start of the 60-day window, a daily refresh only past the previous look
+        stop_at = max(now - WINDOW - DAY, (hist_t - 2 * DAY) if hist_t else 0)
+        for _ in range(OKX_HIST_PAGES):
             if not budget.take():
                 return False
             try:
@@ -652,7 +729,7 @@ def refresh_okx(conn, c: dict, now: int, budget: Budget, get=_okx_get, notes=Non
             if len(data) < 100 or not data:
                 break
             after = data[-1].get("subPosId")
-            if rows and min(x[6] for x in rows) < now - WINDOW - DAY:
+            if rows and min(x[6] for x in rows) < stop_at:
                 break
             time.sleep(0.45)
         conn.execute("UPDATE ws_whale SET fills_t=? WHERE addr=?", (now, addr))
@@ -700,6 +777,28 @@ def okx_trips(conn, addr: str, since: int) -> tuple[list[dict], float]:
         if ct >= since:
             tot += pnl
     return out, tot
+
+
+def okx_open_trips(state: dict, now: int) -> list[dict]:
+    """current OKX sub-positions as open trips at the mark; a sub-position whose instrument / price OKX hides is kept with only its
+    P&L and «hidden» (04.11: a hidden one in loss counts as a losing decision — the trader cannot look better by hiding it)"""
+    out = []
+    for x in (state or {}).get("okx") or []:
+        try:
+            side = (x.get("posSide") or "").lower()
+            if side == "net":
+                side = "long" if _f(x.get("subPos")) > 0 else "short"
+            e_, m_ = _f(x.get("openAvgPx")), _f(x.get("markPx"))
+            ot = int(_f(x.get("openTime"))) or now
+            sg = 1 if side == "long" else -1
+            hid = not (x.get("instId") and e_ and m_)
+            out.append({"coin": "" if hid else _okx_coin(x.get("instId")), "side": "LONG" if side == "long" else "SHORT", "open_t": min(ot, now),
+                        "close_t": now, "hold_h": round((now - min(ot, now)) / H1, 2), "entry": e_, "exit": m_,
+                        "ret_pct": None if hid else round(sg * (m_ / e_ - 1) * 100, 3), "notional": round(_f(x.get("margin")) * _f(x.get("lever"), 1.0), 2),
+                        "pnl": round(_f(x.get("upl")), 2), "fills": 1, "open": True, **({"hidden": True} if hid else {})})
+        except Exception:  # noqa: BLE001
+            continue
+    return out
 
 
 # ------------------------------------------------------------------------------------------------------------ copy desk
@@ -961,11 +1060,75 @@ def desk_public(d: dict, names: dict) -> dict:
                       "closed": [paper_trade(c, True) for c in sorted(cl, key=lambda c: -c["closed_t"])[:20]]},
             "rules_ru": f"Старт $10 000. Повторяем новые позиции топ-5 китов, замеченные между двумя проверками (сервер смотрит раз в ~30 мин), "
                         f"и входим в их уже открытые позиции, если цена не хуже входа кита больше чем на {JOIN_MAX * 100:g}% и кит не в минусе "
-                        f"больше чем на {JOIN_BETTER * 100:g}% по цене (иначе ждём его следующую сделку); первыми — киты с ≥ {GOOD_WIN * 100:.0f}% прибыльных сделок и PF ≥ {GOOD_PF:g} за 30 дней: "
+                        f"больше чем на {JOIN_BETTER * 100:g}% по цене (иначе ждём его следующую сделку); первыми — киты с ≥ {GOOD_WIN * 100:.0f}% прибыльных решений и PF ≥ {GOOD_PF:g} за 60 дней (с открытыми позициями): "
                         f"вход по текущей цене, маржа {DESK_MARGIN * 100:.0f}% счёта, плечо как у кита, но не больше {DESK_LEV_CAP:.0f}×, не больше "
                         f"{DESK_MAX_OPEN} позиций и одна на монету, на одного кита — не больше {WHALE_CAP * 100:.0f}% счёта. Стоп у каждой копии: стоп кита, "
                         f"если он стоит на бирже, иначе −{DESK_STOP * 100:g}% от входа. Выходим, когда кит закрыл или развернул позицию, или по стопу. "
                         f"Комиссии {COST_PCT}% за сделку."}
+
+
+# ------------------------------------------------------------------------------------------------------------ own history
+ARCHIVE_KEEP_IDS_MS = 10 * DAY
+
+
+def archive_trades(conn, now: int, cands: list[dict], out_dir: str) -> dict | None:
+    """04.11 (research: OKX shows only 3 months — to test the selection on 6+ months we keep our own copy): once per UTC day append
+    to <out_dir>/<YYYY-MM-DD>.jsonl every closed whale trade not written before (first day: all we have) and a snapshot of each
+    candidate's open positions. One JSON object per line: kind «closed» | «open». Readers dedupe closed trades by (src, trader, id)."""
+    day = day_key(now)
+    if kv_get(conn, "archive_day") == day:
+        return None
+    last_t = int(kv_get(conn, "archive_t") or 0)
+    done = {k: v for k, v in (kv_get(conn, "archive_ids") or {}).items() if v >= now - ARCHIVE_KEEP_IDS_MS}
+    cutoff = last_t - 3 * DAY if last_t else 0            # late-arriving history (refreshed once a day) is caught on the next dump
+    names = {c["addr"]: c.get("name") or c.get("short") or "" for c in cands}
+    lines, n_closed, n_open = [], 0, 0
+    for src, trader, tid, coin, side, ot, ct, e, ex, pnl, notional, lev in conn.execute(
+            "SELECT src, trader, id, coin, side, open_t, close_t, entry, exit, pnl, notional, lever FROM ws_trips WHERE close_t>=? ORDER BY close_t",
+            (cutoff,)):
+        k = f"{src}|{trader}|{tid}"
+        if k in done:
+            continue
+        done[k] = ct
+        lines.append({"kind": "closed", "src": src, "trader": trader, "name": names.get(trader, ""), "id": tid, "coin": coin, "side": side,
+                      "open_t": ot, "close_t": ct, "entry": e, "exit": ex, "pnl": round(_f(pnl), 2), "notional": round(_f(notional), 2), "lev": lev})
+        n_closed += 1
+    for c in cands:
+        a = c["addr"]
+        r = conn.execute("SELECT state FROM ws_whale WHERE addr=?", (a,)).fetchone()
+        ek = WS.src_of(a)
+        if not ek and not a.startswith("okx:"):
+            for t in round_trips(load_fills(conn, a, cutoff - FETCH_WINDOW if cutoff else 0))[0]:
+                k = f"hl|{a}|{t['coin']}-{t['open_t']}"
+                if t["close_t"] < cutoff or k in done:
+                    continue
+                done[k] = t["close_t"]
+                lines.append({"kind": "closed", "src": "hl", "trader": a, "name": names.get(a, ""), "id": f"{t['coin']}-{t['open_t']}", "coin": t["coin"],
+                              "side": t["side"], "open_t": t["open_t"], "close_t": t["close_t"], "entry": t["entry"], "exit": t["exit"],
+                              "pnl": t["pnl"], "notional": t["notional"], "lev": None})
+                n_closed += 1
+        if not r or not r[0]:
+            continue
+        try:
+            stt = json.loads(r[0])
+            pos = WS.SOURCES[ek]["positions"](stt) if ek else okx_positions(stt) if a.startswith("okx:") else norm_positions(stt)
+        except Exception:  # noqa: BLE001
+            continue
+        for x in pos:
+            lines.append({"kind": "open", "asof": now, "src": ek or ("okx" if a.startswith("okx:") else "hl"), "trader": a, "name": names.get(a, ""),
+                          "coin": x.get("coin") or "", "side": x.get("side") or "", "entry": x.get("entry"), "notional": x.get("notional"),
+                          "upnl": x.get("upnl"), "lev": x.get("lev"), "hidden": not x.get("coin")})
+            n_open += 1
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f"{day}.jsonl")
+    with open(path, "a", encoding="utf-8") as fh:
+        for x in lines:
+            fh.write(json.dumps(x, ensure_ascii=False, separators=(",", ":")) + "\n")
+    kv_set(conn, "archive_day", day)
+    kv_set(conn, "archive_t", now)
+    kv_set(conn, "archive_ids", {k: v for k, v in done.items() if v >= now - ARCHIVE_KEEP_IDS_MS})
+    conn.commit()
+    return {"path": path, "closed": n_closed, "open": n_open}
 
 
 # ------------------------------------------------------------------------------------------------------------ entry point
@@ -983,7 +1146,7 @@ def hl_name(coin: str, mids: dict) -> str | None:
 
 
 def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_get_lb, okx_get=_okx_get,
-        max_requests: int = 90, budget_s: float = 170, src_get: dict | None = None) -> dict:
+        max_requests: int = 90, budget_s: float = 170, src_get: dict | None = None, archive_dir: str | None = None) -> dict:
     now = int(now if now is not None else time.time() * 1000)
     ensure_schema(conn)
     notes: list[str] = []
@@ -1061,7 +1224,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         conn.commit()
     # 4. study data, budgeted and resumable; both sources take turns so neither waits for the other
     if kv_get(conn, "fills_v") != FILLS_V:
-        conn.execute("UPDATE ws_whale SET fills_t=NULL WHERE addr NOT LIKE 'okx:%'")
+        # 04.11 (v3): the window grew to 60 days — Hyperliquid fills and OKX histories are read again once (Binance keeps 90 days already)
+        conn.execute("UPDATE ws_whale SET fills_t=NULL WHERE addr NOT LIKE 'bn:%'")
         kv_set(conn, "fills_v", FILLS_V)
     fresh = ofresh = efresh = 0
     stop_hl = stop_okx = False
@@ -1127,19 +1291,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         elif c.get("src") == "okx":
             trips, total = okx_trips(conn, c["addr"], since)
             st_ = json.loads(r[3]) if r[3] else {}
-            for x in st_.get("okx") or []:            # open sub-positions at the mark price
-                try:
-                    side = (x.get("posSide") or "").lower()
-                    if side == "net":
-                        side = "long" if _f(x.get("subPos")) > 0 else "short"
-                    e_, m_ = _f(x.get("openAvgPx")), _f(x.get("markPx"))
-                    sg = 1 if side == "long" else -1
-                    trips.append({"coin": _okx_coin(x.get("instId")), "side": "LONG" if side == "long" else "SHORT", "open_t": int(x.get("openTime")),
-                                  "close_t": now, "hold_h": round((now - int(x.get("openTime"))) / H1, 2), "entry": e_, "exit": m_,
-                                  "ret_pct": round(sg * (m_ / e_ - 1) * 100, 3) if e_ and m_ else None, "notional": round(_f(x.get("margin")) * _f(x.get("lever"), 1.0), 2),
-                                  "pnl": round(_f(x.get("upl")), 2), "fills": 1, "open": True})
-                except Exception:  # noqa: BLE001
-                    continue
+            trips += okx_open_trips(st_, now)          # open sub-positions at the mark price (hidden ones: P&L only)
             for t in trips:
                 t["coin"] = hl_name(t["coin"], mids) or t["coin"]
             pos = okx_positions(json.loads(r[3])) if r[3] else []
@@ -1154,7 +1306,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         p = profile(c, trips, total, pfs, pos, cs, now, bool(r[1]) and c.get("src") != "okx")
         if c.get("src") == "okx":
             p.update(followers=c.get("followers"), lead_days=c.get("lead_days"), okx_pnl_all=c.get("pnl_all"), okx_win=c.get("win_ratio"))
-        if ek:                     # 04.11: an added source's whale must clear the owner's bar (≥ 70 % wins, PF ≥ 1.5, ≥ 20 trades / 90 d, visible)
+        if ek:                     # an added source's whale: the same 60-day bar as everyone (profile) + positions visible
             lb_ = WS.lb_of(conn, c["addr"])
             n90 = WS.trades_90d(conn, c["addr"], now, lb_)
             p.update(followers=c.get("followers"), site_win=c.get("win_ratio"), site_pnl_30d=c.get("pnl_m"), trades_90d=n90,
@@ -1162,9 +1314,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             p["excluded_ru"] = p["excluded_ru"] + WS.record_gate(p, n90)
             p["eligible"] = not p["excluded_ru"]
         profs.append(p)
-    if profs:                                  # the 30-day record per whale, read by the next run's desk (preference order)
-        kv_set(conn, "quality", {p["addr"]: {"win": p.get("win"), "pf": p.get("pf"), "pnl_30d": p.get("pnl_30d")} for p in profs})
-    elig = sorted([p for p in profs if p["eligible"]], key=lambda p: (-(p["score"] if p["score"] is not None else -99), -p["pnl_30d"]))
+    if profs:                                  # the 60-day record per whale (incl. open), read by the next run's desk (preference order)
+        kv_set(conn, "quality", {p["addr"]: {"win": p.get("win"), "pf": p.get("pf"), "pnl_30d": p.get("pnl_30d"), "pnl_60d": p.get("pnl_60d")} for p in profs})
+    # 04.11 (owner + research): rank by PF counting open positions, then by 60-day P&L
+    elig = sorted([p for p in profs if p["eligible"]], key=lambda p: (-(p["pf"] if p["pf"] is not None else -99), -p["pnl_60d"]))
     top = elig[:TOP_N]
     for i, p in enumerate(top):
         p["rank"] = i + 1
@@ -1175,9 +1328,32 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     # entries cannot be seen, so «following» him only produced false «кит закрыл» exits on 30.10)
     follow_new = [{"addr": p["addr"], "short": p["short"], "name": p["name"]} for p in elig if p.get("copy_ok", (p["copy"].get("30") or {}).get("avg_pct", -1) > 0)
                   and not hidden(p.get("positions") or [])][:FOLLOW_N]
-    if follow_new and (complete or not study.get("top")):
-        kv_set(conn, "study", {"t": now, "top": follow_new, "partial": not complete})
+    # 04.11: a complete run always sets the list — also when the stricter bar leaves fewer (or no) whales; a partial run only
+    # fills an empty list. Who left the list and why is kept for the panel and the report.
+    if complete or (follow_new and not study.get("top")):
+        old = {x["addr"]: x for x in study.get("top") or []}
+        byaddr = {p["addr"]: p for p in profs}
+        new_set = {x["addr"] for x in follow_new}
+        dropped = []
+        for a, x in old.items():
+            if a in new_set:
+                continue
+            q = byaddr.get(a)
+            why = (q or {}).get("excluded_ru") or (["не изучен в этом прогоне"] if not q else
+                                                   ["тест копирования с опозданием 30 мин в минусе"] if not (q.get("copy_ok", (q["copy"].get("30") or {}).get("avg_pct", -1) > 0)) else
+                                                   ["скрывает открытые позиции"] if hidden(q.get("positions") or []) else
+                                                   [f"ниже других по PF (место {next((i + 1 for i, e in enumerate(elig) if e['addr'] == a), '—')})"])
+            dropped.append({"addr": a, "name": x.get("name") or x.get("short"), "src": (q or {}).get("src"), "why_ru": why, "t": now})
+        prev_dropped = [x for x in study.get("dropped") or [] if x["addr"] not in new_set and x["addr"] not in {d_["addr"] for d_ in dropped}]
+        kv_set(conn, "study", {"t": now, "top": follow_new, "partial": not complete, "dropped": (dropped + prev_dropped)[:20],
+                               "rule": "60d-v1"})
     conn.commit()
+    arch = None
+    if archive_dir and complete:               # 04.11: our own whale-trade history, one dated file a day (data/whale_trades), from a full look
+        try:
+            arch = archive_trades(conn, now, rows + orows + erows, archive_dir)
+        except Exception as e:  # noqa: BLE001
+            notes.append(f"архив сделок китов: {str(e)[:100]}")
     names = {p["addr"]: (p["name"] or p["short"]) for p in profs}
     excluded = {}
     for p in profs:
@@ -1186,6 +1362,12 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             excluded[k] = excluded.get(k, 0) + 1
     st_now = kv_get(conn, "study") or {}
     out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []),
+           "follow_dropped": st_now.get("dropped", []), "archive": arch,
+           "follow_rule_ru": f"За {int(WINDOW / DAY)} дней: ≥ {MIN_DECISIONS} решений (части одной сделки в пределах 4 ч — одно решение), "
+                             f"≥ {MIN_WIN * 100:.0f}% решений в плюсе и прибыль/убыток ≥ {MIN_PF:g} с учётом открытых позиций по текущей цене "
+                             f"(скрытые позиции OKX в минусе — убыточные решения), медиана удержания ≥ {MIN_HOLD_H:g} ч, убыток открытых позиций "
+                             f"не больше {OPEN_LOSS_MAX * 100:.0f}% прибыли закрытых. Порядок — по прибыли/убытку, потом по прибыли за 60 дней; "
+                             f"копируем лучших {FOLLOW_N}, у кого тест копирования с опозданием 30 мин в плюсе и позиции видны.",
            "funnel": {"hl_leaderboard": cand.get("why", {}).get("rows"), "hl_after_filters": cand.get("why", {}).get("passed"),
                       "hl_dropped": cand.get("why"), "okx_lead_traders": cand.get("okx_why", {}).get("rows"),
                       "okx_after_filters": cand.get("okx_why", {}).get("passed"),
@@ -1208,10 +1390,16 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
                "Hyperliquid: счёт от $300k, за всё время от +$500k, за месяц в плюсе, не маркетмейкер (оборот ≤ 1000× счёта), без «доходности» больше 1000% за месяц "
                "(это пополнения, а не торговля); 30 крупнейших по прибыли за всё время. OKX: лид-трейдеры с историей от 90 дней и прибылью; 20 крупнейших по прибыли.",
                "Binance (с 04.11): открытые лид-портфели копитрейдинга с прибылью за 30/90 дней и ≥ 70% прибыльных сделок; копируем только тех, кто "
-               "показывает позиции, у кого PF ≥ 1.5 и ≥ 20 сделок за 90 дней. Hyperliquid: плюс 20 лучших по прибыли за 30 дней.",
-               "По каждому — реальные сделки за 30 дней: каждая позиция от открытия до закрытия, результат, время удержания, монеты, сторона.",
-               "В топ попадает только тот, у кого ≥ 8 закрытых сделок, держит позицию не меньше 30 минут (иначе не успеем повторить), за 30 дней в плюсе, прибыль к убытку ≥ 1.2.",
-               "Порядок — по тому, что дало бы копирование с опозданием 30 минут (так видит сервер): средний итог на сделку с учётом разброса и числа сделок.",
-               "Это прошлый месяц, а не обещание: киты хеджируются на других биржах, а сервер видит их сделки с опозданием. Стратегия «Киты» — эксперимент на демо."],
+               "показывает позиции. Hyperliquid: плюс 20 лучших по прибыли за 30 дней.",
+               "По каждому — реальные сделки за 60 дней: каждая позиция от открытия до закрытия, результат, время удержания, монеты, сторона. "
+               "Части одной сделки (та же монета и сторона в пределах 4 ч) — одно решение. Открытые позиции считаются по текущей цене: киты часто "
+               "закрывают прибыль, а убыточные позиции держат открытыми.",
+               "В топ попадает только тот, у кого за 60 дней ≥ 20 решений, ≥ 70% из них в плюсе и прибыль к убытку ≥ 2 — с открытыми позициями, "
+               "держит позицию обычно от 4 ч, за 60 дней в плюсе и убыток открытых позиций не больше 20% прибыли закрытых (04.11, проверка вслепую: "
+               "так отобранные 12 китов из 12 были в плюсе следующие 45 дней).",
+               "Порядок — по прибыли к убытку с открытыми позициями, потом по прибыли за 60 дней. Копировать с опозданием 15–35 минут допустимо — "
+               "киты держат позиции часами.",
+               "Это прошлые 60 дней, а не обещание: киты хеджируются на других биржах, а сервер видит их сделки с опозданием. Сделки китов мы сохраняем "
+               "каждый день (data/whale_trades), чтобы через полгода проверить отбор на своей истории."],
            "notes_ru": notes[:20]}
     return out

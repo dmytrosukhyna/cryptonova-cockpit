@@ -53,12 +53,10 @@ def test_binance_positions_from_recorded_rows():
     assert {t["coin"] for t in tr} == {"BTC", "XAU"} and all(t["open"] for t in tr)
 
 
-def test_record_gate_is_the_owners_bar():
+def test_record_gate_adds_only_the_visibility_check():
+    # 04.11 17:46: the record bar (60 d, ≥ 20 decisions, ≥ 70 % / PF ≥ 2 incl. open, hold ≥ 4 h) is common — whale_study.profile
     ok = {"win": 0.75, "pf": 2.0, "positions": [{"coin": "BTC"}]}
-    assert WS.record_gate(ok, 25) == []
-    assert len(WS.record_gate({**ok, "win": 0.6}, 25)) == 1
-    assert len(WS.record_gate({**ok, "pf": 1.2}, 25)) == 1
-    assert "меньше 20 сделок" in WS.record_gate(ok, 15)[0]
+    assert WS.record_gate(ok, 25) == [] and WS.record_gate({**ok, "win": 0.6}, 5) == []
     assert "скрывает" in WS.record_gate({**ok, "positions": [{"coin": ""}]}, 25)[0]
 
 
@@ -72,7 +70,7 @@ def test_hyperliquid_candidates_add_the_best_of_the_month():
     assert [r["addr"] for r in rows] == ["0xold", "0xmid", "0xnew"] and rows[2]["pick"] == "month" and why["month_slice"] == 1
 
 
-def _hist(n_win=14, n_loss=3):
+def _hist(n_win=20, n_loss=3):
     """recorded row shape, repeated: 4-hour BTC longs inside the last 30 days (wins +3 %, losses −1 %)"""
     base = FX["history_rows"][1]
     out = []
@@ -113,8 +111,8 @@ def test_run_studies_binance_portfolios_and_gives_them_a_30_day_record():
     p = (d["top"] + d["others"])[0]
     assert p["src"] == "bn" and p["src_ru"].startswith("Binance") and p["addr"] == "bn:5278353437811897601"
     # the record fields real_why.json reads (record_30d)
-    # 17 closed + the 2 open positions at the mark (both in profit now)
-    assert p["trips"] == 19 and abs(p["win"] - 16 / 19) < 1e-3 and p["open_trips"] == 2 and p["pf"] >= 1.5 and p["hold_med_h"] == 4.0 and p["style_ru"] == "интрадей"
+    # 23 closed decisions + the 2 open positions at the mark (both in profit now)
+    assert p["trips"] == 25 and abs(p["win"] - 22 / 25) < 1e-3 and p["open_trips"] == 2 and p["pf"] >= 1.5 and p["hold_med_h"] == 4.0 and p["style_ru"] == "интрадей"
     assert p["trades_90d"] == 90 and p["eligible"] and p in d["top"]
     assert {x["coin"] for x in p["positions"]} == {"BTC", "XAU"}
     assert d["following"] and d["following"][0]["addr"] == "bn:5278353437811897601"
@@ -138,4 +136,4 @@ def test_run_does_not_follow_a_binance_portfolio_under_the_bar():
     o = d["others"][0]
     assert o["src"] == "bn" and not d["top"] and not d["following"]
     ex = " ".join(o["excluded_ru"])
-    assert "70%" in ex and "меньше 20 сделок за 90 дней (12)" in ex
+    assert "нужно от 70%" in ex and "мало решений за 60 дней (14" in ex

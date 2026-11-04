@@ -7,8 +7,9 @@ Each source gives the same three things the Hyperliquid / OKX readers in whale_s
                                             current positions into ws_whale.state, at most once a day / every 6 h
   current(get, c) → raw state; positions(state) → [{coin, side, size, notional, entry, upnl, lev}] (coin "" = hidden)
   open_trips(state, now) → the open positions as trips (so a trader sitting on losers does not look like a winner)
-and record_gate(p, c) → extra reasons a trader of this source is not followed (≥ 70 % wins, PF ≥ 1.5, ≥ 20 trades in 90 days,
-positions visible) — the owner's bar for a copied whale; the 30-day profile, copy test and ranking stay whale_study's.
+and record_gate(p, n90) → extra reasons a trader of this source is not followed (positions hidden). Since 04.11 17:46 the record bar
+(60 days, ≥ 20 decisions, ≥ 70 % wins and PF ≥ 2 incl. open positions, hold ≥ 4 h, open losses ≤ 20 % of closed profit) is the same
+for every source and lives in whale_study.profile; the copy test and ranking stay whale_study's too.
 
 Sources (checked from a GitHub runner 04.11 with scripts/whale_sources_probe.py; runners are in the US):
   Binance copy trading — lead portfolios: public web endpoints of binance.com/copy-trading (no login): leaderboard, 30/90-day
@@ -24,7 +25,7 @@ import time
 import urllib.request
 
 DAY, H1 = 86_400_000, 3_600_000
-WIN_MIN, PF_MIN, TRADES_90D_MIN = 0.70, 1.5, 20      # the owner's bar for a copied whale (04.11)
+WIN_MIN = 0.70                        # pre-filter on Binance's own win rate (the real bar: whale_study.profile, 60 days incl. open)
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
       "Accept": "application/json, text/plain, */*", "Content-Type": "application/json", "clienttype": "web", "lang": "en"}
 
@@ -250,15 +251,9 @@ def trades_90d(conn, addr: str, now: int, lb: dict | None = None) -> int:
 
 
 def record_gate(p: dict, n90: int) -> list[str]:
-    """the owner's bar for a whale of an added source (04.11): ≥ 70 % wins and PF ≥ 1.5 over 30 days, ≥ 20 trades in 90 days,
-    open positions visible — reasons in plain Russian, empty = passes"""
+    """what an added source adds to the common 60-day bar (whale_study.profile, 04.11 17:46): open positions must be visible —
+    reasons in plain Russian, empty = passes. n90 (the site's own 90-day trade count) is shown, not gated."""
     why = []
-    if p.get("win") is None or p["win"] < WIN_MIN:
-        why.append(f"прибыльных сделок меньше {WIN_MIN * 100:.0f}% за 30 дней")
-    if p.get("pf") is None or p["pf"] < PF_MIN:
-        why.append(f"прибыль/убыток ниже {PF_MIN:g}")
-    if n90 < TRADES_90D_MIN:
-        why.append(f"меньше {TRADES_90D_MIN} сделок за 90 дней ({n90})")
     if any(not (x or {}).get("coin") for x in p.get("positions") or []):
         why.append("скрывает открытые позиции")
     return why

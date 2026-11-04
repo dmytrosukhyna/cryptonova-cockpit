@@ -203,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
         from .terminal.report import write_report
         conn = sqlite3.connect("data/agents.sqlite")
         os.makedirs(args.out, exist_ok=True)
-        d = whale_study.run(conn)
+        d = whale_study.run(conn, archive_dir=os.path.join("data", "whale_trades"))   # 04.11: + daily whale-trade history
         write_report(d, os.path.join(args.out, "whales_top.json"))
         fn = d.get("funnel") or {}
         dk = d.get("desk") or {}

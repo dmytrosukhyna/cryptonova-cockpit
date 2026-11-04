@@ -74,32 +74,37 @@ def dig(d, *keys):
 
 def binance():
     bn = "https://www.binance.com/bapi/futures"
-    d = probe("binance.list", f"{bn}/v1/friendly/future/copy-trade/home-page/query-list",
-              {"pageNumber": 1, "pageSize": 20, "timeRange": "30D", "dataType": "PNL", "favoriteOnly": False, "hideFull": False,
-               "nickname": "", "order": "DESC", "userAsset": 0, "portfolioType": "PUBLIC"})
-    rows = first_list(d) or []
-    OUT["binance.list"]["rows"] = [{k: r.get(k) for k in r if k != "chartItems"} for r in rows[:3]]
-    summary = []
-    for i, r in enumerate(rows[:20]):
+    rows = []
+    for rng in ("30D", "90D"):
+        d = probe("binance.list", f"{bn}/v1/friendly/future/copy-trade/home-page/query-list",
+                  {"pageNumber": 1, "pageSize": 20, "timeRange": rng, "dataType": "PNL", "favoriteOnly": False, "hideFull": False,
+                   "nickname": "", "order": "DESC", "userAsset": 0, "portfolioType": "PUBLIC"})
+        rows += [r for r in (first_list(d) or []) if r.get("leadPortfolioId") not in {x.get("leadPortfolioId") for x in rows}]
+    OUT.pop("binance.list", None)
+    summary, visible = [], []
+    for r in rows[:40]:
         pid = r.get("leadPortfolioId")
-        det = dig(probe(f"binance.detail.{i}", f"{bn}/v1/friendly/future/copy-trade/lead-portfolio/detail?portfolioId={pid}"), "data") or {}
-        pos = dig(probe(f"binance.pos.{i}", f"{bn}/v1/friendly/future/copy-trade/lead-data/positions?portfolioId={pid}"), "data") or []
-        hist = dig(probe(f"binance.hist.{i}", f"{bn}/v1/public/future/copy-trade/lead-portfolio/position-history",
-                         {"pageNumber": 1, "pageSize": 50, "portfolioId": pid, "sort": "OPENING"}), "data") or {}
-        live = [p for p in pos if isinstance(p, dict) and float(p.get("positionAmount") or 0)]
-        summary.append({"pid": pid, "nick": r.get("nickname"), "pnl": r.get("pnl"), "win": r.get("winRate"),
-                        "det_keys": sorted(det.keys()) if isinstance(det, dict) else None,
-                        "show": {k: det.get(k) for k in det if "show" in k.lower() or "public" in k.lower() or "status" in k.lower()} if isinstance(det, dict) else None,
-                        "n_pos_rows": len(pos), "live": len(live), "hist_total": hist.get("total"), "hist_n": len(hist.get("list") or [])})
-        if live and "binance.live_sample" not in OUT:
-            OUT["binance.live_sample"] = {"rows": live[:2]}
-        if hist.get("list") and "binance.hist_sample" not in OUT:
-            OUT["binance.hist_sample"] = {"rows": hist["list"][:2], "total": hist.get("total")}
-        if i == 0:
-            OUT["binance.detail_raw"] = {"raw": json.dumps(det)[:3000]}
-    OUT["binance.summary"] = {"rows": summary}
-    for k in [k for k in OUT if k.startswith(("binance.detail.", "binance.pos.", "binance.hist."))]:
-        OUT.pop(k)
+        s_, txt = call(f"{bn}/v1/friendly/future/copy-trade/lead-portfolio/detail?portfolioId={pid}")
+        try:
+            det = json.loads(txt).get("data") or {}
+        except Exception:  # noqa: BLE001
+            det = {}
+        show = det.get("positionShow")
+        summary.append(f"{pid}|{str(r.get('nickname'))[:14]}|pnl {round(r.get('pnl') or 0)}|win {r.get('winRate')}|show {show}")
+        if show:
+            visible.append(pid)
+    OUT["binance.summary"] = {"rows": summary, "visible": len(visible), "of": len(summary)}
+    for i, pid in enumerate(visible[:3]):
+        pos = dig(probe(f"binance.pos{i}", f"{bn}/v1/friendly/future/copy-trade/lead-data/positions?portfolioId={pid}"), "data") or []
+        OUT[f"binance.pos{i}"]["rows"] = [p for p in pos if float(p.get("positionAmount") or 0)][:2]
+        for nm, (u, body) in {"ph_open": ("/v1/public/future/copy-trade/lead-portfolio/position-history", {"pageNumber": 1, "pageSize": 10, "portfolioId": pid, "sort": "OPENING"}),
+                              "ph_plain": ("/v1/public/future/copy-trade/lead-portfolio/position-history", {"pageNumber": 1, "pageSize": 10, "portfolioId": pid}),
+                              "ph_friendly": ("/v1/friendly/future/copy-trade/lead-portfolio/position-history", {"pageNumber": 1, "pageSize": 10, "portfolioId": pid, "sort": "OPENING"}),
+                              "th": ("/v1/public/future/copy-trade/lead-portfolio/trade-history", {"pageNumber": 1, "pageSize": 10, "portfolioId": pid}),
+                              "perf90": (f"/v1/public/future/copy-trade/lead-portfolio/performance?portfolioId={pid}&timeRange=90D", None)}.items():
+            probe(f"binance.{nm}{i}", bn + u, body)
+            if OUT[f"binance.{nm}{i}"].get("rows"):
+                OUT[f"binance.{nm}{i}"]["rows"] = OUT[f"binance.{nm}{i}"]["rows"][:2]
 
 
 def bybit():
@@ -158,7 +163,7 @@ def hyperliquid():
 
 
 def main():
-    for f in (binance, mexc_gate):
+    for f in (binance,):
         try:
             f()
         except Exception as e:  # noqa: BLE001

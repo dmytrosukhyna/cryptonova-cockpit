@@ -143,12 +143,15 @@ def first_month(sym, lo="2019-09", hi=None):
 
 def universe(a):
     rows, src = [], ""
-    for page in (1, 2):
+    for page in ((1, 2) if a.mode != "core18" else ()):
         s, b = http(f"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=125&page={page}")
         if s != 200: rows = []; break
         rows += [dict(sym=x["symbol"].upper(), name=x["name"], id=x["id"], rank=x.get("market_cap_rank") or 9999, mcap=x.get("market_cap") or 0,
                       price=x.get("current_price") or 0) for x in json.loads(b)]
         time.sleep(3)
+    if a.mode == "core18":                      # 04.11: only the 18 core coins (always fetched) — fresh copy of the autopilot set
+        json.dump(dict(source="core18", mode="core18", made=dt.datetime.utcnow().isoformat(timespec="minutes"), min_month=a.min_month, coins=[]),
+                  open(a.out, "w"), indent=1); return
     if rows: src = "CoinGecko /coins/markets"
     else:
         s, b = http("https://api.coinpaprika.com/v1/tickers?quotes=USD")
@@ -341,7 +344,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(); sp = ap.add_subparsers(dest="cmd", required=True)
     sp.add_parser("probe")
     u = sp.add_parser("universe"); u.add_argument("--top", type=int, default=100); u.add_argument("--min-month", default="2024-01")
-    u.add_argument("--mode", default="cap", choices=["cap", "all2023"])
+    u.add_argument("--mode", default="cap", choices=["cap", "all2023", "core18"])
     u.add_argument("--out", default="universe.json")
     f = sp.add_parser("fetch"); f.add_argument("--universe", default="universe.json"); f.add_argument("--shard", type=int, default=0)
     f.add_argument("--nshards", type=int, default=1); f.add_argument("--out", default="shard.npz")

@@ -350,3 +350,23 @@ body.compact .tbl td{padding:5px 8px}body.compact .li{padding:6px 0}body.compact
 .tbl td small.muted{display:block;font-size:11px}
 .kpi b.wrapv{font-size:15px;line-height:1.3}
 @media (max-width:420px){.bnav{padding:0 1px env(safe-area-inset-bottom)}.bnav a{font-size:9px;letter-spacing:-.03em;margin:5px 0}.bnav a span{text-overflow:clip}}
+
+/* «Список токенов китов» (04.11 22:38) */
+.wl-head,.wl-row>summary{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.25fr) 44px 64px 64px minmax(0,1fr);gap:8px;align-items:center}
+.wl-head{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:0 0 6px;border-bottom:1px solid var(--line2)}
+.wl-head span:nth-child(n+3),.wl-row>summary>span:nth-child(n+3):not(.wl-fl){text-align:right}
+.wl-row{border-bottom:1px solid var(--line)}
+.wl-row>summary{list-style:none;cursor:pointer;padding:8px 0;font-size:13px}
+.wl-row>summary::-webkit-details-marker{display:none}
+.wl-row>summary:hover{background:rgba(148,172,214,.04)}
+.wl-sym{min-width:0}.wl-sym b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl-sym small{display:block;font-size:11px;color:var(--muted);white-space:nowrap}
+.wl-n small{color:var(--muted);font-size:11px}
+.wl-st .chip,.wl-fl .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.wl-body{padding:4px 0 12px}
+.wl-ev{font-size:12.5px}
+@media (max-width:640px){.wl-head{display:none}.hide-xs{display:none}
+  .wl-row>summary{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"sym n chg" "st st fl";row-gap:5px}
+  .wl-sym{grid-area:sym}.wl-n{grid-area:n}.wl-chg{grid-area:chg;min-width:62px}.wl-st{grid-area:st}.wl-fl{grid-area:fl;text-align:right}
+  .wl-n:before{content:'китов ';color:var(--muted);font-size:11px}}
+.pat td,.pat th{white-space:normal}.pat td small{display:block}

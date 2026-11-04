@@ -217,6 +217,8 @@
       ${A(D.singles).length ? `<details class="more"><summary>Одиночные крупные покупки (${V.int(D.singles.length)}) — для наблюдения</summary><div class="scards" style="margin-top:8px">${D.singles.map(tokCard).join('')}</div></details>` : ''}
       ${A(D.mm_only).length ? `<details class="more"><summary>Набрали только маркетмейкеры (${V.int(D.mm_only.length)})</summary><p class="note">Маркетмейкеры держат запас токенов для работы — это слабый сигнал.</p><div class="scards" style="margin-top:8px">${D.mm_only.map(tokCard).join('')}</div></details>` : ''}
       ${A(hl.held).length ? `<details class="more"><summary>Что держат топ-трейдеры на споте Hyperliquid (${V.int(hl.held.length)})</summary>${hlHeld(hl.held)}</details>` : ''}
+      ${watchBlock(D.watch)}
+      ${patternsBlock(D.watch)}
       <div class="sec-t"><h3>Биржевые кошельки</h3><span class="sub">приток (+) и отток (−) монет у известных кошельков бирж</span></div>
       ${flowTbl(fl)}
       <div class="sec-t"><h3>Работает ли это</h3><span class="sub">цена через 1, 7 и 30 дней после первого сигнала</span></div>
@@ -276,14 +278,68 @@
       <p class="note">Каждый сигнал записывается в журнал в день появления; через 1, 7 и 30 дней записываем цену. Так через месяц будет видно, стоит ли следовать за китами.</p>`;
   }
 
+  /* ── «Список токенов китов»: every token a tracked wallet bought, re-checked hourly (04.11 22:38) ── */
+  const WST = { 'накопление': 'real', 'риски снялись': 'real', 'продают': 'warn', 'новая': 'test', 'под наблюдением': 'test', 'выбыла': 'test' };
+  function watchBlock(W) {
+    if (!W) return '';
+    const toks = A(W.tokens), c = W.counts || {};
+    const st = ['all', ...Object.keys(c).filter((k) => c[k])];
+    const row = (t) => `<details class="wl-row" data-st="${esc(t.status)}"${t.status === 'выбыла' ? ' hidden' : ''}>
+      <summary><span class="wl-sym"><b>${esc(t.symbol)}</b><small>${esc(t.chain)} · с ${esc(V.dshort(t.first_t))}</small></span>
+        <span class="wl-st">${V.chip(t.status, WST[t.status] || 'test')}</span>
+        <span class="wl-n" title="умных кошельков держат">${V.int(t.n)}${t.n_all > t.n ? `<small>/${V.int(t.n_all)}</small>` : ''}</span>
+        <span class="wl-liq hide-xs">${t.liq != null ? usdK(t.liq) : '—'}</span>
+        <span class="wl-chg ${V.cls(t.chg_pct)}">${V.pct(t.chg_pct)}</span>
+        <span class="wl-fl">${A(t.flags).length ? V.chip(A(t.flags).length + ' ' + V.plural(A(t.flags).length, 'риск', 'риска', 'рисков'), 'warn') : V.chip('без рисков', 'test')}</span></summary>
+      <div class="wl-body">
+        ${A(t.flags).length ? `<div class="chips">${t.flags.map((f) => V.chip(f, 'warn')).join('')}</div>` : ''}
+        <div class="kv" style="margin-top:8px"><span>Цена сейчас / при 1-й покупке</span><b>${V.price(t.price)} / ${V.price(t.first_price)}</b>
+          <span>Капитализация / FDV</span><b>${usdK(t.mcap)} / ${usdK(t.fdv)}</b>
+          <span>Возраст пула · ликвидность</span><b>${V.isNum(t.age_days) ? V.int(t.age_days) + ' дн' : '—'} · ${usdK(t.liq)}</b>
+          ${V.isNum(t.top10_pct) ? `<span>Топ-10 держателей</span><b>${V.share(t.top10_pct, 0)}</b>` : ''}
+          <span>С 1-й покупки: 1 / 7 / 30 дн</span><b>${['1', '7', '30'].map((h) => `<span class="${V.cls((t.ret || {})[h])}">${V.pct((t.ret || {})[h])}</span>`).join(' / ')}</b></div>
+        <p class="para small" style="margin-top:8px">${A(t.buyers).map((b) => `${esc(b.label)}${b.auto ? ' <span class="muted">(найден авт.)</span>' : ''} <span class="muted">${b.usd != null ? usdK(b.usd) : ''}${b.sold ? ' · продал' : ''}</span>`).join(' · ')}</p>
+        ${A(t.events).length ? `<ul class="bul wl-ev">${t.events.map((e) => `<li><span class="muted">${esc(V.dt(e.t))}</span> ${esc(e.text)}</li>`).join('')}</ul>` : ''}
+        <p class="note">${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">график</a> · ` : ''}<a href="${esc((t.chain === 'eth' ? 'https://etherscan.io' : t.chain === 'base' ? 'https://basescan.org' : 'https://arbiscan.io') + '/token/' + t.address)}" target="_blank" rel="noopener">контракт</a>${t.first_price_src ? ' · цена 1-й покупки: ' + esc(t.first_price_src) : ''}</p>
+      </div></details>`;
+    return `<div class="sec-t"><h3>Список токенов китов</h3><span class="sub">${V.int(W.n)} ${V.plural(W.n, 'токен', 'токена', 'токенов')} · всё, что купили умные кошельки, проверяем каждый час</span></div>
+      <details class="more" style="margin-top:0;border-top:0;padding-top:0"><summary>Как устроен список</summary><p class="para">${esc(W.about_ru || '')}</p></details>
+      <div class="seg wl-seg" style="margin:8px 0">${st.map((k) => `<button type="button" data-wlst="${esc(k)}" aria-pressed="${k === 'all'}">${k === 'all' ? 'Активные' : esc(k) + ' ' + V.int(c[k])}</button>`).join('')}</div>
+      ${toks.length ? `<div class="wl-head"><span>Токен</span><span>Статус</span><span>Китов</span><span class="hide-xs">Ликв.</span><span>С 1-й пок.</span><span>Риски</span></div><div class="wl">${toks.map(row).join('')}</div>`
+        : V.empty('Пока пусто: умные кошельки за 7 дней ничего не покупали.')}`;
+  }
+  function patternsBlock(W) {
+    const P = A(W && W.patterns);
+    const head = `<div class="sec-t"><h3>Что срабатывало</h3><span class="sub">доля токенов в плюсе и медиана от цены 1-й покупки, по шаблонам</span></div>`;
+    if (!P.length) return head + V.empty('Данных пока нет: первые результаты через 1, 7 и 30 дней после первых покупок. Шаблоны: число умных кошельков, кошелёк, риски, возраст, ликвидность.');
+    const cell = (x) => (x ? `<span class="${V.cls(x.median)}">${V.pct(x.median)}</span><small class="muted"> в плюсе ${winTxt(x.hit)} · n=${V.int(x.n)}${x.small ? ' · мало данных' : ''}</small>` : '<span class="muted">—</span>');
+    const kinds = [...new Set(P.map((p) => p.kind))];
+    return head + kinds.map((k, i) => {
+      const rows = P.filter((p) => p.kind === k);
+      const tbl = `<div class="tbl-wrap"><table class="tbl pat"><thead><tr><th class="l">${esc(k)}</th><th class="hide-sm">1 дн</th><th>7 дн</th><th class="hide-sm">30 дн</th></tr></thead><tbody>
+        ${rows.map((p) => `<tr><td class="l">${esc(p.name)}</td><td class="hide-sm">${cell(p.h['1'])}</td><td>${cell(p.h['7'])}</td><td class="hide-sm">${cell(p.h['30'])}</td></tr>`).join('')}</tbody></table></div>`;
+      return i === 0 ? tbl : `<details class="more"><summary>${esc(k)}</summary>${tbl}</details>`;
+    }).join('') + `<p class="note">«мало» — меньше 10 токенов: выводы делать рано. Медиана — изменение цены от первой покупки умного кошелька; процент — доля токенов в плюсе.</p>`;
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-wlst]'); if (!b) return;
+    const k = b.dataset.wlst, box = b.closest('section');
+    box.querySelectorAll('[data-wlst]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    box.querySelectorAll('.wl-row').forEach((r) => { r.hidden = k === 'all' ? r.dataset.st === 'выбыла' : r.dataset.st !== k; });
+  });
+
   function walletsBlock(D) {
     const ws = A(D.wallets);
-    const cfg = ws.filter((w) => !w.auto), auto = ws.filter((w) => w.auto);
+    const cfg = ws.filter((w) => !w.auto && !w.auto_found), auto = ws.filter((w) => w.auto), found = ws.filter((w) => w.auto_found);
+    const cand = A(D.watch && D.watch.wallets_auto);
     const row = (w) => `<li><b>${esc(w.label)}</b> <span class="muted">· ${esc(w.kind)}${w.confirmed === true ? ' · метка подтверждена' : w.confirmed === false ? ' · метка по источнику (в Blockscout её нет)' : ''}</span>
       ${w.source ? ` · <a href="${esc(w.source)}" target="_blank" rel="noopener">источник</a>` : ''}<br><span class="xs muted">${A(w.chains).map((c) => `${esc(c.chain)}: ${c.error ? esc(c.error) : 'видно ' + V.num(c.coverage_h, 0) + ' ч'}`).join(' · ')}</span></li>`;
     const src = Object.values(D.sources || {});
     return `<ul class="bul">${cfg.map(row).join('')}</ul>
       ${auto.length ? `<p class="para small" style="margin-top:8px">Топ-трейдеры Hyperliquid (${V.int(auto.length)}), смотрим их кошельки в Arbitrum и Ethereum:</p><ul class="bul">${auto.map(row).join('')}</ul>` : ''}
+      <p class="para small" style="margin-top:8px"><b>Найдены автоматически</b> — кошельки, которые покупали токены раньше наших китов перед ростом на 50%+ (2 таких токена и больше). Это не публичные метки, а наблюдение системы.</p>
+      ${found.length ? `<ul class="bul">${found.map((w) => row(w).replace('</span>', ` · ${esc(A(w.found_tokens).join(', '))}</span>`)).join('')}</ul>`
+        : `<p class="note">Пока нет${cand.length ? ` — кандидатов с 1 токеном: ${V.int(cand.filter((c) => c.status !== 'кандидат').length)}` : ''}.</p>`}
       <p class="para small" style="margin-top:8px">Источники: ${src.map((s) => `${esc(s.name_ru)} — <span class="${s.ok === false ? 'neg' : ''}">${esc(s.status_ru)}</span>`).join('; ')}.</p>`;
   }
 })();

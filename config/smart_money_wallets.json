@@ -1,47 +1,204 @@
 {
-  "_about": "04.11.2026 — «Куда инвестируют киты» (cnq/agents/smart_money.py). Publicly labelled addresses only: funds, market makers and well-known on-chain traders. Every entry cites where the label is public (the explorer's own label page; Etherscan/Arbiscan/Basescan show the same name tag). At run time each address is also checked against Blockscout's public tags / ENS name and the panel shows whether the label is confirmed. Hyperliquid top traders (web/whales_top.json, public leaderboard) are added automatically. Information only — no orders. 04.11 check against Blockscout metadata: the Wintermute vanity address 0x0000006d… is tagged «Compromised» (2022 Profanity hack) and Tetranode's was not confirmed — both removed; 0x15ab…de48 is tagged «Galaxy Digital», not GSR — relabelled.",
-  "wallets": [
-    {"label": "Jump Trading", "kind": "маркетмейкер", "address": "0xf584f8728b874a6a5c7a8d4d387c9aae9172d621", "chains": ["eth"],
-     "source": "https://etherscan.io/address/0xf584f8728b874a6a5c7a8d4d387c9aae9172d621", "source_note": "метка Etherscan «Jump Trading»"},
-    {"label": "DWF Labs", "kind": "маркетмейкер / фонд", "address": "0xd4b69e8d62c880e9dd55d419d5e07435c3538342", "chains": ["eth", "base"],
-     "source": "https://etherscan.io/address/0xd4b69e8d62c880e9dd55d419d5e07435c3538342", "source_note": "метка Etherscan «DWF Labs»"},
-    {"label": "Cumberland DRW", "kind": "маркетмейкер", "address": "0xad6eaa735d9df3d7696fd03984379dae02ed8862", "chains": ["eth"],
-     "source": "https://etherscan.io/address/0xad6eaa735d9df3d7696fd03984379dae02ed8862", "source_note": "метка Etherscan «Cumberland»"},
-    {"label": "Galaxy Digital (2)", "kind": "фонд / OTC", "address": "0x15abb66ba754f05cbc0165a64a11cded1543de48", "chains": ["eth"],
-     "source": "https://etherscan.io/address/0x15abb66ba754f05cbc0165a64a11cded1543de48", "source_note": "метка Blockscout / Etherscan «Galaxy Digital»"},
-    {"label": "Galaxy Digital", "kind": "фонд / OTC", "address": "0x33566c9d8be6cf0b23795e0d380e112be9d75836", "chains": ["eth"],
-     "source": "https://etherscan.io/address/0x33566c9d8be6cf0b23795e0d380e112be9d75836", "source_note": "метка Etherscan «Galaxy Digital»"},
-    {"label": "a16z (Andreessen Horowitz)", "kind": "венчурный фонд", "address": "0x05e793ce0c6027323ac150f6d45c2344d28b6019", "chains": ["eth"],
-     "source": "https://etherscan.io/address/0x05e793ce0c6027323ac150f6d45c2344d28b6019", "source_note": "метка Etherscan «a16z»"},
-    {"label": "Justin Sun", "kind": "известный кит", "address": "0x3ddfa8ec3052539b6c9549f12cea2c295cff5296", "chains": ["eth"],
-     "source": "https://etherscan.io/address/0x3ddfa8ec3052539b6c9549f12cea2c295cff5296", "source_note": "метка Etherscan «Justin Sun»"},
-    {"label": "Machi Big Brother (Jeffrey Huang)", "kind": "известный трейдер", "address": "0x020ca66c30bec2c4fe3861a94e4db4a498a35872", "chains": ["eth", "arbitrum", "base"],
-     "source": "https://etherscan.io/address/0x020ca66c30bec2c4fe3861a94e4db4a498a35872", "source_note": "ENS machibigbrother.eth"}
-  ],
-  "exchanges": {
-    "_about": "Known exchange wallets: (1) a token that came to a smart wallet FROM one of these = «вывод с биржи»; (2) their summed balance of ETH / BTC / SOL day by day = exchange inflow (+) or outflow (−) of these wallets. Only a few big wallets, not an exchange's whole reserve.",
-    "eth": [
-      {"label": "Binance 7", "address": "0xbe0eb53f46cd790cd13851d5eff43d12404d33e8", "source": "https://etherscan.io/address/0xbe0eb53f46cd790cd13851d5eff43d12404d33e8"},
-      {"label": "Binance 8", "address": "0xf977814e90da44bfa03b6295a0616a897441acec", "source": "https://etherscan.io/address/0xf977814e90da44bfa03b6295a0616a897441acec"},
-      {"label": "Binance 14", "address": "0x28c6c06298d514db089934071355e5743bf21d60", "source": "https://etherscan.io/address/0x28c6c06298d514db089934071355e5743bf21d60"},
-      {"label": "Coinbase 10", "address": "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43", "source": "https://etherscan.io/address/0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43"},
-      {"label": "Kraken", "address": "0x2910543af39aba0cd09dbb2d50200b3e800a63d2", "source": "https://etherscan.io/address/0x2910543af39aba0cd09dbb2d50200b3e800a63d2"},
-      {"label": "OKX", "address": "0x6cc5f688a315f3dc28a7781717a9a798a59fda7b", "source": "https://etherscan.io/address/0x6cc5f688a315f3dc28a7781717a9a798a59fda7b"},
-      {"label": "Robinhood", "address": "0x40b38765696e3d5d8d9d834d8aad4bb6e418e489", "source": "https://etherscan.io/address/0x40b38765696e3d5d8d9d834d8aad4bb6e418e489"}
-    ],
-    "btc": [
-      {"label": "Binance (холодный)", "address": "34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo", "source": "https://mempool.space/address/34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo"},
-      {"label": "Binance (холодный 2)", "address": "3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6", "source": "https://mempool.space/address/3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6"},
-      {"label": "Bitfinex (холодный)", "address": "bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97", "source": "https://mempool.space/address/bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97"},
-      {"label": "Robinhood (холодный)", "address": "bc1ql49ydapnjafl5t2cp9zqpjwe6pdgmxy98859v2", "source": "https://mempool.space/address/bc1ql49ydapnjafl5t2cp9zqpjwe6pdgmxy98859v2"}
-    ],
-    "sol": [
-      {"label": "Binance 1", "address": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", "source": "https://solscan.io/account/9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"},
-      {"label": "Binance 2", "address": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9", "source": "https://solscan.io/account/5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9"},
-      {"label": "Coinbase 1", "address": "H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS", "source": "https://solscan.io/account/H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS"},
-      {"label": "Coinbase 2", "address": "2AQdpHJ2JpcEgPiATUXjQxA8QmafFegfQwSLWSprPicm", "source": "https://solscan.io/account/2AQdpHJ2JpcEgPiATUXjQxA8QmafFegfQwSLWSprPicm"},
-      {"label": "Kraken", "address": "FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5", "source": "https://solscan.io/account/FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5"},
-      {"label": "OKX", "address": "5VCwKtCXgCJ6kit5FybXjvriW3xELsFDhYrPSqtJNmcD", "source": "https://solscan.io/account/5VCwKtCXgCJ6kit5FybXjvriW3xELsFDhYrPSqtJNmcD"}
-    ]
+ "_about": "04.11.2026 — «Куда инвестируют киты» (cnq/agents/smart_money.py). Publicly labelled addresses only: funds, market makers and well-known on-chain traders. Every entry cites where the label is public (the explorer's own label page; Etherscan/Arbiscan/Basescan show the same name tag). At run time each address is also checked against Blockscout's public tags / ENS name and the panel shows whether the label is confirmed. Hyperliquid top traders (web/whales_top.json, public leaderboard) are added automatically. Information only — no orders. 04.11 check against Blockscout metadata: the Wintermute vanity address 0x0000006d… is tagged «Compromised» (2022 Profanity hack) and Tetranode's was not confirmed — both removed; 0x15ab…de48 is tagged «Galaxy Digital», not GSR — relabelled. 04.11 22:38: entries with require_confirm are scanned only when Blockscout's public tags confirm the label.",
+ "wallets": [
+  {
+   "label": "Jump Trading",
+   "kind": "маркетмейкер",
+   "address": "0xf584f8728b874a6a5c7a8d4d387c9aae9172d621",
+   "chains": [
+    "eth"
+   ],
+   "source": "https://etherscan.io/address/0xf584f8728b874a6a5c7a8d4d387c9aae9172d621",
+   "source_note": "метка Etherscan «Jump Trading»"
+  },
+  {
+   "label": "DWF Labs",
+   "kind": "маркетмейкер / фонд",
+   "address": "0xd4b69e8d62c880e9dd55d419d5e07435c3538342",
+   "chains": [
+    "eth",
+    "base"
+   ],
+   "source": "https://etherscan.io/address/0xd4b69e8d62c880e9dd55d419d5e07435c3538342",
+   "source_note": "метка Etherscan «DWF Labs»"
+  },
+  {
+   "label": "Cumberland DRW",
+   "kind": "маркетмейкер",
+   "address": "0xad6eaa735d9df3d7696fd03984379dae02ed8862",
+   "chains": [
+    "eth"
+   ],
+   "source": "https://etherscan.io/address/0xad6eaa735d9df3d7696fd03984379dae02ed8862",
+   "source_note": "метка Etherscan «Cumberland»"
+  },
+  {
+   "label": "Galaxy Digital (2)",
+   "kind": "фонд / OTC",
+   "address": "0x15abb66ba754f05cbc0165a64a11cded1543de48",
+   "chains": [
+    "eth"
+   ],
+   "source": "https://etherscan.io/address/0x15abb66ba754f05cbc0165a64a11cded1543de48",
+   "source_note": "метка Blockscout / Etherscan «Galaxy Digital»"
+  },
+  {
+   "label": "Galaxy Digital",
+   "kind": "фонд / OTC",
+   "address": "0x33566c9d8be6cf0b23795e0d380e112be9d75836",
+   "chains": [
+    "eth"
+   ],
+   "source": "https://etherscan.io/address/0x33566c9d8be6cf0b23795e0d380e112be9d75836",
+   "source_note": "метка Etherscan «Galaxy Digital»"
+  },
+  {
+   "label": "a16z (Andreessen Horowitz)",
+   "kind": "венчурный фонд",
+   "address": "0x05e793ce0c6027323ac150f6d45c2344d28b6019",
+   "chains": [
+    "eth"
+   ],
+   "source": "https://etherscan.io/address/0x05e793ce0c6027323ac150f6d45c2344d28b6019",
+   "source_note": "метка Etherscan «a16z»"
+  },
+  {
+   "label": "Justin Sun",
+   "kind": "известный кит",
+   "address": "0x3ddfa8ec3052539b6c9549f12cea2c295cff5296",
+   "chains": [
+    "eth"
+   ],
+   "source": "https://etherscan.io/address/0x3ddfa8ec3052539b6c9549f12cea2c295cff5296",
+   "source_note": "метка Etherscan «Justin Sun»"
+  },
+  {
+   "label": "Machi Big Brother (Jeffrey Huang)",
+   "kind": "известный трейдер",
+   "address": "0x020ca66c30bec2c4fe3861a94e4db4a498a35872",
+   "chains": [
+    "eth",
+    "arbitrum",
+    "base"
+   ],
+   "source": "https://etherscan.io/address/0x020ca66c30bec2c4fe3861a94e4db4a498a35872",
+   "source_note": "ENS machibigbrother.eth"
+  },
+  {
+   "label": "Wintermute",
+   "kind": "маркетмейкер",
+   "address": "0xdbf5e9c5206d0db70a90108bf936da60221dc080",
+   "chains": [
+    "eth"
+   ],
+   "require_confirm": true,
+   "source": "https://etherscan.io/address/0xdbf5e9c5206d0db70a90108bf936da60221dc080",
+   "source_note": "метка Etherscan «Wintermute»; сканируем только после подтверждения меткой Blockscout"
+  },
+  {
+   "label": "Abraxas Capital",
+   "kind": "фонд",
+   "address": "0xb99a2c4c1c4f1fc27150681b740396f6ce1cbcf5",
+   "chains": [
+    "eth"
+   ],
+   "require_confirm": true,
+   "source": "https://etherscan.io/address/0xb99a2c4c1c4f1fc27150681b740396f6ce1cbcf5",
+   "source_note": "публичная метка «Abraxas Capital»; сканируем только после подтверждения меткой Blockscout"
   }
+ ],
+ "exchanges": {
+  "_about": "Known exchange wallets: (1) a token that came to a smart wallet FROM one of these = «вывод с биржи»; (2) their summed balance of ETH / BTC / SOL day by day = exchange inflow (+) or outflow (−) of these wallets. Only a few big wallets, not an exchange's whole reserve.",
+  "eth": [
+   {
+    "label": "Binance 7",
+    "address": "0xbe0eb53f46cd790cd13851d5eff43d12404d33e8",
+    "source": "https://etherscan.io/address/0xbe0eb53f46cd790cd13851d5eff43d12404d33e8"
+   },
+   {
+    "label": "Binance 8",
+    "address": "0xf977814e90da44bfa03b6295a0616a897441acec",
+    "source": "https://etherscan.io/address/0xf977814e90da44bfa03b6295a0616a897441acec"
+   },
+   {
+    "label": "Binance 14",
+    "address": "0x28c6c06298d514db089934071355e5743bf21d60",
+    "source": "https://etherscan.io/address/0x28c6c06298d514db089934071355e5743bf21d60"
+   },
+   {
+    "label": "Coinbase 10",
+    "address": "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43",
+    "source": "https://etherscan.io/address/0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43"
+   },
+   {
+    "label": "Kraken",
+    "address": "0x2910543af39aba0cd09dbb2d50200b3e800a63d2",
+    "source": "https://etherscan.io/address/0x2910543af39aba0cd09dbb2d50200b3e800a63d2"
+   },
+   {
+    "label": "OKX",
+    "address": "0x6cc5f688a315f3dc28a7781717a9a798a59fda7b",
+    "source": "https://etherscan.io/address/0x6cc5f688a315f3dc28a7781717a9a798a59fda7b"
+   },
+   {
+    "label": "Robinhood",
+    "address": "0x40b38765696e3d5d8d9d834d8aad4bb6e418e489",
+    "source": "https://etherscan.io/address/0x40b38765696e3d5d8d9d834d8aad4bb6e418e489"
+   }
+  ],
+  "btc": [
+   {
+    "label": "Binance (холодный)",
+    "address": "34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo",
+    "source": "https://mempool.space/address/34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo"
+   },
+   {
+    "label": "Binance (холодный 2)",
+    "address": "3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6",
+    "source": "https://mempool.space/address/3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6"
+   },
+   {
+    "label": "Bitfinex (холодный)",
+    "address": "bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97",
+    "source": "https://mempool.space/address/bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97"
+   },
+   {
+    "label": "Robinhood (холодный)",
+    "address": "bc1ql49ydapnjafl5t2cp9zqpjwe6pdgmxy98859v2",
+    "source": "https://mempool.space/address/bc1ql49ydapnjafl5t2cp9zqpjwe6pdgmxy98859v2"
+   }
+  ],
+  "sol": [
+   {
+    "label": "Binance 1",
+    "address": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+    "source": "https://solscan.io/account/9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM"
+   },
+   {
+    "label": "Binance 2",
+    "address": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9",
+    "source": "https://solscan.io/account/5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9"
+   },
+   {
+    "label": "Coinbase 1",
+    "address": "H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS",
+    "source": "https://solscan.io/account/H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS"
+   },
+   {
+    "label": "Coinbase 2",
+    "address": "2AQdpHJ2JpcEgPiATUXjQxA8QmafFegfQwSLWSprPicm",
+    "source": "https://solscan.io/account/2AQdpHJ2JpcEgPiATUXjQxA8QmafFegfQwSLWSprPicm"
+   },
+   {
+    "label": "Kraken",
+    "address": "FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5",
+    "source": "https://solscan.io/account/FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5"
+   },
+   {
+    "label": "OKX",
+    "address": "5VCwKtCXgCJ6kit5FybXjvriW3xELsFDhYrPSqtJNmcD",
+    "source": "https://solscan.io/account/5VCwKtCXgCJ6kit5FybXjvriW3xELsFDhYrPSqtJNmcD"
+   }
+  ]
+ }
 }

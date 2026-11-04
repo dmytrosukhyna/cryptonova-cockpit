@@ -268,6 +268,9 @@ def main(argv: list[str] | None = None) -> int:
                   f"mm_only={len(d['mm_only'])} singles={len(d['singles'])} hl_accum={len(d['hl'].get('accum') or [])} "
                   f"flows={ {k: v.get('d1') for k, v in d['flows'].items()} } partial={d['partial']} "
                   f"sources={ {k: v.get('status_ru') for k, v in d['sources'].items()} }")
+            wt = d.get("watch") or {}
+            print(f"  watchlist: tokens={wt.get('n')} new={wt.get('new')} counts={wt.get('counts')} outcomes={wt.get('outcomes_n')} "
+                  f"auto_wallets={len(wt.get('wallets_auto') or [])}")
             print(f"  tokens_seen={d.get('tokens_seen')} dropped={d.get('dropped')} "
                   f"wallets={[(w['label'][:14], [(c['chain'], c.get('coverage_h', c.get('error'))) for c in w['chains']]) for w in d['wallets'][:12]]}")
             for n in d.get("notes_ru") or []:

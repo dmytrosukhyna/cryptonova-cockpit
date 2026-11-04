@@ -335,3 +335,117 @@ def test_panel_has_the_whales_route_and_the_spot_card():
     assert "whale_watch.json" in js and "stock_whales.json" in js and "smart_money.json" in js
     assert "не финансовый совет, высокий риск" in js and "источник недоступен" in js
     assert "V.smartMoneyCard" in (ROOT / "web" / "vip" / "spot.js").read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------------------------------------------------------------ token watchlist (04.11 22:38)
+from cnq.agents import smart_watch as SWT
+
+
+def _wl_get(items_by_wallet=None, price="10", liq=80000, mine=None, gp_tax="0.1"):
+    base = _sm_get()
+
+    def get(url, body=None, headers=None, timeout=20):
+        if "token-transfers" in url and items_by_wallet is not None:
+            w = url.split("/addresses/")[1].split("/")[0]
+            return {"items": items_by_wallet.get(w, []), "next_page_params": None}
+        if "/api/v2/tokens/" in url and "/transfers" in url:
+            if mine is None:
+                raise OSError("HTTP Error 503")
+            return {"items": mine, "next_page_params": None}
+        if "dexscreener" in url:
+            return [{"chainId": "ethereum", "baseToken": {"address": TOK}, "priceUsd": price, "liquidity": {"usd": liq}, "fdv": 50e6,
+                     "marketCap": 20e6, "pairAddress": "0xpair", "pairCreatedAt": NOW - 60 * DAY, "url": "https://dexscreener.com/x"}]
+        if "gopluslabs" in url:
+            return {"result": {TOK: {"is_honeypot": "0", "buy_tax": "0", "sell_tax": gp_tax, "holders": []}}}
+        return base(url, body, headers, timeout)
+    return get
+
+
+def _run(conn, tmp_path, now, get):
+    return SM.run(conn, CFG, None, None, now, get, data_dir=str(tmp_path), force=True)
+
+
+def test_every_bought_token_enters_the_watchlist_even_when_it_fails_the_filters(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    d = _run(conn, tmp_path, NOW, _sm_get())
+    w = {t["symbol"]: t for t in d["watch"]["tokens"]}
+    assert set(w) == {"EARLY", "SCAM"}                                # SCAM has no pool — still on the list
+    assert w["EARLY"]["status"] == "накопление" and w["EARLY"]["n"] == 2
+    assert {b["label"] for b in w["EARLY"]["buyers"]} == {"Fund One", "Trader Two"}
+    assert SWT.NO_POOL in w["SCAM"]["flags"] and w["SCAM"]["status"] in ("новая", "под наблюдением")
+    assert w["EARLY"]["first_price"] == 5 and w["EARLY"]["chg_pct"] == 100.0
+    assert any("добавлена" in e["text"] for e in w["EARLY"]["events"])
+    assert (tmp_path / "watchlist").is_dir() and len(list((tmp_path / "watchlist").iterdir())) == 1
+    json.dumps(d)
+
+
+def test_seller_status_and_change_history(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    _run(conn, tmp_path, NOW, _sm_get())
+    t = NOW + 3 * H
+    items = {W1: [_tr(EX, W1, TOK, 1000, NOW - 2 * DAY)], W2: [_tr("0xpool", W2, TOK, 100, NOW - 2 * DAY), _tr(W2, "0xpool", TOK, 600, t - H)]}
+    d = _run(conn, tmp_path, t, _wl_get(items))
+    e = next(x for x in d["watch"]["tokens"] if x["symbol"] == "EARLY")
+    assert e["status"] == "продают" and e["n"] == 1
+    txt = [ev["text"] for ev in e["events"]]
+    assert "продаёт: Trader Two" in txt and "статус: накопление → продают" in txt
+
+
+def test_risk_clears_later_and_is_recorded(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    one = {W1: [_tr(EX, W1, TOK, 1000, NOW - 2 * DAY)]}
+    d = _run(conn, tmp_path, NOW, _wl_get(one, liq=30000))
+    e = next(x for x in d["watch"]["tokens"] if x["symbol"] == "EARLY")
+    assert any("мало ликвидности" in f for f in e["flags"])
+    d = _run(conn, tmp_path, NOW + 2 * DAY, _wl_get(one, liq=500000, gp_tax="0"))
+    e = next(x for x in d["watch"]["tokens"] if x["symbol"] == "EARLY")
+    assert e["flags"] == [] and e["status"] == "риски снялись"
+    txt = [ev["text"] for ev in e["events"]]
+    assert any(x.startswith("риск снят: мало ликвидности") for x in txt) and any("риски снялись" in x for x in txt)
+
+
+def test_forward_returns_and_patterns_from_the_first_smart_buy(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    _run(conn, tmp_path, NOW, _sm_get())
+    d = _run(conn, tmp_path, NOW + 6 * DAY, _wl_get(price="15"))
+    e = next(x for x in d["watch"]["tokens"] if x["symbol"] == "EARLY")
+    assert e["ret"] == {"1": 100.0, "7": 200.0}                        # first smart buy NOW−2 d at $5: 1 d measured at $10, 7 d at $15
+    rows = SM.read_jsonl(str(tmp_path / "token_outcomes.jsonl"))
+    assert sorted(r["h"] for r in rows if r["symbol"] == "EARLY") == [1, 7]
+    pats = d["watch"]["patterns"]
+    g = next(p for p in pats if p["kind"] == "Сколько умных кошельков")
+    assert g["h"]["7"]["n"] == 1 and g["h"]["7"]["small"] is True and g["h"]["7"]["hit"] == 1.0
+
+
+def test_wallet_discovery_needs_two_early_winners():
+    conn = sqlite3.connect(":memory:")
+    SWT.ensure_schema(conn)
+    iso = SM.iso_ms
+    a, b = "0x" + "9" * 40, "0x" + "8" * 40
+    items = [{"timestamp": _iso(NOW - 3 * DAY), "to": {"hash": a, "is_contract": False}},
+             {"timestamp": _iso(NOW - 3 * DAY), "to": {"hash": b, "is_contract": True}},
+             {"timestamp": _iso(NOW + H), "to": {"hash": "0x" + "7" * 40, "is_contract": False}}]
+    assert SWT.early_buyers(items, NOW - 14 * DAY, NOW, set(), iso) == {a}
+    assert SWT.status_of({"first_t": NOW - 5 * DAY, "buyers": {"x": {"sold": True, "sold_t": NOW - 8 * DAY}}, "m": {"pool": "p"}, "last_act": NOW - 8 * DAY}, NOW) == "выбыла"
+    assert SWT.status_of({"first_t": NOW - 5 * DAY, "buyers": {"x": {}}, "m": {}, "last_act": NOW}, NOW) == "выбыла"   # no pool for 3+ days
+    assert SWT.status_of({"first_t": NOW - H, "buyers": {"x": {}}, "m": {"pool": "p"}, "last_act": NOW}, NOW) == "новая"
+
+
+def test_auto_found_wallet_is_scanned_and_marked(tmp_path):
+    conn = sqlite3.connect(":memory:")
+    SWT.ensure_schema(conn)
+    a = "0x" + "9" * 40
+    conn.execute("INSERT INTO sm_wallet VALUES (?,?,?,?,?,?)", (a, "eth", NOW, 2, json.dumps(["AAA", "BBB"]), "кандидат"))
+    early = [{"timestamp": _iso(NOW - 5 * DAY), "to": {"hash": a, "is_contract": False}}]
+    d = _run(conn, tmp_path, NOW, _wl_get(mine=early))
+    row = next(w for w in d["wallets"] if w["address"] == a)
+    assert row["auto_found"] is True and row["score"] == 2 and row["chains"]
+    # EARLY rose 100 % from the first smart buy → its early buyers are mined; a is known now, so nothing new from it
+    assert conn.execute("SELECT mined FROM sm_tok WHERE symbol='EARLY'").fetchone()[0] == 1
+
+
+def test_panel_shows_the_token_watchlist_and_patterns():
+    js = (ROOT / "web" / "vip" / "whales.js").read_text(encoding="utf-8")
+    assert "Список токенов китов" in js and "Что срабатывало" in js and "data-wlst" in js and "мало данных" in js
+    for s in SWT.STATUS_ORDER:
+        assert s in js

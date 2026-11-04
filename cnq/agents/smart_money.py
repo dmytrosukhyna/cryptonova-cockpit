@@ -29,6 +29,8 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 
+from . import smart_watch as SWT
+
 UA = "CryptoNovaResearch/1.0 (+https://cryptonova.vip)"
 H, DAY = 3_600_000, 86_400_000
 EVERY = 55 * 60_000
@@ -393,6 +395,29 @@ def goplus_flags(r: dict | None) -> tuple[list[str], dict]:
     return flags, info
 
 
+def goplus_row(get, chain: str, addr: str, src: Src) -> dict | None:
+    try:
+        j = get(f"{GP}{GP_CHAIN[chain]}?contract_addresses={addr}")
+        src.ok("goplus")
+        _sleep(1.0)
+        return ((j or {}).get("result") or {}).get(addr) or {}
+    except Exception as e:  # noqa: BLE001
+        src.fail("goplus", e)
+        return None
+
+
+def gt_price_at(get, chain: str, pool: str, t: int, src: Src) -> float | None:
+    try:
+        j = get(f"{GT}{GT_NET[chain]}/pools/{pool}/ohlcv/hour?aggregate=1&limit=1000&before_timestamp={int(t / 1000) + 7200}",
+                headers={"Accept": "application/json;version=20230302"})
+        src.ok("geckoterminal")
+        _sleep(2.1)
+        return price_at(((((j or {}).get("data") or {}).get("attributes") or {}).get("ohlcv_list")) or [], t)
+    except Exception as e:  # noqa: BLE001
+        src.fail("geckoterminal", e)
+        return None
+
+
 def risk_flags(tok: dict, now: int) -> list[str]:
     out = []
     liq = tok.get("liq") or 0
@@ -607,6 +632,9 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
     cfg_w = [dict(w, address=w["address"].lower()) for w in cfg.get("wallets") or []]
     hlw = hl_wallets(whales)
     wallets = cfg_w + [dict(w, chains=["arbitrum", "eth"]) for w in hlw[:EVM_HL_ADDRS]]
+    SWT.ensure_schema(conn)
+    known_w = {w["address"] for w in wallets}
+    wallets += [w for w in SWT.auto_wallets(conn) if w["address"] not in known_w]    # 04.11 22:38: auto-found early buyers
     tags = kv_get(conn, "tags2") or {}
     for w in cfg_w:
         k = w["address"]
@@ -632,11 +660,16 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
     scans, wl_out, chain_down = [], [], {}
     for w in wallets:
         row = {"label": w["label"], "kind": w["kind"], "address": w["address"], "source": w.get("source"), "source_note": w.get("source_note"),
-               "chains": [], "auto": w["kind"] == "топ-трейдер Hyperliquid"}
+               "chains": [], "auto": w["kind"] == "топ-трейдер Hyperliquid", "auto_found": bool(w.get("auto_found")),
+               "score": w.get("score"), "found_tokens": w.get("tokens")}
         tg = (tags.get(w["address"]) or {}).get("tags")
         if tg is not None:
             row["tags"] = tg[:4]
             row["confirmed"] = confirmed(w["label"], tg)
+        if w.get("require_confirm") and not row.get("confirmed"):    # 04.11 22:38: scanned only once Blockscout confirms the label
+            row["chains"] = [{"chain": "eth", "error": "ждёт подтверждения метки"}]
+            wl_out.append(row)
+            continue
         for ch in w.get("chains") or ["eth"]:
             if ch not in BS:
                 continue
@@ -739,6 +772,16 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
                 src.fail("geckoterminal", e)
             _sleep(2.1)
     kv_set(conn, "goplus", {k_: v for k_, v in gp_cache.items() if now - v["t"] < 3 * DAY})
+    # 4b. 04.11 22:38: every token any tracked wallet bought → the persistent watchlist (smart_watch), re-checked every run
+    watch = None
+    try:
+        meta = {w["address"]: {"label": w["label"], "kind": w["kind"], "auto": bool(w.get("auto_found"))} for w in wallets}
+        ctx = {"IGNORE": IGNORE, "BS": BS, "DS_CHAIN": DS_CHAIN, "pairs": pairs, "ds_fetch": ds_fetch, "ds_best": ds_best,
+               "gt_price_at": gt_price_at, "goplus": goplus_row, "goplus_flags": goplus_flags, "risk_flags": risk_flags,
+               "append_jsonl": append_jsonl, "read_jsonl": read_jsonl, "iso_ms": iso_ms, "exchanges": exch_eth}
+        watch = SWT.update(conn, now, scans, meta, get, src, t_end + 60, ctx, data_dir)
+    except Exception as e:  # noqa: BLE001
+        notes.append(f"список токенов: {str(e)[:160]}")
     for g in sigs + mm_only + singles:
         g["flags"] = risk_flags(g, now)
         g["age_days"] = round((now - g["created"]) / DAY, 1) if g.get("created") else None
@@ -862,7 +905,7 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
     doc = {"asof": now, "partial": partial, "sources": src.doc(SRC_NAMES), "wallets": wl_out,
            "wallets_n": len(wl_out), "wallets_cfg": len(cfg_w), "wallets_hl": len(hlw),
            "signals": sigs[:20], "mm_only": mm_only[:10], "singles": singles, "dropped": dropped, "hl": hl, "flows": flows, "track": tr,
-           "logged_today": logged, "outcomes_recorded": recorded, "tokens_seen": len(groups),
+           "logged_today": logged, "outcomes_recorded": recorded, "tokens_seen": len(groups), "watch": watch,
            "rule_ru": f"Сигнал — токен, который за 7 дней чисто (входящие минус исходящие) набрали ≥ 2 «умных» кошелька, каждый на ≥ ${MIN_USD // 1000}k. "
                       f"Стейблкоины, обёрнутые BTC/ETH и токены стейкинга не считаем; токены без пула ≥ ${MIN_LIQ // 1000}k ликвидности отсеиваем как спам. "
                       "Hyperliquid: ≥ 2 топ-трейдера купили или добавили ≥ 10% монеты (от $10k) за 7 дней.",

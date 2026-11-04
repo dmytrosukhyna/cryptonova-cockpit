@@ -25,7 +25,7 @@ def test_trade_why_d_in_every_language():
         assert "394" in w["history"] and "2" in w["live"]
         assert "24" in w["plan"] and "$" in w["risk"]
     ru = aw.trade_why(ROW, DESK_D, "D", {"d_open": 3}, CAPS, None, CTX, "ru")
-    assert "дешевле" in ru["signal"] and "закрыто 2 сделки, в плюсе 1" in ru["live"]
+    assert "дешевле" in ru["signal"] and "закрыто: 2, из них в плюсе: 1" in ru["live"]
     assert "около $14" in ru["risk"] and "$15" in ru["risk"]
 
 

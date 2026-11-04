@@ -188,11 +188,11 @@ W: dict[str, dict[str, str]] = {
         "La regla se probó en el histórico {period}: {n} {trades}, {w}% con ganancia, {avg} por operación de media."),
     "rw.hist.years": _w(" Каждый год проверки — в плюсе.", " Every year of the test was positive.", " Кожен рік перевірки — у плюсі.",
                         " Κάθε χρονιά του ελέγχου ήταν θετική.", " Todos los años de la prueba, en positivo."),
-    "rw.live": _w("На реальном счёте CRYPTO NOVA с {d} по этому правилу закрыто {n} {trades}, в плюсе {w}.",
-                  "On CRYPTO NOVA's real account since {d}, {n} {trades} of this rule closed, {w} in profit.",
-                  "На реальному рахунку CRYPTO NOVA з {d} за цим правилом закрито {n} {trades}, у плюсі {w}.",
-                  "Στον πραγματικό λογαριασμό του CRYPTO NOVA από {d} έκλεισαν {n} {trades} αυτού του κανόνα, {w} με κέρδος.",
-                  "En la cuenta real de CRYPTO NOVA desde el {d} se cerraron {n} {trades} de esta regla, {w} con ganancia."),
+    "rw.live": _w("На реальном счёте CRYPTO NOVA с {d} сделок по этому правилу закрыто: {n}, из них в плюсе: {w}.",
+                  "On CRYPTO NOVA's real account since {d}, trades of this rule closed: {n}, in profit: {w}.",
+                  "На реальному рахунку CRYPTO NOVA з {d} угод за цим правилом закрито: {n}, з них у плюсі: {w}.",
+                  "Στον πραγματικό λογαριασμό του CRYPTO NOVA από {d}, κλειστές συναλλαγές αυτού του κανόνα: {n}, με κέρδος: {w}.",
+                  "En la cuenta real de CRYPTO NOVA desde el {d}, operaciones cerradas de esta regla: {n}; con ganancia: {w}."),
     "rw.live0": _w("На реальном счёте CRYPTO NOVA это первая сделка по этому правилу.",
                    "On CRYPTO NOVA's real account this is the rule's first trade.",
                    "На реальному рахунку CRYPTO NOVA це перша угода за цим правилом.",
@@ -459,7 +459,7 @@ def _live(grade: str, ctx: dict, lang: str) -> str:
     if not rows:
         return t(lang, "rw.live0")
     n, w = len(rows), sum(1 for p in rows if p > 0)
-    s = t(lang, "rw.live", d=date_words(ctx["since"], lang), n=n, trades=plural(lang, n, "trade"), w=w)
+    s = t(lang, "rw.live", d=date_words(ctx["since"], lang), n=n, w=w)
     return s + (t(lang, "rw.few") if n < 10 else "")
 
 
@@ -581,10 +581,12 @@ def coin_why(sym: str, share: float | None, row: dict | None, status: dict | Non
         add("rw.c.backtest", True, x=m.group(1), dd=m.group(2).replace("-", "−") + "%")
     st = (status or {}).get("status") or row.get("status")
     if st in ("buy", "add", "small", "wait", "avoid"):
-        out["status"] = t(lang, "rw.c.status", s=t(lang, f"rw.c.st.{st}")) + (" " + t(lang, "rw.c.wait_note") if st == "wait" else "")
+        out["status"] = t(lang, "rw.c.status", s=t(lang, f"rw.c.st.{st}"))
+        if st == "wait":
+            out["note"] = t(lang, "rw.c.wait_note")
     if evaluated and passing is not None:
         out["scale"] = t(lang, "rw.c.scale", n=int(evaluated), k=int(passing))
-    out["text"] = " ".join(x if x.endswith((".", "!", "?")) else x + "." for x in (out["why"], out.get("status"), out.get("scale")) if x)
+    out["text"] = " ".join(x if x.endswith((".", "!", "?")) else x + "." for x in (out["why"], out.get("status"), out.get("note"), out.get("scale")) if x)
     return out
 
 

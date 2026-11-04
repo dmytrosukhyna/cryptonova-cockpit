@@ -457,6 +457,9 @@ class Channel:
     EXIT_RU = {"TIME": "по времени", "STOP": "по стопу", "BREAKEVEN": "в ноль по стопу", "TARGET": "по цели", "TRAIL": "подтянутым стопом"}
     TRADE_HOURS = (8, 23)          # Kyiv: a trade closed at night is posted in the morning (it stays eligible for TRADE_WINDOW)
     TRADE_WINDOW = 14 * 3600_000   # only trades closed in the last 14 h — no flood of old trades on the first run
+    # owner 04.11 22:51: «в канал не надо сбрасывать отчёты об открытых или закрытых сделках отдельными новостями … люди спят …
+    # сделки по $1–2 неинтересны» — no separate post per trade; the day's trades stay in the evening «Итог дня» only.
+    TRADE_POSTS = False
 
     def trade_view(self, t: dict) -> dict:
         entry = t.get("entry"); qty = t.get("qty") or 0; pnl = t.get("pnl_usd")
@@ -559,7 +562,7 @@ class Channel:
     def trade_posts(self, send_fn, photo_fn=None, now: dt.datetime | None = None) -> list[tuple[str, str]]:
         """One post per newly closed autopilot trade (text + picture card); recorded as day='trade', slot='trade:<id>'."""
         now = now or kyiv_now()
-        if not (self.TRADE_HOURS[0] <= now.hour < self.TRADE_HOURS[1]):
+        if not self.TRADE_POSTS or not (self.TRADE_HOURS[0] <= now.hour < self.TRADE_HOURS[1]):
             return []
         x = self.ctx()
         r = x.get("real") or {}

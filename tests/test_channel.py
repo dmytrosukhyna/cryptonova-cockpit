@@ -256,6 +256,8 @@ def _closed_trade_body():
     json.dump(real, open(os.path.join(tmp, "public_real.json"), "w"))
     conn = sqlite3.connect(":memory:"); ch = channel.Channel(conn, tmp)
     sent, photos = [], []
+    assert ch.trade_posts(lambda t: sent.append(t) or True, None, now) == [] and not sent   # owner 04.11: no per-trade posts by default
+    ch.TRADE_POSTS = True
     out = ch.trade_posts(lambda t: sent.append(t) or True, lambda p, c: photos.append((p, c)) or True, now)
     assert len(out) == 2 and not any("SOL" in t or "XRP" in t for _, t in out)
     t_loss, t_win = out[0][1], out[1][1]
@@ -265,7 +267,7 @@ def _closed_trade_body():
     assert "в плюсе 2" in t_win and "+$18" in t_win
     assert len(photos) == 2 or len(sent) == 2                                # picture card when Pillow is there, text otherwise
     assert ch.trade_posts(lambda t: sent.append(t) or True, None, now) == []    # once per trade
-    ch2 = channel.Channel(sqlite3.connect(":memory:"), tmp)
+    ch2 = channel.Channel(sqlite3.connect(":memory:"), tmp); ch2.TRADE_POSTS = True
     assert ch2.trade_posts(lambda t: True, None, now.replace(hour=3)) == []     # no posts at night
     blk = ch.trades_block(ch.ctx())
     assert blk.startswith("<b>Сделки за день (реальный счёт OKX):</b>") and "ARB лонг: <b>+$19 (+9.6%)</b>" in blk and "DOT" in blk

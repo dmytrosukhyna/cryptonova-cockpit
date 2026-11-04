@@ -220,6 +220,18 @@ def test_send_photo_album_falls_back_to_one_picture():
 
 
 def test_closed_trade_gets_its_own_post_and_the_evening_lists_it():
+    """04.11: the test sets the clock to 14:05 Kyiv; day_result() and the 24 h windows read the wall clock, so the clock is
+    frozen at that moment for the test (it used to fail whenever the suite ran far from 14:05 Kyiv)."""
+    real_time = channel.time.time
+    now = dt.datetime.now(channel.KYIV).replace(hour=14, minute=5)
+    channel.time.time = lambda: now.timestamp()
+    try:
+        _closed_trade_body()
+    finally:
+        channel.time.time = real_time
+
+
+def _closed_trade_body():
     """Owner 21.10: results of the trades go to the channel — a post per closed trade (bold date, picture card) and a
     «Сделки за день» block in the evening. Losses are posted like wins; old trades and night hours are skipped.
     31.10 (owner: the channel showed demo-desk losses of −$200 a trade): the trades and the day's result come ONLY from the

@@ -1,0 +1,30 @@
+name: research-whale-rules
+# Branch-only research (04.11.2026): trade histories of the top Hyperliquid / OKX whales + market context
+# (scripts/whale_rules_fetch.py) → release asset lab-data-whales/whale_rules_data.json.gz (the research container can
+# download releases, not artifacts). Public data only, no keys, no orders.
+on:
+  push:
+    branches: [research/whale-rules-0411]
+    paths: [scripts/whale_rules_fetch.py, .github/workflows/research-whale-rules.yml]
+  workflow_dispatch:
+permissions:
+  contents: write   # release asset lab-data-whales
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/whale_rules_fetch.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: whale-rules-data, path: whale_rules_data.json.gz, retention-days: 7 }
+      - name: Upload to release lab-data-whales
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: lab-data-whales
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Research data (not code): trade histories of top Hyperliquid / OKX whales + market context (scripts/whale_rules_fetch.py)." --latest=false --target "${{ github.sha }}"
+          gh release upload "$TAG" whale_rules_data.json.gz --clobber

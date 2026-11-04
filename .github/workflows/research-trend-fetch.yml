@@ -1,0 +1,20 @@
+name: research-trend-fetch
+# Research branch only: fetch BTC/ETH 1h perps + real funding for the trend study (04.11.2026). Public data, no keys.
+on:
+  push:
+    branches: [research/trend-0411]
+    paths: [scripts/trend_fetch.py, .github/workflows/research-trend-fetch.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/trend_fetch.py
+      - uses: actions/upload-artifact@v4
+        with: { name: trend-data, path: trend_data.json, retention-days: 7 }

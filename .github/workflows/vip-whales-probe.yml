@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   probe:
@@ -38,12 +38,9 @@ jobs:
       - name: Smart money (forced)
         env: { CNQ_FORCE: "1" }
         run: cp web/whales_top.json probe/ && python -m cnq.cli smartmoney --out probe 2>&1 | tail -30
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: vip-whales-probe
-          path: |
-            probe/stock_whales.json
-            probe/smart_money.json
-            probe/smart_money_signal.json
-            data/smart_money/
+      - name: Keep the outputs on the research branch only (artifacts are not readable from the sessions)
+        if: always() && startsWith(github.ref, 'refs/heads/research/')
+        run: |
+          mkdir -p docs/research/vipwhales_probe && cp probe/stock_whales.json probe/smart_money.json probe/smart_money_signal.json docs/research/vipwhales_probe/ 2>/dev/null || true
+          git config user.name "cnq-bot"; git config user.email "cnq-bot@users.noreply.github.com"
+          git add docs/research/vipwhales_probe && git commit -q -m "probe: vip whales outputs [skip ci]" && git push -q origin HEAD:${GITHUB_REF#refs/heads/} || echo "nothing to keep"

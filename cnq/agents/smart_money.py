@@ -56,7 +56,9 @@ GP_CHAIN = {"eth": "1", "base": "8453", "arbitrum": "42161"}
 EXPLORER = {"eth": "https://etherscan.io", "base": "https://basescan.org", "arbitrum": "https://arbiscan.io"}
 CHAIN_RU = {"eth": "Ethereum", "base": "Base", "arbitrum": "Arbitrum", "hl": "Hyperliquid спот"}
 HL = "https://api.hyperliquid.xyz/info"
-DS = "https://api.dexscreener.com/latest/dex/tokens/"
+DS = "https://api.dexscreener.com/tokens/v1/"             # + {chainId}/{a,b,…}: every pool of each token (the old «latest/dex/tokens»
+DS_BATCH = 10                                               # answers at most 30 pools for ALL tokens together — most were lost)
+DS_MAX = 200                                                # tokens priced per run
 GT = "https://api.geckoterminal.com/api/v2/networks/"
 GP = "https://api.gopluslabs.io/api/v1/token_security/"
 MEMPOOL = ["https://mempool.space/api/address/", "https://blockstream.info/api/address/"]
@@ -315,16 +317,18 @@ def ds_best(pairs: list[dict], chain: str, addr: str) -> dict | None:
             "vol24": _f((best.get("volume") or {}).get("h24"))}
 
 
-def ds_fetch(get, addrs: list[str], src: Src) -> list[dict]:
+def ds_fetch(get, chain: str, addrs: list[str], src: Src, deadline: float = 0) -> list[dict]:
     pairs = []
-    for i in range(0, len(addrs), 30):
+    for i in range(0, len(addrs), DS_BATCH):
+        if deadline and time.time() > deadline:
+            break
         try:
-            j = get(DS + ",".join(addrs[i:i + 30]))
-            pairs += (j or {}).get("pairs") or []
+            j = get(DS + DS_CHAIN[chain] + "/" + ",".join(addrs[i:i + DS_BATCH]))
+            pairs += j if isinstance(j, list) else (j or {}).get("pairs") or []
             src.ok("dexscreener")
         except Exception as e:  # noqa: BLE001
             src.fail("dexscreener", e)
-        _sleep(0.3)
+        _sleep(0.25)
     return pairs
 
 
@@ -598,7 +602,7 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
         _sleep(0.25)
     kv_set(conn, "tags", tags)
     # 2. scans
-    scans, wl_out = [], []
+    scans, wl_out, chain_down = [], [], {}
     for w in wallets:
         row = {"label": w["label"], "kind": w["kind"], "address": w["address"], "source": w.get("source"), "source_note": w.get("source_note"),
                "chains": [], "auto": w["kind"] == "топ-трейдер Hyperliquid"}
@@ -612,17 +616,29 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
             if time.time() > t_end:
                 row["chains"].append({"chain": ch, "error": "не успели в этом прогоне"})
                 continue
-            s = scan_wallet(get, ch, w["address"], now, exch_eth, src, deadline=t_end)
-            if s.get("error"):
+            if chain_down.get(ch, 0) >= 2:          # 04.11: base / arbitrum Blockscout answer 403 to GitHub runners — stop asking
                 row["chains"].append({"chain": ch, "error": "источник недоступен"})
                 continue
+            s = scan_wallet(get, ch, w["address"], now, exch_eth, src, deadline=t_end)
+            if s.get("error"):
+                chain_down[ch] = chain_down.get(ch, 0) + 1
+                row["chains"].append({"chain": ch, "error": "источник недоступен"})
+                continue
+            chain_down[ch] = -99
             row["chains"].append({"chain": ch, "coverage_h": s["coverage_h"], "full": s["full"], "transfers": s["n_items"]})
             scans.append({"wallet": w["address"], "label": w["label"], "kind": w["kind"], "chain": ch, "flows": s["flows"]})
         wl_out.append(row)
     groups = group_tokens(scans)
     # 3. market data for every token with a positive net inflow (prices → USD; spam / unpriced dropped)
-    addrs = sorted({g["address"] for g in groups.values()})
-    pairs = ds_fetch(get, addrs, src) if addrs and time.time() < t_end else []
+    # DexScreener per chain: tokens ≥ 2 wallets first, then the ones with the biggest inflow by Blockscout's own USD rate, then unpriced
+    def _prio(g):
+        rate = g.get("bs_rate") or 0
+        return (-len({b["address"] for b in g["buyers"]}), -(max(b["amount"] for b in g["buyers"]) * rate), rate > 0)
+    pairs = []
+    for ch in BS:
+        gs = sorted([g for g in groups.values() if g["chain"] == ch], key=_prio)[:DS_MAX]
+        if gs and time.time() < t_end:
+            pairs += ds_fetch(get, ch, [g["address"] for g in gs], src, deadline=t_end)
     dropped = {"spam": 0, "small": 0, "big": 0}
     sigs, mm_only, singles = [], [], []
     for k, g in groups.items():
@@ -800,9 +816,12 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
     due = due_outcomes(data_dir, now)
     px_now = {s["key"]: s["price"] for s in all_sig if s.get("price")}
     px_now.update({f"hl:{c}": p for c, p in prices_hl.items()})
-    need = sorted({r["address"] for r, _h in due if r.get("src") == "evm" and r["key"] not in px_now and r.get("address")})
-    if need and time.time() < t_end + 30:
-        more = ds_fetch(get, need, src)
+    more = []
+    for ch in BS:
+        need = sorted({r["address"] for r, _h in due if r.get("src") == "evm" and r.get("chain") == ch and r["key"] not in px_now and r.get("address")})
+        if need and time.time() < t_end + 30:
+            more += ds_fetch(get, ch, need, src)
+    if more:
         for r, _h in due:
             if r.get("src") == "evm" and r["key"] not in px_now:
                 m = ds_best(more, r["chain"], r["address"])
@@ -816,7 +835,7 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
     doc = {"asof": now, "partial": partial, "sources": src.doc(SRC_NAMES), "wallets": wl_out,
            "wallets_n": len(wl_out), "wallets_cfg": len(cfg_w), "wallets_hl": len(hlw),
            "signals": sigs[:20], "mm_only": mm_only[:10], "singles": singles, "dropped": dropped, "hl": hl, "flows": flows, "track": tr,
-           "logged_today": logged, "outcomes_recorded": recorded,
+           "logged_today": logged, "outcomes_recorded": recorded, "tokens_seen": len(groups),
            "rule_ru": f"Сигнал — токен, который за 7 дней чисто (входящие минус исходящие) набрали ≥ 2 «умных» кошелька, каждый на ≥ ${MIN_USD // 1000}k. "
                       f"Стейблкоины, обёрнутые BTC/ETH и токены стейкинга не считаем; токены без пула ≥ ${MIN_LIQ // 1000}k ликвидности отсеиваем как спам. "
                       "Hyperliquid: ≥ 2 топ-трейдера купили или добавили ≥ 10% монеты (от $10k) за 7 дней.",

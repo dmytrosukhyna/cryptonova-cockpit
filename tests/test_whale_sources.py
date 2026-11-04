@@ -137,3 +137,39 @@ def test_run_does_not_follow_a_binance_portfolio_under_the_bar():
     assert o["src"] == "bn" and not d["top"] and not d["following"]
     ex = " ".join(o["excluded_ru"])
     assert "нужно от 70%" in ex and "мало решений за 60 дней (14" in ex
+
+
+# ------------------------------------------------------------------------------------------------ 04.11 21:14: wider pools, same bar
+def test_okx_pool_reads_all_pages_and_both_sorts_then_takes_pnl_best_plus_win_best():
+    W.time.sleep = lambda s: None
+    calls = []
+
+    def okx_get(path, params):
+        calls.append((params["sortType"], params["page"]))
+        if params["sortType"] == "pnl":
+            base = (params["page"] - 1) * 20
+            ranks = [{"uniqueCode": f"P{base + i}", "nickName": f"p{base + i}", "pnl": str(1e6 - (base + i) * 1000), "winRatio": "0.6"}
+                     for i in range(20 if params["page"] < 4 else 7)]
+            ranks[0]["winRatio"] = "0.3"                                     # cannot reach 70 % decisions
+            return [{"totalPage": "4", "ranks": ranks}]
+        return [{"totalPage": "1", "ranks": [{"uniqueCode": "WIN", "nickName": "w", "pnl": "100", "winRatio": "0.95"},
+                                             {"uniqueCode": "P5", "nickName": "dup", "pnl": "1", "winRatio": "0.6"}]}]
+    rows, why = W.okx_candidates(okx_get)
+    assert ("pnl", 4) in calls and ("pnl", 5) not in calls and ("win_ratio", 1) in calls
+    assert why["rows"] == 68 and why["win"] == 4 and why["studied"] == len(rows) == W.OKX_PRE_N
+    assert [r["code"] for r in rows[:2]] == ["P1", "P2"] and rows[W.OKX_PRE_PNL]["code"] == "WIN"
+
+
+def test_binance_pool_reads_pnl_and_roi_sorts():
+    get = fake_bn()
+    WS.bn_candidates(get)
+    assert sum(1 for c in get.calls if c.endswith("home-page/query-list")) == 4      # PNL/ROI × 30D/90D, empty pages stop early
+
+
+def test_run_reports_per_source_counts_and_the_sources_not_connected():
+    W.time.sleep = WS.time.sleep = lambda s: None
+    conn = sqlite3.connect(":memory:")
+    d = W.run(conn, now=NOW, post=_hl_post(NOW), get_lb=lambda: {"leaderboardRows": []}, okx_get=lambda p, q: [{"ranks": []}] if "lead-traders" in p else [],
+              max_requests=80, budget_s=60, src_get={"bn": fake_bn(hist_rows=_hist())})
+    assert d["by_source"]["bn"] == {"studied": 1, "passed": 1, "following": 1} and d["by_source"]["okx"]["studied"] == 0
+    assert {"bybit", "bitget", "gate", "mexc", "bingx"} <= set(d["sources_off"])

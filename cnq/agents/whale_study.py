@@ -86,7 +86,8 @@ WHALE_CAP = 0.30                      # one whale's open copies: margin ≤ 30 %
 STOP_MIN, STOP_MAX = 0.002, 0.15      # the whale's own stop is used only when it sits 0.2–15 % away on the protective side
 UA = {"Content-Type": "application/json", "User-Agent": "cryptonova-whale-study/1.0"}
 OKX = "https://www.okx.com"
-OKX_PRE_N = 20
+OKX_PRE_N = 60                        # 04.11 21:14 (owner: more whales, same bar): the whole public pool is ~220 (11 pages × 20)
+OKX_PRE_PNL, OKX_WIN_MIN = 40, 0.50   # 40 best by P&L + the best by OKX's own win ratio; < 50 % OKX win ratio cannot reach 70 % decisions
 SRC_RU = {"hl": "Hyperliquid · сделки в блокчейне", "okx": "OKX · лид-трейдер копитрейдинга"}
 SRC_RU.update({k: v["ru"] for k, v in WS.SOURCES.items()})   # 04.11: Binance lead portfolios (cnq.agents.whale_sources)
 
@@ -659,29 +660,41 @@ def _okx_get(path: str, params: dict, timeout: float = 20):
     return j.get("data") or []
 
 
-def okx_candidates(get=_okx_get, pages: int = 3) -> tuple[list[dict], dict]:
-    """OKX public lead traders (perpetual swaps), sorted by P&L; keep those leading ≥ 90 days (minLeadDays=3) with P&L > 0."""
-    rows, why = [], {"rows": 0, "short_record": 0, "loss": 0}
-    for page in range(1, pages + 1):
-        data = get("/api/v5/copytrading/public-lead-traders", {"instType": "SWAP", "sortType": "pnl", "minLeadDays": 3, "page": page, "limit": 20})
-        ranks = (data[0] if data else {}).get("ranks") or []
-        for x in ranks:
-            why["rows"] += 1
-            pnl = _f(x.get("pnl"))
-            if pnl <= 0:
-                why["loss"] += 1; continue
-            code = x.get("uniqueCode")
-            if not code:
-                continue
-            rows.append({"src": "okx", "addr": f"okx:{code}", "code": code, "name": x.get("nickName") or "", "short": (x.get("nickName") or code)[:18],
-                         "account": _f(x.get("aum")), "pnl_all": pnl, "pnl_m": None, "roi_m": None, "pnl_ratio": _f(x.get("pnlRatio")),
-                         "win_ratio": _f(x.get("winRatio")), "followers": int(_f(x.get("copyTraderNum"))), "lead_days": int(_f(x.get("leadDays"))),
-                         "insts": x.get("traderInsts") or []})
-        if len(ranks) < 20:
-            break
-    rows.sort(key=lambda r: -r["pnl_all"])
+def okx_candidates(get=_okx_get, pages: int = 12) -> tuple[list[dict], dict]:
+    """OKX public lead traders (perpetual swaps) leading ≥ 90 days (minLeadDays=3) with P&L > 0 and OKX win ratio ≥ 50 %.
+    04.11 21:14: the whole pool by P&L (all pages, ~220) + the win-ratio sort; studied = the best 40 by P&L + the best of the
+    rest by win ratio, OKX_PRE_N in all — the 60-day record bar (profile) decides, not this list."""
+    rows, why, seen = [], {"rows": 0, "short_record": 0, "loss": 0, "win": 0}, set()
+    for sort, npg in (("pnl", pages), ("win_ratio", min(pages, 5))):
+        for page in range(1, npg + 1):
+            data = get("/api/v5/copytrading/public-lead-traders", {"instType": "SWAP", "sortType": sort, "minLeadDays": 3, "page": page, "limit": 20})
+            d0 = data[0] if data else {}
+            ranks = d0.get("ranks") or []
+            for x in ranks:
+                code = x.get("uniqueCode")
+                if not code or code in seen:
+                    continue
+                seen.add(code)
+                why["rows"] += 1
+                pnl = _f(x.get("pnl"))
+                if pnl <= 0:
+                    why["loss"] += 1; continue
+                if x.get("winRatio") not in (None, "") and _f(x.get("winRatio")) < OKX_WIN_MIN:
+                    why["win"] += 1; continue
+                rows.append({"src": "okx", "addr": f"okx:{code}", "code": code, "name": x.get("nickName") or "", "short": (x.get("nickName") or code)[:18],
+                             "account": _f(x.get("aum")), "pnl_all": pnl, "pnl_m": None, "roi_m": None, "pnl_ratio": _f(x.get("pnlRatio")),
+                             "win_ratio": _f(x.get("winRatio")), "followers": int(_f(x.get("copyTraderNum"))), "lead_days": int(_f(x.get("leadDays"))),
+                             "insts": x.get("traderInsts") or [], "pick": sort})
+            if len(ranks) < 20 or page >= int(_f(d0.get("totalPage"), npg)):
+                break
+            time.sleep(0.25)
+    by_pnl = sorted(rows, key=lambda r: -r["pnl_all"])
+    pick = by_pnl[:OKX_PRE_PNL]
+    have = {r["addr"] for r in pick}
+    pick += sorted((r for r in rows if r["addr"] not in have), key=lambda r: (-r["win_ratio"], -r["pnl_all"]))[:OKX_PRE_N - len(pick)]
     why["passed"] = len(rows)
-    return rows[:OKX_PRE_N], why
+    why["studied"] = len(pick)
+    return pick, why
 
 
 def _okx_coin(inst: str) -> str:
@@ -1368,6 +1381,11 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     st_now = kv_get(conn, "study") or {}
     out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []),
            "follow_dropped": st_now.get("dropped", []), "archive": arch,
+           # 04.11 21:14: per source — candidates studied, passed the 60-day bar, followed (+ sources checked and not connectable)
+           "by_source": {k: {"studied": sum(1 for p in profs if p["src"] == k), "passed": sum(1 for p in elig if p["src"] == k),
+                             "following": sum(1 for x in st_now.get("top", []) if (WS.src_of(x["addr"]) or ("okx" if x["addr"].startswith("okx:") else "hl")) == k)}
+                         for k in ["hl", "okx"] + list(WS.SOURCES)},
+           "sources_off": WS.SOURCES_OFF,
            "follow_rule_ru": f"За {int(WINDOW / DAY)} дней: ≥ {MIN_DECISIONS} решений (части одной сделки в пределах 4 ч — одно решение), "
                              f"≥ {MIN_WIN * 100:.0f}% решений в плюсе и прибыль/убыток ≥ {MIN_PF:g} с учётом открытых позиций по текущей цене "
                              f"(скрытые позиции OKX в минусе — убыточные решения), медиана удержания ≥ {MIN_HOLD_H:g} ч, убыток открытых позиций "
@@ -1388,6 +1406,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
            "hidden_ru": "OKX скрывает открытые позиции этих лид-трейдеров (нет монеты, размера и цены входа — только маржа, плечо и "
                         "результат): повторить их сделки вовремя нельзя, стол «Киты» их не копирует.",
            "not_covered_ru": "Bybit (мастер-трейдеры), Bitget и Gate не подключены: с сервера в США их страницы копитрейдинга закрыты (403/404). "
+                             "MEXC показывает только открытые позиции без истории сделок, BingX требует вход — их тоже не берём. "
                              "Binance — подключён: лид-портфели, которые показывают свои позиции. Чемпионаты (Bybit WSOT и другие) "
                              "публикуют только итоговые проценты без сделок — повторить такую торговлю нельзя, поэтому в рейтинг они не входят.",
            "method_ru": [

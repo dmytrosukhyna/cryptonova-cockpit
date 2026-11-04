@@ -39,9 +39,11 @@ def _f(x, d=0.0):
 
 # ------------------------------------------------------------------------------------------------------------ Binance
 BN = "https://www.binance.com/bapi/futures"
-BN_PRE_N = 15
-BN_PAGES = 3
-BN_DETAIL_MAX = 40                    # detail pages checked per day (is the portfolio showing its positions?)
+# 04.11 21:14 (owner: more whales, same bar): ~9 000 public portfolios — read the top by 30/90-day P&L AND by ROI, 5 pages each
+BN_PRE_N = 35
+BN_PAGES = 5
+BN_SORTS = ("PNL", "ROI")
+BN_DETAIL_MAX = 90                    # detail pages checked per day (is the portfolio showing its positions?)
 BN_HIST_PAGES = 4                     # 50 closed positions per page
 
 
@@ -68,10 +70,10 @@ def bn_candidates(get=bn_get, pages: int = BN_PAGES) -> tuple[list[dict], dict]:
     """Public lead portfolios by 30-day (then 90-day) P&L: P&L > 0, win rate ≥ 70 % (Binance's own number for the period), active and
     showing its positions. PF and trades in 90 days need the portfolio's own pages → refresh + record_gate."""
     rows, why, seen = [], {"rows": 0, "loss": 0, "win": 0, "hidden": 0}, set()
-    for rng in ("30D", "90D"):
+    for rng, dtype in [(r_, t_) for t_ in BN_SORTS for r_ in ("30D", "90D")]:
         for page in range(1, pages + 1):
             data = get("/v1/friendly/future/copy-trade/home-page/query-list",
-                       {"pageNumber": page, "pageSize": 20, "timeRange": rng, "dataType": "PNL", "favoriteOnly": False, "hideFull": False,
+                       {"pageNumber": page, "pageSize": 20, "timeRange": rng, "dataType": dtype, "favoriteOnly": False, "hideFull": False,
                         "nickname": "", "order": "DESC", "userAsset": 0, "portfolioType": "PUBLIC"}) or {}
             lst = data.get("list") if isinstance(data, dict) else data
             for x in lst or []:
@@ -181,6 +183,7 @@ def bn_refresh(conn, c: dict, now: int, budget, get=bn_get, notes=None, refresh_
         c = {**c, "perf": {k: {kk: v.get(kk) for kk in ("roi", "pnl", "mdd", "winRate", "winOrders", "totalOrder", "copierPnl", "sharpRatio")}
                            for k, v in perf.items() if isinstance(v, dict)}}
         rows = []
+        stop_at = max(now - 92 * DAY, (hist_t - 2 * DAY) if hist_t else 0)     # 04.11: after the first look only what is new
         for page in range(1, BN_HIST_PAGES + 1):
             if not budget.take():
                 return False
@@ -204,7 +207,7 @@ def bn_refresh(conn, c: dict, now: int, budget, get=bn_get, notes=None, refresh_
                                  _f(x.get("closingPnl")), qty * e, _f(x.get("leverage"), 0.0)))
                 except Exception:  # noqa: BLE001
                     continue
-            if len(lst) < 50 or (rows and min(x[6] for x in rows) < now - 92 * DAY):
+            if len(lst) < 50 or (rows and min(x[6] for x in rows) < stop_at):
                 break
             time.sleep(0.5)
         conn.executemany("INSERT OR REPLACE INTO ws_trips VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows)
@@ -226,6 +229,16 @@ def bn_refresh(conn, c: dict, now: int, budget, get=bn_get, notes=None, refresh_
 SOURCES = {
     "bn": {"ru": "Binance · лид-трейдер копитрейдинга", "get": bn_get, "candidates": bn_candidates, "refresh": bn_refresh,
            "current": bn_current, "positions": bn_positions, "open_trips": bn_open_trips},
+}
+
+
+# 04.11 19:16–19:19 UTC, scripts/whale_sources_probe.py rounds 4–5 from a GitHub runner (US) — copy-trading sites checked and NOT connected:
+SOURCES_OFF = {
+    "bybit": "Bybit (мастер-трейдеры): 403 Access Denied со всех адресов (api2.bybit.com, bybitglobal, .eu, .nl, .kz) — гео-блок для серверов в США",
+    "bitget": "Bitget: открытые страницы копитрейдинга отвечают 404 или пусто, официальный API копитрейдинга — только с ключом своего счёта",
+    "gate": "Gate: 403 Access Denied (gate.io и gate.com) — гео-блок",
+    "mexc": "MEXC: список трейдеров и их открытые позиции есть, но закрытых сделок (истории) публично нет — 60-дневную статистику не посчитать",
+    "bingx": "BingX: копитрейдинг отвечает «нужна подпись / вход» (100003 / 100400)",
 }
 
 

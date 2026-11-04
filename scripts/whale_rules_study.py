@@ -258,51 +258,77 @@ def load_data(path):
         return json.load(g)
 
 
-def build_series_whales(D, trend):
-    btc = None
-    out = {}
+def btc_series(trend):
     k = trend["kl"]["BTCUSDT"]
     bt = sorted((int(x[0]), x[1:5]) for x in k)
     bf = sorted([int(x[0]), float(x[1])] for x in trend["fund"]["BTCUSDT"])
-    btc = Series([x[0] for x in bt], [x[1][0] for x in bt], [x[1][1] for x in bt], [x[1][2] for x in bt], [x[1][3] for x in bt], fund=bf)
-    for coin, m in (D.get("mkt") or {}).items():
-        rows = m.get("k15") or []
-        if len(rows) >= 4 * 300:
-            arr = np.array(rows, dtype=float)
+    return Series([x[0] for x in bt], [x[1][0] for x in bt], [x[1][1] for x in bt], [x[1][2] for x in bt], [x[1][3] for x in bt], fund=bf)
+
+
+class WhaleSeries(dict):
+    """coin → Series built lazily from <dir>/mkt/<coin>.npz (scripts/whale_rules_convert.py)."""
+
+    def __init__(self, mdir, btc):
+        super().__init__(); self.mdir, self.btc, self.miss = mdir, btc, set()
+
+    def get(self, coin, default=None):
+        if coin in self:
+            return self[coin]
+        if coin in self.miss:
+            return default
+        S = self._build(coin)
+        if S is None:
+            self.miss.add(coin); return default
+        self[coin] = S
+        return S
+
+    def _build(self, coin):
+        fn = os.path.join(self.mdir, f"{coin}.npz")
+        if not os.path.exists(fn):
+            return None
+        m = np.load(fn)
+        arr = m["k15"]
+        if len(arr) >= 4 * 300:
             hb = (arr[:, 0] // H1).astype(np.int64)
             uniq, first = np.unique(hb, return_index=True)
             last = np.r_[first[1:] - 1, len(arr) - 1]
             t = uniq * H1; o = arr[first, 1]; c = arr[last, 4]
             h = np.maximum.reduceat(arr[:, 2], first); l = np.minimum.reduceat(arr[:, 3], first)
-            # keep only full hours with continuous index
-        elif len(m.get("k1h_hl") or []) >= 300:
-            arr = np.array(m["k1h_hl"], dtype=float)
-            t, o, h, l, c = arr[:, 0].astype(np.int64), arr[:, 1], arr[:, 2], arr[:, 3], arr[:, 4]
+        elif len(m["k1h_hl"]) >= 300:
+            a1 = m["k1h_hl"]; t, o, h, l, c = a1[:, 0].astype(np.int64), a1[:, 1], a1[:, 2], a1[:, 3], a1[:, 4]
         else:
-            continue
-        fund = [list(x) for x in (m.get("fund") or [])]
-        fl = [list(x) for x in (m.get("fund_hl") or [])]
+            return None
+        fund = [[int(x[0]), float(x[1])] for x in m["fund"]]
+        fl = [[int(x[0]), float(x[1])] for x in m["fund_hl"]]
         if fl:
             cut = fl[0][0]
             fund = [x for x in fund if x[0] < cut] + fl     # HL hourly prints for the last 40 days (≈ same 8h total)
         fund.sort()
         oi = None
-        if m.get("oi"):
+        if len(m["oi"]):
             od = dict((int(a), b) for a, b in m["oi"])
             oi = np.array([od.get(int(x), np.nan) for x in t], dtype=float)
-        out[coin] = Series(t, o, h, l, c, fund=fund, oi=oi, btc=btc)
-        if len(rows) >= 4 * 300:
-            out[coin].p15 = (arr[:, 0].astype(np.int64), arr[:, 1], arr[:, 4])
-    return out, btc
+        S = Series(t, o, h, l, c, fund=fund, oi=oi, btc=self.btc)
+        if len(arr) >= 4 * 300:
+            S.p15 = (arr[:, 0].astype(np.int64), arr[:, 1], arr[:, 4])
+        return S
 
 
 # ======================================================================================================= 1. trips
-def hl_trips(w):
+def hl_trips(w, now):
+    marks = {}
+    for ap in ((w.get("state") or {}).get("assetPositions") or []):
+        p = ap.get("position") or {}
+        try:
+            sz = abs(float(p.get("szi"))); pv = float(p.get("positionValue"))
+            if sz > 0:
+                marks[p.get("coin")] = pv / sz
+        except Exception:  # noqa: BLE001
+            pass
     fills = [{"t": x[0], "coin": x[1], "side": x[2], "px": x[3], "sz": x[4], "dir": x[5], "start_pos": x[6], "closed_pnl": x[7], "fee": x[8]}
              for x in w["fills"]]
     fills.sort(key=lambda r: r["t"])
-    trips, _ = round_trips(fills)
-    av = None
+    trips, _ = round_trips(fills, marks=marks, now=now)
     hist = {}
     for k, v in (w.get("portfolio") or []):
         hist[k] = v
@@ -326,19 +352,38 @@ def hl_trips(w):
                 if (tr["side"] == "LONG" and o["trig"] < tr["entry"]) or (tr["side"] == "SHORT" and o["trig"] > tr["entry"]):
                     stop = d if stop is None else min(stop, d)
         out.append({"coin": tr["coin"], "side": tr["side"], "open_t": tr["open_t"], "close_t": tr["close_t"], "entry": tr["entry"], "exit": tr["exit"],
-                    "ret": tr["ret_pct"], "pnl": tr["pnl"], "notional": tr["notional"], "lev": lev, "stop": stop, "fills": tr["fills"]})
+                    "ret": tr["ret_pct"], "pnl": tr["pnl"], "notional": tr["notional"], "lev": lev, "stop": stop, "fills": tr["fills"],
+                    "open": bool(tr.get("open"))})
     return out
 
 
-def okx_trips(t):
+def okx_trips(t, now):
     out = []
+    hidden_upl, hidden_n = 0.0, 0
+    for x in t.get("current") or []:
+        try:
+            e, mk, ot = float(x.get("openAvgPx") or 0), float(x.get("markPx") or 0), int(x.get("openTime") or 0)
+        except Exception:  # noqa: BLE001
+            e = mk = ot = 0
+        side = (x.get("posSide") or "").lower()
+        if side == "net":
+            side = "long" if float(x.get("subPos") or 0) > 0 else "short"
+        if not (e and mk and ot and x.get("instId")):
+            hidden_upl += float(x.get("upl") or 0); hidden_n += 1
+            continue
+        s = 1 if side == "long" else -1
+        lev = float(x.get("lever") or 1); mg = float(x.get("margin") or 0)
+        out.append({"coin": x["instId"].split("-")[0], "side": "LONG" if s > 0 else "SHORT", "open_t": ot, "close_t": now, "entry": e, "exit": mk,
+                    "ret": s * (mk / e - 1) * 100, "pnl": float(x.get("upl") or 0), "notional": mg * lev, "lev": lev, "stop": None, "fills": 1,
+                    "open": True})
+    t["_hidden"] = (hidden_n, hidden_upl)
     for r in t["closed"]:
         sid, inst, side, ot, ct, e, ex, lev, mg, pnl, pr, ctype, sz = r
         if not e or not ex or not ot or not ct:
             continue
         s = 1 if side == "long" else -1
         out.append({"coin": (inst or "").split("-")[0], "side": "LONG" if s > 0 else "SHORT", "open_t": ot, "close_t": ct, "entry": e, "exit": ex,
-                    "ret": s * (ex / e - 1) * 100, "pnl": pnl, "notional": mg * lev, "lev": lev, "stop": None, "fills": 1, "ctype": ctype})
+                    "ret": s * (ex / e - 1) * 100, "pnl": pnl, "notional": mg * lev, "lev": lev, "stop": None, "fills": 1, "ctype": ctype, "open": False})
     out.sort(key=lambda x: x["open_t"])
     return out
 
@@ -368,13 +413,13 @@ def episodes(trips):
                     "entry": sum(x["entry"] * wi for x, wi in zip(g, w)) / W, "exit": sum(x["exit"] * wi for x, wi in zip(g, w)) / W,
                     "ret": sum(x["ret"] * wi for x, wi in zip(g, w)) / W, "pnl": sum(x["pnl"] for x in g), "notional": W,
                     "lev": st.median([x["lev"] for x in g if x["lev"]]) if any(x["lev"] for x in g) else None,
-                    "stop": min([x["stop"] for x in g if x["stop"]], default=None), "n_sub": len(g)})
+                    "stop": min([x["stop"] for x in g if x["stop"]], default=None), "n_sub": len(g), "open": any(x.get("open") for x in g)})
     res.sort(key=lambda x: x["open_t"])
     return res
 
 
-def wstats(tr, since, now):
-    x = [t for t in tr if t["close_t"] >= since and t["close_t"] <= now]
+def wstats(tr, since, now, closed_only=False):
+    x = [t for t in tr if t["close_t"] >= since and t["close_t"] <= now and not (closed_only and t.get("open"))]
     if not x:
         return {"n": 0}
     gp = sum(t["pnl"] for t in x if t["pnl"] > 0); gl = -sum(t["pnl"] for t in x if t["pnl"] < 0)
@@ -385,7 +430,8 @@ def wstats(tr, since, now):
             "lev": round(st.median([t["lev"] for t in x if t.get("lev")]), 1) if any(t.get("lev") for t in x) else None,
             "long": round(sum(t["side"] == "LONG" for t in x) / len(x), 2),
             "coins": len({t["coin"] for t in x}),
-            "best_share": round(max((t["pnl"] for t in x), default=0) / max(1.0, sum(t["pnl"] for t in x if t["pnl"] > 0)), 2)}
+            "best_share": round(max((t["pnl"] for t in x), default=0) / max(1.0, sum(t["pnl"] for t in x if t["pnl"] > 0)), 2),
+            "gp": round(gp), "gl": round(gl), "n_open": sum(1 for t in x if t.get("open"))}
 
 
 # ======================================================================================================= 3. compare
@@ -602,8 +648,8 @@ def main():
     D = load_data(a.data)
     trend = json.load(open(a.trend))
     now = int(D["made"])
-    W, btc = build_series_whales(D, trend)
-    print(f"whale-coin series: {len(W)}", flush=True)
+    btc = btc_series(trend)
+    W = WhaleSeries(os.path.join(os.path.dirname(a.data), "mkt"), btc)
     R = {"made": now, "whales": [], "notes": []}
 
     # ---------------- 1. trips + whale stats
@@ -611,17 +657,28 @@ def main():
     for w in D.get("hl") or []:
         if len(w["fills"]) < 8:
             continue
-        tr = hl_trips(w)
+        tr = hl_trips(w, now)
         whales.append({"src": "hl", "id": w["addr"], "name": w.get("name") or w["addr"][:10], "account": w.get("account"), "capped": w.get("capped"),
                        "trips": tr, "ep": tr, "first_t": min((x[0] for x in w["fills"]), default=now)})
     for t in D.get("okx") or []:
-        tr = okx_trips(t)
+        tr = okx_trips(t, now)
         if len(tr) < 8:
             continue
         whales.append({"src": "okx", "id": "okx:" + t["code"], "name": t.get("name") or t["code"], "account": t.get("aum"), "trips": tr,
+                       "hidden_n": t["_hidden"][0], "hidden_upl": round(t["_hidden"][1]),
                        "ep": episodes(tr), "first_t": min(x["open_t"] for x in tr), "followers": t.get("followers"), "lead_days": t.get("lead_days")})
     for w in whales:
         w["s30"] = wstats(w["ep"], now - 30 * DAY, now); w["s90"] = wstats(w["ep"], now - 90 * DAY, now); w["s180"] = wstats(w["ep"], now - 180 * DAY, now)
+        w["s90c"] = wstats(w["ep"], now - 90 * DAY, now, closed_only=True)
+        w["n_open"] = sum(1 for x in w["ep"] if x.get("open"))
+        # hidden OKX open positions (no coin / price published): each one with a loss counts as a losing decision
+        hn, hu = w.get("hidden_n", 0), w.get("hidden_upl", 0)
+        s9 = w["s90"]
+        if hn and s9.get("n"):
+            wins = s9["win"] * s9["n"]
+            gl = s9["gl"] + max(0.0, -hu); gp = s9["gp"] + max(0.0, hu)
+            w["s90"] = {**s9, "n": s9["n"] + hn, "win": round(wins / (s9["n"] + hn), 3), "pnl": round(s9["pnl"] + hu),
+                        "pf": round(gp / gl, 2) if gl > 0 else 99.0}
         w["span_d"] = round((now - min([x["open_t"] for x in w["ep"]], default=now)) / DAY)
     print(f"whales with ≥ 8 trips: {len(whales)} (HL {sum(w['src']=='hl' for w in whales)}, OKX {sum(w['src']=='okx' for w in whales)})", flush=True)
 
@@ -632,7 +689,8 @@ def main():
     best = sorted([w for w in whales if good(w)], key=lambda w: -w["s90"]["pnl"])[:10]
     R["funnel"] = {"hl_fetched": len(D.get("hl") or []), "okx_fetched": len(D.get("okx") or []), "with_trips": len(whales), "best": len(best)}
     for w in sorted(whales, key=lambda w: -(w["s90"].get("pnl") or 0))[:40]:
-        R["whales"].append({k: w.get(k) for k in ("src", "id", "name", "account", "s30", "s90", "s180", "span_d", "followers", "lead_days", "capped")}
+        R["whales"].append({k: w.get(k) for k in ("src", "id", "name", "account", "s30", "s90", "s90c", "s180", "span_d", "followers", "lead_days", "capped",
+                                                  "n_open", "hidden_n", "hidden_upl")}
                            | {"best": w in best, "n_trips": len(w["trips"]), "n_ep": len(w["ep"])})
     print("best:", [(w["name"][:14], w["s90"]) for w in best], flush=True)
 
@@ -693,19 +751,29 @@ def main():
     half = rows_sorted[: len(rows_sorted) // 2]
     second = rows_sorted[len(rows_sorted) // 2:]
     cand = []
-    for f, bs, ru in FEATS:
-        if f == "hour":
+    for side in ("LONG", "SHORT"):
+        HS = [r for r in half if r["side"] == side]
+        if len(HS) < 30:
             continue
-        for k, (lo, hi) in enumerate(bs):
-            for side in ("LONG", "SHORT"):
-                W1 = [r for r in half if r["side"] == side and bucket(r["ctx"].get(f), bs) == k]
-                R1 = [x for r in half if r["side"] == side for x in r["rand"] if bucket(x["ctx"].get(f), bs) == k]
-                if len(W1) < 15 or len(R1) < 30:
+        mu_side = st.mean(r["ret"] for r in HS)
+        RS = [x for r in HS for x in r["rand"]]
+        for f, bs, ru in FEATS:
+            if f == "hour":
+                continue
+            nw = sum(1 for r in HS if r["ctx"].get(f) is not None); nr = sum(1 for x in RS if x["ctx"].get(f) is not None)
+            for k, (lo, hi) in enumerate(bs):
+                W1 = [r for r in HS if bucket(r["ctx"].get(f), bs) == k]
+                R1 = [x for x in RS if bucket(x["ctx"].get(f), bs) == k]
+                if len(W1) < 15 or len(R1) < 30 or not nw or not nr:
                     continue
-                edge = st.mean(r["ret"] for r in W1) - st.mean(x["ret"] for x in R1)
-                cand.append((edge, f, k, lo, hi, side, len(W1), st.mean(r["ret"] for r in W1), st.mean(x["ret"] for x in R1)))
+                pref = (len(W1) / nw) / (len(R1) / nr)          # how much more often whales enter in this condition than chance
+                aw = st.mean(r["ret"] for r in W1)
+                if pref < 1.2 or aw <= mu_side:
+                    continue
+                # score: whales prefer it AND earn more there than on their other trades of that side
+                cand.append(((pref - 1) * (aw - mu_side), f, k, lo, hi, side, len(W1), aw, st.mean(x["ret"] for x in R1), pref))
     cand.sort(reverse=True)
-    R["dd_candidates"] = [{"edge": c[0], "f": c[1], "lo": c[3], "hi": c[4], "side": c[5], "n": c[6], "avg_w": c[7], "avg_r": c[8]} for c in cand[:15]]
+    R["dd_candidates"] = [{"score": c[0], "f": c[1], "lo": c[3], "hi": c[4], "side": c[5], "n": c[6], "avg_w": c[7], "avg_r": c[8], "pref": c[9]} for c in cand[:15]]
     hold_dd = int(min(72, max(4, round((R["shape"]["hold_med"] or 24)))))
     dd_rules = {}
     for c in cand[:6]:

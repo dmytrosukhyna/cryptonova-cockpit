@@ -119,6 +119,17 @@ jobs:
             sleep 2
           done
           echo "::notice title=POST /v2/tts en uk el es (fresh)::$oth"
+          # 04.11 (build 55, owner: «главный доклад никогда не говорит голосом»): a fresh LONG Home briefing (~700 chars, as the app
+          # builds it) vs a fresh short tab report — the time POST /v2/tts takes for each (the app waits 8 s in build 54)
+          long="Доклад $(date -u +%H:%M:%S). Система работает в обычном режиме. Публичный портфель CRYPTO NOVA — 9 604 доллара, с 22 октября минус 421 доллар. Открытых фьючерсных сделок: 5, у каждой стоп на бирже. Биткоин стоит 80 316 долларов, за сутки плюс 3,4 процента; режим рынка по правилам системы — «рост». Индекс страха и жадности — 34, это «страх». Последнее действие системы, 4 ноября: покупка SOL. Система работает круглосуточно: проверяет рынок каждые 60 секунд, а новые идеи сначала испытывает на истории — из 800 вариантов ночной лаборатории проверку прошли 28. На этом всё. Решения — за вами, система держит свои правила."
+          short="Фьючерсы $(date -u +%H:%M:%S): открыто 5 сделок, у каждой стоп на бирже. Итог закрытых — плюс 12 долларов."
+          for n in long short; do
+            t="${!n}"
+            r=$(jq -nc --arg t "$t" '{text: $t, lang: "ru"}' | curl -sS -m 60 -o tts_$n.bin -w '%{http_code} %{time_total}s %{size_download}B' -X POST -H 'content-type: application/json' --data-binary @- $A/v2/tts || echo "000")
+            last=$(curl -sS -m 20 $A/v2/health | jq -c '.tts_last | if . then {ms, voice: (.voice // "" | split("-")[2]), attempts: [(.attempts // [])[] | [.outcome, .first_audio_ms, .ms]]} else . end' 2>/dev/null || echo "?")
+            echo "::notice title=POST /v2/tts $n (${#t} chars)::HTTP $r · $last"
+            sleep 2
+          done
           for l in ru en; do
             u=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.audio_url // empty')
             t=$(curl -sS -m 20 "$A/v2/home?lang=$l" | jq -r '.report.text // empty' | cut -c1-200)

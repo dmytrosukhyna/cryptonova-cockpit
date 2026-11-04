@@ -1069,6 +1069,7 @@ def desk_public(d: dict, names: dict) -> dict:
 
 # ------------------------------------------------------------------------------------------------------------ own history
 ARCHIVE_KEEP_IDS_MS = 10 * DAY
+ARCHIVE_V = 2                          # 04.11: v1's first file never reached git (data/* ignored) — a new version writes all again
 
 
 def archive_trades(conn, now: int, cands: list[dict], out_dir: str) -> dict | None:
@@ -1076,6 +1077,10 @@ def archive_trades(conn, now: int, cands: list[dict], out_dir: str) -> dict | No
     to <out_dir>/<YYYY-MM-DD>.jsonl every closed whale trade not written before (first day: all we have) and a snapshot of each
     candidate's open positions. One JSON object per line: kind «closed» | «open». Readers dedupe closed trades by (src, trader, id)."""
     day = day_key(now)
+    if kv_get(conn, "archive_v") != ARCHIVE_V:
+        for k in ("archive_day", "archive_t", "archive_ids"):
+            conn.execute("DELETE FROM ws_kv WHERE k=?", (k,))
+        kv_set(conn, "archive_v", ARCHIVE_V)
     if kv_get(conn, "archive_day") == day:
         return None
     last_t = int(kv_get(conn, "archive_t") or 0)

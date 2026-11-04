@@ -380,11 +380,15 @@ def test_daily_archive_writes_each_closed_trade_once(tmp_path):
     a = W.archive_trades(conn, now, cands, str(tmp_path))
     assert a["closed"] == 5 and a["open"] == 1
     assert W.archive_trades(conn, now + H, cands, str(tmp_path)) is None                   # once per UTC day
+    W.kv_set(conn, "archive_v", 1)                                                           # an old version → everything again
+    assert W.archive_trades(conn, now + 2 * H, cands, str(tmp_path))["closed"] == 5
+    for f_ in tmp_path.iterdir():
+        f_.unlink()
     conn.execute("INSERT INTO ws_trips VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                  ("okx", "okx:A", "s9", "SOL", "SHORT", now, now + 5 * H, 10.0, 9.0, 5.0, 100.0, 5.0))
     b = W.archive_trades(conn, now + W.DAY, cands, str(tmp_path))
     assert b["closed"] == 1                                                                  # only the new one
     lines = [json.loads(x) for f in sorted(tmp_path.iterdir()) for x in f.read_text().splitlines()]
     closed = [x for x in lines if x["kind"] == "closed"]
-    assert len(closed) == 6 and len({x["id"] for x in closed}) == 6 and closed[0]["name"] == "Alpha"
-    assert {x["coin"] for x in lines if x["kind"] == "open"} == {"ETH"} and len(list(tmp_path.iterdir())) == 2
+    assert len(closed) == 1 and closed[0]["id"] == "s9" and closed[0]["name"] == "Alpha"
+    assert {x["coin"] for x in lines if x["kind"] == "open"} == {"ETH"} and len(list(tmp_path.iterdir())) == 1

@@ -1,0 +1,61 @@
+name: research-gold-desk
+# Manual only. The «Золото» test desk (owner 30.10): gold candles (Binance PAXG spot archive, OKX XAUT / PAXG / XAU swap, Yahoo GC=F)
+# → artifact + release asset lab-data-gold/gold_desk_data.json (the research container can download releases, not artifacts),
+# then the backtest scripts/gold_desk_study.py on that file (the same rule code the live desk runs). Public data only, no orders.
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "data | test | all"
+        required: true
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  data:
+    if: inputs.stage == 'data' || inputs.stage == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GOLD_DIR: /tmp/gold
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: python scripts/fetch_gold_desk.py
+      - uses: actions/upload-artifact@v4
+        with: { name: gold, path: /tmp/gold/gold_desk_data.json, retention-days: 7 }
+      - name: Upload gold_desk_data.json to release lab-data-gold
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: lab-data-gold
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Research data (not code): gold candles for the «Золото» test desk — Binance PAXGUSDT spot 4h, OKX XAUT/PAXG/XAU swap 4H+1D, Yahoo GC=F daily (scripts/fetch_gold_desk.py)." --latest=false
+          gh release upload "$TAG" /tmp/gold/gold_desk_data.json --clobber
+
+  test:
+    needs: data
+    if: always() && (inputs.stage == 'test' || (inputs.stage == 'all' && needs.data.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@v4
+        if: inputs.stage == 'all'
+        with: { name: gold }
+      - name: Release copy of the data
+        if: inputs.stage == 'test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download lab-data-gold -p gold_desk_data.json -R "${{ github.repository }}"
+      - run: python scripts/gold_desk_study.py gold_desk_data.json --md results.md --json results.json
+      - name: Publish results
+        if: always()
+        run: test -f results.md && cat results.md >> "$GITHUB_STEP_SUMMARY" || true

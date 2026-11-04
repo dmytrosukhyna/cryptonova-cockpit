@@ -218,7 +218,7 @@ def summarize(rule, s, D, B):
     out["years"] = by
     out["pf_years_ok"] = sum(1 for y in YEARS if by[y]["pf"] > 1.3)
     out["qualifies"] = out["pf_years_ok"] >= 3 and out["dd"] >= -25
-    bh_curve = c[st:] / c[st - 1]
+    bh_curve = c[st:] / (c[st - 1] if st > 0 else D["o"][st])
     out["bh_total"] = round(100 * (bh_curve[-1] - 1), 1)
     out["bh_dd"] = round(100 * maxdd(bh_curve), 1)
     # last 14 days and today

@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         from .risk import cli as risk_cli
         return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood", "golddesk"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood", "golddesk", "realwhy"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
     ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
     ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
@@ -189,6 +189,14 @@ def main(argv: list[str] | None = None) -> int:
         d = whales.run(conn)
         write_report(d, os.path.join(args.out, "whales.json"))
         print(f"whales.json: available={d.get('available')} whales={len(d.get('whales', []))} coins={len(d.get('coins', []))} changes={len(d.get('changes', []))} bias={(d.get('summary') or {}).get('bias')}")
+    elif args.cmd == "realwhy":
+        import os
+        from .agents import real_why
+        from .terminal.report import write_report
+        os.makedirs(args.out, exist_ok=True)
+        d = real_why.run(args.out)
+        write_report(d, os.path.join(args.out, "real_why.json"))
+        print(f"real_why.json: open={len(d['by_sig'])} closed={len(d['closed'])}")
     elif args.cmd == "whalestudy":
         import os, sqlite3
         from .agents import whale_study

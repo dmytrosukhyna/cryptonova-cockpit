@@ -156,6 +156,12 @@ def main():
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w") as fh:
         json.dump(OUT, fh, ensure_ascii=False, indent=1, default=str)
+    # annotations are readable from a session without a token (the check-runs API): one per source, compact
+    for name, rec in OUT.items():
+        if not isinstance(rec, dict):
+            continue
+        m = json.dumps(rec, ensure_ascii=False, default=str)[:3800].replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+        print(f"::notice title={name[:60]}::{m}", flush=True)
 
 
 if __name__ == "__main__":

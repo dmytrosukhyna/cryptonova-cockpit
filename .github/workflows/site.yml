@@ -214,13 +214,16 @@ jobs:
         timeout-minutes: 2
         run: python -m cnq.cli optmood --out web || true
       - name: CRYPTO NOVA Портфолио — one $10 000 demo sum split by the allocator between spot / futures / funding / fixed-rate carry / lending / sUSDe → web/capital.json
+        if: ${{ steps.state.outputs.stale != 'true' }}      # 04.11 23:10: on a rolled-back database this step published a 15-day-old state (keeps the last good file instead)
         continue-on-error: true
         run: python -m cnq.cli capital --out web
       - name: Каналы трейдеров — forecasts of public channels written down when posted, checked 1–3 days later → web/channel_watch.json; «Из каналов» (launchpads / listings / airdrops / early projects as information, no post texts) → web/channel_opps.json
+        if: ${{ steps.state.outputs.stale != 'true' }}      # 04.11 23:10: on a rolled-back database this step published a 15-day-old state (keeps the last good file instead)
         continue-on-error: true
         timeout-minutes: 5
         run: python -m cnq.cli chwatch --out web
       - name: Forecast calibration (A/B записывается и проверяется) → web/calibration.json
+        if: ${{ steps.state.outputs.stale != 'true' }}      # 04.11 23:10: on a rolled-back database this step published a 15-day-old state (keeps the last good file instead)
         continue-on-error: true
         run: python -m cnq.cli calibrate --out web
       - name: Outlook day / week / month (BTC, ETH, SOL — коридор 2 из 3, рост по режиму BTC, драйверы) → web/outlook.json
@@ -230,6 +233,7 @@ jobs:
         continue-on-error: true
         run: python -m cnq.cli broadcast --out web || true
       - name: Channel editor → @crypto_nova_news (morning / midday / evening, Kyiv time)
+        if: ${{ steps.state.outputs.stale != 'true' }}      # 04.11 23:10: channel_posts lives in the database — a rolled-back copy that is never saved would re-send the same slot on every run
         continue-on-error: true
         env:
           CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}

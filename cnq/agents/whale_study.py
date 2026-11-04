@@ -86,6 +86,7 @@ WHALE_CAP = 0.30                      # one whale's open copies: margin ≤ 30 %
 STOP_MIN, STOP_MAX = 0.002, 0.15      # the whale's own stop is used only when it sits 0.2–15 % away on the protective side
 UA = {"Content-Type": "application/json", "User-Agent": "cryptonova-whale-study/1.0"}
 OKX = "https://www.okx.com"
+CAND_V = 2                            # 04.11 21:14: a new candidate pool (wider OKX / Binance) is read at once, not the next day
 OKX_PRE_N = 60                        # 04.11 21:14 (owner: more whales, same bar): the whole public pool is ~220 (11 pages × 20)
 OKX_PRE_PNL, OKX_WIN_MIN = 40, 0.50   # 40 best by P&L + the best by OKX's own win ratio; < 50 % OKX win ratio cannot reach 70 % decisions
 SRC_RU = {"hl": "Hyperliquid · сделки в блокчейне", "okx": "OKX · лид-трейдер копитрейдинга"}
@@ -1173,8 +1174,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     sget = {k: (src_get or {}).get(k) or v["get"] for k, v in WS.SOURCES.items()}     # 04.11: added sources (Binance …)
     # 1. candidates from all sources, once a day (kept between runs)
     cand = kv_get(conn, "candidates") or {}
-    if not cand or now - cand.get("t", 0) >= REFRESH_MS or "ext" not in cand:
-        new = {"t": now, "rows": [], "why": {}, "okx_rows": [], "okx_why": {}}
+    if not cand or now - cand.get("t", 0) >= REFRESH_MS or "ext" not in cand or cand.get("v") != CAND_V:
+        new = {"t": now, "v": CAND_V, "rows": [], "why": {}, "okx_rows": [], "okx_why": {}}
         try:
             rows, why = candidates(get_lb())
             new.update(rows=rows, why=why)

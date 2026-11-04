@@ -19,7 +19,7 @@ Pipeline (Hyperliquid public info API, no keys):
 6. Copy desk (every run): $10 000 paper account follows the top 5 — a NEW position of a followed whale (seen appear
    between two runs) is opened at the current mid, margin 10 % of equity, leverage = whale's but ≤ 5×, at most 8 at
    once, one per coin; closed when the whale closes or flips. 04.11 17:37 (owner): a position he already holds is joined too
-   while our price is ≤ 1 % worse than his own entry (after a fresh look; the first / a stale look only sets the baseline).
+   while our price is ≤ 1 % worse and ≤ 3 % better than his own entry (after a fresh look; the first / a stale look only sets the baseline).
 
 Honesty: whales hedge across venues, the server sees changes only every ~30 minutes, and a past month is a small
 sample — the copy test says what the delay costs; the desk is an experiment until it has its own record.
@@ -40,6 +40,9 @@ SEEN_MAX_MS = 2 * 3_600_000      # 04.11: a whale's last look older than this �
 # 04.11 17:37 (owner, real money: «Входить и в их открытые»): the desk also joins a followed whale's ALREADY OPEN position, but
 # only while the price is no worse than JOIN_MAX from the whale's own entry (long: px ≤ entry × 1.01; short: px ≥ entry × 0.99)
 JOIN_MAX = 0.01
+# 04.11 17:41 (owner: «бывает, цена откатилась в другую сторону — возможно, тренд уже изменился»): the window is two-sided — a
+# price more than JOIN_BETTER better than his entry means the whale is down > 3 % on price → no join, wait for his next trade
+JOIN_BETTER = 0.03
 JOIN_REDO_MS = 7 * 86_400_000    # a copy of this whale's position stopped out → that same position is not re-joined for 7 days
 GOOD_WIN, GOOD_PF = 0.70, 1.5    # several candidates at once → whales with a 30-day record of ≥ 70 % wins and PF ≥ 1.5 go first
 LB = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard"
@@ -735,7 +738,7 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
     04.11: every copy carries a stop (the whale's, else −8 %) checked every run at the current mid; one whale's copies never hold
     more than 30 % of the equity as margin; every close adds to the whale's daily record (desk['by_whale_day']).
     04.11 17:37 (owner): a followed whale's ALREADY OPEN position is joined too while our price is ≤ 1 % worse than his entry
-    (JOIN_MAX), only on a fresh look (a stale / first look is a baseline). quality = {addr: {win, pf}} (30 days): when several
+    (JOIN_MAX) and he is not down more than 3 % on price (JOIN_BETTER, 17:41), only on a fresh look (a stale / first look is a baseline). quality = {addr: {win, pf}} (30 days): when several
     positions are candidates, whales with ≥ 70 % wins and PF ≥ 1.5 go first, then new positions, then the smallest gap."""
     d = desk or {"start": DESK_START, "cash": DESK_START, "open": [], "closed": [], "seen": {}, "history": [], "started": now}
     d.setdefault("events", [])
@@ -837,6 +840,11 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             if gap > JOIN_MAX:
                 note_wait(key, {"t": now, "kind": "join_wait", "coin": coin, "side": p["side"], "whale": addr, "gap_pct": gap_pct,
                                 "why": f"цена на {gap_pct:.2f}% хуже входа кита (предел {JOIN_MAX * 100:g}%) — ждём его следующую сделку"})
+                continue
+            if gap < -JOIN_BETTER:
+                note_wait(key, {"t": now, "kind": "join_wait", "coin": coin, "side": p["side"], "whale": addr, "gap_pct": gap_pct,
+                                "why": f"кит в минусе на {-gap_pct:.2f}% по цене (предел {JOIN_BETTER * 100:g}%) — возможно, тренд сменился; "
+                                       f"ждём его следующую сделку"})
                 continue
             if any(c["whale"] == addr and c["coin"] == coin and c["side"] == p["side"] and str(c.get("why", "")).startswith("стоп")
                    and now - int(c.get("closed_t") or 0) < JOIN_REDO_MS for c in d["closed"]):
@@ -944,8 +952,8 @@ def desk_public(d: dict, names: dict) -> dict:
                       "since": d.get("started"), "open": [paper_trade(o) for o in d.get("open") or []],
                       "closed": [paper_trade(c, True) for c in sorted(cl, key=lambda c: -c["closed_t"])[:20]]},
             "rules_ru": f"Старт $10 000. Повторяем новые позиции топ-5 китов, замеченные между двумя проверками (сервер смотрит раз в ~30 мин), "
-                        f"и входим в их уже открытые позиции, если цена не хуже входа кита больше чем на {JOIN_MAX * 100:g}% "
-                        f"(иначе ждём его следующую сделку); первыми — киты с ≥ {GOOD_WIN * 100:.0f}% прибыльных сделок и PF ≥ {GOOD_PF:g} за 30 дней: "
+                        f"и входим в их уже открытые позиции, если цена не хуже входа кита больше чем на {JOIN_MAX * 100:g}% и кит не в минусе "
+                        f"больше чем на {JOIN_BETTER * 100:g}% по цене (иначе ждём его следующую сделку); первыми — киты с ≥ {GOOD_WIN * 100:.0f}% прибыльных сделок и PF ≥ {GOOD_PF:g} за 30 дней: "
                         f"вход по текущей цене, маржа {DESK_MARGIN * 100:.0f}% счёта, плечо как у кита, но не больше {DESK_LEV_CAP:.0f}×, не больше "
                         f"{DESK_MAX_OPEN} позиций и одна на монету, на одного кита — не больше {WHALE_CAP * 100:.0f}% счёта. Стоп у каждой копии: стоп кита, "
                         f"если он стоит на бирже, иначе −{DESK_STOP * 100:g}% от входа. Выходим, когда кит закрыл или развернул позицию, или по стопу. "

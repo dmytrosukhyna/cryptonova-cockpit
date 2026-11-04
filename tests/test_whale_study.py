@@ -268,3 +268,15 @@ def test_join_refuses_an_owner_blocked_hype_short_and_prefers_the_strong_whale()
     d = W.desk_step(None, ["0xweak", "0xsilk"], st_, {"ETH": 2005.0}, T0, None, q)
     d = W.desk_step(d, ["0xweak", "0xsilk"], st_, {"ETH": 2005.0}, T0 + H // 2, None, q)
     assert [o["whale"] for o in d["open"]] == ["0xsilk"]
+
+
+def test_no_join_when_the_whale_is_down_more_than_3pct_on_price():
+    """04.11 17:41 (owner: «цена откатилась в другую сторону — возможно, тренд уже изменился»): join window is 3 % better … 1 % worse"""
+    pos = [{"coin": "ETH", "side": "LONG", "lev": 3, "entry": 2000.0}, {"coin": "BTC", "side": "SHORT", "lev": 3, "entry": 100.0},
+           {"coin": "SOL", "side": "LONG", "lev": 3, "entry": 100.0}]
+    mids = {"ETH": 1930.0, "BTC": 103.5, "SOL": 97.5}          # ETH long −3.5 %, BTC short −3.5 % → no; SOL long −2.5 % → join
+    d = W.desk_step(None, ["0xa"], {"0xa": pos}, mids, T0)
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, mids, T0 + H // 2)
+    assert [(o["coin"], o["gap_pct"]) for o in d["open"]] == [("SOL", -2.5)]
+    w = [e for e in d["events"] if e["kind"] == "join_wait"]
+    assert sorted(e["coin"] for e in w) == ["BTC", "ETH"] and all("в минусе" in e["why"] for e in w)

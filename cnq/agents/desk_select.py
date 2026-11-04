@@ -601,7 +601,7 @@ def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int, carry=None) -> 
 # get 0 (they keep managing positions they already hold until those close, and stay demo). «Киты» keep it only while their ladder
 # stage is ≥ 1 — a rollback to 0 drops them to 0 and the budget falls back to the main desks equally (the safety net).
 OWNER_SHARES = {"whales": 1.0}
-OWNER_SHARES_UNTIL = 1796075999000          # 30.11.2026 23:59:59 Kyiv
+OWNER_SHARES_UNTIL = 4102444800000          # 04.11 17:46 (owner: «не надо ограничиваться датами») — no end date; the safety net is the ladder
 
 
 def alloc_shares(prof: dict, cur: str, stages: dict, now: int | None = None) -> dict:

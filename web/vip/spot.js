@@ -22,12 +22,16 @@
   V.views.spot = {
     async html(arg) {
       const [M, X] = await Promise.all([V.real(), model()]);
+      // 04.11: «Куда инвестируют киты» — on-chain smart money (vip/whales.js, smart_money.json; information only)
+      let SM = '';
+      try { SM = V.smartMoneyCard ? await V.smartMoneyCard() : ''; } catch (e) { SM = ''; }
       return `<div class="ph"><div><h2>Спот</h2><p>Спотовая часть публичного портфеля CRYPTO NOVA на OKX с ${V.PUBLIC_START_LABEL}: что куплено, сколько вложено, что делает система и почему.</p></div></div>
         ${summary(M, X)}
         ${assets(M, X)}
         ${journal(M, X)}
         ${pipeline(M, X)}
-        ${cashCard(M, X)}`;
+        ${cashCard(M, X)}
+        ${SM}`;
     },
     mount(el, arg) {
       el.querySelectorAll('[data-asset]').forEach((tr) => {
@@ -35,7 +39,8 @@
         tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') openAsset(tr.dataset.asset); });
       });
       el.querySelectorAll('[data-jtab]').forEach((b) => b.addEventListener('click', () => { ui.tab = b.dataset.jtab; V.render({ keepScroll: true }); }));
-      if (arg === 'cash' || arg === 'pipeline') { const t = el.querySelector(`[data-demo="spot-${arg}"]`); if (t) setTimeout(() => t.scrollIntoView({ block: 'start' }), 50); }
+      if (arg === 'whales') { const t = el.querySelector('#smart-money'); if (t) setTimeout(() => t.scrollIntoView({ block: 'start' }), 50); }
+      else if (arg === 'cash' || arg === 'pipeline') { const t = el.querySelector(`[data-demo="spot-${arg}"]`); if (t) setTimeout(() => t.scrollIntoView({ block: 'start' }), 50); }
       else if (arg) setTimeout(() => openAsset(arg), 0);
     },
   };

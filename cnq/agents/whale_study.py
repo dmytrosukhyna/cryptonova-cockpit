@@ -40,6 +40,7 @@ import urllib.request
 
 from ..execution import owner_overrides as ov
 from . import whale_sources as WS
+from . import vip_whales as _vw
 
 SEEN_MAX_MS = 2 * 3_600_000      # 04.11: a whale's last look older than this → baseline only (no copies from it)
 # 04.11 17:37 (owner, real money: «Входить и в их открытые»): the desk also joins a followed whale's ALREADY OPEN position, but
@@ -482,7 +483,8 @@ def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list,
          "lev_now": round(st.median(levs), 1) if levs else None, "positions": positions[:8],
          "recent": sorted(dec, key=lambda t: -t["close_t"])[:12], "copy": {str(d): v for d, v in copies.items()},
          "portfolio": pf_stats, "too_active": too_active, "open_trips": len(open_tr), "open_upnl": round(open_upnl, 2),
-         "open_loss": round(open_loss, 2), "hidden_open": len(hid), "hidden_loss_n": len(hid_loss)}
+         "open_loss": round(open_loss, 2), "hidden_open": len(hid), "hidden_loss_n": len(hid_loss),
+         "max_dd_usd": _vw.max_dd(allx)}         # 04.11: VIP «Киты» watchlist (display only, not a selection rule)
     why = []
     if too_active:
         why.append("слишком частые сделки (больше 10000 исполнений за 75 дней) — скопировать нельзя")
@@ -1426,5 +1428,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
                "киты держат позиции часами.",
                "Это прошлые 60 дней, а не обещание: киты хеджируются на других биржах, а сервер видит их сделки с опозданием. Сделки китов мы сохраняем "
                "каждый день (data/whale_trades), чтобы через полгода проверить отбор на своей истории."],
-           "notes_ru": notes[:20]}
+           "notes_ru": notes[:20],
+           # 04.11: every studied profile for the VIP «Киты» watchlist (cli pops it into web/whale_watch.json, not whales_top.json)
+           "profiles": profs}
     return out

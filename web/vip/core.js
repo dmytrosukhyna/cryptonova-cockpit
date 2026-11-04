@@ -287,6 +287,7 @@
     { id: 'spot', name: 'Спот', short: 'Спот', icon: 'spot' },
     { id: 'futures', name: 'Фьючерсы', short: 'Фьючерсы', icon: 'futures' },
     { id: 'strategies', name: 'Стратегии', short: 'Стратегии', icon: 'strategies' },
+    { id: 'whales', name: 'Киты', short: 'Киты', icon: 'whales' },      // 04.11: watchlist — crypto + stock market (vip/whales.js)
     { id: 'opps', name: 'Другие возможности', short: 'Другое', icon: 'opps' },
     { id: 'demo', name: 'Live Demo', short: 'Live', icon: 'demo' },
     { id: 'system', name: 'Система', short: 'Система', icon: 'system' },

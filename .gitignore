@@ -13,4 +13,5 @@ data/*
 !data/scorecard_outcomes.jsonl
 !data/scorecard/
 !data/whale_trades/
+!data/smart_money/
 web/*.bak

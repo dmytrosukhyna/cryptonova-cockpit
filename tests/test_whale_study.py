@@ -132,7 +132,8 @@ def test_run_end_to_end_with_fake_api():
             return []
         raise AssertionError(path)
 
-    d = W.run(conn, now=now, post=post, get_lb=lambda: lb, okx_get=okx_get, max_requests=50, budget_s=60)
+    d = W.run(conn, now=now, post=post, get_lb=lambda: lb, okx_get=okx_get, max_requests=50, budget_s=60,
+              src_get={"bn": lambda path, body=None: {"list": []}})
     assert d["complete"] and d["funnel"]["studied"] == 2
     top = d["top"]
     assert len(top) == 1 and top[0]["addr"] == addr and top[0]["trips"] == 10 and top[0]["win"] == 1.0
@@ -142,7 +143,8 @@ def test_run_end_to_end_with_fake_api():
     assert okx["trips"] == 3 and "мало закрытых сделок" in okx["excluded_ru"][0]
     assert d["following"] and d["following"][0]["addr"] == addr
     # next run: the desk starts watching the followed whale (no copy of positions it already had)
-    d2 = W.run(conn, now=now + 1800_000, post=post, get_lb=lambda: lb, okx_get=okx_get, max_requests=50, budget_s=60)
+    d2 = W.run(conn, now=now + 1800_000, post=post, get_lb=lambda: lb, okx_get=okx_get, max_requests=50, budget_s=60,
+              src_get={"bn": lambda path, body=None: {"list": []}})
     assert d2["desk"] and d2["desk"]["open"] == [] and d2["desk"]["equity"] == 10_000
     json.dumps(d2)
 

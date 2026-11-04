@@ -139,8 +139,10 @@ def why_for(sig: str, side: str, entry: float | None, stop: float | None, inst: 
         we = _f(o.get("whale_entry"))
         if we and str(o.get("coin") or "")[:1] == "k" and not str(inst).upper().startswith("1000"):
             we = we / 1000.0            # Hyperliquid kPEPE is priced per 1000 coins, the OKX swap per coin
-        w["whale"] = {"name": name, "source": "okx_lead" if okx else "hyperliquid",
-                      "source_ru": "лид-трейдер копитрейдинга OKX" if okx else "трейдер Hyperliquid (сделки видны в блокчейне)",
+        bn = addr.startswith("bn:")             # 04.11: Binance lead portfolios (cnq.agents.whale_sources)
+        w["whale"] = {"name": name, "source": "okx_lead" if okx else "binance_lead" if bn else "hyperliquid",
+                      "source_ru": "лид-трейдер копитрейдинга OKX" if okx else "лид-трейдер копитрейдинга Binance" if bn
+                      else "трейдер Hyperliquid (сделки видны в блокчейне)",
                       "addr": addr or None, "entry": we, "lev": _f(o.get("whale_lev")),
                       "notional_usd": _f(o.get("whale_notional")), "record_30d": rec}
         w["copy"] = {"entry": entry, "stop": stop, "stop_src_ru": o.get("stop_src") or "защитный стоп −8%", "lev_cap": 5,

@@ -35,6 +35,7 @@ import time
 import urllib.request
 
 from ..execution import owner_overrides as ov
+from . import whale_sources as WS
 
 SEEN_MAX_MS = 2 * 3_600_000      # 04.11: a whale's last look older than this → baseline only (no copies from it)
 # 04.11 17:37 (owner, real money: «Входить и в их открытые»): the desk also joins a followed whale's ALREADY OPEN position, but
@@ -50,6 +51,7 @@ HL = "https://api.hyperliquid.xyz/info"
 M15, H1, DAY = 900_000, 3_600_000, 86_400_000
 WINDOW = 30 * DAY
 PRE_N = 30
+PRE_M = 20                            # 04.11: + the best 20 by 30-day P&L that the all-time top misses
 TOP_N = 10                            # «топ-10 трейдеров» on the panel
 FOLLOW_N = 5                          # the copy desk follows the best 5 whose copy test is positive
 MIN_AV, MIN_ALL = 300_000.0, 500_000.0
@@ -73,6 +75,7 @@ UA = {"Content-Type": "application/json", "User-Agent": "cryptonova-whale-study/
 OKX = "https://www.okx.com"
 OKX_PRE_N = 20
 SRC_RU = {"hl": "Hyperliquid · сделки в блокчейне", "okx": "OKX · лид-трейдер копитрейдинга"}
+SRC_RU.update({k: v["ru"] for k, v in WS.SOURCES.items()})   # 04.11: Binance lead portfolios (cnq.agents.whale_sources)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS ws_fills (addr TEXT, tid TEXT, t INTEGER, coin TEXT, side TEXT, px REAL, sz REAL, dir TEXT,
@@ -153,9 +156,14 @@ def candidates(lb_json: dict, n: int = PRE_N) -> tuple[list[dict], dict]:
                      "pnl_all": pnl_all, "pnl_m": pnl_m, "roi_m": roi_m, "vlm_m": vlm_m,
                      "pnl_w": _f(wk.get("pnl")), "roi_w": _f(wk.get("roi")), "pnl_d": _f(dy.get("pnl"))})
     rows = [r for r in rows if r["addr"].startswith("0x")]
-    rows.sort(key=lambda r: -r["pnl_all"])
     why["passed"] = len(rows)
-    return rows[:n], why
+    # 04.11 (owner: «китов находить … и добавлять к нам»): the top by all-time P&L misses this month's best traders — the top
+    # PRE_M by 30-day P&L that are not already in are studied too (same filters; the record test decides, not the leaderboard)
+    by_all = sorted(rows, key=lambda r: -r["pnl_all"])[:n]
+    have = {r["addr"] for r in by_all}
+    by_month = [dict(r, pick="month") for r in sorted(rows, key=lambda r: -r["pnl_m"]) if r["addr"] not in have][:PRE_M]
+    why["month_slice"] = len(by_month)
+    return by_all + by_month, why
 
 
 # ------------------------------------------------------------------------------------------------------------ storage
@@ -683,7 +691,7 @@ def okx_positions(state: dict) -> list[dict]:
 def okx_trips(conn, addr: str, since: int) -> tuple[list[dict], float]:
     out, tot = [], 0.0
     for coin, side, ot, ct, e, ex, pnl, notional, lev in conn.execute(
-            "SELECT coin, side, open_t, close_t, entry, exit, pnl, notional, lever FROM ws_trips WHERE src='okx' AND trader=? AND close_t>=? ORDER BY open_t",
+            "SELECT coin, side, open_t, close_t, entry, exit, pnl, notional, lever FROM ws_trips WHERE trader=? AND close_t>=? ORDER BY open_t",
             (addr, since)):
         s = 1 if side == "LONG" else -1
         out.append({"coin": coin, "side": side, "open_t": ot, "close_t": ct, "hold_h": round((ct - ot) / H1, 2), "entry": e, "exit": ex,
@@ -975,15 +983,16 @@ def hl_name(coin: str, mids: dict) -> str | None:
 
 
 def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_get_lb, okx_get=_okx_get,
-        max_requests: int = 90, budget_s: float = 170) -> dict:
+        max_requests: int = 90, budget_s: float = 170, src_get: dict | None = None) -> dict:
     now = int(now if now is not None else time.time() * 1000)
     ensure_schema(conn)
     notes: list[str] = []
     budget = Budget(max_requests, budget_s)
     since = now - WINDOW
-    # 1. candidates from both sources, once a day (kept between runs)
+    sget = {k: (src_get or {}).get(k) or v["get"] for k, v in WS.SOURCES.items()}     # 04.11: added sources (Binance …)
+    # 1. candidates from all sources, once a day (kept between runs)
     cand = kv_get(conn, "candidates") or {}
-    if not cand or now - cand.get("t", 0) >= REFRESH_MS:
+    if not cand or now - cand.get("t", 0) >= REFRESH_MS or "ext" not in cand:
         new = {"t": now, "rows": [], "why": {}, "okx_rows": [], "okx_why": {}}
         try:
             rows, why = candidates(get_lb())
@@ -997,10 +1006,19 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         except Exception as e:  # noqa: BLE001
             notes.append(f"OKX лид-трейдеры: {str(e)[:120]}")
             new.update(okx_rows=cand.get("okx_rows") or [], okx_why=cand.get("okx_why") or {})
-        if new["rows"] or new["okx_rows"]:
+        new["ext"] = {}
+        for k, v in WS.SOURCES.items():
+            try:
+                erows, ewhy = v["candidates"](sget[k])
+                new["ext"][k] = {"rows": erows, "why": ewhy}
+            except Exception as e:  # noqa: BLE001
+                notes.append(f"{v['ru'].split(' ·')[0]}: {str(e)[:120]}")
+                new["ext"][k] = (cand.get("ext") or {}).get(k) or {"rows": [], "why": {}}
+        if new["rows"] or new["okx_rows"] or any(x["rows"] for x in new["ext"].values()):
             cand = new
             kv_set(conn, "candidates", cand)
     rows, orows = cand.get("rows") or [], cand.get("okx_rows") or []
+    erows = [r for x in (cand.get("ext") or {}).values() for r in x.get("rows") or [] if WS.src_of(r.get("addr"))]
     # 2. prices (names for mapping, marks for the desk)
     mids = {}
     try:
@@ -1020,7 +1038,12 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             if not budget.take():
                 break
             try:
-                if a.startswith("okx:"):
+                if WS.src_of(a):
+                    sv = WS.SOURCES[WS.src_of(a)]
+                    cur = sv["current"](sget[WS.src_of(a)], {**WS.lb_of(conn, a), "addr": a, "code": a.split(":", 1)[1]})
+                    pos = sv["positions"](cur)
+                    conn.execute("UPDATE ws_whale SET state=?, state_t=? WHERE addr=?", (json.dumps(cur), now, a))
+                elif a.startswith("okx:"):
                     code = okx_codes.get(a) or a[4:]
                     cur = okx_get("/api/v5/copytrading/public-current-subpositions", {"instType": "SWAP", "uniqueCode": code, "limit": 100})
                     pos = okx_positions({"okx": cur})
@@ -1040,9 +1063,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     if kv_get(conn, "fills_v") != FILLS_V:
         conn.execute("UPDATE ws_whale SET fills_t=NULL WHERE addr NOT LIKE 'okx:%'")
         kv_set(conn, "fills_v", FILLS_V)
-    fresh = ofresh = 0
+    fresh = ofresh = efresh = 0
     stop_hl = stop_okx = False
-    for n in range(max(len(rows), len(orows))):
+    stop_ext: set = set()
+    for n in range(max(len(rows), len(orows), len(erows))):
         if n < len(rows) and not stop_hl:
             if refresh_whale(conn, rows[n], now, budget, post, notes):
                 fresh += 1
@@ -1054,14 +1078,21 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
                 ofresh += 1
             else:
                 stop_okx = True
-        if stop_hl and stop_okx:
+        if n < len(erows):
+            k = WS.src_of(erows[n]["addr"])
+            if k not in stop_ext:
+                if WS.SOURCES[k]["refresh"](conn, erows[n], now, budget, sget[k], notes):
+                    efresh += 1
+                else:
+                    stop_ext.add(k)
+        if stop_hl and stop_okx and (stop_ext >= {WS.src_of(r["addr"]) for r in erows}):
             break
     need = []
     for c in rows:
         for (coin,) in conn.execute("SELECT DISTINCT coin FROM ws_fills WHERE addr=? AND t>=?", (c["addr"], since)):
             if coin not in need:
                 need.append(coin)
-    for c in orows:
+    for c in orows + erows:
         for (coin,) in conn.execute("SELECT DISTINCT coin FROM ws_trips WHERE trader=? AND close_t>=?", (c["addr"], since)):
             hn = hl_name(coin, mids)
             if hn and hn not in need:
@@ -1076,14 +1107,24 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             notes.append(f"свечи {coin}: {str(e)[:100]}")
             cdone += 1
         time.sleep(0.2)
-    complete = fresh == len(rows) and ofresh == len(orows) and cdone == len(need)
+    complete = fresh == len(rows) and ofresh == len(orows) and efresh == len(erows) and cdone == len(need)
     # 5. profiles (from cached data, every run)
     profs = []
-    for c in rows + orows:
+    for c in rows + orows + erows:
         r = conn.execute("SELECT fills_t, fills_full, portfolio, state FROM ws_whale WHERE addr=?", (c["addr"],)).fetchone()
         if not r or r[0] is None:
             continue
-        if c.get("src") == "okx":
+        ek = WS.src_of(c["addr"])
+        if ek:
+            sv = WS.SOURCES[ek]
+            trips, total = okx_trips(conn, c["addr"], since)            # ws_trips rows of any source share one shape
+            st_ = json.loads(r[3]) if r[3] else {}
+            trips += sv["open_trips"](st_, now)
+            for t in trips:
+                t["coin"] = hl_name(t["coin"], mids) or t["coin"]
+            pos = [{**x, "coin": hl_name(x["coin"], mids) or x["coin"]} if x.get("coin") else x for x in sv["positions"](st_)]
+            pfs = {}
+        elif c.get("src") == "okx":
             trips, total = okx_trips(conn, c["addr"], since)
             st_ = json.loads(r[3]) if r[3] else {}
             for x in st_.get("okx") or []:            # open sub-positions at the mark price
@@ -1113,6 +1154,13 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         p = profile(c, trips, total, pfs, pos, cs, now, bool(r[1]) and c.get("src") != "okx")
         if c.get("src") == "okx":
             p.update(followers=c.get("followers"), lead_days=c.get("lead_days"), okx_pnl_all=c.get("pnl_all"), okx_win=c.get("win_ratio"))
+        if ek:                     # 04.11: an added source's whale must clear the owner's bar (≥ 70 % wins, PF ≥ 1.5, ≥ 20 trades / 90 d, visible)
+            lb_ = WS.lb_of(conn, c["addr"])
+            n90 = WS.trades_90d(conn, c["addr"], now, lb_)
+            p.update(followers=c.get("followers"), site_win=c.get("win_ratio"), site_pnl_30d=c.get("pnl_m"), trades_90d=n90,
+                     site_perf=lb_.get("perf"))
+            p["excluded_ru"] = p["excluded_ru"] + WS.record_gate(p, n90)
+            p["eligible"] = not p["excluded_ru"]
         profs.append(p)
     if profs:                                  # the 30-day record per whale, read by the next run's desk (preference order)
         kv_set(conn, "quality", {p["addr"]: {"win": p.get("win"), "pf": p.get("pf"), "pnl_30d": p.get("pnl_30d")} for p in profs})
@@ -1141,8 +1189,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
            "funnel": {"hl_leaderboard": cand.get("why", {}).get("rows"), "hl_after_filters": cand.get("why", {}).get("passed"),
                       "hl_dropped": cand.get("why"), "okx_lead_traders": cand.get("okx_why", {}).get("rows"),
                       "okx_after_filters": cand.get("okx_why", {}).get("passed"),
+                      "ext": {k: {"listed": (x.get("why") or {}).get("rows"), "after_filters": (x.get("why") or {}).get("passed"), "dropped": x.get("why")}
+                              for k, x in (cand.get("ext") or {}).items()},
                       "studied": len(profs), "eligible": len(elig), "top": len(top), "excluded": excluded,
-                      "waiting": (len(rows) - fresh) + (len(orows) - ofresh), "candles_waiting": len(need) - cdone},
+                      "waiting": (len(rows) - fresh) + (len(orows) - ofresh) + (len(erows) - efresh), "candles_waiting": len(need) - cdone},
            "top": top,
            "others": [{k: p.get(k) for k in ("src", "addr", "short", "name", "pnl_30d", "trips", "win", "pf", "hold_med_h", "style_ru", "excluded_ru", "score")}
                       for p in sorted(profs, key=lambda p: -p["pnl_30d"]) if p not in top][:30],
@@ -1150,12 +1200,15 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
            "hidden": [{"addr": p["addr"], "name": p["name"] or p["short"], "rank": p.get("rank")} for p in top if p.get("hidden")],
            "hidden_ru": "OKX скрывает открытые позиции этих лид-трейдеров (нет монеты, размера и цены входа — только маржа, плечо и "
                         "результат): повторить их сделки вовремя нельзя, стол «Киты» их не копирует.",
-           "not_covered_ru": "Binance и Bybit копитрейдинг пока не подключены: их данные с сервера в США закрыты. Чемпионаты (Bybit WSOT и другие) "
+           "not_covered_ru": "Bybit (мастер-трейдеры), Bitget и Gate не подключены: с сервера в США их страницы копитрейдинга закрыты (403/404). "
+                             "Binance — подключён: лид-портфели, которые показывают свои позиции. Чемпионаты (Bybit WSOT и другие) "
                              "публикуют только итоговые проценты без сделок — повторить такую торговлю нельзя, поэтому в рейтинг они не входят.",
            "method_ru": [
                "Источники с открытой историей сделок: Hyperliquid (каждая сделка в блокчейне) и лид-трейдеры копитрейдинга OKX (официальные открытые данные биржи).",
                "Hyperliquid: счёт от $300k, за всё время от +$500k, за месяц в плюсе, не маркетмейкер (оборот ≤ 1000× счёта), без «доходности» больше 1000% за месяц "
                "(это пополнения, а не торговля); 30 крупнейших по прибыли за всё время. OKX: лид-трейдеры с историей от 90 дней и прибылью; 20 крупнейших по прибыли.",
+               "Binance (с 04.11): открытые лид-портфели копитрейдинга с прибылью за 30/90 дней и ≥ 70% прибыльных сделок; копируем только тех, кто "
+               "показывает позиции, у кого PF ≥ 1.5 и ≥ 20 сделок за 90 дней. Hyperliquid: плюс 20 лучших по прибыли за 30 дней.",
                "По каждому — реальные сделки за 30 дней: каждая позиция от открытия до закрытия, результат, время удержания, монеты, сторона.",
                "В топ попадает только тот, у кого ≥ 8 закрытых сделок, держит позицию не меньше 30 минут (иначе не успеем повторить), за 30 дней в плюсе, прибыль к убытку ≥ 1.2.",
                "Порядок — по тому, что дало бы копирование с опозданием 30 минут (так видит сервер): средний итог на сделку с учётом разброса и числа сделок.",

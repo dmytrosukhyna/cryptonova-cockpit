@@ -1,0 +1,28 @@
+{
+ "_note": "Recorded 04.11.2026 from a GitHub runner (scripts/whale_sources_probe.py, run 41868149093): Binance copy-trading web endpoints, rows trimmed.",
+ "list_30d": {"list": [
+  {"leadPortfolioId": "5159399805711344897", "nickname": "玺九爺HBJX", "currentCopyCount": 967, "roi": 117.71441194, "pnl": 759272.24560296, "aum": 2016442.63604737, "mdd": 16.778566, "winRate": 88.8889, "copierPnl": 1400787.88219331, "portfolioType": "PUBLIC", "startTime": 1785482592853},
+  {"leadPortfolioId": "5133452281665177088", "nickname": "踢倒丹炉Jason007", "currentCopyCount": 300, "roi": 39.59732441, "pnl": 432397.30112834, "aum": 2500000.0, "mdd": 14.204798, "winRate": 45.8333, "copierPnl": 43817.71318806, "portfolioType": "PUBLIC", "startTime": 1780000000000},
+  {"leadPortfolioId": "5278353437811897601", "nickname": "兔子来了", "currentCopyCount": 40, "roi": 492.06833784, "pnl": 49206.83378454, "aum": 60000.0, "mdd": 37.950358, "winRate": 75.5556, "copierPnl": 203.83434672, "portfolioType": "PUBLIC", "startTime": 1788000000000},
+  {"leadPortfolioId": "4532994172262753536", "nickname": "Sky株式会社", "currentCopyCount": 10, "roi": -3.0, "pnl": -95701.0, "aum": 100000.0, "mdd": 30.0, "winRate": 15.0, "copierPnl": 0, "portfolioType": "PUBLIC", "startTime": 1780000000000}
+ ]},
+ "detail": {
+  "5159399805711344897": {"leadPortfolioId": "5159399805711344897", "status": "ACTIVE", "positionShow": false, "startTime": 1785482592853},
+  "5278353437811897601": {"leadPortfolioId": "5278353437811897601", "status": "ACTIVE", "positionShow": true, "startTime": 1788000000000}
+ },
+ "positions": {
+  "5278353437811897601": [
+   {"id": "0_XAUUSDT_BOTH", "symbol": "XAUUSDT", "collateral": "USDT", "positionAmount": "20.677", "entryPrice": "4051.637098225", "unrealizedProfit": "28.38749010", "cumRealized": "725.36209995", "notionalValue": "83804.08777000", "markPrice": "4053.01000000", "leverage": 20, "isolated": false, "positionSide": "BOTH", "breakEvenPrice": "4052.4307123766516"},
+   {"id": "0_BTCUSDT_SHORT", "symbol": "BTCUSDT", "collateral": "USDT", "positionAmount": "-4.000", "entryPrice": "80546.1", "unrealizedProfit": "565.91330436", "cumRealized": "-27244.28640061", "notionalValue": "-321618.48669564", "markPrice": "80404.62167391", "leverage": 100, "isolated": false, "positionSide": "SHORT", "breakEvenPrice": "80505.82695000003"},
+   {"id": "0_ETHUSDT_BOTH", "symbol": "ETHUSDT", "collateral": "USDT", "positionAmount": "0", "entryPrice": "0", "unrealizedProfit": "0", "notionalValue": "0", "markPrice": "2400", "leverage": 20, "positionSide": "BOTH"}
+  ]
+ },
+ "history_rows": [
+  {"id": 1793806478055, "positionId": "1170385626436141056", "index": "0", "symbol": "BTCUSDT", "type": "UM", "opened": 1793806478055, "closed": 1793806794187, "avgCost": 80748.6, "avgClosePrice": 80591.9, "closingPnl": 95.0371875, "maxOpenInterest": 1.25, "closedVolume": 1.25, "isolated": "Cross", "side": "Short", "status": "All Closed", "updateTime": 1793806794187, "leverage": "14", "roi": "0.01318185"},
+  {"id": 1793368303082, "positionId": "1168547787394203648", "index": "0", "symbol": "ETHUSDT", "type": "UM", "opened": 1793368303082, "closed": 1793803840171, "avgCost": 2229.56315848, "avgClosePrice": 2382.01864418, "closingPnl": 74298.45658442, "maxOpenInterest": 493.37, "closedVolume": 493.37, "isolated": "Cross", "side": "Long", "status": "All Closed", "updateTime": 1793803840171, "leverage": "20", "roi": "1.35088155"}
+ ],
+ "performance": {
+  "30D": {"timeRange": "30D", "roi": 117.7, "pnl": 49206.83, "mdd": 37.95, "copierPnl": 203.8, "winRate": 75.5556, "winOrders": 34, "totalOrder": 45, "sharpRatio": null},
+  "90D": {"timeRange": "90D", "roi": 492.06833784, "pnl": 49206.83378454, "mdd": 37.950358, "copierPnl": 203.83434672, "winRate": 75.5556, "winOrders": 68, "totalOrder": 90, "sharpRatio": null}
+ }
+}

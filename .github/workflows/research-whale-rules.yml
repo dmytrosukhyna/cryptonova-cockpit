@@ -10,17 +10,53 @@ on:
 permissions:
   contents: write   # release asset lab-data-whales
 jobs:
-  fetch:
+  whales:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: python scripts/whale_rules_fetch.py
+      - run: python scripts/whale_rules_fetch.py whales
       - uses: actions/upload-artifact@v4
-        if: always()
-        with: { name: whale-rules-data, path: whale_rules_data.json.gz, retention-days: 7 }
+        with: { name: whales, path: whales.json.gz, retention-days: 3 }
+  fund:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/whale_rules_fetch.py fund
+      - uses: actions/upload-artifact@v4
+        with: { name: fund, path: fund.json.gz, retention-days: 3 }
+  mkt:
+    needs: whales
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      matrix: { shard: [0, 1, 2, 3, 4, 5] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@v4
+        with: { name: whales }
+      - run: python scripts/whale_rules_fetch.py mkt --shard ${{ matrix.shard }}/6
+      - uses: actions/upload-artifact@v4
+        with: { name: "mkt-${{ matrix.shard }}", path: "mkt_${{ matrix.shard }}.json.gz", retention-days: 3 }
+  merge:
+    needs: [whales, fund, mkt]
+    if: always() && needs.whales.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@v4
+        with: { merge-multiple: true }
+      - run: ls -la && python scripts/whale_rules_fetch.py merge
       - name: Upload to release lab-data-whales
         env:
           GH_TOKEN: ${{ github.token }}

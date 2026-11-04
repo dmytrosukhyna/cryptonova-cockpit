@@ -305,14 +305,30 @@ def fund_part(syms):
 
 
 def main():
+    """Usage: whale_rules_fetch.py STEP [--shard i/n]. STEP: whales (hl+okx → whales.json.gz) | mkt (needs whales.json.gz,
+    writes mkt_i.json.gz) | fund (fund.json.gz) | merge (→ whale_rules_data.json.gz) | all (old single-file run)."""
     top = json.load(open("web/whales_top.json"))
-    steps = (sys.argv[1] if len(sys.argv) > 1 else "hl,okx,mkt,fund").split(",")
-    res = {"made": NOW, "log": LOG}
-    if "hl" in steps:
-        res["hl"] = hl_part(top)
-    if "okx" in steps:
-        res["okx"] = okx_part(top)
-    if "mkt" in steps:
+    step = sys.argv[1] if len(sys.argv) > 1 else "all"
+    shard = (0, 1)
+    if "--shard" in sys.argv:
+        i, n = sys.argv[sys.argv.index("--shard") + 1].split("/"); shard = (int(i), int(n))
+
+    def dump(obj, path):
+        with gzip.open(path, "wt") as g:
+            json.dump(obj, g, separators=(",", ":"))
+        log(f"wrote {path} {os.path.getsize(path)/1e6:.1f} MB")
+
+    def load(path):
+        with gzip.open(path, "rt") as g:
+            return json.load(g)
+
+    if step == "whales":
+        dump({"made": NOW, "hl": hl_part(top), "okx": okx_part(top), "log": LOG}, "whales.json.gz"); return
+    if step == "fund":
+        u = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whale_rules_universe.txt")
+        dump({"fund": fund_part(open(u).read().split())}, "fund.json.gz"); return
+    if step == "mkt":
+        res = load("whales.json.gz")
         cnt = {"BTC": 10**6, "ETH": 10**6}
         for w in res.get("hl", []):
             if len(w["fills"]) >= 8:
@@ -325,17 +341,20 @@ def main():
                 cnt[c] = cnt.get(c, 0) + 1
         coins = sorted(c for c in cnt if c)
         oi_coins = set(sorted(cnt, key=lambda c: -cnt[c])[:45])
-        log(f"market coins {len(coins)}: {' '.join(coins)}")
-        res["mkt"] = mkt_part(coins, oi_coins, dt.date(2026, 3, 1))
-    if "fund" in steps:
-        syms = os.environ.get("UNIVERSE", "").split()
-        u = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whale_rules_universe.txt")
-        if not syms and os.path.exists(u):
-            syms = open(u).read().split()
-        res["fund"] = fund_part(syms)
-    with gzip.open(OUT, "wt") as g:
-        json.dump(res, g, separators=(",", ":"))
-    log(f"wrote {OUT} {os.path.getsize(OUT)/1e6:.1f} MB")
+        mine = [c for k, c in enumerate(coins) if k % shard[1] == shard[0]]
+        log(f"market coins {len(coins)}, shard {shard}: {len(mine)}")
+        dump({"mkt": mkt_part(mine, oi_coins, dt.date(2026, 3, 1)), "log": LOG}, f"mkt_{shard[0]}.json.gz"); return
+    if step == "merge":
+        res = load("whales.json.gz")
+        res["mkt"] = {}
+        for fn in sorted(os.listdir(".")):
+            if fn.startswith("mkt_") and fn.endswith(".json.gz"):
+                part = load(fn); res["mkt"].update(part["mkt"]); res["log"] += part.get("log", [])
+        if os.path.exists("fund.json.gz"):
+            res["fund"] = load("fund.json.gz")["fund"]
+        dump(res, OUT); return
+    res = {"made": NOW, "log": LOG, "hl": hl_part(top), "okx": okx_part(top)}
+    dump(res, OUT)
 
 
 if __name__ == "__main__":

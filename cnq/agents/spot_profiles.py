@@ -793,7 +793,7 @@ class IdeasPortfolio:
             # down here («одна покупка на монету»): on 2023–2026 averaging alts gave +17 % vs +39 %, drawdown −68 % vs −58 %.
             actions += self._topups(now, price, smap, sma200 or {}, live)
             actions += self._okx_swap(now, price, okx, src)
-            actions += self._idle_cash(now, price, live, eligible_seen)
+            actions += self._idle_cash(now, price, live, eligible_seen, (ideas or {}).get("btc_bull"))
         self.conn.commit()
         return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
 
@@ -891,34 +891,48 @@ class IdeasPortfolio:
             done += sc
         return done
 
-    def _idle_cash(self, now: int, price: dict, live: set, eligible_seen: bool) -> list[dict]:
-        """the 3-day clock (meta idle_since) and the move of the cash above the floor into the core in the plan proportions"""
+    def _idle_cash(self, now: int, price: dict, live: set, eligible_seen: bool, btc_bull=None) -> list[dict]:
+        """the 3-day clock (meta idle_since) and the move of the cash above the floor into the core in the plan proportions.
+        04.11 (owner, real money: «Кэш USDT в ядро сразу»): while BTC's regime is «рост» (ideas.json btc_bull is True) the cash above
+        the floor goes into the core at once — no 3-day wait, whatever coin passed this run (the buys above already took their cash;
+        a coin that passes later is paid from this top-up first). «спад» / unknown → the 28.10 3-day rule as before."""
         rp, P = self.rp, IDEAS
         V = self.value(price)
         if not V:
             return []
         excess = rp.cash() - P["min_cash"] * V
         since = rp._meta("idle_since") or 0.0
-        if eligible_seen or excess < P["idle_min"] * V:
+        now_ = btc_bull is True
+        if (eligible_seen and not now_) or excess < P["idle_min"] * V:
             if since:
                 rp._set_meta("idle_since", 0.0)
             return []
-        if not since:
-            rp._set_meta("idle_since", now)       # the clock starts at the first run that sees idle cash (no back-dating)
+        if any(c not in live or not price.get(c) for c in self.IDLE_CORE):
+            if not since:
+                rp._set_meta("idle_since", now)
             return []
-        if now - since < P["idle_days"] * DAY or any(c not in live or not price.get(c) for c in self.IDLE_CORE):
-            return []
+        if not now_:
+            if not since:
+                rp._set_meta("idle_since", now)   # the clock starts at the first run that sees idle cash (no back-dating)
+                return []
+            if now - since < P["idle_days"] * DAY:
+                return []
         core = {c: core_target(c) for c in self.IDLE_CORE}
         tot = sum(core.values())
         held = {p["symbol"]: p for p in rp.positions()}
         out = []
-        days = (now - since) / DAY
+        days = (now - since) / DAY if since else 0.0
         for c, t in core.items():
             add = excess * t / tot / (1 + P["fee"])
             px = price[c]
-            why = (f"Кэш → ядро (3 дня без подходящих монет): кэш выше {P['min_cash'] * 100:.0f}% уже {days:.1f} дн., ни одна монета не "
-                   f"проходит правила покупки — {c} +{add / V * 100:.1f}% счёта по плану BTC 30 / ETH 10 / SOL 5 (решение владельца 28.10). "
-                   "Подходящую монету портфель оплатит сначала этой доливкой.")
+            if now_:
+                why = (f"Кэш → ядро сразу (BTC в режиме «рост»): кэш выше {P['min_cash'] * 100:.0f}% не лежит без дела — {c} "
+                       f"+{add / V * 100:.1f}% счёта по плану BTC 30 / ETH 10 / SOL 5 (решение владельца 04.11). "
+                       "Подходящую монету портфель оплатит сначала этой доливкой.")
+            else:
+                why = (f"Кэш → ядро (3 дня без подходящих монет): кэш выше {P['min_cash'] * 100:.0f}% уже {days:.1f} дн., ни одна монета не "
+                       f"проходит правила покупки — {c} +{add / V * 100:.1f}% счёта по плану BTC 30 / ETH 10 / SOL 5 (решение владельца 28.10). "
+                       "Подходящую монету портфель оплатит сначала этой доливкой.")
             p = held.get(c)
             if p and p.get("entry"):
                 out.append(rp._act(now, c, "ADD", p["weight"] + add, px, why, p["bucket"]))
@@ -1052,5 +1066,6 @@ class IdeasPortfolio:
                  if rp._meta(f"idle_q:{c}")}
         return {"since": int(since) if since else None, "due": int(since + P["idle_days"] * DAY) if since else None,
                 "core_extra_pct": extra, "core_extra_total_pct": round(sum(extra.values()), 2),
-                "rule_ru": "Кэш выше 10% три полных дня без подходящих монет → кэш сверх 10% в ядро BTC / ETH / SOL (30 / 10 / 5); "
-                           "новая подходящая монета оплачивается сначала этой доливкой (решение владельца 28.10)."}
+                "rule_ru": "Кэш сверх 10% → в ядро BTC / ETH / SOL (30 / 10 / 5): при режиме BTC «рост» — сразу (решение владельца 04.11), "
+                           "при «спаде» — после трёх полных дней без подходящих монет (28.10); новая подходящая монета оплачивается "
+                           "сначала этой доливкой."}

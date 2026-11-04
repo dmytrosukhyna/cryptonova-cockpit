@@ -1094,6 +1094,24 @@ def test_ideas_idle_cash_goes_to_the_core_after_three_full_days_and_back_for_a_n
     assert abs(st["idle_cash"]["core_extra_total_pct"] - (sum(extra.values()) - 7.5)) < 0.3
 
 
+def test_ideas_idle_cash_goes_to_the_core_at_once_while_btc_is_rising():
+    """04.11 (owner, real money: «Кэш USDT в ядро сразу»): BTC regime «рост» (ideas btc_bull True) → the cash above 10 % goes into the
+    core BTC / ETH / SOL (30 / 10 / 5) in the same run, even the run that bought; «спад» → the 3-day rule as before"""
+    rows, src = _small_world()
+    bull = lambda t: {**_ideas(rows, t), "btc_bull": True}          # noqa: E731
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    st = port.step(src, bull(T0), T0)
+    moves = {a["symbol"]: a for a in st["actions"] if (a["reason"] or "").startswith("Кэш → ядро сразу (BTC в режиме «рост»)")}
+    assert set(moves) == {"BTC", "ETH", "SOL"}
+    extra = st["idle_cash"]["core_extra_pct"]
+    assert abs(extra["BTC"] / extra["ETH"] - 3) < 0.01 and abs(extra["ETH"] / extra["SOL"] - 2) < 0.01
+    assert 9.9 <= port.rp.cash() / (st["index"] / 100) * 100 <= 10.1
+    port2 = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    port2.step(src, {**_ideas(rows, T0), "btc_bull": False}, T0)
+    st = port2.step(src, {**_ideas(rows, T0 + 3_600_000), "btc_bull": False}, T0 + 3_600_000)
+    assert not [a for a in st["actions"] if "Кэш → ядро" in (a["reason"] or "")] and st["idle_cash"]["since"] == T0 + 3_600_000
+
+
 def test_ideas_an_eligible_coin_blocked_by_cash_or_a_stale_table_is_not_idle():
     rows, src = _small_world()
     port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))

@@ -6,7 +6,7 @@ on:
     paths: [scripts/trend_fetch.py, .github/workflows/research-trend-fetch.yml]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write   # release asset lab-data-trend (the research container can download releases, not artifacts)
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -18,3 +18,10 @@ jobs:
       - run: python scripts/trend_fetch.py
       - uses: actions/upload-artifact@v4
         with: { name: trend-data, path: trend_data.json, retention-days: 7 }
+      - name: Upload trend_data.json to release lab-data-trend
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: lab-data-trend
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Research data (not code): BTC/ETH USDT-M perps 1h 2023-01 → now + real funding (scripts/trend_fetch.py)." --latest=false --target "${{ github.sha }}"
+          gh release upload "$TAG" trend_data.json --clobber

@@ -15,7 +15,9 @@ on:
                    # 04.11: the engine's gold demo desk
                    "web/gold_desk.json", "data/gold_desk.jsonl",
                    # 04.11: the daily whale-trade history written by this pipeline itself
-                   "data/whale_trades/**"]
+                   "data/whale_trades/**",
+                   # 04.11: «Куда инвестируют киты» signal log and outcomes written by this pipeline itself
+                   "data/smart_money/**"]
   schedule:
     - cron: "*/30 * * * *"      # данные + отдел новостей каждые 30 минут (UTC)
     - cron: "13,43 * * * *"     # второе расписание со сдвигом: GitHub часто задерживает/пропускает запуски, два шанса в полчаса
@@ -44,6 +46,7 @@ jobs:
           path: |
             data/cnq.sqlite
             data/agents.sqlite
+            data/whales_ext.sqlite
           key: cnq-state-${{ github.run_id }}
           restore-keys: |
             cnq-state-
@@ -148,6 +151,14 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         run: python -m cnq.cli whalestudy --out web
+      - name: «Киты · фондовый рынок» — SEC 13F of 10 funds (checked once a day), ARK daily trades (6 h), Congress trades → web/stock_whales.json (information only)
+        continue-on-error: true
+        timeout-minutes: 8
+        run: python -m cnq.cli stockwhales --out web
+      - name: «Куда инвестируют киты» — on-chain smart money (hourly; Blockscout, DexScreener, GeckoTerminal, GoPlus, Hyperliquid spot, exchange flows) → web/smart_money.json, web/smart_money_signal.json (information only, no orders)
+        continue-on-error: true
+        timeout-minutes: 7
+        run: python -m cnq.cli smartmoney --out web
       - name: Why each real futures position is open (whale, rules, market at entry) → web/real_why.json
         continue-on-error: true
         timeout-minutes: 3
@@ -260,9 +271,11 @@ jobs:
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/real_why.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/options_mood.json web/tokenomics.json web/channel_watch.json web/channel_opps.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 web/spot_pipeline.json web/strategies.json web/opportunities.json web/system_status.json; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/whale_watch.json web/stock_whales.json web/smart_money.json web/smart_money_signal.json web/real_why.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/options_mood.json web/tokenomics.json web/channel_watch.json web/channel_opps.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 web/spot_pipeline.json web/strategies.json web/opportunities.json web/system_status.json; do [ -f "$f" ] && git add "$f"; done
           # 04.11: our own whale-trade history (cnq/agents/whale_study.archive_trades) — one dated JSONL a day, kept for 6+ months
           if [ -d data/whale_trades ]; then git add data/whale_trades || echo "::warning title=whale_trades::not added"; fi
+          # 04.11: «Куда инвестируют киты» — the daily signal log and its 1/7/30-day outcomes (cnq/agents/smart_money.py)
+          if [ -d data/smart_money ]; then git add data/smart_money || echo "::warning title=smart_money::not added"; fi
           # 20.10: data/agents.sqlite reached GitHub's 100 MB file limit (whale study candles/fills) — every push after 09:44 UTC was
           # rejected, so no data reached main for hours. Past 95 MB the database stays in the Actions cache only (it is restored from there).
           sz=$(stat -c %s data/agents.sqlite 2>/dev/null || echo 0)

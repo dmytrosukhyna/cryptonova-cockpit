@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         from .risk import cli as risk_cli
         return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood", "golddesk", "realwhy"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood", "golddesk", "realwhy", "stockwhales", "smartmoney"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
     ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
     ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
@@ -204,13 +204,72 @@ def main(argv: list[str] | None = None) -> int:
         conn = sqlite3.connect("data/agents.sqlite")
         os.makedirs(args.out, exist_ok=True)
         d = whale_study.run(conn, archive_dir=os.path.join("data", "whale_trades"))   # 04.11: + daily whale-trade history
+        profs = d.pop("profiles", None) or []
         write_report(d, os.path.join(args.out, "whales_top.json"))
+        try:                                    # 04.11: VIP «Киты · крипто» watchlist from the same profiles (no extra requests)
+            from .agents import vip_whales
+            ww = vip_whales.crypto_watch(profs, d)
+            write_report(ww, os.path.join(args.out, "whale_watch.json"))
+            print(f"whale_watch.json: whales={ww['n']} counts={ww['counts']}")
+        except Exception as e:  # noqa: BLE001
+            print("whale_watch.json: not written:", str(e)[:200])
         fn = d.get("funnel") or {}
         dk = d.get("desk") or {}
         print(f"whales_top.json: complete={d.get('complete')} studied={fn.get('studied')} eligible={fn.get('eligible')} top={fn.get('top')} "
               f"waiting={fn.get('waiting')} candles_waiting={fn.get('candles_waiting')} desk={dk.get('equity')} open={len(dk.get('open') or [])} notes={len(d.get('notes_ru') or [])}")
         for n in (d.get("notes_ru") or [])[:5]:
             print("  note:", n)
+    elif args.cmd == "stockwhales":
+        # 04.11: «Киты · фондовый рынок» — SEC 13F of 10 funds (daily), ARK daily trades, Congress trades → web/stock_whales.json
+        import json as _j, os, sqlite3
+        from .agents import stock_whales
+        from .terminal.report import write_report
+        os.makedirs("data", exist_ok=True)
+        os.makedirs(args.out, exist_ok=True)
+        conn = sqlite3.connect(os.path.join("data", "whales_ext.sqlite"))
+        path = os.path.join(args.out, "stock_whales.json")
+        try:
+            prev = _j.load(open(path, encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            prev = None
+        d = stock_whales.run(conn, prev, force=os.environ.get("CNQ_FORCE") == "1")
+        if d is None:
+            print("stock_whales.json: nothing due (13F checked daily, ARK every 6 h)")
+        else:
+            write_report(d, path)
+            print(f"stock_whales.json: funds_ok={sum(1 for f in d['funds'] if f.get('period'))}/{len(d['funds'])} "
+                  f"consensus={[(c['period'], len(c['items'])) for c in d['consensus']]} ark_moves={len(d['ark'].get('moves') or [])} "
+                  f"congress={d['congress'].get('available')} sources={ {k: v.get('ok') for k, v in d['sources'].items()} }")
+            for n in d.get("notes_ru") or []:
+                print("  note:", n)
+    elif args.cmd == "smartmoney":
+        # 04.11: «Куда инвестируют киты» — on-chain smart money (information only) → web/smart_money.json + web/smart_money_signal.json
+        import json as _j, os, sqlite3
+        from .agents import smart_money
+        from .terminal.report import write_report
+        os.makedirs("data", exist_ok=True)
+        os.makedirs(args.out, exist_ok=True)
+        conn = sqlite3.connect(os.path.join("data", "whales_ext.sqlite"))
+        path = os.path.join(args.out, "smart_money.json")
+
+        def _ld(p):
+            try:
+                return _j.load(open(p, encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                return None
+        cfg = _ld(os.path.join("config", "smart_money_wallets.json")) or {}
+        d = smart_money.run(conn, cfg, _ld(os.path.join(args.out, "whales_top.json")), _ld(path), force=os.environ.get("CNQ_FORCE") == "1")
+        if d is None:
+            print("smart_money.json: nothing due (hourly)")
+        else:
+            write_report(d, path)
+            write_report(smart_money.signal_feed(d), os.path.join(args.out, "smart_money_signal.json"))
+            print(f"smart_money.json: wallets={d['wallets_n']} signals={[(s['symbol'], s['n']) for s in d['signals'][:8]]} "
+                  f"mm_only={len(d['mm_only'])} singles={len(d['singles'])} hl_accum={len(d['hl'].get('accum') or [])} "
+                  f"flows={ {k: v.get('d1') for k, v in d['flows'].items()} } partial={d['partial']} "
+                  f"sources={ {k: v.get('status_ru') for k, v in d['sources'].items()} }")
+            for n in d.get("notes_ru") or []:
+                print("  note:", n)
     elif args.cmd == "funding":
         import os, sqlite3
         from .agents import funding_desk

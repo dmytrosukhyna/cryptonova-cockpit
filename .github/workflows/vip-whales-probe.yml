@@ -1,0 +1,49 @@
+name: vip-whales-probe
+# 04.11: «Киты» for the VIP panel — which free sources answer from a runner (SEC 13F, OpenFIGI, ARK CSV, Congress, Blockscout,
+# DexScreener, GeckoTerminal, GoPlus, Hyperliquid, mempool.space, Solana RPC). Runs both feeds once (forced) and keeps them as an
+# artifact; nothing is committed.
+on:
+  push:
+    branches: ["research/vipwhales**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - name: Source status codes
+        run: |
+          UA='CryptoNovaResearch/1.0 (+https://cryptonova.vip)'
+          for u in "https://data.sec.gov/submissions/CIK0001067983.json" "https://api.openfigi.com/v3/mapping" \
+                   "https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_INNOVATION_ETF_ARKK_HOLDINGS.csv" \
+                   "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json" \
+                   "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json" \
+                   "https://eth.blockscout.com/api/v2/stats" "https://base.blockscout.com/api/v2/stats" "https://arbitrum.blockscout.com/api/v2/stats" \
+                   "https://api.dexscreener.com/latest/dex/tokens/0x6982508145454ce325ddbe47a25d4ec3d2311933" \
+                   "https://api.geckoterminal.com/api/v2/networks/eth/pools?page=1" \
+                   "https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=0x6982508145454ce325ddbe47a25d4ec3d2311933" \
+                   "https://mempool.space/api/address/34xp4vRoCGJym3xR7yCVPFHoCNxv4Twseo"; do
+            c=$(curl -s -o /dev/null -w "%{http_code}" -m 25 -A "$UA" "$u"); echo "$c $u"; echo "::notice title=probe $c::$u"; done
+      - name: Stock whales (forced)
+        env: { CNQ_FORCE: "1" }
+        run: mkdir -p probe && python -m cnq.cli stockwhales --out probe 2>&1 | tail -30
+      - name: Smart money (forced)
+        env: { CNQ_FORCE: "1" }
+        run: cp web/whales_top.json probe/ && python -m cnq.cli smartmoney --out probe 2>&1 | tail -30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vip-whales-probe
+          path: |
+            probe/stock_whales.json
+            probe/smart_money.json
+            probe/smart_money_signal.json
+            data/smart_money/

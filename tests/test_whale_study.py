@@ -411,3 +411,33 @@ def test_dynamic_sizing_free_margin_over_expected_slots_and_the_soft_whale_cap()
     assert d["util_pct"] == 50.0 and W.desk_public(d, {})["util_pct"] == 50.0
     assert W.expected_slots({x: {"per_day": 1} for x in fol}, fol, T0 - T0 % W.DAY) == 5
     assert W.expected_slots({}, fol, T0) == W.MIN_SLOTS
+
+
+def test_a_rolled_back_database_never_republishes_an_older_desk_or_follow_list(tmp_path):
+    """04.11 (19:28 UTC: a lost cache → a 15-day-old database republished an old «Киты» desk and follow list that the REAL account
+    follows): the database's desk / follow list are used only when at least as new as the published whales_top.json"""
+    now = T0 + 40 * W.DAY
+    conn = sqlite3.connect(":memory:")
+    W.ensure_schema(conn)
+    old = {"start": 10000.0, "cash": 10141.0, "open": [{"whale": "okx:OLD", "coin": "BTC", "side": "SHORT", "entry": 1.0, "opened_t": now - 15 * W.DAY,
+                                                     "margin": 1.0, "lev": 5.0, "notional": 5.0, "stop": 1.1}],
+           "closed": [], "seen": {}, "history": [[now - 15 * W.DAY, 10141.0]], "events": [], "by_whale_day": {}, "started": now - 20 * W.DAY}
+    W.kv_set(conn, "desk", old)
+    W.kv_set(conn, "study", {"t": now - 15 * W.DAY, "top": [{"addr": "okx:OLD", "name": "Old"}]})
+    good_open = {"whale": "okx:NEW", "coin": "ETH", "side": "LONG", "entry": 2500.0, "opened_t": now - W.DAY, "margin": 1000.0, "lev": 5.0,
+                 "notional": 5000.0, "stop": 2300.0, "upnl": 50.0, "whale_ru": "New"}
+    pub = {"asof": now - 3600_000, "study_t": now - 7200_000, "following": [{"addr": "okx:NEW", "name": "New"}], "follow_dropped": [],
+           "desk": {"start": 10000.0, "equity": 11293.0, "started": now - 20 * W.DAY, "open": [good_open], "closed": [],
+                    "history": [[now - 3600_000, 11293.0]]}}
+    p = tmp_path / "whales_top.json"
+    p.write_text(json.dumps(pub))
+    d = W.run(conn, now=now, post=lambda body: {"BTC": "1", "ETH": "2500"} if body["type"] == "allMids" else {"assetPositions": []},
+              get_lb=lambda: {"leaderboardRows": []}, okx_get=lambda path, q: [{"ranks": []}] if "lead-traders" in path else [],
+              max_requests=5, budget_s=5, src_get={"bn": lambda path, body=None: {"list": []}}, pub_path=str(p))
+    assert [x["addr"] for x in d["following"]] == ["okx:NEW"]
+    assert d["desk"]["equity"] >= 11000 and [o["coin"] for o in d["desk"]["open"]] in (["ETH"], [])
+    assert not any(o["whale"] == "okx:OLD" for o in d["desk"]["open"])
+    assert any("старее опубликованного" in n for n in d["notes_ru"])
+    # a database that is newer than the published file keeps its own state
+    desk2, study2, notes = W.never_backwards({**old, "history": [[now, 12000.0]]}, {"t": now, "top": []}, pub, now)
+    assert desk2["history"][-1][1] == 12000.0 and study2 == {"t": now, "top": []} and not notes

@@ -67,16 +67,8 @@ def save(st: dict, env=None) -> None:
 
 
 def seed(wtop: dict, now: int) -> dict:
-    """the published desk (whales_top.json «desk», desk_public shape) → a desk_step state with the same copies (same ids)"""
-    pub = (wtop or {}).get("desk") or {}
-    strip = lambda x: {k: v for k, v in x.items() if k != "whale_ru"}           # noqa: E731
-    opn = [strip(o) for o in pub.get("open") or [] if isinstance(o, dict) and o.get("whale")]
-    start = W._f(pub.get("start"), W.DESK_START)
-    eq = W._f(pub.get("equity"), start)
-    return {"start": start, "cash": round(eq - sum(W._f(o.get("upnl")) for o in opn), 2), "open": opn,
-            "closed": [strip(c) for c in pub.get("closed") or [] if isinstance(c, dict)], "seen": {}, "seen_t": {},
-            "history": [list(x) for x in pub.get("history") or [] if isinstance(x, (list, tuple))][-500:], "started": pub.get("started") or now,
-            "events": [], "by_whale_day": {}, "seeded_from": wtop.get("asof")}
+    """the published desk (whales_top.json «desk») → a desk_step state with the same copies (same ids)"""
+    return W.desk_from_public(wtop, now)
 
 
 def src_of(addr: str) -> str:

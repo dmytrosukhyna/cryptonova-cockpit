@@ -1126,6 +1126,12 @@ def archive_trades(conn, now: int, cands: list[dict], out_dir: str) -> dict | No
     to <out_dir>/<YYYY-MM-DD>.jsonl every closed whale trade not written before (first day: all we have) and a snapshot of each
     candidate's open positions. One JSON object per line: kind «closed» | «open». Readers dedupe closed trades by (src, trader, id)."""
     day = day_key(now)
+    if kv_get(conn, "archive_day") != day and os.path.exists(os.path.join(out_dir, f"{day}.jsonl")) and kv_get(conn, "archive_v") == ARCHIVE_V:
+        # 04.11: today's file is already in the repository (written by a newer state than this database) — mark the day done only
+        kv_set(conn, "archive_day", day)
+        kv_set(conn, "archive_t", now)
+        conn.commit()
+        return None
     if kv_get(conn, "archive_v") != ARCHIVE_V:
         for k in ("archive_day", "archive_t", "archive_ids"):
             conn.execute("DELETE FROM ws_kv WHERE k=?", (k,))
@@ -1202,6 +1208,53 @@ def hl_name(coin: str, mids: dict) -> str | None:
 LIVE_FRESH_MS = 15 * 60_000
 
 
+def desk_from_public(wtop: dict, now: int) -> dict:
+    """the published desk (whales_top.json «desk», desk_public shape) → a desk_step state with the same copies (same ids)"""
+    pub = (wtop or {}).get("desk") or {}
+    strip = lambda x: {k: v for k, v in x.items() if k != "whale_ru"}           # noqa: E731
+    opn = [strip(o) for o in pub.get("open") or [] if isinstance(o, dict) and o.get("whale")]
+    start = _f(pub.get("start"), DESK_START)
+    eq = _f(pub.get("equity"), start)
+    return {"start": start, "cash": round(eq - sum(_f(o.get("upnl")) for o in opn), 2), "open": opn,
+            "closed": [strip(c) for c in pub.get("closed") or [] if isinstance(c, dict)], "seen": {}, "seen_t": {},
+            "history": [list(x) for x in pub.get("history") or [] if isinstance(x, (list, tuple))][-500:], "started": pub.get("started") or now,
+            "events": [], "by_whale_day": {}, "seeded_from": (wtop or {}).get("asof")}
+
+
+def desk_t(desk: dict | None) -> int:
+    """when a desk state was last moved: its last equity point (0 = none)"""
+    h = (desk or {}).get("history") or []
+    try:
+        return int(h[-1][0]) if h else 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def load_published(path: str | None) -> dict:
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def never_backwards(desk: dict | None, study: dict, pub: dict, now: int) -> tuple[dict | None, dict, list[str]]:
+    """04.11 (a lost Actions cache → a 15-day-old database republished an old desk and follow list that the REAL account follows):
+    the database's desk and follow list are used only when they are at least as new as what is already published
+    (web/whales_top.json); otherwise the published ones are taken back into the database. → (desk, study, notes)"""
+    notes = []
+    if pub.get("desk") and desk_t(pub.get("desk")) > desk_t(desk):
+        desk = desk_from_public(pub, now)
+        notes.append("стол «Киты» в базе старее опубликованного — взят опубликованный (база была откачена)")
+    st_pub = int(_f(pub.get("study_t")))
+    if pub.get("following") is not None and st_pub > int(_f((study or {}).get("t"))):
+        study = {"t": st_pub, "top": list(pub.get("following") or []), "dropped": list(pub.get("follow_dropped") or []),
+                 "partial": True, "from_published": True}
+        notes.append("список копируемых китов в базе старее опубликованного — взят опубликованный")
+    return desk, study, notes
+
+
 def live_desk(path: str | None, now: int) -> dict | None:
     """the server's live desk (web/whales_live.json «desk») when it is at most LIVE_FRESH_MS old, else None"""
     if not path:
@@ -1219,7 +1272,7 @@ def live_desk(path: str | None, now: int) -> dict | None:
 
 def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_get_lb, okx_get=_okx_get,
         max_requests: int = 90, budget_s: float = 170, src_get: dict | None = None, archive_dir: str | None = None,
-        live_path: str | None = None) -> dict:
+        live_path: str | None = None, pub_path: str | None = None) -> dict:
     now = int(now if now is not None else time.time() * 1000)
     ensure_schema(conn)
     notes: list[str] = []
@@ -1265,6 +1318,13 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     # 3. copy desk (every run): fresh positions of followed traders + traders we still hold copies of
     desk = kv_get(conn, "desk")
     study = kv_get(conn, "study") or {}
+    desk, study2, back = never_backwards(desk, study, load_published(pub_path), now)
+    if back:
+        notes.extend(back)
+        kv_set(conn, "desk", desk)
+        if study2 is not study:
+            kv_set(conn, "study", study2)
+        study = study2
     follow = [p["addr"] for p in study.get("top", [])]
     # 04.11 22:35: the server copies the followed whales every ~60 s (cnq/execution/whale_live.py → web/whales_live.json). While that
     # desk is fresh it IS the desk: published here as it is, no second desk_step (one desk for the panel, desk_select and the account)
@@ -1413,7 +1473,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
                   for p in elig if p.get("copy_ok", copy_ok(p)) and not hidden(p.get("positions") or [])][:FOLLOW_N]
     # 04.11: a complete run always sets the list — also when the stricter bar leaves fewer (or no) whales; a partial run only
     # fills an empty list. Who left the list and why is kept for the panel and the report.
-    if complete or (follow_new and not study.get("top")):
+    if (complete and profs) or (follow_new and not study.get("top")):        # a run that studied nobody never empties the list
         old = {x["addr"]: x for x in study.get("top") or []}
         byaddr = {p["addr"]: p for p in profs}
         new_set = {x["addr"] for x in follow_new}

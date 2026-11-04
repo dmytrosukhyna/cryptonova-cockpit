@@ -154,10 +154,15 @@ jobs:
       - name: Whales (Hyperliquid leaderboard positions) → web/whales.json
         continue-on-error: true
         run: python -m cnq.cli whales --out web
+      # 04.11 23:20: runs on a stale database too — its desk is the server's live one (web/whales_live.json) or the published one,
+      # never an older one from the database (whale_study.never_backwards), and its study data refetches by itself; a bigger
+      # request budget (CNQ_WHALE_REQ / CNQ_WHALE_BUDGET_S) refills a lost history in a few runs instead of a day
       - name: Top traders study (Hyperliquid + OKX lead traders, copy test, «Киты» copy desk) → web/whales_top.json
-        if: ${{ steps.state.outputs.stale != 'true' }}      # 04.11: a rolled-back database republished a 15-day-old «Киты» desk that the REAL account follows
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 9
+        env:
+          CNQ_WHALE_REQ: "300"
+          CNQ_WHALE_BUDGET_S: "360"
         run: python -m cnq.cli whalestudy --out web
       - name: «Киты · фондовый рынок» — SEC 13F of 10 funds (checked once a day), ARK daily trades (6 h), Congress trades → web/stock_whales.json (information only)
         continue-on-error: true
@@ -168,7 +173,7 @@ jobs:
         timeout-minutes: 7
         run: python -m cnq.cli smartmoney --out web
       - name: Why each real futures position is open (whale, rules, market at entry) → web/real_why.json
-        if: ${{ steps.state.outputs.stale != 'true' }}
+        # 04.11 23:20: reads only published web/ files (whales_top.json is never older than published) — safe on a stale database
         continue-on-error: true
         timeout-minutes: 3
         run: python -m cnq.cli realwhy --out web
@@ -292,8 +297,11 @@ jobs:
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase --autostash -X theirs origin/main && git push origin HEAD:main && break || { echo "::warning title=push::attempt $i failed"; git rebase --abort || true; sleep 15; }; done
+      # 04.11 23:20: also when the run STARTED from an already-stale fallback cache (a hit, but not the pinned key): saving cannot make
+      # the newest cache any older, and the whale study's refetched history (it runs on a stale database, never_backwards) survives.
+      # A cache miss on a stale database is still never saved.
       - name: Save state to the cache — only a good (not rolled-back) state, so a lost cache can never poison later runs (04.11)
-        if: ${{ always() && steps.state.outputs.stale != 'true' && steps.restore.outcome == 'success' }}
+        if: ${{ always() && steps.restore.outcome == 'success' && (steps.state.outputs.stale != 'true' || (steps.restore.outputs.cache-matched-key != '' && steps.restore.outputs.cache-matched-key != steps.pin.outputs.key)) }}
         uses: actions/cache/save@v4
         with:
           path: |

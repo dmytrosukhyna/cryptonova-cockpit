@@ -282,7 +282,16 @@ def sec_refresh(conn, now: int, get=http, notes: list | None = None) -> dict:
     return {"funds": funds_out, "ok": ok_n}
 
 
-def build_funds(conn, status: dict | None = None) -> list[dict]:
+def fix_units(agg: dict) -> tuple[dict, bool]:
+    """04.11 (seen in Duquesne's 13F): some filers still report «value» in thousands although SEC asks for dollars since 2023 —
+    the median price per share then looks like $0.05. Below $0.5 a share the whole table is scaled ×1000."""
+    px = [v[2] / v[3] for v in agg.values() if v[3] > 0 and v[2] > 0]
+    if px and st.median(px) < 0.5:
+        return {k: [v[0], v[1], v[2] * 1000, v[3]] for k, v in agg.items()}, True
+    return agg, False
+
+
+def build_funds(conn, status: dict | None = None, now: int | None = None) -> list[dict]:
     """per fund from the cached filings: latest quarter, top holdings, the moves of the latest quarter (and of the one before)"""
     st_by = {x["key"]: x for x in (status or {}).get("funds") or []}
     out = []
@@ -297,12 +306,23 @@ def build_funds(conn, status: dict | None = None) -> list[dict]:
             out.append(o)
             continue
         fl = [{"acc": a, "filed": fd, "period": p, **json.loads(r)} for a, fd, p, r in rows]
+        scaled = False
+        for x in fl:
+            x["agg"], sc = fix_units(x["agg"])
+            scaled = scaled or sc
         cur, prev = fl[0], (fl[1] if len(fl) > 1 else None)
         top, total = top_holdings(cur["agg"], prev["agg"] if prev else None)
         o.update(filed=cur["filed"], period=cur["period"], period_ru=period_label(cur["period"]), acc=cur["acc"],
                  filing_link=f"https://www.sec.gov/Archives/edgar/data/{f['cik']}/{cur['acc'].replace('-', '')}/",
                  prev_period=prev["period"] if prev else None, prev_period_ru=period_label(prev["period"]) if prev else None,
-                 total_value=round(total), positions=len(cur["agg"]), options=cur.get("options", 0), top=top, diffs={})
+                 total_value=round(total), positions=len(cur["agg"]), options=cur.get("options", 0), top=top, diffs={},
+                 units_fixed=scaled)
+        try:                               # a fund that stopped filing (Scion: last 13F for 3 кв. 2025) is marked, not hidden
+            age_d = ((now or int(time.time() * 1000)) - int(time.mktime(time.strptime(cur["period"], "%Y-%m-%d")) * 1000)) / DAY
+        except Exception:  # noqa: BLE001
+            age_d = 0
+        if age_d > 200:
+            o["stale_ru"] = f"последний отчёт за {period_label(cur['period'])} — фонд больше не подавал 13F"
         for i in range(len(fl) - 1):
             o["diffs"][fl[i]["period"]] = diff(fl[i]["agg"], fl[i + 1]["agg"])
         d = o["diffs"].get(cur["period"])
@@ -513,7 +533,7 @@ def run(conn: sqlite3.Connection, prev: dict | None = None, now: int | None = No
         sources["sec"] = {"ok": sec_status["ok"] > 0, "n_ok": sec_status["ok"], "n": len(FUNDS), "t": now,
                           "name_ru": "SEC EDGAR 13F", "err": None if sec_status["ok"] else "источник недоступен"}
         chk["sec"] = now
-    funds = build_funds(conn, sec_status)
+    funds = build_funds(conn, sec_status, now)
     if due_ark:
         a = ark_refresh(conn, now, get, notes)
         sources["ark"] = {"ok": a["ok"] > 0, "n_ok": a["ok"], "n": len(ARK_FUNDS), "t": now, "name_ru": "ARK Invest (CSV фондов)",

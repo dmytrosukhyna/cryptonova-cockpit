@@ -35,7 +35,7 @@ EVERY = 55 * 60_000
 WINDOW = 7 * DAY
 DEADLINE_S = 240                       # stop fetching after this many seconds (the pipeline step has its own timeout)
 MIN_USD = 5_000                        # a wallet's 7-day net inflow of a token must be worth ≥ $5k to count
-SINGLE_MIN_USD = 25_000
+SINGLE_MIN_USD = 10_000
 MIN_LIQ = 10_000                       # below: spam / unpriced — dropped (counted)
 LOW_LIQ = 100_000
 NEW_DAYS = 30
@@ -55,6 +55,7 @@ GT_NET = {"eth": "eth", "base": "base", "arbitrum": "arbitrum"}
 GP_CHAIN = {"eth": "1", "base": "8453", "arbitrum": "42161"}
 EXPLORER = {"eth": "https://etherscan.io", "base": "https://basescan.org", "arbitrum": "https://arbiscan.io"}
 CHAIN_RU = {"eth": "Ethereum", "base": "Base", "arbitrum": "Arbitrum", "hl": "Hyperliquid спот"}
+BS_META = "https://metadata.services.blockscout.com/api/v1/metadata"
 HL = "https://api.hyperliquid.xyz/info"
 DS = "https://api.dexscreener.com/tokens/v1/"             # + {chainId}/{a,b,…}: every pool of each token (the old «latest/dex/tokens»
 DS_BATCH = 10                                               # answers at most 30 pools for ALL tokens together — most were lost)
@@ -182,6 +183,26 @@ def tags_of(info: dict) -> list[str]:
     if (info or {}).get("name"):
         out.append(str(info["name"]))
     return list(dict.fromkeys(out))
+
+
+def meta_tags(md) -> list[str]:
+    """Blockscout metadata service answer → every tag name in it (shape-tolerant walk)"""
+    out = []
+
+    def walk(x):
+        if isinstance(x, dict):
+            if isinstance(x.get("tags"), list):
+                for t in x["tags"]:
+                    n = t.get("name") if isinstance(t, dict) else t
+                    if n and str(n) not in out:
+                        out.append(str(n))
+            for v in x.values():
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+    walk(md)
+    return out
 
 
 def confirmed(label: str, tags: list[str]) -> bool:
@@ -455,24 +476,24 @@ def flow_change(conn, asset: str, now: int, total: float, n: int) -> dict:
 
 
 def eth_flow_from_history(hist: dict[str, list]) -> dict:
-    """{wallet: [{date, value(wei)}]} → summed ETH per day, change over 1 and 7 days (forward-filled per wallet)"""
+    """{wallet: [{date, value(wei)}]} → summed ETH now and its change over 1 and 7 days. A wallet counts in a change only when its
+    balance is known on (or before) both days — 04.11: the history of some wallets is short, and treating the unknown start as 0
+    showed a fake +2.7M ETH «inflow»."""
+    def at(v, d):
+        vals = [(it["date"], (_f(it.get("value"), 0) or 0) / 1e18) for it in v if it.get("date") and it["date"] <= d]
+        return max(vals)[1] if vals else None
     days = sorted({it["date"] for v in hist.values() for it in v if it.get("date")})
     if not days:
         return {}
-    tot = {}
-    for d in days:
-        s = 0.0
-        for v in hist.values():
-            vals = [(it["date"], _f(it.get("value"), 0) or 0) for it in v if it.get("date") and it["date"] <= d]
-            if vals:
-                s += max(vals)[1] / 1e18
-        tot[d] = s
     last = days[-1]
-    out = {"total": round(tot[last], 2), "date": last, "wallets": len(hist)}
+    out = {"total": round(sum(x for x in (at(v, last) for v in hist.values()) if x is not None), 2), "date": last, "wallets": len(hist)}
     for k, back in (("d1", 1), ("d7", 7)):
-        target = datetime.strptime(last, "%Y-%m-%d").timestamp() - back * 86400
-        prev = [d for d in days if datetime.strptime(d, "%Y-%m-%d").timestamp() <= target]
-        out[k] = round(tot[last] - tot[prev[-1]], 2) if prev else None
+        d0 = datetime.fromtimestamp(datetime.strptime(last, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() - back * 86400,
+                                    tz=timezone.utc).strftime("%Y-%m-%d")
+        pairs = [(at(v, last), at(v, d0)) for v in hist.values()]
+        pairs = [(a, b) for a, b in pairs if a is not None and b is not None]
+        out[k] = round(sum(a - b for a, b in pairs), 2) if pairs else None
+        out[k + "_wallets"] = len(pairs)
     return out
 
 
@@ -586,7 +607,7 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
     cfg_w = [dict(w, address=w["address"].lower()) for w in cfg.get("wallets") or []]
     hlw = hl_wallets(whales)
     wallets = cfg_w + [dict(w, chains=["arbitrum", "eth"]) for w in hlw[:EVM_HL_ADDRS]]
-    tags = kv_get(conn, "tags") or {}
+    tags = kv_get(conn, "tags2") or {}
     for w in cfg_w:
         k = w["address"]
         if k in tags and now - tags[k].get("t", 0) < 7 * DAY:
@@ -596,11 +617,17 @@ def run(conn: sqlite3.Connection, cfg: dict, whales: dict | None = None, prev: d
         try:
             info = get(f"{BS['eth']}/api/v2/addresses/{k}")
             src.ok("blockscout")
-            tags[k] = {"t": now, "tags": tags_of(info)}
+            tg = tags_of(info)
+            try:                               # 04.11: the address API carries no public tags — Blockscout's metadata service does
+                md = get(f"{BS_META}?addresses={k}&chainId=1")
+                tg += [t for t in meta_tags(md) if t not in tg]
+            except Exception:  # noqa: BLE001
+                pass
+            tags[k] = {"t": now, "tags": tg}
         except Exception as e:  # noqa: BLE001
             src.fail("blockscout", e)
         _sleep(0.25)
-    kv_set(conn, "tags", tags)
+    kv_set(conn, "tags2", tags)
     # 2. scans
     scans, wl_out, chain_down = [], [], {}
     for w in wallets:

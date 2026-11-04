@@ -596,9 +596,11 @@ def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int, carry=None) -> 
             "main_pct": round((1 - staged) * 100, 2), "log": log}
 
 
-# 04.11 17:24 (owner, real money, answered explicitly): «Киты» 25 % of the futures budget, «Агрессивная» 25 % until 30.11; the rest
-# goes to the other main desks equally. «Киты» keep their 25 % only while their ladder stage is ≥ 1 (a rollback to 0 drops them to 0).
-OWNER_SHARES = {"whales": 0.25, "aggr": 0.25}
+# 04.11 17:24 (owner, real money, answered explicitly): «Киты» 25 %, «Агрессивная» 25 % until 30.11.
+# 04.11 17:42 (owner, answered explicitly «100% — только киты»): the whole futures budget follows «Киты» until 30.11; the other desks
+# get 0 (they keep managing positions they already hold until those close, and stay demo). «Киты» keep it only while their ladder
+# stage is ≥ 1 — a rollback to 0 drops them to 0 and the budget falls back to the main desks equally (the safety net).
+OWNER_SHARES = {"whales": 1.0}
 OWNER_SHARES_UNTIL = 1796075999000          # 30.11.2026 23:59:59 Kyiv
 
 

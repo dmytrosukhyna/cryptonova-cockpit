@@ -565,6 +565,8 @@ def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict
         return {"skip": "стоп ближе 0,2% к цене — сделку не повторяю"}
     if tp and ((long and px >= tp) or (not long and px <= tp)):
         return {"skip": "цена уже дошла до цели сигнала"}
+    if part <= 0:
+        return {"skip": "доля этого стола в бюджете фьючерсов сейчас 0% (решение владельца 04.11: весь бюджет — столу «Киты»)"}
     worst = ap.ceil_to(px * (1 + slip), tick) if long else ap.floor_to(px * (1 - slip), tick)
     d_risk = ms._f(t.get("risk_usd")) or (float(t.get("qty") or 0) * abs(float(t["entry"]) - float(t["stop"])))
     frac = d_risk / desk_eq if desk_eq and d_risk else cap["risk"]

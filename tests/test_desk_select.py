@@ -266,12 +266,12 @@ def test_whales_get_a_real_share_once_the_feed_carries_the_desk_shape_and_carry_
     assert by["whales"]["stage"] == 1 and by["whales"]["real"] and by["whales"]["real_why"] is None
     al = ds.alloc_shares(w, "aggr", s, ds.OWNER_SHARES_UNTIL + 1)
     assert al["whales"] == 0.05 and abs(al["aggr"] - 0.475) < 1e-6 and abs(sum(al.values()) - 1) < 1e-5
-    # 04.11 (owner): until 30.11 «Киты» 25 %, «Агрессивная» 25 %, the rest («Импульс BTC») 50 %
+    # 04.11 17:42 (owner): until 30.11 the whole futures budget follows «Киты»; the main desks get 0
     own = ds.alloc_shares(w, "aggr", s, NOW)
-    assert own["whales"] == 0.25 and own["aggr"] == 0.25 and abs(own["imp"] - 0.5) < 1e-6 and abs(sum(own.values()) - 1) < 1e-6
+    assert own["whales"] == 1.0 and own["aggr"] == 0 and own["imp"] == 0 and abs(sum(own.values()) - 1) < 1e-6
     s0 = {"desks": [dict(d, stage=0) if d["key"] == "whales" else d for d in s["desks"]]}
-    own0 = ds.alloc_shares(w, "aggr", s0, NOW)                   # a rolled-back «Киты» get nothing, the rest is shared
-    assert "whales" not in own0 and own0["aggr"] == 0.25 and abs(own0["imp"] - 0.75) < 1e-6
+    own0 = ds.alloc_shares(w, "aggr", s0, NOW)                   # a rolled-back «Киты» get nothing: the main desks share it all
+    assert "whales" not in own0 and abs(own0["aggr"] - 0.5) < 1e-6 and abs(own0["imp"] - 0.5) < 1e-6
     c = by["carry"]
     assert not c["real"] and not c["eligible_real"] and c["trades"] >= 5 and "carry" not in al and "день" in c["note"]
     days = ds.carry_days([(NOW - 2 * ds.DAY, 100.0), (NOW - ds.DAY, 101.0), (NOW - 1000, 101.5)], 101.2, NOW)

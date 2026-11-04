@@ -1289,7 +1289,8 @@ def _pp_action(a: dict, lang: str, key: str | None = None) -> str:
     return t(lang, f"pp.a.{k}", sym=sym)
 
 
-def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAULT, whales: dict | None = None) -> dict | None:
+def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAULT, whales: dict | None = None,
+                    real_why: dict | None = None) -> dict | None:
     if not real or not real.get("since") or real.get("equity_usd") is None:
         return None
     since, s0, eq, pnl = int(real["since"]), float(real.get("start_usd") or 0), float(real["equity_usd"]), real.get("pnl_usd")
@@ -1427,7 +1428,7 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
         lv = _real_lev(real.get("futures") or [], closed)          # build 47 (§6.5): the cap in one short note
         fut.update({"lev_cap": lv, "lev_note": t(lang, "pp.lev_note", lev=lv["now"], max=lv["max"], risk=_dec(lv["risk_pct"], lang))})
         try:
-            _why_rows(real, paper, open_rows, closed, fut, lv, since, lang, whales)
+            _why_rows(real, paper, open_rows, closed, fut, lv, since, lang, whales, real_why)
         except Exception as e:  # noqa: BLE001 — the feed never breaks because of an explanation
             print("app_home why_full:", repr(e)[:200], flush=True)
     raw_acts = [a for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
@@ -1451,7 +1452,7 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
 
 
 def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict, lv: dict, since: int, lang: str,
-              whales: dict | None = None) -> None:
+              whales: dict | None = None, real_why: dict | None = None) -> None:
     """build 53 (owner 31.10: «"Откуп дисконта фьючерса" — никто не понимает»): every real trade, open or closed, gets "why_full" —
     the signal in plain words with its own numbers, the checks the system ran, the rule's record on history and on this account,
     the plan and the $ at risk (cnq/agents/app_why.py). Closed trades find their desk trade through the fut_open action's sig."""
@@ -1476,6 +1477,13 @@ def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict,
         sig = row.get("sig")
         g = aw.grade_of(sig)
         rw = row.pop("_rw", None)
+        if not rw and isinstance(real_why, dict):          # build 54: web/real_why.json (cnq/agents/real_why.py), by sig / inst + open time
+            rw = (real_why.get("by_sig") or {}).get(sig) if not is_closed else next(
+                (c.get("why") for c in real_why.get("closed") or [] if isinstance(c, dict) and (
+                    (sig and c.get("sig") == sig) or (c.get("inst") == row.get("inst") and isinstance(c.get("opened"), (int, float))
+                                                      and isinstance(row.get("opened"), (int, float)) and abs(c["opened"] - row["opened"]) <= 600_000))), None)
+        if isinstance(rw, dict) and any(k in rw for k in ("whale", "copy", "target", "market")):
+            rw = aw.flat_real_why(rw)
         if not g:
             continue
         if str(sig).startswith("whales:"):
@@ -1748,7 +1756,8 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
     if public is not None and real is not None:
         public["real"] = real
     try:
-        pport = _real_portfolio(real, paper, now, lang, ex["whales_top"] if "whales_top" in ex else _load(out, "whales_top.json"))
+        pport = _real_portfolio(real, paper, now, lang, ex["whales_top"] if "whales_top" in ex else _load(out, "whales_top.json"),
+                                ex["real_why"] if "real_why" in ex else _load(out, "real_why.json"))
     except Exception as e:  # noqa: BLE001 — the feed never breaks because of the real account's file
         print("app_home public_portfolio:", repr(e)[:200], flush=True)
         pport = None

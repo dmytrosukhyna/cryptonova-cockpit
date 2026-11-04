@@ -84,3 +84,15 @@ def test_whale_copy_explains_itself_with_a_reference_target():
         assert "2%" in d["risk"] and "$30" in d["risk"]
         assert any("410" in c["t"] for c in d["checks"])
     assert aw._num(20.0, 0) == "20" and aw._price(0.0000049781) == "0.000004978"
+
+
+def test_real_why_json_feeds_the_copy_explanation():
+    """build 54: web/real_why.json's nested why (whale / copy / target / market) is read; an empty market says nothing"""
+    from cnq.agents import app_why as aw
+    w = aw.flat_real_why({"whale": {"name": "W1", "source": "okx_lead", "entry": 50.0, "lev": 8, "notional_usd": 90000,
+                                    "record_30d": {"trades": 12, "win": 0.75, "pnl_usd": 5000, "pf": 3.1}},
+                          "copy": {"stop": 108.0}, "target": {"ref_px": 84.0}, "market": {}})
+    row = {"sym": "HYPE", "side": "SHORT", "entry": 100.0, "stop": None, "lev": 5}
+    d = aw.copy_why(row, None, None, w, None, {"lev": 5, "risk_pct": 2.0}, {"since": 1792627200000, "budget_usd": 1500}, "en")
+    assert "W1" in d["signal"] and "OKX" in d["signal"] and "8x" in d["signal"] and d["context"] is None
+    assert d["target_ref"] == 84.0 and "108.00" in d["plan"] and "12 closed trades, 75%" in d["history"]

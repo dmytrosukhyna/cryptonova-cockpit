@@ -288,7 +288,7 @@ W: dict[str, dict[str, str]] = {
     "rw.w.ctx": _w("Рынок при входе: {x}.", "The market at the entry: {x}.", "Ринок під час входу: {x}.", "Η αγορά στην είσοδο: {x}.",
                    "El mercado al entrar: {x}."),
     "rw.w.c.btc": _w("биткоин за сутки {v}", "bitcoin {v} in 24 h", "біткоїн за добу {v}", "bitcoin {v} σε 24 ώρες", "bitcoin {v} en 24 h"),
-    "rw.w.c.fund": _w("фандинг {v}", "funding {v}", "фандинг {v}", "funding {v}", "funding {v}"),
+    "rw.w.c.fund": _w("фандинг {v} за 8 ч", "funding {v} per 8 h", "фандинг {v} за 8 год", "funding {v} ανά 8 ώρες", "funding {v} cada 8 h"),
     "rw.w.c.oi": _w("открытый интерес {v}", "open interest {v}", "відкритий інтерес {v}", "open interest {v}", "interés abierto {v}"),
     "rw.w.c.sup": _w("поддержка {v}", "support {v}", "підтримка {v}", "στήριξη {v}", "soporte {v}"),
     "rw.w.c.res": _w("сопротивление {v}", "resistance {v}", "опір {v}", "αντίσταση {v}", "resistencia {v}"),
@@ -645,6 +645,22 @@ def ref_target(entry, stop, side: str | None) -> float | None:
     return t_ if t_ > 0 else None
 
 
+def flat_real_why(w: dict | None) -> dict | None:
+    """web/real_why.json's why (cnq/agents/real_why.py: whale{…, record_30d{…}}, copy{…}, target{ref_px}, market{…}) → the flat
+    fields [copy_why] reads; anything missing stays missing"""
+    if not isinstance(w, dict):
+        return None
+    wh, cp, tg, mk = (w.get(k) if isinstance(w.get(k), dict) else {} for k in ("whale", "copy", "target", "market"))
+    r30 = wh.get("record_30d") if isinstance(wh.get("record_30d"), dict) else {}
+    src = str(wh.get("source") or "")
+    out = {"whale_name": wh.get("name"), "whale_venue": "okx" if src.startswith("okx") else "hl" if src.startswith("hyper") else None,
+           "whale_entry": wh.get("entry"), "whale_lev": wh.get("lev"), "whale_usd": wh.get("notional_usd"),
+           "whale_trades_30d": r30.get("trades"), "whale_win_30d": r30.get("win"), "whale_pnl_30d": r30.get("pnl_usd"), "whale_pf": r30.get("pf"),
+           "stop": cp.get("stop"), "target_ref": tg.get("ref_px"), "btc_24h": mk.get("btc_24h_pct"), "funding": mk.get("funding_8h_pct"),
+           "support": mk.get("support"), "resistance": mk.get("resistance"), "oi_chg": mk.get("oi_4h_pct")}
+    return {k: v for k, v in out.items() if v not in (None, "")}
+
+
 def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, desk: dict | None, caps: dict, ctx: dict,
              lang: str = DEFAULT, closed: bool = False) -> dict:
     """build 54 (owner 04.11: «Почему вошли» for a copy said only «Сделка по правилам CRYPTO NOVA… 3 из 3»): a real copy of a whale's
@@ -668,10 +684,11 @@ def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, des
                  wn=t(lang, "rw.w.size", u=_usd(float(wn), lang)) if wn and float(wn) >= 1000 else "")
     sig += t(lang, "rw.w.why")
     entry = row.get("entry") if not closed else row.get("open_px")
-    stop = row.get("stop") if row.get("stop") is not None else (wd or {}).get("stop")
+    stop = row.get("stop") if row.get("stop") is not None else _pick(why, "stop") or (wd or {}).get("stop")
     sp = abs(float(stop) / float(entry) - 1) * 100 if entry and stop else None
     checks = []
-    n, win = _pick(why, "whale_trades", "trips") or _pick(rec, "trips"), _pick(why, "whale_win") or _pick(rec, "win")
+    # the whale's record: the system's list (longer) first, else its 30 days from real_why.json
+    n, win = _pick(rec, "trips") or _pick(why, "whale_trades_30d"), _pick(rec, "win") if _pick(rec, "trips") else _pick(why, "whale_win_30d")
     if n and win is not None:
         w = float(win) * 100 if float(win) <= 1 else float(win)
         checks.append({"t": t(lang, "rw.w.chk.list", n=f"{int(n):,}".replace(",", " "), w=int(round(w))), "ok": True})
@@ -688,7 +705,7 @@ def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, des
     hist = None
     if n and win is not None:
         w = float(win) * 100 if float(win) <= 1 else float(win)
-        pf = _pick(rec, "pf")
+        pf = _pick(rec, "pf") or _pick(why, "whale_pf")
         hist = t(lang, "rw.w.hist", n=f"{int(n):,}".replace(",", " "), w=int(round(w)),
                  pf=t(lang, "rw.w.pf", x=_num(float(pf), 1)) if pf and 1 < float(pf) < 50 else "",
                  d30=t(lang, "rw.w.d30", u=("+" if float(p30) > 0 else "") + _usd(float(p30), lang)) if p30 is not None else "")

@@ -255,7 +255,7 @@ W: dict[str, dict[str, str]] = {
                    " Система копіює лише китів зі свого відібраного списку й лише із захисним стопом.",
                    " Το σύστημα αντιγράφει μόνο φάλαινες από τη δική του επιλεγμένη λίστα και μόνο με προστατευτικό stop.",
                    " El sistema solo copia ballenas de su propia lista seleccionada y siempre con un stop de protección."),
-    "rw.w.chk.list": _w("Кит в отобранном списке системы: {n} закрытых сделок, {w}% в плюсе",
+    "rw.w.chk.list": _w("Кит в отобранном списке системы: закрытых сделок — {n}, в плюсе — {w}%",
                         "The whale is on the system's vetted list: {n} closed trades, {w}% profitable",
                         "Кит у відібраному списку системи: {n} закритих угод, {w}% у плюсі",
                         "Η φάλαινα είναι στη λίστα του συστήματος: {n} κλειστές συναλλαγές, {w}% κερδοφόρες",
@@ -267,12 +267,12 @@ W: dict[str, dict[str, str]] = {
                         "Захисний стоп {sp} від входу — у кожної копії, навіть якщо в кита його немає",
                         "Προστατευτικό stop {sp} από την είσοδο σε κάθε αντίγραφο, ακόμη κι αν η φάλαινα δεν έχει",
                         "Un stop de protección a {sp} de la entrada en cada copia, aunque la ballena no lo tenga"),
-    "rw.w.hist": _w("История кита: {n} закрытых сделок, {w}% в плюсе{pf}{d30}.",
+    "rw.w.hist": _w("История кита: закрытых сделок — {n}, в плюсе — {w}%{pf}{d30}.",
                     "The whale's record: {n} closed trades, {w}% profitable{pf}{d30}.",
                     "Історія кита: {n} закритих угод, {w}% у плюсі{pf}{d30}.",
                     "Το ιστορικό της φάλαινας: {n} κλειστές συναλλαγές, {w}% κερδοφόρες{pf}{d30}.",
                     "El historial de la ballena: {n} operaciones cerradas, {w}% con ganancia{pf}{d30}."),
-    "rw.w.pf": _w(", прибыль больше убытков в {x} раза", ", profits {x} times the losses", ", прибуток більший за збитки в {x} раза",
+    "rw.w.pf": _w(", прибыль к убыткам — {x} к 1", ", profits {x} times the losses", ", прибуток більший за збитки в {x} раза",
                   ", κέρδη {x} φορές τις ζημιές", ", ganancias {x} veces las pérdidas"),
     "rw.w.d30": _w(", за 30 дней {u}", ", {u} over 30 days", ", за 30 днів {u}", ", {u} στις 30 ημέρες", ", {u} en 30 días"),
     "rw.w.desk": _w("Копирование китов на демо-счёте системы с {d}: {n} сделок, в плюсе {w}.",
@@ -280,11 +280,11 @@ W: dict[str, dict[str, str]] = {
                     "Копіювання китів на демо-рахунку системи з {d}: {n} угод, у плюсі {w}.",
                     "Αντιγραφή φαλαινών στον demo λογαριασμό του συστήματος από {d}: {n} συναλλαγές, {w} με κέρδος.",
                     "Copia de ballenas en la cuenta demo del sistema desde el {d}: {n} operaciones, {w} con ganancia."),
-    "rw.w.plan": _w("Вход {entry}, стоп {stop} ({sp} от входа). Своей цели у копии нет: выход — вместе с китом. Ориентир — {tgt} (2R: вдвое дальше стопа).",
-                    "Entry {entry}, stop {stop} ({sp} from the entry). A copy has no target of its own: it exits together with the whale. Reference: {tgt} (2R, twice the stop's distance).",
-                    "Вхід {entry}, стоп {stop} ({sp} від входу). Власної цілі в копії немає: вихід — разом із китом. Орієнтир — {tgt} (2R: удвічі далі за стоп).",
-                    "Είσοδος {entry}, stop {stop} ({sp} από την είσοδο). Το αντίγραφο δεν έχει δικό του στόχο: βγαίνει μαζί με τη φάλαινα. Σημείο αναφοράς: {tgt} (2R, διπλάσια απόσταση από το stop).",
-                    "Entrada {entry}, stop {stop} ({sp} desde la entrada). La copia no tiene objetivo propio: sale junto con la ballena. Referencia: {tgt} (2R, el doble de la distancia al stop)."),
+    "rw.w.plan": _w("Вход {entry}, стоп {stop} ({sp} от входа). Ориентир — {tgt}: ход 2R, вдвое больше стопа. Выходим, когда кит закроет позицию, или по стопу.",
+                    "Entry {entry}, stop {stop} ({sp} from the entry). Guide: {tgt}, a 2R move, twice the stop. We exit when the whale closes, or at the stop.",
+                    "Вхід {entry}, стоп {stop} ({sp} від входу). Орієнтир — {tgt}: хід 2R, удвічі більший за стоп. Виходимо, коли кит закриє позицію, або за стопом.",
+                    "Είσοδος {entry}, stop {stop} ({sp} από την είσοδο). Οδηγός: {tgt}, κίνηση 2R, διπλάσια από το stop. Βγαίνουμε όταν κλείσει η φάλαινα ή στο stop.",
+                    "Entrada {entry}, stop {stop} ({sp} desde la entrada). Guía: {tgt}, un movimiento 2R, el doble del stop. Salimos cuando la ballena cierra o en el stop."),
     "rw.w.ctx": _w("Рынок при входе: {x}.", "The market at the entry: {x}.", "Ринок під час входу: {x}.", "Η αγορά στην είσοδο: {x}.",
                    "El mercado al entrar: {x}."),
     "rw.w.c.btc": _w("биткоин за сутки {v}", "bitcoin {v} in 24 h", "біткоїн за добу {v}", "bitcoin {v} σε 24 ώρες", "bitcoin {v} en 24 h"),
@@ -389,6 +389,111 @@ W: dict[str, dict[str, str]] = {
         "las {a} variantes del laboratorio nocturno pasaron {p}."),
 }
 T.update(W)
+
+# build 55 (owner 04.11 on build 54: «Своей цели у копии нет. Выход вместе с китом. Ориентир 2R — вдвое больше стопа» is unclear): a
+# whale copy explains itself as a short summary + a target line under the live bar + «Подробнее» sections — the strategy, the whale,
+# what he did, what we track, our entry, our stop, the target and the exit. Only the numbers the whale desk recorded.
+W55: dict[str, dict[str, str]] = {
+    "w5.strategy": _w("Стратегия «Копирование китов»", "The «Whale copying» strategy", "Стратегія «Копіювання китів»",
+                      "Η στρατηγική «Αντιγραφή φαλαινών»", "La estrategia «Copia de ballenas»"),
+    "w5.sum": _w("Сделку открыла стратегия «Копирование китов»: повторили {side} {sym} за китом {name}{src}. Ориентир — {tgt} ({tp}); выходим вместе с китом или по стопу {stop}.",
+                 "Opened by the «Whale copying» strategy: we repeated the {side} on {sym} of the whale {name}{src}. Guide: {tgt} ({tp}); we exit with the whale or at the stop {stop}.",
+                 "Угоду відкрила стратегія «Копіювання китів»: повторили {side} {sym} за китом {name}{src}. Орієнтир — {tgt} ({tp}); виходимо разом із китом або за стопом {stop}.",
+                 "Την άνοιξε η στρατηγική «Αντιγραφή φαλαινών»: επαναλάβαμε το {side} της φάλαινας {name}{src} στο {sym}. Οδηγός: {tgt} ({tp}). Βγαίνουμε μαζί με τη φάλαινα ή στο stop {stop}.",
+                 "La abrió la estrategia «Copia de ballenas»: repetimos el {side} de la ballena {name}{src} en {sym}. Guía: {tgt} ({tp}); salimos con la ballena o en el stop {stop}."),
+    "w5.sum0": _w("Сделку открыла стратегия «Копирование китов»: повторили {side} {sym} за китом {name}{src}. Выходим вместе с китом или по стопу.",
+                  "Opened by the «Whale copying» strategy: we repeated the {side} on {sym} of the whale {name}{src}. We exit with the whale or at the stop.",
+                  "Угоду відкрила стратегія «Копіювання китів»: повторили {side} {sym} за китом {name}{src}. Виходимо разом із китом або за стопом.",
+                  "Την άνοιξε η στρατηγική «Αντιγραφή φαλαινών»: επαναλάβαμε το {side} της φάλαινας {name}{src} στο {sym}. Βγαίνουμε μαζί με τη φάλαινα ή στο stop.",
+                  "La abrió la estrategia «Copia de ballenas»: repetimos el {side} de la ballena {name}{src} en {sym}. Salimos con la ballena o en el stop."),
+    "w5.long": _w("лонг", "long", "лонг", "long", "largo"),
+    "w5.short": _w("шорт", "short", "шорт", "short", "corto"),
+    "w5.tline": _w("Ориентир {tgt} ({tp}{usd}) — ход вдвое больше стопа. Выход: кит закрыл позицию или стоп {stop}.",
+                   "Guide {tgt} ({tp}{usd}), a move twice the stop. Exit: the whale closes, or the stop {stop}.",
+                   "Орієнтир {tgt} ({tp}{usd}) — хід удвічі більший за стоп. Вихід: кит закрив позицію або стоп {stop}.",
+                   "Οδηγός {tgt} ({tp}{usd}), κίνηση διπλάσια από το stop. Έξοδος: η φάλαινα κλείνει ή το stop {stop}.",
+                   "Guía {tgt} ({tp}{usd}), un movimiento el doble del stop. Salida: la ballena cierra o el stop {stop}."),
+    "w5.usd": _w(", ≈ {u}", ", ≈ {u}", ", ≈ {u}", ", ≈ {u}", ", ≈ {u}"),
+    "w5.s.strategy": _w("Стратегия", "Strategy", "Стратегія", "Στρατηγική", "Estrategia"),
+    "w5.strategy.t": _w("«Копирование китов»: система каждые ~30 минут смотрит позиции 5 лучших трейдеров из своего списка (за 60 дней не меньше 20 решений, 70% и больше в плюсе, прибыль больше убытков минимум вдвое) и повторяет их сделки — всегда со своим стопом.",
+                        "«Whale copying»: about every 30 minutes the system checks the positions of the 5 best traders on its list (over 60 days at least 20 decisions, 70% or more in profit, profits at least twice the losses) and repeats their trades, always with its own stop.",
+                        "«Копіювання китів»: система кожні ~30 хвилин дивиться позиції 5 найкращих трейдерів зі свого списку (за 60 днів не менше 20 рішень, 70% і більше в плюсі, прибуток більший за збитки щонайменше вдвічі) і повторює їхні угоди — завжди зі своїм стопом.",
+                        "«Αντιγραφή φαλαινών»: περίπου κάθε 30 λεπτά το σύστημα ελέγχει τις θέσεις των 5 καλύτερων traders της λίστας του (σε 60 ημέρες τουλάχιστον 20 αποφάσεις, 70% ή περισσότερο με κέρδος, κέρδη τουλάχιστον διπλάσια από τις ζημιές) και επαναλαμβάνει τις συναλλαγές τους, πάντα με δικό του stop.",
+                        "«Copia de ballenas»: cada ~30 minutos el sistema revisa las posiciones de los 5 mejores traders de su lista (en 60 días al menos 20 decisiones, 70% o más con ganancia, ganancias al menos el doble de las pérdidas) y repite sus operaciones, siempre con su propio stop."),
+    "w5.s.whale": _w("Кит", "The whale", "Кит", "Η φάλαινα", "La ballena"),
+    "w5.whale.who": _w("{name} — {src}.", "{name}: {src}.", "{name} — {src}.", "{name}: {src}.", "{name}: {src}."),
+    "w5.whale.style": _w(" Стиль — {s}.", " Style: {s}.", " Стиль — {s}.", " Στυλ: {s}.", " Estilo: {s}."),
+    "w5.whale.hold": _w(" Обычно держит позицию {h}.", " Usually holds a position {h}.", " Зазвичай тримає позицію {h}.",
+                        " Συνήθως κρατά μια θέση {h}.", " Suele mantener una posición {h}."),
+    "w5.h": _w("около {n} ч", "about {n} h", "близько {n} год", "περίπου {n} ώρες", "unas {n} h"),
+    "w5.d": _w("около {n} {u}", "about {n} days", "близько {n} {u}", "περίπου {n} ημέρες", "unos {n} días"),
+    "w5.s.did": _w("Что сделал кит", "What the whale did", "Що зробив кит", "Τι έκανε η φάλαινα", "Qué hizo la ballena"),
+    "w5.did": _w("Открыл {side} {sym}{we}{wl}{wn}.", "Opened a {side} on {sym}{we}{wl}{wn}.", "Відкрив {side} {sym}{we}{wl}{wn}.",
+                 "Άνοιξε {side} στο {sym}{we}{wl}{wn}.", "Abrió un {side} en {sym}{we}{wl}{wn}."),
+    "w5.did.we": _w(" по {p}", " at {p}", " за {p}", " στα {p}", " a {p}"),
+    "w5.did.wl": _w(", плечо {l}x", ", {l}x leverage", ", плече {l}x", ", μόχλευση {l}x", ", apalancamiento {l}x"),
+    "w5.did.wn": _w(", позиция около {u}", ", a position of about {u}", ", позиція близько {u}", ", θέση περίπου {u}", ", una posición de unos {u}"),
+    "w5.did.at": _w(" Система заметила это {d}.", " The system saw it on {d}.", " Система помітила це {d}.", " Το σύστημα το είδε στις {d}.",
+                    " El sistema lo vio el {d}."),
+    "w5.s.track": _w("Что отслеживаем", "What we track", "Що відстежуємо", "Τι παρακολουθούμε", "Qué seguimos"),
+    "w5.track": _w("Каждые ~30 минут — его позицию по {sym}: доливает ли он, сокращает или закрывает. Доливки и частичные сокращения мы видим, но копию не меняем; закрыл или развернул позицию — закрываем и мы.",
+                   "About every 30 minutes, his {sym} position: does he add, cut or close. We see adds and partial cuts but leave the copy as it is; when he closes or flips, we close too.",
+                   "Кожні ~30 хвилин — його позицію по {sym}: чи доливає він, скорочує чи закриває. Доливки й часткові скорочення ми бачимо, але копію не змінюємо; закрив або розвернув позицію — закриваємо й ми.",
+                   "Περίπου κάθε 30 λεπτά τη θέση του στο {sym}: αν προσθέτει, μειώνει ή κλείνει. Βλέπουμε τις προσθήκες και τις μερικές μειώσεις αλλά δεν αλλάζουμε το αντίγραφο· όταν κλείσει ή αντιστρέψει, κλείνουμε κι εμείς.",
+                   "Cada ~30 minutos, su posición en {sym}: si añade, reduce o cierra. Vemos los añadidos y los recortes parciales, pero no tocamos la copia; cuando cierra o da la vuelta, cerramos también."),
+    "w5.track.plus": _w(" Сейчас цена {px} — кит в плюсе: {g} от его входа.", " The price is now {px}: the whale is in profit, {g} from his entry.",
+                        " Зараз ціна {px} — кит у плюсі: {g} від його входу.", " Η τιμή τώρα είναι {px}: η φάλαινα κερδίζει, {g} από την είσοδό του.",
+                        " El precio ahora es {px}: la ballena gana, {g} desde su entrada."),
+    "w5.track.minus": _w(" Сейчас цена {px} — кит пока в минусе: {g} от его входа.", " The price is now {px}: the whale is down for now, {g} from his entry.",
+                         " Зараз ціна {px} — кит поки в мінусі: {g} від його входу.", " Η τιμή τώρα είναι {px}: η φάλαινα χάνει προς το παρόν, {g} από την είσοδό του.",
+                         " El precio ahora es {px}: la ballena pierde por ahora, {g} desde su entrada."),
+    "w5.better": _w("на {g} лучше, чем у кита", "{g} better than the whale's", "на {g} краще, ніж у кита", "{g} καλύτερα από της φάλαινας",
+                    "un {g} mejor que la de la ballena"),
+    "w5.worse": _w("на {g} хуже, чем у кита", "{g} worse than the whale's", "на {g} гірше, ніж у кита", "{g} χειρότερα από της φάλαινας",
+                   "un {g} peor que la de la ballena"),
+    "w5.s.entry": _w("Наш вход", "Our entry", "Наш вхід", "Η είσοδός μας", "Nuestra entrada"),
+    "w5.entry.new": _w("Мы вошли по {e} — по текущей цене, как только заметили новую позицию кита: цена {g}.",
+                       "We entered at {e}, at the market price as soon as we saw the whale's new position: a price {g}.",
+                       "Ми увійшли за {e} — за поточною ціною, щойно помітили нову позицію кита: ціна {g}.",
+                       "Μπήκαμε στα {e}, στην τρέχουσα τιμή μόλις είδαμε τη νέα θέση της φάλαινας: τιμή {g}.",
+                       "Entramos a {e}, al precio de mercado en cuanto vimos la nueva posición de la ballena: un precio {g}."),
+    "w5.entry.join": _w("Мы вошли по {e} — в уже открытую позицию кита: цена {g}. Так входим, только пока цена не хуже его входа больше чем на {mx}% и кит не в минусе больше чем на {bt}%; иначе ждём его следующую сделку.",
+                        "We entered at {e}, into the whale's already open position: a price {g}. We join only while the price is no more than {mx}% worse than his entry and he is not down more than {bt}%; otherwise we wait for his next trade.",
+                        "Ми увійшли за {e} — у вже відкриту позицію кита: ціна {g}. Так входимо, лише поки ціна не гірша за його вхід більше ніж на {mx}% і кит не в мінусі більше ніж на {bt}%; інакше чекаємо його наступну угоду.",
+                        "Μπήκαμε στα {e}, σε ήδη ανοιχτή θέση της φάλαινας: τιμή {g}. Μπαίνουμε έτσι μόνο όσο η τιμή δεν είναι χειρότερη από την είσοδό του πάνω από {mx}% και η φάλαινα δεν χάνει πάνω από {bt}%· αλλιώς περιμένουμε την επόμενη συναλλαγή του.",
+                        "Entramos a {e}, en una posición de la ballena ya abierta: un precio {g}. Solo entramos así mientras el precio no sea más de un {mx}% peor que su entrada y la ballena no pierda más de un {bt}%; si no, esperamos su siguiente operación."),
+    "w5.entry.plain": _w("Мы вошли по {e}.", "We entered at {e}.", "Ми увійшли за {e}.", "Μπήκαμε στα {e}.", "Entramos a {e}."),
+    "w5.s.stop": _w("Наш стоп", "Our stop", "Наш стоп", "Το stop μας", "Nuestro stop"),
+    "w5.stop.whale": _w("{stop} ({sp} от входа) — там же, где стоп самого кита на бирже. Стоп стоит на бирже OKX и сработает, даже если сервер молчит.",
+                        "{stop} ({sp} from the entry), where the whale's own stop sits on the exchange. The stop is placed at OKX and works even if our server is silent.",
+                        "{stop} ({sp} від входу) — там само, де стоп самого кита на біржі. Стоп стоїть на біржі OKX і спрацює, навіть якщо сервер мовчить.",
+                        "{stop} ({sp} από την είσοδο), εκεί που βρίσκεται το stop της ίδιας της φάλαινας στο χρηματιστήριο. Το stop είναι στην OKX και λειτουργεί ακόμη κι αν ο server σωπαίνει.",
+                        "{stop} ({sp} desde la entrada), donde está el stop de la propia ballena en el exchange. El stop está en OKX y funciona aunque el servidor calle."),
+    "w5.stop.own": _w("{stop} ({sp} от входа) — защитный стоп системы: кит свой стоп не показывает, поэтому ставим свой на {d}% от входа. Стоп стоит на бирже OKX и сработает, даже если сервер молчит.",
+                      "{stop} ({sp} from the entry), the system's protective stop: the whale shows no stop, so we set our own {d}% from the entry. The stop is placed at OKX and works even if our server is silent.",
+                      "{stop} ({sp} від входу) — захисний стоп системи: кит свій стоп не показує, тому ставимо свій на {d}% від входу. Стоп стоїть на біржі OKX і спрацює, навіть якщо сервер мовчить.",
+                      "{stop} ({sp} από την είσοδο), το προστατευτικό stop του συστήματος: η φάλαινα δεν δείχνει stop, οπότε βάζουμε δικό μας στο {d}% από την είσοδο. Το stop είναι στην OKX και λειτουργεί ακόμη κι αν ο server σωπαίνει.",
+                      "{stop} ({sp} desde la entrada), el stop de protección del sistema: la ballena no muestra su stop, así que ponemos el nuestro a un {d}% de la entrada. Está en OKX y funciona aunque el servidor calle."),
+    "w5.s.exit": _w("Цель и выход", "Target and exit", "Ціль і вихід", "Στόχος και έξοδος", "Objetivo y salida"),
+    "w5.exit.tgt": _w("Ориентир — {tgt} ({tp} от входа{usd}): ход вдвое больше стопа (2R). Это ориентир, а не заявка: на нём сделку не закрываем, ведь кит может держать дольше.",
+                      "Guide: {tgt} ({tp} from the entry{usd}), a move twice the stop (2R). It is a guide, not an order: we do not close there, since the whale may hold longer.",
+                      "Орієнтир — {tgt} ({tp} від входу{usd}): хід удвічі більший за стоп (2R). Це орієнтир, а не заявка: на ньому угоду не закриваємо, адже кит може тримати довше.",
+                      "Οδηγός: {tgt} ({tp} από την είσοδο{usd}), κίνηση διπλάσια από το stop (2R). Είναι οδηγός, όχι εντολή: δεν κλείνουμε εκεί, αφού η φάλαινα μπορεί να κρατήσει περισσότερο.",
+                      "Guía: {tgt} ({tp} desde la entrada{usd}), un movimiento el doble del stop (2R). Es una guía, no una orden: no cerramos ahí, porque la ballena puede mantener más tiempo."),
+    "w5.exit.usd": _w(", ≈ {u} к результату", ", ≈ {u} to the result", ", ≈ {u} до результату", ", ≈ {u} στο αποτέλεσμα", ", ≈ {u} al resultado"),
+    "w5.exit.when": _w(" Выходим в одном из двух случаев: кит закрыл или развернул позицию — закрываем и мы; цена дошла до стопа {stop}. Скользящего стопа у копий нет.",
+                       " We exit in one of two cases: the whale closes or flips his position, and we close too; or the price reaches the stop {stop}. Copies have no trailing stop.",
+                       " Виходимо в одному з двох випадків: кит закрив або розвернув позицію — закриваємо й ми; ціна дійшла до стопа {stop}. Ковзного стопа в копій немає.",
+                       " Βγαίνουμε σε μία από δύο περιπτώσεις: η φάλαινα κλείνει ή αντιστρέφει τη θέση της, και κλείνουμε κι εμείς· ή η τιμή φτάνει στο stop {stop}. Τα αντίγραφα δεν έχουν κινητό stop.",
+                       " Salimos en uno de dos casos: la ballena cierra o da la vuelta a su posición, y cerramos también; o el precio llega al stop {stop}. Las copias no tienen stop dinámico."),
+    "w5.exit.hold": _w(" Кит обычно держит {h} — примерно столько может длиться и копия.", " The whale usually holds {h}, so the copy may last about as long.",
+                       " Кит зазвичай тримає {h} — приблизно стільки може тривати й копія.", " Η φάλαινα συνήθως κρατά {h}, άρα και το αντίγραφο μπορεί να κρατήσει περίπου τόσο.",
+                       " La ballena suele mantener {h}, así que la copia puede durar más o menos lo mismo."),
+    "w5.s.market": _w("Рынок при входе", "The market at the entry", "Ринок під час входу", "Η αγορά στην είσοδο", "El mercado al entrar"),
+    "w5.s.risk": _w("Риск", "Risk", "Ризик", "Κίνδυνος", "Riesgo"),
+    "w5.s.record": _w("Результаты стратегии", "The strategy's record", "Результати стратегії", "Το ιστορικό της στρατηγικής", "Resultados de la estrategia"),
+}
+T.update(W55)
 
 MONTHS = {"ru": ("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"),
           "uk": ("січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"),
@@ -656,6 +761,8 @@ def flat_real_why(w: dict | None) -> dict | None:
     out = {"whale_name": wh.get("name"), "whale_venue": "okx" if src.startswith("okx") else "hl" if src.startswith("hyper") else None,
            "whale_entry": wh.get("entry"), "whale_lev": wh.get("lev"), "whale_usd": wh.get("notional_usd"),
            "whale_trades_30d": r30.get("trades"), "whale_win_30d": r30.get("win"), "whale_pnl_30d": r30.get("pnl_usd"), "whale_pf": r30.get("pf"),
+           "whale_hold_h": r30.get("hold_med_h"), "whale_style": r30.get("style_ru"), "whale_src_ru": wh.get("source_ru"),
+           "stop_src": cp.get("stop_src_ru"),
            "stop": cp.get("stop"), "target_ref": tg.get("ref_px"), "btc_24h": mk.get("btc_24h_pct"), "funding": mk.get("funding_8h_pct"),
            "support": mk.get("support"), "resistance": mk.get("resistance"), "oi_chg": mk.get("oi_4h_pct")}
     return {k: v for k, v in out.items() if v not in (None, "")}
@@ -744,11 +851,147 @@ def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, des
         result = t(lang, "rw.result", usd=("+" if row["pnl_usd"] > 0 else "") + _usd(row["pnl_usd"], lang, True), mv=_pct(row["move_pct"], 2))
         if str((wd or {}).get("why") or "").startswith("кит"):
             result += " " + t(lang, "rw.w.exit")
+    # build 55: the short summary, the target line under the live bar and the «Подробнее» sections
+    summary, tline, sections = _copy_story(row, wd, rec, why, desk, lang, closed, side, sym, name, venue, src, entry, stop, sp, tgt,
+                                           we, wl, wn, context, risk, live, hist)
     doc = {"title": t(lang, "rw.w.title"), "signal": sig, "checked_title": t(lang, "rw.checked"), "checks": checks, "history": hist,
            "live": " ".join(live), "plan": plan, "risk": risk, "result": result, "context": context, "copy": True,
-           "target_ref": round(float(tgt), 12) if tgt else None}
+           "target_ref": round(float(tgt), 12) if tgt else None, "summary": summary, "target_line": tline, "sections": sections}
     doc["text"] = " ".join(x for x in (doc["signal"], hist, context, doc["live"], plan, risk, result) if x)
     return doc
+
+
+def _hold(h, lang: str) -> str | None:
+    try:
+        h = float(h)
+    except (TypeError, ValueError):
+        return None
+    if h <= 0:
+        return None
+    if h < 48:
+        return t(lang, "w5.h", n=int(round(h)))
+    n = int(round(h / 24))
+    few = n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14)
+    one = n % 10 == 1 and n % 100 != 11
+    u = {"ru": "дня" if few else "день" if one else "дней", "uk": "дні" if few else "день" if one else "днів"}.get(lang, "")
+    return t(lang, "w5.d", n=n, u=u)
+
+
+def _when(ms, lang: str) -> str | None:
+    if not isinstance(ms, (int, float)) or ms <= 0:
+        return None
+    d = dt.datetime.fromtimestamp(int(ms) / 1000, KYIV)
+    return f"{date_words(int(ms), lang)}, {d.hour:02d}:{d.minute:02d}"
+
+
+def _sig_ms(sig) -> int | None:
+    try:
+        return int(str(sig).rsplit("-", 1)[1])
+    except (IndexError, ValueError):
+        return None
+
+
+def _copy_story(row, wd, rec, why, desk, lang, closed, side, sym, name, venue, src, entry, stop, sp, tgt, we, wl, wn, context, risk,
+                live, hist):
+    """build 55: (summary, target_line, sections) of a whale copy — every sentence only with its numbers"""
+    s_side = t(lang, "w5.short" if side == "SHORT" else "w5.long")
+    sgn = -1 if side == "SHORT" else 1
+    nm = f"«{name}»" if name else ""
+    src_short = " (OKX)" if venue == "okx" else " (Hyperliquid)" if venue == "hl" else ""
+    e = float(entry) if entry else None
+    st_ = float(stop) if stop else None
+    tg = float(tgt) if tgt else None
+    tp = (tg / e - 1) * 100 if tg and e else None
+    # the position's size from its own $ result and price move (only when the move is big enough to give a stable size)
+    usd, mv = row.get("pnl_usd"), row.get("move_pct")
+    notional = abs(float(usd) / (float(mv) / 100)) if usd is not None and mv is not None and abs(float(mv)) >= 0.3 else None
+    gain = notional * abs(tp) / 100 if notional and tp is not None else None
+    if tg and e and st_ and not closed:
+        summary = t(lang, "w5.sum", side=s_side, sym=sym, name=nm, src=src_short, tgt=_price(tg), tp=_pct(tp, 1), stop=_price(st_))
+        tline = t(lang, "w5.tline", tgt=_price(tg), tp=_pct(tp, 1), usd=t(lang, "w5.usd", u="+" + _usd(gain, lang)) if gain and gain >= 1 else "",
+                  stop=_price(st_))
+    else:
+        summary = t(lang, "w5.sum0", side=s_side, sym=sym, name=nm, src=src_short)
+        tline = None
+    summary = summary.replace("  ", " ").replace(" ()", "").replace("«» ", "")
+    sec = []
+    # 1 · the strategy and its record
+    rec_t = t(lang, "w5.strategy.t")
+    live = " ".join(live) if isinstance(live, list) else live
+    sec.append({"title": t(lang, "w5.s.strategy"), "text": rec_t + (" " + live if live else "")})
+    # 2 · the whale
+    who = None
+    src_words = src or (_pick(why, "whale_src_ru") or _pick(rec, "src_ru") if lang == "ru" else None)
+    if name:
+        who = t(lang, "w5.whale.who", name=name, src=src_words) if src_words else name + "."
+        style = _pick(why, "whale_style") or _pick(rec, "style_ru")
+        if style and lang == "ru":
+            who += t(lang, "w5.whale.style", s=str(style))
+        h = _hold(_pick(why, "whale_hold_h") or _pick(rec, "hold_med_h"), lang)
+        if h:
+            who += t(lang, "w5.whale.hold", h=h)
+    wtxt = " ".join(x for x in (who, hist) if x)
+    if wtxt:
+        sec.append({"title": t(lang, "w5.s.whale"), "text": wtxt})
+    # 3 · what the whale did
+    did = t(lang, "w5.did", side=s_side, sym=sym, we=t(lang, "w5.did.we", p=_price(float(we))) if we else "",
+            wl=t(lang, "w5.did.wl", l=_num(float(wl), 0)) if wl else "",
+            wn=t(lang, "w5.did.wn", u=_usd(float(wn), lang)) if wn and float(wn) >= 1000 else "")
+    seen = _when((wd or {}).get("opened_t") or _sig_ms(row.get("sig")) or row.get("opened"), lang)
+    if seen:
+        did += t(lang, "w5.did.at", d=seen)
+    sec.append({"title": t(lang, "w5.s.did"), "text": did})
+    # 4 · what we track
+    trk = t(lang, "w5.track", sym=sym)
+    px = row.get("price")
+    if we and px and not closed:
+        g = (float(px) / float(we) - 1) * 100
+        trk += t(lang, "w5.track.plus" if g * sgn >= 0 else "w5.track.minus", px=_price(float(px)), g=_pct(g, 1))
+    sec.append({"title": t(lang, "w5.s.track"), "text": trk})
+    # 5 · our entry against his
+    if e:
+        g0 = (e / float(we) - 1) * 100 if we else None
+        g = None if g0 is None else t(lang, "w5.worse" if g0 * sgn > 0 else "w5.better", g=_num(abs(g0), 1) + "%")
+        if g is not None and (wd or {}).get("join"):
+            try:
+                from .whale_study import JOIN_BETTER, JOIN_MAX
+            except Exception:  # noqa: BLE001
+                JOIN_MAX, JOIN_BETTER = 0.01, 0.03
+            ent = t(lang, "w5.entry.join", e=_price(e), g=g, mx=_num(JOIN_MAX * 100, 1), bt=_num(JOIN_BETTER * 100, 1))
+        elif g is not None:
+            ent = t(lang, "w5.entry.new", e=_price(e), g=g)
+        else:
+            ent = t(lang, "w5.entry.plain", e=_price(e))
+        sec.append({"title": t(lang, "w5.s.entry"), "text": ent})
+    # 6 · our stop and why it is there
+    if st_ and sp is not None:
+        spx = ("+" if side == "SHORT" else "−") + _num(sp, 1) + "%"
+        ssrc = str(_pick(why, "stop_src") or (wd or {}).get("stop_src") or "")
+        if "кита" in ssrc:
+            stx = t(lang, "w5.stop.whale", stop=_price(st_), sp=spx)
+        else:
+            try:
+                from .whale_study import DESK_STOP
+            except Exception:  # noqa: BLE001
+                DESK_STOP = 0.08
+            stx = t(lang, "w5.stop.own", stop=_price(st_), sp=spx, d=_num(DESK_STOP * 100, 1))
+        sec.append({"title": t(lang, "w5.s.stop"), "text": stx})
+    # 7 · the target and the exit
+    ex = ""
+    if tg and tp is not None:
+        ex = t(lang, "w5.exit.tgt", tgt=_price(tg), tp=_pct(tp, 1), usd=t(lang, "w5.exit.usd", u="+" + _usd(gain, lang)) if gain and gain >= 1 else "")
+    ex += t(lang, "w5.exit.when", stop=_price(st_) if st_ else "—")
+    h = _hold(_pick(why, "whale_hold_h") or _pick(rec, "hold_med_h"), lang)
+    if h:
+        ex += t(lang, "w5.exit.hold", h=h)
+    sec.append({"title": t(lang, "w5.s.exit"), "text": ex.strip()})
+    if context:
+        head = t(lang, "rw.w.ctx", x="").rstrip(" .")
+        body = context[len(head):].lstrip(" :") if context.startswith(head) else context
+        sec.append({"title": t(lang, "w5.s.market"), "text": body[:1].upper() + body[1:]})
+    if risk:
+        sec.append({"title": t(lang, "w5.s.risk"), "text": risk})
+    return summary, tline, sec
 
 
 def open_sig_for_closed(c: dict, actions: list) -> str | None:

@@ -1147,8 +1147,11 @@ T: dict[str, dict[str, str]] = {
     "rep.pct_frac": {"ru": "процента", "en": "percent", "uk": "відсотка", "el": "τοις εκατό", "es": "por ciento"},
     # build 53 (owner 30.10): the briefing — the system's state, the portfolio in one clause, bitcoin with the regime, fear & greed,
     # one closing line
-    "rep.ok": {"ru": "Система работает штатно.", "en": "The system is running as usual.", "uk": "Система працює штатно.",
-               "el": "Το σύστημα λειτουργεί κανονικά.", "es": "El sistema funciona con normalidad."},
+    # build 55 (owner 04.11: «главный доклад никогда не говорит голосом»): the app (builds 47–54) refuses a server report with
+    # «штатно» / «as usual» / «κανονικά» / «con normalidad» (VoiceReport.claimsAllWell) and reads its own long text through a live
+    # /v2/tts instead of this report's ready mp3 — so these words are the app's own calm ones, and the ready mp3 is played
+    "rep.ok": {"ru": "Система работает в обычном режиме.", "en": "The system is working normally.", "uk": "Система працює у звичайному режимі.",
+               "el": "Το σύστημα δουλεύει όπως συνήθως.", "es": "El sistema funciona como siempre."},
     "rep.pf": {"ru": "Публичный портфель CRYPTO NOVA — {v}, с {d} {chg}.", "en": "The CRYPTO NOVA public portfolio is {v}, {chg} since {d}.",
                "uk": "Публічний портфель CRYPTO NOVA — {v}, з {d} {chg}.", "el": "Το δημόσιο χαρτοφυλάκιο CRYPTO NOVA είναι {v}, {chg} από {d}.",
                "es": "La cartera pública de CRYPTO NOVA es de {v}, {chg} desde el {d}."},

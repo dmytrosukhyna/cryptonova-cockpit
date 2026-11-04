@@ -555,3 +555,19 @@ def test_rate_is_the_one_brisk_tempo_everywhere():
     assert tts.RATE == "+6%"
     assert voice.RATE == tts.RATE
     assert tts.key("Привет", "ru") != hashlib.sha256(f"{tts.VOICES['ru']}|+0%|{tts.spoken('Привет', 'ru')}".encode()).hexdigest()[:24]
+
+
+def test_a_long_briefing_is_made_in_sentence_chunks_side_by_side(tmp_path):
+    """build 55 (owner 04.11: «главный доклад никогда не говорит голосом»; api-health: a fresh 609-character Russian briefing → 502
+    after 50 s, a sentence 8–12 s): a text longer than PART_CHARS is made in sentence chunks and joined in order, cached as one"""
+    t, s = _tts(tmp_path)
+    text = " ".join(f"Предложение номер {i}: биткоин стоит 80 316 долларов, за сутки плюс 3,4 процента, индекс страха — 34." for i in range(7))
+    parts = tts.chunks(text)
+    assert len(parts) >= 3 and all(len(p) <= tts.PART_CHARS for p in parts) and " ".join(parts) == text
+    c, a = t.post({"text": text, "lang": "ru"}, "1.1.1.1")
+    assert c == 200 and len(s.calls) == len(parts) and a.key == tts.key(text, "ru") and t.last["parts"] == len(parts)
+    assert a.body == b"".join(MP3 + p.encode()[:20] for p in parts)                # in order
+    assert t.post({"text": text, "lang": "ru"}, "1.1.1.1")[1].body == a.body and len(s.calls) == len(parts)
+    assert tts.chunks("Короткий текст.") == ["Короткий текст."] and tts.chunks("  ") == []
+    long_word = "слово " * 100
+    assert all(len(p) <= tts.PART_CHARS for p in tts.chunks(long_word))

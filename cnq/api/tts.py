@@ -71,6 +71,8 @@ FIRST_AUDIO_S = 2.0
 # racing it rarely won.
 FALLBACK_REQUESTS = 2
 MAX_CHARS = 1500
+PART_CHARS = 240                     # build 55: longer texts are made in sentence chunks side by side (chunks() below)
+PART_WORKERS = 4
 MAX_CACHE_MB = 200
 TIMEOUT_S = 25.0
 STRESS = "́"
@@ -130,6 +132,34 @@ def spoken(text: str, lang: str) -> str:
     else:
         s = s.replace("CRYPTO NOVA", "Crypto Nova").replace("NOVA AI", "Nova AI").replace("NOVA", "Nova")
     return re.sub(r"\s+", " ", s).strip()
+
+
+def chunks(text: str, size: int = PART_CHARS) -> list[str]:
+    """build 55 (owner 04.11: «главный доклад никогда не говорит голосом»): api-health 04.11 18:57 UTC — a fresh 609-character
+    Russian briefing failed after 50 s (every voice hit TIMEOUT_S while streaming it), while a sentence took 8–12 s. A text longer
+    than PART_CHARS is made in sentence chunks of at most PART_CHARS side by side and joined (one mp3 stream; the cache key stays
+    the whole text's). A single sentence longer than that is cut at a space."""
+    t = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(t) <= size:
+        return [t] if t else []
+    out: list[str] = []
+    cur = ""
+    for sent in re.split(r"(?<=[.!?…])\s+", t):
+        while len(sent) > size:
+            cut = sent.rfind(" ", 0, size)
+            cut = cut if cut > size // 2 else size
+            if cur:
+                out.append(cur)
+                cur = ""
+            out.append(sent[:cut].strip())
+            sent = sent[cut:].strip()
+        if cur and len(cur) + 1 + len(sent) > size:
+            out.append(cur)
+            cur = ""
+        cur = f"{cur} {sent}".strip()
+    if cur:
+        out.append(cur)
+    return [p for p in out if p]
 
 
 def key(text: str, lang: str) -> str:
@@ -546,14 +576,18 @@ class Tts:
             return k, data
         t0 = time.time()
         _used.voice, _used.attempts, _used.prep_ms, _used.inflight = None, None, None, None
+        parts = chunks(text)
         try:
-            data = self.synth(text, lang, live=True) if live else self.synth(text, lang)
+            if len(parts) == 1:
+                data = self.synth(text, lang, live=True) if live else self.synth(text, lang)
+            else:
+                data = self._make_parts(parts, lang, live)
         except Exception as e:  # noqa: BLE001
             self.last = {"result": "failed", "ms": round((time.time() - t0) * 1000), "lang": lang, "chars": len(text), "at": int(t0),
                          "live": live, "error": str(e)[:120], **self._timings()}
             raise
         self.last = {"result": "ok", "ms": round((time.time() - t0) * 1000), "lang": lang, "chars": len(text), "at": int(t0),
-                     "live": live, "bytes": len(data)}
+                     "live": live, "bytes": len(data), "parts": len(parts)}
         if getattr(_used, "voice", None):                 # 29.10: which voice spoke (the Russian fallback shows here)
             self.last["voice"] = _used.voice
         self.last.update(self._timings())
@@ -561,6 +595,21 @@ class Tts:
         self.put(k, data)
         self.last["put_ms"] = round((time.perf_counter() - t1) * 1000)
         return k, data
+
+    def _make_parts(self, parts: list[str], lang: str, live: bool) -> bytes:
+        """build 55: a long text in sentence chunks made side by side (each from the cache when it is there), joined in order"""
+        from concurrent.futures import ThreadPoolExecutor
+
+        def one(p: str) -> bytes:
+            k = key(p, lang)
+            got = self.get(k)
+            if got is not None:
+                return got
+            b = self.synth(p, lang, live=True) if live else self.synth(p, lang)
+            self.put(k, b)
+            return b
+        with ThreadPoolExecutor(max_workers=min(PART_WORKERS, len(parts))) as ex:
+            return b"".join(ex.map(one, parts))
 
     @staticmethod
     def _timings() -> dict:

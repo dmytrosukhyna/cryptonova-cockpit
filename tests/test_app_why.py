@@ -83,6 +83,10 @@ def test_whale_copy_explains_itself_with_a_reference_target():
         assert d["target_ref"] == 84.0 and "84.00" in d["plan"] and "2R" in d["plan"]
         assert "2%" in d["risk"] and "$30" in d["risk"]
         assert any("410" in c["t"] for c in d["checks"])
+        # build 55: a short summary, a target line in price terms and the «Подробнее» sections — never «Своей цели у копии нет»
+        assert "84.00" in d["summary"] and "84.00" in d["target_line"] and "Luckyboytt" in d["summary"]
+        assert len(d["sections"]) >= 6 and all(x["title"] and x["text"] for x in d["sections"])
+        assert "нет:" not in d["plan"] and "no target" not in d["plan"]
     assert aw._num(20.0, 0) == "20" and aw._price(0.0000049781) == "0.000004978"
 
 
@@ -96,3 +100,27 @@ def test_real_why_json_feeds_the_copy_explanation():
     d = aw.copy_why(row, None, None, w, None, {"lev": 5, "risk_pct": 2.0}, {"since": 1792627200000, "budget_usd": 1500}, "en")
     assert "W1" in d["signal"] and "OKX" in d["signal"] and "8x" in d["signal"] and d["context"] is None
     assert d["target_ref"] == 84.0 and "108.00" in d["plan"] and "12 closed trades, 75%" in d["history"]
+
+
+def test_whale_copy_sections_read_the_desk_and_the_side():
+    """build 55 (owner 04.11): who the whale is, what he did, what we track, our entry vs his, the stop and why, the target and the exit"""
+    from cnq.agents import app_why as aw
+    desk = {"started": 1792316209001, "trades": 10, "wins": 7,
+            "open": [{"whale": "0xabc", "coin": "ZRO", "side": "SHORT", "opened_t": 1793773985528, "whale_entry": 1.74659,
+                      "whale_lev": 5.0, "whale_notional": 22076, "stop": 2.034774, "stop_src": "защитный стоп −8%", "whale_ru": "SilkBtc"}]}
+    wd = aw.whale_trade("whales:W-ZRO-S-1793773985528", desk)
+    rec = {"addr": "0xabc", "src": "hl", "trips": 21, "win": 0.81, "pf": 12.7, "pnl_30d": 2897391, "hold_med_h": 120, "style_ru": "свинг"}
+    row = {"sym": "ZRO", "side": "SHORT", "entry": 1.899455, "price": 1.7991, "stop": 2.0348, "lev": 5, "pnl_usd": 2.01, "move_pct": 5.28,
+           "sig": "whales:W-ZRO-S-1793773985528"}
+    d = aw.copy_why(row, wd, rec, None, desk, {"lev": 5, "risk_pct": 2.0}, {"since": 1792627200000, "budget_usd": 1500}, "ru")
+    txt = {x["title"]: x["text"] for x in d["sections"]}
+    assert "Копирование китов" in d["summary"] and "1.629" in d["target_line"]
+    assert "свинг" in txt["Кит"] and "5 дней" in txt["Кит"] and "Hyperliquid" in txt["Кит"]
+    assert "шорт ZRO по 1.747" in txt["Что сделал кит"] and "$22" in txt["Что сделал кит"]
+    assert "кит пока в минусе" in txt["Что отслеживаем"] and "~30 минут" in txt["Что отслеживаем"]
+    assert "лучше, чем у кита" in txt["Наш вход"]
+    assert "защитный стоп" in txt["Наш стоп"] and "8%" in txt["Наш стоп"]
+    assert "1.629" in txt["Цель и выход"] and "кит закрыл" in txt["Цель и выход"] and "около 5 дней" in txt["Цель и выход"]
+    for lang in aw.L5:
+        e = aw.copy_why(row, wd, rec, None, desk, {"lev": 5, "risk_pct": 2.0}, {"since": 1792627200000, "budget_usd": 1500}, lang)
+        assert e["summary"] and e["target_line"] and len(e["sections"]) >= 6

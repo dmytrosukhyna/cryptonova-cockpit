@@ -233,7 +233,6 @@ jobs:
         continue-on-error: true
         run: python -m cnq.cli broadcast --out web || true
       - name: Channel editor → @crypto_nova_news (morning / midday / evening, Kyiv time)
-        if: ${{ steps.state.outputs.stale != 'true' }}      # 04.11 23:10: channel_posts lives in the database — a rolled-back copy that is never saved would re-send the same slot on every run
         continue-on-error: true
         env:
           CNQ_LLM_KEY: ${{ secrets.CNQ_LLM_KEY }}

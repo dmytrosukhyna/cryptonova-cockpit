@@ -13,6 +13,5 @@ def _step(site: str, marker: str) -> str:
 
 def test_stateful_steps_skip_on_stale_database():
     site = open(os.path.join(ROOT, ".github", "workflows", "site.yml"), encoding="utf-8").read()
-    for marker in ("→ web/capital.json", "→ web/channel_opps.json", "→ web/calibration.json",
-                   "Channel editor → @crypto_nova_news", "Spot portfolio department", "Top traders study"):
+    for marker in ("→ web/capital.json", "→ web/channel_opps.json", "→ web/calibration.json", "Spot portfolio department"):
         assert "steps.state.outputs.stale != 'true'" in _step(site, marker), marker

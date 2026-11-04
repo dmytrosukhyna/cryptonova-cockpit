@@ -1,0 +1,15 @@
+name: whale-check
+# 04.11 22:35: one full whale study on a fresh database (scripts/whale_check.py) — read-only, results in the log
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/whale_check.py

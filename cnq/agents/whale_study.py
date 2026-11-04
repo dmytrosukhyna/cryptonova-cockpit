@@ -1384,7 +1384,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         cs = {coin: candles_of(conn, coin, since - DAY) for coin in {t["coin"] for t in trips}}
         p = profile(c, trips, total, pfs, pos, cs, now, bool(r[1]) and c.get("src") != "okx")
         if c.get("src") == "okx":
-            p.update(followers=c.get("followers"), lead_days=c.get("lead_days"), okx_pnl_all=c.get("pnl_all"), okx_win=c.get("win_ratio"))
+            p.update(followers=c.get("followers"), lead_days=c.get("lead_days"), okx_pnl_all=c.get("pnl_all"), okx_win=c.get("win_ratio"),
+                     pick=c.get("pick"))
         if ek:                     # an added source's whale: the same 60-day bar as everyone (profile) + positions visible
             lb_ = WS.lb_of(conn, c["addr"])
             n90 = WS.trades_90d(conn, c["addr"], now, lb_)
@@ -1465,8 +1466,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
                       "studied": len(profs), "eligible": len(elig), "top": len(top), "excluded": excluded,
                       "waiting": (len(rows) - fresh) + (len(orows) - ofresh) + (len(erows) - efresh), "candles_waiting": len(need) - cdone},
            "top": top,
-           "others": [{k: p.get(k) for k in ("src", "addr", "short", "name", "pnl_30d", "trips", "win", "pf", "hold_med_h", "style_ru", "excluded_ru", "score")}
-                      for p in sorted(profs, key=lambda p: -p["pnl_30d"]) if p not in top][:30],
+           "others": [{**{k: p.get(k) for k in ("src", "addr", "short", "name", "pnl_30d", "trips", "win", "pf", "hold_med_h", "style_ru", "excluded_ru", "score",
+                                              "pnl_60d", "decisions", "win_closed", "pf_closed", "open_loss", "open_trips", "per_day")},
+                       "copy2": (p.get("copy") or {}).get(str(COPY_DELAY))}
+                      for p in sorted(profs, key=lambda p: (-(p.get("pick") == "owner"), -p["pnl_30d"])) if p not in top][:30],
            "desk": desk_public(desk, names) if desk else None,
            "hidden": [{"addr": p["addr"], "name": p["name"] or p["short"], "rank": p.get("rank")} for p in top if p.get("hidden")],
            "hidden_ru": "OKX скрывает открытые позиции этих лид-трейдеров (нет монеты, размера и цены входа — только маржа, плечо и "

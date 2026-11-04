@@ -119,6 +119,12 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     st = st if st is not None else load(env)
     wtop = wtop if isinstance(wtop, dict) else {}
     desk = st.get("desk")
+    # a recovery (04.11: a rolled-back whales_top.json was published and seeded here) — a published file carrying a new
+    # «live_seed» token restarts the live desk from ITS desk once
+    tok = wtop.get("live_seed")
+    if tok and tok != st.get("seed_token") and wtop.get("desk"):
+        desk = seed(wtop, now)
+        st["seed_token"] = tok
     if not isinstance(desk, dict):
         if not wtop.get("desk") and not wtop.get("following"):
             return None

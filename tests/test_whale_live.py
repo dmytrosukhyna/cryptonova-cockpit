@@ -119,3 +119,20 @@ def test_the_github_study_publishes_the_fresh_live_desk_instead_of_its_own(tmp_p
     assert W.live_desk(str(p), NOW + 5 * MIN)["open"][0]["coin"] == "ETH"
     assert W.live_desk(str(p), NOW + 20 * MIN) is None and W.live_desk(str(tmp_path / "none.json"), NOW) is None
 
+
+
+def test_a_new_live_seed_token_restarts_the_desk_from_the_published_one_once(tmp_path):
+    f = Feed()
+    env = {"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}
+    kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
+    bad = {"start": 10000.0, "equity": 10100.0, "open": [{"whale": "okx:Q", "coin": "BTC", "side": "SHORT", "entry": 100000.0, "opened_t": NOW,
+                                                         "margin": 500.0, "lev": 5.0, "notional": 2500.0, "stop": 108000.0, "upnl": 0.0}]}
+    f.okx = [("BTC", "short", 100000, NOW - MIN)]
+    assert WL.step(wtop(desk=bad), now=NOW, **kw)["open"][0]["symbol"] == "BTC"
+    good = {"start": 10000.0, "equity": 11000.0, "open": [], "closed": []}
+    f.okx = []
+    d = WL.step({**wtop(desk=good), "live_seed": "recover-1"}, now=NOW + MIN, **kw)
+    assert d["open"] == [] and d["equity"] == 11000.0
+    f.okx = [("ETH", "long", 2500, NOW + MIN)]
+    WL.step({**wtop(desk=good), "live_seed": "recover-1"}, now=NOW + 2 * MIN, **kw)
+    assert len(WL.step({**wtop(desk=good), "live_seed": "recover-1"}, now=NOW + 3 * MIN, **kw)["open"]) == 1     # not re-seeded again

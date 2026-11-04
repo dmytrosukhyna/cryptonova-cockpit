@@ -40,14 +40,19 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install numpy
+      - name: State pin (04.11 incident) — config/state_pin.txt names an exact good cache to restore after a rollback
+        id: pin
+        run: |
+          k=$(head -1 config/state_pin.txt 2>/dev/null | tr -d '[:space:]'); echo "key=${k:-cnq-state-${{ github.run_id }}}" >> "$GITHUB_OUTPUT"; echo "restore key: ${k:-latest}"
       - name: Restore candle store and department state
-        uses: actions/cache@v4
+        id: restore
+        uses: actions/cache/restore@v4
         with:
           path: |
             data/cnq.sqlite
             data/agents.sqlite
             data/whales_ext.sqlite
-          key: cnq-state-${{ github.run_id }}
+          key: ${{ steps.pin.outputs.key }}
           restore-keys: |
             cnq-state-
             cnq-db-
@@ -148,6 +153,7 @@ jobs:
         continue-on-error: true
         run: python -m cnq.cli whales --out web
       - name: Top traders study (Hyperliquid + OKX lead traders, copy test, «Киты» copy desk) → web/whales_top.json
+        if: ${{ steps.state.outputs.stale != 'true' }}      # 04.11: a rolled-back database republished a 15-day-old «Киты» desk that the REAL account follows
         continue-on-error: true
         timeout-minutes: 5
         run: python -m cnq.cli whalestudy --out web
@@ -160,6 +166,7 @@ jobs:
         timeout-minutes: 7
         run: python -m cnq.cli smartmoney --out web
       - name: Why each real futures position is open (whale, rules, market at entry) → web/real_why.json
+        if: ${{ steps.state.outputs.stale != 'true' }}
         continue-on-error: true
         timeout-minutes: 3
         run: python -m cnq.cli realwhy --out web
@@ -279,10 +286,19 @@ jobs:
           # 20.10: data/agents.sqlite reached GitHub's 100 MB file limit (whale study candles/fills) — every push after 09:44 UTC was
           # rejected, so no data reached main for hours. Past 95 MB the database stays in the Actions cache only (it is restored from there).
           sz=$(stat -c %s data/agents.sqlite 2>/dev/null || echo 0)
-          if [ "$sz" -lt 95000000 ]; then git add data/agents.sqlite; else echo "::warning title=agents.sqlite::$((sz/1000000)) MB — kept in the cache only, not committed (GitHub limit 100 MB)"; fi
+          if [ "${{ steps.state.outputs.stale }}" = "true" ]; then echo "::warning title=state::stale database — not committed"; elif [ "$sz" -lt 95000000 ]; then git add data/agents.sqlite; else echo "::warning title=agents.sqlite::$((sz/1000000)) MB — kept in the cache only, not committed (GitHub limit 100 MB)"; fi
           git status --short | head -20
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
           for i in 1 2 3; do git fetch origin main && git rebase --autostash -X theirs origin/main && git push origin HEAD:main && break || { echo "::warning title=push::attempt $i failed"; git rebase --abort || true; sleep 15; }; done
+      - name: Save state to the cache — only a good (not rolled-back) state, so a lost cache can never poison later runs (04.11)
+        if: ${{ always() && steps.state.outputs.stale != 'true' && steps.restore.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/cnq.sqlite
+            data/agents.sqlite
+            data/whales_ext.sqlite
+          key: cnq-state-${{ github.run_id }}
       - name: Publish web/ to gh-pages branch (works without any Pages setting)
         uses: peaceiris/actions-gh-pages@v4
         with:

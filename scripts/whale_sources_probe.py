@@ -78,21 +78,28 @@ def binance():
               {"pageNumber": 1, "pageSize": 20, "timeRange": "30D", "dataType": "PNL", "favoriteOnly": False, "hideFull": False,
                "nickname": "", "order": "DESC", "userAsset": 0, "portfolioType": "PUBLIC"})
     rows = first_list(d) or []
-    pids = [r.get("leadPortfolioId") or r.get("portfolioId") for r in rows if (r.get("leadPortfolioId") or r.get("portfolioId"))]
-    shown = 0
-    for pid in pids[:6]:
-        pos = probe(f"binance.positions.{pid}", f"{bn}/v1/friendly/future/copy-trade/lead-data/positions?portfolioId={pid}")
-        if shown == 0:
-            probe("binance.detail", f"{bn}/v1/friendly/future/copy-trade/lead-portfolio/detail?portfolioId={pid}")
-            probe("binance.performance", f"{bn}/v1/public/future/copy-trade/lead-portfolio/performance?portfolioId={pid}&timeRange=30D")
-            probe("binance.position_history", f"{bn}/v1/public/future/copy-trade/lead-portfolio/position-history",
-                  {"pageNumber": 1, "pageSize": 50, "portfolioId": pid, "sort": "OPENING"})
-            probe("binance.trade_history", f"{bn}/v1/public/future/copy-trade/lead-portfolio/trade-history",
-                  {"pageNumber": 1, "pageSize": 50, "portfolioId": pid})
-        live = [p for p in (dig(pos, "data") or []) if isinstance(p, dict) and float(p.get("positionAmount") or 0)]
-        OUT[f"binance.positions.{pid}"]["live"] = len(live)
-        OUT[f"binance.positions.{pid}"]["rows"] = live[:2]
-        shown += 1
+    OUT["binance.list"]["rows"] = [{k: r.get(k) for k in r if k != "chartItems"} for r in rows[:3]]
+    summary = []
+    for i, r in enumerate(rows[:20]):
+        pid = r.get("leadPortfolioId")
+        det = dig(probe(f"binance.detail.{i}", f"{bn}/v1/friendly/future/copy-trade/lead-portfolio/detail?portfolioId={pid}"), "data") or {}
+        pos = dig(probe(f"binance.pos.{i}", f"{bn}/v1/friendly/future/copy-trade/lead-data/positions?portfolioId={pid}"), "data") or []
+        hist = dig(probe(f"binance.hist.{i}", f"{bn}/v1/public/future/copy-trade/lead-portfolio/position-history",
+                         {"pageNumber": 1, "pageSize": 50, "portfolioId": pid, "sort": "OPENING"}), "data") or {}
+        live = [p for p in pos if isinstance(p, dict) and float(p.get("positionAmount") or 0)]
+        summary.append({"pid": pid, "nick": r.get("nickname"), "pnl": r.get("pnl"), "win": r.get("winRate"),
+                        "det_keys": sorted(det.keys()) if isinstance(det, dict) else None,
+                        "show": {k: det.get(k) for k in det if "show" in k.lower() or "public" in k.lower() or "status" in k.lower()} if isinstance(det, dict) else None,
+                        "n_pos_rows": len(pos), "live": len(live), "hist_total": hist.get("total"), "hist_n": len(hist.get("list") or [])})
+        if live and "binance.live_sample" not in OUT:
+            OUT["binance.live_sample"] = {"rows": live[:2]}
+        if hist.get("list") and "binance.hist_sample" not in OUT:
+            OUT["binance.hist_sample"] = {"rows": hist["list"][:2], "total": hist.get("total")}
+        if i == 0:
+            OUT["binance.detail_raw"] = {"raw": json.dumps(det)[:3000]}
+    OUT["binance.summary"] = {"rows": summary}
+    for k in [k for k in OUT if k.startswith(("binance.detail.", "binance.pos.", "binance.hist."))]:
+        OUT.pop(k)
 
 
 def bybit():
@@ -125,9 +132,14 @@ def mexc_gate():
     d = probe("mexc.list", "https://futures.mexc.com/copyFutures/api/v1/traders/v2?condition=%5B%5D&limit=10&orderBy=PNL&page=1")
     uid = next((r.get("uid") for r in (first_list(d) or []) if r.get("uid")), None)
     if uid:
-        probe("mexc.orders", f"https://futures.mexc.com/copyFutures/api/v1/trader/orders/v2?limit=20&page=1&uid={uid}")
-        probe("mexc.history", f"https://futures.mexc.com/copyFutures/api/v1/trader/orders/v2?limit=20&page=1&uid={uid}&orderListType=HISTORY")
-    probe("gate.list", "https://www.gate.io/apiw/v2/futures/copy/leader/list?page=1&page_size=10&order_by=profit&sort_by=desc&cycle=month")
+        base = "https://futures.mexc.com/copyFutures/api/v1"
+        for nm, u in {"h1": f"{base}/trader/orders/v2?limit=20&page=1&uid={uid}&orderListType=2",
+                      "h2": f"{base}/trader/historyOrders/v2?limit=20&page=1&uid={uid}",
+                      "h3": f"{base}/trader/orders/history/v2?limit=20&page=1&uid={uid}",
+                      "h4": f"{base}/trader/closedOrders?limit=20&page=1&uid={uid}",
+                      "detail": f"{base}/trader/detail/v2?uid={uid}",
+                      "stats": f"{base}/trader/statistics/v2?uid={uid}"}.items():
+            probe(f"mexc.{nm}", u)
 
 
 def hyperliquid():
@@ -146,7 +158,7 @@ def hyperliquid():
 
 
 def main():
-    for f in (hyperliquid, binance, bybit, bitget, mexc_gate):
+    for f in (binance, mexc_gate):
         try:
             f()
         except Exception as e:  # noqa: BLE001
@@ -160,7 +172,7 @@ def main():
     for name, rec in OUT.items():
         if not isinstance(rec, dict):
             continue
-        m = json.dumps(rec, ensure_ascii=False, default=str)[:3800].replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+        m = json.dumps(rec, ensure_ascii=False, default=str)[:6000].replace("%", "%25").replace("\r", "").replace("\n", "%0A")
         print(f"::notice title={name[:60]}::{m}", flush=True)
 
 

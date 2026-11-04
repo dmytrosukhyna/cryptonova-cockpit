@@ -279,7 +279,9 @@ def norm_position(p: dict, seen: dict) -> dict:
     o = seen.get(f"{sym}|{side}") or {}
     return {"symbol": sym, "side": side, "size": _f(p.get("size")), "entry": _f(p.get("avgPrice")), "mark": _f(p.get("markPrice")),
             "upnl": round(_f(p.get("unrealisedPnl")), 4), "leverage": _f(p.get("leverage")), "liq": _f(p.get("liqPrice")) or None,
-            "value": _f(p.get("positionValue")), "created": int(_f(p.get("createdTime"))) or None, "seen": o.get("seen")}
+            "value": _f(p.get("positionValue")), "created": int(_f(p.get("createdTime"))) or None, "seen": o.get("seen"),
+            # 04.11 (owner: «исследуем стратегию Ивана»): his stop / target on Bybit, when set (0 = none) — needed to copy him
+            "stop": _f(p.get("stopLoss")) or None, "tp": _f(p.get("takeProfit")) or None}
 
 
 def norm_spot(x: dict) -> dict:

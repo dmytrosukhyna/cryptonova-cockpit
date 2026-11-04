@@ -131,7 +131,7 @@ def test_risk_as_the_system_capped_at_one_percent_and_leverage_never_above_three
     """Owner 22.10: «риск фьючерсов как у системы» — the desk's own risk share × this desk's part; 1 % of the budget is the ceiling."""
     fk = F.FakeOkx()
     e = F.env(OKX_FUT_MAX_LEV="10", OKX_FUT_RISK="0.05")                   # env can't loosen the hard caps
-    assert fu.caps(e) == {"lev": 3, "risk": 0.01, "max_pos": 5, "day_loss": 0.03}
+    assert fu.caps(e) == {"lev": 3, "copy_lev": 5, "risk": 0.01, "max_pos": 5, "day_loss": 0.03}
     run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 1 % of the budget
     o = swap_orders(fk)[0]
     assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 1500 * 0.01 + 1e-6
@@ -377,3 +377,66 @@ def test_staged_desks_get_their_share_of_the_budget_and_the_rest_is_split_equall
     assert [k for k, _ in fu.pick_desks(paper, sel={"current": "aggr"})] == ["aggr", "imp"]
     # a rolled-back desk that still holds a position stays followed until it closes
     assert [k for k, _ in fu.pick_desks(paper, sel={"current": "aggr", "stages": {"alloc": {"lab": 0.0}}}, held={"lab"})] == ["aggr", "imp", "lab"]
+
+
+def test_whales_copy_trades_the_whales_leverage_capped_at_five_with_a_stop_at_okx():
+    """04.11 (owner: «по китам повторяй их плечи»): a «Киты» copy (desk.paper of whales_top.json, «copy_lev») enters with the whale's
+    leverage capped at 5×; the other desks stay at the general cap; the stop is attached at OKX; the risk caps are the same"""
+    fk = F.FakeOkx()
+    w = {**F.trade("W-SOL-L-1", entry=200.0, stop=184.0, tp=230.0, risk=320.0), "tps": [], "parts": [], "copy_lev": 10.0}
+    run(fk, F.env(), [("bal", {"equity": 10000.0, "open": []}), ("whales", {"equity": 10000.0, "open": [w]})])
+    o = swap_orders(fk)[0]
+    assert fk.levers[-1]["lever"] == "5" and o["attachAlgoOrds"][0]["slTriggerPx"] == "184.000"
+    assert float(o["sz"]) * (float(o["px"]) - 184.0) <= 1500 * 0.01 + 1e-6            # the same 1 % risk ceiling
+    # a wide stop: the leverage drops so the stop triggers well before liquidation (≤ 0.8 ÷ stop distance)
+    fk2 = F.FakeOkx()
+    w2 = {**w, "id": "W-SOL-L-2", "stop": 150.0, "stop_now": 150.0}
+    run(fk2, F.env(), [("whales", {"equity": 10000.0, "open": [w2]})])
+    assert fk2.levers[-1]["lever"] == "3"
+    # env can lower the copy cap, never raise it
+    assert fu.caps(F.env(OKX_FUT_COPY_MAX_LEV="3"))["copy_lev"] == 3 and fu.caps(F.env(OKX_FUT_COPY_MAX_LEV="20"))["copy_lev"] == 5
+
+
+def test_whales_feed_joins_at_its_stage_share_and_never_closes_on_a_failed_load(monkeypatch):
+    """the whales desk is fetched only while the ladder gives it a share (or a copy is held); a failed load with a held copy skips
+    the pass; a frozen feed (> 3 h) gives no new entries"""
+    paper = {"profiles": {"aggr": {"open": []}, "imp": {"open": []}}}
+    sel = {"current": "aggr", "stages": {"alloc": {"whales": 0.05, "aggr": 0.475, "imp": 0.475}}}
+    wt = {**F.trade("W-BTC-S-1", sym="BTC"), "copy_lev": 5.0}
+    wtop = {"asof": NOW, "desk": {"paper": {"name": "Киты", "equity": 10800.0, "start_equity": 10000.0, "open": [wt], "closed": []}}}
+    urls = []
+
+    def get(url, ok=True):
+        urls.append(url)
+        if url.endswith("paper.json"):
+            return paper
+        if url.endswith("desk_select.json"):
+            return sel
+        if url.endswith("whales_top.json"):
+            if isinstance(get.wtop, Exception):
+                raise get.wtop
+            return get.wtop
+        raise AssertionError(url)
+    get.wtop = wtop
+    monkeypatch.setattr(fu, "_get_json", get)
+    monkeypatch.setattr(fu.time, "time", lambda: NOW / 1000)
+    st = {"trades": {}}
+    ds = fu.fetch_desks({}, st)
+    assert [k for k, _ in ds] == ["aggr", "imp", "whales"] and dict(ds)["whales"]["open"][0]["id"] == "W-BTC-S-1"
+    assert fu.desk_parts(ds, 1000.0, st["sel"]) == {"aggr": 475.0, "imp": 475.0, "whales": 50.0}
+    # no share and nothing held → the whales file is not even read
+    urls.clear()
+    sel["stages"]["alloc"] = {"aggr": 0.5, "imp": 0.5}
+    assert [k for k, _ in fu.fetch_desks({}, {"trades": {}})] == ["aggr", "imp"] and not any("whales" in u for u in urls)
+    # a held copy + the file does not load → the pass is skipped (an exception), never «сигнал закрыт»
+    get.wtop = OSError("timeout")
+    held = {"trades": {"whales:W-BTC-S-1": {"desk": "whales", "inst": "BTC-USDT-SWAP"}}}
+    try:
+        fu.fetch_desks({}, held)
+        raise AssertionError("must not continue")
+    except RuntimeError as e:
+        assert "проход пропущен" in str(e)
+    # a frozen feed: the held copy stays wanted, a new one is not offered
+    get.wtop = {**wtop, "asof": NOW - 4 * 3_600_000, "desk": {"paper": {**wtop["desk"]["paper"], "open": [wt, {**wt, "id": "W-ETH-L-2", "symbol": "ETH"}]}}}
+    ds = dict(fu.fetch_desks({}, held))
+    assert [t["id"] for t in ds["whales"]["open"]] == ["W-BTC-S-1"] and ds["whales"]["stale"]

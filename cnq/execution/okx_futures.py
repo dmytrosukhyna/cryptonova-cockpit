@@ -48,6 +48,14 @@ Through USDC (22.10, owner: «если по USDT ничего нету, то н�
 the coin — is traded there with the same isolated sizing, risk, stop and exits. The margin (+ fee room) is bought as USDC on the
 spot pair USDC-USDT just before the entry; after a close the freed USDC goes back to USDT (okx_autopilot.sweep, at the end of every
 pass). Not for a lead trader (its instruments are USDT swaps). Off with OKX_FUT_USDC=off.
+04.11 (owner, real money: «стол копирования китов уже +$800 — срочно внедрять; по китам повторяй их плечи; логику применять, но себя
+не ужимать»): «Киты · копирование топ-5» (web/whales_top.json → desk.paper, cnq/agents/whale_study.py) is a desk like the others —
+its copies come in the paper-desk trade shape and go through the same guards (stage share of the budget from desk_select.json
+«stages.alloc», the risk caps, late-join guard, max positions, daily stop, a stop attached at OKX). Only its leverage differs: the
+whale's own («copy_lev») capped at COPY_MAX_LEV (5×, OKX_FUT_COPY_MAX_LEV may lower it); the leverage room of the whole sleeve stays
+budget × the general cap. Every position's leverage is also kept low enough that the stop sits well before liquidation
+(lev ≤ 0.8 ÷ stop distance). The whales feed is fetched only while the desk has a share or a held position; unreadable while a
+whale copy is held → the whole pass is skipped (never a close because a file did not load); older than 3 hours → no new entries.
 On unless OKX_FUTURES=off. Log: data/okx_futures.jsonl. State: ~/.cryptonova_okx_futures.json.
 Not financial advice: futures with leverage can lose money fast. Stdlib only."""
 from __future__ import annotations
@@ -69,6 +77,10 @@ LOG = "data/okx_futures.jsonl"
 FRESH_MS = 45 * 60_000
 JOIN_GAP = 0.003            # a trade opened before the start is joined only while the price is ≤ 0.3 % worse than the desk's entry
 MAX_LEV, DEF_LEV = 3, 2
+COPY_MAX_LEV = 5            # 04.11 (owner): copy desks («Киты») trade the copied trader's leverage, at most 5×
+LIQ_ROOM = 0.8              # leverage ≤ 0.8 ÷ stop distance: the stop always triggers well before an isolated position is liquidated
+WHALES = "whales"           # the copy desk's key (desk_select stages, the trade ids «whales:<id>»)
+WHALES_STALE_MS = 3 * 3_600_000
 RISK_CAP = 0.01             # hard ceiling: 1 % of the futures budget per trade (the desk's own risk, e.g. 1.5 % of a half budget = 0.75 %, fits)
 MAX_POS = 5
 DAY_LOSS = 0.03             # 3 % of the futures budget per UTC day
@@ -108,6 +120,7 @@ def caps(env=None) -> dict:
     """The hard caps. Env may only make them stricter."""
     e = _env(env)
     return {"lev": max(1, min(MAX_LEV, int(_num(e, "OKX_FUT_MAX_LEV", DEF_LEV)))),
+            "copy_lev": max(1, min(COPY_MAX_LEV, int(_num(e, "OKX_FUT_COPY_MAX_LEV", COPY_MAX_LEV)))),
             "risk": min(RISK_CAP, _num(e, "OKX_FUT_RISK", RISK_CAP)),
             "max_pos": max(1, min(MAX_POS, int(_num(e, "OKX_FUT_MAX_POS", MAX_POS)))),
             "day_loss": min(DAY_LOSS, _num(e, "OKX_FUT_DAY_LOSS", DAY_LOSS))}
@@ -201,6 +214,11 @@ def pick_desks(paper: dict, forced: list | None = None, sel: dict | None = None,
         for k, share in staged_alloc(sel).items():
             if k not in keys and isinstance(pr.get(k), dict) and (share > 0 or k in held):
                 keys.append(k)
+        # 04.11: a desk this account holds a position of but that has no share any more (rolled back to 0, or dropped from the
+        # ladder) stays followed — its position is closed by the desk, never because the desk left the list — with no budget for
+        # new entries (desk_parts gives it 0)
+        hold_only = [k for k in sorted(held) if k not in keys and isinstance(pr.get(k), dict)]
+        return [(k, pr[k]) for k in keys if isinstance(pr.get(k), dict)] + [(k, {**pr[k], "_hold_only": True}) for k in hold_only]
     return [(k, pr[k]) for k in keys if isinstance(pr.get(k), dict)]
 
 
@@ -216,13 +234,16 @@ def staged_alloc(sel: dict | None) -> dict:
 def desk_parts(ds: list, bud_usd: float, sel: dict | None) -> dict:
     """{desk key: its part of the futures budget in $}: a staged desk its stage share (5 % / 15 %), the rest shared equally by the
     other desks (the main desk, «Импульс BTC», «Сигналы», stage-3 desks); without the ladder every desk gets an equal part"""
-    keys = [k for k, _ in ds]
+    keys = [k for k, d in ds if not (d or {}).get("_hold_only")]
+    out = {k: 0.0 for k, d in ds if (d or {}).get("_hold_only")}      # 04.11: held positions only — no budget for new entries
     al = staged_alloc(sel)
     if not al or not any(k in al for k in keys):
-        return {k: bud_usd / max(1, len(keys)) for k in keys}
-    out, used, rest = {}, 0.0, []
+        return {**out, **{k: bud_usd / max(1, len(keys)) for k in keys}}
+    used, rest = 0.0, []
     for k in keys:
-        if k in al:
+        if k in al and al[k] <= 0:
+            out[k] = 0.0
+        elif k in al:
             out[k] = bud_usd * al[k]; used += al[k]
         else:
             rest.append(k)
@@ -251,13 +272,49 @@ def held_desks(st: dict | None) -> set:
     return {str((m or {}).get("desk") or tid.split(":")[0]) for tid, m in ((st or {}).get("trades") or {}).items()}
 
 
+def whales_src(env=None) -> str:
+    """where web/whales_top.json is read: OKX_FUT_WHALES_SRC, else next to the desks' paper.json"""
+    e = _env(env)
+    if e.get("OKX_FUT_WHALES_SRC"):
+        return e["OKX_FUT_WHALES_SRC"]
+    src = desk_src(env)[0]
+    return src[: -len("paper.json")] + "whales_top.json" if src.endswith("/paper.json") else SRC[: -len("paper.json")] + "whales_top.json"
+
+
+def whales_desk(wtop, held_ids=(), now: int | None = None) -> dict | None:
+    """«Киты» as a paper desk (whales_top.json → desk.paper): {name, equity, start_equity, open, closed}. A feed older than
+    WHALES_STALE_MS keeps only the copies this account already holds (no new entries from a frozen feed); no «paper» → None."""
+    d = ((wtop or {}).get("desk") or {}) if isinstance(wtop, dict) else {}
+    p = d.get("paper")
+    if not isinstance(p, dict) or not isinstance(p.get("open"), list):
+        return None
+    now = int(now or time.time() * 1000)
+    out = {**p, "open": [t for t in p["open"] if isinstance(t, dict)]}
+    if now - int(wtop.get("asof") or 0) > WHALES_STALE_MS:
+        out["open"] = [t for t in out["open"] if f"{WHALES}:{t.get('id')}" in held_ids]
+        out["stale"] = True
+    return out
+
+
 def fetch_desks(env=None, st: dict | None = None) -> list:
     src, forced = desk_src(env)
     paper = _get_json(src)
     sel = None if forced else fetch_sel(env)
     if isinstance(st, dict):
         st["sel"] = {"stages": {"alloc": staged_alloc(sel)}} if sel else None     # the ladder's shares for desk_parts() this pass
-    return pick_desks(paper, forced, sel, (st or {}).get("main"), held_desks(st))
+    held = held_desks(st)
+    if not forced and (staged_alloc(sel).get(WHALES, 0) > 0 or WHALES in held):     # 04.11: the whales copy desk
+        try:
+            wd = whales_desk(_get_json(whales_src(env)), set(((st or {}).get("trades") or {}).keys()))
+        except Exception as e:  # noqa: BLE001
+            if WHALES in held:          # a held copy must never be closed because the file did not load: skip the whole pass
+                raise RuntimeError(f"whales_top.json не загрузился, а позиция «Китов» открыта — проход пропущен: {e}") from e
+            wd = None
+        if wd is None and WHALES in held:
+            raise RuntimeError("whales_top.json без ленты стола «Китов», а позиция открыта — проход пропущен")
+        if wd is not None:
+            paper = {**paper, "profiles": {**(paper.get("profiles") or {}), WHALES: wd}}
+    return pick_desks(paper, forced, sel, (st or {}).get("main"), held)
 
 
 # ── OKX: the swap calls (through the autopilot's signed client — no transfer, no withdrawal exists here) ──────────────────
@@ -510,12 +567,17 @@ def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict
     d_risk = ms._f(t.get("risk_usd")) or (float(t.get("qty") or 0) * abs(float(t["entry"]) - float(t["stop"])))
     frac = d_risk / desk_eq if desk_eq and d_risk else cap["risk"]
     risk_usd = min(frac * part, cap["risk"] * bud)
-    lev = max(1, min(cap["lev"], int(float(inst.get("lever") or cap["lev"]))))
+    inst_max = int(float(inst.get("lever") or COPY_MAX_LEV))
+    lev = max(1, min(cap["lev"], inst_max))
+    room_lev = lev                                  # the whole sleeve's notional stays ≤ budget × the general cap
+    if t.get("copy_lev"):                           # 04.11 (owner): a copy desk trades the copied trader's leverage, ≤ 5×
+        lev = max(1, min(cap.get("copy_lev", COPY_MAX_LEV), inst_max, int(float(t["copy_lev"]))))
+    lev = max(1, min(lev, int(LIQ_ROOM / (abs(worst - stop) / worst))))     # the stop before liquidation, always
     coins = risk_usd / abs(worst - stop)
     capped = f"лимит риска {cap['risk'] * 100:g}% бюджета".replace(".", ",") if frac * part > cap["risk"] * bud else None
-    room = bud * lev - open_notional
+    room = bud * room_lev - open_notional
     if coins * worst > room:
-        coins, capped = max(0.0, room) / worst, f"предел плеча {lev} на весь бюджет"
+        coins, capped = max(0.0, room) / worst, f"предел плеча {room_lev} на весь бюджет"
     if coins * worst > avail * 0.95 * lev:
         coins, capped = max(0.0, avail * 0.95 * lev) / worst, "мало свободных USDT"
     ct, lot, mn = float(inst["ctVal"]), float(inst["lotSz"]), float(inst["minSz"])

@@ -1424,6 +1424,10 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
                     "running": not real.get("stale")})
         lv = _real_lev(real.get("futures") or [], closed)          # build 47 (§6.5): the cap in one short note
         fut.update({"lev_cap": lv, "lev_note": t(lang, "pp.lev_note", lev=lv["now"], max=lv["max"], risk=_dec(lv["risk_pct"], lang))})
+        try:
+            _why_rows(real, paper, open_rows, closed, fut, lv, since, lang)
+        except Exception as e:  # noqa: BLE001 — the feed never breaks because of an explanation
+            print("app_home why_full:", repr(e)[:200], flush=True)
     raw_acts = [a for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
     rule = _pp_rule_kinds(raw_acts)
     acts = [{**{k: a.get(k) for k in ("t", "kind", "sym", "side", "usd", "px")}, "text": _pp_action(a, lang, rule.get(id(a)))}
@@ -1442,6 +1446,51 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             "flows_note": t(lang, "pp.flows", usd=("+" if fl["net_usd"] > 0 else "") + _usd_text(fl["net_usd"], lang)) if fl["n"] else None,
             "alloc": {"asof": asof, "value_usd": _r(eq), "groups": groups, "categories": cats, "assets": assets},
             "spot": spot, "futures": fut, "actions": acts, "moved": moved_doc}
+
+
+def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict, lv: dict, since: int, lang: str) -> None:
+    """build 53 (owner 31.10: «"Откуп дисконта фьючерса" — никто не понимает»): every real trade, open or closed, gets "why_full" —
+    the signal in plain words with its own numbers, the checks the system ran, the rule's record on history and on this account,
+    the plan and the $ at risk (cnq/agents/app_why.py). Closed trades find their desk trade through the fut_open action's sig."""
+    from . import app_why as aw
+    try:
+        from .paper_desk import PROFILES
+    except Exception:  # noqa: BLE001
+        PROFILES = {}
+    acts = real.get("actions") or []
+    for c in closed:
+        c["sig"] = aw.open_sig_for_closed(c, acts)
+    ctx = {"since": since, "budget_usd": fut.get("value_usd") or ((fut.get("start_usd") or 0) + (fut.get("pnl_usd") or 0)) or None,
+           "closed_grades": [(aw.grade_of(c.get("sig")), float(c.get("pnl_usd") or 0)) for c in closed if c.get("sig")]}
+    caps = {"lev": lv.get("set") or lv.get("now"), "risk_pct": lv.get("risk_pct")}
+    for row, is_closed in [(r, False) for r in open_rows] + [(c, True) for c in closed]:
+        sig = row.get("sig")
+        g = aw.grade_of(sig)
+        if not g:
+            continue
+        o, k, _desk = _desk_trade(paper, sig)
+        row["why_full"] = aw.trade_why(row, o, g, PROFILES.get(k) or {}, caps, HISTORY.get(g), ctx, lang,
+                                       title=t(lang, f"title.{g}") if g in TITLES else None, closed=is_closed)
+        if is_closed and row.get("why_title") is None and g in TITLES:
+            row["why_title"] = t(lang, f"title.{g}")
+
+
+def _spot_why(pport: dict | None, out: str, lang: str) -> None:
+    """build 53 (owner 31.10): «Почему этот актив в портфеле» for each coin of the real account — the spot table's own checks with
+    this coin's numbers (web/ideas.json), its status today and how many coins the table checks (cnq/agents/app_why.py)"""
+    sp = (pport or {}).get("spot") or {}
+    if not sp.get("coins"):
+        return
+    from . import app_why as aw
+    ideas = _load(out, "ideas.json")
+    rows = {str(r.get("symbol") or ""): r for r in ideas.get("rows") or [] if isinstance(r, dict)}
+    st = ideas.get("statuses") or {}
+    cnt = ideas.get("counts") or {}
+    passing = sum(int(cnt.get(k) or 0) for k in ("buy", "add", "small")) if cnt else None
+    for c in sp["coins"]:
+        s = str(c.get("sym") or "")
+        if s:
+            c["why_full"] = aw.coin_why(s, c.get("share"), rows.get(s), st.get(s), ideas.get("evaluated"), passing, lang)
 
 
 def _pct_txt(x, lang: str, d: int = 1) -> str:
@@ -1612,6 +1661,10 @@ def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, 
         f = pport.get("futures") or {}
         if f:
             out.append(t(lang, "rep.fut.open", n=f["open_n"]) if f.get("open_n") else t(lang, "rep.fut.none"))
+        # build 53 (owner 31.10): a calm word about a drawdown — only when bitcoin fell more than the account since its start
+        cn = pport.get("calm_note") or {}
+        if cn.get("drawdown") and not pport.get("stale"):
+            out.append(cn["drawdown"])
     b = (mv or {}).get("btc") or {}
     regime = (mv or {}).get("regime")
     if b.get("price") and b.get("chg24") is not None:
@@ -1629,6 +1682,8 @@ def _report(pport: dict | None, mv: dict | None, now: int, lang: str = DEFAULT, 
         if acts:
             a = acts[0]
             out.append(t(lang, "rep.last", d=_say_date(a["t"], lang), what=t(lang, f"rep.w.{REP_WHAT[a['kind']]}"), sym=a["sym"]))
+    if ((pport or {}).get("calm_note") or {}).get("allday"):
+        out.append(pport["calm_note"]["allday"])
     out.append(t(lang, "rep.bye"))
     asof = (pport or {}).get("asof")
     if asof and (issues or now - int(asof) > REP_HOUR_MS):
@@ -1681,6 +1736,17 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
         public["calc"]["futures_why"] += " " + t(lang, "pub.why.fut_rec", since=_date_text(pport["since"], lang), n=int(st_["n"]),
                                                  w=int(st_.get("wins") or 0))
     mv = _market_view_safe(mk, pport, fut, now, lang)
+    market, engine = _market(mk, lang), _engine_facts(out)
+    if pport is not None:
+        try:
+            _spot_why(pport, out, lang)
+            from . import app_why as aw
+            bp = aw.btc_change_since(ex["btc"] if "btc" in ex else _load(out, "app_btc.json"), int(pport["since"]),
+                                     (market.get("btc") or {}).get("price"))
+            pport["btc_since_pct"] = _r(bp)
+            pport["calm_note"] = aw.calm_note(pport, bp, engine, lang)
+        except Exception as e:  # noqa: BLE001
+            print("app_home calm/spot why:", repr(e)[:200], flush=True)
     issues = ex["sys"] if "sys" in ex else sys_issues(out, now)
     real_syms = {str(x.get("sym") or "").upper() for x in (real or {}).get("spot") or [] if x.get("sym")}
     return {"v": 1, "asof": now, "mode": "demo", "lang": lang, "since": paper.get("since") or "2026-10-17",
@@ -1688,7 +1754,7 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
             "public_portfolio": pport, "market_view": mv, "report": _report_safe(pport, mv, now, lang, issues, mk),
             "sources": [{"key": "futures", "usd": fut["usd"]}, {"key": "spot", "usd": spot["usd"]},
                         {"key": "piggy", "usd": None}, {"key": "soon", "label": t(lang, "sources.soon")}],
-            "market": _market(mk, lang), "futures": fut, "spot": spot, "engine": _engine_facts(out), "config": _config(out, lang),
+            "market": market, "futures": fut, "spot": spot, "engine": engine, "config": _config(out, lang),
             "buy_now": _buy_now(out, now, lang, real_syms),
             "note_ru": t(lang, "home.note")}
 
@@ -1726,7 +1792,7 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
     ex = {"ideas": ideas.get("positions") or [], "ideas_pf": ideas, "rows": _load(out, "ideas.json").get("statuses") or {},
           "fut_curve": nova_result(paper.get("profiles") or {}, now, sel)[1], "sel": sel,
           "tok": _load(out, "tokenomics.json"), "profiles": _load(out, "coin_profiles.json").get("coins") or {},
-          "live": _live_shares(out, now), "sys": sys_issues(out, now)}
+          "live": _live_shares(out, now), "sys": sys_issues(out, now), "btc": _load(out, "app_btc.json")}
     docs = {lang: _polished(build(paper, pf, mk, out, now, lang, ex), lang) for lang in LANGS}
     for lang in [x for x in LANGS if x != DEFAULT] + [DEFAULT]:          # Russian last: its mtime says «all languages written»
         _write(out, file_name("app_home", lang), docs[lang])

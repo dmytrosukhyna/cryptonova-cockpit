@@ -87,6 +87,11 @@ def nova_result(paper: dict, out: str = "web") -> tuple[float | None, str]:
 
 def spoken(text: str) -> str:
     """What the neural voice reads: the Latin brand is read badly («Новa» / letters), so it gets the Cyrillic name with the stress mark."""
+    try:                                       # build 53 (owner 04.11): «с 22.10» is said «с 22 октября», never «с 22,1»
+        from ..api.tts import say_dates
+        text = say_dates(text, "ru")
+    except Exception:  # noqa: BLE001
+        pass
     return text.replace("CRYPTO NOVA", "Крипто Но́ва")
 
 

@@ -92,10 +92,39 @@ INSTALL_EVERY_S = 6 * 3600
 INSTALL_TIMEOUT_S = 600
 
 
+_DATE = re.compile(r"(?<![\d.,$€×x+\u2212-])(\d{1,2})\.(0[1-9]|1[0-2])(?:\.(20\d\d))?(?![\d%×x])(?!\.\d)")
+_MONTHS = {"ru": ("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"),
+           "uk": ("січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"),
+           "en": ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"),
+           "el": ("Ιανουαρίου", "Φεβρουαρίου", "Μαρτίου", "Απριλίου", "Μαΐου", "Ιουνίου", "Ιουλίου", "Αυγούστου", "Σεπτεμβρίου",
+                  "Οκτωβρίου", "Νοεμβρίου", "Δεκεμβρίου"),
+           "es": ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")}
+
+
+def say_dates(text: str, lang: str) -> str:
+    """build 53 (owner 04.11: the voice said «с 22,1» for «с 22.10»): a date «22.10» / «22.10.2026» is said in words — «22 октября»,
+    «October 22», «22 жовтня», «22 Οκτωβρίου», «22 de octubre» (with the year: «22 октября 2026 года», «October 22, 2026» …)"""
+    lang = norm_lang(lang)
+
+    def one(m: re.Match) -> str:
+        d, mo, y = int(m.group(1)), int(m.group(2)), m.group(3)
+        if not 1 <= d <= 31:
+            return m.group(0)
+        name = _MONTHS[lang][mo - 1]
+        if lang == "en":
+            return f"{name} {d}" + (f", {y}" if y else "")
+        if lang == "es":
+            return f"{d} de {name}" + (f" de {y}" if y else "")
+        return f"{d} {name}" + ((" " + y + (" года" if lang == "ru" else " року" if lang == "uk" else "")) if y else "")
+    return _DATE.sub(one, text)
+
+
 def spoken(text: str, lang: str) -> str:
     """what the voice reads: the Latin brand is read badly by the Russian / Ukrainian voices («Новa», letters), so they get the
-    Cyrillic name with the stress (Но́ва); the other voices get «Crypto Nova» / «Nova AI» in normal case; Markdown stars go"""
-    s = re.sub(r"\s+", " ", str(text or "")).replace("*", "").replace("NOVΛ", "NOVA").replace("\u2212", "-")   # NBSP → space first
+    Cyrillic name with the stress (Но́ва); the other voices get «Crypto Nova» / «Nova AI» in normal case; Markdown stars go;
+    build 53: dates in words (say_dates)"""
+    s = re.sub(r"\s+", " ", str(text or "")).replace("*", "").replace("NOVΛ", "NOVA")   # NBSP → space first
+    s = say_dates(s, lang).replace("\u2212", "-")
     if lang in ("ru", "uk"):
         s = s.replace("CRYPTO NOVA", f"Крипто Но{STRESS}ва").replace("NOVA AI", f"Но{STRESS}ва").replace("NOVA", f"Но{STRESS}ва")
     else:

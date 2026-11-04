@@ -887,12 +887,7 @@ def system_status(out: str, now: int, lease: dict | None, api: tuple | None, pre
                        "Работают." if st == "ok" else
                        f"Не обновлялись с {_ddmm(t_mon) if t_mon else '—'}: web/ivan.enc.json и web/myspot.enc.json показывают старые данные. "
                        "Включить на сервере: ключи «только чтение» в /etc/cnq-okx.env и `okx_autopilot_server.sh monitors`."))
-    # the Mac's Bybit demo mirror (it trades the demo account — stays on the Mac)
-    t_mac = max(_ms(_load(out, "bybit.json").get("asof")) or 0, _ms(_load(out, "pulse.json").get("t")) or 0) or None
-    st = "ok" if t_mac and now - t_mac <= 45 * 60_000 else "stopped"
-    comps.append(_comp("mac_mirror", "Зеркало на Маке (Bybit демо)", st, t_mac, now,
-                       "Работает." if st == "ok" else "Не обновляло web/bybit.json с " + (_ddmm(t_mac) if t_mac else "—") +
-                       ": демо-счёт Bybit в панели показывает старые данные."))
+    # 04.11 (owner): the Mac's Bybit demo mirror of the autopilot is retired — real money is on OKX; «Иван тест» is in «monitors».
     # the voice brief
     B = _load(out, "brief.json")
     if B:

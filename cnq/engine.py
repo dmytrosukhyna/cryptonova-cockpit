@@ -40,7 +40,8 @@ FAST = ["risk", "paper", "listings", "own", "lsn", "turbo", "signalfeed",
         "okxsignal",       # 22.10: CRYPTO NOVA on the OKX Signal Marketplace (cnq/agents/okx_signal.py) — off unless CNQ_OKX_SIGNAL=on
         "apphome", "apppush",
         "scorecard"]       # 20.10: last — it records what the steps above (and the GitHub feeds) just published → web/scorecard.json
-SLOW = ["quality", "altport", "buynow"]     # 22.10: «Если покупать сегодня» for the app (cnq/agents/buy_now.py), every 30 minutes
+SLOW = ["quality", "altport", "buynow",     # 22.10: «Если покупать сегодня» for the app (cnq/agents/buy_now.py), every 30 minutes
+        "golddesk"]                          # 04.11: «Золото · тест» demo desk (cnq/agents/gold_desk.py, 4-hour bars) → web/gold_desk.json
 # 20.10: strategy conveyor LAB → PAPER → READY → RETIRED (cnq/agents/conveyor.py): once an hour (cycle 1 = soon after a restart, then
 # every 60 cycles), after the desks; it writes data/conveyor_state.json (read by the risk gate) and web/conveyor.json
 HOURLY = ["conveyor",
@@ -53,16 +54,18 @@ OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "al
          "risk.json",                                                      # 20.10: the risk layer's public summary
          "scorecard.json",                                                 # 20.10: the public prediction scorecard
          "okx_signal.json",                                                # 22.10: the OKX signal sender's public log (no token)
+         "gold_desk.json",                                                 # 04.11: «Золото · тест» demo desk (SLOW step; desk_select reads it)
          "desk_select.json"]                                               # 28.10: the main futures desk (state + decision; public)
 # the engine's own state — never overwritten by a pull (20.10: + the conveyor's state, the risk layer's kill switch, state, reset
 # request and log)
 DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json", "kill_switch.json", "risk_state.json", "risk_reset.json", "risk_log.jsonl"}
 STEP_TIMEOUT = {"risk": 60, "paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90, "buynow": 150,
-                "conveyor": 120, "scorecard": 60, "okxsignal": 60, "deskselect": 60}
+                "conveyor": 120, "scorecard": 60, "okxsignal": 60, "deskselect": 60, "golddesk": 60}
 # 20.10: the public scorecard's append-only, hash-chained ledgers (cnq/agents/scorecard.py) — two active files and the directory of
 # their closed segments. Unlike DB_OWNED they are public: the engine is their only writer, a pull never overwrites them, and every
 # sync commits them (like OWNED, but in data/). A fresh install starts from the repo's copy (prepare).
 DATA_OWNED = ["scorecard_ledger.jsonl", "scorecard_outcomes.jsonl", "scorecard",
+              "gold_desk.jsonl",             # 04.11: the gold demo desk's fills (cnq/agents/gold_desk.py)
               "desk_select.jsonl"]           # 28.10: one line per switch of the main futures desk (cnq/agents/desk_select.py)
 
 

@@ -28,6 +28,7 @@
   python -m cnq.cli conveyor [run|status] [--force]   strategy conveyor LAB → PAPER → READY → RETIRED → data/conveyor_state.json + web/conveyor.json
   python -m cnq.cli conveyor reinstate <desk> --reason «…»   the owner brings a retired desk back to PAPER (demo only)
   python -m cnq.cli deskselect      the main futures desk (slow, evidence-based) → web/desk_select.json (+ data/desk_select.jsonl on a switch)
+  python -m cnq.cli golddesk        «Золото · тест» — demo gold desk ($10 000, OKX XAUT candles, no orders) → web/gold_desk.json
   python -m cnq.cli vipfeeds        the closed panel's VIP feeds (read-only): web/spot_pipeline.json, web/strategies.json,
                                     web/opportunities.json, web/system_status.json (cnq/agents/vip_feeds.py)
   python -m cnq.cli optmood [--out web]       «Настроение опционов» — DVOL + put/call OI from Deribit (OKX fallback), information only → web/options_mood.json
@@ -55,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         from .risk import cli as risk_cli
         return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood", "golddesk"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
     ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
     ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
@@ -422,6 +423,13 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:  # noqa: BLE001 — the last web/desk_select.json stays; readers fall back to «Агрессивная» if it breaks
             print("desk_select failed:", repr(e)[:300]); return 1
         print(f"desk_select.json: current={d['current']} ({d['by']}) decision={d['decision']} — {d['short_ru']}")
+    elif args.cmd == "golddesk":
+        # 04.11 (owner 30.10: «по золоту надо, чтобы тест работал … пока в CRYPTO NOVA VIP»): demo only, eligible_real false
+        from .agents import gold_desk
+        d = gold_desk.run(args.out)
+        st = d.get("stats") or {}
+        print(f"gold_desk.json: rule={d['rule']['name']} inst={d.get('inst_used')} equity={d.get('equity_now')} trades={st.get('trades')} "
+              f"open={len(d.get('open') or [])} pending={len(d.get('pending') or [])} {d.get('status_ru')} {d.get('note') or ''}")
     elif args.cmd == "vipfeeds":
         # 28.10 (owner's VIP spec): spot pipeline, strategies, other opportunities, system status — read-only, from the recorded data
         import os, sqlite3

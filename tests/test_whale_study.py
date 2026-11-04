@@ -211,3 +211,60 @@ def test_a_stale_look_at_a_whale_is_only_a_baseline_no_late_copies():
     assert d["open"] == []                                                       # a stale look → baseline only
     d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "HYPE", "side": "SHORT", "lev": 8}, {"coin": "ETH", "side": "LONG", "lev": 3}]}, mids, T0 + 26 * H + H // 2)
     assert [o["coin"] for o in d["open"]] == ["ETH"]                             # a really new position is copied
+
+
+def test_join_an_already_open_position_only_within_1pct_of_the_whale_entry():
+    """04.11 17:37 (owner: «Входить и в их открытые»): a followed whale's open position is joined while our price is ≤ 1 % worse
+    than his own entry; 1.5 % worse → wait (logged once), joined later if the price comes back"""
+    pos = [{"coin": "ETH", "side": "LONG", "lev": 10, "entry": 2000.0}, {"coin": "SOL", "side": "LONG", "lev": 3, "entry": 100.0}]
+    d = W.desk_step(None, ["0xa"], {"0xa": pos}, {"ETH": 2015.0, "SOL": 101.5}, T0)
+    assert d["open"] == []                                                    # the first look is a baseline
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, {"ETH": 2015.0, "SOL": 101.5}, T0 + H // 2)
+    assert [o["coin"] for o in d["open"]] == ["ETH"]                          # 0.75 % → joined; 1.5 % → not
+    eth = d["open"][0]
+    assert eth["join"] and eth["gap_pct"] == 0.75 and eth["lev"] == 5.0 and abs(eth["stop"] - 2015 * 0.92) < 1e-6
+    ev = [e for e in d["events"] if e["kind"] == "join"]
+    assert ev and ev[0]["gap_pct"] == 0.75 and ev[0]["whale_entry"] == 2000.0
+    assert sum(e["kind"] == "join_wait" for e in d["events"]) == 1 and d["join_wait"] == {"0xa|SOL|LONG": 1.5}
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, {"ETH": 2015.0, "SOL": 101.5}, T0 + H)
+    assert sum(e["kind"] == "join_wait" for e in d["events"]) == 1             # not logged again
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, {"ETH": 2015.0, "SOL": 100.4}, T0 + 3 * H // 2)
+    assert sorted(o["coin"] for o in d["open"]) == ["ETH", "SOL"] and d["join_wait"] == {}
+    t = next(x for x in W.desk_public(d, {})["paper"]["open"] if x["symbol"] == "SOL")
+    assert t["join"] and t["gap_pct"] == 0.4 and t["whale_entry"] == 100.0
+
+
+def test_join_a_short_and_no_join_without_the_whale_entry():
+    pos = [{"coin": "BTC", "side": "SHORT", "lev": 4, "entry": 100.0}, {"coin": "ETH", "side": "SHORT", "lev": 4, "entry": 2000.0},
+           {"coin": "XRP", "side": "SHORT", "lev": 4}]
+    mids = {"BTC": 99.2, "ETH": 1975.0, "XRP": 1.0}                         # BTC 0.8 % below his short entry, ETH 1.25 % below
+    d = W.desk_step(None, ["0xa"], {"0xa": pos}, mids, T0)
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, mids, T0 + H // 2)
+    assert [o["coin"] for o in d["open"]] == ["BTC"] and d["open"][0]["side"] == "SHORT" and d["open"][0]["gap_pct"] == 0.8
+    assert d["open"][0]["stop"] > 99.2
+    assert W.join_gap("SHORT", 101.0, 100.0) < 0 and abs(W.join_gap("LONG", 101.0, 100.0) - 0.01) < 1e-12
+
+
+def test_stale_look_is_a_baseline_then_the_next_fresh_look_joins_within_1pct():
+    pos = [{"coin": "ZRO", "side": "SHORT", "lev": 8, "entry": 1.90}]
+    d = W.desk_step(None, ["0xa"], {"0xa": []}, {"ZRO": 1.9}, T0)
+    d = W.desk_step(d, [], {}, {"ZRO": 1.9}, T0 + H)
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, {"ZRO": 1.89}, T0 + 26 * H)        # stale look → baseline only
+    assert d["open"] == []
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, {"ZRO": 1.89}, T0 + 26 * H + H // 2)
+    assert [(o["coin"], o["join"], o["lev"]) for o in d["open"]] == [("ZRO", True, 5.0)]
+
+
+def test_join_refuses_an_owner_blocked_hype_short_and_prefers_the_strong_whale():
+    from cnq.execution import owner_overrides as ov
+    a = ov.active({"set": T0 - H, "until": T0 + 30 * H, "close": ["HYPE"], "no_short": ["HYPE"], "note_ru": "тест"}, T0)
+    hype = [{"coin": "HYPE", "side": "SHORT", "lev": 8, "entry": 85.0}]
+    d = W.desk_step(None, ["0xa"], {"0xa": hype}, {"HYPE": 84.9}, T0, a)
+    d = W.desk_step(d, ["0xa"], {"0xa": hype}, {"HYPE": 84.9}, T0 + H // 2, a)
+    assert d["open"] == [] and any(e["kind"] == "skip" and "HYPE" in e["why"] for e in d["events"])
+    # two whales hold ETH long, both within 1 %: one coin = one copy → the whale with ≥ 70 % wins and PF ≥ 1.5 gets it
+    q = {"0xweak": {"win": 0.55, "pf": 1.3}, "0xsilk": {"win": 0.77, "pf": 2.1}}
+    st_ = {"0xweak": [{"coin": "ETH", "side": "LONG", "lev": 3, "entry": 2010.0}], "0xsilk": [{"coin": "ETH", "side": "LONG", "lev": 3, "entry": 1995.0}]}
+    d = W.desk_step(None, ["0xweak", "0xsilk"], st_, {"ETH": 2005.0}, T0, None, q)
+    d = W.desk_step(d, ["0xweak", "0xsilk"], st_, {"ETH": 2005.0}, T0 + H // 2, None, q)
+    assert [o["whale"] for o in d["open"]] == ["0xsilk"]

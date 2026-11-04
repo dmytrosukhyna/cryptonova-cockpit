@@ -18,8 +18,8 @@ Pipeline (Hyperliquid public info API, no keys):
    Rank = what copying with a 30-minute delay would have earned (mean / sd × √n). Top 5 → profiles in plain Russian.
 6. Copy desk (every run): $10 000 paper account follows the top 5 — a NEW position of a followed whale (seen appear
    between two runs) is opened at the current mid, margin 10 % of equity, leverage = whale's but ≤ 5×, at most 8 at
-   once, one per coin; closed when the whale closes or flips. Positions a whale already had when we started watching
-   him are not copied (we did not see the entry).
+   once, one per coin; closed when the whale closes or flips. 04.11 17:37 (owner): a position he already holds is joined too
+   while our price is ≤ 1 % worse than his own entry (after a fresh look; the first / a stale look only sets the baseline).
 
 Honesty: whales hedge across venues, the server sees changes only every ~30 minutes, and a past month is a small
 sample — the copy test says what the delay costs; the desk is an experiment until it has its own record.
@@ -37,6 +37,11 @@ import urllib.request
 from ..execution import owner_overrides as ov
 
 SEEN_MAX_MS = 2 * 3_600_000      # 04.11: a whale's last look older than this → baseline only (no copies from it)
+# 04.11 17:37 (owner, real money: «Входить и в их открытые»): the desk also joins a followed whale's ALREADY OPEN position, but
+# only while the price is no worse than JOIN_MAX from the whale's own entry (long: px ≤ entry × 1.01; short: px ≥ entry × 0.99)
+JOIN_MAX = 0.01
+JOIN_REDO_MS = 7 * 86_400_000    # a copy of this whale's position stopped out → that same position is not re-joined for 7 days
+GOOD_WIN, GOOD_PF = 0.70, 1.5    # several candidates at once → whales with a 30-day record of ≥ 70 % wins and PF ≥ 1.5 go first
 LB = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard"
 HL = "https://api.hyperliquid.xyz/info"
 M15, H1, DAY = 900_000, 3_600_000, 86_400_000
@@ -709,15 +714,34 @@ def day_key(t: int) -> str:
     return time.strftime("%Y-%m-%d", time.gmtime(int(t) / 1000))
 
 
-def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, now: int, owner: dict | None = None) -> dict:
+def join_gap(side: str, px: float, whale_entry) -> float | None:
+    """how much worse our price is than the whale's own entry, as a fraction (> 0 = worse: above a long's entry, below a
+    short's); None when the whale's entry is unknown"""
+    e = _f(whale_entry)
+    if not e or not px:
+        return None
+    return (px / e - 1) if side == "LONG" else (1 - px / e)
+
+
+def good_whale(q: dict | None) -> bool:
+    q = q or {}
+    return _f(q.get("win")) >= GOOD_WIN and _f(q.get("pf")) >= GOOD_PF
+
+
+def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, now: int, owner: dict | None = None,
+              quality: dict | None = None) -> dict:
     """One run of the paper copy desk. states = {addr: [positions]} for the whales fetched this run (missing addr = not
     fetched → nothing changes for him). desk['seen'][addr] = {coin: side} from the previous run.
     04.11: every copy carries a stop (the whale's, else −8 %) checked every run at the current mid; one whale's copies never hold
-    more than 30 % of the equity as margin; every close adds to the whale's daily record (desk['by_whale_day'])."""
+    more than 30 % of the equity as margin; every close adds to the whale's daily record (desk['by_whale_day']).
+    04.11 17:37 (owner): a followed whale's ALREADY OPEN position is joined too while our price is ≤ 1 % worse than his entry
+    (JOIN_MAX), only on a fresh look (a stale / first look is a baseline). quality = {addr: {win, pf}} (30 days): when several
+    positions are candidates, whales with ≥ 70 % wins and PF ≥ 1.5 go first, then new positions, then the smallest gap."""
     d = desk or {"start": DESK_START, "cash": DESK_START, "open": [], "closed": [], "seen": {}, "history": [], "started": now}
     d.setdefault("events", [])
     d.setdefault("by_whale_day", {})
     seen = d["seen"]
+    cands: list[tuple] = []
 
     def mark(o):
         px = _f(mids.get(o["coin"]))
@@ -778,36 +802,72 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                 ns, src = stop_for(o["side"], o["entry"], p.get("sl"))
                 if src == "стоп кита":
                     o["stop"], o["stop_src"] = round(ns, 8), src
-        # opens: only positions that appeared since the previous look at this whale, and only for whales we follow
+        # opens: positions that appeared since the previous look (new) and, 04.11 17:37, positions he already held (join) —
+        # only on a fresh look and only for whales we follow; collected here, opened below in order of preference
         if prev is not None and addr in follow:
             for coin, p in cur.items():
-                if prev.get(coin) == p["side"]:
-                    continue
-                if any(o["coin"] == coin for o in d["open"]) or len(d["open"]) >= DESK_MAX_OPEN:
-                    continue
-                if owner and ov.blocked(owner, coin, p["side"], now):
-                    d["events"].append({"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
-                                        "why": ov.blocked(owner, coin, p["side"], now)})
-                    continue
-                px = _f(mids.get(coin))
-                if not px:
-                    continue
-                eq = d["cash"] + sum(mark(o) for o in d["open"])
-                margin = round(eq * DESK_MARGIN, 2)
-                used = sum(_f(o.get("margin")) for o in d["open"] if o["whale"] == addr)
-                if used + margin > WHALE_CAP * eq + 0.01:
-                    d["events"].append({"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
-                                        "why": f"у этого кита уже {used / eq * 100:.0f}% счёта — предел {WHALE_CAP * 100:.0f}% на кита"})
-                    continue
-                lev = min(max(1.0, p.get("lev") or 1.0), DESK_LEV_CAP)
-                stp, src = stop_for(p["side"], px, p.get("sl"))
-                o = {"whale": addr, "coin": coin, "side": p["side"], "entry": px, "opened_t": now, "margin": margin, "lev": lev,
-                     "notional": round(margin * lev, 2), "whale_entry": p.get("entry"), "whale_notional": p.get("notional"),
-                     "whale_lev": p.get("lev"), "stop": round(stp, 8), "stop_src": src}
-                d["open"].append(o)
-                d["events"].append({"t": now, "kind": "open", "coin": coin, "side": p["side"], "whale": addr, "px": px})
+                kind = "join" if prev.get(coin) == p["side"] else "new"
+                cands.append((addr, coin, p, kind))
         seen[addr] = {c: p["side"] for c, p in cur.items()}
         d.setdefault("seen_t", {})[addr] = now
+    wait_prev, wait_now = d.get("join_wait") or {}, {}
+
+    def note_wait(key, ev):                  # a join that is not possible now is logged once, not on every run
+        wait_now[key] = ev.get("gap_pct")
+        if key not in wait_prev:
+            d["events"].append(ev)
+
+    rank = []
+    for addr, coin, p, kind in cands:
+        px = _f(mids.get(coin))
+        gap = join_gap(p["side"], px, p.get("entry"))
+        rank.append((0 if good_whale((quality or {}).get(addr)) else 1, 0 if kind == "new" else 1, gap if gap is not None else 9.0,
+                     addr, coin, p, kind, px, gap))
+    rank.sort(key=lambda r: r[:3])
+    for _q, _k, _g, addr, coin, p, kind, px, gap in rank:
+        key = f"{addr}|{coin}|{p['side']}"
+        if any(o["coin"] == coin for o in d["open"]) or len(d["open"]) >= DESK_MAX_OPEN:
+            continue
+        if not px:
+            continue
+        gap_pct = round(gap * 100, 2) if gap is not None else None
+        if kind == "join":
+            if gap is None:
+                continue                                     # the whale's entry is unknown — cannot measure the gap
+            if gap > JOIN_MAX:
+                note_wait(key, {"t": now, "kind": "join_wait", "coin": coin, "side": p["side"], "whale": addr, "gap_pct": gap_pct,
+                                "why": f"цена на {gap_pct:.2f}% хуже входа кита (предел {JOIN_MAX * 100:g}%) — ждём его следующую сделку"})
+                continue
+            if any(c["whale"] == addr and c["coin"] == coin and c["side"] == p["side"] and str(c.get("why", "")).startswith("стоп")
+                   and now - int(c.get("closed_t") or 0) < JOIN_REDO_MS for c in d["closed"]):
+                continue                                     # our copy of this very position was stopped out — no re-entry
+        if owner and ov.blocked(owner, coin, p["side"], now):
+            ev = {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr, "why": ov.blocked(owner, coin, p["side"], now)}
+            if kind == "join":
+                note_wait(key, ev)
+            else:
+                d["events"].append(ev)
+            continue
+        eq = d["cash"] + sum(mark(o) for o in d["open"])
+        margin = round(eq * DESK_MARGIN, 2)
+        used = sum(_f(o.get("margin")) for o in d["open"] if o["whale"] == addr)
+        if used + margin > WHALE_CAP * eq + 0.01:
+            ev = {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                  "why": f"у этого кита уже {used / eq * 100:.0f}% счёта — предел {WHALE_CAP * 100:.0f}% на кита"}
+            if kind == "join":
+                note_wait(key, ev)
+            else:
+                d["events"].append(ev)
+            continue
+        lev = min(max(1.0, p.get("lev") or 1.0), DESK_LEV_CAP)
+        stp, src = stop_for(p["side"], px, p.get("sl"))
+        o = {"whale": addr, "coin": coin, "side": p["side"], "entry": px, "opened_t": now, "margin": margin, "lev": lev,
+             "notional": round(margin * lev, 2), "whale_entry": p.get("entry"), "whale_notional": p.get("notional"),
+             "whale_lev": p.get("lev"), "stop": round(stp, 8), "stop_src": src, "join": kind == "join", "gap_pct": gap_pct}
+        d["open"].append(o)
+        d["events"].append({"t": now, "kind": "join" if kind == "join" else "open", "coin": coin, "side": p["side"], "whale": addr,
+                            "px": px, "whale_entry": p.get("entry"), "gap_pct": gap_pct, "lev": lev})
+    d["join_wait"] = wait_now
     for o in d["open"]:                                        # copies opened before 04.11 get their protective stop now
         if not o.get("stop"):
             stp, src = stop_for(o["side"], o["entry"])
@@ -841,7 +901,8 @@ def paper_trade(o: dict, closed: bool = False) -> dict:
     t = {"id": f"W-{okx_symbol(o['coin'])}-{o['side'][0]}-{int(_f(o.get('opened_t')))}", "symbol": okx_symbol(o["coin"]), "side": o["side"],
          "grade": "W", "kind": "WHALE_COPY", "entry": e, "stop": round(stp, 8), "stop_now": round(stp, 8), "stop_src": o.get("stop_src"),
          "tps": [], "parts": [], "qty": qty, "qty_left": qty, "risk_usd": round(qty * abs(e - stp), 2), "opened": int(_f(o.get("opened_t"))),
-         "copy_lev": min(DESK_LEV_CAP, max(1.0, _f(o.get("lev"), 1.0))), "whale": o.get("whale"), "notional": o.get("notional")}
+         "copy_lev": min(DESK_LEV_CAP, max(1.0, _f(o.get("lev"), 1.0))), "whale": o.get("whale"), "notional": o.get("notional"),
+         "whale_entry": o.get("whale_entry"), "join": bool(o.get("join")), "gap_pct": o.get("gap_pct")}
     if closed:
         t.update(closed=int(_f(o.get("closed_t"))), exit=o.get("exit"), net_usd=o.get("pnl"), exit_kind=o.get("why"))
     return t
@@ -876,11 +937,15 @@ def desk_public(d: dict, names: dict) -> dict:
             "closed": [{**c, "whale_ru": lab(c["whale"])} for c in sorted(cl, key=lambda c: -c["closed_t"])[:20]],
             "history": d.get("history", [])[-500:],
             "by_whale": by_whale(d, names),
+            # 04.11 17:37: every join of an already open whale position (and every one still waiting) with its gap to the whale's entry
+            "joins": [{**e, "whale_ru": lab(e["whale"])} for e in (d.get("events") or []) if e.get("kind") in ("join", "join_wait")][-20:],
             # 04.11: the same copies in the shape of a web/paper.json desk — the real OKX sleeve follows this at the desk's stage share
             "paper": {"name": "Киты · копирование топ-5", "start_equity": d["start"], "equity": d.get("equity", d["start"]),
                       "since": d.get("started"), "open": [paper_trade(o) for o in d.get("open") or []],
                       "closed": [paper_trade(c, True) for c in sorted(cl, key=lambda c: -c["closed_t"])[:20]]},
-            "rules_ru": f"Старт $10 000. Повторяем только новые позиции топ-5 китов, замеченные между двумя проверками (сервер смотрит раз в ~30 мин): "
+            "rules_ru": f"Старт $10 000. Повторяем новые позиции топ-5 китов, замеченные между двумя проверками (сервер смотрит раз в ~30 мин), "
+                        f"и входим в их уже открытые позиции, если цена не хуже входа кита больше чем на {JOIN_MAX * 100:g}% "
+                        f"(иначе ждём его следующую сделку); первыми — киты с ≥ {GOOD_WIN * 100:.0f}% прибыльных сделок и PF ≥ {GOOD_PF:g} за 30 дней: "
                         f"вход по текущей цене, маржа {DESK_MARGIN * 100:.0f}% счёта, плечо как у кита, но не больше {DESK_LEV_CAP:.0f}×, не больше "
                         f"{DESK_MAX_OPEN} позиций и одна на монету, на одного кита — не больше {WHALE_CAP * 100:.0f}% счёта. Стоп у каждой копии: стоп кита, "
                         f"если он стоит на бирже, иначе −{DESK_STOP * 100:g}% от входа. Выходим, когда кит закрыл или развернул позицию, или по стопу. "
@@ -960,7 +1025,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             except Exception as e:  # noqa: BLE001
                 notes.append(f"позиции {a[:12]}: {str(e)[:100]}")
             time.sleep(0.25)
-        desk = desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now))
+        desk = desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), kv_get(conn, "quality") or {})
         kv_set(conn, "desk", desk)
         conn.commit()
     # 4. study data, budgeted and resumable; both sources take turns so neither waits for the other
@@ -1041,6 +1106,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         if c.get("src") == "okx":
             p.update(followers=c.get("followers"), lead_days=c.get("lead_days"), okx_pnl_all=c.get("pnl_all"), okx_win=c.get("win_ratio"))
         profs.append(p)
+    if profs:                                  # the 30-day record per whale, read by the next run's desk (preference order)
+        kv_set(conn, "quality", {p["addr"]: {"win": p.get("win"), "pf": p.get("pf"), "pnl_30d": p.get("pnl_30d")} for p in profs})
     elig = sorted([p for p in profs if p["eligible"]], key=lambda p: (-(p["score"] if p["score"] is not None else -99), -p["pnl_30d"]))
     top = elig[:TOP_N]
     for i, p in enumerate(top):

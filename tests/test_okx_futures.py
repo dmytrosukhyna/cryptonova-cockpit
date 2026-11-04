@@ -440,3 +440,33 @@ def test_whales_feed_joins_at_its_stage_share_and_never_closes_on_a_failed_load(
     get.wtop = {**wtop, "asof": NOW - 4 * 3_600_000, "desk": {"paper": {**wtop["desk"]["paper"], "open": [wt, {**wt, "id": "W-ETH-L-2", "symbol": "ETH"}]}}}
     ds = dict(fu.fetch_desks({}, held))
     assert [t["id"] for t in ds["whales"]["open"]] == ["W-BTC-S-1"] and ds["whales"]["stale"]
+
+
+def test_owner_override_closes_the_held_short_reduce_only_and_never_reopens_it(tmp_path):
+    """04.11 (owner: «Шорт по HYPE надо закрывать … шортить HYPE сейчас нет смысла»): config/owner_overrides.json removes the trade
+    from what the desk wants → the ordinary reduce-only desk close; the same short is never re-opened; a long after «set» is allowed"""
+    import json
+    fk = F.FakeOkx()
+    p = tmp_path / "ov.json"
+    e = F.env(CNQ_OWNER_OVERRIDES=str(p))
+    short = F.trade("T2", "BTC", "SHORT", 100000.0, 102000.0, 90000.0)
+    run(fk, e, F.desks(F.trade(), short))
+    assert "BTC-USDT-SWAP" in fk.pos
+    p.write_text(json.dumps({"set": NOW, "until": NOW + 14 * 86_400_000, "close": ["BTC"], "no_short": ["BTC"], "note_ru": "тест"}))
+    r = run(fk, e, F.desks(F.trade(), short), NOW + 60_000)                  # the desk still holds it — the owner's file closes it
+    assert r["closed"] == 1 and "BTC-USDT-SWAP" not in fk.pos
+    ex = swap_orders(fk)[-1]
+    assert ex["side"] == "buy" and ex["ordType"] == "market" and ex["reduceOnly"] is True
+    n = len(swap_orders(fk))
+    again = F.trade("T3", "BTC", "SHORT", 100000.0, 102000.0, 90000.0, opened=NOW + 100_000)
+    run(fk, e, F.desks(F.trade(), short, again), NOW + 120_000)              # a new BTC short is not opened either
+    assert len(swap_orders(fk)) == n and "BTC-USDT-SWAP" not in fk.pos
+    # after «until» the file does nothing
+    p.write_text(json.dumps({"set": NOW, "until": NOW + 1000, "close": ["BTC"], "no_short": ["BTC"]}))
+    from cnq.execution import owner_overrides as ov
+    a = ov.active(ov.load(env=e), NOW + 5000)
+    assert ov.blocked(a, "BTC", "SHORT", NOW - 1) is None
+    a = ov.active({"set": NOW, "until": NOW + 10, "close": ["kPEPE"], "no_short": ["HYPE"]}, NOW)
+    assert ov.blocked(a, "1000PEPE-USDT-SWAP", "LONG", NOW - 1) and ov.blocked(a, "PEPE", "LONG", NOW + 1) is None
+    assert ov.blocked(a, "HYPE-USDT-SWAP", "SHORT", NOW + 1) and ov.blocked(a, "HYPE", "LONG", NOW + 1) is None
+    assert ov.active(ov.load("/nonexistent.json"), NOW)["close"] == set()

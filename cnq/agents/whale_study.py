@@ -34,6 +34,8 @@ import statistics as st
 import time
 import urllib.request
 
+from ..execution import owner_overrides as ov
+
 LB = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard"
 HL = "https://api.hyperliquid.xyz/info"
 M15, H1, DAY = 900_000, 3_600_000, 86_400_000
@@ -706,7 +708,7 @@ def day_key(t: int) -> str:
     return time.strftime("%Y-%m-%d", time.gmtime(int(t) / 1000))
 
 
-def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, now: int) -> dict:
+def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, now: int, owner: dict | None = None) -> dict:
     """One run of the paper copy desk. states = {addr: [positions]} for the whales fetched this run (missing addr = not
     fetched → nothing changes for him). desk['seen'][addr] = {coin: side} from the previous run.
     04.11: every copy carries a stop (the whale's, else −8 %) checked every run at the current mid; one whale's copies never hold
@@ -746,6 +748,12 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         stp = _f(o.get("stop"))
         if px and stp and ((o["side"] == "LONG" and px <= stp) or (o["side"] == "SHORT" and px >= stp)):
             close(o, f"стоп ({o.get('stop_src') or 'защитный'})", px)
+    # 04.11 (owner, config/owner_overrides.json): a copy the owner closed / a side he forbade is closed now and not re-opened
+    if owner:
+        for o in list(d["open"]):
+            w = ov.blocked(owner, o["coin"], o["side"], o.get("opened_t"))
+            if w:
+                close(o, w)
     for addr, pos in states.items():
         if hidden(pos):                    # 04.11: OKX hides this lead trader's instruments — we cannot tell what he holds: no
             d["events"].append({"t": now, "kind": "hidden", "whale": addr})     # close and no open for him this run (stops still work)
@@ -770,6 +778,10 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                 if prev.get(coin) == p["side"]:
                     continue
                 if any(o["coin"] == coin for o in d["open"]) or len(d["open"]) >= DESK_MAX_OPEN:
+                    continue
+                if owner and ov.blocked(owner, coin, p["side"], now):
+                    d["events"].append({"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                        "why": ov.blocked(owner, coin, p["side"], now)})
                     continue
                 px = _f(mids.get(coin))
                 if not px:
@@ -941,7 +953,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             except Exception as e:  # noqa: BLE001
                 notes.append(f"позиции {a[:12]}: {str(e)[:100]}")
             time.sleep(0.25)
-        desk = desk_step(desk, follow, states, mids, now)
+        desk = desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now))
         kv_set(conn, "desk", desk)
         conn.commit()
     # 4. study data, budgeted and resumable; both sources take turns so neither waits for the other

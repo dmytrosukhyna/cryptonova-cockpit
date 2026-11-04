@@ -1,0 +1,71 @@
+"""Owner overrides for the real futures (04.11.2026, owner: «Шорт по HYPE надо закрывать … шортить HYPE сейчас нет смысла»).
+
+config/owner_overrides.json (in the repo; the server gets it with the engine's git pull, the autopilot restarts onto new code):
+  {"set": <ms or ISO>, "until": <ms or ISO>, "close": ["HYPE"], "no_short": ["HYPE"], "no_long": [], "note_ru": "..."}
+  • close    — a position in that coin opened BEFORE «set» is closed (any side; reduce-only through the sleeve's ordinary desk-close
+               path, and the «Киты» paper desk closes its copy). New trades after «set» are not touched by «close».
+  • no_short — no short in that coin is held or opened until «until» (a held one is closed the same way);
+  • no_long  — the same for longs.
+After «until» the file does nothing. A missing / broken file = no overrides (it can only REMOVE trades, never add one).
+Coins are matched by their base: HYPE, HYPE-USDT-SWAP, kPEPE, 1000PEPE, PEPE all compare as the base coin.
+Stdlib only."""
+from __future__ import annotations
+
+import json
+import os
+import time
+from datetime import datetime
+
+PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "owner_overrides.json")
+
+
+def base(sym) -> str:
+    s = str(sym or "").strip()
+    if s[:1] == "k" and s[1:].isupper():
+        s = s[1:]
+    s = s.upper().split("-")[0]
+    return s[4:] if s.startswith("1000") and len(s) > 4 else s
+
+
+def _ms(v) -> int:
+    if v is None or v == "":
+        return 0
+    if isinstance(v, (int, float)):
+        return int(v)
+    try:
+        return int(datetime.fromisoformat(str(v)).timestamp() * 1000)
+    except ValueError:
+        return 0
+
+
+def load(path: str | None = None, env=None) -> dict:
+    p = path or (os.environ if env is None else env).get("CNQ_OWNER_OVERRIDES") or PATH
+    try:
+        with open(p, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def active(ov: dict | None, now: int | None = None) -> dict:
+    """{"close": set, "no_short": set, "no_long": set, "set": ms, "until": ms, "note_ru"} — empty sets once «until» has passed"""
+    ov = ov or {}
+    now = int(now if now is not None else time.time() * 1000)
+    until = _ms(ov.get("until"))
+    on = bool(until) and now < until
+    pick = lambda k: {base(x) for x in (ov.get(k) or []) if x} if on else set()      # noqa: E731
+    return {"close": pick("close"), "no_short": pick("no_short"), "no_long": pick("no_long"), "set": _ms(ov.get("set")),
+            "until": until, "note_ru": ov.get("note_ru") or "решение владельца"}
+
+
+def blocked(a: dict, sym, side: str, opened=None) -> str | None:
+    """why this trade (coin, LONG/SHORT, opened ms) must not be held / opened now, else None"""
+    b, side = base(sym), str(side or "").upper()
+    if b in a["close"] and int(opened or 0) < (a["set"] or 1 << 62):
+        return f"закрыто по решению владельца: {a['note_ru']}"
+    if side == "SHORT" and b in a["no_short"]:
+        return f"шорты {b} запрещены владельцем: {a['note_ru']}"
+    if side == "LONG" and b in a["no_long"]:
+        return f"лонги {b} запрещены владельцем: {a['note_ru']}"
+    return None

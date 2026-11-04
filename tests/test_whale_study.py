@@ -185,3 +185,18 @@ def test_a_whale_whose_positions_okx_hides_is_neither_closed_nor_copied():
     d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "", "side": "SHORT", "lev": 20, "notional": 5e5}]}, mids, T0 + 2 * H)
     assert len(d["open"]) == 1 and d["closed"] == [] and d["events"][-1]["kind"] == "hidden"
     assert W.hidden([{"coin": ""}]) and not W.hidden([{"coin": "BTC"}]) and not W.hidden([])
+
+
+def test_owner_override_closes_the_copy_and_blocks_new_shorts_of_that_coin():
+    """04.11 (owner): the «Киты» desk closes its HYPE short copy and never re-opens a HYPE short while the override lasts"""
+    from cnq.execution import owner_overrides as ov
+    mids = {"HYPE": 85.0, "ETH": 2000.0}
+    d = W.desk_step(None, ["0xa"], {"0xa": []}, mids, T0)
+    d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "HYPE", "side": "SHORT", "lev": 8}]}, mids, T0 + H)
+    assert [o["coin"] for o in d["open"]] == ["HYPE"]
+    a = ov.active({"set": T0 + 2 * H, "until": T0 + 30 * H, "close": ["HYPE"], "no_short": ["HYPE"], "note_ru": "тест"}, T0 + 2 * H)
+    d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "HYPE", "side": "SHORT", "lev": 8}]}, {**mids, "HYPE": 88.0}, T0 + 2 * H, a)
+    assert d["open"] == [] and "решению владельца" in d["closed"][-1]["why"]
+    d = W.desk_step(d, ["0xa"], {"0xa": []}, mids, T0 + 3 * H, a)
+    d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "HYPE", "side": "SHORT", "lev": 8}, {"coin": "ETH", "side": "LONG", "lev": 3}]}, mids, T0 + 4 * H, a)
+    assert [o["coin"] for o in d["open"]] == ["ETH"]

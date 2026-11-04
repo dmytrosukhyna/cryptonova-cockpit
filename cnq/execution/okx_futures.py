@@ -72,6 +72,7 @@ from . import myspot_watch as ms
 from . import okx_alloc as al
 from . import okx_autopilot as ap
 from . import okx_lead as ld
+from . import owner_overrides as ov
 
 LOG = "data/okx_futures.jsonl"
 FRESH_MS = 45 * 60_000
@@ -877,6 +878,20 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
                 log_path)
         st["main"] = ds[0][0]
     want = want_map(ds)
+    # 04.11 (owner, real money: «Шорт по HYPE надо закрывать»): config/owner_overrides.json removes trades from what the desks want —
+    # a held one then goes through the ordinary reduce-only desk close below, a new one is never opened
+    ova = ov.active(ov.load(env=env), now)
+    owner_why = {}
+    for tid, (t, _, _) in list(want.items()):
+        w = ov.blocked(ova, t.get("symbol"), t.get("side"), t.get("opened"))
+        if w:
+            owner_why[tid] = w
+            want.pop(tid)
+    for tid, m in st["trades"].items():          # a held position whose desk trade is gone anyway: still log the owner's reason
+        if tid not in want and tid not in owner_why:
+            w = ov.blocked(ova, m.get("inst"), m.get("side"), m.get("opened"))
+            if w:
+                owner_why[tid] = w
     slip = ap.limits(env)["slip"]
     seq = 0
     via_used = any(m.get("settle") == "USDC" for m in st["trades"].values())     # a USDC swap now or this pass → sweep at its end
@@ -888,7 +903,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             continue
         seq += 1
         try:
-            if close(ctx, m, None, now, seq, sleep, "сигнал закрыт", log_path):
+            if close(ctx, m, None, now, seq, sleep, owner_why.get(tid) or "сигнал закрыт", log_path):
                 res["closed"] += 1
             else:
                 cancel_algos(ctx, m["inst"])

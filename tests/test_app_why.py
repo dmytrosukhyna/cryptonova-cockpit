@@ -64,3 +64,23 @@ def test_dates_said_in_words():
     for s in ("+1.05%", "$2.10", "×1.10", "0.1207", "3.14"):
         assert say_dates(s, "en") == s
     assert "22 de octubre" in spoken("desde el 22.10", "es")
+
+
+def test_whale_copy_explains_itself_with_a_reference_target():
+    """build 54 (owner 04.11): a copy of a whale's trade — who, what, its record, the 2R reference target; never the generic sentence"""
+    from cnq.agents import app_why as aw
+    desk = {"started": 1792316209001, "trades": 8, "wins": 6,
+            "open": [{"whale": "okx:821389378923984847", "coin": "kPEPE", "side": "LONG", "opened_t": 1793773985528, "whale_entry": 0.004839,
+                      "whale_lev": 20.0, "whale_notional": 7931734, "stop": 0.0000046, "whale_ru": "Luckyboytt"}]}
+    wd = aw.whale_trade("whales:W-1000PEPE-L-1793773985528", desk)
+    assert wd and wd["whale_ru"] == "Luckyboytt"
+    rec = aw.whale_record("okx:821389378923984847", {"top": [{"addr": "okx:821389378923984847", "src": "okx", "trips": 410, "win": 0.81,
+                                                              "pnl_30d": 38488.2, "pf": 7.9}]})
+    row = {"sym": "PEPE", "side": "SHORT", "entry": 100.0, "stop": 108.0, "lev": 5, "pnl_usd": -1.0, "move_pct": -1.0}
+    for lang in aw.L5:
+        d = aw.copy_why(row, wd, rec, None, desk, {"lev": 5, "risk_pct": 2.0}, {"since": 1792627200000, "budget_usd": 1500}, lang)
+        assert "CRYPTO NOVA:" not in d["signal"] and "Luckyboytt" in d["signal"] and "20x" in d["signal"]
+        assert d["target_ref"] == 84.0 and "84.00" in d["plan"] and "2R" in d["plan"]
+        assert "2%" in d["risk"] and "$30" in d["risk"]
+        assert any("410" in c["t"] for c in d["checks"])
+    assert aw._num(20.0, 0) == "20" and aw._price(0.0000049781) == "0.000004978"

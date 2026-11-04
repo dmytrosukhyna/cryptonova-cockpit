@@ -18,7 +18,7 @@ NAME = os.environ.get("CNQ_OWNER_NAME") or "Дмитрий"
 try:
     from cnq.api.tts import RATE
 except Exception:  # noqa: BLE001
-    RATE = "+12%"
+    RATE = "+6%"                   # 04.11 (build 54): one middle tempo
 
 
 def _load(out: str, name: str):
@@ -231,7 +231,7 @@ def run(out: str = "web") -> dict:
             for attempt in range(len(RETRY_PAUSE_S)):
                 try:
                     async def synth(v=voice):
-                        c = edge_tts.Communicate(spoken(text), v, rate=RATE)    # 30.10: the API's +12 % (owner: faster); 21.10: +0 % (was −4 %)
+                        c = edge_tts.Communicate(spoken(text), v, rate=RATE)    # 04.11: the API's +6 % (owner: one middle tempo); 30.10: +12 %
                         await c.save(tmp)
                     asyncio.run(synth())
                     if os.path.getsize(tmp) > 2000:

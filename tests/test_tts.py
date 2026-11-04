@@ -549,9 +549,9 @@ def test_live_race_main_voice_first_then_the_first_fallback_to_finish(tmp_path):
 
 
 def test_rate_is_the_one_brisk_tempo_everywhere():
-    """30.10 (owner, build 51: the voice was too slow): NOVA AI answers, the app's report and the panel's brief all speak at +12 %,
+    """30.10 (owner, build 51: the voice was too slow): NOVA AI answers, the app's report and the panel's brief all speak at one tempo (04.11, build 54: +6 %),
     the same tempo as the app's bundled recordings; the cache key carries the rate, so the old +0 % files are never served"""
     from cnq.agents import voice
-    assert tts.RATE == "+12%"
+    assert tts.RATE == "+6%"
     assert voice.RATE == tts.RATE
     assert tts.key("Привет", "ru") != hashlib.sha256(f"{tts.VOICES['ru']}|+0%|{tts.spoken('Привет', 'ru')}".encode()).hexdigest()[:24]

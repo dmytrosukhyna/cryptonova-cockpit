@@ -496,13 +496,13 @@ def _signal_lev() -> tuple[int, int]:
 
 def _real_lev(real_futures: list, closed: list) -> dict:
     """build 47 (§6.5): the real account's leverage — what OKX applied to its trades (newest first) and the hard caps of
-    cnq/execution/okx_futures.py (default 2x, never above MAX_LEV 3x, risk ≤ RISK_CAP 1 % of the futures budget per trade)"""
+    cnq/execution/okx_futures.py (default 2x, never above MAX_LEV 3x, risk ≤ RISK_CAP 2 % of the futures budget per trade since 04.11)"""
     try:
         from ..execution import okx_futures as of
         c = of.caps()
         caps = {"cap_default": of.DEF_LEV, "max": of.MAX_LEV, "set": c["lev"], "risk_pct": round(c["risk"] * 100, 2)}
     except Exception:  # noqa: BLE001 — the feed never depends on the autopilot module
-        caps = {"cap_default": 2, "max": 3, "set": 2, "risk_pct": 1.0}
+        caps = {"cap_default": 2, "max": 3, "set": 2, "risk_pct": 2.0}         # owner 04.11 17:24: ceiling 2 %
     seen = [float(x["lev"]) for x in list(real_futures or []) + sorted(closed or [], key=lambda c: -(c.get("closed") or 0))
             if isinstance(x.get("lev"), (int, float)) and x["lev"] > 0]
     lev = seen[0] if seen else float(caps["set"])
@@ -1289,7 +1289,7 @@ def _pp_action(a: dict, lang: str, key: str | None = None) -> str:
     return t(lang, f"pp.a.{k}", sym=sym)
 
 
-def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAULT) -> dict | None:
+def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAULT, whales: dict | None = None) -> dict | None:
     if not real or not real.get("since") or real.get("equity_usd") is None:
         return None
     since, s0, eq, pnl = int(real["since"]), float(real.get("start_usd") or 0), float(real["equity_usd"]), real.get("pnl_usd")
@@ -1395,6 +1395,8 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
                "price": x.get("mark"), "stop": x.get("stop"), "target": x.get("target"), "pnl_usd": x.get("upnl_usd"),
                "move_pct": x.get("upnl_pct"), "lev": x.get("lev"), "opened": x.get("opened"), "copy": x.get("copy"),
                "status": "open", "sig": x.get("sig"), "closed_part_usd": None}
+        if isinstance(x.get("why"), dict):
+            row["_rw"] = x["why"]                       # build 54: the execution's own «why» of this trade (read by _why_rows, not shipped)
         o, k, desk = _desk_trade(paper, x.get("sig"))
         if o:
             d = _open_row(o, k, desk, now, lang)
@@ -1425,7 +1427,7 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
         lv = _real_lev(real.get("futures") or [], closed)          # build 47 (§6.5): the cap in one short note
         fut.update({"lev_cap": lv, "lev_note": t(lang, "pp.lev_note", lev=lv["now"], max=lv["max"], risk=_dec(lv["risk_pct"], lang))})
         try:
-            _why_rows(real, paper, open_rows, closed, fut, lv, since, lang)
+            _why_rows(real, paper, open_rows, closed, fut, lv, since, lang, whales)
         except Exception as e:  # noqa: BLE001 — the feed never breaks because of an explanation
             print("app_home why_full:", repr(e)[:200], flush=True)
     raw_acts = [a for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
@@ -1448,7 +1450,8 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             "spot": spot, "futures": fut, "actions": acts, "moved": moved_doc}
 
 
-def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict, lv: dict, since: int, lang: str) -> None:
+def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict, lv: dict, since: int, lang: str,
+              whales: dict | None = None) -> None:
     """build 53 (owner 31.10: «"Откуп дисконта фьючерса" — никто не понимает»): every real trade, open or closed, gets "why_full" —
     the signal in plain words with its own numbers, the checks the system ran, the rule's record on history and on this account,
     the plan and the $ at risk (cnq/agents/app_why.py). Closed trades find their desk trade through the fut_open action's sig."""
@@ -1463,10 +1466,29 @@ def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict,
     ctx = {"since": since, "budget_usd": fut.get("value_usd") or ((fut.get("start_usd") or 0) + (fut.get("pnl_usd") or 0)) or None,
            "closed_grades": [(aw.grade_of(c.get("sig")), float(c.get("pnl_usd") or 0)) for c in closed if c.get("sig")]}
     caps = {"lev": lv.get("set") or lv.get("now"), "risk_pct": lv.get("risk_pct")}
+    wdesk = (whales or {}).get("desk") if isinstance(whales, dict) else None
+    try:
+        from ..execution import okx_futures as of
+        copy_lev = of.caps().get("copy_lev")
+    except Exception:  # noqa: BLE001
+        copy_lev = None
     for row, is_closed in [(r, False) for r in open_rows] + [(c, True) for c in closed]:
         sig = row.get("sig")
         g = aw.grade_of(sig)
+        rw = row.pop("_rw", None)
         if not g:
+            continue
+        if str(sig).startswith("whales:"):
+            # build 54 (owner 04.11): a copy of a whale's trade says who the whale is, what it did and its record — never the
+            # generic «Сделка по правилам CRYPTO NOVA»; its reference target (2R) also feeds the live bar
+            wd = aw.whale_trade(sig, wdesk)
+            rec = aw.whale_record((wd or {}).get("whale"), whales)
+            wcaps = {**caps, "lev": copy_lev or caps.get("lev")}
+            row["why_full"] = aw.copy_why(row, wd, rec, rw, wdesk, wcaps, ctx, lang, closed=is_closed)
+            row["why_title"] = row["why_full"]["title"]
+            row["copy_whale"] = True
+            if not is_closed and row.get("target") is None:
+                row["target_ref"] = row["why_full"].get("target_ref")
             continue
         o, k, _desk = _desk_trade(paper, sig)
         row["why_full"] = aw.trade_why(row, o, g, PROFILES.get(k) or {}, caps, HISTORY.get(g), ctx, lang,
@@ -1726,7 +1748,7 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
     if public is not None and real is not None:
         public["real"] = real
     try:
-        pport = _real_portfolio(real, paper, now, lang)
+        pport = _real_portfolio(real, paper, now, lang, ex["whales_top"] if "whales_top" in ex else _load(out, "whales_top.json"))
     except Exception as e:  # noqa: BLE001 — the feed never breaks because of the real account's file
         print("app_home public_portfolio:", repr(e)[:200], flush=True)
         pport = None

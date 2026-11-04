@@ -17,6 +17,7 @@ Not financial advice. Stdlib only."""
 from __future__ import annotations
 
 import datetime as dt
+import math
 import re
 
 from .i18n import DEFAULT, T, plural, t
@@ -228,6 +229,72 @@ W: dict[str, dict[str, str]] = {
                       "Apalancamiento {lev}x. En riesgo hasta el stop: no más de {cap}, el {risk} del presupuesto de futuros."),
     "rw.result": _w("Итог сделки: {usd} ({mv} по цене).", "The trade's result: {usd} ({mv} in price).", "Підсумок угоди: {usd} ({mv} за ціною).",
                     "Αποτέλεσμα της συναλλαγής: {usd} ({mv} στην τιμή).", "Resultado de la operación: {usd} ({mv} en precio)."),
+    # ------------------------------------------------------------------ build 54: a copy of a whale's trade (owner 04.11: «Сделка по
+    # правилам CRYPTO NOVA… 3 из 3» says nothing for a copy) — who the whale is, what it did, its record, the plan with a reference target
+    "rw.w.title": _w("Копия сделки кита", "A copy of a whale's trade", "Копія угоди кита", "Αντίγραφο συναλλαγής «φάλαινας»",
+                     "Copia de la operación de una ballena"),
+    "rw.w.sig": _w("Система повторила сделку крупного трейдера («кита») {name}{src}: {side} по {sym}.",
+                   "The system copied a trade of a big trader (a «whale»), {name}{src}: {side} on {sym}.",
+                   "Система повторила угоду великого трейдера («кита») {name}{src}: {side} по {sym}.",
+                   "Το σύστημα αντέγραψε μια συναλλαγή μεγάλου trader («φάλαινας»), {name}{src}: {side} στο {sym}.",
+                   "El sistema copió una operación de un gran trader (una «ballena»), {name}{src}: {side} en {sym}."),
+    "rw.w.long": _w("ставка на рост", "a bet on a rise", "ставка на зростання", "στοίχημα σε άνοδο", "una apuesta al alza"),
+    "rw.w.short": _w("ставка на падение", "a bet on a fall", "ставка на падіння", "στοίχημα σε πτώση", "una apuesta a la baja"),
+    "rw.w.pos": _w(" Кит вошёл по {we}{wl}{wn}.", " The whale entered at {we}{wl}{wn}.", " Кит увійшов за {we}{wl}{wn}.",
+                   " Η φάλαινα μπήκε στα {we}{wl}{wn}.", " La ballena entró a {we}{wl}{wn}."),
+    "rw.w.lev": _w(" с плечом {l}x", " with {l}x leverage", " з плечем {l}x", " με μόχλευση {l}x", " con apalancamiento {l}x"),
+    "rw.w.size": _w(", его позиция — около {u}", ", its position is about {u}", ", його позиція — близько {u}", ", η θέση της είναι περίπου {u}",
+                    ", su posición es de unos {u}"),
+    "rw.w.src.okx": _w("лид-трейдер копитрейдинга OKX", "an OKX copy-trading lead trader", "лід-трейдер копітрейдингу OKX",
+                       "lead trader του copy trading της OKX", "lead trader del copy trading de OKX"),
+    "rw.w.src.hl": _w("Hyperliquid, его сделки видны в блокчейне", "Hyperliquid, its trades are visible on the blockchain",
+                      "Hyperliquid, його угоди видно в блокчейні", "Hyperliquid, οι συναλλαγές της φαίνονται στο blockchain",
+                      "Hyperliquid, sus operaciones se ven en la blockchain"),
+    "rw.w.why": _w(" Система копирует только китов из своего отобранного списка и только с защитным стопом.",
+                   " The system copies only whales from its own vetted list, and only with a protective stop.",
+                   " Система копіює лише китів зі свого відібраного списку й лише із захисним стопом.",
+                   " Το σύστημα αντιγράφει μόνο φάλαινες από τη δική του επιλεγμένη λίστα και μόνο με προστατευτικό stop.",
+                   " El sistema solo copia ballenas de su propia lista seleccionada y siempre con un stop de protección."),
+    "rw.w.chk.list": _w("Кит в отобранном списке системы: {n} закрытых сделок, {w}% в плюсе",
+                        "The whale is on the system's vetted list: {n} closed trades, {w}% profitable",
+                        "Кит у відібраному списку системи: {n} закритих угод, {w}% у плюсі",
+                        "Η φάλαινα είναι στη λίστα του συστήματος: {n} κλειστές συναλλαγές, {w}% κερδοφόρες",
+                        "La ballena está en la lista del sistema: {n} operaciones cerradas, {w}% con ganancia"),
+    "rw.w.chk.30d": _w("Кит в плюсе за 30 дней: {u}", "The whale is in profit over 30 days: {u}", "Кит у плюсі за 30 днів: {u}",
+                       "Η φάλαινα είναι σε κέρδος στις 30 ημέρες: {u}", "La ballena gana en 30 días: {u}"),
+    "rw.w.chk.stop": _w("Защитный стоп {sp} от входа — у каждой копии, даже если у кита его нет",
+                        "A protective stop {sp} from the entry on every copy, even when the whale has none",
+                        "Захисний стоп {sp} від входу — у кожної копії, навіть якщо в кита його немає",
+                        "Προστατευτικό stop {sp} από την είσοδο σε κάθε αντίγραφο, ακόμη κι αν η φάλαινα δεν έχει",
+                        "Un stop de protección a {sp} de la entrada en cada copia, aunque la ballena no lo tenga"),
+    "rw.w.hist": _w("История кита: {n} закрытых сделок, {w}% в плюсе{pf}{d30}.",
+                    "The whale's record: {n} closed trades, {w}% profitable{pf}{d30}.",
+                    "Історія кита: {n} закритих угод, {w}% у плюсі{pf}{d30}.",
+                    "Το ιστορικό της φάλαινας: {n} κλειστές συναλλαγές, {w}% κερδοφόρες{pf}{d30}.",
+                    "El historial de la ballena: {n} operaciones cerradas, {w}% con ganancia{pf}{d30}."),
+    "rw.w.pf": _w(", прибыль больше убытков в {x} раза", ", profits {x} times the losses", ", прибуток більший за збитки в {x} раза",
+                  ", κέρδη {x} φορές τις ζημιές", ", ganancias {x} veces las pérdidas"),
+    "rw.w.d30": _w(", за 30 дней {u}", ", {u} over 30 days", ", за 30 днів {u}", ", {u} στις 30 ημέρες", ", {u} en 30 días"),
+    "rw.w.desk": _w("Копирование китов на демо-счёте системы с {d}: {n} сделок, в плюсе {w}.",
+                    "Whale copying on the system's demo account since {d}: {n} trades, {w} in profit.",
+                    "Копіювання китів на демо-рахунку системи з {d}: {n} угод, у плюсі {w}.",
+                    "Αντιγραφή φαλαινών στον demo λογαριασμό του συστήματος από {d}: {n} συναλλαγές, {w} με κέρδος.",
+                    "Copia de ballenas en la cuenta demo del sistema desde el {d}: {n} operaciones, {w} con ganancia."),
+    "rw.w.plan": _w("Вход {entry}, стоп {stop} ({sp} от входа). Своей цели у копии нет: выход — вместе с китом. Ориентир — {tgt} (2R: вдвое дальше стопа).",
+                    "Entry {entry}, stop {stop} ({sp} from the entry). A copy has no target of its own: it exits together with the whale. Reference: {tgt} (2R, twice the stop's distance).",
+                    "Вхід {entry}, стоп {stop} ({sp} від входу). Власної цілі в копії немає: вихід — разом із китом. Орієнтир — {tgt} (2R: удвічі далі за стоп).",
+                    "Είσοδος {entry}, stop {stop} ({sp} από την είσοδο). Το αντίγραφο δεν έχει δικό του στόχο: βγαίνει μαζί με τη φάλαινα. Σημείο αναφοράς: {tgt} (2R, διπλάσια απόσταση από το stop).",
+                    "Entrada {entry}, stop {stop} ({sp} desde la entrada). La copia no tiene objetivo propio: sale junto con la ballena. Referencia: {tgt} (2R, el doble de la distancia al stop)."),
+    "rw.w.ctx": _w("Рынок при входе: {x}.", "The market at the entry: {x}.", "Ринок під час входу: {x}.", "Η αγορά στην είσοδο: {x}.",
+                   "El mercado al entrar: {x}."),
+    "rw.w.c.btc": _w("биткоин за сутки {v}", "bitcoin {v} in 24 h", "біткоїн за добу {v}", "bitcoin {v} σε 24 ώρες", "bitcoin {v} en 24 h"),
+    "rw.w.c.fund": _w("фандинг {v}", "funding {v}", "фандинг {v}", "funding {v}", "funding {v}"),
+    "rw.w.c.oi": _w("открытый интерес {v}", "open interest {v}", "відкритий інтерес {v}", "open interest {v}", "interés abierto {v}"),
+    "rw.w.c.sup": _w("поддержка {v}", "support {v}", "підтримка {v}", "στήριξη {v}", "soporte {v}"),
+    "rw.w.c.res": _w("сопротивление {v}", "resistance {v}", "опір {v}", "αντίσταση {v}", "resistencia {v}"),
+    "rw.w.exit": _w("Кит закрыл позицию — копия закрылась вместе с ним.", "The whale closed its position, and the copy closed with it.",
+                    "Кит закрив позицію — копія закрилася разом із ним.", "Η φάλαινα έκλεισε τη θέση της και το αντίγραφο έκλεισε μαζί της.",
+                    "La ballena cerró su posición y la copia se cerró con ella."),
     # ------------------------------------------------------------------ the spot coin
     "rw.c.core": _w(
         "{sym} — ядро портфеля. BTC, ETH и SOL система держит всегда: докупает, когда доля ниже плана, и продаёт лишнее, когда "
@@ -349,7 +416,8 @@ def _pct(v: float, d: int = 1, sign: bool = True) -> str:
 
 def _price(x: float) -> str:
     a = abs(x)
-    d = 0 if a >= 1000 else 2 if a >= 10 else 3 if a >= 1 else 4 if a >= 0.01 else 6
+    # build 54: below 0.01 four significant digits (PEPE's entry 0.000004978 and stop 0.000004615 both read «0,000005»)
+    d = 0 if a >= 1000 else 2 if a >= 10 else 3 if a >= 1 else 4 if a >= 0.01 else (min(12, 3 - math.floor(math.log10(a))) if a > 0 else 6)
     return f"{x:,.{d}f}".replace(",", " ")
 
 
@@ -361,7 +429,8 @@ def _usd(x: float, lang: str, cents: bool = False) -> str:
 
 
 def _num(x: float, d: int = 1) -> str:
-    return f"{float(x):.{d}f}".rstrip("0").rstrip(".")
+    s = f"{float(x):.{d}f}"
+    return s.rstrip("0").rstrip(".") if "." in s else s          # build 54: «20» stayed «2» (a 20x whale read as 2x)
 
 
 # --------------------------------------------------------------------------------------------- the trade
@@ -512,6 +581,156 @@ def trade_why(row: dict, desk_trade: dict | None, grade: str, prof: dict, caps: 
     doc = {"title": title, "signal": _signal(grade, sym, f, lang), "checked_title": t(lang, "rw.checked"), "checks": checks,
            "history": _history(grade, hist, lang), "live": _live(grade, ctx, lang), "plan": plan, "risk": risk, "result": result}
     doc["text"] = " ".join(x for x in (doc["signal"], doc["history"], doc["live"], plan, risk, result) if x)
+    return doc
+
+
+def _coin_key(c) -> str:
+    """«1000PEPE» / «kPEPE» / «PEPE-USDT-SWAP» → «PEPE» (the whale's venue and OKX name small coins differently)"""
+    c = str(c or "").upper().split("-")[0]
+    for p in ("1000000", "1000", "K"):
+        if c.startswith(p) and len(c) > len(p) + 1:
+            return c[len(p):]
+    return c
+
+
+def whale_trade(sig: str | None, desk: dict | None) -> dict | None:
+    """the copy desk's trade (web/whales_top.json desk.open / desk.closed) that a real «whales:W-<COIN>-<L|S>-<t>» trade mirrors"""
+    if not sig or not str(sig).startswith("whales:") or not isinstance(desk, dict):
+        return None
+    parts = str(sig).split(":", 1)[1].split("-")
+    if len(parts) < 4:
+        return None
+    coin, side = _coin_key(parts[1]), ("LONG" if parts[2] == "L" else "SHORT")
+    try:
+        ts = int(parts[3])
+    except ValueError:
+        ts = None
+    rows = [r for r in list(desk.get("open") or []) + list(desk.get("closed") or []) if isinstance(r, dict)]
+    same = [r for r in rows if _coin_key(r.get("coin")) == coin and str(r.get("side") or "").upper() == side]
+    if ts is not None:
+        exact = [r for r in same if r.get("opened_t") == ts]
+        if exact:
+            return exact[0]
+        same = [r for r in same if isinstance(r.get("opened_t"), (int, float)) and abs(r["opened_t"] - ts) <= 3_600_000]
+    return same[0] if same else None
+
+
+def whale_record(addr: str | None, wt: dict | None) -> dict | None:
+    """the whale's own record in the system's list (web/whales_top.json top / others)"""
+    if not addr or not isinstance(wt, dict):
+        return None
+    for r in list(wt.get("top") or []) + list(wt.get("others") or []) + list(wt.get("following") or []):
+        if isinstance(r, dict) and r.get("addr") == addr:
+            return r
+    return None
+
+
+def _pick(d: dict | None, *keys):
+    for k in keys:
+        v = (d or {}).get(k)
+        if v not in (None, "", []):
+            return v
+    return None
+
+
+def ref_target(entry, stop, side: str | None) -> float | None:
+    """the copy's reference target: 2R — twice the stop's distance on the other side of the entry"""
+    try:
+        e, st = float(entry), float(stop)
+    except (TypeError, ValueError):
+        return None
+    if e <= 0 or st <= 0 or e == st:
+        return None
+    t_ = e + 2 * (e - st)
+    return t_ if t_ > 0 else None
+
+
+def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, desk: dict | None, caps: dict, ctx: dict,
+             lang: str = DEFAULT, closed: bool = False) -> dict:
+    """build 54 (owner 04.11: «Почему вошли» for a copy said only «Сделка по правилам CRYPTO NOVA… 3 из 3»): a real copy of a whale's
+    trade explained — who the whale is and where it trades, its entry / leverage / size, its record, the market at the entry (when the
+    execution recorded it in public_real.json futures[].why), the copy's stop and its reference target (2R; the exit is with the whale).
+    [wd] the copy desk's trade, [rec] the whale's record, [why] the real trade's own «why» block (any of its fields may be missing)."""
+    why = why if isinstance(why, dict) else {}
+    sym = str(row.get("sym") or "")
+    side = str(row.get("side") or (wd or {}).get("side") or "").upper()
+    name = _pick(why, "whale_name", "whale_ru", "name") or (wd or {}).get("whale_ru") or _pick(rec, "name", "short") or ""
+    venue = str(_pick(why, "whale_venue", "venue") or _pick(rec, "src") or ("okx" if str((wd or {}).get("whale") or "").startswith("okx:")
+                else "hl" if str((wd or {}).get("whale") or "").startswith("0x") else "")).lower()
+    src = t(lang, f"rw.w.src.{venue}") if venue in ("okx", "hl") else None
+    sig = t(lang, "rw.w.sig", name=f"«{name}»" if name else "", src=f" ({src})" if src else "",
+            side=t(lang, "rw.w.short" if side == "SHORT" else "rw.w.long"), sym=sym).replace("«» ", "").replace(" ,", ",")
+    we = _pick(why, "whale_entry") or (wd or {}).get("whale_entry")
+    wl = _pick(why, "whale_lev") or (wd or {}).get("whale_lev")
+    wn = _pick(why, "whale_usd", "whale_notional") or (wd or {}).get("whale_notional")
+    if we:
+        sig += t(lang, "rw.w.pos", we=_price(float(we)), wl=t(lang, "rw.w.lev", l=_num(float(wl), 0)) if wl else "",
+                 wn=t(lang, "rw.w.size", u=_usd(float(wn), lang)) if wn and float(wn) >= 1000 else "")
+    sig += t(lang, "rw.w.why")
+    entry = row.get("entry") if not closed else row.get("open_px")
+    stop = row.get("stop") if row.get("stop") is not None else (wd or {}).get("stop")
+    sp = abs(float(stop) / float(entry) - 1) * 100 if entry and stop else None
+    checks = []
+    n, win = _pick(why, "whale_trades", "trips") or _pick(rec, "trips"), _pick(why, "whale_win") or _pick(rec, "win")
+    if n and win is not None:
+        w = float(win) * 100 if float(win) <= 1 else float(win)
+        checks.append({"t": t(lang, "rw.w.chk.list", n=f"{int(n):,}".replace(",", " "), w=int(round(w))), "ok": True})
+    p30 = _pick(why, "whale_pnl_30d") or _pick(rec, "pnl_30d")
+    if p30 is not None and float(p30) > 0:
+        checks.append({"t": t(lang, "rw.w.chk.30d", u="+" + _usd(float(p30), lang)), "ok": True})
+    if sp is not None:
+        checks.append({"t": t(lang, "rw.w.chk.stop", sp=("+" if side == "SHORT" else "−") + _num(sp, 1) + "%"), "ok": True})
+    checks.append({"t": t(lang, "rw.chk.fresh"), "ok": True})
+    checks.append({"t": t(lang, "rw.chk.limits"), "ok": True})
+    if caps.get("risk_pct") is not None and (row.get("lev") or caps.get("lev")):
+        checks.append({"t": t(lang, "rw.chk.real", lev=_num(row.get("lev") or caps["lev"], 0),
+                              risk=_pct(caps["risk_pct"], 1, False).replace(".0%", "%")), "ok": True})
+    hist = None
+    if n and win is not None:
+        w = float(win) * 100 if float(win) <= 1 else float(win)
+        pf = _pick(rec, "pf")
+        hist = t(lang, "rw.w.hist", n=f"{int(n):,}".replace(",", " "), w=int(round(w)),
+                 pf=t(lang, "rw.w.pf", x=_num(float(pf), 1)) if pf and 1 < float(pf) < 50 else "",
+                 d30=t(lang, "rw.w.d30", u=("+" if float(p30) > 0 else "") + _usd(float(p30), lang)) if p30 is not None else "")
+    live = []
+    if isinstance(desk, dict) and desk.get("trades") and desk.get("started"):
+        live.append(t(lang, "rw.w.desk", d=date_words(desk["started"], lang), n=int(desk["trades"]), w=int(desk.get("wins") or 0)))
+    rows = [p for g, p in ctx.get("closed_grades") or [] if g == "W"]
+    live.append(t(lang, "rw.live", d=date_words(ctx["since"], lang), n=len(rows), w=sum(1 for p in rows if p > 0)) if rows
+                else t(lang, "rw.live0"))
+    plan = None
+    tgt = _pick(why, "target_ref", "ref_target") or ref_target(entry, stop, side)
+    if entry and stop:
+        plan = t(lang, "rw.w.plan", entry=_price(float(entry)), stop=_price(float(stop)),
+                 sp=("+" if side == "SHORT" else "−") + _num(sp, 1) + "%", tgt=_price(float(tgt)) if tgt else "—")
+    ctx_parts = []
+    for key, k in (("rw.w.c.btc", ("btc_24h", "btc_24h_pct", "btc24")), ("rw.w.c.fund", ("funding", "funding_pct")),
+                   ("rw.w.c.oi", ("oi_chg", "oi_24h", "oi_pct")), ("rw.w.c.sup", ("support",)), ("rw.w.c.res", ("resistance",))):
+        v = _pick(why, *k)
+        if v is None:
+            continue
+        if key in ("rw.w.c.sup", "rw.w.c.res"):
+            ctx_parts.append(t(lang, key, v=_price(float(v))))
+        else:
+            ctx_parts.append(t(lang, key, v=_pct(float(v), 3 if key == "rw.w.c.fund" else 1)))
+    context = t(lang, "rw.w.ctx", x=", ".join(ctx_parts)) if ctx_parts else (str(why["context"]) if isinstance(why.get("context"), str) else None)
+    risk = None
+    lev = row.get("lev") or caps.get("lev")
+    cap = ctx.get("budget_usd") * caps["risk_pct"] / 100 if ctx.get("budget_usd") and caps.get("risk_pct") is not None else None
+    if lev and cap:
+        rp = _pct(caps["risk_pct"], 1, False).replace(".0%", "%")
+        r = _risk_usd(row, sp)
+        risk = (t(lang, "rw.risk", lev=_num(lev, 0), r=_usd(r, lang), risk=rp, cap=_usd(cap, lang)) if r is not None and r <= cap * 1.25
+                else t(lang, "rw.risk_cap", lev=_num(lev, 0), cap=_usd(cap, lang), risk=rp))
+    result = None
+    if closed and row.get("pnl_usd") is not None and row.get("move_pct") is not None:
+        result = t(lang, "rw.result", usd=("+" if row["pnl_usd"] > 0 else "") + _usd(row["pnl_usd"], lang, True), mv=_pct(row["move_pct"], 2))
+        if str((wd or {}).get("why") or "").startswith("кит"):
+            result += " " + t(lang, "rw.w.exit")
+    doc = {"title": t(lang, "rw.w.title"), "signal": sig, "checked_title": t(lang, "rw.checked"), "checks": checks, "history": hist,
+           "live": " ".join(live), "plan": plan, "risk": risk, "result": result, "context": context, "copy": True,
+           "target_ref": round(float(tgt), 12) if tgt else None}
+    doc["text"] = " ".join(x for x in (doc["signal"], hist, context, doc["live"], plan, risk, result) if x)
     return doc
 
 

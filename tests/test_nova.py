@@ -165,7 +165,7 @@ def test_demo_block_from_app_home():
     k = nova.Knowledge(os.path.join(ROOT, "data"))
     b = k.demo_block(home)
     assert "реальный счёт на OKX" in b and "«Фьючерсы» = фьючерсная часть этого реального счёта" in b and "«Спот» = спот-часть" in b
-    assert "только LONG" in b and "Рынок: биткоин $" in b and "ниже рекорда $126 210" in b and len(b) < 4000
+    assert "только LONG" not in b and "Рынок: биткоин $" in b and "ниже рекорда $126 210" in b and len(b) < 4000
     assert "демо-счёт $10 000" not in b and "Система на демо-счетах" not in b and "17.10" not in b and "$20 000" not in b
     # 29.10: the real account follows the main demo desk, so the same coin can be open on both — only a coin that is open on the demo
     # desks and NOT on the real account proves a demo trade leaked (this failed on live data whenever the two matched)
@@ -285,8 +285,8 @@ def test_knowledge_files():
     assert "UID" not in system and "Оставить заявку" not in system
     assert "копирование пока недоступно" not in system and "VPN" in system          # owner 28.10: no ban volunteered, never a VPN
     # final QA 28.10: one product — the real account since 22.10; the demo desks of 17.10, their 3 sizes and the EU X-Perps line are gone
-    for must in ("Ты — NOVA AI", "Реальный счёт сейчас открывает только LONG", "плечо 2x, предел 3x", "15% стартового капитала",
-                 "не больше 1% фьючерсного бюджета", "«Импульс BTC»", "реальный счёт CRYPTO NOVA на OKX"):
+    for must in ("Ты — NOVA AI", "копии сделок «китов»", "плечо 2x, предел 3x", "15% стартового капитала",
+                 "не больше 2% фьючерсного бюджета", "«Импульс BTC»", "реальный счёт CRYPTO NOVA на OKX"):
         assert must in system, must
     for gone in ("17.10", "демо-счёта $10 000", "3 размера", "X-Perps", "плечо до 10x", "USDT в ЕС недоступен", "на демо-счетах по $10 000"):
         assert gone not in system, gone

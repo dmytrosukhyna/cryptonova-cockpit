@@ -200,3 +200,14 @@ def test_owner_override_closes_the_copy_and_blocks_new_shorts_of_that_coin():
     d = W.desk_step(d, ["0xa"], {"0xa": []}, mids, T0 + 3 * H, a)
     d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "HYPE", "side": "SHORT", "lev": 8}, {"coin": "ETH", "side": "LONG", "lev": 3}]}, mids, T0 + 4 * H, a)
     assert [o["coin"] for o in d["open"]] == ["ETH"]
+
+
+def test_a_stale_look_at_a_whale_is_only_a_baseline_no_late_copies():
+    """04.11: SilkBtc came back into the follow list with a days-old «seen» → his old HYPE/ZRO shorts were copied as «new»"""
+    mids = {"HYPE": 85.0, "ZRO": 1.9, "ETH": 2000.0}
+    d = W.desk_step(None, ["0xa"], {"0xa": []}, mids, T0)
+    d = W.desk_step(d, [], {}, mids, T0 + H)                                     # not followed / not looked at for a day
+    d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "HYPE", "side": "SHORT", "lev": 8}]}, mids, T0 + 26 * H)
+    assert d["open"] == []                                                       # a stale look → baseline only
+    d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "HYPE", "side": "SHORT", "lev": 8}, {"coin": "ETH", "side": "LONG", "lev": 3}]}, mids, T0 + 26 * H + H // 2)
+    assert [o["coin"] for o in d["open"]] == ["ETH"]                             # a really new position is copied

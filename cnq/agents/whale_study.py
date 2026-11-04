@@ -36,6 +36,7 @@ import urllib.request
 
 from ..execution import owner_overrides as ov
 
+SEEN_MAX_MS = 2 * 3_600_000      # 04.11: a whale's last look older than this → baseline only (no copies from it)
 LB = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard"
 HL = "https://api.hyperliquid.xyz/info"
 M15, H1, DAY = 900_000, 3_600_000, 86_400_000
@@ -761,6 +762,11 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             continue
         cur = {p["coin"]: p for p in pos}
         prev = seen.get(addr)
+        # 04.11 bug fix: a whale looked at long ago (e.g. dropped from the follow list, then back) has a stale «seen» — every position
+        # he opened in between looked «new» and was copied late (HYPE/ZRO shorts of SilkBtc, 04.11 06:33 UTC, his entries far from
+        # ours). A look older than SEEN_MAX_MS is only a new baseline: nothing is opened from it.
+        if now - int((d.get("seen_t") or {}).get(addr) or 0) > SEEN_MAX_MS:
+            prev = None
         # closes: our copies of this whale whose coin is gone or flipped
         for o in [o for o in d["open"] if o["whale"] == addr]:
             p = cur.get(o["coin"])
@@ -801,6 +807,7 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                 d["open"].append(o)
                 d["events"].append({"t": now, "kind": "open", "coin": coin, "side": p["side"], "whale": addr, "px": px})
         seen[addr] = {c: p["side"] for c, p in cur.items()}
+        d.setdefault("seen_t", {})[addr] = now
     for o in d["open"]:                                        # copies opened before 04.11 get their protective stop now
         if not o.get("stop"):
             stp, src = stop_for(o["side"], o["entry"])

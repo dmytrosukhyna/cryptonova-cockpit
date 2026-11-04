@@ -12,4 +12,5 @@ data/*
 !data/scorecard_ledger.jsonl
 !data/scorecard_outcomes.jsonl
 !data/scorecard/
+!data/whale_trades/
 web/*.bak

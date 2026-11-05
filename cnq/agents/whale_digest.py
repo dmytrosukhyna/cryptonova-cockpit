@@ -208,5 +208,5 @@ def block(out: str, now_ms: float | None = None, slot: str = "evening", with_tra
 
 def model_line() -> str:
     """How the system works, for people, in one sentence — never the method (owner 05.11)."""
-    return (f"Фьючерсы и спот реального счёта ведёт система CRYPTO NOVA: у каждой сделки стоп на бирже, риск {RISK_PCT}% на сделку, "
-            f"плечо не выше {LEV_CAP}×; основа спота — BTC, ETH и SOL.")
+    return (f"Фьючерсы и спот реального счёта ведёт система CRYPTO NOVA: плечо подбирается под каждый сигнал, риск сделки — не больше "
+            f"{RISK_PCT}% бюджета, стоп на бирже; основа спота — BTC, ETH и SOL.")

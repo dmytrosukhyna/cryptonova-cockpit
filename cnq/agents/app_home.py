@@ -542,7 +542,7 @@ def _whale_futures(out: str, now: int, lang: str = DEFAULT) -> tuple[dict, list]
             "status_ru": None if opened else t(lang, "status.whales"), "scan": None, "wins": w_, "closed_n": n,
             "worst_dd_pct": _r(dd * 100, 1), "since": d.get("started"), "in_result": ["system"], "open": opened, "closed": closed,
             "stats": stats, "curve": [[t_, _r(v)] for t_, v in _sample_keep_last(curve)], "about_ru": t(lang, "futures.about.whales"),
-            "lev_note": t(lang, "fut.lev_note", lo=1, hi=5), "lev_range": [1, 5], "desk": "system"}
+            "lev_note": t(lang, "fut.lev_note", lo=1, hi=20), "lev_range": [1, 20], "desk": "system"}
     return card, curve
 
 

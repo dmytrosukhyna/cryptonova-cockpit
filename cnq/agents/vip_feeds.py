@@ -564,7 +564,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
         n = W.get("trades")
         # 05.11 (owner: «везде должна быть система CRYPTO NOVA»): this public feed never names the method — the whale names and the
         # follow list are on the owner-only «Киты» page (vip/whales.js) only
-        st_w, why_w = (("Active", "весь фьючерсный бюджет реального счёта с 04.11 (риск 2% на сделку, плечо не выше 5×); здесь — те же "
+        st_w, why_w = (("Active", "весь фьючерсный бюджет реального счёта с 04.11 (плечо под каждый сигнал, риск сделки — не больше 2% бюджета); здесь — те же "
                                   "сигналы на демо-счёте $10 000") if whales_real else ("Testing", "эксперимент на демо-счёте"))
         out.append(_st("whales_copy", "Система CRYPTO NOVA · фьючерсы", "futures", st_w, why_w,
                        real=({"sleeve": "futures", "share_pct": round(SHARES.get("futures", 0.15) * 100, 1)} if whales_real else None),

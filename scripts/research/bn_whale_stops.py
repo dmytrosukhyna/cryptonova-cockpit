@@ -165,7 +165,10 @@ def main():
         data[sym] = load_sym(sym, t0, t1)
         if n % 10 == 0:
             print(f"candles {n + 1}/{len(syms)} {sym} {'ok' if data[sym] else 'none'}", flush=True)
-    VAR = {"S4": 4, "S5": 5, "S8": 8, "S12": 12, "S16": 16, "S20": 20, "SW": None, "NONE": 0}
+    VAR = {"S4": 4, "S5": 5, "S8": 8, "S12": 12, "S16": 16, "S20": 20, "SW": None, "NONE": 0,
+           # 05.11 second run (after seeing that copies held > 3 days lost — so stricter: must help in BOTH halves and on good_h2):
+           # the −16 % stop plus a time exit after 24 / 48 / 72 / 120 h
+           "S16_T24": 16, "S16_T48": 16, "S16_T72": 16, "S16_T120": 16}
     res = []
     for e in eps:
         S = data.get(e["coin"] + "USDT")
@@ -176,7 +179,10 @@ def main():
         for k, sv in VAR.items():
             if k == "SW":
                 sv = min(20, max(4, 80 / e["lev"])) if e["lev"] else 16
-            v = copy_ret(S, e["side"], e["open_t"] + 120_000, e["close_t"] + 120_000, sv)
+            t_out = e["close_t"] + 120_000
+            if "_T" in k:
+                t_out = min(t_out, e["open_t"] + 120_000 + int(k.split("_T")[1]) * H)
+            v = copy_ret(S, e["side"], e["open_t"] + 120_000, t_out, sv)
             if v is None or not math.isfinite(v):
                 ok = False; break
             r[k] = v / (sv or 16)

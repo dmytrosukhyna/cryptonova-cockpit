@@ -31,7 +31,9 @@ SRC = os.environ.get("OKX_PUBLIC_SRC") or os.environ.get("MYSPOT_MODEL_SRC") or 
     "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/"
 # Owner's decision of 28.10 (real money, answered explicitly): futures 25 % → 15 %, the freed 10 % → the core BTC / ETH / SOL.
 # Account: spot portfolio 65 % + extra core 10 % + futures 15 % + «Импульс BTC» 10 %. Leverage stays 2x (max 3x, okx_futures).
-SHARES = {"spot": 0.65, "core": 0.10, "futures": 0.15, "active": 0.10}
+# 05.11 14:14 (owner, real money, option 2): the retired «Активный спот» 10 % goes to the futures budget — futures 15 % → 25 %, active 0.
+# The env (OKX_FUT_SHARE / OKX_ACT_SHARE) still overrides; the risk caps of okx_futures are unchanged.
+SHARES = {"spot": 0.65, "core": 0.10, "futures": 0.25, "active": 0.0}
 ENV_KEYS = {"spot": "OKX_SPOT_SHARE", "core": "OKX_CORE_SHARE", "futures": "OKX_FUT_SHARE", "active": "OKX_ACT_SHARE"}
 PRICE_TOL = 0.25
 CORE = ("BTC", "ETH", "SOL")

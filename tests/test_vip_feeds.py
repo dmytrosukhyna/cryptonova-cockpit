@@ -123,7 +123,7 @@ def test_strategies_one_status_set_and_real_money_only_for_active():
     d2 = vf.strategies({**PAPER, "profiles": {**PAPER["profiles"], "imps": {"name": "Активный спот · Импульс BTC", "start_equity": 10000,
                                                                              "equity": 10000, "open": [], "stats": {"trades": 0}}}},
                        CONV, SEL, _pf(POS, [], []), {}, {}, {}, {}, {}, {"asof": NOW - 6 * DAY}, None, REAL, NOW)
-    assert {x["key"]: x for x in d2["strategies"]}["imps"]["name_ru"] == "Импульс BTC · спот 10%" and S["imp"]["name_ru"] == "Импульс BTC"
+    assert {x["key"]: x for x in d2["strategies"]}["imps"]["name_ru"] == "Импульс BTC · спот (выключен)" and S["imp"]["name_ru"] == "Импульс BTC"
     if d["real_account"]:
         assert d["real_account"]["split_pct"]["core"] == 10
     assert S["ivan"]["status"] == "Testing" and S["ivan"]["trades"] is None and not S["ivan"]["real_money"]

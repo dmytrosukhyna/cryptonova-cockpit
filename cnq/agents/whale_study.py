@@ -881,6 +881,20 @@ def copy_ok(p: dict) -> bool:
 # copies — the rolling 14-day record decides: PF > 1.5 and drawdown < 5 % → up to 90 %; PF ≥ 1 and drawdown < 10 % (or too few trades
 # to judge) → 75 %; worse → 50 %. The per-trade caps of the real account (2 % risk, 3 % day stop, stops at OKX) never change.
 UTIL_GOOD, UTIL_BASE, UTIL_BAD = 0.90, 0.75, 0.50
+# 05.11 14:12 (owner: «$3 000 лежит, а копий нет»): a copy is sized like the REAL account sizes it — risk COPY_RISK of the equity from
+# the stop distance (okx_futures.size: 2 % of the budget), notional = risk ÷ stop distance, margin = notional ÷ leverage. Utilisation =
+# that margin ÷ equity, so «97 %» can no longer block new copies while the real futures budget is 77 % idle. Older copies count with
+# min(their recorded margin, this risk margin) — what the real account really holds for them.
+COPY_RISK = 0.02
+
+
+def risk_margin(o: dict, eq: float) -> float:
+    """the margin a copy really needs at COPY_RISK of the equity (≤ its recorded margin)"""
+    e, stp, lev = _f(o.get("entry")), _f(o.get("stop")), max(1.0, _f(o.get("lev"), 1.0))
+    m = _f(o.get("margin"))
+    if not e or not stp or e == stp:
+        return m
+    return min(m, COPY_RISK * eq / (abs(e - stp) / e) / lev)
 UTIL_DAYS, UTIL_MIN_TRADES = 14, 5
 
 
@@ -965,6 +979,11 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             close(o, f"стоп ({o.get('stop_src') or 'защитный'})", px)
     # 04.11 (owner, config/owner_overrides.json): a copy the owner closed / a side he forbade is closed now and not re-opened
     if owner:
+        gone = set(owner.get("closed_ids") or ())
+        for o in list(d["open"]):
+            if paper_trade(o)["id"] in gone:          # 05.11: closed by the owner by hand on OKX → closed here too, never re-joined
+                close(o, "закрыта владельцем вручную на OKX")
+                d.setdefault("owner_closed", {})[f"{o['whale']}|{o['coin']}|{o['side']}"] = now
         for o in list(d["open"]):
             w = ov.blocked(owner, o["coin"], o["side"], o.get("opened_t"))
             if w:
@@ -1033,6 +1052,8 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                                 "why": f"кит в минусе на {-gap_pct:.2f}% по цене (предел {JOIN_BETTER * 100:g}%) — возможно, тренд сменился; "
                                        f"ждём его следующую сделку"})
                 continue
+            if f"{addr}|{coin}|{p['side']}" in (d.get("owner_closed") or {}):
+                continue                                     # the owner closed our copy of this very position by hand
             if any(c["whale"] == addr and c["coin"] == coin and c["side"] == p["side"] and str(c.get("why", "")).startswith("стоп")
                    and now - int(c.get("closed_t") or 0) < JOIN_REDO_MS for c in d["closed"]):
                 continue                                     # our copy of this very position was stopped out — no re-entry
@@ -1044,9 +1065,9 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                 d["events"].append(ev)
             continue
         eq = d["cash"] + sum(mark(o) for o in d["open"])
-        used = sum(_f(o.get("margin")) for o in d["open"] if o["whale"] == addr)
+        used = sum(risk_margin(o, eq) for o in d["open"] if o["whale"] == addr)
         ucap, _rec = util_cap(d, now)
-        free = ucap * eq - sum(_f(o.get("margin")) for o in d["open"])        # 05.11: up to the adaptive utilisation target
+        free = ucap * eq - sum(risk_margin(o, eq) for o in d["open"])         # 05.11: up to the adaptive utilisation target
         # 04.11 22:38 (owner): free margin ÷ the copies still expected today, never past the soft per-whale cap
         margin = round(min(free / expected_slots(quality, follow, now), WHALE_CAP * eq - used), 2)
         if margin < MIN_COPY_MARGIN * eq:
@@ -1066,6 +1087,8 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         if lev > liq_lev:
             lev_note = f"плечо кита {lev:g}× → {liq_lev:g}×: при {lev:g}× ликвидация наступила бы раньше нашего стопа"
             lev = liq_lev
+        # 05.11 14:12: the notional is what COPY_RISK of the equity allows from the stop distance (the real account's sizing)
+        margin = round(min(margin, COPY_RISK * eq / (abs(px - stp) / px) / lev), 2) if px and stp and px != stp else margin
         o = {"whale": addr, "coin": coin, "side": p["side"], "entry": px, "opened_t": now, "margin": margin, "lev": lev,
              "notional": round(margin * lev, 2), "whale_entry": p.get("entry"), "whale_notional": p.get("notional"),
              "whale_lev": p.get("lev"), "lev_src": "кит" if _f(p.get("lev")) else "медиана кита" if w_lev != 1.0 else "нет данных",
@@ -1084,7 +1107,7 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         o["price"] = _f(mids.get(o["coin"])) or None
     d["equity"] = round(eq, 2)
     # 04.11 22:38: how much of the whales budget works — margin in positions ÷ equity
-    d["util_pct"] = round(sum(_f(o.get("margin")) for o in d["open"]) / eq * 100, 1) if eq > 0 else 0.0
+    d["util_pct"] = round(sum(risk_margin(o, eq) for o in d["open"]) / eq * 100, 1) if eq > 0 else 0.0
     uc, ur = util_cap(d, now)
     d["util_cap_pct"], d["util_rule"] = round(uc * 100), ur
     d["history"].append([now, round(eq, 2)])

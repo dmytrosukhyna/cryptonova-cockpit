@@ -55,8 +55,10 @@ def active(ov: dict | None, now: int | None = None) -> dict:
     until = _ms(ov.get("until"))
     on = bool(until) and now < until
     pick = lambda k: {base(x) for x in (ov.get(k) or []) if x} if on else set()      # noqa: E731
+    # 05.11: copies the owner closed by hand on OKX (trade ids «W-…»): the desk closes them too and never re-opens them (no expiry)
     return {"close": pick("close"), "no_short": pick("no_short"), "no_long": pick("no_long"), "set": _ms(ov.get("set")),
-            "until": until, "note_ru": ov.get("note_ru") or "решение владельца"}
+            "until": until, "note_ru": ov.get("note_ru") or "решение владельца",
+            "closed_ids": {str(x) for x in (ov.get("closed_ids") or []) if x}}
 
 
 def blocked(a: dict, sym, side: str, opened=None) -> str | None:

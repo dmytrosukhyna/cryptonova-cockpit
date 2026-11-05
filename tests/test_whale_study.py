@@ -71,7 +71,8 @@ def test_desk_copies_only_new_positions_and_closes_with_the_whale():
     assert d["open"] == [] and d["seen"]["0xa"] == {"ETH": "LONG"}           # already open when we started watching → not copied
     q = {"0xa": {"per_day": 40}}                         # ~16 copies still expected today → each takes 1/16 of the free margin
     d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "ETH", "side": "LONG", "lev": 10}, {"coin": "BTC", "side": "SHORT", "lev": 20}]}, mids, T0 + H, quality=q)
-    m = round(0.75 * 10_000 / W.expected_slots(q, ["0xa"], T0 + H), 2)       # 05.11: base utilisation target 75 % (no 14-day record)
+    # 05.11 14:12: risk-sized like the real account — 2 % of 10 000 from the 8 % stop = notional 2500, at 10× margin 250
+    m = min(round(0.75 * 10_000 / W.expected_slots(q, ["0xa"], T0 + H), 2), 250.0)
     assert len(d["open"]) == 1 and d["open"][0]["coin"] == "BTC" and d["open"][0]["lev"] == 10.0 and d["open"][0]["margin"] == m
     assert d["util_pct"] == round(m / 100, 1)
     mids2 = {"BTC": "90", "ETH": "2000"}
@@ -407,9 +408,9 @@ def test_dynamic_sizing_free_margin_over_expected_slots_and_the_soft_whale_cap()
     pos = [{"coin": c, "side": "LONG", "lev": 3} for c in ("BTC", "ETH", "SOL")]
     d = W.desk_step(d, fol, {"0xa": pos, **{a: [] for a in fol[1:]}}, mids, T0 + H)          # no record → 2 slots: 50 %, then the cap
     a = [o for o in d["open"] if o["whale"] == "0xa"]
-    # 05.11: up to the 75 % utilisation target: 3750, then 1250 more reaches the whale's 50 % cap, the third waits
-    assert [o["margin"] for o in a] == [3750.0, 1250.0] and any(e["kind"] == "skip" and "50%" in e["why"] for e in d["events"])
-    assert d["util_pct"] == 50.0 and W.desk_public(d, {})["util_pct"] == 50.0 and W.desk_public(d, {})["util_cap_pct"] == 75
+    # 05.11 14:12: each copy is risk-sized (2 % of equity from the 8 % stop at 3× → margin 833.33), so all three fit
+    assert [o["margin"] for o in a] == [833.33] * 3
+    assert d["util_pct"] == 25.0 and W.desk_public(d, {})["util_pct"] == 25.0 and W.desk_public(d, {})["util_cap_pct"] == 75
     assert W.expected_slots({x: {"per_day": 1} for x in fol}, fol, T0 - T0 % W.DAY) == 5
     assert W.expected_slots({}, fol, T0) == W.MIN_SLOTS
 
@@ -458,3 +459,22 @@ def test_hidden_leverage_uses_the_whales_median_and_utilisation_adapts_to_the_14
     assert W.util_cap(good, T0 + H)[0] == 0.90 and W.util_cap(bad, T0 + H)[0] == 0.50
     assert W.util_cap({"closed": [], "history": []}, T0)[0] == 0.75
     assert d["util_cap_pct"] == 75 and "мало сделок" in d["util_rule"]["why_ru"]
+
+
+def test_util_counts_risk_sized_margin_so_old_oversized_copies_do_not_block_new_ones_and_owner_closed_copies_stay_closed():
+    """05.11 14:12 (owner: «$3 000 лежит»): util 97 % from 9 old copies of 10–13 % margin each, while the real account held 23 % —
+    utilisation is the margin a copy needs at 2 % risk; a copy the owner closed by hand is closed on the desk and never re-joined"""
+    old = [{"whale": "0xa", "coin": c, "side": "LONG", "entry": 100.0, "stop": 92.0, "lev": 5.0, "margin": 1100.0, "notional": 5500.0,
+            "opened_t": T0} for c in ("A", "B", "C", "D", "E", "F", "G", "H", "I")]
+    assert round(sum(W.risk_margin(o, 11000.0) for o in old) / 11000 * 100, 1) == 45.0       # not 90 %
+    mids = {c: "100" for c in "ABCDEFGHIJ"}
+    d = {"start": 10000.0, "cash": 11000.0, "open": old, "closed": [], "seen": {"0xa": {c: "LONG" for c in "ABCDEFGHI"}},
+         "seen_t": {"0xa": T0}, "history": [], "events": [], "by_whale_day": {}, "started": T0}
+    pos = [{"coin": c, "side": "LONG", "lev": 5} for c in "ABCDEFGHIJ"]
+    hid = W.paper_trade(old[0])["id"]
+    owner = {"close": set(), "no_short": set(), "no_long": set(), "set": 0, "closed_ids": {hid}}
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, mids, T0 + 1800_000, owner, {"0xa": {"per_day": 1}})
+    assert "J" in {o["coin"] for o in d["open"]}                                              # a new copy fits again
+    assert "A" not in {o["coin"] for o in d["open"]} and d["closed"][-1]["why"] == "закрыта владельцем вручную на OKX"
+    d = W.desk_step(d, ["0xa"], {"0xa": pos}, mids, T0 + 3600_000, owner, {"0xa": {"per_day": 1}})
+    assert "A" not in {o["coin"] for o in d["open"]}                                          # not re-joined

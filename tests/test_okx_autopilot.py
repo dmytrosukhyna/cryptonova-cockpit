@@ -32,7 +32,9 @@ def live_fake(**kw):
 
 def test_split_defaults_env_and_normalisation():
     # owner's decision of 28.10: spot portfolio 65 % + extra core 10 % + futures 15 % + «Импульс BTC» 10 %
-    assert al.shares({}) == {"spot": 0.65, "core": 0.1, "futures": 0.15, "active": 0.1, "reserve": 0.0}
+    # 05.11 14:14 (owner, option 2): the retired active 10 % → futures: 65 / 10 / 25 / 0
+    assert al.shares({}) == {"spot": 0.65, "core": 0.1, "futures": 0.25, "active": 0.0, "reserve": 0.0}
+    assert al.shares({"OKX_FUT_SHARE": "0.15", "OKX_ACT_SHARE": "0.10"})["active"] == 0.1
     w = al.shares({"OKX_SPOT_SHARE": "0.6", "OKX_CORE_SHARE": "0", "OKX_FUT_SHARE": "0.2", "OKX_ACT_SHARE": "0.1"})
     assert w["spot"] == 0.6 and round(w["reserve"], 6) == 0.1
     w = al.shares({"OKX_SPOT_SHARE": "0.8", "OKX_FUT_SHARE": "0.4", "OKX_ACT_SHARE": "0.0"})   # > 100 % → scaled to 100 %

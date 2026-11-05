@@ -327,7 +327,9 @@ def env(tmp=None, **kw):
     e = {"OKX_API_KEY": "APKEY-test", "OKX_API_SECRET": "APSECRET-test", "OKX_API_PASSPHRASE": "APPHRASE-test",
          "OKX_AUTOPILOT_STATE": os.path.join(tmp, "state.json"), "OKX_STOP_FILE": os.path.join(tmp, "stop"),
          "OKX_FUT_STATE": os.path.join(tmp, "fut.json"), "OKX_ACT_STATE": os.path.join(tmp, "act.json"),
-         "OKX_LEASE_FILE": os.path.join(tmp, "lease.json")}      # the lease (okx_lease.py) in a local file, never GitHub
+         "OKX_LEASE_FILE": os.path.join(tmp, "lease.json"),     # the lease (okx_lease.py) in a local file, never GitHub
+         # 05.11: the defaults are now futures 25 % / active 0 — these tests keep the 28.10 split they were written for
+         "OKX_FUT_SHARE": "0.15", "OKX_ACT_SHARE": "0.10"}
     e.update(kw)
     return e
 

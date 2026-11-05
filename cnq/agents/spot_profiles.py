@@ -471,6 +471,16 @@ def smart_check(t: dict, okx: set | None = None) -> tuple[bool, list[str]]:
     return not why, why
 
 
+def smart_exit(c: dict) -> bool:
+    """05.11 14:12 (AAVE bought 08:17, sold 11:13 because Jump Trading — a market maker — sold its working stock while Galaxy Digital
+    kept holding): the sleeve leaves with the wallets only when no non-market-maker wallet still holds, or the token dropped out"""
+    if str(c.get("status")) == "выбыла":
+        return True
+    if str(c.get("status")) != "продают":
+        return False
+    return not any(not str(b.get("kind") or "").startswith("маркетмейкер") for b in c.get("holders") or [])
+
+
 def smart_candidates(sm: dict | None, okx: set | None = None) -> list[dict]:
     """the watch list judged: [{symbol, name, ok, why_ru, n, liq, top10_pct, age_days, price, status}] — passing tokens first"""
     out = []
@@ -480,6 +490,7 @@ def smart_candidates(sm: dict | None, okx: set | None = None) -> list[dict]:
             continue
         ok, why = smart_check(t, okx)
         out.append({"symbol": sym, "name": t.get("name") or sym, "ok": ok, "why_ru": why, "n": t.get("n"), "liq": t.get("liq"),
+                    "holders": [{"label": b.get("label"), "kind": b.get("kind")} for b in t.get("buyers") or [] if not b.get("sold")],
                     "top10_pct": t.get("top10_pct"), "age_days": t.get("age_days"), "price": t.get("price"), "status": t.get("status")})
     out.sort(key=lambda x: (not x["ok"], -(x["n"] or 0), -(x["liq"] or 0)))
     return out
@@ -734,7 +745,7 @@ class IdeasPortfolio:
                     self._sell(now, s, p, px, f"Смарт-мани: стоп {_pc(SMART['stop'])} — {s} {res}.", actions)
                 elif held_d >= SMART["days"]:
                     self._sell(now, s, p, px, f"Смарт-мани: {SMART['days']} дней прошло — выходим по времени, {s} {res}.", actions)
-                elif c is not None and str(c.get("status")) in ("продают", "выбыла"):
+                elif c is not None and smart_exit(c):
                     self._sell(now, s, p, px, f"Смарт-мани: кошельки {c.get('status')} {s} — выходим вместе с ними, {res}.", actions)
                 continue
             if okx is not None and s not in okx and kind != "core":

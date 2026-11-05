@@ -496,7 +496,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
         nxt = (f"Ворота конвейера PAPER → READY: от 30 сделок и 21 дня, средняя сделка от +0,3%, профит-фактор от 1,2, просадка в пределах. "
                f"Сейчас: {gate}.") if gate else None
         # final QA 28.10: the 10 % active spot sleeve is «Импульс BTC · спот 10%» — not to be confused with the futures desk «Импульс BTC»
-        name = f"Импульс BTC · спот {SHARES.get('active', 0.1) * 100:.0f}%" if spot else (v.get("name") or k)
+        name = (f"Импульс BTC · спот {SHARES['active'] * 100:.0f}%" if SHARES.get('active') else "Импульс BTC · спот (выключен)") if spot else (v.get("name") or k)
         out.append(_st(k, name, "spot" if spot else "futures", status, why,
                        since=_ms(c.get("since") or v.get("since")), trades=n,
                        win_rate=_r(c.get("winrate_pct"), 1) if n else None, net_usd=round(net, 2), net_pct=round(net / start * 100, 2),

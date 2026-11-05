@@ -1173,3 +1173,11 @@ def test_smart_sleeve_sits_in_the_core_then_buys_a_qualifying_token_from_the_cor
     st = port.step(src2, _ideas(rows, t2), t2, smart=sm)
     a = next(a for a in st["actions"] if a["symbol"] == "AAVE")
     assert a["action"] == "SELL" and "стоп" in a["reason"] and "AAVE" not in {p["symbol"] for p in st["positions"]}
+
+
+def test_smart_sleeve_does_not_leave_when_only_a_market_maker_sells():
+    """05.11 14:12: AAVE was sold 3 h after the buy because Jump Trading (market maker) sold while Galaxy Digital kept holding"""
+    mm_sold = {"status": "продают", "holders": [{"label": "Galaxy Digital", "kind": "фонд / OTC"}]}
+    all_sold = {"status": "продают", "holders": [{"label": "Jump", "kind": "маркетмейкер"}]}
+    assert not sp.smart_exit(mm_sold) and sp.smart_exit(all_sold) and sp.smart_exit({"status": "выбыла", "holders": []})
+    assert not sp.smart_exit({"status": "накопление", "holders": []})

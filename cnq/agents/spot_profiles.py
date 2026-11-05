@@ -417,6 +417,74 @@ def _load_hz() -> dict:
 HZ = _load_hz()
 
 
+# 05.11 (owner, real money: «ядро + средний риск + высокий риск + 10% смарт-мани»): the smart-money sleeve of «CRYPTO NOVA портфель».
+# A token enters when ≥ 2 tracked wallets accumulate it (web/smart_money.json watch list) AND it passes a BALANCED risk check
+# («не слишком жёсткие, не слишком мягкие») — calibrated on the 05.11 watch list (19 tokens: only AAVE passes; LINK — wallets sell,
+# MNT / ATH / SKY / LIT — top-10 hold 62–90 %, GRT / ATH / SKY — the owner can mint, KAIO / BASED / SLOP — no liquidity or too new):
+#   hard fails: honeypot / cannot sell, buy or sell tax > 10 %, the owner can mint new tokens or blacklist holders;
+#   liquidity ≥ $250k in the DEX pool, top-10 wallets hold ≤ 60 %, token age ≥ 7 days, ≥ 2 wallets still holding (not sold), not only
+#   market makers (their buys are often working stock);
+#   tradable on OKX spot (the real account repeats the model) — otherwise watch-only, with the reason.
+# Size: 2.5 % of the model per token, at most 4 → the sleeve ≤ 10 %. Exit: stop −25 % from the entry, 30 days, or the wallets sell
+# («продают» / «выбыла»). While no token qualifies, the sleeve's 10 % sits in the core (core plans scaled up, core_t); a buy is paid
+# from the cash above the floor, then from the core (the core is sold for it).
+SMART = {"max": 0.10, "w": 0.025, "n": 4, "stop": -0.25, "days": 30, "liq_min": 250_000.0, "top10_max": 60.0, "age_min": 7.0,
+         "tax_max": 10.0, "wallets_min": 2}
+SMART_RULE_RU = ("Рукав «смарт-мани» — до 10% портфеля: токены, которые набирают ≥ 2 отслеживаемых «умных» кошелька и проходят "
+                 "проверку риска: не ловушка (продать можно), налог покупки/продажи ≤ 10%, владелец не может выпускать токены и "
+                 "блокировать держателей, ликвидность пула ≥ $250k, топ-10 кошельков держат ≤ 60%, токену ≥ 7 дней, купили не только "
+                 "маркетмейкеры, есть спот-пара на OKX. 2,5% на токен (до 4), стоп −25%, выход через 30 дней или когда кошельки продают. "
+                 "Пока подходящих нет, эти 10% лежат в ядре BTC / ETH / SOL.")
+
+
+def smart_check(t: dict, okx: set | None = None) -> tuple[bool, list[str]]:
+    """one watch-list token (web/smart_money.json watch.tokens) → (passes the balanced check, reasons it fails / notes)"""
+    why = []
+    flags = " ".join(str(f) for f in t.get("flags") or []).lower()
+    buyers = [b for b in t.get("buyers") or [] if not b.get("sold")]
+    if "honeypot" in flags or "продать нельзя" in flags:
+        why.append("ловушка: продать нельзя")
+    sec = t.get("security") or {}
+    tax = max(float(sec.get("buy_tax") or 0), float(sec.get("sell_tax") or 0))
+    if tax > SMART["tax_max"] or "налог" in flags:
+        why.append(f"налог {tax:g}% (предел {SMART['tax_max']:g}%)" if tax else "высокий налог")
+    if "выпускать новые токены" in flags or "mint" in flags:
+        why.append("владелец может выпускать новые токены")
+    if "чёрн" in flags or "блокир" in flags or "blacklist" in flags:
+        why.append("владелец может блокировать держателей")
+    if (t.get("liq") or 0) < SMART["liq_min"]:
+        why.append(f"ликвидность ${(t.get('liq') or 0) / 1000:.0f}k < ${SMART['liq_min'] / 1000:.0f}k")
+    if t.get("top10_pct") is None:
+        why.append("нет данных о держателях")
+    elif t["top10_pct"] > SMART["top10_max"]:
+        why.append(f"топ-10 держат {t['top10_pct']:.0f}% (предел {SMART['top10_max']:.0f}%)")
+    if t.get("age_days") is None or t["age_days"] < SMART["age_min"]:
+        why.append("токену меньше 7 дней" if t.get("age_days") is not None else "возраст неизвестен")
+    if len(buyers) < SMART["wallets_min"] or str(t.get("status")) in ("продают", "выбыла"):
+        why.append(f"держат {len(buyers)} умных кошелька (нужно ≥ {SMART['wallets_min']})" if str(t.get("status")) not in ("продают", "выбыла")
+                   else f"кошельки {t.get('status')}")
+    elif all(str(b.get("kind") or "").startswith("маркетмейкер") for b in buyers):
+        why.append("купили только маркетмейкеры")
+    sym = str(t.get("symbol") or "").upper()
+    if not why and okx is not None and sym not in okx:
+        why.append("нет спот-пары на OKX — только наблюдение")
+    return not why, why
+
+
+def smart_candidates(sm: dict | None, okx: set | None = None) -> list[dict]:
+    """the watch list judged: [{symbol, name, ok, why_ru, n, liq, top10_pct, age_days, price, status}] — passing tokens first"""
+    out = []
+    for t in (((sm or {}).get("watch") or {}).get("tokens") or []):
+        sym = str(t.get("symbol") or "").upper()
+        if not sym or not sym.isascii() or not sym.isalnum():
+            continue
+        ok, why = smart_check(t, okx)
+        out.append({"symbol": sym, "name": t.get("name") or sym, "ok": ok, "why_ru": why, "n": t.get("n"), "liq": t.get("liq"),
+                    "top10_pct": t.get("top10_pct"), "age_days": t.get("age_days"), "price": t.get("price"), "status": t.get("status")})
+    out.sort(key=lambda x: (not x["ok"], -(x["n"] or 0), -(x["liq"] or 0)))
+    return out
+
+
 def core_target(sym: str) -> float:
     """The plan weight of a core coin in the CRYPTO NOVA портфель (BTC 30 % / ETH 10 % / SOL 5 %; another core coin 10 %)."""
     cw = IDEAS["core_w"]
@@ -448,8 +516,9 @@ IDEAS_SRC = ("cg", "meme", "hl")          # price sources of portfolio.run in pr
 IDEAS_SRC_RU = {"cg": "CoinGecko", "meme": "список мемов", "hl": "спот Hyperliquid", "ideas": "цена из таблицы",
                 "last": "последняя известная цена"}
 _SRC_CODE = {"cg": 1.0, "meme": 2.0, "hl": 3.0}      # meta `src:SYM` (REAL column)
-IDEAS_ROLE_RU = {"buy": "из таблицы: можно брать", "add": "из таблицы: можно добрать", "small": "на небольшую сумму"}
-KIND_RU = {"core": "ядро", "mid": "крупный альт", "high": "высокий риск", "meme": "мем"}
+IDEAS_ROLE_RU = {"buy": "из таблицы: можно брать", "add": "из таблицы: можно добрать", "small": "на небольшую сумму",
+                 "smart": "смарт-мани: набирают умные кошельки"}
+KIND_RU = {"core": "ядро", "mid": "крупный альт", "high": "высокий риск", "meme": "мем", "smart": "смарт-мани"}
 
 
 def _pc(x: float) -> str:
@@ -613,7 +682,7 @@ class IdeasPortfolio:
         self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
 
     def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None,
-             tradeable: set | None = None) -> dict:
+             tradeable: set | None = None, smart: dict | None = None) -> dict:
         """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
         "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas()); `sma200` (20.10) —
         {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map). `tradeable` (22.10, owner) — coins with an
@@ -629,6 +698,8 @@ class IdeasPortfolio:
         if rp._meta("started") is None:
             rp._set_meta("started", now)
         actions: list[dict] = []
+        self._smart = smart_candidates(smart, okx)
+        smart_by = {c["symbol"]: c for c in self._smart}
         # --- 1. price the holdings (own source → another agreeing source → the table's price → last seen)
         price, live, psrc = {}, set(), {}
         for p in rp.positions():
@@ -656,6 +727,16 @@ class IdeasPortfolio:
             r = smap.get(s) or {}
             st = r.get("status")
             res = f"{_pc(ret)} от входа" + ("" if s in live else f", цена — {IDEAS_SRC_RU[psrc[s]]}")
+            if kind == "smart":                                   # 05.11: the smart-money sleeve has its own exits
+                c = smart_by.get(s)
+                held_d = (now - (p.get("entry_time") or now)) / DAY
+                if ret <= SMART["stop"]:
+                    self._sell(now, s, p, px, f"Смарт-мани: стоп {_pc(SMART['stop'])} — {s} {res}.", actions)
+                elif held_d >= SMART["days"]:
+                    self._sell(now, s, p, px, f"Смарт-мани: {SMART['days']} дней прошло — выходим по времени, {s} {res}.", actions)
+                elif c is not None and str(c.get("status")) in ("продают", "выбыла"):
+                    self._sell(now, s, p, px, f"Смарт-мани: кошельки {c.get('status')} {s} — выходим вместе с ними, {res}.", actions)
+                continue
             if okx is not None and s not in okx and kind != "core":
                 rp._set_meta("okx_swap", (rp._meta("okx_swap") or 0.0) + self._mv(p, px))
                 self._sell(now, s, p, px, f"Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный "
@@ -737,6 +818,7 @@ class IdeasPortfolio:
                 live.add(s)
                 held[s] = {"symbol": s}
                 n_small, n_buy = (n_small + 1, n_buy) if small else (n_small, n_buy + 1)
+            actions += self._smart_buys(now, price, live, psrc, src, actions)
             # 19.10 (owner: «сделки почти все в минус … нужна понятная модель»): the portfolio had drifted ALT-heavy — 5 alts bought at
             # 10 % each before the 7.5 % plan, BTC 13 % of its 30 % plan, no free cash to top it up. At the Monday review (and once on
             # the first run of this rule) a non-core «можно брать» coin above 1.2× its plan is trimmed back to the plan; the cash goes
@@ -766,7 +848,7 @@ class IdeasPortfolio:
                 kind, _ = self._split(p["bucket"])
                 if kind != "core" or s not in price or not V or not p["entry"]:
                     continue
-                T = core_target(s)
+                T = self._core_t(s, price)
                 mw = p["weight"] * price[s] / p["entry"] / V
                 ish = (rp._meta(f"idle_q:{s}") or 0.0) * price[s] / V      # 28.10: the idle-cash top-up is not «лишнее» — never trimmed back
                 if weekly and mw > T * P["core_trim"] + ish:
@@ -796,6 +878,70 @@ class IdeasPortfolio:
             actions += self._idle_cash(now, price, live, eligible_seen, (ideas or {}).get("btc_bull"))
         self.conn.commit()
         return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
+
+    def _smart_w(self, price: dict) -> float:
+        """the smart-money sleeve's share of the model now"""
+        V = self.value(price) or 1.0
+        return sum(self._mv(p, price.get(p["symbol"])) for p in self.rp.positions() if self._split(p["bucket"])[0] == "smart") / V
+
+    def _core_t(self, sym: str, price: dict) -> float:
+        """05.11: a core coin's plan + its part of the empty smart-money sleeve (the sleeve's free 10 % sits in the core)"""
+        cw = IDEAS["core_w"]
+        tot = sum(cw.values())
+        free = max(0.0, SMART["max"] - self._smart_w(price))
+        return core_target(sym) * (1 + free / tot) if sym in cw else core_target(sym)
+
+    def _smart_buys(self, now: int, price: dict, live: set, psrc: dict, src: dict, prev: list) -> list[dict]:
+        """05.11: buy the tokens that pass smart_check — 2.5 % each, the sleeve ≤ 10 %; paid from the cash above the floor, then the
+        idle core top-up, then the core itself (BTC / ETH / SOL in plan proportions)"""
+        rp, P = self.rp, IDEAS
+        out: list[dict] = []
+        held = {p["symbol"]: p for p in rp.positions()}
+        n = sum(1 for p in held.values() if self._split(p["bucket"])[0] == "smart")
+        for c in [x for x in self._smart if x["ok"]]:
+            s = c["symbol"]
+            V = self.value(price)
+            if s in held or n >= SMART["n"] or self._smart_w(price) + SMART["w"] > SMART["max"] + 1e-9 or not V:
+                continue
+            if s in rp.sold_recently(now, P["cooldown_d"]):
+                continue
+            px, k, why_not = self._entry_price(s, {"price": c.get("price")}, src)
+            if px is None:
+                c["why_ru"] = [f"цена не сверилась: {why_not}"]
+                c["ok"] = False
+                continue
+            cost = SMART["w"] * V / (1 + P["fee"])
+            need = cost - (rp.cash() - P["min_cash"] * V)
+            if need > 0:
+                need -= self._idle_release(now, need, price, live, out, s)
+            if need > 1e-9:                                       # the rest from the core itself, in plan proportions
+                cw = {x: IDEAS["core_w"][x] for x in self.IDLE_CORE if x in held and x in live and held[x].get("entry")}
+                tot = sum(cw.values())
+                for x, f in cw.items():
+                    q = need * f / tot
+                    p = held[x]
+                    neww = max(0.0, p["weight"] - q * p["entry"] / price[x])
+                    out.append(rp._act(now, x, "TRIM", neww, price[x], f"Ядро → смарт-мани: продаём {x} −{q / V * 100:.1f}% счёта, чтобы купить "
+                                                                       f"{s} (10% рукава лежали в ядре, пока не было подходящего токена).", None))
+                    rp._set_cash(rp.cash() - q * P["fee"])
+                    held[x] = {**p, "weight": neww}
+            first = rp._meta("smart_first") is None
+            out.append(rp._act(now, s, "BUY", cost, px, (f"ПЕРВАЯ ПОКУПКА рукава «смарт-мани» (05.11, решение владельца). " if first else "")
+                               + f"Смарт-мани: {s} набирают {c.get('n')} умных кошелька, проверка риска пройдена (ликвидность "
+                               f"${(c.get('liq') or 0) / 1e6:.1f}M, топ-10 {c.get('top10_pct'):.0f}%, {c.get('age_days'):.0f} дн.). "
+                               f"{SMART['w'] * 100:g}% счёта, стоп {_pc(SMART['stop'])}, выход через {SMART['days']} дней или когда кошельки продают.",
+                               "smart:smart"))
+            if first:
+                rp._set_meta("smart_first", now)
+                print(f"SMART-MONEY FIRST BUY: {s} {SMART['w'] * 100:g}% of «CRYPTO NOVA портфель» at {px}", flush=True)
+            rp._set_cash(rp.cash() - cost * P["fee"])
+            rp._set_meta(f"src:{s}", _SRC_CODE[k])
+            rp._set_meta(f"px:{s}", px)
+            price[s], psrc[s] = px, k
+            live.add(s)
+            held[s] = {"symbol": s}
+            n += 1
+        return out
 
     def _okx_swap(self, now: int, price: dict, okx: set | None, src: dict | None = None) -> list[dict]:
         """22.10 (owner: «если монеты нет на бирже — заменить тем, что приносит деньги»): the money of a coin sold because OKX has no
@@ -1021,14 +1167,18 @@ class IdeasPortfolio:
             ret = px / p["entry"] - 1 if px and p["entry"] else None
             h = horizon_of(kind, est)
             held = (now - p["entry_time"]) / DAY if p.get("entry_time") else None
+            if kind == "smart":
+                h = "short"
             hz = {"horizon": h, "horizon_ru": f"{HORIZONS[h]['name_ru']} · {HORIZONS[h]['period_ru']}", "horizon_days": list(HORIZONS[h]["days"]),
                   "held_days": round(held, 1) if held is not None else None,
                   "horizon_over": bool(held is not None and held > HORIZONS[h]["days"][1]),
-                  "levels": {"stop": round(p["entry"] * (1 + (P["stop_small"] if h == "short" else P["stop_buy"])), 8) if h != "long" and p.get("entry") else None,
+                  "levels": {"stop": round(p["entry"] * (1 + (SMART["stop"] if kind == "smart" else P["stop_small"] if h == "short" else P["stop_buy"])), 8)
+                             if h != "long" and p.get("entry") else None,
                              "take_half": round(p["entry"] * P["body_x"], 8) if h == "short" and p.get("entry") and not p.get("fixes") else None}}
             out.append({**p, **hz, "bucket": kind, "kind_ru": KIND_RU.get(kind, kind), "role": est, "role_ru": IDEAS_ROLE_RU.get(est, est),
                         "name": names.get(s) or s, "weight": round(mv / V, 4), "cost_weight": round(p["weight"], 6),
-                        "target_weight": P["small_w"] if est == "small" else core_target(s) if kind == "core" else P["buy_w"],
+                        "target_weight": (SMART["w"] if kind == "smart" else P["small_w"] if est == "small" else round(self._core_t(s, price), 4)
+                                          if kind == "core" else P["buy_w"]),
                         "price": px, "price_live": s in live, "price_src": psrc.get(s),
                         "pnl_pct": round(ret * 100, 2) if ret is not None else None,
                         "pnl_usd": round(10_000 * (mv - p["weight"]), 2), "value_usd": round(10_000 * mv, 2),
@@ -1055,6 +1205,11 @@ class IdeasPortfolio:
                 "ideas": {"asof": (ideas or {}).get("asof"), "fresh": fresh, "note_ru": note,
                           "summary_ru": (ideas or {}).get("summary_ru") if fresh else None},
                 "not_bought": not_bought,
+                # 05.11 (owner): the smart-money sleeve — the rule, its share now and every watch-list token with the check's verdict
+                "smart": {"rule_ru": SMART_RULE_RU, "max_pct": SMART["max"] * 100, "now_pct": round(self._smart_w(price) * 100, 2),
+                          "in_core_pct": round(max(0.0, SMART["max"] - self._smart_w(price)) * 100, 2),
+                          "first_buy": int(rp._meta("smart_first")) if rp._meta("smart_first") else None,
+                          "candidates": getattr(self, "_smart", [])[:20]},
                 "idle_cash": self._idle_info(price, V, now),
                 "started": int(started) if started else None, "last_weekly": int(last_weekly) if last_weekly else None}
 

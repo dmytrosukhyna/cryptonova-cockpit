@@ -73,6 +73,9 @@
       </div>
       ${shown.length ? `<div class="scards wh-cards">${shown.map(card).join('')}</div>` : V.empty('Под этот фильтр китов нет.')}
       ${!ui.all && list.length > shown.length ? `<div style="margin-top:12px"><button class="btn" type="button" data-wall="1">Показать всех (${V.int(list.length)})</button></div>` : ''}
+      ${A(W.bench).length ? `<details class="more" style="margin-top:12px"><summary>Скамейка — следующие за копируемыми (${V.int(W.bench.length)})</summary><div class="tbl-wrap"><table class="tbl"><tbody>
+        ${W.bench.map((b) => `<tr><td><span class="sym">${esc(b.name)}<small>${esc(b.src_ru || b.src)}</small></span></td><td>${V.isNum(b.win) ? winTxt(b.win) : '—'} · PF ${V.isNum(b.pf) ? esc(String(b.pf)) : '—'}</td><td class="l">${esc(b.why_ru || '')}</td></tr>`).join('')}
+      </tbody></table></div></details>` : ''}
       ${failed.length ? `<details class="more" style="margin-top:12px"><summary>Не прошли отбор (${V.int(failed.length)})</summary><div class="tbl-wrap"><table class="tbl"><tbody>
         ${failed.map((w) => `<tr><td><span class="sym">${esc(w.name)}<small>${esc(w.src_ru || w.src)}</small></span></td><td class="${V.cls(w.pnl_60d)}">${V.isNum(w.pnl_60d) ? V.smoney(w.pnl_60d) : '—'}</td><td class="l">${esc(A(w.why_ru).join('; ') || '—')}</td></tr>`).join('')}
       </tbody></table></div></details>` : ''}`;

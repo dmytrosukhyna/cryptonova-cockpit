@@ -276,3 +276,11 @@ def test_whales_get_a_real_share_once_the_feed_carries_the_desk_shape_and_carry_
     assert not c["real"] and not c["eligible_real"] and c["trades"] >= 5 and "carry" not in al and "день" in c["note"]
     days = ds.carry_days([(NOW - 2 * ds.DAY, 100.0), (NOW - ds.DAY, 101.0), (NOW - 1000, 101.5)], 101.2, NOW)
     assert days == [(NOW - ds.DAY, 1.0), (NOW, 0.2)]
+
+
+def test_funding_carry_is_tracked_only_and_never_gets_budget():
+    """05.11 09:52 (owner: «керри фандинга не нужно»)"""
+    from cnq.agents import desk_select as DS
+    st = {"desks": [{"key": "carry", "real": True, "stage": 3}, {"key": "whales", "real": True, "stage": 1}]}
+    out = DS.alloc_shares({}, "aggr", st, 0)
+    assert "carry" not in out and out.get("whales") == 1.0

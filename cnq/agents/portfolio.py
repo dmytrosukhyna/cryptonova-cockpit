@@ -1328,8 +1328,13 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
     from .spot_profiles import IDEAS, IDEAS_ABOUT, IdeasPortfolio, load_ideas
     try:      # 6th: «По рекомендациям» — buys what the spot ideas table says (web/ideas.json of the PREVIOUS run: the ideas step runs
               # after this one); prices: the same live sources as the other profiles, the source a coin was bought with is kept
+        try:                  # 05.11: the smart-money watch list for the sleeve (web/smart_money.json, the same pipeline run)
+            with open("web/smart_money.json", encoding="utf-8") as f:
+                smart = json.load(f)
+        except Exception:  # noqa: BLE001
+            smart = None
         profiles["ideas"] = IdeasPortfolio(conn).step({"cg": price, "meme": meme_px, "hl": hl_px}, load_ideas(), now, sma200=sma,
-                                                      tradeable=okx_spot_list(conn, now))
+                                                      tradeable=okx_spot_list(conn, now), smart=smart)
     except Exception as e:  # noqa: BLE001
         profiles["ideas"] = {"key": "ideas", "name": IDEAS["name"], "about": IDEAS_ABOUT, "experiment": True, "error": str(e), **empty}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),

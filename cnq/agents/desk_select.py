@@ -603,6 +603,8 @@ def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int, carry=None) -> 
 # get 0 (they keep managing positions they already hold until those close, and stay demo). «Киты» keep it only while their ladder
 # stage is ≥ 1 — a rollback to 0 drops them to 0 and the budget falls back to the main desks equally (the safety net).
 OWNER_SHARES = {"whales": 1.0}
+# 05.11 09:52 (owner: «керри фандинга не нужно»): tracked on its ladder only — never a share of the real budget, whatever its stage
+TRACK_ONLY = {"carry"}
 OWNER_SHARES_UNTIL = 4102444800000          # 04.11 17:46 (owner: «не надо ограничиваться датами») — no end date; the safety net is the ladder
 
 
@@ -623,7 +625,7 @@ def alloc_shares(prof: dict, cur: str, stages: dict, now: int | None = None) -> 
             elif k in st and st[k].get("real") and st[k].get("stage", 0) >= 1:
                 fixed[k] = v
     for d in stages.get("desks") or []:
-        if not d.get("real") or d["key"] in main or d["key"] in fixed:
+        if not d.get("real") or d["key"] in main or d["key"] in fixed or d["key"] in TRACK_ONLY:
             continue
         if d["stage"] in (1, 2):
             out[d["key"]] = STAGE_SHARE[d["stage"]]

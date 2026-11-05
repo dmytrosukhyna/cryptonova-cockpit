@@ -134,6 +134,8 @@ def crypto_watch(profs: list[dict], top: dict) -> dict:
     return {"asof": top.get("asof"), "complete": top.get("complete"), "counts": counts, "by_src": by_src, "n": len(rows), "whales": rows,
             "desk": dk, "rule_ru": top.get("follow_rule_ru"), "not_covered_ru": top.get("not_covered_ru"), "hidden_ru": top.get("hidden_ru"),
             "funnel": top.get("funnel"),
+            # 05.11 (owner): the next whales after the followed ten — who would come in when one drops out
+            "bench": [{**b, "src_ru": SRC_RU.get(b.get("src"), b.get("src")), "link": link_of(b.get("addr"), b.get("src"))} for b in top.get("bench") or []],
             "about_ru": "Все киты, которых система изучает: из лидерборда Hyperliquid, лид-трейдеры копитрейдинга OKX и открытые лид-портфели "
                         "Binance. «Копируем» — стол «Киты» повторяет их новые сделки на демо-счёте; «кандидат» — изучаем, в копирование не взяли "
                         "(причина рядом), показываем только тех, кто проходит отбор или близок к нему; «исключён» — раньше копировали, сняли; «не прошли» — "

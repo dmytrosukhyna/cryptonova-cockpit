@@ -124,7 +124,7 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     fresh = now - int(W._f(wtop.get("asof"))) <= FOLLOW_STALE_MS
     fol = [x for x in (wtop.get("following") or []) if isinstance(x, dict) and x.get("addr")] if fresh else []
     follow = [x["addr"] for x in fol]
-    quality = {x["addr"]: {k: x.get(k) for k in ("win", "pf", "per_day", "pnl_60d")} for x in fol}
+    quality = {x["addr"]: {k: x.get(k) for k in ("win", "pf", "per_day", "pnl_60d", "lev_med")} for x in fol}
     names = {**(st.get("names") or {}), **{x["addr"]: x.get("name") or x.get("short") or x["addr"] for x in fol}}
     mids = post({"type": "allMids"}) or {}
     watch = list(dict.fromkeys(follow + [o["whale"] for o in desk.get("open") or []]))

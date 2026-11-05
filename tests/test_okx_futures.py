@@ -131,7 +131,7 @@ def test_risk_as_the_system_capped_at_one_percent_and_leverage_never_above_three
     """Owner 22.10: «риск фьючерсов как у системы» — the desk's own risk share × this desk's part; 1 % of the budget is the ceiling."""
     fk = F.FakeOkx()
     e = F.env(OKX_FUT_MAX_LEV="10", OKX_FUT_RISK="0.05")                   # env can't loosen the hard caps
-    assert fu.caps(e) == {"lev": 3, "copy_lev": 5, "risk": 0.02, "max_pos": 15, "day_loss": 0.03}
+    assert fu.caps(e) == {"lev": 3, "copy_lev": 20, "risk": 0.02, "max_pos": 15, "day_loss": 0.03}
     run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 1 % of the budget
     o = swap_orders(fk)[0]
     assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 1500 * 0.02 + 1e-6    # owner 04.11: the ceiling is 2 % of the budget
@@ -379,14 +379,19 @@ def test_staged_desks_get_their_share_of_the_budget_and_the_rest_is_split_equall
     assert [k for k, _ in fu.pick_desks(paper, sel={"current": "aggr", "stages": {"alloc": {"lab": 0.0}}}, held={"lab"})] == ["aggr", "imp", "lab"]
 
 
-def test_whales_copy_trades_the_whales_leverage_capped_at_five_with_a_stop_at_okx():
+def test_whales_copy_trades_the_whales_own_leverage_within_the_liquidation_room_with_a_stop_at_okx():
     """04.11 (owner: «по китам повторяй их плечи»): a «Киты» copy (desk.paper of whales_top.json, «copy_lev») enters with the whale's
     leverage capped at 5×; the other desks stay at the general cap; the stop is attached at OKX; the risk caps are the same"""
     fk = F.FakeOkx()
-    w = {**F.trade("W-SOL-L-1", entry=200.0, stop=184.0, tp=230.0, risk=320.0), "tps": [], "parts": [], "copy_lev": 10.0}
+    # 05.11 (owner: «Какое у них плечо, такое и у нас»): the whale's own 6× (stop 8 % away allows up to 9×)
+    w = {**F.trade("W-SOL-L-1", entry=200.0, stop=184.0, tp=230.0, risk=320.0), "tps": [], "parts": [], "copy_lev": 6.0}
     run(fk, F.env(), [("bal", {"equity": 10000.0, "open": []}), ("whales", {"equity": 10000.0, "open": [w]})])
     o = swap_orders(fk)[0]
-    assert fk.levers[-1]["lever"] == "5" and o["attachAlgoOrds"][0]["slTriggerPx"] == "184.000"
+    assert fk.levers[-1]["lever"] == "6" and o["attachAlgoOrds"][0]["slTriggerPx"] == "184.000"
+    # the whale's 20×: liquidation would come before our 8 % stop → the highest leverage that keeps it outside
+    fk3 = F.FakeOkx()
+    run(fk3, F.env(), [("whales", {"equity": 10000.0, "open": [{**w, "id": "W-SOL-L-3", "copy_lev": 20.0}]})])
+    assert int(fk3.levers[-1]["lever"]) == int(fu.LIQ_ROOM / ((200 * 1.004 - 184) / (200 * 1.004)))
     assert float(o["sz"]) * (float(o["px"]) - 184.0) <= 1500 * fu.RISK_CAP + 1e-6        # the same risk ceiling (2 % since 04.11)
     # a wide stop: the leverage drops so the stop triggers well before liquidation (≤ 0.8 ÷ stop distance)
     fk2 = F.FakeOkx()
@@ -394,7 +399,7 @@ def test_whales_copy_trades_the_whales_leverage_capped_at_five_with_a_stop_at_ok
     run(fk2, F.env(), [("whales", {"equity": 10000.0, "open": [w2]})])
     assert fk2.levers[-1]["lever"] == "3"
     # env can lower the copy cap, never raise it
-    assert fu.caps(F.env(OKX_FUT_COPY_MAX_LEV="3"))["copy_lev"] == 3 and fu.caps(F.env(OKX_FUT_COPY_MAX_LEV="20"))["copy_lev"] == 5
+    assert fu.caps(F.env(OKX_FUT_COPY_MAX_LEV="3"))["copy_lev"] == 3 and fu.caps(F.env(OKX_FUT_COPY_MAX_LEV="50"))["copy_lev"] == 20
 
 
 def test_whales_feed_joins_at_its_stage_share_and_never_closes_on_a_failed_load(monkeypatch):

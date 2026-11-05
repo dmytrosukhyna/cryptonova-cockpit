@@ -52,7 +52,7 @@ pass). Not for a lead trader (its instruments are USDT swaps). Off with OKX_FUT_
 не ужимать»): «Киты · копирование топ-5» (web/whales_top.json → desk.paper, cnq/agents/whale_study.py) is a desk like the others —
 its copies come in the paper-desk trade shape and go through the same guards (stage share of the budget from desk_select.json
 «stages.alloc», the risk caps, late-join guard, max positions, daily stop, a stop attached at OKX). Only its leverage differs: the
-whale's own («copy_lev») capped at COPY_MAX_LEV (5×, OKX_FUT_COPY_MAX_LEV may lower it); the leverage room of the whole sleeve stays
+whale's own («copy_lev», 05.11: up to the COPY_MAX_LEV 20× backstop, OKX_FUT_COPY_MAX_LEV may lower it); the leverage room of the whole sleeve stays
 budget × the general cap. Every position's leverage is also kept low enough that the stop sits well before liquidation
 (lev ≤ 0.8 ÷ stop distance). The whales feed is fetched only while the desk has a share or a held position; unreadable while a
 whale copy is held → the whole pass is skipped (never a close because a file did not load); older than 3 hours → no new entries.
@@ -78,7 +78,10 @@ LOG = "data/okx_futures.jsonl"
 FRESH_MS = 45 * 60_000
 JOIN_GAP = 0.003            # a trade opened before the start is joined only while the price is ≤ 0.3 % worse than the desk's entry
 MAX_LEV, DEF_LEV = 3, 2
-COPY_MAX_LEV = 5            # 04.11 (owner): copy desks («Киты») trade the copied trader's leverage, at most 5×
+# 05.11 09:52 (owner: «Какое у них плечо, такое и у нас»): copy desks trade the copied trader's OWN leverage; 20× is only the
+# exchange / safety backstop. The risk is unchanged (2 % of the budget from the stop distance) — leverage only sets the margin — and
+# the stop always sits before liquidation (LIQ_ROOM): a whale leverage that would put liquidation inside our stop is lowered and logged
+COPY_MAX_LEV = 20
 LIQ_ROOM = 0.8              # leverage ≤ 0.8 ÷ stop distance: the stop always triggers well before an isolated position is liquidated
 WHALES = "whales"           # the copy desk's key (desk_select stages, the trade ids «whales:<id>»)
 WHALES_STALE_MS = 3 * 3_600_000
@@ -581,9 +584,13 @@ def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict
     inst_max = int(float(inst.get("lever") or COPY_MAX_LEV))
     lev = max(1, min(cap["lev"], inst_max))
     room_lev = lev                                  # the whole sleeve's notional stays ≤ budget × the general cap
-    if t.get("copy_lev"):                           # 04.11 (owner): a copy desk trades the copied trader's leverage, ≤ 5×
+    lev_note = None
+    if t.get("copy_lev"):                           # 05.11 (owner): a copy desk trades the copied trader's own leverage (≤ 20× backstop)
         lev = max(1, min(cap.get("copy_lev", COPY_MAX_LEV), inst_max, int(float(t["copy_lev"]))))
-    lev = max(1, min(lev, int(LIQ_ROOM / (abs(worst - stop) / worst))))     # the stop before liquidation, always
+    liq_lev = max(1, int(LIQ_ROOM / (abs(worst - stop) / worst)))
+    if lev > liq_lev:                               # the stop before liquidation, always
+        lev_note = f"плечо {lev}× → {liq_lev}×: при {lev}× ликвидация наступила бы раньше стопа"
+        lev = liq_lev
     coins = risk_usd / abs(worst - stop)
     capped = f"лимит риска {cap['risk'] * 100:g}% бюджета".replace(".", ",") if frac * part > cap["risk"] * bud else None
     room = bud * room_lev - open_notional
@@ -597,7 +604,7 @@ def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict
         return {"skip": f"меньше минимума OKX ({inst['minSz']} контр. ≈ {ap.usd(mn * ct * px)})" + (f" · {capped}" if capped else "")}
     coins = sz * ct
     r = coins * abs(worst - stop)
-    return {"sz": ap.fmt(sz, inst["lotSz"]), "contracts": sz, "coins": coins, "notional": round(coins * px, 2), "lev": lev,
+    return {"sz": ap.fmt(sz, inst["lotSz"]), "contracts": sz, "coins": coins, "notional": round(coins * px, 2), "lev": lev, "lev_note": lev_note,
             "margin": round(coins * worst / lev, 2), "risk_usd": round(r, 2), "risk_pct": round(r / bud * 100, 3) if bud else 0.0,
             "stop": stop, "tp": tp, "px": px, "worst": worst, "capped": capped, "desk_risk_pct": round(frac * 100, 2)}
 

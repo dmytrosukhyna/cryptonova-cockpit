@@ -71,14 +71,14 @@ def test_desk_copies_only_new_positions_and_closes_with_the_whale():
     assert d["open"] == [] and d["seen"]["0xa"] == {"ETH": "LONG"}           # already open when we started watching → not copied
     q = {"0xa": {"per_day": 40}}                         # ~16 copies still expected today → each takes 1/16 of the free margin
     d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "ETH", "side": "LONG", "lev": 10}, {"coin": "BTC", "side": "SHORT", "lev": 20}]}, mids, T0 + H, quality=q)
-    m = round(10_000 / W.expected_slots(q, ["0xa"], T0 + H), 2)
-    assert len(d["open"]) == 1 and d["open"][0]["coin"] == "BTC" and d["open"][0]["lev"] == 5.0 and d["open"][0]["margin"] == m
+    m = round(0.75 * 10_000 / W.expected_slots(q, ["0xa"], T0 + H), 2)       # 05.11: base utilisation target 75 % (no 14-day record)
+    assert len(d["open"]) == 1 and d["open"][0]["coin"] == "BTC" and d["open"][0]["lev"] == 10.0 and d["open"][0]["margin"] == m
     assert d["util_pct"] == round(m / 100, 1)
     mids2 = {"BTC": "90", "ETH": "2000"}
     d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "ETH", "side": "LONG", "lev": 10}]}, mids2, T0 + 2 * H)
     assert d["open"] == [] and len(d["closed"]) == 1
     c = d["closed"][0]
-    assert c["why"] == "кит закрыл" and abs(c["pnl"] - (5 * m * 0.1 - 5 * m * W.COST_PCT / 100)) < 0.01
+    assert c["why"] == "кит закрыл" and abs(c["pnl"] - (10 * m * 0.1 - 10 * m * W.COST_PCT / 100)) < 0.01
     assert abs(d["equity"] - (10_000 + c["pnl"])) < 1e-6
     pub = W.desk_public(d, {"0xa": "Кит"})
     assert pub["trades"] == 1 and pub["wins"] == 1 and pub["closed"][0]["whale_ru"] == "Кит"
@@ -171,14 +171,14 @@ def test_desk_stops_per_whale_cap_paper_shape_and_daily_record():
     eth = next(o for o in d["open"] if o["coin"] == "ETH")
     assert abs(eth["stop"] - 2000 * 0.92) < 1e-6 and "−8%" in eth["stop_src"]
     pepe = next(o for o in d["open"] if o["coin"] == "kPEPE")
-    assert pepe["lev"] == 5.0 and abs(pepe["stop"] - 0.0108) < 1e-9
+    assert pepe["lev"] == 10.0 and pepe["lev_note"] and abs(pepe["stop"] - 0.0108) < 1e-9
     # the stop closes a copy at the current mid even while the whale still holds
     d = W.desk_step(d, ["0xa", "0xb"], {"0xa": pos, "0xb": [{"coin": "kPEPE", "side": "SHORT", "lev": 20}]}, {**mids, "ETH": "1800"}, T0 + 2 * H, quality=q)
     assert not any(o["coin"] == "ETH" for o in d["open"]) and d["closed"][-1]["why"].startswith("стоп")
     pub = W.desk_public(d, {"0xa": "Кит А"})
     p = pub["paper"]
     t = next(x for x in p["open"] if x["symbol"] == "1000PEPE")
-    assert t["side"] == "SHORT" and t["copy_lev"] == 5.0 and t["stop"] > t["entry"] and abs(t["risk_usd"] - t["qty"] * (t["stop"] - t["entry"])) < 0.01
+    assert t["side"] == "SHORT" and t["copy_lev"] == 10.0 and t["stop"] > t["entry"] and abs(t["risk_usd"] - t["qty"] * (t["stop"] - t["entry"])) < 0.01
     assert all(x["id"].startswith("W-") and x["stop"] for x in p["open"]) and p["closed"][0]["net_usd"] < 0
     bw = {w["whale"]: w for w in pub["by_whale"]}
     assert bw["0xa"]["trades"] == 1 and bw["0xa"]["whale_ru"] == "Кит А" and bw["0xa"]["days"][0]["n"] == 1 and bw["0xb"]["open"] == 1
@@ -231,7 +231,7 @@ def test_join_an_already_open_position_only_within_1pct_of_the_whale_entry():
     d = W.desk_step(d, ["0xa"], {"0xa": pos}, {"ETH": 2015.0, "SOL": 101.5}, T0 + H // 2, quality={"0xa": {"per_day": 30}})
     assert [o["coin"] for o in d["open"]] == ["ETH"]                          # 0.75 % → joined; 1.5 % → not
     eth = d["open"][0]
-    assert eth["join"] and eth["gap_pct"] == 0.75 and eth["lev"] == 5.0 and abs(eth["stop"] - 2015 * 0.92) < 1e-6
+    assert eth["join"] and eth["gap_pct"] == 0.75 and eth["lev"] == 10.0 and abs(eth["stop"] - 2015 * 0.92) < 1e-6
     ev = [e for e in d["events"] if e["kind"] == "join"]
     assert ev and ev[0]["gap_pct"] == 0.75 and ev[0]["whale_entry"] == 2000.0
     assert sum(e["kind"] == "join_wait" for e in d["events"]) == 1 and d["join_wait"] == {"0xa|SOL|LONG": 1.5}
@@ -261,7 +261,7 @@ def test_stale_look_is_a_baseline_then_the_next_fresh_look_joins_within_1pct():
     d = W.desk_step(d, ["0xa"], {"0xa": pos}, {"ZRO": 1.89}, T0 + 26 * H)        # stale look → baseline only
     assert d["open"] == []
     d = W.desk_step(d, ["0xa"], {"0xa": pos}, {"ZRO": 1.89}, T0 + 26 * H + H // 2)
-    assert [(o["coin"], o["join"], o["lev"]) for o in d["open"]] == [("ZRO", True, 5.0)]
+    assert [(o["coin"], o["join"], o["lev"]) for o in d["open"]] == [("ZRO", True, 8.0)]
 
 
 def test_join_refuses_an_owner_blocked_hype_short_and_prefers_the_strong_whale():
@@ -407,8 +407,9 @@ def test_dynamic_sizing_free_margin_over_expected_slots_and_the_soft_whale_cap()
     pos = [{"coin": c, "side": "LONG", "lev": 3} for c in ("BTC", "ETH", "SOL")]
     d = W.desk_step(d, fol, {"0xa": pos, **{a: [] for a in fol[1:]}}, mids, T0 + H)          # no record → 2 slots: 50 %, then the cap
     a = [o for o in d["open"] if o["whale"] == "0xa"]
-    assert len(a) == 1 and a[0]["margin"] == 5000.0 and any(e["kind"] == "skip" and "50%" in e["why"] for e in d["events"])
-    assert d["util_pct"] == 50.0 and W.desk_public(d, {})["util_pct"] == 50.0
+    # 05.11: up to the 75 % utilisation target: 3750, then 1250 more reaches the whale's 50 % cap, the third waits
+    assert [o["margin"] for o in a] == [3750.0, 1250.0] and any(e["kind"] == "skip" and "50%" in e["why"] for e in d["events"])
+    assert d["util_pct"] == 50.0 and W.desk_public(d, {})["util_pct"] == 50.0 and W.desk_public(d, {})["util_cap_pct"] == 75
     assert W.expected_slots({x: {"per_day": 1} for x in fol}, fol, T0 - T0 % W.DAY) == 5
     assert W.expected_slots({}, fol, T0) == W.MIN_SLOTS
 
@@ -441,3 +442,19 @@ def test_a_rolled_back_database_never_republishes_an_older_desk_or_follow_list(t
     # a database that is newer than the published file keeps its own state
     desk2, study2, notes = W.never_backwards({**old, "history": [[now, 12000.0]]}, {"t": now, "top": []}, pub, now)
     assert desk2["history"][-1][1] == 12000.0 and study2 == {"t": now, "top": []} and not notes
+
+
+def test_hidden_leverage_uses_the_whales_median_and_utilisation_adapts_to_the_14_day_record():
+    """05.11 09:52 (owner): «Какое у них плечо, такое и у нас» — hidden leverage → the median of his record; utilisation up to 90 %
+    while the 14-day record is good (PF > 1.5, drawdown < 5 %), 50 % when it is bad"""
+    mids = {"BTC": "100", "ETH": "2000"}
+    q = {"0xa": {"per_day": 1, "lev_med": 7.0}}
+    d = W.desk_step(None, ["0xa"], {"0xa": []}, mids, T0)
+    d = W.desk_step(d, ["0xa"], {"0xa": [{"coin": "BTC", "side": "LONG"}]}, mids, T0 + H, quality=q)
+    o = d["open"][0]
+    assert o["lev"] == 7.0 and o["lev_src"] == "медиана кита" and o["lev_note"] is None
+    good = {"closed": [{"closed_t": T0, "pnl": 100.0}] * 6 + [{"closed_t": T0, "pnl": -50.0}], "history": [[T0, 10000.0], [T0 + 1, 10400.0]]}
+    bad = {"closed": [{"closed_t": T0, "pnl": -100.0}] * 6 + [{"closed_t": T0, "pnl": 50.0}], "history": [[T0, 10000.0], [T0 + 1, 9000.0]]}
+    assert W.util_cap(good, T0 + H)[0] == 0.90 and W.util_cap(bad, T0 + H)[0] == 0.50
+    assert W.util_cap({"closed": [], "history": []}, T0)[0] == 0.75
+    assert d["util_cap_pct"] == 75 and "мало сделок" in d["util_rule"]["why_ru"]

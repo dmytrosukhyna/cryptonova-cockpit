@@ -690,7 +690,7 @@ def test_ideas_core_is_btc_heavy_and_trimmed_back_on_monday():
     port = sp.IdeasPortfolio(conn)
     port.step(src, _ideas(rows, T0), T0)                                              # Wednesday
     src1 = copy.deepcopy(src)
-    src1["cg"]["BTC"] *= 2.5
+    src1["cg"]["BTC"] *= 4.0                       # 05.11: the empty smart-money sleeve (10 %) sits in the core → BTC plan 36.7 %
     rows1 = copy.deepcopy(rows)
     _set(rows1, "BTC", price=src1["cg"]["BTC"])
     tue = T0 + DAY
@@ -700,7 +700,7 @@ def test_ideas_core_is_btc_heavy_and_trimmed_back_on_monday():
     st = port.step(src1, _ideas(rows1, mon), mon)
     a = next(x for x in st["actions"] if x["symbol"] == "BTC")
     by = {p["symbol"]: p for p in st["positions"]}
-    assert a["action"] == "TRIM" and "больше плана 30%" in a["reason"] and abs(by["BTC"]["weight"] - 0.30) < 0.002
+    assert a["action"] == "TRIM" and "больше плана 37%" in a["reason"] and abs(by["BTC"]["weight"] - 0.30 * (1 + 0.10 / 0.45)) < 0.002
     assert sp.core_target("BTC") == 0.30 and sp.core_target("SOL") == 0.05 and sp.core_target("XYZ") == 0.10
 
 
@@ -1122,3 +1122,54 @@ def test_ideas_an_eligible_coin_blocked_by_cash_or_a_stale_table_is_not_idle():
     assert not st["actions"] and st["idle_cash"]["since"] == t1
     st = port.step(src, _ideas(rows, t1 + 3 * DAY + 120_000), t1 + 3 * DAY + 120_000)
     assert {a["symbol"] for a in st["actions"] if "Кэш → ядро" in a["reason"]} == {"BTC", "ETH", "SOL"}
+
+
+# ------------------------------------------------------------------------------------------------ 05.11 smart-money sleeve
+def _tok(sym, n=2, liq=450_000, top10=43.0, age=2000.0, flags=(), kinds=("маркетмейкер", "фонд / OTC"), status="накопление", price=130.0):
+    return {"symbol": sym, "name": sym, "status": status, "n": n, "liq": liq, "top10_pct": top10, "age_days": age, "flags": list(flags),
+            "price": price, "buyers": [{"label": f"w{i}", "kind": kinds[i % len(kinds)], "sold": False} for i in range(n)]}
+
+
+def test_smart_money_check_is_balanced_on_the_05_11_watch_list_cases():
+    okx = {"AAVE", "LINK", "ATH", "MNT", "GRT", "UNI"}
+    cases = {"AAVE": _tok("AAVE"),                                                            # ≥ 2 wallets, fund + MM, deep pool → passes
+             "LINK": _tok("LINK", n=0, status="продают", top10=30.6),
+             "ATH": _tok("ATH", n=2, top10=76.6, flags=["владелец может выпускать новые токены"]),
+             "KAIO": _tok("KAIO", liq=900, top10=99.0, age=37),
+             "SLOP": _tok("SLOP", liq=55_947, age=2.9, top10=73.0),
+             "UNI": _tok("UNI", n=2, kinds=("маркетмейкер",)),
+             "HP": _tok("HP", flags=["ловушка: продать нельзя (honeypot)"]),
+             "OFFX": _tok("OFFX")}
+    v = {k: sp.smart_check(t, okx) for k, t in cases.items()}
+    assert v["AAVE"] == (True, [])
+    assert not v["LINK"][0] and "кошельки продают" in v["LINK"][1]
+    assert not v["ATH"][0] and any("топ-10" in w for w in v["ATH"][1]) and any("выпускать" in w for w in v["ATH"][1])
+    assert not v["KAIO"][0] and not v["SLOP"][0] and any("7 дней" in w for w in v["SLOP"][1])
+    assert v["UNI"][1] == ["купили только маркетмейкеры"] and "ловушка" in v["HP"][1][0]
+    assert v["OFFX"] == (False, ["нет спот-пары на OKX — только наблюдение"])
+
+
+def test_smart_sleeve_sits_in_the_core_then_buys_a_qualifying_token_from_the_core_and_stops_out():
+    rows, src = ideas_world()
+    src = copy.deepcopy(src)
+    src["cg"]["AAVE"] = 130.0
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    st = port.step(src, _ideas(rows, T0), T0)
+    assert st["smart"]["now_pct"] == 0 and st["smart"]["in_core_pct"] == 10.0
+    assert abs(port._core_t("BTC", src["cg"]) - 0.30 * (1 + 0.10 / 0.45)) < 1e-9
+    sm = {"watch": {"tokens": [_tok("AAVE"), _tok("ATH", top10=77.0)]}}
+    t1 = T0 + 3_600_000
+    st = port.step(src, _ideas(rows, t1), t1, smart=sm)
+    buy = next(a for a in st["actions"] if a["symbol"] == "AAVE")
+    assert buy["action"] == "BUY" and "ПЕРВАЯ ПОКУПКА" in buy["reason"] and st["smart"]["first_buy"] == t1
+    by = {p["symbol"]: p for p in st["positions"]}
+    assert abs(by["AAVE"]["weight"] - 0.025) < 0.002 and by["AAVE"]["bucket"] == "smart" and abs(by["AAVE"]["levels"]["stop"] - 130 * 0.75) < 1e-6
+    assert st["cash_pct"] >= 10 and abs(st["smart"]["now_pct"] - 2.5) < 0.2 and abs(st["smart"]["in_core_pct"] - 7.5) < 0.2
+    assert [c["symbol"] for c in st["smart"]["candidates"] if c["ok"]] == ["AAVE"]
+    src2 = copy.deepcopy(src)
+    src2["cg"]["AAVE"] = 130.0 * 0.70                                                     # −30 % → the −25 % stop
+    t2 = t1 + 3_600_000
+    st = port.step(src2, _ideas(rows, t2), t2, smart=sm)
+    a = next(a for a in st["actions"] if a["symbol"] == "AAVE")
+    assert a["action"] == "SELL" and "стоп" in a["reason"] and "AAVE" not in {p["symbol"] for p in st["positions"]}

@@ -66,7 +66,10 @@ CANDLE_DAYS = 50                       # Hyperliquid serves the newest 5000 cand
 PRE_N = 30
 PRE_M = 20                            # 04.11: + the best 20 by 30-day P&L that the all-time top misses
 TOP_N = 10                            # «топ-10 трейдеров» on the panel
-FOLLOW_N = 5                          # the copy desk follows the best 5 whose copy test is positive (04.11 22:38 owner: «пяти хватит»)
+# 05.11 09:52 (owner: «если топ-10 все шикарные, то можно и все 10»): every whale that passes the full bar and the delayed-copy test
+# is followed, up to 10; the next ones are the bench (whales_top.json «bench», shown on the panel)
+FOLLOW_N = 10
+BENCH_N = 10
 MIN_AV, MIN_ALL = 300_000.0, 500_000.0
 MAX_VLM_X, MAX_ROI_M = 400.0, 10.0
 FETCH_WINDOW = 75 * DAY               # fills fetched for 75 days so positions opened before the 60-day window are known
@@ -81,7 +84,10 @@ DELAYS_MIN = (2, 15, 30, 60)
 COPY_DELAY = 2                        # minutes: what the server's live copy loop achieves (poll every ~60 s + the order)
 COST_PCT = 0.11                       # taker 0.045 % × 2 + slippage 0.02 %
 REFRESH_MS = DAY                      # study data per whale refreshed once a day
-DESK_START, DESK_MARGIN, DESK_LEV_CAP, DESK_MAX_OPEN = 10_000.0, 0.10, 5.0, 15
+# 05.11 09:52 (owner: «Какое у них плечо, такое и у нас»): the whale's own leverage (hidden → the median of his record), 20× backstop,
+# never so high that liquidation comes before our stop (LIQ_ROOM ÷ stop distance)
+DESK_START, DESK_MARGIN, DESK_LEV_CAP, DESK_MAX_OPEN = 10_000.0, 0.10, 20.0, 15
+LIQ_ROOM = 0.8
 # 04.11 (owner, real money: «стол копирования китов … срочно внедрять; повторяй их плечи; логику применять, но себя не ужимать»):
 # the desk now also trades the way the real OKX sleeve can follow it — every copy has a protective stop (the whale's own stop
 # when he has one on the exchange, else −8 % from our entry) and one whale never takes more than 30 % of the desk's equity as margin
@@ -479,6 +485,7 @@ def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list,
     worst = min(dec, key=lambda t: t["pnl"]) if dec else None
     copies = {d: copy_test(dec, candles, d) for d in DELAYS_MIN}
     levs = [p["lev"] for p in positions if p.get("lev")]
+    hist_levs = [_f(t.get("lev")) for t in trips if _f(t.get("lev"))] + [_f(x) for x in levs if _f(x)]
     src = c.get("src", "hl")
     p = {"src": src, "src_ru": SRC_RU.get(src, src), "addr": c["addr"], "short": c.get("short") or (c["addr"][:6] + "…" + c["addr"][-4:]), "name": c.get("name") or "",
          "account": round(c.get("account") or 0), "pnl_all": round(c.get("pnl_all") or 0), "pnl_m_lb": round(c.get("pnl_m") or 0),
@@ -491,6 +498,7 @@ def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list,
          "coins": coins[:6], "n_coins": len(coins), "best": best, "worst": worst,
          "best_share": round(best["pnl"] / gp, 2) if best and gp > 0 else None,
          "lev_now": round(st.median(levs), 1) if levs else None, "positions": positions[:8],
+         "lev_med": round(st.median(hist_levs), 1) if hist_levs else None,
          "recent": sorted(dec, key=lambda t: -t["close_t"])[:12], "copy": {str(d): v for d, v in copies.items()},
          "portfolio": pf_stats, "too_active": too_active, "open_trips": len(open_tr), "open_upnl": round(open_upnl, 2),
          "open_loss": round(open_loss, 2), "hidden_open": len(hid), "hidden_loss_n": len(hid_loss),
@@ -869,6 +877,35 @@ def copy_ok(p: dict) -> bool:
     return bool(c.get("n")) and (c.get("avg_pct") if c.get("avg_pct") is not None else -1) > 0
 
 
+# 05.11 09:52 (owner: «деньги должны работать … где-то лояльнее, где-то скругляем углы»): how much of the desk's equity may sit in
+# copies — the rolling 14-day record decides: PF > 1.5 and drawdown < 5 % → up to 90 %; PF ≥ 1 and drawdown < 10 % (or too few trades
+# to judge) → 75 %; worse → 50 %. The per-trade caps of the real account (2 % risk, 3 % day stop, stops at OKX) never change.
+UTIL_GOOD, UTIL_BASE, UTIL_BAD = 0.90, 0.75, 0.50
+UTIL_DAYS, UTIL_MIN_TRADES = 14, 5
+
+
+def util_cap(d: dict, now: int) -> tuple[float, dict]:
+    """(share of equity the copies may hold as margin, the 14-day record behind it)"""
+    since = now - UTIL_DAYS * DAY
+    cl = [c for c in d.get("closed") or [] if int(_f(c.get("closed_t"))) >= since]
+    gp = sum(_f(c.get("pnl")) for c in cl if _f(c.get("pnl")) > 0)
+    gl = -sum(_f(c.get("pnl")) for c in cl if _f(c.get("pnl")) < 0)
+    pf = (gp / gl) if gl > 0 else (99.0 if gp > 0 else None)
+    vals = [v for t, v in (d.get("history") or []) if t >= since] or [d.get("equity") or d.get("start") or DESK_START]
+    peak, dd = vals[0], 0.0
+    for v in vals:
+        peak = max(peak, v)
+        dd = max(dd, (peak - v) / peak if peak else 0.0)
+    rec = {"trades": len(cl), "pf": None if pf is None else round(pf, 2), "dd_pct": round(dd * 100, 2), "days": UTIL_DAYS}
+    if len(cl) < UTIL_MIN_TRADES:
+        return UTIL_BASE, {**rec, "why_ru": f"мало сделок за {UTIL_DAYS} дней ({len(cl)}) — базовая загрузка {UTIL_BASE * 100:.0f}%"}
+    if pf is not None and pf > 1.5 and dd < 0.05:
+        return UTIL_GOOD, {**rec, "why_ru": f"за {UTIL_DAYS} дней PF {pf:.2f} > 1,5 и просадка {dd * 100:.1f}% < 5% — загрузка до {UTIL_GOOD * 100:.0f}%"}
+    if pf is not None and pf >= 1.0 and dd < 0.10:
+        return UTIL_BASE, {**rec, "why_ru": f"за {UTIL_DAYS} дней PF {pf:.2f}, просадка {dd * 100:.1f}% — загрузка до {UTIL_BASE * 100:.0f}%"}
+    return UTIL_BAD, {**rec, "why_ru": f"за {UTIL_DAYS} дней PF {pf if pf is None else round(pf, 2)}, просадка {dd * 100:.1f}% — осторожно, загрузка до {UTIL_BAD * 100:.0f}%"}
+
+
 def expected_slots(quality: dict | None, follow: list, now: int) -> int:
     """copies still expected today: the followed whales' decisions per day × the share of the UTC day left, at least MIN_SLOTS"""
     left = 1 - (now % DAY) / DAY
@@ -1008,26 +1045,34 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             continue
         eq = d["cash"] + sum(mark(o) for o in d["open"])
         used = sum(_f(o.get("margin")) for o in d["open"] if o["whale"] == addr)
-        free = eq - sum(_f(o.get("margin")) for o in d["open"])
+        ucap, _rec = util_cap(d, now)
+        free = ucap * eq - sum(_f(o.get("margin")) for o in d["open"])        # 05.11: up to the adaptive utilisation target
         # 04.11 22:38 (owner): free margin ÷ the copies still expected today, never past the soft per-whale cap
         margin = round(min(free / expected_slots(quality, follow, now), WHALE_CAP * eq - used), 2)
         if margin < MIN_COPY_MARGIN * eq:
             ev = {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
                   "why": (f"у этого кита уже {used / eq * 100:.0f}% счёта — предел {WHALE_CAP * 100:.0f}% на кита" if used + MIN_COPY_MARGIN * eq > WHALE_CAP * eq
-                          else f"свободной маржи {free / eq * 100:.0f}% счёта — весь бюджет уже в позициях")}
+                          else f"в позициях уже {ucap * 100 - free / eq * 100:.0f}% счёта — предел загрузки сейчас {ucap * 100:.0f}% ({_rec['why_ru']})")}
             if kind == "join":
                 note_wait(key, ev)
             else:
                 d["events"].append(ev)
             continue
-        lev = min(max(1.0, p.get("lev") or 1.0), DESK_LEV_CAP)
         stp, src = stop_for(p["side"], px, p.get("sl"))
+        w_lev = _f(p.get("lev")) or _f(((quality or {}).get(addr) or {}).get("lev_med")) or 1.0
+        lev = min(max(1.0, w_lev), DESK_LEV_CAP)
+        liq_lev = max(1.0, float(int(LIQ_ROOM / (abs(px - stp) / px) + 1e-9))) if px and stp else lev
+        lev_note = None
+        if lev > liq_lev:
+            lev_note = f"плечо кита {lev:g}× → {liq_lev:g}×: при {lev:g}× ликвидация наступила бы раньше нашего стопа"
+            lev = liq_lev
         o = {"whale": addr, "coin": coin, "side": p["side"], "entry": px, "opened_t": now, "margin": margin, "lev": lev,
              "notional": round(margin * lev, 2), "whale_entry": p.get("entry"), "whale_notional": p.get("notional"),
-             "whale_lev": p.get("lev"), "stop": round(stp, 8), "stop_src": src, "join": kind == "join", "gap_pct": gap_pct}
+             "whale_lev": p.get("lev"), "lev_src": "кит" if _f(p.get("lev")) else "медиана кита" if w_lev != 1.0 else "нет данных",
+             "lev_note": lev_note, "stop": round(stp, 8), "stop_src": src, "join": kind == "join", "gap_pct": gap_pct}
         d["open"].append(o)
         d["events"].append({"t": now, "kind": "join" if kind == "join" else "open", "coin": coin, "side": p["side"], "whale": addr,
-                            "px": px, "whale_entry": p.get("entry"), "gap_pct": gap_pct, "lev": lev})
+                            "px": px, "whale_entry": p.get("entry"), "gap_pct": gap_pct, "lev": lev, "lev_note": lev_note})
     d["join_wait"] = wait_now
     for o in d["open"]:                                        # copies opened before 04.11 get their protective stop now
         if not o.get("stop"):
@@ -1040,6 +1085,8 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
     d["equity"] = round(eq, 2)
     # 04.11 22:38: how much of the whales budget works — margin in positions ÷ equity
     d["util_pct"] = round(sum(_f(o.get("margin")) for o in d["open"]) / eq * 100, 1) if eq > 0 else 0.0
+    uc, ur = util_cap(d, now)
+    d["util_cap_pct"], d["util_rule"] = round(uc * 100), ur
     d["history"].append([now, round(eq, 2)])
     if len(d["history"]) > 2000:
         d["history"] = d["history"][::2]
@@ -1094,7 +1141,7 @@ def desk_public(d: dict, names: dict) -> dict:
         peak = max(peak, v); dd = max(dd, (peak - v) / peak * 100 if peak else 0)
     lab = lambda a: names.get(a) or (a[:6] + "…" + a[-4:])
     return {"name_ru": "Киты · копирование топ-5", "start": d["start"], "started": d.get("started"), "equity": d.get("equity", d["start"]),
-            "util_pct": d.get("util_pct"), "live": d.get("live"),
+            "util_pct": d.get("util_pct"), "util_cap_pct": d.get("util_cap_pct"), "util_rule": d.get("util_rule"), "live": d.get("live"),
             "pnl_usd": round(d.get("equity", d["start"]) - d["start"], 2), "pnl_pct": round((d.get("equity", d["start"]) / d["start"] - 1) * 100, 2),
             "trades": len(cl), "wins": wins, "winrate": round(wins / len(cl), 3) if cl else None, "max_dd_pct": round(dd, 2),
             "open": [{**o, "whale_ru": lab(o["whale"])} for o in d.get("open") or []],
@@ -1110,7 +1157,7 @@ def desk_public(d: dict, names: dict) -> dict:
             "rules_ru": f"Старт $10 000. Повторяем новые позиции топ-5 китов, замеченные между двумя проверками (сервер смотрит раз в ~30 мин), "
                         f"и входим в их уже открытые позиции, если цена не хуже входа кита больше чем на {JOIN_MAX * 100:g}% и кит не в минусе "
                         f"больше чем на {JOIN_BETTER * 100:g}% по цене (иначе ждём его следующую сделку); первыми — киты с ≥ {GOOD_WIN * 100:.0f}% прибыльных решений и PF ≥ {GOOD_PF:g} за 60 дней (с открытыми позициями): "
-                        f"вход по текущей цене, маржа {DESK_MARGIN * 100:.0f}% счёта, плечо как у кита, но не больше {DESK_LEV_CAP:.0f}×, не больше "
+                        f"вход по текущей цене, маржа {DESK_MARGIN * 100:.0f}% счёта, плечо как у кита (скрыто — его обычное), не больше {DESK_LEV_CAP:.0f}× и так, чтобы ликвидация была дальше стопа, не больше "
                         f"{DESK_MAX_OPEN} позиций и одна на монету, на одного кита — не больше {WHALE_CAP * 100:.0f}% счёта. Стоп у каждой копии: стоп кита, "
                         f"если он стоит на бирже, иначе −{DESK_STOP * 100:g}% от входа. Выходим, когда кит закрыл или развернул позицию, или по стопу. "
                         f"Комиссии {COST_PCT}% за сделку."}
@@ -1456,7 +1503,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
         profs.append(p)
     if profs:                                  # the 60-day record per whale (incl. open), read by the next run's desk (preference order)
         kv_set(conn, "quality", {p["addr"]: {"win": p.get("win"), "pf": p.get("pf"), "pnl_30d": p.get("pnl_30d"), "pnl_60d": p.get("pnl_60d"),
-                                             "per_day": p.get("per_day")} for p in profs})
+                                             "per_day": p.get("per_day"), "lev_med": p.get("lev_med")} for p in profs})
     # 04.11 (owner + research): rank by PF counting open positions, then by 60-day P&L
     elig = sorted([p for p in profs if p["eligible"]], key=lambda p: (-(p["pf"] if p["pf"] is not None else -99), -p["pnl_60d"]))
     top = elig[:TOP_N]
@@ -1469,8 +1516,15 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     # entries cannot be seen, so «following» him only produced false «кит закрыл» exits on 30.10)
     # 04.11 22:35: + src / record / signals a day for the server's live copy loop (whale_live) and its sizing
     follow_new = [{"addr": p["addr"], "short": p["short"], "name": p["name"], "src": p["src"], "win": p.get("win"), "pf": p.get("pf"),
-                   "decisions": p.get("decisions"), "hold_med_h": p.get("hold_med_h"), "per_day": p.get("per_day"), "pnl_60d": p.get("pnl_60d")}
+                   "decisions": p.get("decisions"), "hold_med_h": p.get("hold_med_h"), "per_day": p.get("per_day"), "pnl_60d": p.get("pnl_60d"),
+                   "lev_med": p.get("lev_med")}
                   for p in elig if p.get("copy_ok", copy_ok(p)) and not hidden(p.get("positions") or [])][:FOLLOW_N]
+    fset = {x["addr"] for x in follow_new}
+    bench = [{"addr": p["addr"], "name": p["name"] or p["short"], "src": p["src"], "win": p.get("win"), "pf": p.get("pf"), "decisions": p.get("decisions"),
+              "hold_med_h": p.get("hold_med_h"), "pnl_60d": p.get("pnl_60d"),
+              "why_ru": ("скрывает открытые позиции" if hidden(p.get("positions") or []) else
+                         f"тест копирования с опозданием {COPY_DELAY} мин в минусе" if not p.get("copy_ok", copy_ok(p)) else "за пределами десятки")}
+             for p in elig if p["addr"] not in fset][:BENCH_N]
     # 04.11: a complete run always sets the list — also when the stricter bar leaves fewer (or no) whales; a partial run only
     # fills an empty list. Who left the list and why is kept for the panel and the report.
     if (complete and profs) or (follow_new and not study.get("top")):        # a run that studied nobody never empties the list
@@ -1505,7 +1559,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             excluded[k] = excluded.get(k, 0) + 1
     st_now = kv_get(conn, "study") or {}
     out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []),
-           "follow_dropped": st_now.get("dropped", []), "archive": arch,
+           "follow_dropped": st_now.get("dropped", []), "archive": arch, "bench": bench,
            # 04.11 21:14: per source — candidates studied, passed the 60-day bar, followed (+ sources checked and not connectable)
            "by_source": {k: {"studied": sum(1 for p in profs if p["src"] == k), "passed": sum(1 for p in elig if p["src"] == k),
                              "following": sum(1 for x in st_now.get("top", []) if (WS.src_of(x["addr"]) or ("okx" if x["addr"].startswith("okx:") else "hl")) == k)}

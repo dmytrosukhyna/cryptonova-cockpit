@@ -287,7 +287,9 @@
     { id: 'spot', name: 'Спот', short: 'Спот', icon: 'spot' },
     { id: 'futures', name: 'Фьючерсы', short: 'Фьючерсы', icon: 'futures' },
     { id: 'strategies', name: 'Стратегии', short: 'Стратегии', icon: 'strategies' },
-    { id: 'whales', name: 'Киты', short: 'Киты', icon: 'whales' },      // 04.11: watchlist — crypto + stock market (vip/whales.js)
+    // 04.11: watchlist — crypto + stock market (vip/whales.js). 05.11 (owner: «то, что мы копируем китов, — только для нашего
+    // внутреннего понимания»): owner-only — hidden from the menu and refused by the router unless CNAuth.state.isOwner
+    { id: 'whales', name: 'Киты', short: 'Киты', icon: 'whales', owner: true },
     { id: 'opps', name: 'Другие возможности', short: 'Другое', icon: 'opps' },
     { id: 'demo', name: 'Live Demo', short: 'Live', icon: 'demo' },
     { id: 'system', name: 'Система', short: 'Система', icon: 'system' },
@@ -295,13 +297,14 @@
   V.parse = () => {
     const h = (location.hash || '').replace(/^#\/?/, '');
     const [id, ...rest] = h.split('/');
-    const r = V.ROUTES.find((x) => x.id === id) ? id : 'overview';
+    const rt = V.ROUTES.find((x) => x.id === id);
+    const r = rt && (!rt.owner || V.auth.owner()) ? id : 'overview';
     return { id: r, arg: rest.length ? decodeURIComponent(rest.join('/')) : null };
   };
   V.go = (id, arg) => { const h = '#/' + id + (arg ? '/' + encodeURIComponent(arg) : ''); if (location.hash === h) V.render(); else location.hash = h; };
 
   function paintNav(cur) {
-    const html = (short) => V.ROUTES.map((r) =>
+    const html = (short) => V.ROUTES.filter((r) => !r.owner || V.auth.owner()).map((r) =>
       `<a href="#/${r.id}" ${r.id === cur ? 'aria-current="page"' : ''}>${V.ico(r.icon)}<span>${esc(short ? r.short : r.name)}</span></a>`).join('');
     document.getElementById('navSide').innerHTML = html(false);
     document.getElementById('navBottom').innerHTML = html(true);

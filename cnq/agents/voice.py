@@ -125,13 +125,14 @@ def whales_line(out: str) -> str | None:
         return None
     c = wd.copies(out)
     oc, cc = c["open_copies"], c["copies_closed"]
-    s = f"Фьючерсы — это копии сделок {len(fol[:5])} проверенных трейдеров копитрейдинга" + ("" if oc else ", открытых копий сейчас нет")
+    # 05.11 (owner 09:52): spoken words say «система CRYPTO NOVA», never the method (whales, copies, traders)
+    s = "Фьючерсы ведёт система CRYPTO NOVA" + ("" if oc else ", открытых сделок сейчас нет")
     if cc:
         s += f"; за сутки закрыли {deals(len(cc), acc=True)}, итог {'около нуля' if abs(c['copies_usd']) < 5 else result(c['copies_usd'])}"
     s += "."
     d = wd.desk(out)
     if d:
-        s += f" Демо-стол «Киты» на 10 тысяч долларов: {'около нуля' if abs(d['pnl_usd']) < 5 else result(d['pnl_usd'])}."
+        s += f" Демо-счёт системы на 10 тысяч долларов: {'около нуля' if abs(d['pnl_usd']) < 5 else result(d['pnl_usd'])}."
     return s
 
 

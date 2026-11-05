@@ -132,8 +132,8 @@ def test_voice_brief_says_what_the_panel_shows(tmp_path):
     (d / "whales_top.json").write_text(json.dumps({"following": [{"addr": f"bn:{i}", "name": f"鸿{i}", "src": "bn"} for i in range(5)],
                                                    "desk": {"start": 10_000.0, "equity": 10_500.0, "pnl_usd": 500.0, "trades": 4, "wins": 3}}))
     text = voice.compose(str(d))
-    assert "Фьючерсы — это копии сделок 5 проверенных трейдеров копитрейдинга, открытых копий сейчас нет." in text
-    assert "Демо-стол «Киты» на 10 тысяч долларов: в плюсе на 500 долларов." in text and "鸿" not in text
+    assert "Фьючерсы ведёт система CRYPTO NOVA, открытых сделок сейчас нет." in text
+    assert "Демо-счёт системы на 10 тысяч долларов: в плюсе на 500 долларов." in text and "鸿" not in text and "кит" not in text.lower()
     assert "Фьючерсы реального счёта: открытых сделок нет; закрыто с начала: 1; итог около нуля." in text
     assert voice.compose.keys["parts"] == {"fut": 100, "spot": 300}          # the panel's keys are unchanged (it still plays the audio)
     assert voice.spoken("CRYPTO NOVA портфель") == "Крипто Но́ва портфель"

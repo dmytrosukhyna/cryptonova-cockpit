@@ -33,7 +33,7 @@ WEEK_MS = 7 * DAY_MS
 WORDS_PER_MIN = 130          # calm live speech
 SHOW_MIN_PER_SLIDE = 0.3     # time to switch and point at the card
 # 05.11: since 04.11 the real OKX account copies the top-5 verified traders; every other account of the deck is demo
-DISCLAIMER = "Не финансовая рекомендация. Реальный счёт — копии сделок проверенных трейдеров и ядро спота; остальные счета — демо."
+DISCLAIMER = "Не финансовая рекомендация. Реальный счёт ведёт система CRYPTO NOVA; остальные счета — демо."
 
 
 # ------------------------------------------------------------------ small helpers
@@ -561,38 +561,36 @@ def strategy_rows(ctx: dict) -> list[dict]:
 
 
 def s_whales(ctx: dict, now_ms: int) -> dict | None:
-    """05.11 (owner: «вся система должна быть подключена к лучшим трейдерам мира»): the real account and the «Киты» desk —
-    who we copy, the copies of the week, the demo copy desk, one fund / on-chain highlight. No Chinese nicknames in speech."""
+    """05.11: the real account and the system's futures — positions, the week's trades and result, the demo account on the same
+    signals, one market line. Owner 05.11 09:52: «везде должна быть система CRYPTO NOVA» — never the method (whales, copying)."""
     d = ctx.get("_dir")
     if not d:
         return None
     from . import whale_digest as wd
-    fol = wd.following(d)
-    if not fol:
-        return None
     real = _load(d, "public_real.json") or {}
+    if real.get("equity_usd") is None:
+        return None
     c = wd.copies(d, now_ms, 7 * 24)
     desk = wd.desk(d)
-    B, S = [], ["Как система работает сейчас: фьючерсы реального счёта повторяют сделки проверенных трейдеров, спот — ядро."]
-    if real.get("equity_usd") is not None:
-        B.append(f"Реальный счёт OKX: {usd(real['equity_usd'], sign=False)}, с 22.10 {usd(real.get('pnl_usd') or 0)} ({pct((real.get('pnl_pct') or 0) / 100)})")
-        S.append(f"Реальный счёт на OKX — {say_usd(real['equity_usd'], sign=False)}; с 22 октября {say_usd(real.get('pnl_usd') or 0)}.")
-    B.append(f"Копируем {len(fol[:5])} лид-трейдеров: " + ", ".join(f["name"] for f in fol[:5]))
-    S.append(f"Копируем {len(fol[:5])} лид-трейдеров копитрейдинга: у каждого за 60 дней от 20 решений и от 70% сделок в плюсе.")
-    oc, cc = c["open_copies"], c["copies_closed"]
-    B.append(f"Копии: в работе {len(oc)}, за неделю закрыто {len(cc)}, итог {usd(c['copies_usd'])}")
-    S.append(f"Сейчас в работе {len(oc)} {plural(len(oc), 'копия', 'копии', 'копий')}, у каждой стоп на бирже; за неделю закрыто {len(cc)}, "
-             f"итог {say_usd(c['copies_usd'])}.")
+    opn, cl = c["open"], c["closed"]
+    wk = sum(x["pnl"] for x in cl)
+    B, S = [], ["Как работает реальный счёт: фьючерсы и спот ведёт система CRYPTO NOVA, у каждой сделки стоп на бирже."]
+    B.append(f"Реальный счёт OKX: {usd(real['equity_usd'], sign=False)}, с 22.10 {usd(real.get('pnl_usd') or 0)} ({pct((real.get('pnl_pct') or 0) / 100)})")
+    S.append(f"Реальный счёт на OKX — {say_usd(real['equity_usd'], sign=False)}; с 22 октября {say_usd(real.get('pnl_usd') or 0)}.")
+    B.append("Позиции: " + (", ".join(f"{o['coin']} {'лонг' if o['side'] == 'long' else 'шорт'}" for o in opn[:5]) if opn else "открытых нет"))
+    B.append(f"За неделю закрыто сделок: {len(cl)}, итог {usd(wk)}")
+    S.append(f"Сейчас открыто {len(opn)} {plural(len(opn), 'позиция', 'позиции', 'позиций')}, у каждой стоп на бирже; за неделю закрыто "
+             f"{len(cl)} {plural(len(cl), 'сделка', 'сделки', 'сделок')}, итог {say_usd(wk)}.")
     if desk:
-        B.append(f"Демо-стол «Киты» ($10 000): {usd(desk['pnl_usd'])}, сделок {desk['trades']}, в плюсе {desk['wins']}")
-        S.append(f"Демо-стол «Киты» на 10 тысяч долларов: {say_usd(desk['pnl_usd'])}, сделок {desk['trades']}.")
+        B.append(f"Демо-счёт системы ($10 000): {usd(desk['pnl_usd'])}, сделок {desk['trades']}, в плюсе {desk['wins']}")
+        S.append(f"Демо-счёт на тех же сигналах, 10 тысяч долларов: {say_usd(desk['pnl_usd'])}, сделок {desk['trades']}.")
     hl = wd.onchain_line(d) or wd.funds_line(d, now_ms)
     if hl:
         B.append(hl.rstrip("."))
-    return slide("whales", "Киты: кого копируем", "kpi", B[:5], S,
-                 {"following": [f["name"] for f in fol[:5]], "open_copies": len(oc), "week_copies": len(cc), "week_copies_usd": c["copies_usd"],
+    return slide("whales", "Система CRYPTO NOVA: реальный счёт", "kpi", B[:5], S,
+                 {"open": len(opn), "week_closed": len(cl), "week_usd": round(wk, 2),
                   "desk": {k: desk[k] for k in ("pnl_usd", "trades", "wins")} if desk else None},
-                 "Покажи верх панели: реальный счёт OKX, затем блок «Киты» — список трейдеров и открытые копии.")
+                 "Покажи верх панели: реальный счёт OKX и открытые позиции.")
 
 
 def s_strategies(ctx: dict, now_ms: int) -> dict | None:
@@ -657,14 +655,14 @@ def s_now(ctx: dict, now_ms: int) -> dict | None:
     main = [o for o in opens if o["desk"] in ("cons", "bal", "aggr")]
     rr = radar_rows(scan) if scan else []
     B, S = [], ["Что делаем прямо сейчас."]
-    try:   # 05.11: the real futures first — the open copies of the traders we follow
+    try:   # 05.11: the real futures first — the system's open positions
         from . import whale_digest as wd
         oc = wd.copies(ctx["_dir"], now_ms)["open_copies"] if ctx.get("_dir") else []
     except Exception:  # noqa: BLE001
         oc = []
     if oc:
-        B.append("Реальный счёт, копии трейдеров: " + ", ".join(f"{o['coin']} {'лонг' if o['side'] == 'long' else 'шорт'}" for o in oc[:5]))
-        S.append(f"На реальном счёте открыто {len(oc)} {plural(len(oc), 'копия', 'копии', 'копий')} сделок проверенных трейдеров, у каждой стоп на бирже.")
+        B.append("Реальный счёт, позиции системы: " + ", ".join(f"{o['coin']} {'лонг' if o['side'] == 'long' else 'шорт'}" for o in oc[:5]))
+        S.append(f"На реальном счёте открыто {len(oc)} {plural(len(oc), 'позиция', 'позиции', 'позиций')} системы, у каждой стоп на бирже.")
     if main:
         B.append("Старые правила (демо): " + "; ".join(f"{o['symbol']} {'лонг' if o['side'] == 'LONG' else 'шорт'} ({o['rule_ru']}) {usd(o['open_pnl_usd'])}" for o in main[:3]))
         S.append("На демо-счетах старых правил открыто: " + ", ".join(f"{o['symbol']} {'лонг' if o['side'] == 'LONG' else 'шорт'} по правилу «{o['rule_ru']}»" for o in main[:3]) + ".")
@@ -830,8 +828,8 @@ def s_plan(ctx: dict, now_ms: int) -> dict | None:
     scan = (ctx.get("paper") or {}).get("scan") or {}
     if scan.get("need_breadth") is not None:
         facts["need_breadth"] = scan["need_breadth"]
-    B.append("Фьючерсы: копии сделок 5 проверенных трейдеров; спот — ядро BTC, ETH, SOL")
-    S.append("Дальше система работает так же: фьючерсы повторяют сделки проверенных трейдеров, спот держит ядро — биткоин, эфир и солану.")
+    B.append("Фьючерсы и спот ведёт система CRYPTO NOVA; основа спота — BTC, ETH, SOL")
+    S.append("Дальше система работает так же: фьючерсы и спот ведёт система CRYPTO NOVA, основа спота — биткоин, эфир и солана.")
     B.append(DISCLAIMER)
     S.append("Это не финансовая рекомендация; кроме реального счёта, все счета — демо. Спасибо, что были с нами!")
     return slide("plan", "Итог и план на неделю", "chartCard", B[-5:] if len(B) > 5 else B, S, facts,

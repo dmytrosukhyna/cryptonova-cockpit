@@ -495,6 +495,85 @@ W55: dict[str, dict[str, str]] = {
 }
 T.update(W55)
 
+
+# 05.11 (owner, 09:52: «нигде не надо писать, что это копии китов, копии трейдеров … везде должна быть система CRYPTO NOVA … людям
+# нужен только результат»): the real futures trade is explained as a signal of the system CRYPTO NOVA — the market at the entry
+# (trend, levels, BTC, funding, open interest), the plan (entry, stop, target) and the exit rule. No whale, no copy, no trader.
+# The document keeps the build 55 shape (title / signal / checks / plan / summary / target_line / sections …) so the app renders it.
+SY: dict[str, dict[str, str]] = {
+    "sy.title": _w("Сигнал системы CRYPTO NOVA", "CRYPTO NOVA system signal", "Сигнал системи CRYPTO NOVA", "Σήμα του συστήματος CRYPTO NOVA",
+                   "Señal del sistema CRYPTO NOVA"),
+    "sy.sig": _w("Система CRYPTO NOVA открыла сделку: {side} по {sym}.", "The CRYPTO NOVA system opened a trade: {side} on {sym}.",
+                 "Система CRYPTO NOVA відкрила угоду: {side} по {sym}.", "Το σύστημα CRYPTO NOVA άνοιξε συναλλαγή: {side} στο {sym}.",
+                 "El sistema CRYPTO NOVA abrió una operación: {side} en {sym}."),
+    "sy.sig.why": _w(" Вход — по сигналу системы с учётом состояния рынка; у сделки сразу стоит стоп на бирже.",
+                     " The entry follows the system's signal and the state of the market; the stop is on the exchange from the start.",
+                     " Вхід — за сигналом системи з урахуванням стану ринку; стоп одразу стоїть на біржі.",
+                     " Η είσοδος γίνεται με σήμα του συστήματος και με βάση την κατάσταση της αγοράς· το stop μπαίνει αμέσως στο ανταλλακτήριο.",
+                     " La entrada sigue la señal del sistema y el estado del mercado; el stop está en el exchange desde el inicio."),
+    "sy.chk.trend": _w("Тренд {sym}: {x}", "{sym} trend: {x}", "Тренд {sym}: {x}", "Τάση {sym}: {x}", "Tendencia de {sym}: {x}"),
+    "sy.tr.bull": _w("цена выше средней за 200 дней", "the price is above its 200-day average", "ціна вища за середню за 200 днів",
+                     "η τιμή είναι πάνω από τον μέσο όρο 200 ημερών", "el precio está por encima de su media de 200 días"),
+    "sy.tr.bear": _w("цена ниже средней за 200 дней", "the price is below its 200-day average", "ціна нижча за середню за 200 днів",
+                     "η τιμή είναι κάτω από τον μέσο όρο 200 ημερών", "el precio está por debajo de su media de 200 días"),
+    "sy.tr.up": _w("среднесрочно вверх", "up over the medium term", "середньостроково вгору", "ανοδική μεσοπρόθεσμα", "al alza a medio plazo"),
+    "sy.tr.down": _w("среднесрочно вниз", "down over the medium term", "середньостроково вниз", "πτωτική μεσοπρόθεσμα", "a la baja a medio plazo"),
+    "sy.chk.levels": _w("Уровни при входе: {x}", "Levels at the entry: {x}", "Рівні під час входу: {x}", "Επίπεδα στην είσοδο: {x}",
+                        "Niveles al entrar: {x}"),
+    "sy.chk.stop": _w("Стоп {sp} от входа стоит на бирже сразу", "The stop, {sp} from the entry, is on the exchange at once",
+                      "Стоп {sp} від входу одразу стоїть на біржі", "Το stop, {sp} από την είσοδο, μπαίνει αμέσως στο ανταλλακτήριο",
+                      "El stop, a {sp} de la entrada, está en el exchange desde el inicio"),
+    "sy.desk": _w("Те же сигналы на демо-счёте системы с {d}: сделок {n}, в плюсе {w}.",
+                  "The same signals on the system's demo account since {d}: {n} trades, {w} in profit.",
+                  "Ті самі сигнали на демо-рахунку системи з {d}: угод {n}, у плюсі {w}.",
+                  "Τα ίδια σήματα στον demo λογαριασμό του συστήματος από {d}: {n} συναλλαγές, κερδοφόρες {w}.",
+                  "Las mismas señales en la cuenta demo del sistema desde el {d}: {n} operaciones, {w} con ganancia."),
+    "sy.plan": _w("Вход {entry}, стоп {stop} ({sp} от входа), цель {tgt}. Система закрывает позицию при развороте сигнала или по стопу.",
+                  "Entry {entry}, stop {stop} ({sp} from the entry), target {tgt}. The system closes the position when the signal reverses or at the stop.",
+                  "Вхід {entry}, стоп {stop} ({sp} від входу), ціль {tgt}. Система закриває позицію при розвороті сигналу або за стопом.",
+                  "Είσοδος {entry}, stop {stop} ({sp} από την είσοδο), στόχος {tgt}. Το σύστημα κλείνει τη θέση όταν αντιστραφεί το σήμα ή στο stop.",
+                  "Entrada {entry}, stop {stop} ({sp} de la entrada), objetivo {tgt}. El sistema cierra la posición cuando la señal se invierte o en el stop."),
+    "sy.exit": _w("Сигнал развернулся — система закрыла позицию.", "The signal reversed, and the system closed the position.",
+                  "Сигнал розвернувся — система закрила позицію.", "Το σήμα αντιστράφηκε και το σύστημα έκλεισε τη θέση.",
+                  "La señal se invirtió y el sistema cerró la posición."),
+    "sy.sum": _w("Сигнал системы CRYPTO NOVA: {side} {sym}. Цель {tgt} ({tp}), стоп {stop}.",
+                 "CRYPTO NOVA system signal: {side} {sym}. Target {tgt} ({tp}), stop {stop}.",
+                 "Сигнал системи CRYPTO NOVA: {side} {sym}. Ціль {tgt} ({tp}), стоп {stop}.",
+                 "Σήμα του συστήματος CRYPTO NOVA: {side} {sym}. Στόχος {tgt} ({tp}), stop {stop}.",
+                 "Señal del sistema CRYPTO NOVA: {side} {sym}. Objetivo {tgt} ({tp}), stop {stop}."),
+    "sy.sum0": _w("Сигнал системы CRYPTO NOVA: {side} {sym}. Стоп стоит на бирже; система закроет позицию при развороте сигнала или по стопу.",
+                  "CRYPTO NOVA system signal: {side} {sym}. The stop is on the exchange; the system closes the position when the signal reverses or at the stop.",
+                  "Сигнал системи CRYPTO NOVA: {side} {sym}. Стоп стоїть на біржі; система закриє позицію при розвороті сигналу або за стопом.",
+                  "Σήμα του συστήματος CRYPTO NOVA: {side} {sym}. Το stop είναι στο ανταλλακτήριο· το σύστημα κλείνει τη θέση όταν αντιστραφεί το σήμα ή στο stop.",
+                  "Señal del sistema CRYPTO NOVA: {side} {sym}. El stop está en el exchange; el sistema cierra la posición cuando la señal se invierte o en el stop."),
+    "sy.tline": _w("Цель {tgt} ({tp}{usd}). Выход: разворот сигнала системы или стоп {stop}.",
+                   "Target {tgt} ({tp}{usd}). Exit: the system's signal reverses or the stop {stop}.",
+                   "Ціль {tgt} ({tp}{usd}). Вихід: розворот сигналу системи або стоп {stop}.",
+                   "Στόχος {tgt} ({tp}{usd}). Έξοδος: αντιστροφή του σήματος του συστήματος ή stop {stop}.",
+                   "Objetivo {tgt} ({tp}{usd}). Salida: la señal del sistema se invierte o el stop {stop}."),
+    "sy.s.signal": _w("Сигнал", "Signal", "Сигнал", "Σήμα", "Señal"),
+    "sy.s.entry": _w("Вход", "Entry", "Вхід", "Είσοδος", "Entrada"),
+    "sy.s.stop": _w("Стоп", "Stop", "Стоп", "Stop", "Stop"),
+    "sy.signal.t": _w("Система CRYPTO NOVA открыла {side} {sym}{at}.", "The CRYPTO NOVA system opened a {side} on {sym}{at}.",
+                      "Система CRYPTO NOVA відкрила {side} {sym}{at}.", "Το σύστημα CRYPTO NOVA άνοιξε {side} στο {sym}{at}.",
+                      "El sistema CRYPTO NOVA abrió un {side} en {sym}{at}."),
+    "sy.at": _w(" — {d}", " on {d}", " — {d}", " στις {d}", " el {d}"),
+    "sy.entry": _w("Вход по {e}.", "Entry at {e}.", "Вхід за {e}.", "Είσοδος στα {e}.", "Entrada a {e}."),
+    "sy.stop": _w("{stop} ({sp} от входа). Стоп стоит на бирже OKX и сработает, даже если система недоступна.",
+                  "{stop} ({sp} from the entry). The stop sits on OKX and works even if the system is offline.",
+                  "{stop} ({sp} від входу). Стоп стоїть на біржі OKX і спрацює, навіть якщо система недоступна.",
+                  "{stop} ({sp} από την είσοδο). Το stop βρίσκεται στο OKX και λειτουργεί ακόμη κι αν το σύστημα δεν είναι διαθέσιμο.",
+                  "{stop} ({sp} de la entrada). El stop está en OKX y funciona aunque el sistema no esté disponible."),
+    "sy.exit.tgt": _w("Цель — {tgt} ({tp} от входа{usd}).", "Target: {tgt} ({tp} from the entry{usd}).", "Ціль — {tgt} ({tp} від входу{usd}).",
+                      "Στόχος: {tgt} ({tp} από την είσοδο{usd}).", "Objetivo: {tgt} ({tp} desde la entrada{usd})."),
+    "sy.exit.when": _w(" Система закрывает позицию при развороте сигнала или по стопу {stop}.",
+                       " The system closes the position when the signal reverses or at the stop {stop}.",
+                       " Система закриває позицію при розвороті сигналу або за стопом {stop}.",
+                       " Το σύστημα κλείνει τη θέση όταν αντιστραφεί το σήμα ή στο stop {stop}.",
+                       " El sistema cierra la posición cuando la señal se invierte o en el stop {stop}."),
+}
+T.update(SY)
+
 MONTHS = {"ru": ("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"),
           "uk": ("січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"),
           "en": ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November",
@@ -770,74 +849,60 @@ def flat_real_why(w: dict | None) -> dict | None:
 
 def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, desk: dict | None, caps: dict, ctx: dict,
              lang: str = DEFAULT, closed: bool = False) -> dict:
-    """build 54 (owner 04.11: «Почему вошли» for a copy said only «Сделка по правилам CRYPTO NOVA… 3 из 3»): a real copy of a whale's
-    trade explained — who the whale is and where it trades, its entry / leverage / size, its record, the market at the entry (when the
-    execution recorded it in public_real.json futures[].why), the copy's stop and its reference target (2R; the exit is with the whale).
-    [wd] the copy desk's trade, [rec] the whale's record, [why] the real trade's own «why» block (any of its fields may be missing)."""
+    """A real futures trade of the system's futures desk explained for people (owner 05.11 09:52: «сигнал системы CRYPTO NOVA»):
+    the market at the entry (trend from ctx["trend"], levels, BTC, funding, open interest — from real_why.json when recorded), the
+    plan (entry, stop, the 2R target) and the exit rule; the demo account on the same signals. [wd]/[rec] are used for nothing a
+    person sees (kept in the signature for the callers). The keys are those of build 55 so the app renders it unchanged."""
     why = why if isinstance(why, dict) else {}
     sym = str(row.get("sym") or "")
     side = str(row.get("side") or (wd or {}).get("side") or "").upper()
-    name = _pick(why, "whale_name", "whale_ru", "name") or (wd or {}).get("whale_ru") or _pick(rec, "name", "short") or ""
-    venue = str(_pick(why, "whale_venue", "venue") or _pick(rec, "src") or ("okx" if str((wd or {}).get("whale") or "").startswith("okx:")
-                else "hl" if str((wd or {}).get("whale") or "").startswith("0x") else "")).lower()
-    src = t(lang, f"rw.w.src.{venue}") if venue in ("okx", "hl") else None
-    sig = t(lang, "rw.w.sig", name=f"«{name}»" if name else "", src=f" ({src})" if src else "",
-            side=t(lang, "rw.w.short" if side == "SHORT" else "rw.w.long"), sym=sym).replace("«» ", "").replace(" ,", ",")
-    we = _pick(why, "whale_entry") or (wd or {}).get("whale_entry")
-    wl = _pick(why, "whale_lev") or (wd or {}).get("whale_lev")
-    wn = _pick(why, "whale_usd", "whale_notional") or (wd or {}).get("whale_notional")
-    if we:
-        sig += t(lang, "rw.w.pos", we=_price(float(we)), wl=t(lang, "rw.w.lev", l=_num(float(wl), 0)) if wl else "",
-                 wn=t(lang, "rw.w.size", u=_usd(float(wn), lang)) if wn and float(wn) >= 1000 else "")
-    sig += t(lang, "rw.w.why")
+    side_w = t(lang, "rw.w.short" if side == "SHORT" else "rw.w.long")
+    s_side = t(lang, "w5.short" if side == "SHORT" else "w5.long")
+    sig = t(lang, "sy.sig", side=side_w, sym=sym) + t(lang, "sy.sig.why")
     entry = row.get("entry") if not closed else row.get("open_px")
     stop = row.get("stop") if row.get("stop") is not None else _pick(why, "stop") or (wd or {}).get("stop")
     sp = abs(float(stop) / float(entry) - 1) * 100 if entry and stop else None
+    spx = (("+" if side == "SHORT" else "−") + _num(sp, 1) + "%") if sp is not None else None
+    tr = (ctx.get("trend") or {}).get(sym) or {}
+    tparts = []
+    if tr.get("long") in ("BULL", "BEAR"):
+        tparts.append(t(lang, "sy.tr.bull" if tr["long"] == "BULL" else "sy.tr.bear"))
+    if tr.get("mid") in ("LONG", "SHORT"):
+        tparts.append(t(lang, "sy.tr.up" if tr["mid"] == "LONG" else "sy.tr.down"))
+    lv = []
+    for key, k in (("rw.w.c.sup", "support"), ("rw.w.c.res", "resistance")):
+        v = _pick(why, k)
+        if v is not None:
+            lv.append(t(lang, key, v=_price(float(v))))
     checks = []
-    # the whale's record: the system's list (longer) first, else its 30 days from real_why.json
-    n, win = _pick(rec, "trips") or _pick(why, "whale_trades_30d"), _pick(rec, "win") if _pick(rec, "trips") else _pick(why, "whale_win_30d")
-    if n and win is not None:
-        w = float(win) * 100 if float(win) <= 1 else float(win)
-        checks.append({"t": t(lang, "rw.w.chk.list", n=f"{int(n):,}".replace(",", " "), w=int(round(w))), "ok": True})
-    p30 = _pick(why, "whale_pnl_30d") or _pick(rec, "pnl_30d")
-    if p30 is not None and float(p30) > 0:
-        checks.append({"t": t(lang, "rw.w.chk.30d", u="+" + _usd(float(p30), lang)), "ok": True})
-    if sp is not None:
-        checks.append({"t": t(lang, "rw.w.chk.stop", sp=("+" if side == "SHORT" else "−") + _num(sp, 1) + "%"), "ok": True})
+    if tparts:
+        checks.append({"t": t(lang, "sy.chk.trend", sym=sym, x=", ".join(tparts)), "ok": True})
+    if lv:
+        checks.append({"t": t(lang, "sy.chk.levels", x=", ".join(lv)), "ok": True})
+    if spx:
+        checks.append({"t": t(lang, "sy.chk.stop", sp=spx), "ok": True})
     checks.append({"t": t(lang, "rw.chk.fresh"), "ok": True})
     checks.append({"t": t(lang, "rw.chk.limits"), "ok": True})
     if caps.get("risk_pct") is not None and (row.get("lev") or caps.get("lev")):
         checks.append({"t": t(lang, "rw.chk.real", lev=_num(row.get("lev") or caps["lev"], 0),
                               risk=_pct(caps["risk_pct"], 1, False).replace(".0%", "%")), "ok": True})
-    hist = None
-    if n and win is not None:
-        w = float(win) * 100 if float(win) <= 1 else float(win)
-        pf = _pick(rec, "pf") or _pick(why, "whale_pf")
-        hist = t(lang, "rw.w.hist", n=f"{int(n):,}".replace(",", " "), w=int(round(w)),
-                 pf=t(lang, "rw.w.pf", x=_num(float(pf), 1)) if pf and 1 < float(pf) < 50 else "",
-                 d30=t(lang, "rw.w.d30", u=("+" if float(p30) > 0 else "") + _usd(float(p30), lang)) if p30 is not None else "")
     live = []
     if isinstance(desk, dict) and desk.get("trades") and desk.get("started"):
-        live.append(t(lang, "rw.w.desk", d=date_words(desk["started"], lang), n=int(desk["trades"]), w=int(desk.get("wins") or 0)))
+        live.append(t(lang, "sy.desk", d=date_words(desk["started"], lang), n=int(desk["trades"]), w=int(desk.get("wins") or 0)))
     rows = [p for g, p in ctx.get("closed_grades") or [] if g == "W"]
     live.append(t(lang, "rw.live", d=date_words(ctx["since"], lang), n=len(rows), w=sum(1 for p in rows if p > 0)) if rows
                 else t(lang, "rw.live0"))
-    plan = None
     tgt = _pick(why, "target_ref", "ref_target") or ref_target(entry, stop, side)
-    if entry and stop:
-        plan = t(lang, "rw.w.plan", entry=_price(float(entry)), stop=_price(float(stop)),
-                 sp=("+" if side == "SHORT" else "−") + _num(sp, 1) + "%", tgt=_price(float(tgt)) if tgt else "—")
+    plan = t(lang, "sy.plan", entry=_price(float(entry)), stop=_price(float(stop)), sp=spx,
+             tgt=_price(float(tgt)) if tgt else "—") if entry and stop else None
     ctx_parts = []
     for key, k in (("rw.w.c.btc", ("btc_24h", "btc_24h_pct", "btc24")), ("rw.w.c.fund", ("funding", "funding_pct")),
-                   ("rw.w.c.oi", ("oi_chg", "oi_24h", "oi_pct")), ("rw.w.c.sup", ("support",)), ("rw.w.c.res", ("resistance",))):
+                   ("rw.w.c.oi", ("oi_chg", "oi_24h", "oi_pct"))):
         v = _pick(why, *k)
-        if v is None:
-            continue
-        if key in ("rw.w.c.sup", "rw.w.c.res"):
-            ctx_parts.append(t(lang, key, v=_price(float(v))))
-        else:
+        if v is not None:
             ctx_parts.append(t(lang, key, v=_pct(float(v), 3 if key == "rw.w.c.fund" else 1)))
-    context = t(lang, "rw.w.ctx", x=", ".join(ctx_parts)) if ctx_parts else (str(why["context"]) if isinstance(why.get("context"), str) else None)
+    mk_parts = tparts + lv + ctx_parts
+    context = t(lang, "rw.w.ctx", x=", ".join(mk_parts)) if mk_parts else None
     risk = None
     lev = row.get("lev") or caps.get("lev")
     cap = ctx.get("budget_usd") * caps["risk_pct"] / 100 if ctx.get("budget_usd") and caps.get("risk_pct") is not None else None
@@ -850,14 +915,42 @@ def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, des
     if closed and row.get("pnl_usd") is not None and row.get("move_pct") is not None:
         result = t(lang, "rw.result", usd=("+" if row["pnl_usd"] > 0 else "") + _usd(row["pnl_usd"], lang, True), mv=_pct(row["move_pct"], 2))
         if str((wd or {}).get("why") or "").startswith("кит"):
-            result += " " + t(lang, "rw.w.exit")
-    # build 55: the short summary, the target line under the live bar and the «Подробнее» sections
-    summary, tline, sections = _copy_story(row, wd, rec, why, desk, lang, closed, side, sym, name, venue, src, entry, stop, sp, tgt,
-                                           we, wl, wn, context, risk, live, hist)
-    doc = {"title": t(lang, "rw.w.title"), "signal": sig, "checked_title": t(lang, "rw.checked"), "checks": checks, "history": hist,
+            result += " " + t(lang, "sy.exit")
+    # summary, the target line under the live bar and the «Подробнее» sections
+    e = float(entry) if entry else None
+    st_ = float(stop) if stop else None
+    tg = float(tgt) if tgt else None
+    tp = (tg / e - 1) * 100 if tg and e else None
+    usd, mv = row.get("pnl_usd"), row.get("move_pct")
+    notional = abs(float(usd) / (float(mv) / 100)) if usd is not None and mv is not None and abs(float(mv)) >= 0.3 else None
+    gain = notional * abs(tp) / 100 if notional and tp is not None else None
+    if tg and e and st_ and not closed:
+        summary = t(lang, "sy.sum", side=s_side, sym=sym, tgt=_price(tg), tp=_pct(tp, 1), stop=_price(st_))
+        tline = t(lang, "sy.tline", tgt=_price(tg), tp=_pct(tp, 1), usd=t(lang, "w5.usd", u="+" + _usd(gain, lang)) if gain and gain >= 1 else "",
+                  stop=_price(st_))
+    else:
+        summary, tline = t(lang, "sy.sum0", side=s_side, sym=sym), None
+    seen = _when(row.get("opened") or (wd or {}).get("opened_t") or _sig_ms(row.get("sig")), lang)
+    sec = [{"title": t(lang, "sy.s.signal"), "text": t(lang, "sy.signal.t", side=s_side, sym=sym, at=t(lang, "sy.at", d=seen) if seen else "")
+            + " " + " ".join(live)}]
+    if context:
+        head = t(lang, "rw.w.ctx", x="").rstrip(" .")
+        body = context[len(head):].lstrip(" :") if context.startswith(head) else context
+        sec.append({"title": t(lang, "w5.s.market"), "text": body[:1].upper() + body[1:]})
+    if e:
+        sec.append({"title": t(lang, "sy.s.entry"), "text": t(lang, "sy.entry", e=_price(e))})
+    if st_ and spx:
+        sec.append({"title": t(lang, "sy.s.stop"), "text": t(lang, "sy.stop", stop=_price(st_), sp=spx)})
+    ex = t(lang, "sy.exit.tgt", tgt=_price(tg), tp=_pct(tp, 1), usd=t(lang, "w5.exit.usd", u="+" + _usd(gain, lang)) if gain and gain >= 1 else "") \
+        if tg and tp is not None else ""
+    ex += t(lang, "sy.exit.when", stop=_price(st_) if st_ else "—")
+    sec.append({"title": t(lang, "w5.s.exit"), "text": ex.strip()})
+    if risk:
+        sec.append({"title": t(lang, "w5.s.risk"), "text": risk})
+    doc = {"title": t(lang, "sy.title"), "signal": sig, "checked_title": t(lang, "rw.checked"), "checks": checks, "history": None,
            "live": " ".join(live), "plan": plan, "risk": risk, "result": result, "context": context, "copy": True,
-           "target_ref": round(float(tgt), 12) if tgt else None, "summary": summary, "target_line": tline, "sections": sections}
-    doc["text"] = " ".join(x for x in (doc["signal"], hist, context, doc["live"], plan, risk, result) if x)
+           "target_ref": round(float(tgt), 12) if tgt else None, "summary": summary, "target_line": tline, "sections": sec}
+    doc["text"] = " ".join(x for x in (doc["signal"], context, doc["live"], plan, risk, result) if x)
     return doc
 
 
@@ -889,109 +982,6 @@ def _sig_ms(sig) -> int | None:
         return int(str(sig).rsplit("-", 1)[1])
     except (IndexError, ValueError):
         return None
-
-
-def _copy_story(row, wd, rec, why, desk, lang, closed, side, sym, name, venue, src, entry, stop, sp, tgt, we, wl, wn, context, risk,
-                live, hist):
-    """build 55: (summary, target_line, sections) of a whale copy — every sentence only with its numbers"""
-    s_side = t(lang, "w5.short" if side == "SHORT" else "w5.long")
-    sgn = -1 if side == "SHORT" else 1
-    nm = f"«{name}»" if name else ""
-    src_short = " (OKX)" if venue == "okx" else " (Hyperliquid)" if venue == "hl" else ""
-    e = float(entry) if entry else None
-    st_ = float(stop) if stop else None
-    tg = float(tgt) if tgt else None
-    tp = (tg / e - 1) * 100 if tg and e else None
-    # the position's size from its own $ result and price move (only when the move is big enough to give a stable size)
-    usd, mv = row.get("pnl_usd"), row.get("move_pct")
-    notional = abs(float(usd) / (float(mv) / 100)) if usd is not None and mv is not None and abs(float(mv)) >= 0.3 else None
-    gain = notional * abs(tp) / 100 if notional and tp is not None else None
-    if tg and e and st_ and not closed:
-        summary = t(lang, "w5.sum", side=s_side, sym=sym, name=nm, src=src_short, tgt=_price(tg), tp=_pct(tp, 1), stop=_price(st_))
-        tline = t(lang, "w5.tline", tgt=_price(tg), tp=_pct(tp, 1), usd=t(lang, "w5.usd", u="+" + _usd(gain, lang)) if gain and gain >= 1 else "",
-                  stop=_price(st_))
-    else:
-        summary = t(lang, "w5.sum0", side=s_side, sym=sym, name=nm, src=src_short)
-        tline = None
-    summary = summary.replace("  ", " ").replace(" ()", "").replace("«» ", "")
-    sec = []
-    # 1 · the strategy and its record
-    rec_t = t(lang, "w5.strategy.t")
-    live = " ".join(live) if isinstance(live, list) else live
-    sec.append({"title": t(lang, "w5.s.strategy"), "text": rec_t + (" " + live if live else "")})
-    # 2 · the whale
-    who = None
-    src_words = src or (_pick(why, "whale_src_ru") or _pick(rec, "src_ru") if lang == "ru" else None)
-    if name:
-        who = t(lang, "w5.whale.who", name=name, src=src_words) if src_words else name + "."
-        style = _pick(why, "whale_style") or _pick(rec, "style_ru")
-        if style and lang == "ru":
-            who += t(lang, "w5.whale.style", s=str(style))
-        h = _hold(_pick(why, "whale_hold_h") or _pick(rec, "hold_med_h"), lang)
-        if h:
-            who += t(lang, "w5.whale.hold", h=h)
-    wtxt = " ".join(x for x in (who, hist) if x)
-    if wtxt:
-        sec.append({"title": t(lang, "w5.s.whale"), "text": wtxt})
-    # 3 · what the whale did
-    did = t(lang, "w5.did", side=s_side, sym=sym, we=t(lang, "w5.did.we", p=_price(float(we))) if we else "",
-            wl=t(lang, "w5.did.wl", l=_num(float(wl), 0)) if wl else "",
-            wn=t(lang, "w5.did.wn", u=_usd(float(wn), lang)) if wn and float(wn) >= 1000 else "")
-    seen = _when((wd or {}).get("opened_t") or _sig_ms(row.get("sig")) or row.get("opened"), lang)
-    if seen:
-        did += t(lang, "w5.did.at", d=seen)
-    sec.append({"title": t(lang, "w5.s.did"), "text": did})
-    # 4 · what we track
-    trk = t(lang, "w5.track", sym=sym)
-    px = row.get("price")
-    if we and px and not closed:
-        g = (float(px) / float(we) - 1) * 100
-        trk += t(lang, "w5.track.plus" if g * sgn >= 0 else "w5.track.minus", px=_price(float(px)), g=_pct(g, 1))
-    sec.append({"title": t(lang, "w5.s.track"), "text": trk})
-    # 5 · our entry against his
-    if e:
-        g0 = (e / float(we) - 1) * 100 if we else None
-        g = None if g0 is None else t(lang, "w5.worse" if g0 * sgn > 0 else "w5.better", g=_num(abs(g0), 1) + "%")
-        if g is not None and (wd or {}).get("join"):
-            try:
-                from .whale_study import JOIN_BETTER, JOIN_MAX
-            except Exception:  # noqa: BLE001
-                JOIN_MAX, JOIN_BETTER = 0.01, 0.03
-            ent = t(lang, "w5.entry.join", e=_price(e), g=g, mx=_num(JOIN_MAX * 100, 1), bt=_num(JOIN_BETTER * 100, 1))
-        elif g is not None:
-            ent = t(lang, "w5.entry.new", e=_price(e), g=g)
-        else:
-            ent = t(lang, "w5.entry.plain", e=_price(e))
-        sec.append({"title": t(lang, "w5.s.entry"), "text": ent})
-    # 6 · our stop and why it is there
-    if st_ and sp is not None:
-        spx = ("+" if side == "SHORT" else "−") + _num(sp, 1) + "%"
-        ssrc = str(_pick(why, "stop_src") or (wd or {}).get("stop_src") or "")
-        if "кита" in ssrc:
-            stx = t(lang, "w5.stop.whale", stop=_price(st_), sp=spx)
-        else:
-            try:
-                from .whale_study import DESK_STOP
-            except Exception:  # noqa: BLE001
-                DESK_STOP = 0.08
-            stx = t(lang, "w5.stop.own", stop=_price(st_), sp=spx, d=_num(DESK_STOP * 100, 1))
-        sec.append({"title": t(lang, "w5.s.stop"), "text": stx})
-    # 7 · the target and the exit
-    ex = ""
-    if tg and tp is not None:
-        ex = t(lang, "w5.exit.tgt", tgt=_price(tg), tp=_pct(tp, 1), usd=t(lang, "w5.exit.usd", u="+" + _usd(gain, lang)) if gain and gain >= 1 else "")
-    ex += t(lang, "w5.exit.when", stop=_price(st_) if st_ else "—")
-    h = _hold(_pick(why, "whale_hold_h") or _pick(rec, "hold_med_h"), lang)
-    if h:
-        ex += t(lang, "w5.exit.hold", h=h)
-    sec.append({"title": t(lang, "w5.s.exit"), "text": ex.strip()})
-    if context:
-        head = t(lang, "rw.w.ctx", x="").rstrip(" .")
-        body = context[len(head):].lstrip(" :") if context.startswith(head) else context
-        sec.append({"title": t(lang, "w5.s.market"), "text": body[:1].upper() + body[1:]})
-    if risk:
-        sec.append({"title": t(lang, "w5.s.risk"), "text": risk})
-    return summary, tline, sec
 
 
 def open_sig_for_closed(c: dict, actions: list) -> str | None:

@@ -57,19 +57,22 @@ def _tmp():
     return tmp, now_ms
 
 
-def test_whale_block_is_short_russian_and_honest():
+METHOD = re.compile(r"кит|копи|трейдер|лид-|Binance|邢|荣耀|领航|金虎|慢就是快", re.I)     # owner 05.11 09:52: never the method in public
+
+
+def test_system_block_is_short_russian_and_never_names_the_method():
     tmp, now_ms = _tmp()
     b = whale_digest.block(tmp, now_ms, slot="evening")
-    assert b.startswith("<b>Киты</b>\n— Копируем 5 проверенных лид-трейдеров Binance: 邢小鸿, 金虎趋势论, 领航财经, 慢就是快Mike8, 荣耀学员.")
-    assert "За сутки закрыто копий: 1, итог <b>+$2.13</b>; в работе 1." in b          # the SOL trade is not a copy → not counted
-    assert "Умные кошельки в блокчейне набирают AAVE (покупают: маркетмейкер и фонд)." in b
-    assert "Jump" not in b and not any(channel.latin_heavy(ln) for ln in b.splitlines())    # the post stays Russian (the lint blocks English)
+    assert b.startswith("<b>Система CRYPTO NOVA</b>\n— За сутки закрыто сделок: 2, итог <b>+$1.89</b>.")
+    assert "— В работе 1: BNB шорт; у каждой позиции стоп на бирже." in b
+    assert "В блокчейне крупные кошельки набирают AAVE (покупают: маркетмейкер и фонд)." in b
+    assert not METHOD.search(b) and "Jump" not in b and not any(channel.latin_heavy(ln) for ln in b.splitlines())
     assert len(re.sub(r"<[^>]+>", "", b)) < 420
     b2 = whale_digest.block(tmp, now_ms, slot="morning", highlights=2)
-    assert "Копий в работе 1, у каждой стоп на бирже." in b2 and "Фонд ARK (Кэти Вуд) за день: купил TSLA; продал ROKU." in b2
-    c = whale_digest.copies(tmp, now_ms)
+    assert "За сутки" not in b2 and "Фонд ARK (Кэти Вуд) за день: купил TSLA; продал ROKU." in b2 and not METHOD.search(b2)
+    c = whale_digest.copies(tmp, now_ms)                         # internally the copies are still known (for the counts)
     assert [o["whale"] for o in c["open_copies"]] == ["荣耀学员"] and c["copies_closed"][0]["whale"] == "领航财经"
-    assert whale_digest.block(tempfile.mkdtemp(), now_ms) == ""                        # no whale list yet → no section at all
+    assert whale_digest.block(tempfile.mkdtemp(), now_ms) == ""                      # no real account file → no section
 
 
 def test_quiet_hours_23_to_8_kyiv():
@@ -84,16 +87,18 @@ def test_channel_posts_follow_the_whale_model_and_fit_the_caption():
     for slot, h in (("morning", 8), ("evening", 21)):
         p = ch.post(slot, now=now.replace(hour=h, minute=40))
         p = ch.shrink(p) if len(re.sub(r"<[^>]+>", "", p)) > 1024 else p
-        assert "<b>Киты</b>" in p and "Копируем 5 проверенных лид-трейдеров" in p, slot
+        assert "<b>Система CRYPTO NOVA</b>" in p and not METHOD.search(p), (slot, METHOD.search(p))
         assert len(re.sub(r"<[^>]+>", "", p)) <= 1024 and ch.lint(p, {}) == [], slot
         assert not RETIRED.search(p), (slot, RETIRED.search(p))
-        assert p.index("<b>Киты</b>") < p.index("Вывод CRYPTO NOVA")
+        assert p.index("<b>Система CRYPTO NOVA</b>") < p.index("Вывод CRYPTO NOVA")
     ev = ch.post("evening", now=now.replace(hour=21, minute=40))
-    assert "ZRO шорт: <b>+$2.13 (+4.2%)</b>, копия 领航财经" in ev and "SOL лонг" in ev
-    assert "BNB шорт: в работе" not in ev                         # with «Киты» the open copies are counted there, not listed twice
+    assert "ZRO шорт: <b>+$2.13 (+4.2%)</b>, закрыта по сигналу системы" in ev and "SOL лонг" in ev
+    assert "BNB шорт: в работе" not in ev                         # the system block lists the open positions; not listed twice
     sl = ch.facts(ch.ctx(), now)["system_line"]
-    assert "Фьючерсы повторяют сделки 5 проверенных трейдеров" in sl and "Спот — ядро BTC, ETH и SOL" in sl and not RETIRED.search(sl)
-    assert not RETIRED.search(ch.intro()) and "5 проверенных трейдеров" in ch.intro() and len(ch.intro()) < 1500
+    assert "Фьючерсы ведёт система CRYPTO NOVA" in sl and "Спот — ядро BTC, ETH и SOL" in sl and not RETIRED.search(sl) and not METHOD.search(sl)
+    it = ch.intro()
+    assert not RETIRED.search(it) and not METHOD.search(it) and "apps.apple.com" in it and "Google Play" not in it and "play.google" not in it
+    assert "CRYPTO NOVA AI" in it and len(re.sub(r"<[^>]+>", "", it)) < 1200
 
 
 def test_channel_is_silent_at_night_and_has_no_per_trade_posts():
@@ -116,11 +121,11 @@ def test_weekly_post_speaks_about_the_real_account_and_the_whales():
     doc = weekly.run(sqlite3.connect(":memory:"), rep, os.path.join(tmp, "weekly.json"), now_ms)
     post, text = doc["post"], doc["text"]
     assert post.startswith("📊") and "Реальный счёт CRYPTO NOVA на OKX: 9 650 $" in post and "С 22.10.2026: −$374.40 (−3.73%)" in post
-    assert "Киты\n— Копируем 5 проверенных лид-трейдеров Binance" in post and "За неделю закрыто копий: 1" in post
+    assert "Система CRYPTO NOVA\n— За неделю закрыто сделок: 2" in post and not METHOD.search(post) and not METHOD.search(text)
     assert "Спот — ядро: BTC 36%, ETH 13%, SOL 7% счёта" in post and "<b>" not in post
     for s in (post, text):
         assert not RETIRED.search(s) and "Демо-счета" not in s and "три стратегии" not in s, RETIRED.search(s)
-    assert "## Киты" in text and "Как работает система: фьючерсы реального счёта повторяют сделки 5 проверенных трейдеров" in text
+    assert "## Система CRYPTO NOVA" in text and "Как работает система: фьючерсы и спот реального счёта ведёт система CRYPTO NOVA" in text
 
 
 def test_retired_desks_signals_are_not_posted_to_telegram(monkeypatch):
@@ -144,11 +149,13 @@ def test_app_demo_futures_is_the_whale_desk(tmp_path):
     from cnq.agents import app_home
     tmp, now_ms = _tmp()
     card, curve = app_home._whale_futures(tmp, now_ms, "ru")
-    assert card["in_result"] == ["whales"] and card["usd"] == 420.0 and card["pct"] == 4.2 and card["closed_n"] == 1
-    assert card["open"][0]["why"].startswith("Копия сделки трейдера 荣耀学员") and card["open"][0]["src_ru"] == "Киты · копия"
-    assert "повторяет сделки 5 проверенных трейдеров" in card["about_ru"] and curve[-1][1] == 420.0
-    en, _ = app_home._whale_futures(tmp, now_ms, "en")
-    assert "copies the trades of 5 verified" in en["about_ru"]
+    assert card["in_result"] == ["system"] and card["usd"] == 420.0 and card["pct"] == 4.2 and card["closed_n"] == 1
+    assert card["open"][0]["why"].startswith("Сигнал системы CRYPTO NOVA") and card["open"][0]["src_ru"] == "Система CRYPTO NOVA"
+    assert "сигналы системы CRYPTO NOVA" in card["about_ru"] and curve[-1][1] == 420.0
+    assert not METHOD.search(json.dumps(card, ensure_ascii=False))
+    for lang in ("en", "uk", "el", "es"):
+        en, _ = app_home._whale_futures(tmp, now_ms, lang)
+        assert "CRYPTO NOVA" in en["about_ru"] and not re.search(r"whale|copy|trader|ballena|φάλαιν|кит|копі|трейдер", json.dumps(en, ensure_ascii=False), re.I)
     assert app_home._whale_futures(str(tmp_path), now_ms, "ru") is None    # no desk → the old card stays
 
 
@@ -169,10 +176,10 @@ def test_capital_demo_follows_the_whale_desk_and_the_core():
               open(os.path.join(d, "whales_top.json"), "w"))
     a = K.run(conn, d, T0 + 3_600_000)
     w = {s["key"]: s["weight"] for s in a["sleeves"]}
-    assert a["model"] == "whales" and a["value_usd"] == 10_000 and "Новая модель" in a["events"][0] and a["previous"]["model"] == "desks"
+    assert a["model"] == "system" and a["value_usd"] == 10_000 and "Новая модель" in a["events"][0] and a["previous"]["model"] == "desks"
     assert "active" not in w and "listings" not in w and w["spot"] == 0.525 and w["futures"] == 0.175
     names = {s["key"]: s["name_ru"] for s in a["sleeves"]}
-    assert names["futures"].startswith("Фьючерсы · копии «Китов»") and names["spot"] == "Спот · ядро BTC / ETH / SOL"
+    assert names["futures"] == "Фьючерсы · система CRYPTO NOVA" and names["spot"] == "Спот · ядро BTC / ETH / SOL"
     px(88_000.0, 2_400.0, 96.0)                                          # BTC +10 % → the core +6.67 %
     json.dump({"following": [{"addr": "bn:1", "name": "邢小鸿"}], "desk": {"start": 10_000.0, "equity": 11_550.0, "history": []}},
               open(os.path.join(d, "whales_top.json"), "w"))                # the whale desk +10 %

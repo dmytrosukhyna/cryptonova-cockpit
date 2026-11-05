@@ -26,6 +26,7 @@
 
   V.views.whales = {
     async html(arg) {
+      if (!V.auth.owner()) return `<div class="card">${V.nodata('раздел доступен только владельцу')}</div>`;   // 05.11: owner-only
       if (arg === 'stocks' || arg === 'crypto') ui.tab = arg;
       const [W, S] = await V.feeds(['whale_watch.json', 'stock_whales.json']);
       const nc = W ? A(W.whales).length : null, ns = S ? A(S.funds).length : null;

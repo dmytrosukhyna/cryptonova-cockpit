@@ -1,4 +1,4 @@
-"""«Киты» in every public text (05.11.2026, owner: «вся система должна быть подключена к лучшим трейдерам мира … всё подтянуть,
+"""The «Система CRYPTO NOVA» block of the public texts (internally: the «Киты» desk) (05.11.2026, owner: «вся система должна быть подключена к лучшим трейдерам мира … всё подтянуть,
 адаптировать, привести в порядок»).
 
 Since 04.11 the whole real futures budget copies the top-5 verified whales (Binance lead traders chosen by
@@ -172,36 +172,41 @@ def onchain_line(out: str) -> str | None:
         k = list(dict.fromkeys(str(x.get("kind") or "").split(" /")[0].strip() for x in t.get("buyers") or [] if isinstance(x, dict) and x.get("kind")))
         k = [x for x in k if x and not re.search(r"[A-Za-z]{3,}", x)]
         return f" (покупают: {' и '.join(k[:2])})" if k else ""
-    return "Умные кошельки в блокчейне набирают " + "; ".join(f"{t['symbol']}{who(t)}" for t in pick) + "."
+    return "В блокчейне крупные кошельки набирают " + "; ".join(f"{t['symbol']}{who(t)}" for t in pick) + "."
+
+
+SIDE_SHORT = {"long": "лонг", "short": "шорт"}
 
 
 def block(out: str, now_ms: float | None = None, slot: str = "evening", with_trades: bool = False, highlights: int = 1,
           hours: int = 24, period_ru: str = "За сутки") -> str:
-    """The short «Киты» section of a post. Empty when the whale study has no list yet (the post then simply has no section)."""
-    fol = following(out)
-    if not fol:
+    """The short «Система CRYPTO NOVA» section of a post: the real account's open futures positions, the period's closed trades and
+    their result, one calm market line. 05.11 (owner, 09:52: «нигде не надо писать, что это копии китов … везде должна быть система
+    CRYPTO NOVA … людям нужен только результат»): no whales, no copying, no trader names or counts — only the system's result.
+    Empty without the real account's file."""
+    real = _load(out, "public_real.json")
+    if not real or real.get("stale"):
         return ""
-    names = ", ".join(f["name"] for f in fol[:5])
-    src = {f["src_ru"] for f in fol}
-    lines = [f"— Копируем {len(fol[:5])} проверенных лид-трейдеров{(' ' + next(iter(src))) if len(src) == 1 else ''}: {names}."]
     c = copies(out, now_ms, hours)
-    oc = c["open_copies"]
-    old = sum(1 for o in oc if not o["in_top"])
-    work = f"в работе {len(oc)}" + (f" ({old} — от выбывших из списка, закроем вместе с ними)" if old else "")
+    opn = c["open"]
+    lines = []
+    pos = ", ".join(f"{o['coin']} {SIDE_SHORT.get(o['side'], o['side'])}" for o in opn[:5]) + (" …" if len(opn) > 5 else "")
     if slot == "evening" or with_trades:
-        cc = c["copies_closed"]
-        if cc:
-            lines.append(f"— {period_ru} закрыто копий: {len(cc)}, итог <b>{_usd(c['copies_usd'])}</b>; {work}.")
-        elif oc:
-            lines.append(f"— {period_ru} закрытых копий не было; {work}, у каждой стоп на бирже.")
-    elif oc:
-        lines.append(f"— Копий {work}, у каждой стоп на бирже.")
+        cl = c["closed"]
+        if cl:
+            lines.append(f"— {period_ru} закрыто сделок: {len(cl)}, итог <b>{_usd(sum(x['pnl'] for x in cl))}</b>.")
+        else:
+            lines.append(f"— {period_ru} закрытых сделок не было.")
+    if opn:
+        lines.append(f"— В работе {len(opn)}: {pos}; у каждой позиции стоп на бирже.")
+    else:
+        lines.append("— Открытых позиций сейчас нет: система ждёт свой следующий сигнал.")
     hl = [ln for ln in (onchain_line(out), funds_line(out, now_ms)) if ln]
     lines += ["— " + ln for ln in hl[:highlights]]
-    return "<b>Киты</b>\n" + "\n".join(lines)
+    return "<b>Система CRYPTO NOVA</b>\n" + "\n".join(lines)
 
 
 def model_line() -> str:
-    """How the system works now, in one honest sentence (for intros, the weekly post, the brief)."""
-    return (f"Фьючерсы реального счёта повторяют сделки 5 проверенных трейдеров (риск {RISK_PCT}% на сделку, плечо не выше {LEV_CAP}×); "
-            "спот — ядро BTC, ETH и SOL.")
+    """How the system works, for people, in one sentence — never the method (owner 05.11)."""
+    return (f"Фьючерсы и спот реального счёта ведёт система CRYPTO NOVA: у каждой сделки стоп на бирже, риск {RISK_PCT}% на сделку, "
+            f"плечо не выше {LEV_CAP}×; основа спота — BTC, ETH и SOL.")

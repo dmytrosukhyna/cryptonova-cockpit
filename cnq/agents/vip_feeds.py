@@ -380,8 +380,9 @@ _S_ORDER = {k: i for i, k in enumerate(STATUS_RU)}
 _C_ORDER = {k: i for i, k in enumerate(("used", "validation", "testing", "paused", "rejected"))}
 _T_ORDER = {"futures": 0, "spot": 1, "other": 2}
 STATUS_RULES_RU = [
-    "Active — по ней сейчас торгует реальный счёт CRYPTO NOVA на OKX (основной стол выбирает web/desk_select.json, «Импульс BTC» — "
-    "вторая половина фьючерсов, «Импульс BTC · спот 10%» — активный спот, «CRYPTO NOVA портфель» — спот 65% и доп. ядро BTC/ETH/SOL 10%).",
+    "Active — по ней сейчас торгует реальный счёт CRYPTO NOVA на OKX. С 04.11 весь фьючерсный бюджет копирует топ-5 проверенных "
+    "трейдеров (стол «Киты», web/whales_top.json); «Импульс BTC · спот 10%» — активный спот, «CRYPTO NOVA портфель» — спот 65% и доп. "
+    "ядро BTC/ETH/SOL 10%.",
     "Approved — прошла ворота конвейера PAPER → READY (сейчас таких нет). На реальные деньги — только решением владельца или автовыбора.",
     "Validation — кандидат на реальные деньги, ждёт своих ворот: автовыбор основного стола (20 сделок, результат к просадке лучше на 20%) "
     "или ворота «Сигналов CRYPTO NOVA» (30 сделок, от +0,3% на сделку).",
@@ -448,6 +449,11 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
     except Exception:  # noqa: BLE001
         SHARES = {"spot": 0.65, "core": 0.10, "futures": 0.15, "active": 0.10}      # owner's decision of 28.10
     sel_c = {c.get("key"): c for c in (sel or {}).get("candidates") or [] if isinstance(c, dict)}
+    # 05.11 (owner, 04.11): the whole real futures budget copies the top-5 whales — when the whale study has its list, the rule
+    # desks that used to trade the real futures (desk_select's main desk + «Импульс BTC») are demo only
+    whales_real = bool((whales or {}).get("following"))
+    if whales_real:
+        main, second = "\0none", "\0none"
     out = []
     # ---- the paper desks (web/paper.json) with the conveyor's record (web/conveyor.json) ----
     for k, v in prof.items():
@@ -465,6 +471,8 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
             status, why = "Paused", c.get("reason_ru") or "снят конвейером"
         elif c.get("stage") == "ready":
             status, why = "Approved", "прошёл ворота конвейера PAPER → READY"
+        elif whales_real and k in ("cons", "bal", "aggr", "imp"):
+            status, why = "Testing", "демо-счёт: с 04.11 реальные фьючерсы копируют топ-5 проверенных трейдеров (стол «Киты»)"
         elif k in ("cons", "bal", "aggr"):
             status, why = "Validation", ("размер семейства «Автопилот», которое сейчас ведёт реальные фьючерсы размером «"
                                          + ((prof.get(main) or {}).get("name") or main) + "»; автовыбор размеры не переключает (решение владельца 28.10)")
@@ -555,7 +563,10 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
     W = (whales or {}).get("desk") or {}
     if W:
         n = W.get("trades")
-        out.append(_st("whales_copy", W.get("name_ru") or "Киты · копирование", "futures", "Testing", "эксперимент на демо-счёте",
+        st_w, why_w = (("Active", "весь фьючерсный бюджет реального счёта с 04.11 (риск 2% на сделку, плечо не выше 5×); здесь — та же "
+                                  "копия на демо-счёте $10 000") if whales_real else ("Testing", "эксперимент на демо-счёте"))
+        out.append(_st("whales_copy", W.get("name_ru") or "Киты · копирование", "futures", st_w, why_w,
+                       real=({"sleeve": "futures", "share_pct": round(SHARES.get("futures", 0.15) * 100, 1)} if whales_real else None),
                        since=_ms(W.get("started")), trades=n, win_rate=_r(_num(W.get("winrate")) * 100, 1) if n and W.get("winrate") is not None else None,
                        net_usd=_r(W.get("pnl_usd"), 2), net_pct=_r(W.get("pnl_pct"), 2), max_dd_pct=_r(W.get("max_dd_pct"), 2),
                        updated=_ms((whales or {}).get("asof")), sample_note_ru=_sample_note(n), about_ru=W.get("rules_ru"), source="whales_top.json",

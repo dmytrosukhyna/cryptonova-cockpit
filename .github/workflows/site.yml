@@ -262,14 +262,14 @@ jobs:
           CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
           CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
         run: python -m cnq.cli weekly --out web --send
-      - name: Monday gaps (FX, class A)
+      # 05.11: computed only, never posted — it ran Sunday 22:05 UTC (00:05 Kyiv, quiet hours) and posted FX trade signals to the
+      # news channel; the channel has no per-trade posts and the real money copies the top-5 whales now
+      - name: Monday gaps (FX, class A) — log only, no Telegram post
         if: github.event.schedule == '5 22 * * 0'
         continue-on-error: true
         env:
           TWELVE_DATA_KEY: ${{ secrets.TWELVE_DATA_KEY }}
-          CNQ_TG_TOKEN: ${{ secrets.CNQ_TG_TOKEN }}
-          CNQ_TG_CHAT: ${{ secrets.CNQ_TG_CHAT }}
-        run: python -m cnq.cli fx-gaps --send
+        run: python -m cnq.cli fx-gaps
       - name: Spoken brief (neural voice) → web/brief.mp3 + web/brief.json
         continue-on-error: true
         env:

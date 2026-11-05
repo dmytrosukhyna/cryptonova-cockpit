@@ -484,6 +484,84 @@ def _futures(paper: dict, now: int, lang: str = DEFAULT, sel: dict | None = None
             "lev_note": t(lang, "fut.lev_note", lo=lo, hi=hi), "lev_range": [lo, hi]}
 
 
+def _whale_futures(out: str, now: int, lang: str = DEFAULT) -> tuple[dict, list] | None:
+    """05.11 (owner: «демо-портфель — всё как положено»; since 04.11 the real futures copy the top-5 whales): the demo futures card
+    is the «Киты» desk — the same copies on $10 000 (whales_top.json desk, cnq/agents/whale_study.py) — in the shape of _futures().
+    Returns (card, curve [(t, $)]) or None without the desk (then the old card stays)."""
+    from . import whale_digest as wd
+    d = wd.desk(out)
+    if not d:
+        return None
+    start = d["start"]
+    usd = d["equity"] - start
+    curve = sorted((int(p[0]), float(p[1]) - start) for p in d["history"] if isinstance(p, (list, tuple)) and len(p) == 2 and p[1] is not None)
+    if d.get("started") and (not curve or curve[0][0] > int(d["started"])):
+        curve.insert(0, (int(d["started"]), 0.0))
+    if not curve or curve[-1][0] < now:
+        curve.append((now, usd))
+    day0 = int(dt.datetime.fromtimestamp(now / 1000, dt.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
+    before = [v for t_, v in curve if t_ < day0]
+    peak, dd = start, 0.0
+    for _, v in curve:
+        peak = max(peak, start + v)
+        dd = min(dd, (start + v) / peak - 1)
+
+    def who(o):   # a nickname people can read; a raw id becomes the exchange's name
+        nm = str(o.get("whale_ru") or "")
+        if nm and not re.match(r"^(bn:|okx:|0x)", nm):
+            return nm
+        w = str(o.get("whale") or nm)
+        return "Binance" if w.startswith("bn:") else "OKX" if w.startswith("okx:") else "Hyperliquid"
+    opened = []
+    for o in d["open"]:
+        if not isinstance(o, dict):
+            continue
+        side = str(o.get("side") or "").upper()
+        entry, price = o.get("entry"), o.get("price")
+        pct = (price / entry - 1) * 100 * (1 if side == "LONG" else -1) if entry and price else None
+        opened.append({"sym": o.get("coin"), "side": side, "entry": entry, "price": price, "stop": o.get("stop"), "target": None,
+                       "pnl_usd": _r(float(o.get("upnl") or 0)), "pct": _r(pct, 1), "opened": o.get("opened_t"), "expires": None,
+                       "why": t(lang, "why.whale", name=who(o)), "src": "whales", "src_ru": t(lang, "src.whales"),
+                       "why_title": t(lang, "title.whales"), "checks": None, "history": None, "risk": None, "work": None, "note": None,
+                       "lev": o.get("lev"), "in_result": True})
+    opened.sort(key=lambda o: -(o.get("opened") or 0))
+    cl = sorted((c for c in d["closed"] if isinstance(c, dict)), key=lambda c: c.get("closed_t") or 0, reverse=True)
+    closed = [{"sym": c.get("coin"), "side": str(c.get("side") or "").upper(), "pnl_usd": _r(float(c.get("pnl") or 0)),
+               "closed": c.get("closed_t"), "acct_usd": _r(float(c.get("pnl") or 0)), "acct_pct": _r(float(c.get("pnl") or 0) / start * 100, 3)}
+              for c in cl[:8]]
+    n = len(cl) or d["trades"]
+    w_ = sum(1 for c in cl if float(c.get("pnl") or 0) > 0) if cl else d["wins"]
+    l_ = sum(1 for c in cl if float(c.get("pnl") or 0) < 0)
+    tot_ = sum(float(c.get("pnl") or 0) for c in cl)
+    stats = {"n": n, "wins": w_, "losses": l_, "win_rate": _r(w_ / n * 100, 1) if n else None, "realized_usd": _r(tot_),
+             "realized_pct": _r(tot_ / start * 100), "avg_usd": _r(tot_ / n) if n else None, "since": d.get("started"), "base_usd": start}
+    card = {"usd": _r(usd), "pct": _r(usd / start * 100), "today_usd": _r(usd - (before[-1] if before else 0.0)), "trades": n + len(opened),
+            "status_ru": None if opened else t(lang, "status.whales"), "scan": None, "wins": w_, "closed_n": n,
+            "worst_dd_pct": _r(dd * 100, 1), "since": d.get("started"), "in_result": ["whales"], "open": opened, "closed": closed,
+            "stats": stats, "curve": [[t_, _r(v)] for t_, v in _sample_keep_last(curve)], "about_ru": t(lang, "futures.about.whales"),
+            "lev_note": t(lang, "fut.lev_note", lo=1, hi=5), "lev_range": [1, 5], "desk": "whales"}
+    return card, curve
+
+
+def _whale_public(public: dict, card: dict, curve: list, ex: dict, now: int, lang: str) -> dict:
+    """the demo «public» portfolio with the «Киты» desk as its futures part (spot stays the model's spot part)"""
+    sp = public.get("spot") or {}
+    s0 = float(sp.get("start_usd") or START)
+    fr = float(card["usd"] or 0)
+    since = min(int(card.get("since") or now), int(sp.get("since") or now))
+    out = dict(public)
+    out["futures"] = {"usd": card["usd"], "pct": card["pct"], "equity": _r(START + fr), "base": START, "since": card.get("since"),
+                      "desks": ["whales"], "open_n": len(card["open"]), "in_result_n": len(card["open"]),
+                      "closed_n": card["closed_n"], "wins": card["wins"]}
+    out["total_usd"] = _r(fr + float(sp.get("usd") or 0))
+    out["base_usd"] = _r(START + s0)
+    out["since"] = since
+    out["curve"] = _public_curve(curve, ex.get("pf_app") or {}, s0, since, now, out["total_usd"])
+    if isinstance(out.get("calc"), dict):
+        out["calc"] = {**out["calc"], "futures_why": t(lang, "pub.why.futures.whales")}
+    return out
+
+
 def _signal_lev() -> tuple[int, int]:
     """the lowest and highest leverage the signals carry (signal_feed.LEV: per rule — the farther the stop, the lower)"""
     try:
@@ -1749,9 +1827,18 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
     ex = ex or {}
     sel = ex["sel"] if "sel" in ex else ph.load_sel(out)              # 28.10: the main futures desk (web/desk_select.json)
     fut, spot = _futures(paper, now, lang, sel), _spot(pf, lang, ex)
+    public = _public(paper, ex.get("ideas_pf") or {}, pf, fut, ex.get("fut_curve") or [], ex.get("rows") or {}, now, lang, sel)
+    try:   # 05.11: the demo futures = the «Киты» desk (the real model), not the retired rule desks
+        wf = _whale_futures(out, now, lang)
+    except Exception as e:  # noqa: BLE001
+        print("app_home whale futures:", repr(e)[:200], flush=True)
+        wf = None
+    if wf:
+        fut = wf[0]
+        if public is not None:
+            public = _whale_public(public, fut, wf[1], {"pf_app": pf}, now, lang)
     pub = _public_portfolio(out)
     total = pub["pnl_usd"] if pub else round((fut["usd"] or 0) + (spot["usd"] or 0), 2)
-    public = _public(paper, ex.get("ideas_pf") or {}, pf, fut, ex.get("fut_curve") or [], ex.get("rows") or {}, now, lang, sel)
     real = _public_real(out, now)
     if public is not None and real is not None:
         public["real"] = real

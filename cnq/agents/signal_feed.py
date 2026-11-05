@@ -128,9 +128,19 @@ def signals_chat(conn: sqlite3.Connection | None = None) -> str | None:
     return r[0] if r and r[0] else None
 
 
+# 05.11 (owner: since 04.11 the whole real futures budget copies the top-5 whales; the rule desks bal / imp / own / lst no longer
+# trade real money): their signals are still recorded in web/signals_feed.json (the panel, the live record), but they are NOT posted
+# to the Telegram signals channel any more — a public signal must not look like a trade of the real account. The owner turns it back
+# on by setting this to True (or by pointing the channel at another source).
+TG_POSTS = False
+
+
 def _send(text: str, reply_to: int | None = None, chat: str | None = None) -> int | None:
     chat, token = chat or os.environ.get("CNQ_SIGNALS_CHAT"), os.environ.get("CNQ_TG_TOKEN")
     if not chat or not token:
+        return None
+    from .whale_digest import quiet
+    if quiet():                        # 05.11: 23:00–08:00 Kyiv nothing goes to a public channel (alt_portfolio retries after 08:00)
         return None
     import urllib.request
     body = {"chat_id": chat, "text": text[:4000], "disable_web_page_preview": True}
@@ -249,13 +259,14 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> d
     chat = signals_chat(conn)
 
     def send(text, reply_to=None):
-        return _send(text, reply_to, chat)
+        return _send(text, reply_to, chat) if TG_POSTS else None
     for k, _, _ in SOURCES:
         desk = (paper.get("profiles") or {}).get(k) or {}
         ok, _ = live_ok(conn, k, now or int(time.time() * 1000))
         res[k] = step(conn, desk, now, send=send, source=k, active=ok)
     doc = public(conn, now)
     doc["this_run"] = res
+    doc["tg_posts"] = TG_POSTS
     with open(os.path.join(out, "signals_feed.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False)
     return doc

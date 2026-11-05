@@ -313,8 +313,16 @@ def mexc5():
             print(f"mexc5.{uid}.{nm}", json.dumps({k: v for k, v in rec.items() if k not in ("keys", "sample")}), flush=True)
 
 
+def okx_earn():
+    """05.11: public OKX rates only (no key): Simple Earn flexible USDT lending rate summary / history"""
+    for nm, u in {"sum": "https://www.okx.com/api/v5/finance/savings/lending-rate-summary?ccy=USDT",
+                  "hist": "https://www.okx.com/api/v5/finance/savings/lending-rate-history?ccy=USDT&limit=24"}.items():
+        s_, txt = call(u)
+        print(f"okxearn.{nm}", s_, txt[:1500], flush=True)
+
+
 def main():
-    for f in (mexc5,):
+    for f in (okx_earn,):
         try:
             f()
         except Exception as e:  # noqa: BLE001

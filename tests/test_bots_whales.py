@@ -150,3 +150,35 @@ def test_app_demo_futures_is_the_whale_desk(tmp_path):
     en, _ = app_home._whale_futures(tmp, now_ms, "en")
     assert "copies the trades of 5 verified" in en["about_ru"]
     assert app_home._whale_futures(str(tmp_path), now_ms, "ru") is None    # no desk → the old card stays
+
+
+def test_capital_demo_follows_the_whale_desk_and_the_core():
+    """05.11: the CRYPTO NOVA Портфолио demo = the real model — futures follow the «Киты» desk, spot the core BTC/ETH/SOL 30/10/5;
+    no active spot or listing short; switching from the old desks model restarts the demo once (no jump in the numbers)"""
+    from cnq.agents import capital as K
+    from test_capital import world, T0
+    d = tempfile.mkdtemp()
+    conn = sqlite3.connect(":memory:")
+    world(d)
+    old = K.run(conn, d, T0)
+    assert old["model"] == "desks" and any(s["key"] == "active" for s in old["sleeves"])
+    px = lambda b, e, s: json.dump({"top": [{"symbol": "BTC", "price": b}, {"symbol": "ETH", "price": e}, {"symbol": "SOL", "price": s}]},
+                                   open(os.path.join(d, "markets.json"), "w"))
+    px(80_000.0, 2_400.0, 96.0)
+    json.dump({"following": [{"addr": "bn:1", "name": "邢小鸿"}], "desk": {"start": 10_000.0, "equity": 10_500.0, "history": []}},
+              open(os.path.join(d, "whales_top.json"), "w"))
+    a = K.run(conn, d, T0 + 3_600_000)
+    w = {s["key"]: s["weight"] for s in a["sleeves"]}
+    assert a["model"] == "whales" and a["value_usd"] == 10_000 and "Новая модель" in a["events"][0] and a["previous"]["model"] == "desks"
+    assert "active" not in w and "listings" not in w and w["spot"] == 0.525 and w["futures"] == 0.175
+    names = {s["key"]: s["name_ru"] for s in a["sleeves"]}
+    assert names["futures"].startswith("Фьючерсы · копии «Китов»") and names["spot"] == "Спот · ядро BTC / ETH / SOL"
+    px(88_000.0, 2_400.0, 96.0)                                          # BTC +10 % → the core +6.67 %
+    json.dump({"following": [{"addr": "bn:1", "name": "邢小鸿"}], "desk": {"start": 10_000.0, "equity": 11_550.0, "history": []}},
+              open(os.path.join(d, "whales_top.json"), "w"))                # the whale desk +10 %
+    b = K.run(conn, d, T0 + 2 * 3_600_000)
+    v = {s["key"]: s["value_usd"] for s in b["sleeves"]}
+    assert abs(v["spot"] - 5250 * (1 + 0.1 * 30 / 45)) < 0.1 and abs(v["futures"] - 1925) < 0.1 and b["events"] == []
+    txt = json.dumps(b, ensure_ascii=False)
+    assert "бесплатно" not in txt and "Импульс BTC" not in " ".join(b["rules_ru"])
+    assert "Как реальный счёт" in b["models"]["balanced"]["about_ru"]

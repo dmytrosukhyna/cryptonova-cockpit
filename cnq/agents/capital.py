@@ -105,6 +105,28 @@ TITLE = {"spot": "Спот", "active": "Активный спот", "futures": "
 KYIV = dt.timezone(dt.timedelta(hours=3))
 
 
+WHALE_MODELS = {
+    "calm": {"about_ru": "Держим ядро BTC 30 / ETH 10 / SOL 5 (в этих пропорциях), без фьючерсов; когда BTC ниже своей 200-дневной "
+                         "средней — большая часть уходит в доходные доллары."},
+    "balanced": {"about_ru": "Как реальный счёт: ядро BTC / ETH / SOL на споте и фьючерсы — копии сделок 5 проверенных трейдеров; "
+                             "доли система двигает сама — по рынку и по ставкам."},
+    "bold": {"about_ru": "Больше фьючерсов — копий сделок 5 проверенных трейдеров — и выше риск. Защита та же: режим BTC, стоп у "
+                         "каждой копии, плечо не выше 5×, резерв в кредитовании."},
+}
+WHALE_RULES = [
+    f"Демо-счёт ${START:,.0f} по модели реального счёта: спот — ядро BTC, ETH и SOL (30 / 10 / 5), фьючерсы — копии сделок 5 проверенных "
+    "трейдеров копитрейдинга (стол «Киты»: у каждой копии стоп, плечо не выше 5×, выход вместе с трейдером).",
+    "Часть со ставкой на рост (спот и фьючерсы) зависит от рынка: когда BTC выше своей 200-дневной средней и за 60 дней в плюсе — 70%, "
+    "иначе — 20%. Направление, которое за 30 дней потеряло больше 5%, получает половину доли, заработавшее больше 5% — в 1.25 раза больше.",
+    "Остальное — источники без ставки на цену: кредитование стейблкоинов (Aave, Sky), фикс-ставка на фьючерсах BTC/ETH, фандинг и "
+    "доходные доллары sUSDe. Делим по тому, сколько каждый платит сейчас, минус скидка за риск; в кредитовании всегда не меньше 30% этой части.",
+    "Пересчёт — каждый понедельник, сразу при новом источнике и при смене режима рынка (не чаще раза в сутки); каждый пересчёт стоит 0.1% "
+    "от переложенной суммы.",
+    "Рядом показан вариант «без перераспределения»: распределитель полезен, только если обгоняет его.",
+    "В конце месяца — итог; 10% от прибыли — оплата (за месяц без прибыли оплаты нет).",
+    "Это демо, а не обещание: результат может быть и минусом."]
+
+
 def _load(out: str, name: str) -> dict:
     try:
         return json.load(open(os.path.join(out, name), encoding="utf-8"))
@@ -138,9 +160,40 @@ def lst_gate(out: str) -> tuple[bool, dict]:
     return bool(n >= LST_GATE["trades"] and avg is not None and avg >= LST_GATE["avg_trade_pct"]), {"trades": n, "avg_trade_pct": avg}
 
 
+# 05.11 (owner: «демо-портфель — всё как положено», the same model as the real account since 04.11): when the whale study has its
+# list (web/whales_top.json «following» + desk), the futures sleeve follows the «Киты» copy desk and the spot sleeve the core
+# BTC / ETH / SOL in the real account's proportions 30 / 10 / 5; the retired rule desks («Импульс BTC» active spot, the listing
+# short) get no money. Without the whale file the old model runs unchanged. The switch restarts the demo once (st["model"]).
+CORE_W = {"BTC": 30 / 45, "ETH": 10 / 45, "SOL": 5 / 45}
+CORE_REF = {"BTC": 80_000.0, "ETH": 2_400.0, "SOL": 96.0}          # fixed reference prices: only the ratio between runs matters
+WHALE_NAMES = {"spot": "Спот · ядро BTC / ETH / SOL", "futures": "Фьючерсы · копии «Китов» (топ-5 трейдеров)"}
+
+
+def whale_mode(out: str) -> bool:
+    w = _load(out, "whales_top.json")
+    return bool(w.get("following")) and (w.get("desk") or {}).get("equity") is not None
+
+
+def core_value(out: str) -> float | None:
+    """the core basket BTC / ETH / SOL (30 / 10 / 5) from markets.json prices — None when a price is missing"""
+    top = {str(t.get("symbol") or "").upper(): t.get("price") for t in _load(out, "markets.json").get("top") or [] if isinstance(t, dict)}
+    if not all(top.get(k) for k in CORE_W):
+        return None
+    return sum(w * float(top[k]) / CORE_REF[k] for k, w in CORE_W.items()) * 10_000
+
+
 def desk_values(out: str) -> dict:
     """Current equity of each desk (any unit — only the ratio between runs matters). Missing → not in the dict."""
     v = {}
+    if whale_mode(out):
+        d = _load(out, "whales_top.json")["desk"]
+        v["futures"] = float(d["equity"])
+        cv = core_value(out)
+        if cv:
+            v["core"] = v["spot"] = cv
+        for k, x in _carry_values(out).items():
+            v[k] = x
+        return v
     pfs = _load(out, "portfolio.json").get("portfolios") or {}
     for key, name in (("spot", "ideas"), ("spot_cons", "cons")):
         pf = pfs.get(name) or {}
@@ -157,6 +210,15 @@ def desk_values(out: str) -> dict:
            for k in fut_keys(out) if (d := prof.get(k)) and d.get("equity") is not None]
     if fut:
         v["futures"] = sum(fut) / len(fut)
+    v.update(_carry_values(out))
+    d = prof.get("lst") or {}
+    if d.get("equity") is not None:                      # tracked always (index), given money only after the gate
+        v["listings"] = float(d["equity_mtm"] if d.get("equity_mtm") is not None else d["equity"])
+    return v
+
+
+def _carry_values(out: str) -> dict:
+    v = {}
     fd = _load(out, "funding.json")
     if fd.get("start_equity"):
         v["funding"] = float(fd["equity_mtm"] if fd.get("equity_mtm") is not None else fd.get("equity", fd["start_equity"]))
@@ -168,9 +230,6 @@ def desk_values(out: str) -> dict:
         v["yield"] = float(yd["equity"])
     if _susde(out).get("equity") is not None:
         v["susde"] = float(_susde(out)["equity"])
-    d = prof.get("lst") or {}
-    if d.get("equity") is not None:                      # tracked always (index), given money only after the gate
-        v["listings"] = float(d["equity_mtm"] if d.get("equity_mtm") is not None else d["equity"])
     return v
 
 
@@ -183,6 +242,16 @@ def desk_30d(out: str, now: int) -> dict:
     """Return of each desk over the last 30 days (from the desks' own histories), for the tilt of the directional part."""
     since = now - 30 * 86_400_000
     r = {}
+    if whale_mode(out):
+        x = _ret([[p[0], p[1]] for p in (_load(out, "whales_top.json")["desk"].get("history") or []) if isinstance(p, list) and len(p) == 2], since)
+        if x is not None:
+            r["futures"] = x
+        for k, h in (("funding", _load(out, "funding.json").get("history")), ("basis", _load(out, "basis.json").get("history")),
+                     ("yield", _load(out, "yield.json").get("history")), ("susde", _susde(out).get("history"))):
+            x = _ret(h or [], since)
+            if x is not None:
+                r[k] = x
+        return r
     pf = (_load(out, "portfolio.json").get("portfolios") or {}).get("ideas") or {}
     x = _ret([[p.get("time", 0), p.get("v")] for p in pf.get("history") or []], since)
     if x is not None:
@@ -254,7 +323,7 @@ def allocate(profile: dict, reg: str, r30: dict, rates: dict, available: set, re
     d = profile[reg]
     act = profile.get("act", 0.0)
     w = {"spot": d * (1 - profile["fut"] - act), "active": d * act, "futures": d * profile["fut"]}
-    why.append(f"Рынок: {'рост' if reg == 'on' else 'осторожность'} — {reason or regime_text(reg)}: на рост (спот, активный спот, фьючерсы) {d*100:.0f}%.")
+    why.append(f"Рынок: {'рост' if reg == 'on' else 'осторожность'} — {reason or regime_text(reg)}: на рост ({'спот, активный спот, фьючерсы' if 'active' in available else 'спот, фьючерсы'}) {d*100:.0f}%.")
     for k in ("active", "futures"):                  # a desk that isn't running yet: its share stays in the spot portfolio
         if k not in available and "spot" in available:
             w["spot"] += w[k]
@@ -354,6 +423,8 @@ def spot_cash_bonus(out: str, rates: dict, dt_ms: int) -> float:
     idle — it sits in lending like the rest of the dollars. Multiplier for the spot sleeve over dt_ms."""
     pf = (_load(out, "portfolio.json").get("portfolios") or {}).get("ideas") or {}
     cash = (pf.get("cash_pct") or 0) / 100
+    if whale_mode(out):                                  # the core holds no cash of its own
+        return 1.0
     apy = rates.get("yield")
     if not cash or apy is None or dt_ms <= 0:
         return 1.0
@@ -399,6 +470,17 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     reg, reason = regime(out)
     rates = carry_rates(out, now)
     events = []
+    wm = whale_mode(out)
+    model = "whales" if wm else "desks"
+    if st.get("models") and st.get("version") == VERSION and st.get("model", "desks") != model:   # 05.11: the model changed → one restart
+        old = st["models"]["balanced"]["sleeves"]
+        prev = {"version": VERSION, "model": st.get("model", "desks"), "started": st.get("started"), "ended": now, "value": round(sum(old.values()), 2)}
+        conn.execute("DELETE FROM capital_state")
+        conn.execute("DELETE FROM capital_hist")
+        st = {"previous": prev}
+        events.append(("Новая модель: фьючерсы — копии сделок 5 проверенных трейдеров (стол «Киты»), спот — ядро BTC, ETH и SOL, как на "
+                       f"реальном счёте. Демо-счёт начат заново с ${START:,.0f} (прошлый запуск закончился на ${prev['value']:,.2f}).")
+                      if wm else f"Модель «Киты» недоступна — демо-счёт начат заново с ${START:,.0f}.")
     if (st.get("sleeves") or st.get("models")) and st.get("version") != VERSION:   # the allocator changed → one clean restart
         old = st.get("sleeves") or st["models"]["balanced"]["sleeves"]
         prev = {"version": st.get("version", 1), "started": st.get("started"), "ended": now, "value": round(sum(old.values()), 2)}
@@ -408,11 +490,13 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
         events.append(f"Новая версия распределения: 6 источников и умный распределитель — демо-счёт начат заново с ${START:,.0f} "
                       f"(прошлый запуск закончился на ${prev['value']:,.2f}).")
     avail = set(desks) & set(KEYS)
+    if wm:
+        avail -= {"active", "listings"}
     if not rates.get("listings_ok"):                     # tracked, but not a source of its own until its live test passes
         avail.discard("listings")
     if not st.get("models"):
         r30 = desk_30d(out, now)
-        st = {**st, "version": VERSION, "started": now, "last": desks, "week": _monday(now), "month_start": _month_start(now),
+        st = {**st, "version": VERSION, "model": model, "started": now, "last": desks, "week": _monday(now), "month_start": _month_start(now),
               "month_value": START, "regime": reg, "split_at": now, "models": {}}
         for m, prof in PROFILES.items():
             w, why = allocate(prof, reg, r30, rates, avail, reason)
@@ -423,8 +507,8 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
         last = st["last"]
         bonus = spot_cash_bonus(out, rates, now - st.get("t_last", now))
         for mk, m in st["models"].items():
-            m["sleeves"] = _follow(m["sleeves"], last, desks, bonus, PROFILES[mk]["spot"])
-        st["bench"] = _follow(st["bench"], last, desks, bonus, PROFILES["balanced"]["spot"])
+            m["sleeves"] = _follow(m["sleeves"], last, desks, bonus, {"core": 1.0} if wm else PROFILES[mk]["spot"])
+        st["bench"] = _follow(st["bench"], last, desks, bonus, {"core": 1.0} if wm else PROFILES["balanced"]["spot"])
         st["last"] = {**last, **desks}
         main = st["models"]["balanced"]
         if _month_start(now) != st["month_start"]:          # a new calendar month: the previous one is closed
@@ -475,7 +559,8 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     w_now = main["weights"]
     return {"asof": now, "name": "CRYPTO NOVA Портфолио", "version": VERSION, "start_usd": START, "started": st["started"],
             "value_usd": round(total, 2), "pnl_usd": round(total - START, 2), "pnl_pct": round((total / START - 1) * 100, 2),
-            "sleeves": [{"key": k, "name_ru": NAMES[k], "kind": "directional" if k in DIRECTIONAL else ("short" if k == "listings" else "carry"), "risk": RISK[k],
+            "model": model,
+            "sleeves": [{"key": k, "name_ru": (WHALE_NAMES.get(k) if wm else None) or NAMES[k], "kind": "directional" if k in DIRECTIONAL else ("short" if k == "listings" else "carry"), "risk": RISK[k],
                          "weight": w_now.get(k), "rate_now": round(rates[k], 2) if k in CARRY and rates.get(k) is not None else None,
                          "value_usd": round(v, 2), "share_now": round(v / total, 4) if total else None}
                         for k, v in sorted(main["sleeves"].items(), key=lambda kv: KEYS.index(kv[0]))],
@@ -488,7 +573,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
                       "fee_usd": round(max(0.0, month_profit) * FEE, 2), "fee_pct": FEE * 100},
             "months": st.get("months", []), "history": hist, "events": events, "event_log": st["ev"][-20:], "previous": st.get("previous"),
             "index_keys": IDX_KEYS, "index_history": st.get("idx", []),
-            "models": {k: {**MODELS[k], "w": m["weights"], "why_ru": m.get("why", []), "value_usd": round(sum(m["sleeves"].values()), 2),
+            "models": {k: {**MODELS[k], **(WHALE_MODELS.get(k, {}) if wm else {}), "w": m["weights"], "why_ru": m.get("why", []), "value_usd": round(sum(m["sleeves"].values()), 2),
                            "pnl_pct": round((sum(m["sleeves"].values()) / START - 1) * 100, 2), "history": m["hist"][-200:]}
                        for k, m in st["models"].items()},
             "models_rank": rank_models(st["models"], now, st["started"]), "options": OPTIONS,
@@ -515,8 +600,8 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
                 "кредитовании), но рискованное: деньги он получает только после живой проверки — 20 закрытых демо-сделок и в среднем "
                 "не меньше +1% на сделку. Тогда — 8% суммы в Сбалансированной и 12% в Смелой (Спокойная без него).",
                 "Арбитраж и треугольник денег не получают: их цифры — виртуальная оценка, клиент не может их исполнить.",
-                "В конце месяца — итог; 10% от прибыли — оплата (месяц без прибыли бесплатно).",
-                "Это демо, а не обещание: результат может быть и минусом."]}
+                "В конце месяца — итог; 10% от прибыли — оплата (за месяц без прибыли оплаты нет).",
+                "Это демо, а не обещание: результат может быть и минусом."] if not wm else WHALE_RULES}
 
 
 def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> dict:

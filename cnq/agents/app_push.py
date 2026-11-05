@@ -3,10 +3,12 @@
 Rules:
 - only what the user switched on (Кабинет → Уведомления); default (28.10, spec §14 — no notifications without consent): all off;
 - quiet hours 22:00–09:00 Kyiv time: nothing is sent (trade news is not queued — it would be stale);
-- trades: a CRYPTO NOVA demo trade opened or closed, at most 6 messages a day per person, several at once are bundled;
-- piggy: one reminder on the buy day at 10:00 Kyiv; weekly summary: Friday 18:00 Kyiv;
+- trades (05.11, owner: the system copies the top-5 verified traders since 04.11): ONE evening summary of the «Киты» demo desk
+  (whales_top.json desk) at 20:00 Kyiv — copies closed today, their result, how many are open; only when a closed copy moved at
+  least $5 (no pushes about $1–2 trades); no push per trade, the retired rule desks are no longer pushed;
+- piggy: one reminder on the buy day at 10:00 Kyiv; weekly summary («Киты» desk over 7 days): Friday 18:00 Kyiv;
 - «важное на рынке» (news switch): bitcoin moved ≥ 5% in 24 h — at most once a day, 10:00–21:00 Kyiv.
-Every trade message says «демо». Runs every engine cycle; reads data/api.sqlite (users, prefs, push tokens), web/paper.json
+Every trade message says «демо». Runs every engine cycle; reads data/api.sqlite (users, prefs, push tokens), web/whales_top.json
 and web/markets.json. Timed messages have a 10-minute window and are deduplicated per person and day (a slow cycle never
 skips or doubles them)."""
 from __future__ import annotations
@@ -23,7 +25,10 @@ try:                                  # Kyiv time with summer / winter time (UTC
 except Exception:  # noqa: BLE001
     KYIV = dt.timezone(dt.timedelta(hours=3))
 QUIET = (22, 9)
-TRADE_CAP = 6
+TRADE_CAP = 1           # 05.11: one «Киты» summary a day per person
+MIN_USD = 5.0           # a copy that moved less than $5 is not news (owner 04.11: «сделки по $1–2 неинтересны»)
+DAILY_HOUR = 20         # the evening summary, Kyiv time
+DAY_MS = 86_400_000
 BIG_MOVE = 5.0          # % in 24 h that counts as «важное на рынке»
 
 
@@ -53,31 +58,47 @@ def _db(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE TABLE IF NOT EXISTS push_log(uid TEXT, kind TEXT, day TEXT, t INTEGER)")
 
 
-def _mix_keys() -> list[str]:
+def _desk(out: str) -> dict:
     try:
-        from .signal_feed import SOURCES
-        return [k for k, _n, _w in SOURCES]
+        with open(os.path.join(out, "whales_top.json"), encoding="utf-8") as f:
+            d = (json.load(f) or {}).get("desk") or {}
+        return d if isinstance(d, dict) else {}
     except Exception:  # noqa: BLE001
-        return ["bal"]
+        return {}
 
 
-def trade_events(paper: dict) -> list[dict]:
-    """20.10: trades of every source of the CRYPTO NOVA mix (the main desk + our own daily signals + …), not only the main desk"""
-    prof = paper.get("profiles") or {}
-    ev = []
-    for src in _mix_keys():
-        desk = prof.get(src) or (paper if src == "bal" and not prof else {})
-        for o in desk.get("open") or []:
-            side = "рост" if str(o.get("side")).upper() == "LONG" else "падение"
-            tps = o.get("tps") or []
-            ev.append({"key": f"open:{o.get('id') or o.get('symbol')}:{o.get('opened')}", "title": "Новая сделка CRYPTO NOVA · демо",
-                       "body": f"{o.get('symbol')} · {side} · вход {_fmt_price(o.get('entry'))}, стоп {_fmt_price(o.get('stop'))}"
-                               + (f", цель {_fmt_price(tps[-1])}" if tps else ""), "sym": o.get("symbol"), "src": src})
-        for c in desk.get("closed") or []:
-            pnl = float(c.get("pnl_usd") or 0)
-            ev.append({"key": f"close:{c.get('id') or c.get('symbol')}:{c.get('closed')}", "title": "Сделка закрыта · демо",
-                       "body": f"{c.get('symbol')}: {_fmt_usd(pnl)} на счёте $10 000", "sym": c.get("symbol"), "src": src})
-    return ev
+def _closed_since(desk: dict, since_ms: int) -> list[dict]:
+    return [c for c in desk.get("closed") or [] if isinstance(c, dict) and (c.get("closed_t") or 0) >= since_ms]
+
+
+def day_summary(out: str, now_ms: int) -> tuple[str, str] | None:
+    """(title, body) of the evening «Киты» summary: the copies the demo desk closed today (Kyiv) — None when nothing worth a push
+    (no closed copy that moved at least MIN_USD)"""
+    desk = _desk(out)
+    k = _now_kyiv(now_ms)
+    day0 = int(k.replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000)
+    cl = _closed_since(desk, day0)
+    if not any(abs(float(c.get("pnl") or 0)) >= MIN_USD for c in cl):
+        return None
+    tot = sum(float(c.get("pnl") or 0) for c in cl)
+    wins = sum(1 for c in cl if float(c.get("pnl") or 0) > 0)
+    best = max(cl, key=lambda c: float(c.get("pnl") or 0))
+    n_open = len([o for o in desk.get("open") or [] if isinstance(o, dict)])
+    body = (f"Закрыто копий: {len(cl)}, в плюсе {wins}; итог {_fmt_usd(tot)} на демо-счёте $10 000"
+            + (f". Лучшая: {best.get('coin')} {_fmt_usd(float(best.get('pnl') or 0))}" if float(best.get("pnl") or 0) > 0 else "")
+            + f". В работе {n_open}.")
+    return "Киты за день · демо", body
+
+
+def week_summary(out: str, now_ms: int) -> tuple[str, str] | None:
+    """(title, body) of the Friday summary of the «Киты» demo desk over 7 days — None without closed copies"""
+    desk = _desk(out)
+    cl = _closed_since(desk, now_ms - 7 * DAY_MS)
+    if not cl:
+        return None
+    tot = sum(float(c.get("pnl") or 0) for c in cl)
+    return ("Итоги недели · Киты",
+            f"Копии сделок 5 проверенных трейдеров: закрыто {len(cl)}, итог {_fmt_usd(tot)} на демо-счёте $10 000. Подробности — в приложении.")
 
 
 def _big_move(out: str) -> tuple[str, str] | None:
@@ -104,30 +125,10 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
     if fcm is None:
         from cnq.api.push import Fcm
         fcm = Fcm()
-    try:
-        with open(os.path.join(out, "paper.json"), encoding="utf-8") as f:
-            paper = json.load(f)
-    except Exception:  # noqa: BLE001
-        paper = {}
     first_run = conn.execute("SELECT 1 FROM push_seen WHERE key='__init__'").fetchone() is None
     if first_run:
         conn.execute("INSERT OR IGNORE INTO push_seen VALUES('__init__', ?)", (now_ms,))
-    fresh = []
-    # a source seen for the first time (e.g. our own daily signals, added 20.10) only remembers its existing trades — silently
-    have = (paper.get("profiles") or {}).keys()
-    new_src = {s for s in _mix_keys() if s != "bal" and s in have
-               and conn.execute("SELECT 1 FROM push_seen WHERE key=?", (f"__init__:{s}",)).fetchone() is None}
-    for s in new_src:
-        conn.execute("INSERT OR IGNORE INTO push_seen VALUES(?, ?)", (f"__init__:{s}", now_ms))
-    for e in trade_events(paper):
-        if conn.execute("SELECT 1 FROM push_seen WHERE key=?", (e["key"],)).fetchone():
-            continue
-        conn.execute("INSERT INTO push_seen VALUES(?,?)", (e["key"], now_ms))
-        if e.get("src") not in new_src:
-            fresh.append(e)
     conn.commit()
-    if first_run:                 # the very first run only remembers what already exists — no flood of old trades
-        return {"sent": 0, "first_run": True, "events": len(fresh)}
     if not os.path.exists(api_db):
         return {"sent": 0, "reason": "no api db"}
     from cnq.api.store import Store
@@ -135,22 +136,15 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
     day = _now_kyiv(now_ms).strftime("%Y-%m-%d")
     sent, dropped, results = 0, 0, {}
     msgs: list[tuple[str, str, str, dict]] = []      # (pref, title, body, data)
-    if fresh and not quiet(now_ms):
-        if len(fresh) == 1:
-            msgs.append(("trades", fresh[0]["title"], fresh[0]["body"], {"open": "futures"}))
-        else:
-            msgs.append(("trades", f"CRYPTO NOVA · {len(fresh)} события по сделкам · демо",
-                         "; ".join(e["body"] for e in fresh[:3]) + (" …" if len(fresh) > 3 else ""), {"open": "futures"}))
     k = _now_kyiv(now_ms)
-    if k.weekday() == 4 and k.hour == 18 and k.minute < 10:
-        prof = (paper.get("profiles") or {}).get("bal") or {}
-        hist = prof.get("equity_history") or []
-        week_ago = now_ms - 7 * 86_400_000
-        base = next((h["equity"] for h in hist if h["time"] >= week_ago), None)
-        if base and hist:
-            # final QA 28.10: «Итоги системы за неделю» — not «что заработала система» (a week can end in a loss)
-            msgs.append(("brief", "Итоги системы за неделю", f"Система за неделю: {_fmt_usd(hist[-1]['equity'] - base)} на демо-счёте $10 000. Подробности — в приложении.",
-                         {"open": "home"}))
+    summary = day_summary(out, now_ms) if k.hour == DAILY_HOUR and not quiet(now_ms) else None
+    if summary:                                       # once a day per person (push_log); the whole hour so a slow cycle never skips it
+        msgs.append(("trades", summary[0], summary[1], {"open": "futures"}))
+    if k.weekday() == 4 and k.hour == 18:
+        ws = week_summary(out, now_ms)
+        if ws:
+            # final QA 28.10: «Итоги … за неделю» — not «что заработала система» (a week can end in a loss)
+            msgs.append(("brief", ws[0], ws[1], {"open": "home"}))
     move = _big_move(out)
     if move and 10 <= k.hour < 21:
         msgs.append(("news", move[0], move[1], {"open": "home"}))
@@ -190,4 +184,4 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
                 conn.execute("INSERT INTO push_log VALUES(?,?,?,?)", (uid, "piggy", day, now_ms))
                 sent += 1
     conn.commit()
-    return {"sent": sent, "dropped": dropped, "results": results, "events": len(fresh), "quiet": quiet(now_ms)}
+    return {"sent": sent, "dropped": dropped, "results": results, "summary": bool(summary), "quiet": quiet(now_ms)}

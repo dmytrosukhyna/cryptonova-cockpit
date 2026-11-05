@@ -85,7 +85,13 @@ COPY_MAX_LEV = 20
 LIQ_ROOM = 0.8              # leverage ≤ 0.8 ÷ stop distance: the stop always triggers well before an isolated position is liquidated
 WHALES = "whales"           # the copy desk's key (desk_select stages, the trade ids «whales:<id>»)
 WHALES_STALE_MS = 3 * 3_600_000
-RISK_CAP = 0.02             # hard ceiling: 2 % of the futures budget per trade (owner 04.11 17:24: «Риск 2% на сделку»; was 1 %)
+# 05.11 15:18 (owner, real money, «и 1, и 2, и 3 запускать»): 3 % of the futures budget per trade (was 2 %); back to RISK_BACK (2 %)
+# automatically while the rolling 7-day realised result is below −RISK_BACK_DD (−5 %) of the budget (logged «risk_back»)
+RISK_CAP = 0.03
+RISK_BACK, RISK_BACK_DD, RISK_BACK_DAYS = 0.02, 0.05, 7
+# 05.11 15:18 (owner): the whole sleeve's notional ≤ the budget × ROOM_LEV (was the general 2×); a position's own leverage stays the
+# desk's (copies: the whale's, ≤ 20×, liquidation beyond the stop); OKX_FUT_ROOM_LEV may lower it
+ROOM_LEV = 5
 RISK_MULT = 2.0            # owner 04.11: trades twice as large — the desk's own risk share × 2, still within RISK_CAP
 MAX_POS = 15                # 04.11 22:35 (owner): 5 followed whales × their positions must fit (was 5); margin stays ≤ the budget
 # 05.11 (watch): «instrument busy» is NOT final — the whale ETH/SOL shorts of 04.11 were skipped for good while another desk held
@@ -130,6 +136,7 @@ def caps(env=None) -> dict:
     return {"lev": max(1, min(MAX_LEV, int(_num(e, "OKX_FUT_MAX_LEV", DEF_LEV)))),
             "copy_lev": max(1, min(COPY_MAX_LEV, int(_num(e, "OKX_FUT_COPY_MAX_LEV", COPY_MAX_LEV)))),
             "risk": min(RISK_CAP, _num(e, "OKX_FUT_RISK", RISK_CAP)),
+            "room_lev": max(1, min(ROOM_LEV, int(_num(e, "OKX_FUT_ROOM_LEV", ROOM_LEV)))),
             "max_pos": max(1, min(MAX_POS, int(_num(e, "OKX_FUT_MAX_POS", MAX_POS)))),
             "day_loss": min(DAY_LOSS, _num(e, "OKX_FUT_DAY_LOSS", DAY_LOSS))}
 
@@ -486,6 +493,25 @@ def day_start(now: int) -> int:
     return now - now % DAY
 
 
+def week_pnl(ctx: Ctx, now: int) -> float:
+    """realised P/L of the last RISK_BACK_DAYS days (OKX positions history; fees and funding included) + the open losses"""
+    start = now - RISK_BACK_DAYS * DAY
+    try:
+        hist = ctx.get("/api/v5/account/positions-history", {"instType": "SWAP", "limit": 100})
+    except ms.OkxError:
+        hist = []
+    real = sum(ms._f(h.get("realizedPnl")) or 0.0 for h in hist if int(h.get("uTime") or 0) >= start)
+    upl = sum(p["upl"] for p in ctx.positions().values())
+    return round(real + min(0.0, upl), 2)
+
+
+def risk_now(cap: dict, wk: float, bud: float) -> tuple[float, str | None]:
+    """(risk share per trade, why it was stepped back) — RISK_BACK while the 7-day result is below −RISK_BACK_DD of the budget"""
+    if bud > 0 and wk < -RISK_BACK_DD * bud and cap["risk"] > RISK_BACK:
+        return RISK_BACK, f"риск {cap['risk'] * 100:g}% → {RISK_BACK * 100:g}%: за {RISK_BACK_DAYS} дней {wk:+.2f}$ — хуже −{RISK_BACK_DD * 100:g}% бюджета"
+    return cap["risk"], None
+
+
 def day_pnl(ctx: Ctx, now: int) -> float:
     """Realised P/L of the UTC day (fees and funding included, OKX positions history) + the open losses. The sub-account is the
     autopilot's own: every SWAP position on it counts."""
@@ -586,7 +612,7 @@ def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict
     risk_usd = min(frac * part * RISK_MULT, cap["risk"] * bud)
     inst_max = int(float(inst.get("lever") or COPY_MAX_LEV))
     lev = max(1, min(cap["lev"], inst_max))
-    room_lev = lev                                  # the whole sleeve's notional stays ≤ budget × the general cap
+    room_lev = cap.get("room_lev", lev)             # 05.11: the whole sleeve's notional stays ≤ budget × ROOM_LEV (5×)
     lev_note = None
     if t.get("copy_lev"):                           # 05.11 (owner): a copy desk trades the copied trader's own leverage (≤ 20× backstop)
         lev = max(1, min(cap.get("copy_lev", COPY_MAX_LEV), inst_max, int(float(t["copy_lev"]))))
@@ -1005,6 +1031,16 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             if bud["usd"] > 0 and dp <= -cap["day_loss"] * bud["usd"]:
                 st["day_stop"] = day
                 log({"ev": "day_stop", "day_pnl": dp, "budget": bud["usd"]}, log_path)
+        wk = week_pnl(ctx, now)                 # 05.11: the 7-day step-back of the risk per trade
+        r_now, back = risk_now(cap, wk, bud["usd"])
+        if back and st.get("risk_back") != day:
+            log({"ev": "risk_back", "week_pnl": wk, "budget": bud["usd"], "risk": r_now, "why": back}, log_path)
+            st["risk_back"] = day
+        elif not back and st.get("risk_back"):
+            log({"ev": "risk_restore", "week_pnl": wk, "budget": bud["usd"], "risk": r_now}, log_path)
+            st.pop("risk_back", None)
+        cap = {**cap, "risk": r_now}
+        st["risk_now"] = r_now
         if st.get("day_stop") == day:
             res["skipped"] += [{"id": tid, "why": "дневной стоп: убыток дня ≥ 3% бюджета фьючерсов — новых входов до завтра (UTC)"} for tid, _ in fresh]
             fresh = []

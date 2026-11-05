@@ -131,10 +131,10 @@ def test_risk_as_the_system_capped_at_one_percent_and_leverage_never_above_three
     """Owner 22.10: «риск фьючерсов как у системы» — the desk's own risk share × this desk's part; 1 % of the budget is the ceiling."""
     fk = F.FakeOkx()
     e = F.env(OKX_FUT_MAX_LEV="10", OKX_FUT_RISK="0.05")                   # env can't loosen the hard caps
-    assert fu.caps(e) == {"lev": 3, "copy_lev": 20, "risk": 0.02, "max_pos": 15, "day_loss": 0.03}
+    assert fu.caps(e) == {"lev": 3, "copy_lev": 20, "risk": 0.03, "room_lev": 5, "max_pos": 15, "day_loss": 0.03}
     run(fk, e, F.desks(F.trade(risk=500.0)))                                 # desk risked 5 % → capped at 1 % of the budget
     o = swap_orders(fk)[0]
-    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 1500 * 0.02 + 1e-6    # owner 04.11: the ceiling is 2 % of the budget
+    assert float(o["sz"]) * (float(o["px"]) - 190.0) <= 1500 * 0.03 + 1e-6    # owner 05.11: the ceiling is 3 % of the budget
     fk2 = F.FakeOkx()
     run(fk2, F.env(), F.desks(F.trade(risk=150.0)))                          # desk risked 1.5 % → 1.5 % × 2 of the $750 part = $22.50
     o2 = swap_orders(fk2)[0]
@@ -516,3 +516,18 @@ def test_busy_instrument_is_retried_after_the_other_position_closes():
     fu.save_state(st, e)
     run(fk, e, F.desks(a, imp=[b]))
     assert "imp:B1" not in fu.load_state(e)["skip"]
+
+
+def test_risk_three_percent_steps_back_to_two_after_a_bad_week_and_the_sleeve_room_is_five_x():
+    """05.11 15:18 (owner): 3 % per trade, back to 2 % while the 7-day result < −5 % of the budget; sleeve notional ≤ 5 × budget"""
+    cap = fu.caps(F.env())
+    assert cap["risk"] == 0.03 and cap["room_lev"] == 5 and fu.caps(F.env(OKX_FUT_ROOM_LEV="9"))["room_lev"] == 5
+    assert fu.risk_now(cap, -100.0, 2500.0) == (0.03, None)
+    r, why = fu.risk_now(cap, -130.0, 2500.0)
+    assert r == 0.02 and "3% → 2%" in why
+    inst = {"tickSz": "0.01", "ctVal": "1", "lotSz": "1", "minSz": "1", "lever": "20"}
+    t = {"side": "LONG", "entry": 100.0, "stop": 92.0, "risk_usd": 300.0, "copy_lev": 10.0}
+    big = fu.size(t, 10000.0, 2500.0, 2500.0, cap, inst, 100.0, 1.0, 0.0, 100000.0)
+    assert big["risk_usd"] <= 2500 * 0.03 + 1e-6 and big["notional"] > 2500 * 2 * 0.15     # 3 %: ~ $940 notional
+    full = fu.size(t, 10000.0, 2500.0, 2500.0, cap, inst, 100.0, 1.0, 2500 * 5 - 300.0, 100000.0)
+    assert full["notional"] <= 300.0 + 1e-6 and "предел плеча 5" in full["capped"]          # the 5 × budget room binds

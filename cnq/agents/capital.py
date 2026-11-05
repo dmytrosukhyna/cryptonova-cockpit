@@ -108,14 +108,14 @@ KYIV = dt.timezone(dt.timedelta(hours=3))
 WHALE_MODELS = {
     "calm": {"about_ru": "Держим ядро BTC 30 / ETH 10 / SOL 5 (в этих пропорциях), без фьючерсов; когда BTC ниже своей 200-дневной "
                          "средней — большая часть уходит в доходные доллары."},
-    "balanced": {"about_ru": "Как реальный счёт: ядро BTC / ETH / SOL на споте и фьючерсы — копии сделок 5 проверенных трейдеров; "
+    "balanced": {"about_ru": "Как реальный счёт: ядро BTC / ETH / SOL на споте и фьючерсы по сигналам системы CRYPTO NOVA; "
                              "доли система двигает сама — по рынку и по ставкам."},
-    "bold": {"about_ru": "Больше фьючерсов — копий сделок 5 проверенных трейдеров — и выше риск. Защита та же: режим BTC, стоп у "
-                         "каждой копии, плечо не выше 5×, резерв в кредитовании."},
+    "bold": {"about_ru": "Больше фьючерсов по сигналам системы CRYPTO NOVA — выше и доход, и риск. Защита та же: режим BTC, стоп у "
+                         "каждой сделки, плечо не выше 5×, резерв в кредитовании."},
 }
 WHALE_RULES = [
-    f"Демо-счёт ${START:,.0f} по модели реального счёта: спот — ядро BTC, ETH и SOL (30 / 10 / 5), фьючерсы — копии сделок 5 проверенных "
-    "трейдеров копитрейдинга (стол «Киты»: у каждой копии стоп, плечо не выше 5×, выход вместе с трейдером).",
+    f"Демо-счёт ${START:,.0f} по модели реального счёта: спот — ядро BTC, ETH и SOL (30 / 10 / 5), фьючерсы — сигналы системы "
+    "CRYPTO NOVA (у каждой сделки стоп, плечо не выше 5×; позицию система закрывает при развороте сигнала или по стопу).",
     "Часть со ставкой на рост (спот и фьючерсы) зависит от рынка: когда BTC выше своей 200-дневной средней и за 60 дней в плюсе — 70%, "
     "иначе — 20%. Направление, которое за 30 дней потеряло больше 5%, получает половину доли, заработавшее больше 5% — в 1.25 раза больше.",
     "Остальное — источники без ставки на цену: кредитование стейблкоинов (Aave, Sky), фикс-ставка на фьючерсах BTC/ETH, фандинг и "
@@ -166,7 +166,7 @@ def lst_gate(out: str) -> tuple[bool, dict]:
 # short) get no money. Without the whale file the old model runs unchanged. The switch restarts the demo once (st["model"]).
 CORE_W = {"BTC": 30 / 45, "ETH": 10 / 45, "SOL": 5 / 45}
 CORE_REF = {"BTC": 80_000.0, "ETH": 2_400.0, "SOL": 96.0}          # fixed reference prices: only the ratio between runs matters
-WHALE_NAMES = {"spot": "Спот · ядро BTC / ETH / SOL", "futures": "Фьючерсы · копии «Китов» (топ-5 трейдеров)"}
+WHALE_NAMES = {"spot": "Спот · ядро BTC / ETH / SOL", "futures": "Фьючерсы · система CRYPTO NOVA"}   # owner 05.11: never the method
 
 
 def whale_mode(out: str) -> bool:
@@ -471,16 +471,16 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     rates = carry_rates(out, now)
     events = []
     wm = whale_mode(out)
-    model = "whales" if wm else "desks"
-    if st.get("models") and st.get("version") == VERSION and st.get("model", "desks") != model:   # 05.11: the model changed → one restart
+    model = "system" if wm else "desks"
+    if st.get("models") and st.get("version") == VERSION and st.get("model", "desks") not in (model, "whales" if wm else model):   # 05.11: the model changed → one restart
         old = st["models"]["balanced"]["sleeves"]
         prev = {"version": VERSION, "model": st.get("model", "desks"), "started": st.get("started"), "ended": now, "value": round(sum(old.values()), 2)}
         conn.execute("DELETE FROM capital_state")
         conn.execute("DELETE FROM capital_hist")
         st = {"previous": prev}
-        events.append(("Новая модель: фьючерсы — копии сделок 5 проверенных трейдеров (стол «Киты»), спот — ядро BTC, ETH и SOL, как на "
+        events.append(("Новая модель: фьючерсы — сигналы системы CRYPTO NOVA, спот — ядро BTC, ETH и SOL, как на "
                        f"реальном счёте. Демо-счёт начат заново с ${START:,.0f} (прошлый запуск закончился на ${prev['value']:,.2f}).")
-                      if wm else f"Модель «Киты» недоступна — демо-счёт начат заново с ${START:,.0f}.")
+                      if wm else f"Модель реального счёта недоступна — демо-счёт начат заново с ${START:,.0f}.")
     if (st.get("sleeves") or st.get("models")) and st.get("version") != VERSION:   # the allocator changed → one clean restart
         old = st.get("sleeves") or st["models"]["balanced"]["sleeves"]
         prev = {"version": st.get("version", 1), "started": st.get("started"), "ended": now, "value": round(sum(old.values()), 2)}

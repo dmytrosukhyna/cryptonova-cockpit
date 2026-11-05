@@ -24,7 +24,8 @@
       const [M, X] = await Promise.all([V.real(), model()]);
       // 04.11: «Куда инвестируют киты» — on-chain smart money (vip/whales.js, smart_money.json; information only)
       let SM = '';
-      try { SM = V.smartMoneyCard ? await V.smartMoneyCard() : ''; } catch (e) { SM = ''; }
+      // 05.11 (owner): «Куда инвестируют киты» — only in the owner's view (CNAuth.state.isOwner)
+      try { SM = V.smartMoneyCard && V.auth.owner() ? await V.smartMoneyCard() : ''; } catch (e) { SM = ''; }
       return `<div class="ph"><div><h2>Спот</h2><p>Спотовая часть публичного портфеля CRYPTO NOVA на OKX с ${V.PUBLIC_START_LABEL}: что куплено, сколько вложено, что делает система и почему.</p></div></div>
         ${summary(M, X)}
         ${assets(M, X)}

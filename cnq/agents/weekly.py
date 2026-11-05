@@ -173,8 +173,8 @@ def _usd(v: float) -> str:
     return (f"+${v:,.2f}" if v >= 0 else f"−${abs(v):,.2f}").replace(",", " ")
 
 
-MODEL_LINE = ("фьючерсы реального счёта повторяют сделки 5 проверенных трейдеров копитрейдинга (риск 2% на сделку, плечо не выше 5×, "
-              "у каждой сделки стоп на бирже); спот — ядро BTC, ETH и SOL.")
+MODEL_LINE = ("фьючерсы и спот реального счёта ведёт система CRYPTO NOVA (риск 2% на сделку, плечо не выше 5×, у каждой сделки "
+              "стоп на бирже); основа спота — BTC, ETH и SOL.")
 
 
 def _plain(html: str) -> str:
@@ -199,8 +199,8 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
     else:
         L.append("- Дней широкого падения не было.")
     L.append("")
-    # 05.11 (owner): the review speaks about the system as it works now — the real OKX account since 22.10, futures copying the
-    # top-5 verified traders («Киты»), spot = the core BTC / ETH / SOL. The retired demo desks stay in the JSON (paper), not in the text.
+    # 05.11 (owner): the review speaks about the real OKX account since 22.10 and the system CRYPTO NOVA only (never the method:
+    # owner 05.11 09:52); spot = the core BTC / ETH / SOL. The retired demo desks stay in the JSON (paper), not in the text.
     if real:
         L.append("## Реальный счёт CRYPTO NOVA на OKX")
         L.append(f"- Счёт {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
@@ -210,7 +210,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
         L.append(f"- Фьючерсных сделок закрыто за неделю: {real['n']}, в плюсе {real['wins']}; в работе {real['open']}, у каждой стоп на бирже.")
         L.append("")
     if whales:
-        L.append("## Киты")
+        L.append("## Система CRYPTO NOVA")
         L += ["- " + ln.lstrip("— ") for ln in whales.split("\n")[1:]]
         L.append("")
     if real and real.get("spot_top"):
@@ -246,7 +246,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
             P.append(f"С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%)".replace("(-", "(−"))
     if whales:
         P.append("")
-        P.append("Киты")
+        P.append("Система CRYPTO NOVA")
         P += whales.split("\n")[1:]
     if real and real.get("spot_top"):
         P.append("")
@@ -300,7 +300,7 @@ def run(conn: sqlite3.Connection, rep: dict, out_path: str, now_ms: int | None =
     except Exception:  # noqa: BLE001
         real = None
     whales = ""
-    try:   # 05.11: the «Киты» block — who we copy, the week's copies and their result, one fund / on-chain highlight
+    try:   # 05.11: the «Система CRYPTO NOVA» block — the week's closed trades and result, open positions, market lines
         from . import whale_digest
         whales = _plain(whale_digest.block(os.path.dirname(out_path) or ".", now_ms, slot="evening", with_trades=True, hours=7 * 24,
                                            period_ru="За неделю", highlights=2))

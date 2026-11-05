@@ -484,6 +484,15 @@ def _futures(paper: dict, now: int, lang: str = DEFAULT, sel: dict | None = None
             "lev_note": t(lang, "fut.lev_note", lo=lo, hi=hi), "lev_range": [lo, hi]}
 
 
+def _trend(out: str) -> dict:
+    """{coin: regime {long, mid, short}} of the coins web/terminal.json analyses — for the «why» of a system signal (05.11)"""
+    try:
+        return {str(c.get("symbol") or "").split("-")[0]: c.get("regime") or {} for c in _load(out, "terminal.json").get("coins") or []
+                if isinstance(c, dict) and c.get("symbol")}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _whale_futures(out: str, now: int, lang: str = DEFAULT) -> tuple[dict, list] | None:
     """05.11 (owner: «демо-портфель — всё как положено»; since 04.11 the real futures copy the top-5 whales): the demo futures card
     is the «Киты» desk — the same copies on $10 000 (whales_top.json desk, cnq/agents/whale_study.py) — in the shape of _futures().
@@ -506,12 +515,6 @@ def _whale_futures(out: str, now: int, lang: str = DEFAULT) -> tuple[dict, list]
         peak = max(peak, start + v)
         dd = min(dd, (start + v) / peak - 1)
 
-    def who(o):   # a nickname people can read; a raw id becomes the exchange's name
-        nm = str(o.get("whale_ru") or "")
-        if nm and not re.match(r"^(bn:|okx:|0x)", nm):
-            return nm
-        w = str(o.get("whale") or nm)
-        return "Binance" if w.startswith("bn:") else "OKX" if w.startswith("okx:") else "Hyperliquid"
     opened = []
     for o in d["open"]:
         if not isinstance(o, dict):
@@ -521,7 +524,7 @@ def _whale_futures(out: str, now: int, lang: str = DEFAULT) -> tuple[dict, list]
         pct = (price / entry - 1) * 100 * (1 if side == "LONG" else -1) if entry and price else None
         opened.append({"sym": o.get("coin"), "side": side, "entry": entry, "price": price, "stop": o.get("stop"), "target": None,
                        "pnl_usd": _r(float(o.get("upnl") or 0)), "pct": _r(pct, 1), "opened": o.get("opened_t"), "expires": None,
-                       "why": t(lang, "why.whale", name=who(o)), "src": "whales", "src_ru": t(lang, "src.whales"),
+                       "why": t(lang, "why.whale"), "src": "system", "src_ru": t(lang, "src.whales"),
                        "why_title": t(lang, "title.whales"), "checks": None, "history": None, "risk": None, "work": None, "note": None,
                        "lev": o.get("lev"), "in_result": True})
     opened.sort(key=lambda o: -(o.get("opened") or 0))
@@ -537,9 +540,9 @@ def _whale_futures(out: str, now: int, lang: str = DEFAULT) -> tuple[dict, list]
              "realized_pct": _r(tot_ / start * 100), "avg_usd": _r(tot_ / n) if n else None, "since": d.get("started"), "base_usd": start}
     card = {"usd": _r(usd), "pct": _r(usd / start * 100), "today_usd": _r(usd - (before[-1] if before else 0.0)), "trades": n + len(opened),
             "status_ru": None if opened else t(lang, "status.whales"), "scan": None, "wins": w_, "closed_n": n,
-            "worst_dd_pct": _r(dd * 100, 1), "since": d.get("started"), "in_result": ["whales"], "open": opened, "closed": closed,
+            "worst_dd_pct": _r(dd * 100, 1), "since": d.get("started"), "in_result": ["system"], "open": opened, "closed": closed,
             "stats": stats, "curve": [[t_, _r(v)] for t_, v in _sample_keep_last(curve)], "about_ru": t(lang, "futures.about.whales"),
-            "lev_note": t(lang, "fut.lev_note", lo=1, hi=5), "lev_range": [1, 5], "desk": "whales"}
+            "lev_note": t(lang, "fut.lev_note", lo=1, hi=5), "lev_range": [1, 5], "desk": "system"}
     return card, curve
 
 
@@ -551,7 +554,7 @@ def _whale_public(public: dict, card: dict, curve: list, ex: dict, now: int, lan
     since = min(int(card.get("since") or now), int(sp.get("since") or now))
     out = dict(public)
     out["futures"] = {"usd": card["usd"], "pct": card["pct"], "equity": _r(START + fr), "base": START, "since": card.get("since"),
-                      "desks": ["whales"], "open_n": len(card["open"]), "in_result_n": len(card["open"]),
+                      "desks": ["system"], "open_n": len(card["open"]), "in_result_n": len(card["open"]),
                       "closed_n": card["closed_n"], "wins": card["wins"]}
     out["total_usd"] = _r(fr + float(sp.get("usd") or 0))
     out["base_usd"] = _r(START + s0)
@@ -1368,7 +1371,7 @@ def _pp_action(a: dict, lang: str, key: str | None = None) -> str:
 
 
 def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAULT, whales: dict | None = None,
-                    real_why: dict | None = None) -> dict | None:
+                    real_why: dict | None = None, trend: dict | None = None) -> dict | None:
     if not real or not real.get("since") or real.get("equity_usd") is None:
         return None
     since, s0, eq, pnl = int(real["since"]), float(real.get("start_usd") or 0), float(real["equity_usd"]), real.get("pnl_usd")
@@ -1506,7 +1509,7 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
         lv = _real_lev(real.get("futures") or [], closed)          # build 47 (§6.5): the cap in one short note
         fut.update({"lev_cap": lv, "lev_note": t(lang, "pp.lev_note", lev=lv["now"], max=lv["max"], risk=_dec(lv["risk_pct"], lang))})
         try:
-            _why_rows(real, paper, open_rows, closed, fut, lv, since, lang, whales, real_why)
+            _why_rows(real, paper, open_rows, closed, fut, lv, since, lang, whales, real_why, trend)
         except Exception as e:  # noqa: BLE001 — the feed never breaks because of an explanation
             print("app_home why_full:", repr(e)[:200], flush=True)
     raw_acts = [a for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
@@ -1530,7 +1533,7 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
 
 
 def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict, lv: dict, since: int, lang: str,
-              whales: dict | None = None, real_why: dict | None = None) -> None:
+              whales: dict | None = None, real_why: dict | None = None, trend: dict | None = None) -> None:
     """build 53 (owner 31.10: «"Откуп дисконта фьючерса" — никто не понимает»): every real trade, open or closed, gets "why_full" —
     the signal in plain words with its own numbers, the checks the system ran, the rule's record on history and on this account,
     the plan and the $ at risk (cnq/agents/app_why.py). Closed trades find their desk trade through the fut_open action's sig."""
@@ -1543,7 +1546,8 @@ def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict,
     for c in closed:
         c["sig"] = aw.open_sig_for_closed(c, acts)
     ctx = {"since": since, "budget_usd": fut.get("value_usd") or ((fut.get("start_usd") or 0) + (fut.get("pnl_usd") or 0)) or None,
-           "closed_grades": [(aw.grade_of(c.get("sig")), float(c.get("pnl_usd") or 0)) for c in closed if c.get("sig")]}
+           "closed_grades": [(aw.grade_of(c.get("sig")), float(c.get("pnl_usd") or 0)) for c in closed if c.get("sig")],
+           "trend": trend or {}}          # 05.11: {coin: regime} from web/terminal.json — the «why» of a system signal names the trend
     caps = {"lev": lv.get("set") or lv.get("now"), "risk_pct": lv.get("risk_pct")}
     wdesk = (whales or {}).get("desk") if isinstance(whales, dict) else None
     try:
@@ -1565,8 +1569,8 @@ def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict,
         if not g:
             continue
         if str(sig).startswith("whales:"):
-            # build 54 (owner 04.11): a copy of a whale's trade says who the whale is, what it did and its record — never the
-            # generic «Сделка по правилам CRYPTO NOVA»; its reference target (2R) also feeds the live bar
+            # 05.11 (owner 09:52): a futures trade of the system is explained as «Сигнал системы CRYPTO NOVA» — the market at the
+            # entry, the plan and the exit rule, never the whale; its reference target (2R) also feeds the live bar
             wd = aw.whale_trade(sig, wdesk)
             rec = aw.whale_record((wd or {}).get("whale"), whales)
             wcaps = {**caps, "lev": copy_lev or caps.get("lev")}
@@ -1844,7 +1848,8 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
         public["real"] = real
     try:
         pport = _real_portfolio(real, paper, now, lang, ex["whales_top"] if "whales_top" in ex else _load(out, "whales_top.json"),
-                                ex["real_why"] if "real_why" in ex else _load(out, "real_why.json"))
+                                ex["real_why"] if "real_why" in ex else _load(out, "real_why.json"),
+                                ex["trend"] if "trend" in ex else _trend(out))
     except Exception as e:  # noqa: BLE001 — the feed never breaks because of the real account's file
         print("app_home public_portfolio:", repr(e)[:200], flush=True)
         pport = None
@@ -1910,7 +1915,7 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
     ex = {"ideas": ideas.get("positions") or [], "ideas_pf": ideas, "rows": _load(out, "ideas.json").get("statuses") or {},
           "fut_curve": nova_result(paper.get("profiles") or {}, now, sel)[1], "sel": sel,
           "tok": _load(out, "tokenomics.json"), "profiles": _load(out, "coin_profiles.json").get("coins") or {},
-          "live": _live_shares(out, now), "sys": sys_issues(out, now), "btc": _load(out, "app_btc.json")}
+          "live": _live_shares(out, now), "sys": sys_issues(out, now), "btc": _load(out, "app_btc.json"), "trend": _trend(out)}
     docs = {lang: _polished(build(paper, pf, mk, out, now, lang, ex), lang) for lang in LANGS}
     for lang in [x for x in LANGS if x != DEFAULT] + [DEFAULT]:          # Russian last: its mtime says «all languages written»
         _write(out, file_name("app_home", lang), docs[lang])

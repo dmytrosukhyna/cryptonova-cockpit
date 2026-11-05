@@ -84,10 +84,10 @@ def day_summary(out: str, now_ms: int) -> tuple[str, str] | None:
     wins = sum(1 for c in cl if float(c.get("pnl") or 0) > 0)
     best = max(cl, key=lambda c: float(c.get("pnl") or 0))
     n_open = len([o for o in desk.get("open") or [] if isinstance(o, dict)])
-    body = (f"Закрыто копий: {len(cl)}, в плюсе {wins}; итог {_fmt_usd(tot)} на демо-счёте $10 000"
+    body = (f"Закрыто сделок: {len(cl)}, в плюсе {wins}; итог {_fmt_usd(tot)} на демо-счёте $10 000"
             + (f". Лучшая: {best.get('coin')} {_fmt_usd(float(best.get('pnl') or 0))}" if float(best.get("pnl") or 0) > 0 else "")
             + f". В работе {n_open}.")
-    return "Киты за день · демо", body
+    return "Система CRYPTO NOVA за день · демо", body
 
 
 def week_summary(out: str, now_ms: int) -> tuple[str, str] | None:
@@ -97,8 +97,8 @@ def week_summary(out: str, now_ms: int) -> tuple[str, str] | None:
     if not cl:
         return None
     tot = sum(float(c.get("pnl") or 0) for c in cl)
-    return ("Итоги недели · Киты",
-            f"Копии сделок 5 проверенных трейдеров: закрыто {len(cl)}, итог {_fmt_usd(tot)} на демо-счёте $10 000. Подробности — в приложении.")
+    return ("Итоги недели · система CRYPTO NOVA",
+            f"Сигналы системы на демо-счёте $10 000: закрыто сделок {len(cl)}, итог {_fmt_usd(tot)}. Подробности — в приложении.")
 
 
 def _big_move(out: str) -> tuple[str, str] | None:

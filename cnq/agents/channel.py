@@ -5,8 +5,9 @@ already produce (web/*.json). Four slots a day in Kyiv time, in the format Dmytr
   15–17  Новость                — вторая новость дня (если есть сильная)
   20–22  Итоги дня              — главные события, как вёл себя рынок, прогноз кратко/средне/долгосрочно, вывод (+ картинка)
   Сделки реального счёта — только в вечерних «Итогах дня» (отдельный пост на сделку выключен владельцем 04.11).
-  05.11: с 04.11 фьючерсы реального счёта копируют топ-5 проверенных трейдеров (стол «Киты»), спот — ядро BTC/ETH/SOL; утренний
-  и вечерний посты несут короткий блок «Киты» (cnq/agents/whale_digest.py). Тихие часы: 23:00–08:00 по Киеву ничего не уходит.
+  05.11: утренний и вечерний посты несут короткий блок «Система CRYPTO NOVA» (позиции реального счёта, итог, одна строка о рынке —
+  cnq/agents/whale_digest.py). Владелец 05.11 09:52: людям — только «система CRYPTO NOVA» и результат, никогда метод (киты, копии,
+  имена трейдеров). Тихие часы: 23:00–08:00 по Киеву ничего не уходит.
 The LLM writes the text from a compact facts JSON; a post is accepted only if every number in it exists in the facts
 (no invented figures). Without an LLM a plain template is sent. One post per slot per day (table channel_posts).
 """
@@ -328,9 +329,9 @@ class Channel:
     @staticmethod
     def system_line(facts: dict) -> str:
         """«Вывод CRYPTO NOVA» for people: what happened on the market, what the system does, what we expect.
-        05.11 (owner: the whole real futures budget copies the top-5 whales since 04.11): the futures part says that we repeat the
-        trades of 5 verified traders and how many copies are open; the spot part is the core BTC / ETH / SOL. No rule names, no
-        retired desks («откуп падений», «автопилот»), no promises."""
+        05.11 (owner 09:52: «везде должна быть система CRYPTO NOVA … людям нужен только результат»): futures are run by the
+        system CRYPTO NOVA — never the method (whales, copying, traders); the spot part is the core BTC / ETH / SOL. No rule names,
+        no retired desks («откуп падений», «автопилот»), no promises."""
         ap = facts.get("autopilot") or {}
         share = facts.get("stress_share")
         lt = ((facts.get("btc_regime") or {}).get("long_term") or "")
@@ -342,13 +343,12 @@ class Channel:
             s = "Рынок нервный, но без паники."
         else:
             s = "Рынок спокойный, без сильных движений."
-        who = f"{n_wh} проверенных трейдеров" if n_wh else "проверенных трейдеров"
-        if n and n_wh:                         # the «Киты» section right above gives the count of open copies
-            s += f" Фьючерсы повторяют сделки {who}, у каждой сделки стоп на бирже."
+        if n and n_wh:                         # the «Система CRYPTO NOVA» section right above lists the open positions
+            s += " Фьючерсы ведёт система CRYPTO NOVA, у каждой сделки стоп на бирже."
         elif n:
-            s += f" Фьючерсы повторяют сделки {who}: в работе {Channel._deals(n)}, у каждой стоп на бирже."
+            s += f" Фьючерсы: система CRYPTO NOVA ведёт {Channel._deals(n)}, у каждой стоп на бирже."
         else:
-            s += f" Фьючерсы повторяют сделки {who}; открытых сделок сейчас нет — ждём их новых входов."
+            s += " Фьючерсы: открытых сделок сейчас нет — система ждёт свой следующий сигнал."
         if "медвеж" in lt:
             s += " Спот — ядро BTC, ETH и SOL; биткоин ниже своей долгосрочной средней, поэтому крупных покупок не делаем."
         else:
@@ -381,11 +381,9 @@ class Channel:
         opn = [o for o in real.get("futures") or [] if isinstance(o, dict)]
         out["autopilot"] = {"n": len(opn), "coins": [str(o.get("inst") or "").replace("-USDT-SWAP", "") for o in opn]} if opn else None
         out["other_open"] = 0
-        try:   # 05.11: who the real futures copy (whales_top.json «following») — the «Киты» facts for the writer
+        try:   # 05.11: is the «Система CRYPTO NOVA» block there (it lists the positions)? — no names ever reach the writer
             from . import whale_digest
-            fol = whale_digest.following(self.out)
-            out["whales_following"] = len(fol[:5])
-            out["whales_names"] = [f["name"] for f in fol[:5]]
+            out["whales_following"] = 1 if whale_digest.block(self.out, slot="morning") else 0
         except Exception:  # noqa: BLE001
             out["whales_following"] = 0
         out["system_line"] = self.system_line(out)
@@ -505,7 +503,7 @@ class Channel:
         """«Сделки за день» for the evening post: closed in the last 24 h, then the ones still open. Empty when there are none."""
         r = x.get("real") or {}
         lines = []
-        try:   # 05.11: a copy of a whale names the whale («копия 荣耀学员»)
+        try:   # 05.11: which closed trades came from the system's futures signals (never named — owner 05.11)
             from . import whale_digest
             cp = whale_digest.copies(self.out)
         except Exception:  # noqa: BLE001
@@ -514,7 +512,7 @@ class Channel:
         for v in self.closed_trades(x, time.time() * 1000 - 86400_000)[-4:]:
             pc = f" ({v['pct']:+.1f}%)".replace("-", "−") if v.get("pct") is not None else ""
             c = wk.get((re.sub(r"^1000", "", str(v["symbol"])), "long" if str(v["side"]).upper() == "LONG" else "short", v["closed"])) or {}
-            how = (f"копия {c['whale']}" if c.get("whale") else "копия трейдера") if c.get("copy") else f"закрыта {v['exit_ru']}"
+            how = "закрыта по сигналу системы" if c.get("copy") else f"закрыта {v['exit_ru']}"
             lines.append(f"— <b>{v['date'][:5]}</b> · {v['symbol']} {'лонг' if str(v['side']).upper() == 'LONG' else 'шорт'}: "
                          f"<b>{self._usd(v['net_usd'])}{pc}</b>, {how}")
         ow = {(o["coin"], o["side"]): o for o in cp.get("open") or []}
@@ -522,9 +520,8 @@ class Channel:
             u = o.get("upnl_usd")
             sym = str(o.get("inst") or "").replace("-USDT-SWAP", "")
             side = "long" if str(o.get("side", "long")).lower() == "long" else "short"
-            w = (ow.get((re.sub(r"^1000", "", sym), side)) or {}).get("whale")
             lines.append(f"— {sym} {'лонг' if side == 'long' else 'шорт'}: в работе, стоп на бирже"
-                         + (f", сейчас {self._usd(u)}" if u is not None else "") + (f", копия {w}" if w and not str(w).startswith(("bn:", "0x")) else ""))
+                         + (f", сейчас {self._usd(u)}" if u is not None else ""))
         return ("<b>Сделки за день (реальный счёт OKX):</b>\n" + "\n".join(lines)) if lines else ""
 
     @staticmethod
@@ -534,9 +531,9 @@ class Channel:
         def visible(t: str) -> int:
             return len(re.sub(r"<[^>]+>", "", t))
         secs = text.split("\n\n")
-        # 05.11: + «Киты» (first to 2 lines, then to 1), the trades list a second time to 2 lines
+        # 05.11: + «Система CRYPTO NOVA» (to 3 lines, then 2), the trades list a second time to 2 lines
         caps = [("Главное за день", 1), ("Сделки за день", 3), ("Что дальше", 2), ("Календарь", 1), ("Что важно сегодня", 2),
-                ("Уровни на день", 2), ("Сделки за день", 2), ("Киты", 3), ("Киты", 2)]
+                ("Уровни на день", 2), ("Сделки за день", 2), ("Система CRYPTO NOVA", 3), ("Система CRYPTO NOVA", 2)]
         for title, cap in caps:
             if visible("\n\n".join(secs)) <= limit:
                 break
@@ -636,8 +633,9 @@ class Channel:
              "главные слова и цифры (цена, вывод, уровень) выделяй <b>жирным</b> — только тегом <b>, никаких звёздочек * и markdown. Никакого сплошного текста. "
              "Язык — как другу, который не разбирается в крипте: без жаргона, любой термин (поддержка, ликвидации, открытый интерес, фандинг) поясняй простыми словами. "
              "Если какого-то факта нет — просто не упоминай его. Весь текст — только на русском: английские заголовки и фразы из данных обязательно переводи (имена, компании и тикеры можно латиницей). Разметка: только <b>…</b> для заголовков разделов. Без эмодзи, без хэштегов, без ссылок, без подписи в конце. "
-             "Разделы «Киты» и «Сделки за день» добавят к посту после — сам их не пиши и не называй имён трейдеров; "
-             "не упоминай «автопилот», демо-счета и названия старых стратегий.")
+             "Разделы «Система CRYPTO NOVA» и «Сделки за день» добавят к посту после — сам их не пиши. Сделки ведёт система "
+             "CRYPTO NOVA: никогда не пиши про китов, копирование, трейдеров и как устроена система; не упоминай «автопилот», "
+             "демо-счета и названия стратегий.")
 
     PROMPTS = {
         "morning": "Напиши утренний пост. Структура строго:\n<b>Доброе утро, дорогие подписчики!</b>\n<b>Утренний обзор рынка · {date}</b>\n\n<b>Рынок:</b> три строки через «— »: «— <b>Биткоин</b> $… (±…%)», то же для ETH и SOL; без индекса страха и жадности.\n\n<b>Аналитика:</b> один-два абзаца: что сейчас двигает рынок (новости из news с их механизмом, если они есть; если нет — режим и потоки), как ведёт себя биткоин относительно альтов.\n\n<b>Ключевые факторы:</b> 2–3 коротких пункта, каждый с новой строки через «— ».\n\n<b>Уровни на день:</b> две строки из btc_levels: «— Сопротивление: …» и «— Поддержка: …» (числа <b>жирным</b>); без вероятностей, без слов «сценарий», «основной», «запасной»; одной фразой — что будет значить пробой каждого уровня.\n\n<b>Вывод CRYPTO NOVA:</b> 2–3 предложения: защитный или рабочий режим, где ждём разворота (зоны), что делает система — возьми фразу из system_line по смыслу. Пиши как аналитик: что произошло на рынке, что мы сделали, чего ждём. Не упоминай «автопилот», правила и условия входа, не пиши, что новых сделок не будет; спот — частями. Не пиши «входим от сильных уровней» — система так не работает. Если в данных есть events — добавь блок <b>Календарь</b> с этими строками как есть. Пост идёт подписью к картинке, поэтому строго до 800 символов (картинка уже показывает цены, зоны и сценарии с вероятностями — в тексте только уровни, не дублируй всё подряд).",
@@ -779,7 +777,7 @@ class Channel:
             if n.get("mechanism"):
                 parts.append(f"<b>Как это может повлиять на рынок:</b> {n['mechanism']}")
             # 05.11: no «ждём реакцию у зоны» — the system does not trade news or zones; futures copy the verified traders
-            parts.append("<b>Вывод CRYPTO NOVA:</b> на новость не торгуем — фьючерсы повторяют сделки проверенных трейдеров, у каждой сделки стоп на бирже."
+            parts.append("<b>Вывод CRYPTO NOVA:</b> на новость не торгуем вдогонку — система CRYPTO NOVA ведёт свои сделки, у каждой стоп на бирже."
                          + (f" Подтвердит влияние новости: {n['confirms_if']}." if n.get("confirms_if") else ""))
             return "\n\n".join(parts)
         names = {"BTC": "Биткоин", "ETH": "Эфир", "SOL": "Солана"}
@@ -870,12 +868,12 @@ class Channel:
                 if "цель достигнута" in v:
                     facts["scenario_verdict"] = v
         facts["_max_len"] = 1000                 # morning / evening go out as a photo caption (Telegram limit 1024)
-        try:                                     # 05.11: the short «Киты» section (who we copy, the day's copies, funds, on-chain)
+        try:                                     # 05.11: the short «Система CRYPTO NOVA» section (positions, the day's result, a market line)
             from . import whale_digest
             wblock = whale_digest.block(self.out, now.timestamp() * 1000, slot=slot)
         except Exception:  # noqa: BLE001
             wblock = ""
-        # with «Киты» (it counts the open copies) the trades list keeps only the day's closed trades
+        # with «Система CRYPTO NOVA» (it lists the open positions) the trades list keeps only the day's closed trades
         block = self.trades_block(x, open_lines=not wblock) if slot == "evening" else ""
         block = "\n\n".join(b for b in (block, wblock) if b)
         if block:                                # added as is after the text is written: exact numbers, room kept in the caption
@@ -883,15 +881,20 @@ class Channel:
         txt = self.write(slot, facts, llm) or self.template(slot, facts)
         return self.insert_block(txt, block)
 
+    APP_STORE = "https://apps.apple.com/app/id6754893343"
+
     def intro(self) -> str:
-        """05.11: the intro describes the system as it works now — copying the top-5 verified traders on futures, the core on spot."""
-        return ("<b>CRYPTO NOVA — как работает система</b>\n\n"
-                "— <b>Фьючерсы</b> реального счёта повторяют сделки 5 проверенных трейдеров копитрейдинга. Список каждый день "
-                "пересчитывается по их открытой истории за 60 дней: от 20 решений, от 70% сделок в плюсе. Риск — 2% на сделку, плечо не выше 5×, у каждой сделки стоп на бирже.\n"
-                "— <b>Спот</b> — ядро портфеля: BTC, ETH и SOL, держим в долгую.\n"
-                "— <b>Киты</b> — следим за отчётами крупных фондов и за «умными» кошельками в блокчейне; это информация, а не сигнал.\n\n"
-                "Здесь: утренний обзор рынка, главные новости дня и вечерние итоги с результатом реального счёта CRYPTO NOVA на OKX "
-                "(статистика с 22.10.2026). Ночью, с 23:00 до 08:00 по Киеву, постов нет.\n\n"
+        """05.11 (owner 09:52): the system CRYPTO NOVA AI works with a real account (futures and spot, re-balancing); the iOS app shows
+        the market and how the system works; anyone can connect. No method, no Google Play (the Android account is under appeal)."""
+        return ("<b>CRYPTO NOVA AI — система, которая работает с реальным счётом</b>\n\n"
+                "Система CRYPTO NOVA AI круглые сутки ведёт реальный счёт на OKX: фьючерсы и спот, сама балансирует доли между ними. "
+                "У каждой сделки стоп на бирже, результат публикуем честно — и плюсы, и минусы (статистика с 22.10.2026).\n\n"
+                "В приложении CRYPTO NOVA видно всё: что происходит на рынке, какие позиции открыты и почему, как работает система "
+                "и какой у неё результат.\n\n"
+                "Подключиться может каждый, кто хочет: скачайте приложение и следуйте шагам в разделе «Подключить».\n\n"
+                f"Приложение для iPhone и iPad — в App Store: <a href=\"{self.APP_STORE}\">CRYPTO NOVA</a>\n\n"
+                "В канале: утренний обзор рынка, главные новости дня и вечерние итоги реального счёта. Ночью, с 23:00 до 08:00 по Киеву, "
+                "постов нет.\n\n"
                 "Прошлые результаты не гарантируют будущих, это не инвестиционный совет. Вопросы: @cryptonova_core_ai_bot")
 
     def evening_verdict(self, btc: dict, x: dict, day: str | None = None) -> str:

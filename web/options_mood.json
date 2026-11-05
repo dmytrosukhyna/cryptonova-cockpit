@@ -1,5 +1,5 @@
 {
- "asof": 1793852559900,
+ "asof": 1793853115757,
  "name": "Настроение опционов",
  "source": "deribit",
  "error": null,
@@ -7,8 +7,8 @@
  "dvol_pct_1y": 28,
  "dvol_hist_days": 365,
  "put_call_oi": 0.652,
- "puts_oi": 133282.1,
- "calls_oi": 204314.2,
+ "puts_oi": 133285.3,
+ "calls_oi": 204327.7,
  "label": "calm",
  "label_ru": "спокойно",
  "label_en": "calm",

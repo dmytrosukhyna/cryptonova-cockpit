@@ -95,6 +95,8 @@ def _has_col(conn, table, col) -> bool:
 
 def spot_block(conn: sqlite3.Connection, now_ms: int) -> dict:
     since = now_ms - WEEK_MS
+    if not _has_col(conn, "spot_value", "time"):          # 05.11: a fresh database (the review never fails because of the old spot table)
+        return {"value_start": None, "value_end": None, "ret": None, "actions": [], "positions": []}
     vals = conn.execute("select time, index_value from spot_value order by time").fetchall()
     v0 = next((v for t, v in vals if t >= since), vals[0][1] if vals else None)
     v1 = vals[-1][1] if vals else None
@@ -107,7 +109,10 @@ def spot_block(conn: sqlite3.Connection, now_ms: int) -> dict:
 
 def next_week(rep: dict) -> list:
     out = []
-    for c in rep.get("coins", [])[:6]:
+    # 05.11: BTC, ETH and SOL first (the spot core), then the rest in the report's order
+    core = {"BTC": 0, "ETH": 1, "SOL": 2}
+    coins = sorted(rep.get("coins", []), key=lambda c: core.get(str(c.get("symbol", "")).split("-")[0], 9))
+    for c in coins[:6]:
         p = c["price"]
         sup = [l for l in c.get("levels", []) if l["kind"] == "support" and l["status"] == "ACTIVE" and l["lo"] <= p]
         res = [l for l in c.get("levels", []) if l["kind"] == "resistance" and l["status"] == "ACTIVE" and l["hi"] >= p]
@@ -156,7 +161,10 @@ def real_week(real: dict, now_ms: int) -> dict | None:
         return curve[-1][1] - base
     tot = change(real.get("curve")); fut = change(real.get("fut_curve"))
     closed = [t for t in real.get("closed") or [] if isinstance(t, dict) and not t.get("partial") and (t.get("closed") or 0) > now_ms - 7 * 86400_000]
+    spot_top = sorted(({"sym": str(c.get("sym")), "share": float(c.get("share") or 0)} for c in real.get("spot") or []
+                       if isinstance(c, dict) and c.get("sym") in ("BTC", "ETH", "SOL")), key=lambda c: -c["share"])
     return {"equity": real["equity_usd"], "week_usd": tot, "fut_usd": fut, "spot_usd": (tot - fut) if (tot is not None and fut is not None) else None,
+            "spot_top": spot_top,
             "n": len(closed), "wins": sum(1 for t in closed if (t.get("pnl_usd") or 0) > 0), "open": len(real.get("futures") or []),
             "since_usd": real.get("pnl_usd"), "since_pct": real.get("pnl_pct")}
 
@@ -165,7 +173,17 @@ def _usd(v: float) -> str:
     return (f"+${v:,.2f}" if v >= 0 else f"−${abs(v):,.2f}").replace(",", " ")
 
 
-def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: dict | None, real: dict | None = None) -> tuple[str, str]:
+MODEL_LINE = ("фьючерсы реального счёта повторяют сделки 5 проверенных трейдеров копитрейдинга (риск 2% на сделку, плечо не выше 5×, "
+              "у каждой сделки стоп на бирже); спот — ядро BTC, ETH и SOL.")
+
+
+def _plain(html: str) -> str:
+    import re
+    return re.sub(r"<[^>]+>", "", html or "")
+
+
+def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: dict | None, real: dict | None = None,
+            whales: str = "") -> tuple[str, str]:
     L = []
     L.append(f"# CRYPTO NOVΛ — итоги недели {week['from']}–{week['to']}")
     L.append("")
@@ -177,38 +195,28 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
         L.append("- Лучшие: " + ", ".join(f"{r['symbol']} {_pct(r['ret7'])}" for r in market["best"]) +
                  "; худшие: " + ", ".join(f"{r['symbol']} {_pct(r['ret7'])}" for r in market["worst"]) + ".")
     if market["stress_days"]:
-        L.append(f"- Дни широкого падения (≥70% монет −3%): {', '.join(market['stress_days'])}. В такие дни система лонги не открывала — "
-                 f"на истории покупка дна со стопом даёт −0.20R, шорт после падения −0.04R.")
+        L.append(f"- Дни широкого падения (≥70% монет −3%): {', '.join(market['stress_days'])}.")
     else:
         L.append("- Дней широкого падения не было.")
     L.append("")
-    L.append("## Демо-счета фьючерсы (три стратегии по $10 000)")
-    for st in paper.get("strategies", []):
-        L.append(f"- {st['name']}: {st['n']} сделок, {st['sum_r']:+.2f}R" + (f", счёт {_fmt(st['equity_end'])} $" if st.get("equity_end") else ""))
-    L.append("")
-    L.append("### Сбалансированная — подробно")
-    if paper["n"]:
-        L.append(f"- Закрыто сделок: {paper['n']}, в плюс {paper['wins']}, итог {paper['sum_r']:+.2f}R ({paper['usd']:+.0f} $). "
-                 f"Счёт {_fmt(paper['equity_start'])} → {_fmt(paper['equity_end'])} $." if paper["equity_start"] and paper["equity_end"] else
-                 f"- Закрыто сделок: {paper['n']}, итог {paper['sum_r']:+.2f}R.")
-        for t in paper["trades"]:
-            L.append(f"  - {t['symbol']} {'лонг' if t['side']=='LONG' else 'шорт'} ({t['grade']}) {_d(t['opened'])}→{_d(t['closed'])}: "
-                     f"{'стоп' if t['exit']=='STOP' else 'цель' if str(t['exit']).startswith('TP') else t['exit']} {t['r']:+.2f}R")
-    else:
-        L.append("- Сделок не было — система не нашла входа от зоны. Это нормально: сделка только у стенки.")
-    if paper["open"]:
-        L.append("- Открыто сейчас: " + ", ".join(f"{o['symbol']} {'лонг' if o['side']=='LONG' else 'шорт'} от {_fmt(o['entry'])}" for o in paper["open"]) + ".")
-    L.append("")
-    L.append("## Спотовый портфель ($10 000)")
-    if spot["ret"] is not None:
-        L.append(f"- Стоимость {_pct(spot['ret'])} за неделю ({_fmt(spot['value_start'])} → {_fmt(spot['value_end'])}).")
-    if spot["actions"]:
-        L.append("- Действия: " + "; ".join(f"{a['action']} {a['symbol']}" for a in spot["actions"][:8]) + ".")
-    else:
-        L.append("- Изменений в портфеле не было.")
-    if spot["positions"]:
-        L.append("- Состав: " + ", ".join(f"{p['symbol']} {p['weight']*100:.0f}%" for p in spot["positions"][:8]) + ".")
-    L.append("")
+    # 05.11 (owner): the review speaks about the system as it works now — the real OKX account since 22.10, futures copying the
+    # top-5 verified traders («Киты»), spot = the core BTC / ETH / SOL. The retired demo desks stay in the JSON (paper), not in the text.
+    if real:
+        L.append("## Реальный счёт CRYPTO NOVA на OKX")
+        L.append(f"- Счёт {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
+                 + (f" (фьючерсы {_usd(real['fut_usd'])}, спот {_usd(real['spot_usd'])})" if real.get("fut_usd") is not None and real.get("spot_usd") is not None else "") + ".")
+        if real.get("since_usd") is not None:
+            L.append(f"- С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%). Пополнения и выводы в результат не входят.".replace("(-", "(−"))
+        L.append(f"- Фьючерсных сделок закрыто за неделю: {real['n']}, в плюсе {real['wins']}; в работе {real['open']}, у каждой стоп на бирже.")
+        L.append("")
+    if whales:
+        L.append("## Киты")
+        L += ["- " + ln.lstrip("— ") for ln in whales.split("\n")[1:]]
+        L.append("")
+    if real and real.get("spot_top"):
+        L.append("## Спот")
+        L.append("- Ядро портфеля: " + ", ".join(f"{c['sym']} {c['share']:.0f}%" for c in real["spot_top"]) + " счёта; держим в долгую.")
+        L.append("")
     if last and last["checks"]:
         L.append(f"## Что говорили в прошлый раз ({last['week']}) → что вышло")
         for c in last["checks"]:
@@ -221,26 +229,36 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
             parts.append(f"поддержка {_fmt(n['support']['lo'])}–{_fmt(n['support']['hi'])} ({n['support']['touches']}× касаний) — там ждём покупателей")
         if n["resistance"]:
             parts.append(f"сопротивление {_fmt(n['resistance']['lo'])}–{_fmt(n['resistance']['hi'])} ({n['resistance']['touches']}× касаний) — там продавцы")
-        mode = ("Выше средней 200 дней — лонг от поддержки" if n["bull"] else "Ниже средней 200 дней — шорт от сопротивления") + (f"; {n['mid_note']}" if n.get("mid_note") else "")
+        mode = ("Цена выше средней за 200 дней" if n["bull"] else "Цена ниже средней за 200 дней") + (f"; {n['mid_note']}" if n.get("mid_note") else "")
         L.append(f"- {n['symbol']} {_fmt(n['price'])}: " + "; ".join(parts) + f". {mode}.")
     L.append("")
-    L.append("Правило недели: вход только от стенки с ретестом, стоп за зоной, риск 1% на сделку. Не гонимся за движением — ждём цену у стенки.")
+    L.append("Как работает система: " + MODEL_LINE)
     text = "\n".join(L)
     # telegram post (short)
     P = [f"📊 CRYPTO NOVΛ — неделя {week['from']}–{week['to']}"]
     if market["btc"]:
         P.append(f"BTC {_pct(market['btc']['ret7'])}, в плюсе {market['up']}/{market['total']} монет" + (f", дни паники: {', '.join(market['stress_days'])}" if market["stress_days"] else ""))
     if real:
+        P.append("")
         P.append(f"Реальный счёт CRYPTO NOVA на OKX: {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
                  + (f" (фьючерсы {_usd(real['fut_usd'])}, спот {_usd(real['spot_usd'])})" if real.get("fut_usd") is not None and real.get("spot_usd") is not None else ""))
-        P.append(f"Закрыто сделок за неделю: {real['n']}, в плюсе {real['wins']}; в работе {real['open']}, у каждой стоп на бирже")
         if real.get("since_usd") is not None:
-            P.append(f"С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%)")
-    P.append("На неделю:")
-    for n in nxt[:4]:
-        if n["support"] and n["resistance"]:
-            P.append(f"• {n['symbol']} {_fmt(n['price'])}: {_fmt(n['support']['lo'])} ⇄ {_fmt(n['resistance']['hi'])}")
-    P.append("Вход только от стенки, не гонимся за движением. Не финансовый совет.")
+            P.append(f"С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%)".replace("(-", "(−"))
+    if whales:
+        P.append("")
+        P.append("Киты")
+        P += whales.split("\n")[1:]
+    if real and real.get("spot_top"):
+        P.append("")
+        P.append("Спот — ядро: " + ", ".join(f"{c['sym']} {c['share']:.0f}%" for c in real["spot_top"]) + " счёта, держим в долгую.")
+    lv = [n for n in nxt[:3] if n["support"] and n["resistance"]]
+    if lv:
+        P.append("")
+        P.append("Уровни на неделю:")
+        for n in lv:
+            P.append(f"— {n['symbol']} {_fmt(n['price'])}: поддержка {_fmt(n['support']['lo'])}, сопротивление {_fmt(n['resistance']['hi'])}")
+    P.append("")
+    P.append("Прошлые результаты не гарантируют будущих. Не финансовый совет.")
     return text, "\n".join(P)
 
 
@@ -281,7 +299,14 @@ def run(conn: sqlite3.Connection, rep: dict, out_path: str, now_ms: int | None =
         real = real_week(json.load(open(rp, encoding="utf-8")), now_ms) if os.path.exists(rp) else None
     except Exception:  # noqa: BLE001
         real = None
-    text, post = compose(week, market, paper, spot, nxt, last, real)
+    whales = ""
+    try:   # 05.11: the «Киты» block — who we copy, the week's copies and their result, one fund / on-chain highlight
+        from . import whale_digest
+        whales = _plain(whale_digest.block(os.path.dirname(out_path) or ".", now_ms, slot="evening", with_trades=True, hours=7 * 24,
+                                           period_ru="За неделю", highlights=2))
+    except Exception:  # noqa: BLE001
+        whales = ""
+    text, post = compose(week, market, paper, spot, nxt, last, real, whales)
     hist = (prev_doc or {}).get("history", [])
     if prev_doc and prev_doc.get("week") and prev_doc["week"].get("end_ms", 0) < now_ms - 3 * 86400000:
         hist = ([{"week": prev_doc["week"], "btc": (prev_doc.get("market") or {}).get("btc"), "paper_sum_r": (prev_doc.get("paper") or {}).get("sum_r"),

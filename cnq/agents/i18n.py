@@ -488,6 +488,49 @@ T: dict[str, dict[str, str]] = {
                           "έτσι είναι φθηνότερα και ιστορικά πιο επικερδές.",
                     "es": "La estrategia principal no tiene operaciones ahora: solo entra tras una venta brusca con mucho volumen; "
                           "así sale más barato y, en el histórico, más rentable."},
+    # 05.11: the demo futures card follows the real model — the «Киты» desk copying the top-5 verified traders (whales_top.json desk)
+    "status.whales": {"ru": "Сейчас открытых копий нет: ждём новых сделок трейдеров из списка.",
+                      "en": "No open copies right now: waiting for new trades of the traders on the list.",
+                      "uk": "Зараз відкритих копій немає: чекаємо нових угод трейдерів зі списку.",
+                      "el": "Δεν υπάρχουν ανοιχτά αντίγραφα αυτή τη στιγμή: περιμένουμε νέες συναλλαγές των traders της λίστας.",
+                      "es": "Ahora no hay copias abiertas: esperamos nuevas operaciones de los traders de la lista."},
+    "futures.about.whales": {"ru": "Демо-счёт $10 000 по настоящим ценам: повторяет сделки 5 проверенных трейдеров копитрейдинга — так же, "
+                                   "как фьючерсы реального счёта. У каждой копии стоп, плечо не выше 5×; выходим вместе с трейдером.",
+                             "en": "A $10 000 demo account at real prices: it copies the trades of 5 verified copy-trading traders — the "
+                                   "same way as the real account's futures. Every copy has a stop, leverage at most 5×; we exit with the trader.",
+                             "uk": "Демо-рахунок $10 000 за справжніми цінами: повторює угоди 5 перевірених трейдерів копітрейдингу — так "
+                                   "само, як ф'ючерси реального рахунку. У кожної копії стоп, плече не вище 5×; виходимо разом із трейдером.",
+                             "el": "Demo λογαριασμός $10 000 σε πραγματικές τιμές: αντιγράφει τις συναλλαγές 5 επαληθευμένων traders του "
+                                   "copy trading — όπως τα futures του πραγματικού λογαριασμού. Κάθε αντίγραφο έχει stop, μόχλευση έως 5×· "
+                                   "βγαίνουμε μαζί με τον επενδυτή.",
+                             "es": "Cuenta demo de $10 000 a precios reales: copia las operaciones de 5 traders verificados de copy "
+                                   "trading, igual que los futuros de la cuenta real. Cada copia tiene stop y apalancamiento de hasta 5×; "
+                                   "salimos junto con el trader."},
+    "why.whale": {"ru": "Копия сделки трейдера {name}: мы повторяем его позицию и выходим вместе с ним (или по стопу).",
+                  "en": "A copy of trader {name}'s trade: we repeat the position and exit together with him (or at the stop).",
+                  "uk": "Копія угоди трейдера {name}: повторюємо його позицію і виходимо разом із ним (або за стопом).",
+                  "el": "Αντίγραφο της συναλλαγής του επενδυτή {name}: επαναλαμβάνουμε τη θέση και βγαίνουμε μαζί του (ή στο stop).",
+                  "es": "Copia de la operación del trader {name}: repetimos su posición y salimos junto con él (o en el stop)."},
+    "src.whales": {"ru": "Киты · копия", "en": "Whales · copy", "uk": "Кити · копія", "el": "Φάλαινες · αντίγραφο", "es": "Ballenas · copia"},
+    "title.whales": {"ru": "Копия проверенного трейдера", "en": "Copy of a verified trader", "uk": "Копія перевіреного трейдера",
+                     "el": "Αντίγραφο επαληθευμένου επενδυτή", "es": "Copia de un trader verificado"},
+    "pub.why.futures.whales": {"ru": "Фьючерсы — копии сделок 5 проверенных трейдеров копитрейдинга: список каждый день пересчитывается по "
+                                     "их открытой истории за 60 дней. У каждой копии стоп, риск — 2% на сделку, плечо не выше 5×. Минус "
+                                     "тоже бывает: убыточную копию закрывает стоп или выход трейдера.",
+                               "en": "Futures are copies of the trades of 5 verified copy-trading traders: the list is recalculated every "
+                                     "day from their public 60-day history. Every copy has a stop, the risk is 2% per trade, leverage at "
+                                     "most 5×. Losses happen too: the stop or the trader's exit closes a losing copy.",
+                               "uk": "Ф'ючерси — копії угод 5 перевірених трейдерів копітрейдингу: список щодня перераховується за їхньою "
+                                     "відкритою історією за 60 днів. У кожної копії стоп, ризик — 2% на угоду, плече не вище 5×. Мінус теж "
+                                     "буває: збиткову копію закриває стоп або вихід трейдера.",
+                               "el": "Τα futures είναι αντίγραφα των συναλλαγών 5 επαληθευμένων traders του copy trading: η λίστα "
+                                     "ξαναϋπολογίζεται κάθε μέρα από το δημόσιο ιστορικό 60 ημερών τους. Κάθε αντίγραφο έχει stop, ο "
+                                     "κίνδυνος είναι 2% ανά συναλλαγή, μόχλευση έως 5×. Συμβαίνουν και απώλειες: το stop ή η έξοδος του "
+                                     "επενδυτή κλείνει ένα ζημιογόνο αντίγραφο.",
+                               "es": "Los futuros son copias de las operaciones de 5 traders verificados de copy trading: la lista se "
+                                     "recalcula cada día con su historial público de 60 días. Cada copia tiene stop, el riesgo es del 2% por "
+                                     "operación y el apalancamiento de hasta 5×. También hay pérdidas: el stop o la salida del trader "
+                                     "cierran una copia perdedora."},
     "status.last": {"ru": " Последняя сделка: {sym}, {pnl}, {d}.", "en": " Last trade: {sym}, {pnl}, {d}.",
                     "uk": " Остання угода: {sym}, {pnl}, {d}.", "el": " Τελευταία συναλλαγή: {sym}, {pnl}, {d}.",
                     "es": " Última operación: {sym}, {pnl}, {d}."},
@@ -774,17 +817,18 @@ T: dict[str, dict[str, str]] = {
     # = the real CRYPTO NOVA account on OKX since 22.10 (web/public_real.json), its allocation, spot / futures parts and real actions
     "pp.title": {"ru": "Публичный портфель CRYPTO NOVA", "en": "CRYPTO NOVA public portfolio", "uk": "Публічний портфель CRYPTO NOVA",
                  "el": "Δημόσιο χαρτοφυλάκιο CRYPTO NOVA", "es": "Cartera pública de CRYPTO NOVA"},
-    "pp.note": {"ru": "Реальный счёт CRYPTO NOVA на OKX. История начинается {d}, стартовый капитал {usd}. Сделки ставит автопилот "
-                      "системы. Прошлый результат не гарантирует будущий.",
-                "en": "CRYPTO NOVA's real account on OKX. The history starts on {d} with a starting capital of {usd}. The system's "
-                      "autopilot places the trades. Past results don't guarantee future ones.",
-                "uk": "Реальний рахунок CRYPTO NOVA на OKX. Історія починається {d}, стартовий капітал {usd}. Угоди відкриває "
-                      "автопілот системи. Минулий результат не гарантує майбутнього.",
+    "pp.note": {"ru": "Реальный счёт CRYPTO NOVA на OKX. История начинается {d}, стартовый капитал {usd}. Фьючерсы повторяют "
+                      "сделки 5 проверенных трейдеров копитрейдинга, спот — ядро BTC, ETH и SOL. Прошлый результат не гарантирует будущий.",
+                "en": "CRYPTO NOVA's real account on OKX. The history starts on {d} with a starting capital of {usd}. Futures copy the "
+                      "trades of 5 verified copy-trading traders; spot is the BTC, ETH and SOL core. Past results don't guarantee future ones.",
+                "uk": "Реальний рахунок CRYPTO NOVA на OKX. Історія починається {d}, стартовий капітал {usd}. Ф'ючерси повторюють "
+                      "угоди 5 перевірених трейдерів копітрейдингу, спот — ядро BTC, ETH і SOL. Минулий результат не гарантує майбутнього.",
                 "el": "Ο πραγματικός λογαριασμός του CRYPTO NOVA στο OKX. Το ιστορικό ξεκινά στις {d} με αρχικό κεφάλαιο {usd}. "
-                      "Τις συναλλαγές τις ανοίγει ο αυτόματος πιλότος του συστήματος. Οι προηγούμενες αποδόσεις δεν εγγυώνται "
-                      "τις μελλοντικές.",
-                "es": "La cuenta real de CRYPTO NOVA en OKX. El historial empieza el {d} con un capital inicial de {usd}. Las "
-                      "operaciones las abre el piloto automático del sistema. Los resultados pasados no garantizan los futuros."},
+                      "Τα futures αντιγράφουν τις συναλλαγές 5 επαληθευμένων traders του copy trading· το spot είναι ο πυρήνας BTC, ETH "
+                      "και SOL. Οι προηγούμενες αποδόσεις δεν εγγυώνται τις μελλοντικές.",
+                "es": "La cuenta real de CRYPTO NOVA en OKX. El historial empieza el {d} con un capital inicial de {usd}. Los "
+                      "futuros copian las operaciones de 5 traders verificados de copy trading; el spot es el núcleo BTC, ETH y SOL. "
+                      "Los resultados pasados no garantizan los futuros."},
     "pp.stale": {"ru": "Данные могли устареть: показываем последние подтверждённые цифры счёта.",
                  "en": "The data may be out of date: these are the account's last confirmed numbers.",
                  "uk": "Дані могли застаріти: показуємо останні підтверджені цифри рахунку.",
@@ -1108,14 +1152,14 @@ T: dict[str, dict[str, str]] = {
                   "el": "Σήμερα: {chg}, δηλαδή {pct}.", "es": "Hoy: {chg}, es decir, {pct}."},
     "rep.since": {"ru": "С {d} — {chg}, это {pct}.", "en": "Since {d}: {chg}, that's {pct}.", "uk": "З {d} — {chg}, це {pct}.",
                   "el": "Από τις {d}: {chg}, δηλαδή {pct}.", "es": "Desde el {d}: {chg}, es decir, {pct}."},
-    "rep.fut.none": {"ru": "Открытых фьючерсных сделок сейчас нет.", "en": "There are no open futures trades right now.",
-                     "uk": "Відкритих ф'ючерсних угод зараз немає.", "el": "Δεν υπάρχουν ανοιχτές συναλλαγές futures αυτή τη στιγμή.",
-                     "es": "Ahora no hay operaciones de futuros abiertas."},
-    "rep.fut.open": {"ru": "Открытых фьючерсных сделок: {n}, у каждой стоп на бирже.",
-                     "en": "Open futures trades: {n}, each with its stop on the exchange.",
-                     "uk": "Відкритих ф'ючерсних угод: {n}, у кожної стоп на біржі.",
-                     "el": "Ανοιχτές συναλλαγές futures: {n}, η καθεμία με stop στο ανταλλακτήριο.",
-                     "es": "Operaciones de futuros abiertas: {n}, cada una con su stop en el exchange."},
+    "rep.fut.none": {"ru": "Фьючерсы повторяют сделки 5 проверенных трейдеров; открытых копий сейчас нет.", "en": "Futures copy the trades of 5 verified traders; there are no open copies right now.",
+                     "uk": "Ф'ючерси повторюють угоди 5 перевірених трейдерів; відкритих копій зараз немає.", "el": "Τα futures αντιγράφουν τις συναλλαγές 5 επαληθευμένων traders· δεν υπάρχουν ανοιχτά αντίγραφα αυτή τη στιγμή.",
+                     "es": "Los futuros copian las operaciones de 5 traders verificados; ahora no hay copias abiertas."},
+    "rep.fut.open": {"ru": "Фьючерсы повторяют сделки 5 проверенных трейдеров: открыто {n}, у каждой стоп на бирже.",
+                     "en": "Futures copy the trades of 5 verified traders: {n} open, each with its stop on the exchange.",
+                     "uk": "Ф'ючерси повторюють угоди 5 перевірених трейдерів: відкрито {n}, у кожної стоп на біржі.",
+                     "el": "Τα futures αντιγράφουν τις συναλλαγές 5 επαληθευμένων traders: ανοιχτές {n}, η καθεμία με stop στο ανταλλακτήριο.",
+                     "es": "Los futuros copian las operaciones de 5 traders verificados: {n} abiertas, cada una con su stop en el exchange."},
     "rep.last": {"ru": "Последнее действие системы, {d}: {what} {sym}.", "en": "The system's last action, {d}: {what} {sym}.",
                  "uk": "Остання дія системи, {d}: {what} {sym}.", "el": "Τελευταία ενέργεια του συστήματος, {d}: {what} {sym}.",
                  "es": "Última acción del sistema, el {d}: {what} {sym}."},

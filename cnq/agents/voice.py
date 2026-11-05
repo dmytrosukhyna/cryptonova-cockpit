@@ -116,6 +116,25 @@ def real_line(out: str = "web") -> str | None:
             f"{'около нуля' if abs(pnl) < 5 else result(pnl)}. Фьючерсы реального счёта: {fut}.{stale}")
 
 
+def whales_line(out: str) -> str | None:
+    """05.11: the «Киты» desk in spoken words — how many traders we copy, open copies, the day's closed copies; the demo copy desk
+    on $10 000 as a reference. No Chinese nicknames (the Russian voice cannot read them)."""
+    from . import whale_digest as wd
+    fol = wd.following(out)
+    if not fol:
+        return None
+    c = wd.copies(out)
+    oc, cc = c["open_copies"], c["copies_closed"]
+    s = f"Фьючерсы — это копии сделок {len(fol[:5])} проверенных трейдеров копитрейдинга" + ("" if oc else ", открытых копий сейчас нет")
+    if cc:
+        s += f"; за сутки закрыли {deals(len(cc), acc=True)}, итог {'около нуля' if abs(c['copies_usd']) < 5 else result(c['copies_usd'])}"
+    s += "."
+    d = wd.desk(out)
+    if d:
+        s += f" Демо-стол «Киты» на 10 тысяч долларов: {'около нуля' if abs(d['pnl_usd']) < 5 else result(d['pnl_usd'])}."
+    return s
+
+
 def compose(out: str = "web") -> str:
     """Executive report in plain words: the real account first (final QA 28.10), then the demo desks — labelled demo, never as
     CRYPTO NOVA's result — how many trades are open, market direction."""
@@ -149,8 +168,14 @@ def compose(out: str = "web") -> str:
         # their live gate. 21.10: the panel shows the mix as ONE $10 000 account — the AVERAGE of its desks (novaRes) — and the brief must say
         # the same number, or the panel refuses the neural audio and falls back to the robotic browser voice (owner: «голос робота снова»)
         fut_res, since = nova_result(paper, out)
-        L.append("Демо-фьючерсы, отобранные сигналы" + (f": с {since} {result(fut_res)}; " if fut_res is not None else ": ")
-                 + "; ".join(parts) + ".")
+        # 05.11 (owner: the whole real futures budget copies the top-5 whales since 04.11): the retired rule desks are no longer
+        # spoken — their numbers stay in the keys only, so the panel still recognises this brief as matching its screen
+    try:
+        wl = whales_line(out)
+    except Exception:  # noqa: BLE001
+        wl = None
+    if wl:
+        L.append(wl)
     spot_res = None
     pf = _load(out, "portfolio.json") or {}
     # 18.10 (owner): the header and the brief show OUR strategies (CNPTS «Сбалансированная» + the AI portfolio), not the leader
@@ -160,9 +185,7 @@ def compose(out: str = "web") -> str:
         spot_res = float(sp["equity_usd"]) - float(sp["start_usd"])
     elif sp.get("index"):
         spot_res = 10_000 * sp["index"] / 100 - 10_000
-    if spot_res is not None:
-        nm = "модельный портфель CRYPTO NOVA" if sp_key == "ideas" else (sp.get("name_short") or "Умеренный")
-        L.append(f"Демо-спот, {nm}: {'в плюсе на ' + usd(spot_res) if spot_res > 5 else 'в минусе на ' + usd(spot_res) if spot_res < -5 else 'около нуля'}.")
+    L.append("Спот — это ядро: биткоин, эфир и солана, держим в долгую.")
     # every desk counts in «Заработано всего»: funding carry (real demo), arbitrage and triangle (virtual estimates)
     extra = {}
     fd = _load(out, "funding.json") or {}
@@ -174,11 +197,7 @@ def compose(out: str = "web") -> str:
             extra[k] = float(w)
     # 19.10 (owner: «всё простым языком»): «Заработано всего» = futures + spot, exactly the two accounts of the panel's «Доход онлайн»;
     # funding, arbitrage and triangle are on probation (tab «Заработок») and are not in the total — so they are not in the keys either
-    if fut_res is not None and spot_res is not None:
-        tot = fut_res + spot_res
-        L.append(f"Итого по демо — {'около нуля' if abs(tot) < 5 else ('плюс ' if tot >= 0 else 'минус ') + usd(tot)}.")
-    else:
-        tot = None
+    tot = fut_res + spot_res if fut_res is not None and spot_res is not None else None
     markets = _load(out, "markets.json") or {}
     btc = next((t for t in markets.get("top", []) if t.get("symbol") == "BTC"), None)
     stress = (paper.get("stress") or {}).get("level") if isinstance(paper.get("stress"), dict) else None

@@ -119,14 +119,21 @@ def test_voice_brief_says_what_the_panel_shows(tmp_path):
         assert k["fut"] == "nova" and k["spot"] == "ideas" and k["mode"] == "desks" and k["fut_open"] == 0
         assert k["parts"] == {"fut": 100, "spot": 300} and k["total"] == 400      # (200 + 0) / 20 000 × 10 000 = 100, not the sum 200
         assert "arb" not in k["parts"] and k["probation"]["arb"] == 33.27
-        assert "в плюсе на 100 доллар" in text and "Итого по демо — плюс 400" in text
-        # final QA 28.10: the desks are labelled demo, never «CRYPTO NOVA — …» as the system's result; no real file → no real line
-        assert "Демо-фьючерсы, отобранные сигналы: с" in text and "CRYPTO NOVA — отобранные" not in text and "Реальный счёт" not in text
+        # 05.11 (owner: the real futures copy the top-5 whales): the retired rule desks are no longer SPOKEN — their numbers stay in
+        # the keys only (the panel still plays the audio); no real file → no real line
+        assert "Итого по демо" not in text and "Демо-фьючерсы" not in text and "Реальный счёт" not in text
+        assert "Спот — это ядро: биткоин, эфир и солана" in text
     # the real account first: web/public_real.json (value, result since 22.10, its futures)
     (d / "public_real.json").write_text(json.dumps({"since": 1792669322166, "equity_usd": 9877.17, "pnl_usd": -147.23, "futures": [],
                                                     "closed_n": 1, "fut_pnl_usd": 0.27, "stale": False}))
     text = voice.compose(str(d))
-    assert text.index("Реальный счёт CRYPTO NOVA на OKX — 9877 долларов: с 22.10 в минусе на 147 долларов.") < text.index("Демо-фьючерсы")
+    assert text.index("Реальный счёт CRYPTO NOVA на OKX — 9877 долларов: с 22.10 в минусе на 147 долларов.") < text.index("Спот — это ядро")
+    # the «Киты» line: how many traders we copy, the day's copies, the demo copy desk — no Chinese nicknames in speech
+    (d / "whales_top.json").write_text(json.dumps({"following": [{"addr": f"bn:{i}", "name": f"鸿{i}", "src": "bn"} for i in range(5)],
+                                                   "desk": {"start": 10_000.0, "equity": 10_500.0, "pnl_usd": 500.0, "trades": 4, "wins": 3}}))
+    text = voice.compose(str(d))
+    assert "Фьючерсы — это копии сделок 5 проверенных трейдеров копитрейдинга, открытых копий сейчас нет." in text
+    assert "Демо-стол «Киты» на 10 тысяч долларов: в плюсе на 500 долларов." in text and "鸿" not in text
     assert "Фьючерсы реального счёта: открытых сделок нет; закрыто с начала: 1; итог около нуля." in text
     assert voice.compose.keys["parts"] == {"fut": 100, "spot": 300}          # the panel's keys are unchanged (it still plays the audio)
     assert voice.spoken("CRYPTO NOVA портфель") == "Крипто Но́ва портфель"

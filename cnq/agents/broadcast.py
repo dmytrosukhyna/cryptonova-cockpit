@@ -32,7 +32,8 @@ GEN = {"BTC": "биткоина", "ETH": "эфира", "SOL": "соланы"}
 WEEK_MS = 7 * DAY_MS
 WORDS_PER_MIN = 130          # calm live speech
 SHOW_MIN_PER_SLIDE = 0.3     # time to switch and point at the card
-DISCLAIMER = "Не финансовая рекомендация. Все счета — демо, деньги виртуальные."
+# 05.11: since 04.11 the real OKX account copies the top-5 verified traders; every other account of the deck is demo
+DISCLAIMER = "Не финансовая рекомендация. Реальный счёт — копии сделок проверенных трейдеров и ядро спота; остальные счета — демо."
 
 
 # ------------------------------------------------------------------ small helpers
@@ -559,6 +560,41 @@ def strategy_rows(ctx: dict) -> list[dict]:
     return rows
 
 
+def s_whales(ctx: dict, now_ms: int) -> dict | None:
+    """05.11 (owner: «вся система должна быть подключена к лучшим трейдерам мира»): the real account and the «Киты» desk —
+    who we copy, the copies of the week, the demo copy desk, one fund / on-chain highlight. No Chinese nicknames in speech."""
+    d = ctx.get("_dir")
+    if not d:
+        return None
+    from . import whale_digest as wd
+    fol = wd.following(d)
+    if not fol:
+        return None
+    real = _load(d, "public_real.json") or {}
+    c = wd.copies(d, now_ms, 7 * 24)
+    desk = wd.desk(d)
+    B, S = [], ["Как система работает сейчас: фьючерсы реального счёта повторяют сделки проверенных трейдеров, спот — ядро."]
+    if real.get("equity_usd") is not None:
+        B.append(f"Реальный счёт OKX: {usd(real['equity_usd'], sign=False)}, с 22.10 {usd(real.get('pnl_usd') or 0)} ({pct((real.get('pnl_pct') or 0) / 100)})")
+        S.append(f"Реальный счёт на OKX — {say_usd(real['equity_usd'], sign=False)}; с 22 октября {say_usd(real.get('pnl_usd') or 0)}.")
+    B.append(f"Копируем {len(fol[:5])} лид-трейдеров: " + ", ".join(f["name"] for f in fol[:5]))
+    S.append(f"Копируем {len(fol[:5])} лид-трейдеров копитрейдинга: у каждого за 60 дней от 20 решений и от 70% сделок в плюсе.")
+    oc, cc = c["open_copies"], c["copies_closed"]
+    B.append(f"Копии: в работе {len(oc)}, за неделю закрыто {len(cc)}, итог {usd(c['copies_usd'])}")
+    S.append(f"Сейчас в работе {len(oc)} {plural(len(oc), 'копия', 'копии', 'копий')}, у каждой стоп на бирже; за неделю закрыто {len(cc)}, "
+             f"итог {say_usd(c['copies_usd'])}.")
+    if desk:
+        B.append(f"Демо-стол «Киты» ($10 000): {usd(desk['pnl_usd'])}, сделок {desk['trades']}, в плюсе {desk['wins']}")
+        S.append(f"Демо-стол «Киты» на 10 тысяч долларов: {say_usd(desk['pnl_usd'])}, сделок {desk['trades']}.")
+    hl = wd.onchain_line(d) or wd.funds_line(d, now_ms)
+    if hl:
+        B.append(hl.rstrip("."))
+    return slide("whales", "Киты: кого копируем", "kpi", B[:5], S,
+                 {"following": [f["name"] for f in fol[:5]], "open_copies": len(oc), "week_copies": len(cc), "week_copies_usd": c["copies_usd"],
+                  "desk": {k: desk[k] for k in ("pnl_usd", "trades", "wins")} if desk else None},
+                 "Покажи верх панели: реальный счёт OKX, затем блок «Киты» — список трейдеров и открытые копии.")
+
+
 def s_strategies(ctx: dict, now_ms: int) -> dict | None:
     rows = strategy_rows(ctx)
     if not rows:
@@ -566,19 +602,19 @@ def s_strategies(ctx: dict, now_ms: int) -> dict | None:
     by = {r["key"]: r for r in rows}
     tot = sum(r["pnl"] for r in rows)
     paper = ctx.get("paper") or {}
-    B, S = [], ["Наши стратегии. Все — на демо-счетах по 10 000 долларов, видно и плюсы, и минусы."]
+    B, S = [], ["Демо-счета и эксперименты, без реальных денег: по 10 000 долларов, видно и плюсы, и минусы."]
     ap = [by[k] for k in ("cons", "bal", "aggr") if k in by]
     reset = paper.get("reset") or {}
     if ap:
         tr = sum(r["trades"] or 0 for r in ap)
         since = kyiv(reset["time"]).strftime("%d.%m") if reset.get("time") else None
-        B.append("Автопилот: " + ", ".join(f"{r['name'].replace('Автопилот · ', '')} {usd(r['pnl'])}" for r in ap)
+        B.append("Старые правила (демо): " + ", ".join(f"{r['name'].replace('Автопилот · ', '')} {usd(r['pnl'])}" for r in ap)
                  + (f" — с {since}, сделок {tr}" if since else f", сделок {tr}"))
         if reset.get("time") and reset.get("archived_trades") is not None:
             n = reset["archived_trades"]
-            S.append(f"{since} счета автопилота обнулили по решению владельца: прошлые {n} {plural(n, 'сделка', 'сделки', 'сделок')} — в архиве, "
+            S.append(f"{since} демо-счета старых правил обнулили по решению владельца: прошлые {n} {plural(n, 'сделка', 'сделки', 'сделок')} — в архиве, "
                      f"итог {say_usd(reset.get('archived_pnl_usd'))}.")
-        S.append(f"С тех пор у автопилота {tr} {plural(tr, 'сделка', 'сделки', 'сделок')}" +
+        S.append(f"С тех пор у старых правил {tr} {plural(tr, 'сделка', 'сделки', 'сделок')}" +
                  (": сигналов на покупку после резкого падения не было." if tr == 0 else ": " + ", ".join(f"{speak_name(r['name'])} {say_usd(r['pnl'])}" for r in ap) + "."))
     lab = [by[k] for k in ("lab", "exp") if k in by]
     if lab:
@@ -598,7 +634,7 @@ def s_strategies(ctx: dict, now_ms: int) -> dict | None:
         B.append(", ".join(f"{r['name']} {usd(r['pnl'])}" for r in other))
     B.append(f"Всего по всем счетам: {usd(tot)}")
     S.append(f"Всего по всем счетам сейчас {say_usd(tot)}.")
-    return slide("strategies", "Наши стратегии", "stratsCard", B[:5], S, {"rows": rows, "total_pnl": round(tot, 2), "paper_reset": reset or None},
+    return slide("strategies", "Демо-счета и эксперименты", "stratsCard", B[:5], S, {"rows": rows, "total_pnl": round(tot, 2), "paper_reset": reset or None},
                  "Разверни карточку «Результат всех стратегий»: пройди сверху вниз — фьючерсы, эксперименты, спот, заработок; покажи итог справа вверху.")
 
 
@@ -621,13 +657,21 @@ def s_now(ctx: dict, now_ms: int) -> dict | None:
     main = [o for o in opens if o["desk"] in ("cons", "bal", "aggr")]
     rr = radar_rows(scan) if scan else []
     B, S = [], ["Что делаем прямо сейчас."]
+    try:   # 05.11: the real futures first — the open copies of the traders we follow
+        from . import whale_digest as wd
+        oc = wd.copies(ctx["_dir"], now_ms)["open_copies"] if ctx.get("_dir") else []
+    except Exception:  # noqa: BLE001
+        oc = []
+    if oc:
+        B.append("Реальный счёт, копии трейдеров: " + ", ".join(f"{o['coin']} {'лонг' if o['side'] == 'long' else 'шорт'}" for o in oc[:5]))
+        S.append(f"На реальном счёте открыто {len(oc)} {plural(len(oc), 'копия', 'копии', 'копий')} сделок проверенных трейдеров, у каждой стоп на бирже.")
     if main:
-        B.append("Автопилот: " + "; ".join(f"{o['symbol']} {'лонг' if o['side'] == 'LONG' else 'шорт'} ({o['rule_ru']}) {usd(o['open_pnl_usd'])}" for o in main[:3]))
-        S.append("У автопилота открыто: " + ", ".join(f"{o['symbol']} {'лонг' if o['side'] == 'LONG' else 'шорт'} по правилу «{o['rule_ru']}»" for o in main[:3]) + ".")
+        B.append("Старые правила (демо): " + "; ".join(f"{o['symbol']} {'лонг' if o['side'] == 'LONG' else 'шорт'} ({o['rule_ru']}) {usd(o['open_pnl_usd'])}" for o in main[:3]))
+        S.append("На демо-счетах старых правил открыто: " + ", ".join(f"{o['symbol']} {'лонг' if o['side'] == 'LONG' else 'шорт'} по правилу «{o['rule_ru']}»" for o in main[:3]) + ".")
     else:
-        B.append("Автопилот: позиций нет — ждёт резкого падения")
+        B.append("Старые правила (демо): позиций нет — ждут резкого падения")
         calm = scan and (scan.get("breadth") or 0) < (scan.get("need_breadth") or 0.4) and (not rr or rr[0]["score"] < 1)
-        S.append("Основной автопилот без позиций: он покупает только после резких падений" + (", а сейчас ни одно условие не выполнено." if calm else "."))
+        S.append("Демо-счета старых правил без позиций: они покупают только после резких падений" + (", а сейчас ни одно условие не выполнено." if calm else "."))
     other = [o for o in opens if o["desk"] not in ("cons", "bal", "aggr")]
     if other:
         tot = sum(o.get("open_pnl_usd") or 0 for o in other)
@@ -785,16 +829,16 @@ def s_plan(ctx: dict, now_ms: int) -> dict | None:
         B.append("Плановых событий на неделю нет")
     scan = (ctx.get("paper") or {}).get("scan") or {}
     if scan.get("need_breadth") is not None:
-        B.append(f"Автопилот ждёт: паника от {round(scan['need_breadth'] * 100)}% монет, пролив, сброс позиций или дисконт фьючерса")
-        S.append("Автопилот ждёт резкого падения — там он и покупает; в спокойном рынке он не торгует.")
         facts["need_breadth"] = scan["need_breadth"]
+    B.append("Фьючерсы: копии сделок 5 проверенных трейдеров; спот — ядро BTC, ETH, SOL")
+    S.append("Дальше система работает так же: фьючерсы повторяют сделки проверенных трейдеров, спот держит ядро — биткоин, эфир и солану.")
     B.append(DISCLAIMER)
-    S.append("Это не финансовая рекомендация, все счета — демо. Спасибо, что были с нами!")
+    S.append("Это не финансовая рекомендация; кроме реального счёта, все счета — демо. Спасибо, что были с нами!")
     return slide("plan", "Итог и план на неделю", "chartCard", B[-5:] if len(B) > 5 else B, S, facts,
                  "Вернись на график BTC: покажи коридор недели и ближние зоны; в конце — общий вид панели.")
 
 
-SLIDES = (s_week, s_news, s_macro, s_calendar, s_breadth, s_rsi, s_btc, s_forecast, s_strategies, s_now, s_ideas, s_memes, s_earn, s_plan)
+SLIDES = (s_week, s_news, s_macro, s_calendar, s_breadth, s_rsi, s_btc, s_forecast, s_whales, s_strategies, s_now, s_ideas, s_memes, s_earn, s_plan)
 
 
 def build_slides(ctx: dict, now_ms: int) -> list[dict]:
@@ -855,6 +899,7 @@ def live(ctx: dict, now_ms: int, generated: int | None) -> dict:
 def load_ctx(in_dir: str, conn: sqlite3.Connection | None = None) -> dict:
     ctx = {n: _load(in_dir, n + ".json") for n in FILES}
     ctx["conn"] = conn
+    ctx["_dir"] = in_dir                       # 05.11: the «Киты» slide reads whales_top / public_real / real_why there (whale_digest)
     return ctx
 
 

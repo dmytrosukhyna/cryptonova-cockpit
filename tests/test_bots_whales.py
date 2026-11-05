@@ -1,0 +1,152 @@
+"""05.11.2026 (owner: «всё подтянуть, адаптировать, привести в порядок»): every public text speaks about the system as it works now —
+futures of the real account copy the top-5 verified traders («Киты»), spot is the core BTC / ETH / SOL, numbers of the real OKX
+account since 22.10; no retired desk as if it traded real money; a short «Киты» block in the daily and weekly posts; the photo
+caption fits 1024 characters; nothing goes out 23:00–08:00 Kyiv; no post per trade."""
+import datetime as dt
+import json
+import os
+import re
+import sqlite3
+import tempfile
+import time
+
+from cnq.agents import channel, whale_digest, weekly
+from test_channel import _web
+
+RETIRED = re.compile(r"автопилот|откуп|Сбалансированн|Агрессивн|Консервативн|Импульс BTC|демо-стол|от стенки", re.I)
+
+
+def _whales(tmp, now_ms):
+    names = ["邢小鸿", "金虎趋势论", "领航财经", "慢就是快Mike8", "荣耀学员"]
+    fol = [{"addr": f"bn:{i}", "short": n, "name": n, "src": "bn", "win": 0.9, "pf": 12.0, "decisions": 40} for i, n in enumerate(names)]
+    json.dump({"following": fol, "desk": {"name_ru": "Киты · копирование топ-5", "start": 10_000.0, "equity": 10_420.0, "pnl_usd": 420.0,
+                                          "trades": 6, "wins": 4, "started": now_ms - 10 * 86400_000,
+                                          "open": [{"whale": "bn:4", "whale_ru": "荣耀学员", "coin": "BNB", "side": "SHORT", "entry": 717.0,
+                                                    "price": 714.0, "stop": 774.0, "upnl": 21.0, "lev": 5.0, "opened_t": now_ms - 3600_000}],
+                                          "closed": [{"whale": "bn:2", "whale_ru": "领航财经", "coin": "ZEC", "side": "SHORT", "pnl": 103.6,
+                                                      "closed_t": now_ms - 7200_000}],
+                                          "history": [[now_ms - 86400_000, 10_300.0], [now_ms - 3600_000, 10_420.0]]}},
+              open(os.path.join(tmp, "whales_top.json"), "w"))
+    sig_open = f"whales:W-BNB-S-{now_ms - 3600_000}"
+    sig_closed = f"whales:W-ZRO-S-{now_ms - 30 * 3600_000}"
+    whale = lambda i: {"name": names[i], "addr": f"bn:{i}", "source": "binance_lead"}
+    json.dump({"by_sig": {sig_open: {"desk": "whales", "whale": whale(4)}}, "memory": {sig_closed: {"desk": "whales", "whale": whale(2)}}},
+              open(os.path.join(tmp, "real_why.json"), "w"))
+    json.dump({"exchange": "OKX", "since": now_ms - 14 * 86400_000, "start_usd": 10_024.4, "equity_usd": 9_650.0, "pnl_usd": -374.4,
+               "pnl_pct": -3.73, "stale": False, "fut_pnl_usd": -50.0,
+               "spot": [{"sym": "BTC", "share": 36.0}, {"sym": "ETH", "share": 13.0}, {"sym": "SOL", "share": 7.0}],
+               "futures": [{"inst": "BNB-USDT-SWAP", "side": "short", "upnl_usd": 1.34, "sig": sig_open, "lev": 5.0}],
+               "closed": [{"inst": "ZRO-USDT-SWAP", "side": "short", "open_px": 1.9, "close_px": 1.82, "move_pct": 4.2, "pnl_usd": 2.13,
+                           "opened": now_ms - 30 * 3600_000, "closed": now_ms - 5 * 3600_000, "partial": False},
+                          {"inst": "SOL-USDT-SWAP", "side": "long", "open_px": 96.5, "close_px": 96.48, "move_pct": -0.04, "pnl_usd": -0.24,
+                           "opened": now_ms - 20 * 3600_000, "closed": now_ms - 4 * 3600_000, "partial": False}],
+               "curve": [[now_ms - 40 * 3600_000, -420.0], [now_ms, -374.4]], "fut_curve": [[now_ms - 40 * 3600_000, -45.0], [now_ms, -50.0]]},
+              open(os.path.join(tmp, "public_real.json"), "w"))
+    json.dump({"ark": {"moves": [{"fund": "ARKK", "ticker": "TSLA", "action": "buy", "usd": 5e6}, {"fund": "ARKW", "ticker": "TSLA", "action": "buy", "usd": 1e6},
+                                 {"fund": "ARKK", "ticker": "ROKU", "action": "sell", "usd": -2e6}], "date": "2026-11-04"}, "consensus": []},
+              open(os.path.join(tmp, "stock_whales.json"), "w"))
+    json.dump({"signals": [], "watch": {"tokens": [{"symbol": "AAVE", "status": "накопление",
+                                                    "buyers": [{"label": "Jump Trading", "kind": "маркетмейкер"}, {"label": "Galaxy Digital", "kind": "фонд / OTC"}]}]}},
+              open(os.path.join(tmp, "smart_money.json"), "w"))
+
+
+def _tmp():
+    tmp = tempfile.mkdtemp(); _web(tmp)
+    now_ms = int(time.time() * 1000)
+    _whales(tmp, now_ms)
+    return tmp, now_ms
+
+
+def test_whale_block_is_short_russian_and_honest():
+    tmp, now_ms = _tmp()
+    b = whale_digest.block(tmp, now_ms, slot="evening")
+    assert b.startswith("<b>Киты</b>\n— Копируем 5 проверенных лид-трейдеров Binance: 邢小鸿, 金虎趋势论, 领航财经, 慢就是快Mike8, 荣耀学员.")
+    assert "За сутки закрыто копий: 1, итог <b>+$2.13</b>; в работе 1." in b          # the SOL trade is not a copy → not counted
+    assert "Умные кошельки в блокчейне набирают AAVE (покупают: маркетмейкер и фонд)." in b
+    assert "Jump" not in b and not any(channel.latin_heavy(ln) for ln in b.splitlines())    # the post stays Russian (the lint blocks English)
+    assert len(re.sub(r"<[^>]+>", "", b)) < 420
+    b2 = whale_digest.block(tmp, now_ms, slot="morning", highlights=2)
+    assert "Копий в работе 1, у каждой стоп на бирже." in b2 and "Фонд ARK (Кэти Вуд) за день: купил TSLA; продал ROKU." in b2
+    c = whale_digest.copies(tmp, now_ms)
+    assert [o["whale"] for o in c["open_copies"]] == ["荣耀学员"] and c["copies_closed"][0]["whale"] == "领航财经"
+    assert whale_digest.block(tempfile.mkdtemp(), now_ms) == ""                        # no whale list yet → no section at all
+
+
+def test_quiet_hours_23_to_8_kyiv():
+    q = lambda h, m=0: whale_digest.quiet(dt.datetime(2026, 11, 5, h, m, tzinfo=whale_digest.KYIV))
+    assert q(23) and q(2) and q(7, 59) and not q(8) and not q(12) and not q(22, 59)
+
+
+def test_channel_posts_follow_the_whale_model_and_fit_the_caption():
+    tmp, now_ms = _tmp()
+    ch = channel.Channel(sqlite3.connect(":memory:"), tmp)
+    now = channel.kyiv_now(now_ms)
+    for slot, h in (("morning", 8), ("evening", 21)):
+        p = ch.post(slot, now=now.replace(hour=h, minute=40))
+        p = ch.shrink(p) if len(re.sub(r"<[^>]+>", "", p)) > 1024 else p
+        assert "<b>Киты</b>" in p and "Копируем 5 проверенных лид-трейдеров" in p, slot
+        assert len(re.sub(r"<[^>]+>", "", p)) <= 1024 and ch.lint(p, {}) == [], slot
+        assert not RETIRED.search(p), (slot, RETIRED.search(p))
+        assert p.index("<b>Киты</b>") < p.index("Вывод CRYPTO NOVA")
+    ev = ch.post("evening", now=now.replace(hour=21, minute=40))
+    assert "ZRO шорт: <b>+$2.13 (+4.2%)</b>, копия 领航财经" in ev and "SOL лонг" in ev
+    assert "BNB шорт: в работе" not in ev                         # with «Киты» the open copies are counted there, not listed twice
+    sl = ch.facts(ch.ctx(), now)["system_line"]
+    assert "Фьючерсы повторяют сделки 5 проверенных трейдеров" in sl and "Спот — ядро BTC, ETH и SOL" in sl and not RETIRED.search(sl)
+    assert not RETIRED.search(ch.intro()) and "5 проверенных трейдеров" in ch.intro() and len(ch.intro()) < 1500
+
+
+def test_channel_is_silent_at_night_and_has_no_per_trade_posts():
+    tmp, now_ms = _tmp()
+    ch = channel.Channel(sqlite3.connect(":memory:"), tmp)
+    sent = []
+    r = ch.run(lambda t: sent.append(t) or True, now=dt.datetime(2026, 11, 5, 23, 30, tzinfo=channel.KYIV))
+    assert r["sent"] is False and "quiet" in r["why"] and not sent
+    r = ch.run(lambda t: sent.append(t) or True, now=dt.datetime(2026, 11, 5, 6, 0, tzinfo=channel.KYIV))
+    assert r["sent"] is False and not sent
+    assert channel.Channel.TRADE_POSTS is False
+
+
+def test_weekly_post_speaks_about_the_real_account_and_the_whales():
+    tmp, now_ms = _tmp()
+    rep = json.load(open(os.path.join(tmp, "terminal.json")))
+    for c in rep["coins"]:
+        for lv in c["levels"]:
+            lv["kind"] = "support" if lv["hi"] <= c["price"] else "resistance"
+    doc = weekly.run(sqlite3.connect(":memory:"), rep, os.path.join(tmp, "weekly.json"), now_ms)
+    post, text = doc["post"], doc["text"]
+    assert post.startswith("📊") and "Реальный счёт CRYPTO NOVA на OKX: 9 650 $" in post and "С 22.10.2026: −$374.40 (−3.73%)" in post
+    assert "Киты\n— Копируем 5 проверенных лид-трейдеров Binance" in post and "За неделю закрыто копий: 1" in post
+    assert "Спот — ядро: BTC 36%, ETH 13%, SOL 7% счёта" in post and "<b>" not in post
+    for s in (post, text):
+        assert not RETIRED.search(s) and "Демо-счета" not in s and "три стратегии" not in s, RETIRED.search(s)
+    assert "## Киты" in text and "Как работает система: фьючерсы реального счёта повторяют сделки 5 проверенных трейдеров" in text
+
+
+def test_retired_desks_signals_are_not_posted_to_telegram(monkeypatch):
+    from cnq.agents import signal_feed
+    tmp = tempfile.mkdtemp()
+    now = int(time.time() * 1000)
+    desk = {"open": [{"id": "E-BTC-1", "symbol": "BTC", "side": "LONG", "grade": "E", "entry": 80000, "stop": 76000, "opened": now}], "closed": []}
+    json.dump({"profiles": {"bal": desk, "imp": {"open": [], "closed": []}}}, open(os.path.join(tmp, "paper.json"), "w"))
+    calls = []
+    monkeypatch.setattr(signal_feed, "_send", lambda *a, **k: calls.append(a) or 1)
+    monkeypatch.setattr(signal_feed, "signals_chat", lambda conn=None: "-100")
+    conn = sqlite3.connect(":memory:")
+    signal_feed.ensure(conn)
+    conn.execute("INSERT INTO signal_feed(id, symbol, side, opened, seeded, source) VALUES('old', 'X', 'LONG', 1, 1, 'bal')")   # not the first run
+    doc = signal_feed.run(conn, tmp, now)
+    assert doc["tg_posts"] is False and not calls                       # recorded for the panel, not posted
+    assert any(i["id"] == "E-BTC-1" and not i["posted"] for i in doc["items"])
+
+
+def test_app_demo_futures_is_the_whale_desk(tmp_path):
+    from cnq.agents import app_home
+    tmp, now_ms = _tmp()
+    card, curve = app_home._whale_futures(tmp, now_ms, "ru")
+    assert card["in_result"] == ["whales"] and card["usd"] == 420.0 and card["pct"] == 4.2 and card["closed_n"] == 1
+    assert card["open"][0]["why"].startswith("Копия сделки трейдера 荣耀学员") and card["open"][0]["src_ru"] == "Киты · копия"
+    assert "повторяет сделки 5 проверенных трейдеров" in card["about_ru"] and curve[-1][1] == 420.0
+    en, _ = app_home._whale_futures(tmp, now_ms, "en")
+    assert "copies the trades of 5 verified" in en["about_ru"]
+    assert app_home._whale_futures(str(tmp_path), now_ms, "ru") is None    # no desk → the old card stays

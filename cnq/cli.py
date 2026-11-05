@@ -661,7 +661,10 @@ def main(argv: list[str] | None = None) -> int:
                 print("weekly: not Friday yet / already written this week"); return 0
             doc = weekly.run(conn, rep, path)
             print(f"weekly.json written ({why}): {doc['week']['from']}–{doc['week']['to']}, paper {doc['paper']['n']} trades {doc['paper']['sum_r']:+.2f}R")
-            if args.send and why in ("friday", "forced"):
+            from .agents.whale_digest import quiet
+            if args.send and why in ("friday", "forced") and quiet():
+                print("weekly: not sent — quiet hours 23:00–08:00 Kyiv")      # 05.11: no public post at night
+            elif args.send and why in ("friday", "forced"):
                 print("sent" if notify.send(doc["post"]) else "not sent (CNQ_TG_TOKEN/CNQ_TG_CHAT missing?)")
         elif args.cmd == "agents":
             from .agents.orchestrator import Orchestrator

@@ -212,7 +212,7 @@ class RiskPortfolio:
             if ret <= -0.30:
                 actions.append(self._act(now, sym, "SELL", 0, px, f"Стоп −30%: {ret*100:+.0f}% от входа. В высоком риске убыток режем сразу."))
             elif fixes == 0 and ret >= 1.0:
-                actions.append(self._act(now, sym, "TRIM", round(p["weight"] / 2, 4), px, f"Удвоение ({ret*100:+.0f}%): забираем тело — продаём половину, остаток едет бесплатно.", fixes=1, last_fix=px))
+                actions.append(self._act(now, sym, "TRIM", round(p["weight"] / 2, 4), px, f"Удвоение ({ret*100:+.0f}%): забираем тело — продаём половину, остаток держим бонусом.", fixes=1, last_fix=px))
             elif fixes >= 1 and px >= last_fix * 1.5:
                 actions.append(self._act(now, sym, "TRIM", round(p["weight"] / 2, 4), px, f"Ещё +50% от последней фиксации ({ret*100:+.0f}% от входа): продаём половину остатка.", fixes=fixes + 1, last_fix=px))
             elif px < high * 0.65 and ret > 0.3:
@@ -530,7 +530,7 @@ def ideas_reco(kind: str, est: str, p: dict, px: float | None, row: dict | None,
             dd = 1 - px / max(p.get("high") or px, px)
             if dd >= P["trail"] - 0.07:
                 return {"k": "sell", "t": "У трейлинга", "why": f"{dd*100:.0f}% ниже пика; на откате 35% остаток продаём."}
-            return {"k": "hold", "t": "Едет бесплатно", "why": f"Тело забрано; остаток держим до отката 35% от пика; {tab}."}
+            return {"k": "hold", "t": "Держим бонусом", "why": f"Тело забрано; остаток держим до отката 35% от пика; {tab}."}
     elif kind != "core" and ret <= P["stop_buy"] + 0.05:
         return {"k": "sell", "t": "У стопа −20%", "why": f"Сейчас {_pc(ret)} от входа; на −20% продаём."}
     if fresh and st == "wait" and ret <= P["review_pnl"]:

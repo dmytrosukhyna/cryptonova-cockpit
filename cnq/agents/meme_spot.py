@@ -349,7 +349,7 @@ def reasons_and_flags(r: dict) -> None:
         elif h["top10_pct"] > 40:
             fl.append({"level": "yellow", "text": f"топ-10 кошельков держат {h['top10_pct']:.0f}% (биржевые кошельки не отделены)"})
     else:
-        rs.append("держатели: нет данных" + ("" if r.get("solana_mint") else " (не Solana — бесплатно не проверить)"))
+        rs.append("держатели: нет данных" + ("" if r.get("solana_mint") else " (не Solana — проверить нечем)"))
     rs.append(f"на рынке {r['age_days'] / 365:.1f} г." if r.get("age_days") is not None and r["age_days"] >= 365 else
               (f"на рынке {r['age_days']:.0f} дн." if r.get("age_days") is not None else "возраст: нет данных"))
     if r.get("lp_locked_pct") is not None:

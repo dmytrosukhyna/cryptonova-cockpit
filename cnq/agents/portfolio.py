@@ -450,7 +450,7 @@ class SpotPortfolio:
             elif p["bucket"] == "short" and (sc < 40 or not btc_bull):
                 actions.append(self._act(now, sym, "SELL", 0, px, f"Короткая идея отработала/выдохлась: оценка {sc}/100{'' if btc_bull else ', BTC в медвежьем режиме'} — выходим ({ret*100:+.0f}%)."))
             elif ret >= 0.40 and p["weight"] > 0.03:
-                actions.append(self._act(now, sym, "TRIM", round(p["weight"] / 2, 3), px, f"Фиксируем половину: {ret*100:+.0f}% от входа. Остаток едет бесплатно, стоп переносим на вход."))
+                actions.append(self._act(now, sym, "TRIM", round(p["weight"] / 2, 3), px, f"Фиксируем половину: {ret*100:+.0f}% от входа. Остаток держим бонусом, стоп переносим на вход."))
             elif p["bucket"] == "mid" and sc < 35 and rebalance:
                 actions.append(self._act(now, sym, "SELL", 0, px, f"Среднесрочная оценка упала до {sc}/100 — тренд сломан, освобождаем место ({ret*100:+.0f}%)."))
             elif px < high * 0.75 and ret > 0.2:
@@ -1002,7 +1002,7 @@ def bal_reco(role: str, p: dict, px: float | None, w_now: float, w_target: float
     dd = 1 - px / high
     if dd >= BAL["trail"] - 0.07:
         return {"k": "sell", "t": "У трейлинга", "why": f"{dd*100:.0f}% ниже пика; на откате 35% остаток продаём."}
-    return {"k": "hold", "t": "Едет бесплатно", "why": "Тело забрано; остаток без потолка, выход при откате 35% от пика."}
+    return {"k": "hold", "t": "Держим бонусом", "why": "Тело забрано; остаток без потолка, выход при откате 35% от пика."}
 
 
 # ----------------------------------------------------------------------------- 4th profile: the meme desk's paper account in this schema
@@ -1044,7 +1044,7 @@ def meme_profile(m: dict | None, now: int | None = None) -> dict:
                 left = ((p.get("entry_time") or now) + (lim.get("pre_body_limit_h") or 72) * 3_600_000 - now) / 3_600_000
                 reco = {"k": "hold", "t": "Держать", "why": f"Ждём +50% для тела; если не будет ещё {max(0, left):.0f} ч — выход целиком."}
         else:
-            reco = {"k": "hold", "t": "Едет бесплатно", "why": "Тело забрано; остаток продаём при откате 35% от пика (4-часовые свечи)."}
+            reco = {"k": "hold", "t": "Держим бонусом", "why": "Тело забрано; остаток продаём при откате 35% от пика (4-часовые свечи)."}
         pos.append({"symbol": sym, "coin": p["coin"], "contract_mult": k, "name": sym, "bucket": "meme", "role": "meme", "sleeve": "мемы",
                     "weight": round((p.get("value") or 0) / eq, 4) if eq else 0, "entry": entry, "entry_time": p.get("entry_time"),
                     "high": (p.get("peak_px") or p["entry_px"]) / k, "status": "OPEN", "reason": p.get("why"), "price": px,

@@ -168,7 +168,7 @@ def test_bal_take_profit_trailing_stops_and_meme_dip():
     acts = {(a["symbol"], a["action"]) for a in st["actions"]}
     assert ("LAI", "TRIM") in acts and ("A0", "SELL") in acts and ("PEPE", "BUY") in acts
     by = {p["symbol"]: p for p in st["positions"]}
-    assert by["LAI"]["fixes"] == 1 and by["LAI"]["reco"]["t"] == "Едет бесплатно" and "A0" not in by
+    assert by["LAI"]["fixes"] == 1 and by["LAI"]["reco"]["t"] == "Держим бонусом" and "A0" not in by
     assert by["PEPE"]["role"] == "meme" and abs(by["PEPE"]["weight"] - 0.03) < 0.003
     _px(rows, "LAI", 0.6)                                     # 40 % below its peak → trailing exit of the rest
     _px(rows, "PEPE", 0.6)                                    # −40 % from entry → stop; still «in a dip» but not re-bought (30-day cooldown)
@@ -601,7 +601,7 @@ def test_ideas_avoid_stops_body_trailing_and_cooldown():
     assert ("M1", "SELL") in acts and acts[("M1", "SELL")]["reason"].startswith("Стоп −35%") and ("M2", "TRIM") in acts
     assert not {("A3", "SELL"), ("BTC", "SELL"), ("M3", "SELL")} & set(acts)
     by = {p["symbol"]: p for p in st["positions"]}
-    assert by["M2"]["fixes"] == 1 and by["M2"]["reco"]["t"] == "Едет бесплатно" and abs(by["M2"]["cost_weight"] - 0.025 / 1.001 / 2) < 1e-6
+    assert by["M2"]["fixes"] == 1 and by["M2"]["reco"]["t"] == "Держим бонусом" and abs(by["M2"]["cost_weight"] - 0.025 / 1.001 / 2) < 1e-6
     # 18.10: the core has no stop and is topped back up to its plan (BTC 30 %) when it falls under ¾ of it (cash permitting)
     assert ("BTC", "ADD") in acts and "доливаем" in acts[("BTC", "ADD")]["reason"]
     assert -40.0 < by["BTC"]["pnl_pct"] < 0 and by["BTC"]["reco"]["k"] == "hold"

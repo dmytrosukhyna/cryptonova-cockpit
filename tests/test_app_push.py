@@ -20,10 +20,10 @@ def ms(h, m=0, day=19, weekday_fri=False):
     return int(d.timestamp() * 1000)
 
 
-def paper(opens=(), closes=()):
-    return {"profiles": {"bal": {"open": [{"id": o, "symbol": o, "side": "LONG", "entry": 0.1755, "stop": 0.1544, "tps": [0.2632], "opened": 1}
-                                          for o in opens],
-                                 "closed": [{"id": c, "symbol": c, "pnl_usd": 2.04, "closed": 2} for c in closes]}}}
+def whales(closes=(), n_open=2):
+    """the «Киты» demo desk (whales_top.json) with copies closed at the given (kyiv hour, day, pnl)"""
+    return {"desk": {"start": 10000.0, "equity": 10100.0, "open": [{"coin": f"C{i}"} for i in range(n_open)],
+                     "closed": [{"coin": c, "pnl": pnl, "closed_t": ms(h, day=day)} for c, h, day, pnl in closes]}}
 
 
 ON = {"trades": True, "news": True, "brief": True}        # what this person switched on in the app
@@ -47,23 +47,16 @@ def test_default_settings_send_nothing(tmp_path):
     st = Store(api)
     assert st.prefs("u1") == {"trades": False, "news": False, "piggy": False, "brief": False}
     st.set_piggy("u1", {"amount": 20, "freq": "week", "on": True, "start_day": int(ms(10, 2, weekday_fri=True) // 86_400_000)})
-    (web / "paper.json").write_text(json.dumps({"profiles": {"bal": {"open": [], "closed": [], "equity_history": [
-        {"time": ms(12, day=16), "equity": 10000}, {"time": ms(17, day=23), "equity": 10100}]}}}))
-    f = FakeFcm()
-    app_push.run(conn, api, str(web), ms(9, day=23), f)                   # first run: silent
+    (web / "whales_top.json").write_text(json.dumps(whales([("ZEC", 12, 23, 104.0)])))
     (web / "markets.json").write_text(json.dumps({"top": [{"symbol": "BTC", "price": 70000, "chg24": -9.0}]}))
-    doc = json.loads((web / "paper.json").read_text())
-    doc["profiles"]["bal"]["open"] = paper(["ARB"])["profiles"]["bal"]["open"]
-    (web / "paper.json").write_text(json.dumps(doc))
-    for h, m in ((10, 2), (12, 0), (18, 2)):                              # piggy day, big move, new trade, Friday summary
+    f = FakeFcm()
+    for h, m in ((10, 2), (12, 0), (18, 2), (20, 5)):                     # piggy day, big move, Friday summary, evening summary
         app_push.run(conn, api, str(web), ms(h, m, weekday_fri=True), f)
     assert f.sent == []
     st.set_prefs("u1", {"trades": True})                                  # the person turns one switch on → only that one
     assert st.prefs("u1") == {"trades": True, "news": False, "piggy": False, "brief": False}
-    doc["profiles"]["bal"]["open"] = paper(["ARB", "SEI"])["profiles"]["bal"]["open"]
-    (web / "paper.json").write_text(json.dumps(doc))
-    app_push.run(conn, api, str(web), ms(18, 3, weekday_fri=True), f)
-    assert len(f.sent) == 1 and "SEI" in f.sent[0][2]
+    app_push.run(conn, api, str(web), ms(20, 6, weekday_fri=True), f)
+    assert len(f.sent) == 1 and "ZEC +$104" in f.sent[0][2] and "Киты" in f.sent[0][1]
 
 
 def test_saved_settings_are_kept_and_only_sent_switches_are_stored(tmp_path):
@@ -77,52 +70,51 @@ def test_saved_settings_are_kept_and_only_sent_switches_are_stored(tmp_path):
     assert [u for u, _ in st.push_tokens(pref="news")] == []
 
 
-def test_first_run_is_silent_then_new_trade_sends(tmp_path):
+def test_whale_summary_once_in_the_evening_never_per_trade(tmp_path):
+    """05.11: the retired rule desks are not pushed; ONE «Киты» summary a day at 20:00 Kyiv, only if a copy moved ≥ $5"""
     web, api, conn = setup(tmp_path)
-    (web / "paper.json").write_text(json.dumps(paper(["XRP"])))
+    (web / "paper.json").write_text(json.dumps({"profiles": {"bal": {"open": [{"id": "X", "symbol": "XRP", "side": "LONG", "opened": 1}], "closed": []}}}))
+    (web / "whales_top.json").write_text(json.dumps(whales([("PEPE", 9, 19, -1.2), ("BTC", 11, 19, 0.8)])))
     f = FakeFcm()
-    assert app_push.run(conn, api, str(web), ms(12), f)["first_run"]
+    for h in (12, 15, 20):
+        app_push.run(conn, api, str(web), ms(h), f)
+    assert f.sent == []                                   # only $1–2 copies today → nothing; retired desks never pushed
+    (web / "whales_top.json").write_text(json.dumps(whales([("PEPE", 9, 19, -1.2), ("ZEC", 13, 19, 103.6), ("BNB", 14, 19, -20.0)], n_open=5)))
+    app_push.run(conn, api, str(web), ms(15), f)          # before 20:00 → wait for the evening
     assert f.sent == []
-    (web / "paper.json").write_text(json.dumps(paper(["XRP", "ARB"])))
-    r = app_push.run(conn, api, str(web), ms(12, 5), f)
-    assert r["sent"] == 1 and "ARB" in f.sent[0][2] and "демо" in f.sent[0][1]
-    app_push.run(conn, api, str(web), ms(12, 6), f)          # nothing new → nothing sent
+    r = app_push.run(conn, api, str(web), ms(20, 3), f)
+    assert r["sent"] == 1 and f.sent[0][1] == "Киты за день · демо"
+    assert f.sent[0][2] == "Закрыто копий: 3, в плюсе 1; итог +$82 на демо-счёте $10 000. Лучшая: ZEC +$104. В работе 5."
+    for m_ in (10, 30, 59):
+        app_push.run(conn, api, str(web), ms(20, m_), f)  # the same evening → still one
     assert len(f.sent) == 1
+    (web / "whales_top.json").write_text(json.dumps(whales([("ZEC", 13, 20, 50.0)])))
+    app_push.run(conn, api, str(web), ms(20, 1, day=20), f)   # next day → the next summary
+    assert len(f.sent) == 2
 
 
 def test_quiet_hours_and_prefs(tmp_path):
     web, api, conn = setup(tmp_path, {"trades": False})
-    (web / "paper.json").write_text(json.dumps(paper([])))
+    (web / "whales_top.json").write_text(json.dumps(whales([("ZEC", 13, 19, 103.6)])))
     f = FakeFcm()
-    app_push.run(conn, api, str(web), ms(12), f)
-    (web / "paper.json").write_text(json.dumps(paper(["ARB"])))
-    app_push.run(conn, api, str(web), ms(12, 1), f)          # trades switched off
+    app_push.run(conn, api, str(web), ms(20, 5), f)          # trades switched off
     assert f.sent == []
-    web2, api2, conn2 = setup(tmp_path / "b") if (tmp_path / "b").mkdir() is None else (None, None, None)
-    (web2 / "paper.json").write_text(json.dumps(paper([])))
-    app_push.run(conn2, api2, str(web2), ms(12), f)
-    (web2 / "paper.json").write_text(json.dumps(paper(["ARB"])))
-    assert app_push.run(conn2, api2, str(web2), ms(23), f)["quiet"]
+    assert app_push.run(conn, api, str(web), ms(23), f)["quiet"] and app_push.quiet(ms(8, 59)) and not app_push.quiet(ms(9))
     assert f.sent == []
 
 
-def test_bundle_and_cap(tmp_path):
+def test_friday_week_summary_of_the_whale_desk(tmp_path):
     web, api, conn = setup(tmp_path)
-    (web / "paper.json").write_text(json.dumps(paper([])))
+    (web / "whales_top.json").write_text(json.dumps(whales([("ZEC", 13, 21, 103.6), ("OP", 10, 22, -40.0)])))
     f = FakeFcm()
-    app_push.run(conn, api, str(web), ms(10, 30), f)
-    (web / "paper.json").write_text(json.dumps(paper(["A", "B", "C"], ["D"])))
-    app_push.run(conn, api, str(web), ms(10, 31), f)
-    assert len(f.sent) == 1 and "4 события" in f.sent[0][1]
-    for i in range(10):
-        (web / "paper.json").write_text(json.dumps(paper([f"N{i}"])))
-        app_push.run(conn, api, str(web), ms(11, i), f)
-    assert len(f.sent) == app_push.TRADE_CAP
+    app_push.run(conn, api, str(web), ms(18, 20, weekday_fri=True), f)
+    app_push.run(conn, api, str(web), ms(18, 40, weekday_fri=True), f)
+    briefs = [x for x in f.sent if x[1] == "Итоги недели · Киты"]
+    assert len(briefs) == 1 and "закрыто 2, итог +$64" in briefs[0][2]
 
 
 def test_big_move_news_once_a_day_and_brief_dedupe(tmp_path):
     web, api, conn = setup(tmp_path)
-    (web / "paper.json").write_text(json.dumps(paper()))
     f = FakeFcm()
     app_push.run(conn, api, str(web), ms(12), f)                      # first run: silent
     (web / "markets.json").write_text(json.dumps({"top": [{"symbol": "BTC", "price": 76000, "chg24": -6.4}]}))
@@ -141,18 +133,3 @@ def test_big_move_news_once_a_day_and_brief_dedupe(tmp_path):
     assert len(f.sent) == 1
 
 
-def test_new_source_is_seeded_silently_then_its_new_trades_send(tmp_path):
-    web, api, conn = setup(tmp_path)
-    (web / "paper.json").write_text(json.dumps(paper(["XRP"])))
-    f = FakeFcm()
-    app_push.run(conn, api, str(web), ms(12), f)                         # first run ever: silent
-    own_open = lambda ids: [{"id": i, "symbol": i, "side": "LONG", "entry": 1.0, "stop": 0.85, "opened": 3} for i in ids]
-    doc = paper(["XRP"])
-    doc["profiles"]["own"] = {"open": own_open(["AVAX", "FIL", "APT"]), "closed": []}
-    (web / "paper.json").write_text(json.dumps(doc))
-    app_push.run(conn, api, str(web), ms(12, 5), f)                      # «own» appears with 3 old trades → nothing sent
-    assert f.sent == []
-    doc["profiles"]["own"]["open"] = own_open(["AVAX", "FIL", "APT", "SEI"])
-    (web / "paper.json").write_text(json.dumps(doc))
-    r = app_push.run(conn, api, str(web), ms(12, 10), f)                 # a genuinely new own trade → one push
-    assert r["sent"] == 1 and "SEI" in f.sent[0][2]

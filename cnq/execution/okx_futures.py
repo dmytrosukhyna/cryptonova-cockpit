@@ -88,6 +88,9 @@ WHALES_STALE_MS = 3 * 3_600_000
 RISK_CAP = 0.02             # hard ceiling: 2 % of the futures budget per trade (owner 04.11 17:24: «Риск 2% на сделку»; was 1 %)
 RISK_MULT = 2.0            # owner 04.11: trades twice as large — the desk's own risk share × 2, still within RISK_CAP
 MAX_POS = 15                # 04.11 22:35 (owner): 5 followed whales × their positions must fit (was 5); margin stays ≤ the budget
+# 05.11 (watch): «instrument busy» is NOT final — the whale ETH/SOL shorts of 04.11 were skipped for good while another desk held
+# ETH/SOL longs, and stayed uncopied after those closed (03:50 UTC). Re-checked every pass; the late-join guard still applies.
+BUSY = "по этому инструменту уже есть позиция — вторую не открываю"
 DAY_LOSS = 0.03             # 3 % of the futures budget per UTC day
 OWN_GATE = (30, 0.3)        # «Сигналы CRYPTO NOVA» join the futures result after 30 closed trades at ≥ +0.3 % a trade (as the header)
 MIN_STOP = 0.002            # a stop closer than 0.2 % to the price is not a trade
@@ -822,7 +825,7 @@ def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict
     if len(pos) >= cap["max_pos"]:
         return {**base, "skip": f"уже {len(pos)} открытых позиций — предел {cap['max_pos']}", "final": False}
     if inst_id in pos:
-        return {**base, "skip": "по этому инструменту уже есть позиция — вторую не открываю", "final": True}
+        return {**base, "skip": BUSY, "final": False}
     if ctx.lead:
         base["copy"] = inst_id in ctx.lead_insts      # not yet a lead instrument → step() adds it before the entry (add_lead)
     inst = ctx.inst(inst_id)
@@ -831,7 +834,7 @@ def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict
         ainst = ctx.inst(alt)                       # no USDT swap of this coin → its USDC-margined swap (22.10)
         if ainst:
             if alt in pos:
-                return {**base, "inst": alt, "skip": "по этому инструменту уже есть позиция — вторую не открываю", "final": True}
+                return {**base, "inst": alt, "skip": BUSY, "final": False}
             inst_id, inst = alt, ainst
             base = {**base, "inst": alt, "settle": "USDC"}
             avail = avail + ctx.avail_ccy("USDC")   # USDT turns into USDC margin right before the entry
@@ -990,6 +993,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     # 3. new desk trades
     for k in ("skip", "tries", "done"):
         st[k] = {x: v for x, v in st[k].items() if x in want}
+    st["skip"] = {x: v for x, v in st["skip"].items() if v != BUSY}     # legacy final «busy» skips are retried (05.11)
     fresh = [(tid, w) for tid, w in want.items() if tid not in st["trades"] and tid not in st["skip"] and tid not in st["done"]]
     if fresh:
         cap = caps(env)

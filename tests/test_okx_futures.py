@@ -500,3 +500,19 @@ def test_owner_override_closes_the_held_short_reduce_only_and_never_reopens_it(t
     assert ov.blocked(a, "1000PEPE-USDT-SWAP", "LONG", NOW - 1) and ov.blocked(a, "PEPE", "LONG", NOW + 1) is None
     assert ov.blocked(a, "HYPE-USDT-SWAP", "SHORT", NOW + 1) and ov.blocked(a, "HYPE", "LONG", NOW + 1) is None
     assert ov.active(ov.load("/nonexistent.json"), NOW)["close"] == set()
+
+
+def test_busy_instrument_is_retried_after_the_other_position_closes():
+    """05.11: a desk trade skipped because another desk held the coin is not skipped for good — legacy «busy» skips are dropped too."""
+    fk = F.FakeOkx(balances={"USDT": 100000.0})
+    e = F.env()
+    a = F.trade("A1", "SOL", entry=F.PX["SOL"], stop=F.PX["SOL"] * 0.95, tp=F.PX["SOL"] * 1.2, risk=50.0)
+    b = F.trade("B1", "SOL", entry=F.PX["SOL"], stop=F.PX["SOL"] * 0.95, tp=F.PX["SOL"] * 1.2, risk=50.0, opened=NOW - 60_000)
+    r = run(fk, e, F.desks(a, imp=[b]))
+    assert r["opened"] == 1 and any(x["why"] == fu.BUSY for x in r["skipped"])
+    st = fu.load_state(e)
+    assert not any(v == fu.BUSY for v in st["skip"].values())
+    st["skip"]["imp:B1"] = fu.BUSY                                             # a skip saved by the old code
+    fu.save_state(st, e)
+    run(fk, e, F.desks(a, imp=[b]))
+    assert "imp:B1" not in fu.load_state(e)["skip"]

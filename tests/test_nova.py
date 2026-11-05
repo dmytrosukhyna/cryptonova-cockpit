@@ -286,7 +286,7 @@ def test_knowledge_files():
     assert "копирование пока недоступно" not in system and "VPN" in system          # owner 28.10: no ban volunteered, never a VPN
     # final QA 28.10: one product — the real account since 22.10; the demo desks of 17.10, their 3 sizes and the EU X-Perps line are gone
     # 05.11 (owner 09:52): the futures are «сигнал системы CRYPTO NOVA»; the method stays internal
-    for must in ("Ты — NOVA AI", "сигнал системы CRYPTO NOVA", "не раскрывай", "плечо 2x, предел 3x", "15% стартового капитала",
+    for must in ("Ты — NOVA AI", "сигнал системы CRYPTO NOVA", "не раскрывай", "плечо подбирается под каждый сигнал", "15% стартового капитала",
                  "не больше 2% фьючерсного бюджета", "реальный счёт CRYPTO NOVA на OKX"):
         assert must in system, must
     for gone in ("17.10", "демо-счёта $10 000", "3 размера", "X-Perps", "плечо до 10x", "USDT в ЕС недоступен", "на демо-счетах по $10 000"):

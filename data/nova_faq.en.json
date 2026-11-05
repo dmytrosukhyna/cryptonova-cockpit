@@ -405,22 +405,21 @@
     {
       "id": "leverage_real",
       "topic": "learn",
-      "q": "Why is the real account's leverage only 2x?",
-      "a": "On CRYPTO NOVA's real account the leverage is 2x: the system's rules set it, with a cap of 3x. Leverage doesn't change the amount at risk: the trade size comes from the stop, and one trade risks at most 2% of the futures budget. Higher leverage would only lower the margin and bring liquidation closer, and the trades' stops can be 6–12% away. Demo-account signals may show 2x–5x, but on the real account the leverage is 2x, with a cap of 3x.",
+      "q": "What leverage does the real account use?",
+      "a": "Leverage is set for each CRYPTO NOVA system signal. Leverage doesn't change the amount at risk: the trade size comes from the stop, and one trade risks at most 2% of the futures budget; the stop is on the exchange from the start. The closer the stop, the higher the leverage can be, the farther — the lower: the trade's risk stays the same.",
       "tags": [
         "leverage",
-        "2x",
-        "3x",
         "why",
         "real",
         "account",
-        "only",
-        "low",
-        "liquidation"
+        "what",
+        "liquidation",
+        "risk"
       ],
       "alt": [
-        "Why is leverage 2x?",
-        "Why is the leverage 2x or 3x?"
+        "Why this leverage?",
+        "What leverage do the trades use?",
+        "Why do trades have different leverage?"
       ]
     },
     {

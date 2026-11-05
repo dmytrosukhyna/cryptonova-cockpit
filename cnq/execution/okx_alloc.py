@@ -136,6 +136,12 @@ def ideas(portfolio: dict) -> dict:
     return out
 
 
+def reseed_id(portfolio: dict) -> str | None:
+    """05.11: the id of a one-time rebuild of «CRYPTO NOVA портфель» from the real account (cnq/agents/spot_reseed.py), else None"""
+    r = (((portfolio or {}).get("portfolios") or {}).get("ideas") or {}).get("reseed")
+    return str(r.get("id")) if isinstance(r, dict) and r.get("id") else None
+
+
 def meta(portfolio: dict) -> dict:
     pf = (portfolio.get("portfolios") or {}).get("ideas") or {}
     acts = [a for a in (pf.get("recent_actions") or []) + (pf.get("actions") or []) if isinstance(a, dict)]

@@ -58,6 +58,10 @@ jobs:
           restore-keys: |
             cnq-state-
             cnq-db-
+      - name: Spot rebuild from the real OKX account (05.11, owner; once per config/spot_reseed.json id, scripts/ci_spot_reseed.py)
+        id: reseed
+        continue-on-error: true
+        run: python scripts/ci_spot_reseed.py
       - name: State guard — the spot portfolio never runs on a rolled-back database (23.10 incident, scripts/ci_state_guard.py)
         id: state
         run: python scripts/ci_state_guard.py
@@ -178,7 +182,9 @@ jobs:
         timeout-minutes: 3
         run: python -m cnq.cli realwhy --out web
       - name: Spot portfolio department → web/portfolio.json
-        if: ${{ steps.state.outputs.stale != 'true' }}      # 28.10: never on a rolled-back database — the real OKX account mirrors this model
+        # 28.10: never on a rolled-back database — the real OKX account mirrors this model; 05.11: not in the run that rebuilt it (the
+        # autopilot's first pass must see the rebuilt model as published by scripts/ci_spot_reseed.py)
+        if: ${{ steps.state.outputs.stale != 'true' && steps.reseed.outputs.reseeded != 'true' }}
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

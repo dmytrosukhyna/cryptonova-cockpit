@@ -907,6 +907,8 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
     bad = world_ok(cl, env)
     if bad:
         return {"ok": False, "why": bad}
+    if model is None:                           # 05.11: fetched here so the rebuild check below sees the same model as the plan
+        model = al.fetch_portfolio()
     b = build(cl, env, model)
     if (b.get("lead") or {}).get("err"):
         log({"ev": "refused", "why": "lead positions unreadable", "error": b["lead"]["err"]}, log_path)
@@ -917,6 +919,27 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
     if live(env) and not cl.demo and not st.get("first_live"):
         st["first_live"] = {"t": now, "usd": b["total_usd"]}       # the start of «результат с начала» on the owner's card
     log({"ev": "plan", "mode": mode, "reason": reason, "total_usd": b["total_usd"], "sells": len(b["sells"]), "buys": len(b["buys"])}, log_path)
+    # 05.11 (owner): the model was rebuilt from this very account (cnq/agents/spot_reseed.py) — its first pass is a CHECK only: no
+    # orders at all. Model == account (no order above the drift line, max($25, 1 %)) → accepted, the normal passes follow; otherwise
+    # refused every pass (nothing traded) until a new model without this rebuild id is published.
+    rid = al.reseed_id(model or {})
+    if rid and st.get("reseed_ok") != rid:
+        n, usd_ = len(b["sells"]) + len(b["buys"]), round(sum(o["usd"] for o in b["sells"] + b["buys"]), 2)
+        ok = not drifted(b)
+        log({"ev": "reseed_check", "id": rid, "ok": ok, "orders": n, "usd": usd_, "total_usd": b["total_usd"],
+             "plan": [{k: o.get(k) for k in ("ccy", "side", "usd", "now_pct", "target_pct")} for o in b["sells"] + b["buys"]]}, log_path)
+        if not ok:
+            return {"ok": False, "why": f"проверка после пересборки модели: счёт расходится с моделью — {n} ордеров на {usd(usd_)}; "
+                                        "ничего не исполняю, нужна проверка"}
+        st.update({"reseed_ok": rid, "reseed_check": {"t": now, "orders": 0, "small": n, "usd": usd_}, "last_sig": b["sig"],
+                   "drift_t": now, "same": b["same"], "targets": b["targets"][:20], "split": b["split"]})
+        if save:
+            save_state(st, env)
+        summary = {"t": now, "reason": "проверка после пересборки модели", "mode": mode, "sold_usd": 0.0, "bought_usd": 0.0, "orders": 0,
+                   "partial": 0, "failed": 0, "skipped": 0, "limit": False, "stopped": False, "half": [], "usdc_back": 0.0,
+                   "total_usd": b["total_usd"], "quote": b["quote"]}
+        log({"ev": "done", **summary}, log_path)
+        return {"ok": True, **summary, "plan": b, "cl": cl}
     res = execute(cl, b, st, env, now, sleep, log_path)
     summary = {"t": now, "reason": reason, "mode": mode, **res, "total_usd": b["total_usd"], "quote": b["quote"]}
     st.update({"last_run": now, "last_sig": b["sig"], "last": summary, "mode": mode, "split": b["split"], "same": b["same"],
@@ -933,6 +956,9 @@ def due(st: dict, pf: dict, now: int, env=None) -> str | None:
     """Why a spot rebalance is due now (None = not due): the public portfolio changed. Only for an armed, not stopped autopilot."""
     if not st.get("armed") or not enabled(env) or stopped(env):
         return None
+    rid = al.reseed_id(pf)
+    if rid and rid != st.get("reseed_ok"):               # 05.11: a model rebuilt from the account → its check pass (no orders)
+        return "модель пересобрана по реальному счёту — проверка без ордеров"
     sig = model_sig(pf, env)
     if sig and sig != st.get("last_sig"):
         return "портфель CRYPTO NOVA изменился"

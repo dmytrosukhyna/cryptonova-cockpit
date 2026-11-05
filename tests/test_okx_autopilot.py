@@ -310,3 +310,33 @@ def test_plan_reason_of_a_held_coin_is_the_portfolios_own_never_the_screeners_op
     text = ap.plan_text(b, "test")
     line = next(x for x in text.split("\n") if "КУПИТЬ" in x and " BBB " in x)
     assert "ждём" not in line and "Просадка −32%" in line and "стоп портфеля 1.3" in line
+
+
+def test_first_pass_after_a_rebuild_from_the_account_places_no_orders_and_a_mismatch_is_refused():
+    """05.11 (owner, option 1): «CRYPTO NOVA портфель» rebuilt from the real account (cnq/agents/spot_reseed.py) — the autopilot's
+    first pass on it is a check only: model == account → accepted with 0 orders; a model that differs → refused, nothing traded"""
+    from cnq.agents import spot_reseed as R
+    tmp = tempfile.mkdtemp()
+    fk = live_fake(balances={"USDT": 3000.0, "BTC": 0.045, "ETH": 0.8, "SOL": 3.0, "LINK": 30.0})    # $4500 / $2400 / $600 / $600
+    e = F.env(tmp, CNQ_LIVE_TRADING="yes", OKX_AUTOPILOT="on")
+    total = 3000 + 4500 + 2400 + 600 + 600
+    real = {"equity_usd": total, "alloc": {}, "spot": [{"sym": c, "usd": u} for c, u in (("BTC", 4500), ("ETH", 2400), ("SOL", 600), ("LINK", 600))]}
+    w = {"spot": 0.65, "core": 0.10}
+    model, cash, acct = R.account_shares(real, w)
+    assert R.plan_gaps(model, acct, w, total) == [] and 0 < cash < 1
+
+    def pf(rid, m):
+        return {"asof": NOW, "portfolios": {"ideas": {"name": "CRYPTO NOVA портфель", "reseed": {"id": rid} if rid else None,
+                                                       "positions": [{"symbol": c, "weight": s, "price": F.PX[c], "status": "OPEN", "name": c}
+                                                                     for c, s in m.items()], "recent_actions": []}}}
+    st = ap.load_state(e)
+    st["armed"] = True
+    ap.save_state(st, e)
+    assert "пересобрана" in ap.due(st, pf("rs-1", model), NOW, e)                # the check pass is due at once
+    r = ap.run_once(e, fk, pf("rs-1", model), NOW, F.nosleep)
+    assert r["ok"] and r["orders"] == 0 and not fk.orders and ap.load_state(e)["reseed_ok"] == "rs-1"
+    bad = {**model, "BTC": model["BTC"] + 0.10}                             # the model wants ~$650 more BTC than the account has
+    r = ap.run_once(e, fk, pf("rs-2", bad), NOW, F.nosleep)
+    assert not r["ok"] and "расходится" in r["why"] and not fk.orders
+    r = ap.run_once(e, fk, pf(None, bad), NOW, F.nosleep)                   # the next normal model → normal rules
+    assert r["ok"] and any(o["instId"] == "BTC-USDT" and o["side"] == "buy" for o in fk.orders)

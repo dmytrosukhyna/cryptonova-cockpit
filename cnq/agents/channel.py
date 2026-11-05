@@ -881,7 +881,7 @@ class Channel:
         txt = self.write(slot, facts, llm) or self.template(slot, facts)
         return self.insert_block(txt, block)
 
-    APP_STORE = "https://apps.apple.com/app/id6754893343"
+    APP_STORE = "https://apps.apple.com/gr/app/crypto-nova-ai/id6754893343"
 
     def intro(self) -> str:
         """05.11 (owner 09:52): the system CRYPTO NOVA AI works with a real account (futures and spot, re-balancing); the iOS app shows
@@ -889,13 +889,12 @@ class Channel:
         return ("<b>CRYPTO NOVA AI — система, которая работает с реальным счётом</b>\n\n"
                 "Система CRYPTO NOVA AI круглые сутки ведёт реальный счёт на OKX: фьючерсы и спот, сама балансирует доли между ними. "
                 "У каждой сделки стоп на бирже, результат публикуем честно — и плюсы, и минусы (статистика с 22.10.2026).\n\n"
-                "В приложении CRYPTO NOVA видно всё: что происходит на рынке, какие позиции открыты и почему, как работает система "
-                "и какой у неё результат.\n\n"
-                "Подключиться может каждый, кто хочет: скачайте приложение и следуйте шагам в разделе «Подключить».\n\n"
-                f"Приложение для iPhone и iPad — в App Store: <a href=\"{self.APP_STORE}\">CRYPTO NOVA</a>\n\n"
-                "В канале: утренний обзор рынка, главные новости дня и вечерние итоги реального счёта. Ночью, с 23:00 до 08:00 по Киеву, "
-                "постов нет.\n\n"
-                "Прошлые результаты не гарантируют будущих, это не инвестиционный совет. Вопросы: @cryptonova_core_ai_bot")
+                "В приложении CRYPTO NOVA AI видно всё: что происходит на рынке, какие позиции открыты и почему, как работает система "
+                "и какой у неё результат.\n"
+                "Подключиться может каждый: скачайте приложение и следуйте шагам в разделе «Подключить».\n"
+                f"Приложение для iPhone и iPad — в App Store: <a href=\"{self.APP_STORE}\">CRYPTO NOVA AI</a>\n\n"
+                "В канале: утренний обзор рынка, главные новости дня и вечерние итоги реального счёта. С 23:00 до 08:00 по Киеву постов нет.\n"
+                "Прошлые результаты не гарантируют будущих, это не инвестиционный совет. Вопросы: @dmytrosukhyna")
 
     def evening_verdict(self, btc: dict, x: dict, day: str | None = None) -> str:
         price = btc.get("price")

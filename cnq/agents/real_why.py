@@ -145,7 +145,7 @@ def why_for(sig: str, side: str, entry: float | None, stop: float | None, inst: 
                       else "трейдер Hyperliquid (сделки видны в блокчейне)",
                       "addr": addr or None, "entry": we, "lev": _f(o.get("whale_lev")),
                       "notional_usd": _f(o.get("whale_notional")), "record_30d": rec}
-        w["copy"] = {"entry": entry, "stop": stop, "stop_src_ru": o.get("stop_src") or "защитный стоп −8%", "lev_cap": 5,
+        w["copy"] = {"entry": entry, "stop": stop, "stop_src_ru": o.get("stop_src") or "защитный стоп системы", "lev_cap": 5,
                      "lev": min(5.0, _f(o.get("whale_lev"), 1.0) or 1.0), "exit_ru": "выход вместе с китом (или по стопу)"}
         side_ru = "лонг" if long else "шорт"
         rec_ru = (f"за 30 дней {'+' if (rec.get('pnl_usd') or 0) >= 0 else ''}${_num_ru(rec.get('pnl_usd'), 0)}, {rec.get('trades')} сделок, "

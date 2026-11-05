@@ -91,7 +91,10 @@ LIQ_ROOM = 0.8
 # 04.11 (owner, real money: «стол копирования китов … срочно внедрять; повторяй их плечи; логику применять, но себя не ужимать»):
 # the desk now also trades the way the real OKX sleeve can follow it — every copy has a protective stop (the whale's own stop
 # when he has one on the exchange, else −8 % from our entry) and one whale never takes more than 30 % of the desk's equity as margin
-DESK_STOP = 0.08                      # protective stop, fraction of the entry price (5× → at most −40 % of the position's margin)
+DESK_STOP = 0.16                      # protective stop, fraction of the entry price. 05.11 (owner «проверь, исследуй и сделай как можно
+#   лучше»): −8 % → −16 %. 9 110 copied decisions of 56 OKX/HL whales, +2 min, costs + funding, risk-sized (result in R): −16 % +0.036 R
+#   (t 8.6, worst run −30 R) vs −8 % +0.029 R (t 3.8, −90 R) vs −4 % (= the whale's 20×) +0.010 R (t 0.75, −222 R); both halves and
+#   walk-forward-selected whales agree (docs/research/whale-stops-2026-11-05.md). Liquidation stays behind the stop → leverage ≤ 5×.
 # 04.11 22:35 / 22:38 (owner: «пересмотреть, чтобы мы могли подключаться и зарабатывать вместе с ними»; «в основном бюджет должен
 # работать»): no fixed 30 % / 10 % — a new copy takes the FREE margin ÷ the slots still expected today (the followed whales' own
 # signal frequency, at least 2), and one whale's copies hold at most WHALE_CAP (a soft cap, so an active whale may use more than 1/N
@@ -840,8 +843,8 @@ def okx_open_trips(state: dict, now: int) -> list[dict]:
 
 # ------------------------------------------------------------------------------------------------------------ copy desk
 def stop_for(side: str, entry: float, whale_sl: float | None = None) -> tuple[float, str]:
-    """(stop price, where it comes from): the whale's own stop when it is on the protective side 0.2–15 % away, else −8 % from
-    our entry (04.11, owner)"""
+    """(stop price, where it comes from): the whale's own stop when it is on the protective side 0.2–15 % away, else −16 % from
+    our entry (04.11 owner; −8 % → −16 % on 05.11, see DESK_STOP)"""
     s = 1 if side == "LONG" else -1
     w = _f(whale_sl)
     if w and entry:

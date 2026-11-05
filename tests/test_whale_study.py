@@ -7,6 +7,33 @@ H, M = W.H1, 60_000
 T0 = 1_790_000_000_000
 
 
+def _stop8(fn):
+    """These tests pin the desk mechanics (sizing, joins, leverage vs liquidation) at the old −8 % protective stop; the stop
+    itself (−16 % since 05.11) is pinned by test_protective_stop_is_16pct_and_keeps_liquidation_behind_it."""
+    import functools
+
+    @functools.wraps(fn)
+    def run(*a, **k):
+        old = W.DESK_STOP
+        W.DESK_STOP = 0.08
+        try:
+            return fn(*a, **k)
+        finally:
+            W.DESK_STOP = old
+    return run
+
+
+def test_protective_stop_is_16pct_and_keeps_liquidation_behind_it():
+    # 05.11 (owner «проверь, исследуй и сделай как можно лучше»; docs/research/whale-stops-2026-11-05.md)
+    assert W.DESK_STOP == 0.16
+    p, src = W.stop_for("LONG", 100.0)
+    assert abs(p - 84.0) < 1e-9 and "−16%" in src
+    p, src = W.stop_for("SHORT", 100.0)
+    assert abs(p - 116.0) < 1e-9
+    assert W.stop_for("LONG", 100.0, 95.0) == (95.0, "стоп кита")          # the whale's own stop still wins when it is shown
+    assert int(W.LIQ_ROOM / W.DESK_STOP + 1e-9) == 5                        # 20× whale → 5× copy: liquidation never before the stop
+
+
 def f(t, coin, side, px, sz, start, pnl=0.0, fee=0.0):
     return {"t": t, "coin": coin, "side": side, "px": px, "sz": sz, "dir": "", "start_pos": start, "closed_pnl": pnl, "fee": fee}
 
@@ -65,6 +92,7 @@ def test_candidates_filter_drops_deposit_artefacts_and_market_makers():
     assert why["roi_artefact"] == 1 and why["mm"] == 1 and why["small"] == 1 and why["month"] == 1
 
 
+@_stop8
 def test_desk_copies_only_new_positions_and_closes_with_the_whale():
     mids = {"BTC": "100", "ETH": "2000"}
     d = W.desk_step(None, ["0xa"], {"0xa": [{"coin": "ETH", "side": "LONG", "lev": 10, "entry": 1900}]}, mids, T0)
@@ -156,6 +184,7 @@ def test_run_end_to_end_with_fake_api():
     json.dumps(d2)
 
 
+@_stop8
 def test_desk_stops_per_whale_cap_paper_shape_and_daily_record():
     """04.11 (owner, real money): every copy has a stop (the whale's own when usable, else −8 %), one whale ≤ 30 % of the equity as
     margin, the copies are published in the paper-desk shape the real OKX sleeve follows, per-whale results by UTC day"""
@@ -223,6 +252,7 @@ def test_a_stale_look_at_a_whale_is_only_a_baseline_no_late_copies():
     assert [o["coin"] for o in d["open"]] == ["ETH"]                             # a really new position is copied
 
 
+@_stop8
 def test_join_an_already_open_position_only_within_1pct_of_the_whale_entry():
     """04.11 17:37 (owner: «Входить и в их открытые»): a followed whale's open position is joined while our price is ≤ 1 % worse
     than his own entry; 1.5 % worse → wait (logged once), joined later if the price comes back"""
@@ -255,6 +285,7 @@ def test_join_a_short_and_no_join_without_the_whale_entry():
     assert W.join_gap("SHORT", 101.0, 100.0) < 0 and abs(W.join_gap("LONG", 101.0, 100.0) - 0.01) < 1e-12
 
 
+@_stop8
 def test_stale_look_is_a_baseline_then_the_next_fresh_look_joins_within_1pct():
     pos = [{"coin": "ZRO", "side": "SHORT", "lev": 8, "entry": 1.90}]
     d = W.desk_step(None, ["0xa"], {"0xa": []}, {"ZRO": 1.9}, T0)
@@ -399,6 +430,7 @@ def test_daily_archive_writes_each_closed_trade_once(tmp_path):
     assert {x["coin"] for x in lines if x["kind"] == "open"} == {"ETH"} and len(list(tmp_path.iterdir())) == 1
 
 
+@_stop8
 def test_dynamic_sizing_free_margin_over_expected_slots_and_the_soft_whale_cap():
     """04.11 22:38 (owner: «в основном бюджет должен работать»): a copy takes free ÷ the copies still expected today (≥ 2); one whale
     at most 50 %; an active whale may use more than 1/N while the others are quiet"""
@@ -445,6 +477,7 @@ def test_a_rolled_back_database_never_republishes_an_older_desk_or_follow_list(t
     assert desk2["history"][-1][1] == 12000.0 and study2 == {"t": now, "top": []} and not notes
 
 
+@_stop8
 def test_hidden_leverage_uses_the_whales_median_and_utilisation_adapts_to_the_14_day_record():
     """05.11 09:52 (owner): «Какое у них плечо, такое и у нас» — hidden leverage → the median of his record; utilisation up to 90 %
     while the 14-day record is good (PF > 1.5, drawdown < 5 %), 50 % when it is bad"""

@@ -46,13 +46,14 @@ def test_a_new_whale_position_is_copied_on_the_next_pass_and_its_close_on_the_on
     f.okx = [("ETH", "long", 2500, NOW + 30_000)]                               # the OKX whale opens ETH 30 s after our pass
     d = WL.step(wtop(), now=NOW + MIN, **kw)
     assert [t["symbol"] for t in d["open"]] == ["ETH"] and d["live"]["lag_s_last"] == 30      # copied in the next pass, 30 s later
+    assert d["live"]["lag_by_src"] == {"okx": {"med": 30, "n": 1}}                # the lag is told per source
     t = d["open"][0]
     assert t["copy_lev"] == 5.0 and t["stop"] < t["entry"] and t["id"].startswith("W-ETH-L-")
     f.okx = []                                                                   # the whale closes
     d = WL.step(wtop(), now=NOW + 2 * MIN, **kw)
     assert d["open"] == [] and d["closed"][0]["exit_kind"] == "кит закрыл"
     st = json.loads((tmp_path / "live.json").read_text())
-    assert st["desk"]["closed"][0]["coin"] == "ETH" and st["lags"] == [30]
+    assert st["desk"]["closed"][0]["coin"] == "ETH" and st["lags"] == [30] and st["lags_src"] == {"okx": [30]}
 
 
 def test_the_first_pass_keeps_the_published_copies_with_the_same_ids(tmp_path):

@@ -139,14 +139,20 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     desk = W.desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), quality)
     # copy latency: how long after the whale opened we opened (sources that publish the open time: OKX, Binance)
     lags = list((st.get("lags") or [])[-49:])
+    by_src = {k: list(v)[-29:] for k, v in (st.get("lags_src") or {}).items() if isinstance(v, list)}
     for e in desk.get("events") or []:
         if e.get("t") == now and e.get("kind") == "open":          # a join copies an older position — not a latency
             t0 = opened.get((e["whale"], e["coin"], e["side"]))
             if t0 and 0 <= now - t0 <= 6 * 3_600_000:
                 lags.append(round((now - t0) / 1000))
+                src = str(e["whale"]).split(":")[0] if ":" in str(e["whale"]) else "hl"
+                by_src.setdefault(src, []).append(lags[-1])
+    med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None  # noqa: E731
     desk["live"] = {"t": now, "whales": len(watch), "polled": len(states), "errors": errors[:5], "follow_asof": wtop.get("asof"),
-                    "lag_s_med": sorted(lags)[len(lags) // 2] if lags else None, "lag_s_last": lags[-1] if lags else None, "n_lags": len(lags)}
-    st.update(desk=desk, names=names, lags=lags, t=now)
+                    "lag_s_med": med(lags), "lag_s_last": lags[-1] if lags else None, "n_lags": len(lags),
+                    # 05.11 (backlog 88a): which source is slow — {source: {med, n}}
+                    "lag_by_src": {k: {"med": med(v), "n": len(v)} for k, v in sorted(by_src.items()) if v}}
+    st.update(desk=desk, names=names, lags=lags, lags_src=by_src, t=now)
     pub = W.desk_public(desk, names)
     _publish(st, desk, now, env, put)
     if persist:

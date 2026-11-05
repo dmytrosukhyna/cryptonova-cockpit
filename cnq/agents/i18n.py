@@ -1259,20 +1259,20 @@ T: dict[str, dict[str, str]] = {
     # §12.1 «Если покупать сегодня»: each coin's real state in the spot portfolio (web/spot_pipeline.json) — never «рекомендовано»
     "buy.note": {
         "ru": "Система проверила {n} {coins} по графику: цена выше средней за 200 дней, отскоки от поддержки, RSI, оценка проекта и "
-              "позиции крупных трейдеров. Это кандидаты по графику, а не покупки: портфель CRYPTO NOVA покупает только монеты, которые "
+              "рыночные данные. Это кандидаты по графику, а не покупки: портфель CRYPTO NOVA покупает только монеты, которые "
               "прошли его таблицу и правила. Статус рядом с монетой — что с ней сейчас в портфеле.",
         "en": "The system checked {n} {coins} on the chart: price above its 200-day average, bounces off a support, RSI, the project's "
-              "score and the largest traders' positions. These are chart candidates, not buys: the CRYPTO NOVA portfolio buys only "
+              "score and market data. These are chart candidates, not buys: the CRYPTO NOVA portfolio buys only "
               "coins that pass its table and rules. The status next to a coin shows where it stands in the portfolio now.",
         "uk": "Система перевірила {n} {coins} за графіком: ціна вище за 200-денну середню, відскоки від підтримки, RSI, оцінка проєкту "
-              "й позиції великих трейдерів. Це кандидати за графіком, а не покупки: портфель CRYPTO NOVA купує лише монети, які пройшли "
+              "й ринкові дані. Це кандидати за графіком, а не покупки: портфель CRYPTO NOVA купує лише монети, які пройшли "
               "його таблицю й правила. Статус біля монети — що з нею зараз у портфелі.",
         "el": "Το σύστημα έλεγξε {n} {coins} στο γράφημα: τιμή πάνω από τον μέσο όρο 200 ημερών, αναπηδήσεις από στήριξη, RSI, "
-              "βαθμολογία του έργου και θέσεις των μεγαλύτερων traders. Είναι υποψήφια από το γράφημα, όχι αγορές: το χαρτοφυλάκιο "
+              "βαθμολογία του έργου και δεδομένα αγοράς. Είναι υποψήφια από το γράφημα, όχι αγορές: το χαρτοφυλάκιο "
               "CRYPTO NOVA αγοράζει μόνο νομίσματα που περνούν τον πίνακα και τους κανόνες του. Η κατάσταση δίπλα σε κάθε νόμισμα "
               "δείχνει πού βρίσκεται τώρα στο χαρτοφυλάκιο.",
         "es": "El sistema revisó {n} {coins} en el gráfico: precio por encima de su media de 200 días, rebotes en un soporte, RSI, la "
-              "puntuación del proyecto y las posiciones de los grandes traders. Son candidatas por el gráfico, no compras: la cartera "
+              "puntuación del proyecto y datos de mercado. Son candidatas por el gráfico, no compras: la cartera "
               "CRYPTO NOVA compra solo monedas que pasan su tabla y sus reglas. El estado junto a cada moneda muestra dónde está ahora "
               "en la cartera."},
     "bst.watch": {"ru": "наблюдение", "en": "watching", "uk": "спостереження", "el": "παρακολούθηση", "es": "en observación"},

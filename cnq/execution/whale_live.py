@@ -34,6 +34,8 @@ from . import owner_overrides as ov
 FOLLOW_STALE_MS = 6 * 3_600_000      # a follow list older than this → no new copies (closes and stops still work)
 PUB_MS, PUB_IDLE_MS = 2 * 60_000, 10 * 60_000
 POLL_GAP_S = 0.25
+GONE_MS = 30 * 60_000                # 05.11: a lead trader OKX answers «60004 Trader doesn't exist» for this long → treated as flat
+GONE_MARKS = ("60004", "doesn't exist", "does not exist")
 PATH = "web/whales_live.json"
 REPO = "dmytrosukhyna/cryptonova-cockpit"
 
@@ -129,14 +131,31 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     mids = post({"type": "allMids"}) or {}
     watch = list(dict.fromkeys(follow + [o["whale"] for o in desk.get("open") or []]))
     states, opened, errors = {}, {}, []
+    gone = dict(st.get("gone") or {})
+    vanished = []
     for a in watch:
         try:
             states[a], op = poll(a, mids, post, okx_get, src_get)
             opened.update({(a,) + k: v for k, v in op.items()})
+            gone.pop(a, None)
         except Exception as e:  # noqa: BLE001
             errors.append(f"{names.get(a, a)[:16]}: {str(e)[:80]}")
+            # 05.11 bug fix (Luckyboytt): a lead trader who left OKX copy trading answers «Trader doesn't exist» forever — his
+            # copies were held blind until their −8 % stop. Gone for GONE_MS and no longer followed → his copies are closed.
+            if any(m in str(e) for m in GONE_MARKS):
+                gone.setdefault(a, now)
+                if a not in follow and now - int(gone[a]) >= GONE_MS:
+                    states[a] = []
+                    vanished.append(a)
+            else:
+                gone.pop(a, None)
         sleep(POLL_GAP_S)
+    gone = {a: t for a, t in gone.items() if a in watch}
     desk = W.desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), quality)
+    why = "кит исчез с OKX (Trader doesn't exist ≥ 30 мин)"
+    for x in (desk.get("events") or []) + (desk.get("closed") or []):
+        if x.get("whale") in vanished and x.get("why") == "кит закрыл" and (x.get("t") == now or x.get("closed_t") == now):
+            x["why"] = why
     # copy latency: how long after the whale opened we opened (sources that publish the open time: OKX, Binance)
     lags = list((st.get("lags") or [])[-49:])
     by_src = {k: list(v)[-29:] for k, v in (st.get("lags_src") or {}).items() if isinstance(v, list)}
@@ -152,7 +171,7 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
                     "lag_s_med": med(lags), "lag_s_last": lags[-1] if lags else None, "n_lags": len(lags),
                     # 05.11 (backlog 88a): which source is slow — {source: {med, n}}
                     "lag_by_src": {k: {"med": med(v), "n": len(v)} for k, v in sorted(by_src.items()) if v}}
-    st.update(desk=desk, names=names, lags=lags, lags_src=by_src, t=now)
+    st.update(desk=desk, names=names, lags=lags, lags_src=by_src, t=now, gone=gone)
     pub = W.desk_public(desk, names)
     _publish(st, desk, now, env, put)
     if persist:

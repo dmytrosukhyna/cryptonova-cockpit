@@ -137,3 +137,43 @@ def test_a_new_live_seed_token_restarts_the_desk_from_the_published_one_once(tmp
     f.okx = [("ETH", "long", 2500, NOW + MIN)]
     WL.step({**wtop(desk=good), "live_seed": "recover-1"}, now=NOW + 2 * MIN, **kw)
     assert len(WL.step({**wtop(desk=good), "live_seed": "recover-1"}, now=NOW + 3 * MIN, **kw)["open"]) == 1     # not re-seeded again
+
+
+def test_a_lead_trader_gone_from_okx_for_30_min_has_his_copies_closed(tmp_path):
+    """05.11 (Luckyboytt): OKX answered «60004 Trader doesn't exist» — the BTC copy was held blind; after 30 min it is closed"""
+    f = Feed()
+    env = {"OKX_WHALE_LIVE_STATE": str(tmp_path / "live.json")}
+    kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
+    WL.step(wtop(), now=NOW, **kw)
+    f.okx = [("ETH", "long", 2500, NOW + 30_000)]
+    d = WL.step(wtop(), now=NOW + MIN, **kw)
+    assert [t["symbol"] for t in d["open"]] == ["ETH"]
+    dropped = wtop()
+    dropped["following"] = dropped["following"][:1]                              # Queen leaves the list, her ETH copy is kept
+    gone_get = lambda path, params: (_ for _ in ()).throw(RuntimeError("OKX 60004: Trader doesn't exist"))  # noqa: E731
+    kw2 = {**kw, "okx_get": gone_get}
+    d = WL.step(dropped, now=NOW + 2 * MIN, **kw2)
+    assert [t["symbol"] for t in d["open"]] == ["ETH"] and "60004" in d["live"]["errors"][0]   # not yet: maybe a blip
+    d = WL.step(dropped, now=NOW + 20 * MIN, **kw2)
+    assert [t["symbol"] for t in d["open"]] == ["ETH"]
+    d = WL.step(dropped, now=NOW + 33 * MIN, **kw2)
+    assert d["open"] == [] and d["closed"][0]["exit_kind"].startswith("кит исчез с OKX")
+
+
+def test_a_followed_whale_or_a_plain_error_never_closes_copies(tmp_path):
+    f = Feed()
+    env = {"OKX_WHALE_LIVE_STATE": str(tmp_path / "live.json")}
+    kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
+    WL.step(wtop(), now=NOW, **kw)
+    f.okx = [("ETH", "long", 2500, NOW + 30_000)]
+    WL.step(wtop(), now=NOW + MIN, **kw)
+    gone_get = lambda path, params: (_ for _ in ()).throw(RuntimeError("OKX 60004: Trader doesn't exist"))  # noqa: E731
+    timeout = lambda path, params: (_ for _ in ()).throw(RuntimeError("timeout"))  # noqa: E731
+    for t in (2, 40, 80):                                                        # still on the follow list → held
+        d = WL.step(wtop(), now=NOW + t * MIN, **{**kw, "okx_get": gone_get})
+    assert [x["symbol"] for x in d["open"]] == ["ETH"]
+    dropped = wtop()
+    dropped["following"] = dropped["following"][:1]
+    for t in (90, 130, 170):                                                     # a plain error never closes
+        d = WL.step(dropped, now=NOW + t * MIN, **{**kw, "okx_get": timeout})
+    assert [x["symbol"] for x in d["open"]] == ["ETH"]

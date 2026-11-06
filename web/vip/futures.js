@@ -10,12 +10,23 @@
     async html() {
       const [M, names, DS, H] = await Promise.all([V.real(), V.deskNames(), V.feed('desk_select.json'), V.feed('app_home.json')]);
       if (!M) return `<div class="ph"><div><h2>Фьючерсы</h2></div></div><div class="card">${V.nodata('public_real.json не загрузился')}</div>`;
+      // 06.11 (owner 17:30): the owner's Futures picture on top (web/fut_owner.json, ../fut_owner.js) — owner views only
+      let OWN = '';
+      if (V.auth.owner() && window.CNFutOwner) {
+        try {
+          const [FO, IS] = await V.feeds(['fut_owner.json', 'ivan_stats.json']);
+          let IV = null; try { IV = await V.ownerData('ivan'); } catch (e) { IV = null; }
+          OWN = `<div class="card" style="margin-bottom:var(--gap)">${window.CNFutOwner.html(FO, { ivan: IV, ivanStats: IS })}</div>`;
+        } catch (e) { OWN = ''; }
+      }
       return `<div class="ph"><div><h2>Фьючерсы</h2><p>Реальные фьючерсные позиции счёта CRYPTO NOVA на OKX с ${V.PUBLIC_START_LABEL}. Тестовые сделки демо-столов здесь не показываются.</p></div></div>
+        ${OWN}
         ${summary(M)}
         <div class="grid g-main" style="margin-top:var(--gap)">${openCard(M, names)}${stateCard(M, names, DS, H)}</div>
         ${closedCard(M, names)}`;
     },
     mount(el) {
+      if (window.CNFutOwner) window.CNFutOwner.mount(el);
       el.querySelectorAll('[data-fper]').forEach((b) => b.addEventListener('click', () => { if (!b.disabled) { ui.per = b.dataset.fper; V.render({ keepScroll: true }); } }));
       el.querySelectorAll('[data-ff]').forEach((i) => i.addEventListener('change', () => { ui[i.dataset.ff] = i.value; V.render({ keepScroll: true }); }));
       const r = el.querySelector('[data-freset]'); if (r) r.addEventListener('click', () => { Object.assign(ui, { from: '', to: '', sym: '', strat: '', res: '' }); V.render({ keepScroll: true }); });

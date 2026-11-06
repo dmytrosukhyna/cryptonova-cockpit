@@ -552,6 +552,16 @@ def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int, carry=None) -> 
         dd_ref = st.get("dd_ref")
         change = None
         why = rollback_why(st, m) if stage > 0 else None
+        risk_back = None
+        # 06.11 19:51 (owner: «киты получают 100% бюджета фьючерсов … работаем только с ними»): «Киты» are never rolled back — the
+        # same conditions (losing days, deeper drawdown, PF < 1 on the last 10) only cut the risk per trade 3 % → 2 % until they clear
+        if k == "whales":
+            risk_back = rollback_why(st, m) or (rollback_why({**st, "stage": 1}, m) if stage == 0 else None)
+            if risk_back and not st.get("risk_back"):
+                change = {"t": now, "key": k, "name": src["name"], "kind": "risk_back", "why_ru": f"риск на сделку 3% → 2%: {risk_back}"}
+            elif not risk_back and st.get("risk_back"):
+                change = {"t": now, "key": k, "name": src["name"], "kind": "risk_restore", "why_ru": "риск на сделку снова 3%"}
+            why = None
         if why:
             stage, since, t_reset, dd_ref = stage - 1, now, now, m["dd_pct"]
             change = {"t": now, "key": k, "name": src["name"], "from": stage + 1, "to": stage, "why_ru": f"откат: {why}; отсчёт дней и сделок заново"}
@@ -560,7 +570,8 @@ def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int, carry=None) -> 
         desks.append({"key": k, "name": src["name"], "stage": stage, "since": since, "t_reset": t_reset or None, "dd_ref": dd_ref,
                       **m, "window_from": t0, "real": src["real"], "real_why": src["real_why"],
                       "eligible_real": src["eligible_real"], "eligible_real_why": src["eligible_real_why"], "note": src["note"],
-                      "family": family_of(k), "members": list(FAMILIES.get(family_of(k), (k,))), "_change": change})
+                      "family": family_of(k), "members": list(FAMILIES.get(family_of(k), (k,))), "_change": change,
+                      **({"risk_back": risk_back} if k == "whales" else {})})
     # promotions, one step each, best-staged first, within the 40 % cap on the stage-1/2 shares
     desks.sort(key=lambda d: (-d["stage"], d["since"]))
     used = sum(STAGE_SHARE.get(d["stage"], 0.0) for d in desks)
@@ -603,41 +614,21 @@ def stage_eval(prof: dict, prev, wtop, gold, cur: str, now: int, carry=None) -> 
 # get 0 (they keep managing positions they already hold until those close, and stay demo). «Киты» keep it only while their ladder
 # stage is ≥ 1 — a rollback to 0 drops them to 0 and the budget falls back to the main desks equally (the safety net).
 OWNER_SHARES = {"whales": 1.0}
+WHALES_KEY = "whales"
 # 05.11 09:52 (owner: «керри фандинга не нужно»): tracked on its ladder only — never a share of the real budget, whatever its stage
 TRACK_ONLY = {"carry"}
 OWNER_SHARES_UNTIL = 4102444800000          # 04.11 17:46 (owner: «не надо ограничиваться датами») — no end date; the safety net is the ladder
 
 
 def alloc_shares(prof: dict, cur: str, stages: dict, now: int | None = None) -> dict:
-    """the real futures sleeve's budget shares {desk key: fraction, sum 1}: stage-1/2 desks the sleeve can follow (web/paper.json)
-    at their share; the main set (the main desk + «Импульс BTC» + «Сигналы» after their gate) and the followable stage-3 desks share
-    the rest equally. A staged desk the sleeve cannot follow («Киты», «Золото») leaves its share with the main set.
-    04.11: until OWNER_SHARES_UNTIL the owner's fixed shares win over the ladder for the desks they name."""
-    now = int(now or time.time() * 1000)
-    main = list(ph.nova_keys(prof, {"current": cur}))
-    out, used = {}, 0.0
-    fixed = {}
-    if now <= OWNER_SHARES_UNTIL:
-        st = {d["key"]: d for d in stages.get("desks") or []}
-        for k, v in OWNER_SHARES.items():
-            if k in main:
-                fixed[k] = v
-            elif k in st and st[k].get("real") and st[k].get("stage", 0) >= 1:
-                fixed[k] = v
+    """the real futures sleeve's budget shares. 06.11 19:51 (owner, real money: «киты получают 100% бюджета фьючерсов … работаем
+    только с ними, плюс Иван»): «Киты» (Ivan inside) always 1.0; every rule desk 0 for good — demo only (the ladder and the conveyor may
+    still track their stages, they never allocate real money). The 0 entries keep held positions of those desks managed until they close."""
+    out = {k: 0.0 for k in ph.nova_keys(prof, {"current": cur})}
     for d in stages.get("desks") or []:
-        if not d.get("real") or d["key"] in main or d["key"] in fixed or d["key"] in TRACK_ONLY:
-            continue
-        if d["stage"] in (1, 2):
-            out[d["key"]] = STAGE_SHARE[d["stage"]]
-            used += STAGE_SHARE[d["stage"]]
-        elif d["stage"] == 3:
-            main.append(d["key"])
-    for k, v in fixed.items():
-        out[k] = v
-        used += v
-    rest = [k for k in main if k not in fixed]
-    for k in rest:
-        out[k] = round(max(0.0, 1 - used) / len(rest), 6)
+        if d.get("key") and d["key"] != WHALES_KEY:
+            out[d["key"]] = 0.0
+    out[WHALES_KEY] = 1.0
     return out
 
 
@@ -659,6 +650,7 @@ def run(out: str = "web", now: int | None = None, log_path: str = LOG) -> dict:
         stages.setdefault(k, c)
     doc = decide(prof, prev, _load(out, "public_real.json"), stages, now)
     stg["alloc"] = alloc_shares(prof, doc["current"], stg, now)
+    stg["whales_risk_back"] = next((d.get("risk_back") for d in stg["desks"] if d["key"] == WHALES_KEY), None)
     stg["short_ru"] = " · ".join(f"«{d['name']}» ступень {d['stage']} ({d['share_ru']})" for d in stg["desks"]) or "кандидатов нет"
     doc["stages"] = stg
     try:

@@ -217,17 +217,17 @@ def test_staged_promotion_owner_numbers_and_rollback(tmp_path):
     assert "whales" not in by and "gold" not in by                     # no feed → not listed
     assert s1["staged_pct"] == 5.0 and any(x["to"] == 1 and x["key"] == "own" for x in s1["log"])
     al = ds.alloc_shares(w, "aggr", s1, ds.OWNER_SHARES_UNTIL + 1)
-    assert al["own"] == 0.05 and abs(al["aggr"] - 0.475) < 1e-6 and abs(al["imp"] - 0.475) < 1e-6 and abs(sum(al.values()) - 1) < 1e-5
+    assert al["own"] == 0 and al["aggr"] == 0 and al["imp"] == 0 and al["whales"] == 1.0          # 06.11: whales only, rule desks demo
     # one step per run: the same desk with 8 days / 12 trades passes stage 2 only on the next evaluation
     w["own"] = _stage_desk(8, 12, name="Сигналы CRYPTO NOVA")
     s2 = ds.stage_eval(w, {**prev, "stages": s1}, None, None, "aggr", NOW)
-    assert {d["key"]: d["stage"] for d in s2["desks"]}["own"] == 2 and ds.alloc_shares(w, "aggr", s2, ds.OWNER_SHARES_UNTIL + 1)["own"] == 0.15
+    assert {d["key"]: d["stage"] for d in s2["desks"]}["own"] == 2 and ds.alloc_shares(w, "aggr", s2, ds.OWNER_SHARES_UNTIL + 1)["own"] == 0
     w["own"] = _stage_desk(15, 16, name="Сигналы CRYPTO NOVA")
     s3 = ds.stage_eval(w, {**prev, "stages": s2}, None, None, "aggr", NOW)
     b3 = {d["key"]: d for d in s3["desks"]}["own"]
     assert b3["stage"] == 3 and b3["share_ru"] == "полная доля" and ds.ready_check(b3) == (True, "")
     al3 = ds.alloc_shares(w, "aggr", s3, ds.OWNER_SHARES_UNTIL + 1)
-    assert abs(al3["own"] - al3["aggr"]) < 1e-9 and abs(sum(al3.values()) - 1) < 1e-5
+    assert al3["own"] == 0 and al3["aggr"] == 0 and abs(sum(al3.values()) - 1) < 1e-5
     # rollback: 5 losing days in a row → one step down and the window restarts (days and trades from the rollback)
     bad = _stage_desk(15, 16, name="Сигналы CRYPTO NOVA")
     bad["closed"] = [{"id": f"l{i}", "closed": NOW - i * ds.DAY - 1000, "net_usd": -30.0} for i in range(5)]
@@ -241,7 +241,7 @@ def test_staged_promotion_owner_numbers_and_rollback(tmp_path):
                      "closed": [{"whale": "okx:A", "coin": "BTC", "pnl": 50.0, "closed_t": NOW - 3 * ds.DAY + i * H} for i in range(6)]}}
     s5 = ds.stage_eval(w, {**prev, "stages": s4}, wtop, None, "aggr", NOW)
     wh = {d["key"]: d for d in s5["desks"]}["whales"]
-    assert wh["stage"] == 1 and not wh["real"] and "whales" not in ds.alloc_shares(w, "aggr", s5, ds.OWNER_SHARES_UNTIL + 1)
+    assert wh["stage"] == 1 and not wh["real"] and ds.alloc_shares(w, "aggr", s5, ds.OWNER_SHARES_UNTIL + 1)["whales"] == 1.0
     # the full run writes the ladder into the file and the log
     json.dump({"profiles": w}, open(tmp_path / "paper.json", "w"))
     json.dump(wtop, open(tmp_path / "whales_top.json", "w"))
@@ -265,15 +265,15 @@ def test_whales_get_a_real_share_once_the_feed_carries_the_desk_shape_and_carry_
     by = {d["key"]: d for d in s["desks"]}
     assert by["whales"]["stage"] == 1 and by["whales"]["real"] and by["whales"]["real_why"] is None
     al = ds.alloc_shares(w, "aggr", s, ds.OWNER_SHARES_UNTIL + 1)
-    assert al["whales"] == 0.05 and abs(al["aggr"] - 0.475) < 1e-6 and abs(sum(al.values()) - 1) < 1e-5
+    assert al["whales"] == 1.0 and al["aggr"] == 0 and abs(sum(al.values()) - 1) < 1e-5
     # 04.11 17:42 (owner): until 30.11 the whole futures budget follows «Киты»; the main desks get 0
     own = ds.alloc_shares(w, "aggr", s, NOW)
     assert own["whales"] == 1.0 and own["aggr"] == 0 and own["imp"] == 0 and abs(sum(own.values()) - 1) < 1e-6
     s0 = {"desks": [dict(d, stage=0) if d["key"] == "whales" else d for d in s["desks"]]}
-    own0 = ds.alloc_shares(w, "aggr", s0, NOW)                   # a rolled-back «Киты» get nothing: the main desks share it all
-    assert "whales" not in own0 and abs(own0["aggr"] - 0.5) < 1e-6 and abs(own0["imp"] - 0.5) < 1e-6
+    own0 = ds.alloc_shares(w, "aggr", s0, NOW)                   # 06.11 (owner): «Киты» keep 100 % at any stage
+    assert own0["whales"] == 1.0 and own0["aggr"] == 0 and own0["imp"] == 0
     c = by["carry"]
-    assert not c["real"] and not c["eligible_real"] and c["trades"] >= 5 and "carry" not in al and "день" in c["note"]
+    assert not c["real"] and not c["eligible_real"] and c["trades"] >= 5 and not al.get("carry") and "день" in c["note"]
     days = ds.carry_days([(NOW - 2 * ds.DAY, 100.0), (NOW - ds.DAY, 101.0), (NOW - 1000, 101.5)], 101.2, NOW)
     assert days == [(NOW - ds.DAY, 1.0), (NOW, 0.2)]
 
@@ -283,4 +283,21 @@ def test_funding_carry_is_tracked_only_and_never_gets_budget():
     from cnq.agents import desk_select as DS
     st = {"desks": [{"key": "carry", "real": True, "stage": 3}, {"key": "whales", "real": True, "stage": 1}]}
     out = DS.alloc_shares({}, "aggr", st, 0)
-    assert "carry" not in out and out.get("whales") == 1.0
+    assert not out.get("carry") and out.get("whales") == 1.0
+
+
+def test_no_rule_desk_can_ever_get_a_real_share_and_a_whale_rollback_only_cuts_the_risk():
+    """06.11 19:51 (owner: «киты получают 100% бюджета фьючерсов … работаем только с ними, плюс Иван»)"""
+    st = {"desks": [{"key": k, "real": True, "stage": s_} for k, s_ in (("own", 3), ("aggr", 3), ("gold", 2), ("whales", 0), ("bal", 1))]}
+    for now in (0, NOW, ds.OWNER_SHARES_UNTIL + 1):
+        al = ds.alloc_shares(world(), "aggr", st, now)
+        assert al["whales"] == 1.0 and all(v == 0 for k, v in al.items() if k != "whales")
+    w = world()
+    prev = {"current": "aggr", "since": ds.OWNER["since"], "by": "owner",
+            "stages": {"desks": [{"key": "whales", "stage": 1, "since": NOW - 5 * ds.DAY, "dd_ref": 1.0}]}}
+    wtop = {"desk": {"name_ru": "Киты", "start": 10000.0, "started": NOW - 6 * ds.DAY, "equity": 9800.0, "trades": 12, "max_dd_pct": 3.0,
+                     "history": [[NOW - 3 * ds.DAY, 10000.0], [NOW - ds.DAY, 9800.0]], "paper": {"open": [], "closed": []},
+                     "closed": [{"whale": "okx:A", "coin": "BTC", "pnl": -50.0 if i % 4 else 20.0, "closed_t": NOW - 3 * ds.DAY + i * H} for i in range(12)]}}
+    s = ds.stage_eval(w, prev, wtop, None, "aggr", NOW)
+    wh = {d["key"]: d for d in s["desks"]}["whales"]
+    assert wh["stage"] == 1 and wh["risk_back"] and any(x.get("kind") == "risk_back" for x in s["log"])

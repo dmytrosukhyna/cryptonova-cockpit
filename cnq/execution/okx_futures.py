@@ -326,6 +326,7 @@ def fetch_desks(env=None, st: dict | None = None) -> list:
     sel = None if forced else fetch_sel(env)
     if isinstance(st, dict):
         st["sel"] = {"stages": {"alloc": staged_alloc(sel)}} if sel else None     # the ladder's shares for desk_parts() this pass
+        st["ladder_risk_back"] = ((sel or {}).get("stages") or {}).get("whales_risk_back") if sel else None      # 06.11
     held = held_desks(st)
     held_w = WHALES in held or IVAN in held
     if not forced and (staged_alloc(sel).get(WHALES, 0) > 0 or held_w):     # 04.11: the whales copy desk
@@ -1091,6 +1092,8 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
                 log({"ev": "day_stop", "day_pnl": dp, "budget": bud["usd"]}, log_path)
         wk = week_pnl(ctx, now)                 # 05.11: the 7-day step-back of the risk per trade
         r_now, back = risk_now(cap, wk, bud["usd"])
+        if not back and st.get("ladder_risk_back") and cap["risk"] > RISK_BACK:      # 06.11: the ladder's former rollback of «Киты»
+            r_now, back = RISK_BACK, f"риск {cap['risk'] * 100:g}% → {RISK_BACK * 100:g}%: {st['ladder_risk_back']}"
         if back and st.get("risk_back") != day:
             log({"ev": "risk_back", "week_pnl": wk, "budget": bud["usd"], "risk": r_now, "why": back}, log_path)
             st["risk_back"] = day

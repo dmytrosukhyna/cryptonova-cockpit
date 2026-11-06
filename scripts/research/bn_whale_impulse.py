@@ -9,7 +9,6 @@ Pools: A all traders with >= 20 decisions, B walk-forward bar (prior 60 d: win >
 Longs after an impulse reported the same way (descriptive). Read-only. Usage: bn_whale_impulse.py DB OUT.json"""
 import bisect, json, math, os, random, sqlite3, statistics as st, sys
 from collections import defaultdict
-import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bn_whale_stops as B
 
@@ -91,12 +90,12 @@ def main():
 
     def imp_times(sym, wn):
         if (sym, wn) not in imp_cache:
-            S = data[sym]; look, thr = TH[wn]
-            t = np.array(S["t"], dtype=np.int64); cl = np.array([S["k"][x][3] for x in S["t"]])
-            j = np.searchsorted(t, t - look, side="right") - 1
-            ok = (j >= 0)
-            rr = np.full(len(t), np.nan); rr[ok] = cl[ok] / cl[j[ok]] - 1
-            imp_cache[(sym, wn)] = t[np.nan_to_num(rr, nan=-1) >= thr] + 5 * MIN + DL * MIN     # entry 2 min after the bar closes
+            S = data[sym]; look, thr = TH[wn]; t = S["t"]; outl = []
+            for i, ti in enumerate(t):
+                j = bisect.bisect_right(t, ti - look) - 1
+                if j >= 0 and S["k"][ti][3] / S["k"][t[j]][3] - 1 >= thr:
+                    outl.append(ti + 5 * MIN + DL * MIN)                    # entry 2 min after the bar closes
+            imp_cache[(sym, wn)] = outl
         return imp_cache[(sym, wn)]
 
     def placebo(sel, side, mode, wn):
@@ -110,8 +109,9 @@ def main():
                     if hi <= lo: continue
                     tt = RNG.randrange(lo, hi)
                 else:
-                    cand = imp_times(r["sym"], wn)
-                    cand = cand[(np.abs(cand - r["t"]) <= 14 * DAY) & (np.abs(cand - r["t"]) > 6 * H) & (cand > tbeg) & (cand < tend)]
+                    al = imp_times(r["sym"], wn)
+                    lo_i, hi_i = bisect.bisect_left(al, max(tbeg, r["t"] - 14 * DAY)), bisect.bisect_right(al, min(tend, r["t"] + 14 * DAY))
+                    cand = [x for x in al[lo_i:hi_i] if abs(x - r["t"]) > 6 * H]
                     if len(cand) == 0: continue
                     tt = int(cand[RNG.randrange(len(cand))])
                 v = B.copy_ret(S, side, tt, tt + r["hold"], 16)

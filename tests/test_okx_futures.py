@@ -558,3 +558,19 @@ def test_no_new_entry_for_a_whale_that_left_the_follow_list():
     assert r["opened"] == 0 and not swap_orders(fk)
     r = run(fk, F.env(), [("whales", {"equity": 10000.0, "open": [{**w, "id": "W-SOL-L-10", "follow": True}]})])
     assert r["opened"] == 1
+
+
+def test_a_fresh_whale_entry_skipped_for_a_zero_share_is_copied_once_the_share_returns():
+    """06.11 (BCH long of 法兰西基金 16:04 UTC, never copied): the ladder rolled «Киты» to 0 at 00:31 → «доля 0%» was a FINAL skip and
+    the trade was never tried again; size skips are retried now, and a fresh whale entry opens as soon as the share is back"""
+    fk = F.FakeOkx()
+    e = F.env()
+    w = {**F.trade("W-SOL-L-77", entry=200.0, stop=168.0, tp=None, risk=320.0, opened=NOW - 60_000), "tps": [], "parts": [],
+         "copy_lev": 5.0, "whale_entry": 199.8, "follow": True}
+    cl = ap.connect(e, fk, {}, F.nosleep)
+    r = fu.step(e, desks=[("whales", {"equity": 10000.0, "open": [w], "_hold_only": True})], now=NOW, sleep=F.nosleep, cl=cl)
+    assert r["opened"] == 0 and "доля" in r["skipped"][0]["why"]
+    st = fu.load_state(e)
+    assert "whales:W-SOL-L-77" not in st["skip"] and st["copy_skips"][-1]["sig"] == "whales:W-SOL-L-77"
+    r = fu.step(e, desks=[("whales", {"equity": 10000.0, "open": [w]})], now=NOW + 60_000, sleep=F.nosleep, cl=cl)
+    assert r["opened"] == 1

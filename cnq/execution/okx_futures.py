@@ -613,6 +613,15 @@ def own_capital(fetch, host: str, env=None) -> dict | None:
             "margin": round(max(0.0, margin), 2)}
 
 
+FINAL_SIZE_SKIPS = ("цена уже за стопом", "стоп ближе", "цена уже дошла до цели")
+
+
+def _size_skip(why) -> bool:
+    """a reason size() gives (budget / money / room / minimum) — such a skip is retried, never final"""
+    w = str(why)
+    return w.startswith(("доля этого стола", "меньше минимума OKX", "мало свободных")) or "предел плеча" in w
+
+
 def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict, px: float, mult: float, open_notional: float,
          avail: float, slip: float = 0.004) -> dict:
     """Contracts for one desk trade, or {"skip": why}. part = this desk's share of the budget (budget ÷ number of desks).
@@ -922,7 +931,10 @@ def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict
         return {**base, "skip": why, "final": False, "late": True}
     sz = size(t, desk_eq, part, bud, cap, inst, px, mult, sum(p["notional"] for p in pos.values()), avail, slip)
     if sz.get("skip"):
-        return {**base, "skip": sz["skip"], "final": True}
+        # 06.11 bug fix (owner: «счёт не копирует новые позиции»): every size skip was FINAL — a trade skipped once for «доля 0%»
+        # (the ladder rolled «Киты» back at 00:31 UTC), «меньше минимума», «мало USDT» or the leverage room was never tried again,
+        # even after the share / money came back. Only the trade's own price facts are final now.
+        return {**base, "skip": sz["skip"], "final": sz["skip"].startswith(FINAL_SIZE_SKIPS)}
     return {**base, "inst_info": inst, "bid": bid or px, "ask": ask or px, "s": sz}
 
 
@@ -1064,6 +1076,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     for k in ("skip", "tries", "done"):
         st[k] = {x: v for x, v in st[k].items() if x in want}
     st["skip"] = {x: v for x, v in st["skip"].items() if v != BUSY}     # legacy final «busy» skips are retried (05.11)
+    st["skip"] = {x: v for x, v in st["skip"].items() if str(v).startswith(FINAL_SIZE_SKIPS) or not _size_skip(v)}   # 06.11: retried
     fresh = [(tid, w) for tid, w in want.items() if tid not in st["trades"] and tid not in st["skip"] and tid not in st["done"]
              and w[0].get("follow") is not False]      # 06.11: never a NEW entry for a whale no longer on the follow list
     if fresh:
@@ -1169,6 +1182,8 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     st["last"]["skipped"] = len(res["skipped"])
     # 06.11 (owner: «счёт не копирует новые позиции»): the latest reason per skipped desk trade, published in public_real.json
     sk = {x["sig"]: x for x in st.get("copy_skips") or [] if isinstance(x, dict) and x.get("sig")}
+    for tid, why in (st.get("skip") or {}).items():            # the standing final skips too (never retried) — visible as well
+        sk.setdefault(str(tid), {"t": now, "sig": str(tid), "inst": None, "why": "окончательно: " + str(why)[:180]})
     for x in res["skipped"]:
         if x.get("id"):
             sk[str(x["id"])] = {"t": now, "sig": str(x["id"]), "inst": x.get("inst"), "why": str(x.get("why") or "")[:200]}

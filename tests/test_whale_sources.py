@@ -134,7 +134,7 @@ def test_run_does_not_follow_a_binance_portfolio_under_the_bar():
     d = W.run(conn, now=NOW, post=_hl_post(NOW), get_lb=lambda: {"leaderboardRows": []}, okx_get=lambda p, q: [{"ranks": []}] if "lead-traders" in p else [],
               max_requests=80, budget_s=60, src_get={"bn": get})
     o = d["others"][0]
-    assert o["src"] == "bn" and not d["top"] and not d["following"]
+    assert o["src"] == "bn" and not d["top"] and not [x for x in d["following"] if not x.get("owner_pick")]
     ex = " ".join(o["excluded_ru"])
     assert "нужно от 70%" in ex and "мало решений за 60 дней (14" in ex
 

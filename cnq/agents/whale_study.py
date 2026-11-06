@@ -1225,6 +1225,8 @@ def paper_trade(o: dict, closed: bool = False) -> dict:
          "tps": [], "parts": [], "qty": qty, "qty_left": qty, "risk_usd": round(qty * abs(e - stp), 2), "opened": int(_f(o.get("opened_t"))),
          "copy_lev": min(DESK_LEV_CAP, max(1.0, _f(o.get("lev"), 1.0))), "whale": o.get("whale"), "notional": o.get("notional"),
          "whale_entry": o.get("whale_entry"), "join": bool(o.get("join")), "gap_pct": o.get("gap_pct")}
+    if str(o.get("whale") or "").startswith("ivan:"):              # 06.11: Ivan's copies — the panel attributes them by «sig» ivan:…
+        t["sig"] = f"ivan:{t['id']}"
     if closed:
         t.update(closed=int(_f(o.get("closed_t"))), exit=o.get("exit"), net_usd=o.get("pnl"), exit_kind=o.get("why"))
     return t
@@ -1362,6 +1364,19 @@ def hl_name(coin: str, mids: dict) -> str | None:
     if coin.startswith("1000") and "k" + coin[4:] in mids:
         return "k" + coin[4:]
     return None
+
+
+# 06.11 17:33 (owner, «по ивану да»): fixed owner picks followed outside the selection and the 3-day lock (config/whale_owner_picks.json)
+PICKS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "whale_owner_picks.json")
+
+
+def owner_picks(path: str | None = None) -> list[dict]:
+    try:
+        with open(path or PICKS, encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception:  # noqa: BLE001
+        return []
+    return [{**x, "owner_pick": True} for x in (d.get("picks") or []) if isinstance(x, dict) and x.get("addr") and x.get("on", True)]
 
 
 LIVE_FRESH_MS = 15 * 60_000
@@ -1685,7 +1700,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             k = w.split(" (")[0]
             excluded[k] = excluded.get(k, 0) + 1
     st_now = kv_get(conn, "study") or {}
-    out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []),
+    out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []) + owner_picks(),
            "follow_dropped": st_now.get("dropped", []), "archive": arch, "bench": bench,
            # 06.11 (owner): the list is fixed between reviews; whale_live closes the copies of a whale who left it
            "follow_lock": ({"rule": LOCK_RULE, "t": st_now.get("lock_t"), "next_t": int(st_now["lock_t"]) + LOCK_MS, "n": LOCK_N,

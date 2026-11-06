@@ -186,3 +186,32 @@ def test_copies_carry_the_follow_flag_and_whales_are_polled_concurrently(tmp_pat
     f.okx = [("ETH", "long", 2500, NOW + 1000)]
     d = WL.step(wtop(), now=NOW + MIN, **kw)
     assert d["open"][0]["follow"] is True and d["live"]["poll_s"] is not None
+
+
+def test_ivan_is_followed_from_his_bybit_positions_with_his_stop_and_an_ivan_sig(tmp_path):
+    """06.11 17:33 (owner: «по ивану да»): Ivan's Bybit positions read every pass; his stop when usable; copies carry sig «ivan:…»"""
+    f = Feed()
+    rows = []
+    reader = lambda: rows                                                         # noqa: E731
+    kw = dict(env={"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}, post=f.post, okx_get=f.okx_get, put=lambda doc: True,
+              sleep=lambda s: None, src_get={"ivan": reader})
+    wt = wtop()
+    wt["following"] = wt["following"] + [{"addr": WL.IVAN_ADDR, "name": "Иван", "owner_pick": True}]
+    WL.step(wt, now=NOW, **kw)
+    rows.append({"symbol": "SOLUSDT", "side": "Buy", "size": "10", "avgPrice": "100.2", "positionValue": "1002", "unrealisedPnl": "0",
+                 "leverage": "10", "stopLoss": "95", "createdTime": str(NOW + 20_000)})
+    d = WL.step(wt, now=NOW + MIN, **kw)
+    t = next(x for x in d["open"] if x["symbol"] == "SOL")
+    assert t["whale"] == WL.IVAN_ADDR and t["sig"].startswith("ivan:W-SOL-L-") and t["stop"] == 95.0 and t["follow"] is True
+    assert t["whale_entry"] == 100.2
+    rows.clear()                                                                  # Ivan closes → our copy closes
+    d = WL.step(wt, now=NOW + 2 * MIN, **kw)
+    assert not [x for x in d["open"] if x["symbol"] == "SOL"]
+
+
+def test_okx_futures_holds_ivans_copies_as_their_own_desk_with_the_whale_part():
+    from cnq.execution import okx_futures as fu
+    ds = fu.split_ivan([("whales", {"equity": 1e4, "open": [{"id": "W-A", "whale": "okx:Q"}, {"id": "W-B", "whale": "ivan:bybit"}]})])
+    assert [k for k, _ in ds] == ["whales", "ivan"] and [t["id"] for t in dict(ds)["ivan"]["open"]] == ["W-B"]
+    parts = fu.desk_parts(ds, 2500.0, {"stages": {"alloc": {"whales": 1.0, "aggr": 0.0}}})
+    assert parts == {"whales": 2500.0, "ivan": 2500.0}

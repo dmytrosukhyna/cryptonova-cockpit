@@ -468,7 +468,7 @@ def test_a_rolled_back_database_never_republishes_an_older_desk_or_follow_list(t
     d = W.run(conn, now=now, post=lambda body: {"BTC": "1", "ETH": "2500"} if body["type"] == "allMids" else {"assetPositions": []},
               get_lb=lambda: {"leaderboardRows": []}, okx_get=lambda path, q: [{"ranks": []}] if "lead-traders" in path else [],
               max_requests=5, budget_s=5, src_get={"bn": lambda path, body=None: {"list": []}}, pub_path=str(p))
-    assert [x["addr"] for x in d["following"]] == ["okx:NEW"]
+    assert [x["addr"] for x in d["following"] if not x.get("owner_pick")] == ["okx:NEW"]
     assert d["desk"]["equity"] >= 11000 and [o["coin"] for o in d["desk"]["open"]] in (["ETH"], [])
     assert not any(o["whale"] == "okx:OLD" for o in d["desk"]["open"])
     assert any("старее опубликованного" in n for n in d["notes_ru"])

@@ -75,14 +75,70 @@ def seed(wtop: dict, now: int) -> dict:
 
 
 def src_of(addr: str) -> str:
+    if str(addr).startswith("ivan:"):
+        return "ivan"
     return WS.src_of(addr) or ("okx" if str(addr).startswith("okx:") else "hl")
+
+
+# 06.11 17:33 (owner, real money, «по ивану да»): Ivan's Bybit account (the «Иван тест» read-only key IVAN_BYBIT_KEY / IVAN_BYBIT_SECRET,
+# the same env file as this autopilot) is one more followed «whale», a fixed owner pick outside the 3-day lock (whales_top.json
+# «following» with owner_pick). His positions are read directly from Bybit every pass (/v5/position/list, GET only) — not from the
+# 15-minute encrypted web/ivan.enc.json.
+IVAN_ADDR = "ivan:bybit"
+
+
+def ivan_keys(env=None):
+    e = os.environ if env is None else env
+    k, sec = (e.get("IVAN_BYBIT_KEY") or "").strip(), (e.get("IVAN_BYBIT_SECRET") or "").strip()
+    return (k, sec) if k and sec else None
+
+
+def ivan_reader(env, st: dict):
+    """→ a function () → Bybit position rows (size > 0), or None without the read-only key; the working host is remembered in st"""
+    keys = ivan_keys(env)
+    if not keys:
+        return None
+    from . import ivan_watch as IV
+    fetch = IV.make_fetch(*keys)
+
+    def read():
+        host = st.get("ivan_host")
+        if host not in IV.HOSTS:
+            host, _ = IV.probe(fetch, None)
+            st["ivan_host"] = host
+        return IV.read_positions(fetch, IV.HOSTS[host])
+    return read
+
+
+def ivan_positions(rows: list) -> list[dict]:
+    """Bybit /v5/position/list rows → [{coin, side, size, notional, entry, upnl, lev, sl, opened}] (coin without the USDT quote)"""
+    out = []
+    for x in rows or []:
+        sz = W._f(x.get("size"))
+        if not sz:
+            continue
+        sym = str(x.get("symbol") or "").upper()
+        coin = sym[:-4] if sym.endswith("USDT") else sym
+        side = "LONG" if str(x.get("side") or "").lower().startswith("b") else "SHORT"
+        out.append({"coin": coin, "side": side, "size": sz, "notional": round(W._f(x.get("positionValue"))), "entry": W._f(x.get("avgPrice")),
+                    "upnl": round(W._f(x.get("unrealisedPnl"))), "lev": W._f(x.get("leverage")) or None,
+                    "sl": W._f(x.get("stopLoss")) or None, "opened": int(W._f(x.get("createdTime")))})
+    return out
 
 
 def poll(addr: str, mids: dict, post, okx_get, src_get: dict) -> tuple[list[dict], dict]:
     """one whale's current positions (Hyperliquid coin names) + {(coin, side): opened ms} where the source tells it"""
     k = src_of(addr)
     opened: dict = {}
-    if k == "hl":
+    if k == "ivan":
+        reader = src_get.get("ivan")
+        if reader is None:
+            raise RuntimeError("нет ключа IVAN_BYBIT_KEY / IVAN_BYBIT_SECRET — позиции Ивана не читаются")
+        pos = ivan_positions(reader())
+        for x in pos:
+            if x.get("opened"):
+                opened[(x["coin"], x["side"])] = x["opened"]
+    elif k == "hl":
         pos = W.norm_positions(post({"type": "clearinghouseState", "user": addr}))
     elif k == "okx":
         cur = okx_get("/api/v5/copytrading/public-current-subpositions", {"instType": "SWAP", "uniqueCode": addr.split(":", 1)[1], "limit": 100})
@@ -130,6 +186,8 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     quality = {x["addr"]: {k: x.get(k) for k in ("win", "pf", "per_day", "pnl_60d", "lev_med")} for x in fol}
     names = {**(st.get("names") or {}), **{x["addr"]: x.get("name") or x.get("short") or x["addr"] for x in fol}}
     mids = post({"type": "allMids"}) or {}
+    if IVAN_ADDR in follow and "ivan" not in src_get:
+        src_get = {**src_get, "ivan": ivan_reader(env, st)}
     watch = list(dict.fromkeys(follow + [o["whale"] for o in desk.get("open") or []]))
     states, opened, errors = {}, {}, []
     gone = dict(st.get("gone") or {})

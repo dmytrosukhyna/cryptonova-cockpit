@@ -84,6 +84,7 @@ MAX_LEV, DEF_LEV = 3, 2
 COPY_MAX_LEV = 20
 LIQ_ROOM = 0.8              # leverage ≤ 0.8 ÷ stop distance: the stop always triggers well before an isolated position is liquidated
 WHALES = "whales"           # the copy desk's key (desk_select stages, the trade ids «whales:<id>»)
+IVAN = "ivan"               # 06.11 (owner): Ivan's copies come from the same whale desk, held as «ivan:<id>» (the panel's «sig»), same budget
 WHALES_STALE_MS = 3 * 3_600_000
 # 05.11 15:18 (owner, real money, «и 1, и 2, и 3 запускать»): 3 % of the futures budget per trade (was 2 %); back to RISK_BACK (2 %)
 # automatically while the rolling 7-day realised result is below −RISK_BACK_DD (−5 %) of the budget (logged «risk_back»)
@@ -249,11 +250,16 @@ def staged_alloc(sel: dict | None) -> dict:
 def desk_parts(ds: list, bud_usd: float, sel: dict | None) -> dict:
     """{desk key: its part of the futures budget in $}: a staged desk its stage share (5 % / 15 %), the rest shared equally by the
     other desks (the main desk, «Импульс BTC», «Сигналы», stage-3 desks); without the ladder every desk gets an equal part"""
-    keys = [k for k, d in ds if not (d or {}).get("_hold_only")]
+    keys = [k for k, d in ds if not (d or {}).get("_hold_only") and not (d or {}).get("_share_of")]
     out = {k: 0.0 for k, d in ds if (d or {}).get("_hold_only")}      # 04.11: held positions only — no budget for new entries
+    out.update({k: 0.0 for k, d in ds if (d or {}).get("_share_of")})
     al = staged_alloc(sel)
     if not al or not any(k in al for k in keys):
-        return {**out, **{k: bud_usd / max(1, len(keys)) for k in keys}}
+        out = {**out, **{k: bud_usd / max(1, len(keys)) for k in keys}}
+        for k, d in ds:
+            if (d or {}).get("_share_of") and not (d or {}).get("_hold_only"):
+                out[k] = out.get(d["_share_of"], 0.0)
+        return out
     used, rest = 0.0, []
     for k in keys:
         if k in al and al[k] <= 0:
@@ -264,6 +270,9 @@ def desk_parts(ds: list, bud_usd: float, sel: dict | None) -> dict:
             rest.append(k)
     for k in rest:
         out[k] = bud_usd * max(0.0, 1 - used) / max(1, len(rest))
+    for k, d in ds:                                    # 06.11: Ivan's desk shares the whale desk's part
+        if (d or {}).get("_share_of") and not (d or {}).get("_hold_only"):
+            out[k] = out.get(d["_share_of"], 0.0)
     return out
 
 
@@ -318,7 +327,8 @@ def fetch_desks(env=None, st: dict | None = None) -> list:
     if isinstance(st, dict):
         st["sel"] = {"stages": {"alloc": staged_alloc(sel)}} if sel else None     # the ladder's shares for desk_parts() this pass
     held = held_desks(st)
-    if not forced and (staged_alloc(sel).get(WHALES, 0) > 0 or WHALES in held):     # 04.11: the whales copy desk
+    held_w = WHALES in held or IVAN in held
+    if not forced and (staged_alloc(sel).get(WHALES, 0) > 0 or held_w):     # 04.11: the whales copy desk
         try:
             wtop = _get_json(whales_src(env))
             # 04.11 22:35 (owner: «моментально копироваться»): the followed whales' positions are read HERE, every pass (~60 s,
@@ -329,14 +339,30 @@ def fetch_desks(env=None, st: dict | None = None) -> list:
             else:
                 wd = whales_desk(wtop, set(((st or {}).get("trades") or {}).keys()))
         except Exception as e:  # noqa: BLE001
-            if WHALES in held:          # a held copy must never be closed because the file did not load: skip the whole pass
+            if held_w:                  # a held copy must never be closed because the file did not load: skip the whole pass
                 raise RuntimeError(f"whales_top.json не загрузился, а позиция «Китов» открыта — проход пропущен: {e}") from e
             wd = None
-        if wd is None and WHALES in held:
+        if wd is None and held_w:
             raise RuntimeError("whales_top.json без ленты стола «Китов», а позиция открыта — проход пропущен")
         if wd is not None:
             paper = {**paper, "profiles": {**(paper.get("profiles") or {}), WHALES: wd}}
-    return pick_desks(paper, forced, sel, (st or {}).get("main"), held)
+    ds = pick_desks(paper, forced, sel, (st or {}).get("main"), held)
+    return split_ivan(ds, held)
+
+
+def split_ivan(ds: list, held=()) -> list:
+    """06.11: the whale desk's copies of Ivan (whale «ivan:…») become a desk of their own — key IVAN, the same budget part as WHALES"""
+    out = []
+    for k, d in ds:
+        if k != WHALES:
+            out.append((k, d))
+            continue
+        opn = d.get("open") or []
+        iv = [t for t in opn if str(t.get("whale") or "").startswith("ivan:")]
+        out.append((k, {**d, "open": [t for t in opn if t not in iv]}))
+        if iv or IVAN in held:
+            out.append((IVAN, {**d, "name": "Иван · копия (выбор владельца)", "open": iv, "_share_of": WHALES}))
+    return out
 
 
 # ── OKX: the swap calls (through the autopilot's signed client — no transfer, no withdrawal exists here) ──────────────────

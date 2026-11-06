@@ -487,6 +487,7 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
         return None
     e = _env(env)
     now = int(now or time.time() * 1000)
+    own_state = state is None                     # the server's own run (tests hand in a state) — only then the auto share
     if state is None:
         state = load_state(env)
         save = save or (lambda s_: save_state(s_, env))
@@ -504,6 +505,13 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
         except Exception:  # noqa: BLE001 — never fails because of the flows: the known ones stay
             pass
         doc = clean(build(s, state, now, *closed_history(fetch, "https://" + s["host"], since), acts=acts))
+        try:                                       # 06.11 (owner 05.11, backlog 87): the weekly auto futures share
+            if not own_state:
+                raise LookupError
+            from cnq.execution import auto_alloc
+            auto_alloc.update(doc.get("closed") or [], float(doc.get("start_usd") or 0.0), now, env=env)
+        except Exception:  # noqa: BLE001 — the summary never fails because of the auto share
+            pass
     elif state.get("last"):
         # the last real numbers, their own asof — never invented ones (a «last» from before 28.10 gets the new keys empty)
         doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, **state["last"], "stale": True})

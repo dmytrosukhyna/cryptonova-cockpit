@@ -73,7 +73,16 @@ def shares(env=None) -> dict:
     if t > 1:
         w = {k: v / t for k, v in w.items()}
     w["reserve"] = max(0.0, 1 - sum(w.values()))
-    return {k: round(v, 6) for k, v in w.items()}
+    w = {k: round(v, 6) for k, v in w.items()}
+    # 06.11 (owner's decision of 05.11, backlog 87): the weekly auto futures share — only when neither OKX_FUT_SHARE nor
+    # OKX_SPOT_SHARE is set explicitly (the env always wins); no state file yet → the defaults above
+    if not any(_f((e.get(ENV_KEYS[k]) or "").strip()) is not None for k in ("futures", "spot")):
+        try:
+            from cnq.execution import auto_alloc as aa
+            w = aa.apply(w, aa.futures_share(aa.load(e)))
+        except Exception:  # noqa: BLE001 — the split never fails because of the auto state
+            pass
+    return w
 
 
 def core_extra(w: dict) -> dict:

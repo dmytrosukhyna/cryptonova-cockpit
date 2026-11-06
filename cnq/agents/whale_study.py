@@ -1107,6 +1107,15 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                 kind = "join" if prev.get(coin) == p["side"] else "new"
                 cands.append((addr, coin, p, kind))
         seen[addr] = {c: p["side"] for c, p in cur.items()}
+        # 06.11 (owner, Ivan: «never copy his adds / averaging-down»): an owner pick's entry is FIXED at first sight — his later
+        # averaging moves his avgPrice, not our join window (one copy per position, never added to)
+        if addr.startswith("ivan:"):
+            fe = d.setdefault("first_entry", {})
+            keep = {f"{addr}|{c}|{p['side']}" for c, p in cur.items()}
+            for k_ in [k_ for k_ in fe if k_.startswith(addr + "|") and k_ not in keep]:
+                fe.pop(k_)
+            for c, p in cur.items():
+                fe.setdefault(f"{addr}|{c}|{p['side']}", p.get("entry"))
         d.setdefault("seen_t", {})[addr] = now
     wait_prev, wait_now = d.get("join_wait") or {}, {}
 
@@ -1118,7 +1127,8 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
     rank = []
     for addr, coin, p, kind in cands:
         px = _f(mids.get(coin))
-        gap = join_gap(p["side"], px, p.get("entry"))
+        w_entry = (d.get("first_entry") or {}).get(f"{addr}|{coin}|{p['side']}") or p.get("entry")
+        gap = join_gap(p["side"], px, w_entry)
         rank.append((0 if good_whale((quality or {}).get(addr)) else 1, 0 if kind == "new" else 1, gap if gap is not None else 9.0,
                      addr, coin, p, kind, px, gap))
     rank.sort(key=lambda r: r[:3])
@@ -1179,7 +1189,8 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         # 05.11 14:12: the notional is what COPY_RISK of the equity allows from the stop distance (the real account's sizing)
         margin = round(min(margin, COPY_RISK * eq / (abs(px - stp) / px) / lev), 2) if px and stp and px != stp else margin
         o = {"whale": addr, "coin": coin, "side": p["side"], "entry": px, "opened_t": now, "margin": margin, "lev": lev,
-             "notional": round(margin * lev, 2), "whale_entry": p.get("entry"), "whale_notional": p.get("notional"),
+             "notional": round(margin * lev, 2),
+             "whale_entry": (d.get("first_entry") or {}).get(f"{addr}|{coin}|{p['side']}") or p.get("entry"), "whale_notional": p.get("notional"),
              "whale_lev": p.get("lev"), "lev_src": "кит" if _f(p.get("lev")) else "медиана кита" if w_lev != 1.0 else "нет данных",
              "lev_note": lev_note, "stop": round(stp, 8), "stop_src": src, "join": kind == "join", "gap_pct": gap_pct}
         d["open"].append(o)

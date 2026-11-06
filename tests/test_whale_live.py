@@ -215,3 +215,22 @@ def test_okx_futures_holds_ivans_copies_as_their_own_desk_with_the_whale_part():
     assert [k for k, _ in ds] == ["whales", "ivan"] and [t["id"] for t in dict(ds)["ivan"]["open"]] == ["W-B"]
     parts = fu.desk_parts(ds, 2500.0, {"stages": {"alloc": {"whales": 1.0, "aggr": 0.0}}})
     assert parts == {"whales": 2500.0, "ivan": 2500.0}
+
+
+def test_ivans_averaging_down_is_never_added_to_and_his_first_entry_fixes_the_window(tmp_path):
+    """06.11 (owner): never copy Ivan's adds or averaging-down; the join window is around his avgPrice at first sight"""
+    f = Feed()
+    rows = [{"symbol": "SOLUSDT", "side": "Buy", "size": "10", "avgPrice": "100", "positionValue": "1000", "unrealisedPnl": "0",
+             "leverage": "10", "stopLoss": "", "createdTime": str(NOW - 3_600_000)}]
+    kw = dict(env={"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}, post=f.post, okx_get=f.okx_get, put=lambda doc: True,
+              sleep=lambda s: None, src_get={"ivan": lambda: rows})
+    wt = {**wtop(), "following": [{"addr": WL.IVAN_ADDR, "name": "Иван", "owner_pick": True}]}
+    f_post = f.post
+    f.post = lambda body: {**f_post(body), "SOL": "96"} if body["type"] == "allMids" else f_post(body)
+    kw["post"] = f.post
+    WL.step(wt, now=NOW, **kw)                                   # first sight: his entry 100, price 96 (he is −4 %) → no join
+    rows[0].update(size="30", avgPrice="97.3")                   # he averages down: 30 SOL at avg 97.3
+    d = WL.step(wt, now=NOW + MIN, **kw)
+    assert not d["open"]                                         # 96 vs his FIRST entry 100 → −4 %, outside −3 %…+1 % → still no join
+    st = json.loads((tmp_path / "s.json").read_text())
+    assert st["desk"]["first_entry"][f"{WL.IVAN_ADDR}|SOL|LONG"] == 100.0

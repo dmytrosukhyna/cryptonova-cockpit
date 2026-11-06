@@ -34,6 +34,7 @@ from . import owner_overrides as ov
 FOLLOW_STALE_MS = 6 * 3_600_000      # a follow list older than this → no new copies (closes and stops still work)
 PUB_MS, PUB_IDLE_MS = 2 * 60_000, 10 * 60_000
 POLL_GAP_S = 0.25
+POLL_WORKERS = 8
 GONE_MS = 30 * 60_000                # 05.11: a lead trader OKX answers «60004 Trader doesn't exist» for this long → treated as flat
 GONE_MARKS = ("60004", "doesn't exist", "does not exist")
 PATH = "web/whales_live.json"
@@ -133,9 +134,25 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     states, opened, errors = {}, {}, []
     gone = dict(st.get("gone") or {})
     vanished = []
-    for a in watch:
+    # 06.11 (owner: copy lag median 341 s): all watched whales are polled at once (one thread each, ≤ POLL_WORKERS) — a pass takes
+    # about one slow answer instead of the sum of all; each source still gets ≤ 1 request per whale per pass
+    from concurrent.futures import ThreadPoolExecutor
+    t_poll = time.time()
+    with ThreadPoolExecutor(max_workers=max(1, min(POLL_WORKERS, len(watch)))) as ex:
+        futs = {a: ex.submit(poll, a, mids, post, okx_get, src_get) for a in watch}
+    results = {}
+    for a, f in futs.items():
         try:
-            states[a], op = poll(a, mids, post, okx_get, src_get)
+            results[a] = (f.result(), None)
+        except Exception as e:  # noqa: BLE001
+            results[a] = (None, e)
+    poll_s = round(time.time() - t_poll, 2)
+    for a in watch:
+        res_, err = results[a]
+        try:
+            if err is not None:
+                raise err
+            states[a], op = res_
             opened.update({(a,) + k: v for k, v in op.items()})
             gone.pop(a, None)
         except Exception as e:  # noqa: BLE001
@@ -149,7 +166,6 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
                     vanished.append(a)
             else:
                 gone.pop(a, None)
-        sleep(POLL_GAP_S)
     gone = {a: t for a, t in gone.items() if a in watch}
     # 06.11 (owner): the fixed list (whales_top.json «close_unfollowed») — copies of a whale who left it are closed; only on a fresh feed
     desk = W.desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), quality,
@@ -169,7 +185,7 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
                 src = str(e["whale"]).split(":")[0] if ":" in str(e["whale"]) else "hl"
                 by_src.setdefault(src, []).append(lags[-1])
     med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None  # noqa: E731
-    desk["live"] = {"t": now, "whales": len(watch), "polled": len(states), "errors": errors[:5], "follow_asof": wtop.get("asof"),
+    desk["live"] = {"t": now, "whales": len(watch), "polled": len(states), "errors": errors[:5], "follow_asof": wtop.get("asof"), "poll_s": poll_s,
                     "lag_s_med": med(lags), "lag_s_last": lags[-1] if lags else None, "n_lags": len(lags),
                     # 05.11 (backlog 88a): which source is slow — {source: {med, n}}
                     "lag_by_src": {k: {"med": med(v), "n": len(v)} for k, v in sorted(by_src.items()) if v}}
@@ -178,7 +194,12 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     _publish(st, desk, now, env, put)
     if persist:
         save(st, env)
-    return {**pub["paper"], "live": desk["live"], "util_pct": desk.get("util_pct")}
+    paper = pub["paper"]
+    fset = set(follow)
+    # 06.11 (owner: after the 00:00 day-stop lift the account opened two copies of a whale who had left the list): every copy says whether
+    # its whale is followed now — okx_futures never opens a new entry for follow=False (copies already held are still managed)
+    paper["open"] = [{**t, "follow": t.get("whale") in fset} for t in paper.get("open") or []]
+    return {**paper, "live": desk["live"], "util_pct": desk.get("util_pct")}
 
 
 def _sig(desk: dict) -> str:

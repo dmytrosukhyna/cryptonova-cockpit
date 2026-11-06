@@ -342,3 +342,8 @@ def test_first_pass_after_a_rebuild_from_the_account_places_no_orders_and_a_mism
     assert not r["ok"] and "расходится" in r["why"] and not fk.orders
     r = ap.run_once(e, fk, pf(None, bad), NOW, F.nosleep)                   # the next normal model → normal rules
     assert r["ok"] and any(o["instId"] == "BTC-USDT" and o["side"] == "buy" for o in fk.orders)
+
+
+def test_loop_cycles_start_every_30_seconds():
+    """06.11 (owner: whale copy lag 341 s): the window's cycles start every LOOP_S from their start, not 60 s after their end"""
+    assert ap.LOOP_S == 30 and ap.next_sleep(100.0, 112.0) == 18.0 and ap.next_sleep(100.0, 160.0) == 5.0

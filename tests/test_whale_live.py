@@ -177,3 +177,12 @@ def test_a_followed_whale_or_a_plain_error_never_closes_copies(tmp_path):
     for t in (90, 130, 170):                                                     # a plain error never closes
         d = WL.step(dropped, now=NOW + t * MIN, **{**kw, "okx_get": timeout})
     assert [x["symbol"] for x in d["open"]] == ["ETH"]
+
+
+def test_copies_carry_the_follow_flag_and_whales_are_polled_concurrently(tmp_path):
+    f = Feed()
+    kw = dict(env={"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
+    WL.step(wtop(), now=NOW, **kw)
+    f.okx = [("ETH", "long", 2500, NOW + 1000)]
+    d = WL.step(wtop(), now=NOW + MIN, **kw)
+    assert d["open"][0]["follow"] is True and d["live"]["poll_s"] is not None

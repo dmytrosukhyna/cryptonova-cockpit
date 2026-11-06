@@ -93,6 +93,14 @@ MIN_ORDER = ms.MIN_ORDER             # $10 — smaller moves are not worth an or
 BAND = 0.003                          # a coin within 0.3 % of the account of its target is left alone
 DRIFT_EVERY_MS = 3_600_000            # the account is compared with the public portfolio at least hourly
 SPOT_EVERY_S = 300                    # the public portfolio is read every 5 minutes in the window
+LOOP_S = max(15, int(os.environ.get("OKX_LOOP_S") or 30))
+
+
+def next_sleep(t_start: float, t_now: float, period: float = LOOP_S) -> float:
+    """seconds to sleep so that cycles start every `period` seconds (at least 5 s of rest after a long cycle)"""
+    return max(5.0, period - (t_now - t_start))
+
+
 PUBLIC_EVERY_S = 15 * 60              # server mode: web/public_real.json once at start, then every 15 minutes (public_real.py)
 DAY = 86_400
 VIA = "USDC"                          # a coin without a USDT pair is traded through USDC on the global account
@@ -1344,6 +1352,7 @@ def _main(argv=None) -> int:
         last_spot, said, last_pub, pub_said = 0.0, None, 0.0, False
         upd = Updater()
         while True:
+            t_cycle = time.time()
             # 22.10: on the server the service also publishes «Реальный счёт CRYPTO NOVA на OKX» (public_real.py) — the Mac mirror
             # does it while the autopilot runs on the Mac; public_real.writer() lets only the lease's machine write
             if lease.node_of() == "server" and time.time() - last_pub >= PUBLIC_EVERY_S:
@@ -1391,7 +1400,9 @@ def _main(argv=None) -> int:
             if restart:
                 _PLANNED["restart"] = True
                 return 0
-            time.sleep(60)
+            # 06.11 (owner: whale copy lag 341 s): a fixed cycle of LOOP_S (30 s) from the cycle's START — the futures pass (and the whale
+            # positions it reads) no longer waits a full minute after a slow cycle; the spot portfolio keeps its own 5-minute clock
+            time.sleep(next_sleep(t_cycle, time.time()))
     if "--plan" in argv or "--run" in argv:
         try:
             if "--run" in argv:

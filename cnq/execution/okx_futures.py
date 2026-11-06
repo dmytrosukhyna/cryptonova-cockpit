@@ -610,6 +610,8 @@ def size(t: dict, desk_eq: float, part: float, bud: float, cap: dict, inst: dict
     d_risk = ms._f(t.get("risk_usd")) or (float(t.get("qty") or 0) * abs(float(t["entry"]) - float(t["stop"])))
     frac = d_risk / desk_eq if desk_eq and d_risk else cap["risk"]
     risk_usd = min(frac * part * RISK_MULT, cap["risk"] * bud)
+    if t.get("copy_lev"):        # 06.11 (owner: copies 3–25 % of the desk's size): a whale copy has ONE rule — cap risk of its budget part
+        frac, risk_usd = cap["risk"], cap["risk"] * min(part, bud)
     inst_max = int(float(inst.get("lever") or COPY_MAX_LEV))
     lev = max(1, min(cap["lev"], inst_max))
     room_lev = cap.get("room_lev", lev)             # 05.11: the whole sleeve's notional stays ≤ budget × ROOM_LEV (5×)
@@ -825,10 +827,26 @@ def want_map(desks: list) -> dict:
     return out
 
 
+# 06.11 (owner: BTC long after Luckyboytt entered 32 h late, 2.9 % above the whale's entry): a whale copy is judged against the WHALE's
+# entry — joined only while our price is at most WHALE_WORSE worse and at most WHALE_BETTER better than his entry (the desk's join window),
+# whatever the copy's age; a copy whose whale's entry is unknown falls back to the desk rule below
+WHALE_WORSE, WHALE_BETTER = 0.01, 0.03
+
+
 def late(t: dict, px: float, mult: float, start: int, now: int, gap: float) -> str | None:
     """None when the trade may be joined now; otherwise why not. New = opened after the start and ≤ 45 min ago; an older one only
-    while the price is at most `gap` worse than the desk's entry (higher for a long, lower for a short)."""
+    while the price is at most `gap` worse than the desk's entry (higher for a long, lower for a short). A whale copy: the whale's
+    entry and the −3 %…+1 % window decide (any age)."""
     o = int(t.get("opened") or 0)
+    we = ms._f(t.get("whale_entry"))
+    if t.get("copy_lev") and we:
+        e = we / mult
+        away = (px / e - 1) if t.get("side") == "LONG" else (1 - px / e)
+        if -WHALE_BETTER <= away <= WHALE_WORSE:
+            return None
+        x = f"{away * 100:+.2f}".replace(".", ",")
+        return (f"пропущено: цена {x}% от входа кита (окно −{WHALE_BETTER * 100:g}%…+{WHALE_WORSE * 100:g}%), копия стола открыта "
+                f"{(now - o) / 3_600_000:.1f} ч назад")
     if o >= start and now - o <= FRESH_MS:
         return None
     entry = float(t["entry"]) / mult
@@ -1020,7 +1038,8 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     for k in ("skip", "tries", "done"):
         st[k] = {x: v for x, v in st[k].items() if x in want}
     st["skip"] = {x: v for x, v in st["skip"].items() if v != BUSY}     # legacy final «busy» skips are retried (05.11)
-    fresh = [(tid, w) for tid, w in want.items() if tid not in st["trades"] and tid not in st["skip"] and tid not in st["done"]]
+    fresh = [(tid, w) for tid, w in want.items() if tid not in st["trades"] and tid not in st["skip"] and tid not in st["done"]
+             and w[0].get("follow") is not False]      # 06.11: never a NEW entry for a whale no longer on the follow list
     if fresh:
         cap = caps(env)
         day = time.strftime("%Y-%m-%d", time.gmtime(now / 1000))

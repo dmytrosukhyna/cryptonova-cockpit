@@ -531,3 +531,30 @@ def test_risk_three_percent_steps_back_to_two_after_a_bad_week_and_the_sleeve_ro
     assert big["risk_usd"] <= 2500 * 0.03 + 1e-6 and big["notional"] > 2500 * 2 * 0.15     # 3 %: ~ $940 notional
     full = fu.size(t, 10000.0, 2500.0, 2500.0, cap, inst, 100.0, 1.0, 2500 * 5 - 300.0, 100000.0)
     assert full["notional"] <= 300.0 + 1e-6 and "предел плеча 5" in full["capped"]          # the 5 × budget room binds
+
+
+def test_whale_copy_is_judged_against_the_whales_entry_and_sized_by_one_rule():
+    """06.11 (owner): BTC after Luckyboytt entered 32 h late, 2.9 % above the whale's entry (−$24); copies were 3–25 % of the desk"""
+    now = NOW
+    old = now - 32 * 3_600_000
+    t = {"side": "LONG", "entry": 78000.0, "stop": 71760.0, "opened": old, "copy_lev": 5.0, "whale_entry": 75859.0}
+    why = fu.late(t, 78058.7, 1.0, now - 86_400_000, now, fu.JOIN_GAP)
+    assert why and "входа кита" in why                                                  # +2.9 % → skipped
+    assert fu.late({**t, "whale_entry": 77600.0}, 78058.7, 1.0, now - 86_400_000, now, fu.JOIN_GAP) is None    # +0.6 % → joined
+    assert fu.late({**t, "side": "SHORT", "whale_entry": 80000.0}, 78058.7, 1.0, 0, now, fu.JOIN_GAP)        # short 2.4 % below his entry = worse → skip
+    assert fu.late({**t, "side": "SHORT", "whale_entry": 82000.0}, 78058.7, 1.0, 0, now, fu.JOIN_GAP)        # short 4.8 % below his entry → skip
+    # sizing: whatever the desk copy's own risk, a whale copy risks the cap share of its budget part
+    cap = fu.caps(F.env())
+    inst = {"tickSz": "0.1", "ctVal": "0.001", "lotSz": "1", "minSz": "1", "lever": "20"}
+    a = fu.size({**t, "risk_usd": 50.0}, 10000.0, 2500.0, 2500.0, cap, inst, 78000.0, 1.0, 0.0, 1e6)
+    b = fu.size({**t, "risk_usd": 2000.0}, 10000.0, 2500.0, 2500.0, cap, inst, 78000.0, 1.0, 0.0, 1e6)
+    assert abs(a["risk_usd"] - b["risk_usd"]) < 2.5 and a["risk_usd"] <= 2500 * cap["risk"] + 1e-6 and a["risk_usd"] > 2500 * cap["risk"] * 0.95
+
+
+def test_no_new_entry_for_a_whale_that_left_the_follow_list():
+    fk = F.FakeOkx()
+    w = {**F.trade("W-SOL-L-9", entry=200.0, stop=184.0, tp=230.0, risk=320.0), "tps": [], "parts": [], "copy_lev": 5.0, "follow": False}
+    r = run(fk, F.env(), [("whales", {"equity": 10000.0, "open": [w]})])
+    assert r["opened"] == 0 and not swap_orders(fk)
+    r = run(fk, F.env(), [("whales", {"equity": 10000.0, "open": [{**w, "id": "W-SOL-L-10", "follow": True}]})])
+    assert r["opened"] == 1

@@ -557,7 +557,7 @@ details.pfirm{border:1px solid var(--line2);border-radius:14px;background:var(--
 .fdesk .fsw{flex-wrap:wrap!important;overflow:visible!important}.fsw.sub{margin-top:-2px;padding-left:14px;border-left:2px solid rgba(124,196,255,.35)}.fsw.sub button{font-size:11.5px}.fabout{font-size:11.5px;margin:2px 0 8px;line-height:1.45}
 .romanbox{border:1px dashed var(--line2);border-radius:12px;padding:14px;display:grid;gap:6px;font-size:12.5px}
 body.tab-futures:not(.fsys-nova) #sigCard,body.tab-futures:not(.fsys-ivan):not(.fut-own) #ivanCard,body.tab-futures:not(.fsys-whales) #wtopCard,body.tab-futures:not(.fsys-chan) #chwCard,body:not(.tab-futures) #chwCard,body.guest #chwCard{display:none!important}
-body.tab-futures #fdeskBox{order:-50!important}
+body.tab-futures #fdeskBox{order:-50!important}#fOwnCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard:not([hidden]){display:block!important;order:-60!important}
 @media (max-width:760px){.fsys{grid-template-columns:1fr 1fr 1fr;gap:6px}.fsys button{padding:7px 8px}.fsys button small{display:none}.fsys button b{font-size:12px}}
 /* compact cards: a fixed preview with «развернуть» instead of a scroll box inside the page */
 .card.cmp{position:relative}.card.cmp:not(.cmp-open){max-height:var(--cmp-h,260px);overflow:hidden;padding-bottom:44px}
@@ -979,7 +979,7 @@ body.ls-min .lspanel .lsb,body.ls-min .lspanel .lsmeta{display:none}
     <div class="card" id="urgentCard"></div>
   </aside>
   <section class="col">
-    <div class="card" id="fdeskBox" hidden></div>
+    <div class="card" id="fOwnCard" hidden></div>     <div class="card" id="fdeskBox" hidden></div>
     <div class="card" id="ivanCard" hidden></div>
     <div class="card" id="sigCard" hidden></div>
     <div class="card" id="wtopCard" hidden></div>
@@ -2487,6 +2487,7 @@ async function loadIvan(force){ const pass=load('cnq_ivan_pass',''); const card=
   try{ IVAN=await ivanDecrypt(blob,pass); IVAN.__asof=blob.asof; IVAN_ERR=''; }catch(e){ IVAN=null; IVAN_ERR=(e&&e.message==='Неверный пароль')?(store('cnq_ivan_pass'),'Пароль не подошёл — введи тот же, что в строке IVAN_PASS на Маке.'):'Не удалось прочитать данные: '+(e.message||e); }
   renderIvan(); }
 function ivanPub(){ const J=IVST; if(!J) return ''; return `<div class="fkpi"><div><small>В плюсе</small><b class="num">${wrN(J.win_rate||0,J.closed_n||0)}</b><em class="muted">закрытые сделки</em></div><div><small>Закрытые</small><b class="num ${(J.net_closed_usd||0)>=0?'pos':'neg'}">${sUsd2(J.net_closed_usd||0)}</b><em class="muted">после комиссий</em></div><div><small>В открытых</small><b class="num ${(J.open_upnl_usd||0)>=0?'pos':'neg'}">${sUsd2(J.open_upnl_usd||0)}</b><em class="muted">${J.open_n||0} поз.</em></div><div><small>Макс. просадка</small><b class="num">${J.max_dd_pct!=null?'−'+String((+J.max_dd_pct).toFixed(1)).replace('.',',')+'%':'—'}</b></div></div>${J.note_ru?`<div class="muted" style="font-size:12px;line-height:1.5">${mypEsc(J.note_ru)}</div>`:''}${J.asof?`<div class="muted" style="font-size:11px;margin-top:4px">демо · тест · обновлено ${fmtT(J.asof)}</div>`:''}`; }
+window.__cnIvan=()=>({ivan:IVAN, stats:IVST, guest:IS_GUEST});   // 06.11: read by the owner's Futures card (fut_owner.js)
 function renderIvan(){ const el=$('#ivanCard'); if(!el) return; const pass=load('cnq_ivan_pass',''); if(!pass&&!IVAN){ if(load('cnq_guest','')==='1'&&!ownerSigned()){ el.hidden=true; return; } el.hidden=false; el.innerHTML=`<h2>${ico('shield')} Иван тест <span class="r muted">демо · тест · видно только тебе</span></h2>${ivanPub()}${IVAN_ERR?`<div class="muted" style="font-size:12px;margin-top:6px">${mypEsc(IVAN_ERR)}</div>`:''}<div class="eact"><span class="muted">Сделки и позиции — после входа владельца.</span><button class="ib sm" id="ivSign">Войти</button></div><details class="edet ivold"><summary>Открыть по-старому, паролем</summary><div class="eact"><input id="ivPass" type="password" autocomplete="off" placeholder="пароль IVAN_PASS" style="flex:1;min-width:0"><button class="ib sm" id="ivGo">Открыть</button></div></details>`; { const b=$('#ivSign'); if(b) b.addEventListener('click',()=>{ try{ window.cnOwnerLogin&&window.cnOwnerLogin(); }catch(e){} }); } const go=()=>{ const v=$('#ivPass').value; if(!v) return; store('cnq_ivan_pass',v); IVAN_T=0; loadIvan(true); }; $('#ivGo').addEventListener('click',go); $('#ivPass').addEventListener('keydown',e=>{ if(e.key==='Enter') go(); }); return; } el.hidden=false;
   const usd=v=>(v<0?'−':'')+'$'+Math.abs(v).toLocaleString('ru-RU',{maximumFractionDigits:2,minimumFractionDigits:Math.abs(v)<100?2:0}); const sg=v=>(v>0?'+':'')+usd(v); const cl=v=>v>0?'pos':v<0?'neg':'';
   const head=`<h2>${ico('shield')} Иван тест <span class="r muted">${IVAN?`Bybit ${IVAN.host==='demo'?'демо':'основной'} · обновлено ${new Date(IVAN.asof||IVAN.__asof).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · видно только тебе`:'видно только тебе'}</span></h2>`;
@@ -3203,7 +3204,7 @@ let TSEL=load('cnq_tsel','research'); if(!['research','ivan','roman','memes','ex
 let CNPROF=load('cnq_cnprof',''); if(!['cons','bal','aggr'].includes(CNPROF)) CNPROF=['cons','bal','aggr'].includes(PROF)?PROF:'bal';
 // 18.10 (owner): Тесты → CNPTS → CRYPTO NOVA. CRYPTO NOVA = the finished product (selected signals); CNPTS = the self-learning engine; tests = everything under test
 const FSYS_META={nova:['CRYPTO NOVA','реальный счёт OKX · фьючерсы с 22.10','real'],cn:['CNPTS','самообучающийся движок · ищет идеальную систему','engine'],tests:['Тесты стратегий','все стратегии на проверке','test']};
-const TESTS=[['research','Лаборатория'],['own','Сигналы CRYPTO NOVA'],['lsn','Нейтральная корзина'],['ivan','Иван'],['roman','Роман'],['memes','Мемкоины'],['exp','Свинг'],['brk','Пробой'],['imp','Импульс BTC'],['imps','Активный спот'],['lst','Шорт листингов'],['lstx','Турбо · листинги'],['btcx','Турбо · BTC ×2'],['swp','Ложный пробой · лонг'],['chan','Каналы трейдеров'],['lab','Новые идеи'],['whales','Киты · копирование'],['gold','Золото · тест']];
+const TESTS=[['research','Лаборатория'],['own','Сигналы CRYPTO NOVA'],['lsn','Нейтральная корзина'],['ivan','Иван'],['roman','Роман'],['memes','Мемкоины'],['exp','Свинг'],['brk','Пробой'],['imp','Импульс BTC'],['imps','Активный спот'],['lst','Шорт листингов'],['lstx','Турбо · листинги'],['btcx','Турбо · BTC ×2'],['swp','Ложный пробой · лонг'],['chan','Каналы трейдеров'],['lab','Новые идеи'],['whales','CRYPTO NOVA v2 · копирование китов'],['gold','Золото · тест']];
 // 18.10: public names — the owner (!IS_GUEST) keeps the internal names above, everyone else sees these; null = hidden from non-owners
 const PUBLIC_NAMES={exp:'Волна',brk:'Прорыв',imp:'Импульс',lab:'Эксперименты',memes:'Мем-радар',whales:null,gold:'Золото',ivan:'Наставник A',roman:'Наставник B',research:null};
 const PUBLIC_ABOUT={exp:'Ловит движение на несколько дней: покупает, когда монета выходит из затишья, и быстро откупает резкие откаты. По 10% счёта на сделку, до 15 сделок сразу',brk:'Покупает монету, когда она пробивает максимум 5 дней на двойном объёме, и только если биткоин растёт. Держит 2 дня. На истории 2025–2026 счёт +20%, но просадки доходили до −49% — стратегия резкая',imp:'Когда биткоин за час вырос на 2.5% и больше, покупает самые ликвидные альткоины — они обычно догоняют. Держит до 12 часов, до 5 сделок по 20% счёта. На истории 2025–2026 счёт +34% при просадке до −12%, но в обвальном 2022 был минус',lab:'Свежие идеи проверяем вживую: покупка у низа диапазона, сделки по сильным новостям, откуп паники на альткоинах. На истории ещё не доказаны, поэтому не больше 10% счёта на сделку',memes:'Торгует мемами: покупает только после резкого обвала (−25% от максимума суток) и сначала забирает вложенное. Риск высокий',whales:'Повторяет сделки лучших трейдеров Hyperliquid и OKX с опозданием и честно считает, выгодно ли это',gold:'Золото (токен XAUT на OKX): держит лонг, пока цена выше средней за 100 дней, иначе вне рынка. Правило выбрано на истории 2023–2026 из 6; сделок мало — несколько в год. Только демо'};
@@ -4743,5 +4744,19 @@ highlighted. Self-contained: it switches tabs with the tab buttons, so the main 
   document.querySelectorAll('canvas[data-sphere]').forEach(c=>{ try{ if(!c._sph) c._sph=NovaSphere.mount(c,{busy}); }catch(e){ return; }
     if('ResizeObserver' in window){ let w0=c.clientWidth; new ResizeObserver(()=>{ if(c.clientWidth===w0||!c._sph) return; w0=c.clientWidth; c._sph.size(); if(reduce) window.dispatchEvent(new Event('resize')); }).observe(c); } });
 })();</script>
+<script src="fut_owner.js?v=3"></script>
+<script>
+// 06.11 (owner 17:30): the owner's Futures picture on top of «Фьючерсы» — web/fut_owner.json rendered by fut_owner.js; never for guests
+let FOWN=null, FOWN_T=0;
+async function renderFOwn(){ const el=document.getElementById('fOwnCard'); if(!el) return;
+  const I=window.__cnIvan?window.__cnIvan():{guest:true};
+  if(I.guest||document.body.classList.contains('guest')){ el.hidden=true; el.innerHTML=''; return; }
+  if(Date.now()-FOWN_T>5*60000){ FOWN_T=Date.now(); try{ const r=await fetch('./fut_owner.json?t='+Math.floor(Date.now()/60000),{cache:'no-store'}); if(r.ok) FOWN=await r.json(); }catch(e){} }
+  if(!window.CNFutOwner) return;
+  const sig=JSON.stringify([FOWN&&FOWN.asof, I.ivan?I.ivan.asof||1:0, I.stats?I.stats.asof:0]);
+  if(el.__sig===sig) return; el.__sig=sig; el.hidden=false;
+  el.innerHTML=CNFutOwner.html(FOWN,{ivan:I.ivan, ivanStats:I.stats}); CNFutOwner.mount(el); }
+setTimeout(renderFOwn,1200); setInterval(renderFOwn,60000);
+</script>
 </body>
 </html>

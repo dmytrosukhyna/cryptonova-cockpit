@@ -151,7 +151,9 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
                 gone.pop(a, None)
         sleep(POLL_GAP_S)
     gone = {a: t for a, t in gone.items() if a in watch}
-    desk = W.desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), quality)
+    # 06.11 (owner): the fixed list (whales_top.json «close_unfollowed») — copies of a whale who left it are closed; only on a fresh feed
+    desk = W.desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), quality,
+                       close_unfollowed=bool(fresh and wtop.get("close_unfollowed")))
     why = "кит исчез с OKX (Trader doesn't exist ≥ 30 мин)"
     for x in (desk.get("events") or []) + (desk.get("closed") or []):
         if x.get("whale") in vanished and x.get("why") == "кит закрыл" and (x.get("t") == now or x.get("closed_t") == now):

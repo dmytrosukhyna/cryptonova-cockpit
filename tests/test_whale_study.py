@@ -511,3 +511,55 @@ def test_util_counts_risk_sized_margin_so_old_oversized_copies_do_not_block_new_
     assert "A" not in {o["coin"] for o in d["open"]} and d["closed"][-1]["why"] == "закрыта владельцем вручную на OKX"
     d = W.desk_step(d, ["0xa"], {"0xa": pos}, mids, T0 + 3600_000, owner, {"0xa": {"per_day": 1}})
     assert "A" not in {o["coin"] for o in d["open"]}                                          # not re-joined
+
+
+def _w(a, pf=5.0):
+    return {"addr": a, "short": a, "name": a, "src": "bn", "win": 0.9, "pf": pf, "pnl_60d": 1000.0}
+
+
+def test_the_list_is_fixed_for_3_days_and_a_whale_leaves_only_for_a_hard_reason():
+    now = 1_800_000_000_000
+    ranked = [_w(f"bn:{i}") for i in range(10)]
+    prof = {x["addr"]: {**x, "positions": []} for x in ranked}
+    top, why, lock_t, passing = W.lock_follow({}, ranked, prof, {"equity": 7000.0}, now)       # the first lock: the best 7 now
+    assert [x["addr"] for x in top] == [f"bn:{i}" for i in range(7)] and lock_t == now and not why
+    st = {"rule": W.LOCK_RULE, "top": top, "lock_t": lock_t, "passing": passing, "joined": {x["addr"]: now for x in top}}
+    # 12 h later the ranking is different and bn:0 is not studied at all: nobody leaves (no «не изучен», no PF shuffle)
+    later = now + W.DAY // 2
+    re = [_w(f"bn:{i}") for i in (9, 8, 7, 6, 5, 4, 3, 2, 1)]
+    top2, why2, lt2, p2 = W.lock_follow(st, re, {x["addr"]: {**x, "positions": []} for x in re}, {"equity": 7000.0}, later)
+    assert [x["addr"] for x in top2] == [x["addr"] for x in top] and lt2 == now and not why2
+    # hard reasons: 60 days negative; copies on our desk lost > 10 % of his share (7000 / 7 = 1000 → −$100)
+    bad = {x["addr"]: {**x, "positions": []} for x in re}
+    bad["bn:1"]["pnl_60d"] = -5.0
+    desk = {"equity": 7000.0, "closed": [{"whale": "bn:2", "pnl": -80.0, "closed_t": later}], "open": [{"whale": "bn:2", "upnl": -30.0}]}
+    top3, why3, _, _ = W.lock_follow({**st, "passing": p2}, re, bad, desk, later + 1)
+    assert set(why3) == {"bn:1", "bn:2"} and "ушёл в минус" in why3["bn:1"][0] and "больше 10%" in why3["bn:2"][0]
+    assert {x["addr"] for x in top3} == {f"bn:{i}" for i in (0, 3, 4, 5, 6)}
+
+
+def test_at_the_review_a_newcomer_needs_3_days_in_a_row_in_the_bar():
+    now = 1_800_000_000_000
+    old = [_w(f"bn:{i}") for i in range(7)]
+    passing = {x["addr"]: [now - 4 * W.DAY, now - 600_000] for x in old}
+    passing["bn:new_old"] = [now - 4 * W.DAY, now - 600_000]          # passed the bar for 4 days
+    passing["bn:new_fresh"] = [now - W.DAY, now - 600_000]             # only for 1 day
+    st = {"rule": W.LOCK_RULE, "top": old, "lock_t": now - 3 * W.DAY, "passing": passing}
+    ranked = [_w("bn:new_fresh", 50), _w("bn:new_old", 40)] + [_w(f"bn:{i}") for i in range(1, 7)]   # bn:0 studied and failed
+    prof = {x["addr"]: {**x, "positions": []} for x in ranked + [_w("bn:0")]}
+    top, why, lock_t, _ = W.lock_follow(st, ranked, prof, None, now)
+    assert lock_t == now and "bn:0" not in {x["addr"] for x in top}
+    assert [x["addr"] for x in top] == [f"bn:{i}" for i in range(1, 7)] + ["bn:new_old"]
+
+
+def test_the_desk_closes_the_copies_of_a_whale_who_left_the_fixed_list():
+    now = 1_800_000_000_000
+    o = {"whale": "bn:gone", "coin": "SOL", "side": "SHORT", "entry": 100.0, "notional": 500.0, "margin": 100.0, "opened_t": now - W.DAY,
+         "stop": 120.0}
+    d = {"start": 10000.0, "cash": 10000.0, "open": [dict(o)], "closed": [], "seen": {}, "history": [], "started": now - 2 * W.DAY}
+    kept = W.desk_step(json.loads(json.dumps(d)), ["bn:a"], {}, {"SOL": 90.0}, now)
+    assert [x["coin"] for x in kept["open"]] == ["SOL"]                                      # old rule: held until the whale exits
+    cl = W.desk_step(json.loads(json.dumps(d)), ["bn:a"], {}, {"SOL": 90.0}, now, close_unfollowed=True)
+    assert not cl["open"] and cl["closed"][-1]["why"] == "кит убран из списка" and cl["closed"][-1]["pnl"] > 0
+    empty = W.desk_step(json.loads(json.dumps(d)), [], {}, {"SOL": 90.0}, now, close_unfollowed=True)
+    assert [x["coin"] for x in empty["open"]] == ["SOL"]                                     # an empty list never closes anything

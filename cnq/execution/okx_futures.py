@@ -1167,6 +1167,12 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
         pass
     st["last"] = {k: res[k] for k in ("t", "opened", "closed", "reduced", "stops", "gone", "errors")}
     st["last"]["skipped"] = len(res["skipped"])
+    # 06.11 (owner: «счёт не копирует новые позиции»): the latest reason per skipped desk trade, published in public_real.json
+    sk = {x["sig"]: x for x in st.get("copy_skips") or [] if isinstance(x, dict) and x.get("sig")}
+    for x in res["skipped"]:
+        if x.get("id"):
+            sk[str(x["id"])] = {"t": now, "sig": str(x["id"]), "inst": x.get("inst"), "why": str(x.get("why") or "")[:200]}
+    st["copy_skips"] = sorted(sk.values(), key=lambda x: x["t"])[-30:]
     if save:
         save_state(st, env)
     return res

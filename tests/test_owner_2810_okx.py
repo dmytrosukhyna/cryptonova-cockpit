@@ -129,7 +129,7 @@ def test_impulse_sleeve_waits_in_btc_sells_it_on_the_exit_pauses_three_days_and_
     A = pr.actions(0, {"spot": ap.LOG, "active": ac.LOG, "fut": fu.LOG})              # the log stamps the wall clock
     kinds = [x["kind"] for x in A]
     assert "active_park" in kinds and "active_unpark" in kinds and all("ordId" not in json.dumps(x) for x in A)
-    assert pr.clean({**{k: None for k in pr.KEYS}, "closed": [], "fut_curve": [], "flows": {}, "actions": A, "alloc": {}})["actions"]
+    assert pr.clean({**{k: None for k in pr.KEYS}, "closed": [], "fut_curve": [], "flows": {}, "actions": A, "alloc": {}, "copy_skips": []})["actions"]
 
 
 def test_impulse_parking_switched_off_sells_the_btc_and_waits_in_usdt():

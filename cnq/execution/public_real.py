@@ -64,7 +64,10 @@ from . import myspot_watch as ms
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
         "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve",
-        "actions", "flows")
+        "actions", "flows", "copy_skips")
+# 06.11 (owner: «счёт не копирует новые позиции китов»): why the futures sleeve did NOT open a desk trade — the latest reason per
+# trade, last COPY_SKIPS_MAX, from okx_futures state «copy_skips» (desk trade id = «sig», OKX instrument, plain Russian reason)
+COPY_SKIPS_MAX = 30
 SPOT_KEYS = ("sym", "share", "usd", "copy", "copy_reason", "copy_pct")
 FUT_KEYS = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason", "mark", "lev", "opened", "sig")
 CLOSED_KEYS = ("inst", "side", "open_px", "close_px", "move_pct", "pnl_usd", "lev", "opened", "closed", "partial")
@@ -422,7 +425,15 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
             "stale": not running(s.get("lease")), "flows": fl,
             "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url"),
             "closed": list(closed_rows or [])[:CLOSED_MAX], "fut_curve": [[int(t), _r(v)] for t, v in fcurve],
-            "actions": list(acts or [])[:ACTIONS_MAX]}
+            "actions": list(acts or [])[:ACTIONS_MAX], "copy_skips": copy_skips()}
+
+
+def copy_skips(env=None) -> list:
+    try:
+        from . import okx_futures
+        return list((okx_futures.load_state(env).get("copy_skips") or []))[-COPY_SKIPS_MAX:]
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def clean(doc: dict) -> dict:
@@ -467,6 +478,9 @@ def clean(doc: dict) -> dict:
     out["fut_curve"] = [[int(p[0]), num(p[1])] for p in doc.get("fut_curve") or []
                         if isinstance(p, (list, tuple)) and len(p) == 2 and num(p[0]) and num(p[1]) is not None]
     out["alloc"] = {k: (doc.get("alloc") or {}).get(k) for k in sub.ALLOC_KEYS}
+    out["copy_skips"] = [{"t": int(x["t"]), "sig": x["sig"] if isinstance(x.get("sig"), str) and SIG_RE.match(x["sig"]) else None,
+                          "inst": x["inst"] if INST_RE.match(str(x.get("inst") or "")) else None, "why": str(x.get("why") or "")[:200]}
+                         for x in (doc.get("copy_skips") or [])[-COPY_SKIPS_MAX:] if isinstance(x, dict) and num(x.get("t"))]
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None
     return out
@@ -514,7 +528,8 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
             pass
     elif state.get("last"):
         # the last real numbers, their own asof — never invented ones (a «last» from before 28.10 gets the new keys empty)
-        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, **state["last"], "stale": True})
+        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, "copy_skips": copy_skips(env),
+                     **state["last"], "stale": True})
     else:
         return None
     if put is None:

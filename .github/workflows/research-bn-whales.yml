@@ -3,6 +3,12 @@ name: research-bn-whales
 # restores the state cache to read ws_trips, never saves it. Results in the run's annotations and the artifact.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "stops (bn_whale_stops.py) or size (bn_whale_size.py, backlog 92)"
+        type: choice
+        options: [stops, size]
+        default: stops
 permissions:
   contents: read
 jobs:
@@ -23,7 +29,7 @@ jobs:
           key: cnq-state-none
           restore-keys: |
             cnq-state-
-      - run: python scripts/research/bn_whale_stops.py data/agents.sqlite bn_whale_stops.json
+      - run: python scripts/research/bn_whale_${{ inputs.mode || 'stops' }}.py data/agents.sqlite bn_whale_${{ inputs.mode || 'stops' }}.json
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: bn-whale-stops, path: bn_whale_stops.json }
+        with: { name: bn-whale-${{ inputs.mode || 'stops' }}, path: bn_whale_${{ inputs.mode || 'stops' }}.json }

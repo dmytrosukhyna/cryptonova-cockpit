@@ -1190,7 +1190,8 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
     for x in res["skipped"]:
         if x.get("id"):
             sk[str(x["id"])] = {"t": now, "sig": str(x["id"]), "inst": x.get("inst"), "why": str(x.get("why") or "")[:200]}
-    st["copy_skips"] = sorted(sk.values(), key=lambda x: x["t"])[-30:]
+    held = set(st.get("trades") or {}) | set(st.get("done") or {})       # a trade we hold / held is no longer «not copied»
+    st["copy_skips"] = sorted((x for x in sk.values() if x["sig"] not in held), key=lambda x: x["t"])[-30:]
     if save:
         save_state(st, env)
     return res

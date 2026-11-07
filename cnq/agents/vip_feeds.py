@@ -3,7 +3,7 @@ panel, built ONLY from what the system already recorded (web/*.json, the spot le
 the researcher's log). Nothing here trades, changes a rule, a weight, a filter or a desk; a number that can not be computed
 correctly is null, a reason that was never recorded is «причина не записана».
 
-  web/spot_pipeline.json   every coin the spot table evaluated, at ONE stage of the way to the CRYPTO NOVA portfolio:
+  web/spot_pipeline.json   every coin the spot table evaluated, at ONE stage of the way to the CRYPTO NOVA AI portfolio:
                            found → first_check → all_filters → recommended → bought, or waiting / rejected on the way;
                            per coin {sym, stage, stage_ru, passed[], why_ru, since, okx_pair, in_real_account, last_action};
                            plus the cash: {cash_pct_real, cash_pct_portfolio, cash_target_pct, cash_target_kind, cash_why_ru, …}.
@@ -133,7 +133,7 @@ STAGE_ABOUT_RU = {
     "recommended": "Прошла фильтры таблицы и правила портфеля: портфель покупает её на ближайшем прогоне.",
     "waiting": "Прошла фильтры таблицы, но правило портфеля временно не даёт купить: 14 дней после продажи, заняты места, кэш у минимума, цена не сверилась.",
     "rejected": "Таблица поставила «не брать», или монету нельзя купить на реальном счёте (нет спот-пары на OKX — правило владельца с 22.10).",
-    "bought": "Монета в портфеле CRYPTO NOVA (реальный счёт повторяет его на OKX).",
+    "bought": "Монета в портфеле CRYPTO NOVA AI (реальный счёт повторяет его на OKX).",
 }
 _FOUND = ("Анкеты пока нет", "без проверки мем-деска", "нет данных")
 _OKX_NONE = "на споте OKX нет пары"
@@ -150,7 +150,7 @@ def _ideas_rows(ideas: dict) -> dict:
 
 
 def ledger_actions(conn) -> list[dict]:
-    """the whole action ledger of «CRYPTO NOVA портфель» (spot_ideas_actions) — [] without the database"""
+    """the whole action ledger of «CRYPTO NOVA AI портфель» (spot_ideas_actions) — [] without the database"""
     if conn is None:
         return []
     try:
@@ -244,7 +244,7 @@ def spot_pipeline(pf: dict, ideas: dict, memes: dict, real: dict, prev: dict | N
         if p:
             stage, passed = "bought", ["found", "first_check", "all_filters", "recommended", "bought"]
             reco = p.get("reco") or {}
-            why = "; ".join(w for w in [f"в портфеле CRYPTO NOVA: {_pct_ru(_num(p.get('weight'), 0) * 100)} портфеля",
+            why = "; ".join(w for w in [f"в портфеле CRYPTO NOVA AI: {_pct_ru(_num(p.get('weight'), 0) * 100)} портфеля",
                                         (reco.get("t") + (" — " + reco["why"] if reco.get("why") else "")) if reco.get("t") else ""] if w)
             since = _ms(p.get("entry_time"))
         elif x:
@@ -267,7 +267,7 @@ def spot_pipeline(pf: dict, ideas: dict, memes: dict, real: dict, prev: dict | N
                 why = f"Таблица: «{r.get('status_ru') or st}» ({why_t or UNKNOWN_RU}). Портфель не покупает: {stale_note or UNKNOWN_RU}"
         elif st == "avoid" and _cross_stop(r):
             stage, passed = "first_check", ["found", "first_check"]
-            why = (f"Таблица: «не брать» — {why_t or UNKNOWN_RU}. Для портфеля CRYPTO NOVA это «не добирать»: не покупает, но и не "
+            why = (f"Таблица: «не брать» — {why_t or UNKNOWN_RU}. Для портфеля CRYPTO NOVA AI это «не добирать»: не покупает, но и не "
                    "продаёт (решение владельца 28.10).")
         elif st == "avoid":
             stage, passed = "rejected", ["found", "first_check"]
@@ -284,7 +284,7 @@ def spot_pipeline(pf: dict, ideas: dict, memes: dict, real: dict, prev: dict | N
         base = _okx_base(s)
         in_real = base in real_spot
         if in_real and not p:
-            why += f" На реальном счёте есть {base} ({_usd_ru(real_spot[base])}), а в портфеле CRYPTO NOVA её нет — автопилот её продаёт."
+            why += f" На реальном счёте есть {base} ({_usd_ru(real_spot[base])}), а в портфеле CRYPTO NOVA AI её нет — автопилот её продаёт."
         if okx is not None:
             okx_pair = base in okx
         elif s in meme_listed and meme_listed[s] is not None:
@@ -309,7 +309,7 @@ def spot_pipeline(pf: dict, ideas: dict, memes: dict, real: dict, prev: dict | N
             "stages": [{"key": k, "name_ru": STAGE_RU[k], "about_ru": STAGE_ABOUT_RU[k], "now": counts[k],
                         "reached": reached.get(k)} for k in STAGES],
             "counts": counts, **cash_block(ip, real, nb, acts, now), "coins": coins,
-            "about_ru": ("Путь монеты от таблицы «Что брать на спот» до портфеля CRYPTO NOVA и реального счёта OKX. Причины — только "
+            "about_ru": ("Путь монеты от таблицы «Что брать на спот» до портфеля CRYPTO NOVA AI и реального счёта OKX. Причины — только "
                          "записанные системой; «причина не записана» — если её нет в данных. «since» — время сделки или первый раз, "
                          "когда этот файл увидел монету на этой стадии.")}
 
@@ -333,7 +333,7 @@ def cash_block(ip: dict, real: dict, nb: dict, acts: list, now: int) -> dict:
     if cash_real is not None:
         parts.append(f"Кэш спот-части реального счёта — {_pct_ru(cash_real)} ({_usd_ru(sc)} из {_usd_ru(sc + sk)}).")
     if cash_pf is not None:
-        parts.append(f"В портфеле CRYPTO NOVA, который счёт повторяет, — {_pct_ru(cash_pf)}.")
+        parts.append(f"В портфеле CRYPTO NOVA AI, который счёт повторяет, — {_pct_ru(cash_pf)}.")
     idle = ip.get("idle_cash") or {}
     parts.append(f"{floor * 100:.0f}% — это нижняя граница кэша, а не цель покупок: портфель тратит кэш на монеты из таблицы, "
                  "которые проходят все его правила.")
@@ -380,11 +380,11 @@ _S_ORDER = {k: i for i, k in enumerate(STATUS_RU)}
 _C_ORDER = {k: i for i, k in enumerate(("used", "validation", "testing", "paused", "rejected"))}
 _T_ORDER = {"futures": 0, "spot": 1, "other": 2}
 STATUS_RULES_RU = [
-    "Active — по ней сейчас торгует реальный счёт CRYPTO NOVA на OKX: фьючерсы — сигналы системы CRYPTO NOVA AI (с 04.11), "
-    "«Импульс BTC · спот 10%» — активный спот, «CRYPTO NOVA портфель» — спот 65% и доп. ядро BTC/ETH/SOL 10%.",
+    "Active — по ней сейчас торгует реальный счёт CRYPTO NOVA AI на OKX: фьючерсы — сигналы системы CRYPTO NOVA AI (с 04.11), "
+    "«Импульс BTC · спот 10%» — активный спот, «CRYPTO NOVA AI портфель» — спот 65% и доп. ядро BTC/ETH/SOL 10%.",
     "Approved — прошла ворота конвейера PAPER → READY (сейчас таких нет). На реальные деньги — только решением владельца или автовыбора.",
     "Validation — кандидат на реальные деньги, ждёт своих ворот: автовыбор основного стола (20 сделок, результат к просадке лучше на 20%) "
-    "или ворота «Сигналов CRYPTO NOVA» (30 сделок, от +0,3% на сделку).",
+    "или ворота «Сигналов CRYPTO NOVA AI» (30 сделок, от +0,3% на сделку).",
     "Testing — работает на демо-счёте или в наблюдении, к реальным деньгам не допущена.",
     "In Development — идея из лаборатории или исследования, ещё не запущена даже на демо.",
     "Paused — снята конвейером (паузу снимает только владелец).",
@@ -596,7 +596,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
     # ---- allocator / models ----
     if capital:
         st0 = _num(capital.get("start_usd"), 10_000.0) or 10_000.0
-        out.append(_st("capital", capital.get("name") or "CRYPTO NOVA Портфолио", "other", "Testing",
+        out.append(_st("capital", capital.get("name") or "CRYPTO NOVA AI Портфолио", "other", "Testing",
                        "демо-распределитель $10 000; публичный портфель — реальный счёт с 22.10, не эта модель",
                        since=_ms(capital.get("started")), net_usd=_r(capital.get("pnl_usd"), 2), net_pct=_r(capital.get("pnl_pct"), 2),
                        updated=_ms(capital.get("asof")), about_ru=capital.get("why_ru"), source="capital.json",
@@ -630,7 +630,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
                   # final QA 28.10: + the extra core 10 % (spot 65 + core 10 + futures 15 + «Импульс BTC» 10)
                   "split_pct": {**{k: _num(al.get(f"{k}_pct")) for k in ("spot", "fut", "active")},
                                 "core": _num(al.get("core_pct"), round(SHARES.get("core", 0.10) * 100, 1))},
-                  "note_ru": "Реальный счёт CRYPTO NOVA на OKX с 22.10.2026 — отдельно от демо-результатов стратегий ниже."} if real else None
+                  "note_ru": "Реальный счёт CRYPTO NOVA AI на OKX с 22.10.2026 — отдельно от демо-результатов стратегий ниже."} if real else None
     return {"asof": now, "statuses": [{"key": k, "name_ru": v, "category": CATEGORY[k]} for k, v in STATUS_RU.items()],
             "status_rules_ru": STATUS_RULES_RU, "categories": [{"key": k, "name_ru": v} for k, v in CATEGORY_RU.items()],
             "sort_ru": "Категория → статус → тип (фьючерсы, спот, другое) → недавно обновлённые → название.",
@@ -745,7 +745,7 @@ def opportunities(tri: dict, arb: dict, funding: dict, basis: dict, yld: dict, p
                         ops=len((funding.get("positions") or [])), ops_ru="открытых пар спот + фьючерс сейчас",
                         risks_ru=["Ставка фандинга может упасть или стать отрицательной.", "Комиссия входа и выхода 0,30% круга окупается неделями.",
                                   "История 2025–2026: около +1% в год на крупных монетах."],
-                        why_not_used_ru="На реальном счёте нет такого рукава: владелец оставил на OKX только спот, фьючерсы CRYPTO NOVA и активный спот (22.10).",
+                        why_not_used_ru="На реальном счёте нет такого рукава: владелец оставил на OKX только спот, фьючерсы CRYPTO NOVA AI и активный спот (22.10).",
                         since=_ms((funding.get("history") or [[None]])[0][0]) if funding.get("history") else None,
                         updated=_ms(funding.get("asof")), source="funding.json"))
     if basis:
@@ -777,7 +777,7 @@ def opportunities(tri: dict, arb: dict, funding: dict, basis: dict, yld: dict, p
                     why_not_used_ru="Только исследование (docs/research/polymarket.md): после комиссий денег нет; реальные деньги — только после 4 недель бумаги и заключения юриста.",
                     source="docs/research/polymarket.md"))
     if real:
-        out.append(_opp("okx_copy", "Копитрейдинг OKX (ведущий трейдер)", "Реальный счёт CRYPTO NOVA — ведущий трейдер OKX: копировщики повторяют его сделки, "
+        out.append(_opp("okx_copy", "Копитрейдинг OKX (ведущий трейдер)", "Реальный счёт CRYPTO NOVA AI — ведущий трейдер OKX: копировщики повторяют его сделки, "
                         "ведущий получает долю их прибыли.", "Active", ops=(real or {}).get("copiers"), ops_ru="копировщиков сейчас",
                         risks_ru=["Доход только от прибыли копировщиков.", "Монеты только с парой к USDC на копирование не попадают."],
                         why_not_used_ru=None if (real or {}).get("copiers") else "Работает, но копировщиков пока нет.",
@@ -877,7 +877,7 @@ def system_status(out: str, now: int, lease: dict | None, api: tuple | None, pre
     P, I = _load(out, "portfolio.json"), _load(out, "ideas.json")
     t_i = _ms(I.get("asof"))
     st = "ok" if t_i and now - t_i <= H else ("stale" if t_i else "error")
-    comps.append(_comp("spot_table", "Таблица «Что брать на спот» и портфель CRYPTO NOVA", st, min(t_i or 0, _ms(P.get("asof")) or 0) or None, now,
+    comps.append(_comp("spot_table", "Таблица «Что брать на спот» и портфель CRYPTO NOVA AI", st, min(t_i or 0, _ms(P.get("asof")) or 0) or None, now,
                        "Старше 3 часов — портфель не покупает новые монеты (правило портфеля)." if st != "ok" else "Свежая: портфель может покупать."))
     # hourly conveyor and the desk selector
     C, D = _load(out, "conveyor.json"), _load(out, "desk_select.json")

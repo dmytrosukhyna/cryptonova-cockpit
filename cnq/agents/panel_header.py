@@ -1,9 +1,9 @@
 """The header of the owner's closed system (cryptonova.vip, web/app.html) on the server — the app's PUBLIC portfolio.
 
-Owner 22.10 (build 44): the app's public portfolio is exactly «наша система CRYPTO NOVA» as the panel's header shows it:
-  FUTURES · CRYPTO NOVA («отобранные сигналы»)  — novaRes(): the desks of the mix (the main desk + imp; the own daily signals join
+Owner 22.10 (build 44): the app's public portfolio is exactly «наша система CRYPTO NOVA AI» as the panel's header shows it:
+  FUTURES · CRYPTO NOVA AI («отобранные сигналы»)  — novaRes(): the desks of the mix (the main desk + imp; the own daily signals join
                                                    once their live record passes the gate) as ONE $10 000 account, each from 17.10;
-  SPOT · CRYPTO NOVA портфель                    — spotEq(portfolio.json → portfolios.ideas);
+  SPOT · CRYPTO NOVA AI портфель                    — spotEq(portfolio.json → portfolios.ideas);
   «Заработано всего»                             — hdrVals().tot = futures result + spot result (hdrExtras() is empty since 19.10).
 
 Every function here is the panel's own JavaScript, line for line (the names in brackets), so the app shows the same numbers as
@@ -66,7 +66,7 @@ def fut_eq(v: dict | None, px: dict | None = None) -> float:
 
 
 def base_d0(v: dict) -> float:
-    """[baseD0] the desk's equity at the CRYPTO NOVA start (17.10), or its own start when it began later"""
+    """[baseD0] the desk's equity at the CRYPTO NOVA AI start (17.10), or its own start when it began later"""
     h = v.get("equity_history") or []
     st = _num(v.get("start_equity"), 0.0) or START
     if not h or _num(h[0].get("time")) >= FUT_D0:
@@ -121,7 +121,7 @@ def nova_keys(prof: dict, sel: dict | None = None) -> list[str]:
 
 
 def nova_res(prof: dict, px: dict | None = None, sel: dict | None = None) -> dict | None:
-    """[novaRes] CRYPTO NOVA futures as ONE $10 000 account: Σ (desk now − desk at 17.10) ÷ Σ desk starts × $10 000"""
+    """[novaRes] CRYPTO NOVA AI futures as ONE $10 000 account: Σ (desk now − desk at 17.10) ÷ Σ desk starts × $10 000"""
     comps, t0 = [], None
     for k in nova_keys(prof, sel):
         v = prof[k]
@@ -158,7 +158,7 @@ def spot_since(s: dict) -> int | None:
 
 
 def header(prof: dict, ideas: dict | None, px: dict | None = None, sel: dict | None = None) -> dict | None:
-    """[hdrVals], the panel's default (no account picked by hand): futures = CRYPTO NOVA, spot = CRYPTO NOVA портфель.
+    """[hdrVals], the panel's default (no account picked by hand): futures = CRYPTO NOVA AI, spot = CRYPTO NOVA AI портфель.
     f / sp — the accounts now; f0 / s0 — their starts; fr / sr — the results; tot — «Заработано всего» = fr + sr.
     None when neither part exists; a missing part is None and adds nothing (the panel would show another account there)."""
     n = nova_res(prof or {}, px, sel)

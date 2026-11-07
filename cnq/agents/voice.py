@@ -59,7 +59,7 @@ def result(x: float) -> str:
 
 
 def nova_result(paper: dict, out: str = "web") -> tuple[float | None, str]:
-    """CRYPTO NOVA futures as the panel shows it (novaRes): the desks of the mix averaged into one $10 000 account, each desk counted since its own
+    """CRYPTO NOVA AI futures as the panel shows it (novaRes): the desks of the mix averaged into one $10 000 account, each desk counted since its own
     start (equity + open P&L − start), dated by the FIRST desk's start. Returns (result in $, «dd.mm»)."""
     pr = paper.get("profiles") or {}
     from . import panel_header as ph
@@ -92,11 +92,11 @@ def spoken(text: str) -> str:
         text = say_dates(text, "ru")
     except Exception:  # noqa: BLE001
         pass
-    return text.replace("CRYPTO NOVA", "Крипто Но́ва")
+    return text.replace("CRYPTO NOVA AI", "Крипто Но́ва Эй-Ай").replace("CRYPTO NOVA", "Крипто Но́ва")
 
 
 def real_line(out: str = "web") -> str | None:
-    """Final QA 28.10 (owner): the brief starts with the REAL account — the public portfolio, CRYPTO NOVA's own OKX account since
+    """Final QA 28.10 (owner): the brief starts with the REAL account — the public portfolio, CRYPTO NOVA AI's own OKX account since
     22.10 (web/public_real.json, the autopilot's sub-account only): its value, its result since the start, its futures. None without
     the file."""
     r = _load(out, "public_real.json") or {}
@@ -112,7 +112,7 @@ def real_line(out: str = "web") -> str | None:
         fp = float(r["fut_pnl_usd"])
         fut += "; итог около нуля" if abs(fp) < 5 else f"; итог — {result(fp)}"
     stale = " Данные счёта могли устареть." if r.get("stale") else ""
-    return (f"Реальный счёт CRYPTO NOVA на OKX — {usd(float(r['equity_usd']))}: с {since} "
+    return (f"Реальный счёт CRYPTO NOVA AI на OKX — {usd(float(r['equity_usd']))}: с {since} "
             f"{'около нуля' if abs(pnl) < 5 else result(pnl)}. Фьючерсы реального счёта: {fut}.{stale}")
 
 
@@ -138,7 +138,7 @@ def whales_line(out: str) -> str | None:
 
 def compose(out: str = "web") -> str:
     """Executive report in plain words: the real account first (final QA 28.10), then the demo desks — labelled demo, never as
-    CRYPTO NOVA's result — how many trades are open, market direction."""
+    CRYPTO NOVA AI's result — how many trades are open, market direction."""
     hour = (dt.datetime.utcnow() + dt.timedelta(hours=3)).hour
     hello = "Доброй ночи" if hour < 5 else "Доброе утро" if hour < 12 else "Добрый день" if hour < 18 else "Добрый вечер"
     L = [f"{hello}, {NAME}. Система работает штатно."]

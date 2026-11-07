@@ -14,20 +14,20 @@ import urllib.request
 
 PROFILE_VERSION = "v1"
 SHORT = "AI-система оценки и анализа крипторынка. Канал: @crypto_nova_news"
-DESCRIPTION = ("CRYPTO NOVA — AI-платформа, которая читает рынок по данным: зоны, стакан, потоки, крупные игроки, новости и их последствия. "
+DESCRIPTION = ("CRYPTO NOVA AI — AI-платформа, которая читает рынок по данным: зоны, стакан, потоки, крупные игроки, новости и их последствия. "
                "Ведёт канал @crypto_nova_news: утренний обзор, разбор главных новостей, итоги дня с проверкой прогноза.\n\n"
                "Напишите сообщение — мы ответим. Доступ к платформе откроется скоро.")
 COMMANDS = [{"command": "start", "description": "О платформе и канале"}, {"command": "help", "description": "Что умеет система"},
             {"command": "channel", "description": "Ссылка на канал"}]
-WELCOME = ("Здравствуйте! Это бот платформы <b>CRYPTO NOVA</b> — AI-системы оценки и анализа крипторынка.\n\n"
+WELCOME = ("Здравствуйте! Это бот платформы <b>CRYPTO NOVA AI</b> — AI-системы оценки и анализа крипторынка.\n\n"
            "Что мы делаем: смотрим на рынок круглые сутки, читаем зоны разворота, стакан, потоки и позиции крупных игроков, "
            "разбираем новости и их последствия — и каждый вечер проверяем свой же утренний прогноз.\n\n"
            "Канал с обзорами: @crypto_nova_news\n"
            "Доступ к самой платформе откроем скоро — вы в списке. Если есть вопрос, просто напишите сюда: отвечаем в течение дня.")
 # 18.10 (owner): «Подключить» on the panel opens t.me/<bot>?start=connect_<strategy>. The bot explains the terms and tells the owner.
-CONNECT_NAMES = {"cryptonova": "CRYPTO NOVA (отобранные сигналы)", "portfolio": "CRYPTO NOVA портфель",
+CONNECT_NAMES = {"cryptonova": "CRYPTO NOVA AI (отобранные сигналы)", "portfolio": "CRYPTO NOVA AI портфель",
                  "altport": "Портфель «Ядро + альтсезон» (ядро + альты по датчику альтсезона + фьючерсы)",
-                 "capital": "CRYPTO NOVA Портфолио (система сама распределяет вашу сумму)", "exp": "Волна", "brk": "Прорыв",
+                 "capital": "CRYPTO NOVA AI Портфолио (система сама распределяет вашу сумму)", "exp": "Волна", "brk": "Прорыв",
                  "imp": "Импульс", "lab": "Эксперименты", "memes": "Мем-радар", "whales": "По следам китов",
                  "cons": "портфель «Консервативный»", "mod": "портфель «Умеренный»", "high": "портфель «Высокий риск»",
                  "meme": "портфель «Мемы»", "bal": "портфель «Сбалансированный»"}
@@ -36,26 +36,26 @@ OPTION_RU = {"r": "рискованные монеты", "d": "больше DeFi
 
 
 def connect_name(what: str) -> str:
-    """connect_capital_bold_r_d → «CRYPTO NOVA Портфолио · модель «Смелая» + рискованные монеты, больше DeFi-кредитования»."""
+    """connect_capital_bold_r_d → «CRYPTO NOVA AI Портфолио · модель «Смелая» + рискованные монеты, больше DeFi-кредитования»."""
     if what in CONNECT_NAMES:
         return CONNECT_NAMES[what]
     parts = what.split("_")
     if parts and parts[0] == "capital" and len(parts) > 1 and parts[1] in MODEL_RU:
         opts = [OPTION_RU[p] for p in parts[2:] if p in OPTION_RU]
-        return f"CRYPTO NOVA Портфолио · модель «{MODEL_RU[parts[1]]}»" + (" + " + ", ".join(opts) if opts else "")
-    return "стратегия CRYPTO NOVA"
+        return f"CRYPTO NOVA AI Портфолио · модель «{MODEL_RU[parts[1]]}»" + (" + " + ", ".join(opts) if opts else "")
+    return "стратегия CRYPTO NOVA AI"
 
 
 # 21.10 owner: «сосредоточимся просто на реферальной системе … 10% — потом, когда изучим юридическую часть» — no fee, no API keys,
 # no administrator: the person opens an exchange account (our partner link when web/app_config.json has one) and follows the app.
 CONNECT = ("Вы выбрали: <b>{name}</b>.\n\n"
-           "<b>Как начать работу с CRYPTO NOVA — около 15 минут.</b> Пошаговая инструкция:\n"
+           "<b>Как начать работу с CRYPTO NOVA AI — около 15 минут.</b> Пошаговая инструкция:\n"
            "1. Откройте счёт на бирже BingX{ref}. Счёт на ваше имя — деньги всегда у вас.\n"
            "2. Пройдите проверку личности (KYC) — так требует биржа.\n"
            "3. Пополните счёт в USDT на сумму, которую не страшно потерять.\n"
            "4. <b>Пришлите сюда свой UID</b> — номер счёта BingX: в приложении биржи нажмите на аватар, UID рядом с ним. "
-           "Я проверю, что счёт открыт по ссылке CRYPTO NOVA и пополнен, и отвечу. UID — не пароль: по нему нельзя войти в счёт.\n"
-           "5. Откройте в приложении CRYPTO NOVA портфель и сделки: у каждой сделки видны вход, стоп и цель — повторяйте их на своём счёте.\n\n"
+           "Я проверю, что счёт открыт по ссылке CRYPTO NOVA AI и пополнен, и отвечу. UID — не пароль: по нему нельзя войти в счёт.\n"
+           "5. Откройте в приложении CRYPTO NOVA AI портфель и сделки: у каждой сделки видны вход, стоп и цель — повторяйте их на своём счёте.\n\n"
            "Копирование сделок в один клик на BingX готовим: запустим, когда биржа письменно подтвердит программу. Кто прислал UID — узнает первым.\n"
            "Нужна помощь — напишите сюда, подскажем по шагам.\n\n"
            "Важно: торговля связана с риском, прошлый результат не гарантирует будущий.")
@@ -69,13 +69,13 @@ REGION_KB = {"keyboard": [[{"text": "Живу в ЕС"}, {"text": "Живу в �
 EU_RE = re.compile(r"(?i)^\s*(?:я\s+)?(?:живу\s+)?(?:в\s+)?(?:ЕС|EU|Евросоюзе?|Европе|Европа|Греции|Греция)\s*[.!]?\s*$")
 WORLD_RE = re.compile(r"(?i)^\s*(?:я\s+)?(?:живу\s+)?(?:в\s+)?(?:другой\s+стране|другая\s+страна|не\s+в\s+ЕС|вне\s+ЕС|other|Украине|Украина)\s*[.!]?\s*$")
 CONNECT_OKX = ("Вы выбрали: <b>{name}</b>. Вы живёте в ЕС — значит, биржа <b>OKX</b> (лицензия ЕС).\n\n"
-               "<b>Как начать работу с CRYPTO NOVA — около 15 минут.</b> Пошаговая инструкция:\n"
+               "<b>Как начать работу с CRYPTO NOVA AI — около 15 минут.</b> Пошаговая инструкция:\n"
                "1. Откройте счёт на OKX{ref}. Счёт на ваше имя — деньги всегда у вас.\n"
                "2. Пройдите проверку личности (KYC) — так требует биржа.\n"
                "3. Пополните счёт в USDC или евро (USDT в ЕС на OKX недоступен) на сумму, которую не страшно потерять.\n"
                "4. <b>Пришлите сюда свой UID</b> — номер счёта OKX: в приложении биржи откройте профиль, UID рядом с именем. "
                "UID — не пароль: по нему нельзя войти в счёт.\n"
-               "5. Откройте в приложении CRYPTO NOVA портфель и сделки: у каждой сделки видны вход, стоп и цель — повторяйте их на своём счёте. "
+               "5. Откройте в приложении CRYPTO NOVA AI портфель и сделки: у каждой сделки видны вход, стоп и цель — повторяйте их на своём счёте. "
                "Фьючерсы в ЕС на OKX называются X-Perps: плечо до 10x, около 20 пар, так что часть монет может быть недоступна; "
                "спот и портфель работают полностью.\n\n"
                "Нужна помощь — напишите сюда, подскажем по шагам.\n\n"
@@ -86,12 +86,12 @@ CONNECT_OKX = ("Вы выбрали: <b>{name}</b>. Вы живёте в ЕС �
 # Only the number is stored (bot_uids) — a UID is not a secret and gives no access to the account.
 UID_RE = re.compile(r"(?i)^\s*(?:bingx\s*)?(?:uid|юид|уид|айди|id)?\s*[:#№-]?\s*(\d{6,12})\s*$")
 UID_REPLY = {
-    "ok": "UID {uid} подтверждён: счёт открыт по ссылке CRYPTO NOVA и пополнен. Спасибо! Дальше — сделки и портфель в приложении CRYPTO NOVA. "
+    "ok": "UID {uid} подтверждён: счёт открыт по ссылке CRYPTO NOVA AI и пополнен. Спасибо! Дальше — сделки и портфель в приложении CRYPTO NOVA AI. "
           "Когда запустим копирование в один клик, напишу вам первым.",
-    "no_deposit": "Счёт {uid} открыт по ссылке CRYPTO NOVA, но пока не пополнен. Пополните его в {cur} и пришлите UID ещё раз — проверю снова.",
-    "not_invited": "Счёт {uid} открыт не по ссылке CRYPTO NOVA. Ничего менять не нужно: приложением можно пользоваться и так. "
+    "no_deposit": "Счёт {uid} открыт по ссылке CRYPTO NOVA AI, но пока не пополнен. Пополните его в {cur} и пришлите UID ещё раз — проверю снова.",
+    "not_invited": "Счёт {uid} открыт не по ссылке CRYPTO NOVA AI. Ничего менять не нужно: приложением можно пользоваться и так. "
                    "Если номер с ошибкой — пришлите UID ещё раз.",
-    "pending": "UID {uid} получен. Проверим вручную в течение 24 часов и ответим здесь. Пока можно открыть сделки и портфель в приложении CRYPTO NOVA.",
+    "pending": "UID {uid} получен. Проверим вручную в течение 24 часов и ответим здесь. Пока можно открыть сделки и портфель в приложении CRYPTO NOVA AI.",
 }
 
 
@@ -159,7 +159,7 @@ class Mailbox:
 
     def channel_event(self, mcm: dict, owner_username: str | None) -> str | None:
         """19.10: the owner adds the bot as an admin to a private channel with «signal» / «сигнал» in its title → that channel
-        becomes the CRYPTO NOVA signals channel (signal_feed.py posts there). Only when the OWNER added it (his user id or
+        becomes the CRYPTO NOVA AI signals channel (signal_feed.py posts there). Only when the OWNER added it (his user id or
         username), never the news channel (CNQ_TG_CHAT / @crypto_nova_news). Removing the bot switches it off. → a note for the owner."""
         chat = mcm.get("chat") or {}
         new = (mcm.get("new_chat_member") or {}).get("status")
@@ -180,10 +180,10 @@ class Mailbox:
             return None
         self.set_meta("signals_chat", str(cid))
         self.set_meta("signals_chat_title", title)
-        return f"Канал «{title}» подключён: новые сигналы CRYPTO NOVA (вход, стоп, цели и «Close» при выходе) будут приходить туда."
+        return f"Канал «{title}» подключён: новые сигналы CRYPTO NOVA AI (вход, стоп, цели и «Close» при выходе) будут приходить туда."
 
     def title_ok(self, title: str) -> bool:
-        """19.10: the owner's channel is «CRYPTO NOVA FUTURES» — a title with signals / futures (any language), or ANY channel of
+        """19.10: the owner's channel is «CRYPTO NOVA AI FUTURES» — a title with signals / futures (any language), or ANY channel of
         the owner while no signals channel is connected yet (the owner is always checked; the news channel never qualifies)."""
         return bool(re.search(r"(?i)signal|сигнал|futures|фьючерс", title)) or not self.meta("signals_chat")
 
@@ -211,7 +211,7 @@ class Mailbox:
             return None
         self.set_meta("signals_chat", str(cid))
         self.set_meta("signals_chat_title", title)
-        return f"Канал «{title}» подключён: новые сигналы CRYPTO NOVA (вход, стоп, цели и «Close» при выходе) и портфель будут приходить туда."
+        return f"Канал «{title}» подключён: новые сигналы CRYPTO NOVA AI (вход, стоп, цели и «Close» при выходе) и портфель будут приходить туда."
 
     def owner_chat(self, owner_username: str | None) -> int | None:
         if owner_username:
@@ -275,7 +275,7 @@ class Mailbox:
             except Exception:  # noqa: BLE001
                 ex = None
             exn = "OKX" if ex == "okx" else "BingX"
-            ru = {"ok": "подтверждён (по ссылке CRYPTO NOVA, пополнен)", "no_deposit": "по нашей ссылке, но не пополнен",
+            ru = {"ok": "подтверждён (по ссылке CRYPTO NOVA AI, пополнен)", "no_deposit": "по нашей ссылке, но не пополнен",
                   "not_invited": "открыт не по нашей ссылке",
                   "pending": f"нужна ручная проверка в партнёрском кабинете {exn} (ключ партнёра не подключён)"}
             try:
@@ -432,7 +432,7 @@ def run(conn: sqlite3.Connection, llm=None, token: str | None = None, owner: str
         if llm is None:
             return None
         try:
-            out = llm.complete("Ты — ассистент платформы CRYPTO NOVA (AI-система оценки и анализа крипторынка). Отвечай по-русски коротко, дружелюбно и по делу, "
+            out = llm.complete("Ты — ассистент платформы CRYPTO NOVA AI (AI-система оценки и анализа крипторынка). Отвечай по-русски коротко, дружелюбно и по делу, "
                                "3–5 предложений. Не давай торговых рекомендаций по конкретным сделкам и не называй цен или чисел, которых нет в вопросе. "
                                "Если спрашивают о доступе к платформе — скажи, что доступ откроется скоро, человек в списке. Канал: @crypto_nova_news.", text)
             return (out or "").strip()[:1500] or None

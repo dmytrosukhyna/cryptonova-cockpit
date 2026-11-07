@@ -482,7 +482,7 @@ def system_plan(ctx: dict, regime: dict, price: float | None) -> dict | None:
     if high20:
         L.append(lv("high20", "Максимум 20 дней", high20, [
             # own_desk rule C: close above the previous 20-day high and the 20-day average, regime «рост», day volume ≥ 1.5× — demo
-            {"text_ru": "Закрытие выше → «Сигналы CRYPTO NOVA» (демо) покупают пробой 20 дней, только в «рост» и при объёме дня от 1.5×.",
+            {"text_ru": "Закрытие выше → «Сигналы CRYPTO NOVA AI» (демо) покупают пробой 20 дней, только в «рост» и при объёме дня от 1.5×.",
              "src": "cnq/agents/own_desk.py rule C"},
             # paper_desk.signals class C makes a SHORT at a resistance zone in any regime (stop zone + 0.25 ATR), but no PROFILES desk trades C
             {"text_ru": "Шорт от сопротивления в коде есть, но ни один счёт его не торгует — основной счёт только покупает.",
@@ -498,7 +498,7 @@ def system_plan(ctx: dict, regime: dict, price: float | None) -> dict | None:
             {"text_ru": "Фьючерсы: откупы паники и каскадов идут в любом режиме (запрет лонгов альтов — только у неторгуемых правил "
                         "«у уровня» и «ретест»).", "src": "cnq/agents/paper_desk.py signals()"},
             # turbo_desk.step (btcx → dollars), own_desk (buys only in «рост»), sweep_desk.step (bull is not True → no entry)
-            {"text_ru": "«Турбо · BTC ×2» уходит в доллары; «Сигналы CRYPTO NOVA» и «Ложный пробой» не покупают.",
+            {"text_ru": "«Турбо · BTC ×2» уходит в доллары; «Сигналы CRYPTO NOVA AI» и «Ложный пробой» не покупают.",
              "src": "cnq/agents/turbo_desk.py; cnq/agents/own_desk.py; cnq/agents/sweep_desk.py"},
         ], note))
     always = [

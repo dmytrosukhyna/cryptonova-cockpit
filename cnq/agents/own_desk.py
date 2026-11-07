@@ -1,4 +1,4 @@
-"""«Сигналы CRYPTO NOVA» — our own daily signals with a steady flow, a $10 000 demo desk (19.10.2026, owner: «нам нужны
+"""«Сигналы CRYPTO NOVA AI» — our own daily signals with a steady flow, a $10 000 demo desk (19.10.2026, owner: «нам нужны
 собственные сигналы … нужно движение, сигналы должны быть»; «почему мы не будем открывать ничего без резкого пролива?»).
 
 Evidence (scripts/own_signals_study.py, Binance USDT-M daily candles 2022-01 → 2026-10, costs 0.14 % a trade + 0.02 % a day):
@@ -76,7 +76,7 @@ VOL_MIN, VOL_DAYS = 1.5, 30        # 19.10 rounds 6–8: the signal day's dollar
 FEE = 0.0007                      # 0.05 % taker + 0.02 % slippage, per side
 HOLD = {"P": 10, "C": 14}
 DAY = 86_400_000
-NAME = "Сигналы CRYPTO NOVA"
+NAME = "Сигналы CRYPTO NOVA AI"
 RULE_RU = {"P": "откат в тренде", "C": "пробой 20 дней"}
 # 20.10 (owner: «хотелось бы видеть более серьёзное объяснение, почему мы вошли в сделку»): the conditions a coin has to meet —
 # counted in the daily scan («проверила 40 монет по 8 условиям») and shown per trade in the app (app_home.py)

@@ -103,7 +103,7 @@ DESKS = {
     "imps": {"dd": 12, "en": "Active spot · BTC impulse", "ev": "partial"},
     "exp": {"dd": None, "en": "Swing", "ev": "in_sample"},
     "lst": {"dd": 30, "en": "Listing short", "ev": "in_sample"},
-    "own": {"dd": 23, "en": "CRYPTO NOVA signals", "ev": "partial"},
+    "own": {"dd": 23, "en": "CRYPTO NOVA AI signals", "ev": "partial"},
     "lsn": {"dd": 25, "en": "Neutral basket", "ev": "in_sample"},
     "lstx": {"dd": 56, "en": "Turbo · listing short ×4", "ev": "in_sample", "mirror_of": "lst"},
     "btcx": {"dd": 69, "en": "Turbo · BTC ×2 in uptrend", "ev": "in_sample", "holding": True},

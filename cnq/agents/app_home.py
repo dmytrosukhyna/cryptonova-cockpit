@@ -1,10 +1,10 @@
-"""One small feed for the CRYPTO NOVA 2.0 app (19.10.2026, owner: «приложение — быстрая сводка, как Apple Watch; всё должно
+"""One small feed for the CRYPTO NOVA AI 2.0 app (19.10.2026, owner: «приложение — быстрая сводка, как Apple Watch; всё должно
 работать по-настоящему»).
 
 web/app_home.json (https://cryptonova.vip/app_home.json, on the server every minute) — everything the 2.0 home, futures and
 spot tabs show, already in plain numbers so the app never recomputes the engine:
   total: earned since the demo start, split by source (futures = the average CNPTS $10 000 account — cons/bal/aggr trade the
-         same signals at three sizes; spot = the CRYPTO NOVA portfolio per $10 000);
+         same signals at three sizes; spot = the CRYPTO NOVA AI portfolio per $10 000);
   curve: both sources over time (≤ 60 points); futures: result, today, trades, worst dip, open trades with stop/entry/now/target
          and a plain «why», last closed trades; spot: allocation groups, per-coin change since purchase, last action;
   market: bitcoin price and 24 h change, fear & greed, regime (BTC above its 200-day average = «рост»).
@@ -283,7 +283,7 @@ def _scan_text(sc: dict, now: int | None, lang: str = DEFAULT) -> str | None:
 
 
 def _scan(sc: dict | None, now: int | None, lang: str = DEFAULT) -> dict | None:
-    """futures.scan — today's (the last) daily scan of «Сигналы CRYPTO NOVA», real counters only"""
+    """futures.scan — today's (the last) daily scan of «Сигналы CRYPTO NOVA AI», real counters only"""
     if not isinstance(sc, dict) or not sc.get("coins"):
         return None
     return {"coins": sc.get("coins"), "checks": sc.get("checks"), "passed": sc.get("passed"), "signals": sc.get("signals"),
@@ -398,7 +398,7 @@ nova_keys, _base_d0, _fut_eq = ph.nova_keys, ph.base_d0, ph.fut_eq
 
 
 def nova_result(prof: dict, now: int, sel: dict | None = None) -> tuple[float, list[tuple[int, float]]]:
-    """(the CRYPTO NOVA account's $ result now, its curve [(t, $)] from 18.10 ending with the live point); sel = web/desk_select.json"""
+    """(the CRYPTO NOVA AI account's $ result now, its curve [(t, $)] from 18.10 ending with the live point); sel = web/desk_select.json"""
     keys = nova_keys(prof, sel)
     if not keys:
         return 0.0, []
@@ -846,7 +846,7 @@ def _engine_facts(out: str) -> dict:
 
 
 CONNECT_STATES = ("not_started", "action_on_exchange", "waiting", "confirmed", "error", "unverifiable")
-CONNECT_VERIFIABLE = False        # CRYPTO NOVA has no technical link to a user's OKX account (no API key, no OKX copier list)
+CONNECT_VERIFIABLE = False        # CRYPTO NOVA AI has no technical link to a user's OKX account (no API key, no OKX copier list)
 
 
 def connect_states(lang: str = DEFAULT) -> dict:
@@ -941,7 +941,7 @@ def btc_daily(conn: sqlite3.Connection | None, out: str) -> dict:
 
 def _public_portfolio(out: str) -> dict | None:
     """The public portfolio of the app (owner 20.10: «нашу лучшую версию… полностью распределить $10 000, как на практике»):
-    «CRYPTO NOVA Портфолио», its main «balanced» model (web/capital.json) — one $10 000 demo account spread over 7 sources
+    «CRYPTO NOVA AI Портфолио», its main «balanced» model (web/capital.json) — one $10 000 demo account spread over 7 sources
     by the regime allocator. curve = $ earned since the start. None while capital.json is missing → the app falls back to
     the two $10 000 demo accounts (futures + spot)."""
     c = _load(out, "capital.json")
@@ -971,7 +971,7 @@ _MON_EN = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
 
 
 def _pipeline(out: str, now: int) -> tuple[dict | None, int | None]:
-    """web/spot_pipeline.json (cnq/agents/vip_feeds.py): ({sym: the coin's stage on its way from the spot table to the CRYPTO NOVA
+    """web/spot_pipeline.json (cnq/agents/vip_feeds.py): ({sym: the coin's stage on its way from the spot table to the CRYPTO NOVA AI
     portfolio and the real OKX account}, its asof); (None, None) when missing or older than 3 hours (nothing is guessed then)"""
     d = _load(out, "spot_pipeline.json")
     if not isinstance(d.get("coins"), list) or not isinstance(d.get("asof"), (int, float)) or now - d["asof"] > PIPE_STALE_MS:
@@ -1883,7 +1883,7 @@ def build(paper: dict, pf: dict, mk: dict, out: str, now: int, lang: str = DEFAU
 
 
 def _polished(doc: dict, lang: str) -> dict:
-    """28.10 (build 46 QA): every text of the feed as the app shows it — «CRYPTO NOVA» never wraps, the true minus, and the
+    """28.10 (build 46 QA): every text of the feed as the app shows it — «CRYPTO NOVA AI» never wraps, the true minus, and the
     language's own decimal comma and thousands space (i18n.polish); the spoken report's key follows its final text"""
     from .i18n import polish_doc
     d = polish_doc(doc, lang)

@@ -27,7 +27,7 @@ def test_channel_templates_slots_and_guard():
     tmp = tempfile.mkdtemp(); _web(tmp)
     conn = sqlite3.connect(":memory:"); ch = channel.Channel(conn, tmp)
     m = ch.post("morning")
-    assert "Доброе утро, дорогие подписчики" in m and "$80 984" in m and "Вывод CRYPTO NOVA" in m and "http" not in m
+    assert "Доброе утро, дорогие подписчики" in m and "$80 984" in m and "Вывод CRYPTO NOVA AI" in m and "http" not in m
     n = ch.post("news1")
     assert n and "Приток в ETF" in n and "Mock one" not in n and 'href="https://www.coindesk.com/x"' in n and "CoinDesk" in n
     sent = []
@@ -111,10 +111,10 @@ def test_lint_allows_repeated_bold_values_but_not_repeated_sections():
 def test_news_post_may_not_claim_a_fall_the_market_does_not_show():
     from cnq.agents.channel import Channel
     C = Channel.__new__(Channel)
-    txt = "<b>Вывод CRYPTO NOVA:</b>\nСистема фиксирует падение. Страх приводит к массовой продаже, давление ощущается на биткоине."
+    txt = "<b>Вывод CRYPTO NOVA AI:</b>\nСистема фиксирует падение. Страх приводит к массовой продаже, давление ощущается на биткоине."
     assert any("нет падения" in p for p in C.lint(txt, {"btc": {"chg24": "+0.4%"}}))
     assert not any("нет падения" in p for p in C.lint(txt, {"btc": {"chg24": "-3.2%"}}))
-    ok = "<b>Вывод CRYPTO NOVA:</b>\nНовость может добавить осторожности, но на цене это пока не видно."
+    ok = "<b>Вывод CRYPTO NOVA AI:</b>\nНовость может добавить осторожности, но на цене это пока не видно."
     assert not any("падения" in p for p in C.lint(ok, {"btc": {"chg24": "+0.4%"}}))
     n = {"title": "Китайский подозреваемый в $75 млн крипто‑преступной сети арестован в Бангкоке", "strength": "3/5"}
     assert Channel.minor_enforcement(n, {"title_en": "Chinese suspect in $75M crime network arrested"})
@@ -147,7 +147,7 @@ def test_posts_show_levels_not_scenarios():
 def test_deals_plural_and_caption_fit():
     from cnq.terminal.notify import fit_caption
     assert [channel.Channel._deals(n) for n in (1, 3, 9, 11, 21, 25)] == ["1 сделку", "3 сделки", "9 сделок", "11 сделок", "21 сделку", "25 сделок"]
-    post = "<b>Итоги дня</b>\n\n" + "\n".join(f"— строка <b>{i}</b>" for i in range(60)) + "\n\n<b>Вывод CRYPTO NOVA</b>\nДолгосрочный тренд биткоина вверх."
+    post = "<b>Итоги дня</b>\n\n" + "\n".join(f"— строка <b>{i}</b>" for i in range(60)) + "\n\n<b>Вывод CRYPTO NOVA AI</b>\nДолгосрочный тренд биткоина вверх."
     assert len(post) > 1024 >= len(__import__("re").sub(r"<[^>]+>", "", post))
     assert fit_caption(post) == post                                                   # tags don't count: nothing is cut
     long = post + "\n\n" + "я" * 400
@@ -262,7 +262,7 @@ def _closed_trade_body():
     assert len(out) == 2 and not any("SOL" in t or "XRP" in t for _, t in out)
     t_loss, t_win = out[0][1], out[1][1]
     d = now.strftime("%d.%m.%Y")
-    assert f"<b>Сделка закрыта · {d}</b>" in t_win and "<b>+$19 (+9.6%)</b>" in t_win and "Реальный счёт CRYPTO NOVA на OKX" in t_win
+    assert f"<b>Сделка закрыта · {d}</b>" in t_win and "<b>+$19 (+9.6%)</b>" in t_win and "Реальный счёт CRYPTO NOVA AI на OKX" in t_win
     assert "Демо" not in t_win and "<b>−$0.78 (−2.3%)</b>" in t_loss
     assert "в плюсе 2" in t_win and "+$18" in t_win
     assert len(photos) == 2 or len(sent) == 2                                # picture card when Pillow is there, text otherwise
@@ -275,6 +275,6 @@ def _closed_trade_body():
     dr = ch.day_result(ch.ctx())
     assert dr["total"] == "+$51" and dr["futures"] == "+$17" and dr["spot"] == "+$33" and dr["futures_trades_closed"] == 2
     ev = ch.post("evening", now=now.replace(hour=21, minute=40))
-    assert "<b>Сделки за день (реальный счёт OKX):</b>" in ev and ev.index("Сделки за день") < ev.index("Вывод CRYPTO NOVA")
-    assert "−$212" not in ev and "−$213" not in ev and "реальный счёт CRYPTO NOVA на OKX" in ev
+    assert "<b>Сделки за день (реальный счёт OKX):</b>" in ev and ev.index("Сделки за день") < ev.index("Вывод CRYPTO NOVA AI")
+    assert "−$212" not in ev and "−$213" not in ev and "реальный счёт CRYPTO NOVA AI на OKX" in ev
     assert ch.lint(ev, {}) == []

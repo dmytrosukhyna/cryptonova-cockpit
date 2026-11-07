@@ -98,11 +98,11 @@ T: dict[str, dict[str, str]] = {
         "el": "Το bitcoin ανέβηκε απότομα, αυτό το νόμισμα όχι ακόμη — ιστορικά τα altcoins πιο συχνά ακολουθούν το άλμα του BTC.",
         "es": "Bitcoin subió de golpe y esta moneda todavía no: en el histórico, las altcoins alcanzan más a menudo el impulso de BTC."},
     "why.default": {
-        "ru": "Сделка по правилам CRYPTO NOVA: вход, стоп и цель заданы заранее.",
-        "en": "A trade by CRYPTO NOVA's rules: entry, stop and target are set in advance.",
-        "uk": "Угода за правилами CRYPTO NOVA: вхід, стоп і ціль задано заздалегідь.",
-        "el": "Συναλλαγή με τους κανόνες του CRYPTO NOVA: είσοδος, stop και στόχος ορίζονται εκ των προτέρων.",
-        "es": "Una operación según las reglas de CRYPTO NOVA: entrada, stop y objetivo fijados de antemano."},
+        "ru": "Сделка по правилам CRYPTO NOVA AI: вход, стоп и цель заданы заранее.",
+        "en": "A trade by CRYPTO NOVA AI's rules: entry, stop and target are set in advance.",
+        "uk": "Угода за правилами CRYPTO NOVA AI: вхід, стоп і ціль задано заздалегідь.",
+        "el": "Συναλλαγή με τους κανόνες του CRYPTO NOVA AI: είσοδος, stop και στόχος ορίζονται εκ των προτέρων.",
+        "es": "Una operación según las reglas de CRYPTO NOVA AI: entrada, stop y objetivo fijados de antemano."},
     "why.vol": {"ru": " Объём дня сигнала — ×{vol} к обычному.", "en": " The signal day's volume was ×{vol} the usual.",
                 "uk": " Обсяг дня сигналу — ×{vol} до звичайного.", "el": " Ο όγκος της ημέρας του σήματος ήταν ×{vol} του συνηθισμένου.",
                 "es": " El volumen del día de la señal fue ×{vol} el habitual."},
@@ -111,11 +111,11 @@ T: dict[str, dict[str, str]] = {
     "src.bal": {"ru": "основная стратегия", "en": "main strategy", "uk": "основна стратегія", "el": "κύρια στρατηγική",
                 "es": "estrategia principal"},
     "src.imp": {"ru": "импульс BTC", "en": "BTC momentum", "uk": "імпульс BTC", "el": "ορμή BTC", "es": "impulso de BTC"},
-    "src.own": {"ru": "сигналы CRYPTO NOVA", "en": "CRYPTO NOVA signals", "uk": "сигнали CRYPTO NOVA", "el": "σήματα CRYPTO NOVA",
-                "es": "señales de CRYPTO NOVA"},
+    "src.own": {"ru": "сигналы CRYPTO NOVA AI", "en": "CRYPTO NOVA AI signals", "uk": "сигнали CRYPTO NOVA AI", "el": "σήματα CRYPTO NOVA AI",
+                "es": "señales de CRYPTO NOVA AI"},
     "src.lst": {"ru": "шорт листингов", "en": "listing shorts", "uk": "шорт лістингів", "el": "short σε νέες εισαγωγές",
                 "es": "shorts de listados"},
-    "src.default": {"ru": "CRYPTO NOVA", "en": "CRYPTO NOVA", "uk": "CRYPTO NOVA", "el": "CRYPTO NOVA", "es": "CRYPTO NOVA"},
+    "src.default": {"ru": "CRYPTO NOVA AI", "en": "CRYPTO NOVA AI", "uk": "CRYPTO NOVA AI", "el": "CRYPTO NOVA AI", "es": "CRYPTO NOVA AI"},
     # the rules (Russian = signal_feed.RULE_RU, the Telegram names)
     "rule.A": {"ru": "откуп гэпа", "en": "gap buy", "uk": "викуп гепу", "el": "αγορά στο κενό τιμής", "es": "compra del gap"},
     "rule.B": {"ru": "откуп каскада ликвидаций", "en": "liquidation cascade buy", "uk": "викуп каскаду ліквідацій",
@@ -498,11 +498,11 @@ T: dict[str, dict[str, str]] = {
     "status.last": {"ru": " Последняя сделка: {sym}, {pnl}, {d}.", "en": " Last trade: {sym}, {pnl}, {d}.",
                     "uk": " Остання угода: {sym}, {pnl}, {d}.", "el": " Τελευταία συναλλαγή: {sym}, {pnl}, {d}.",
                     "es": " Última operación: {sym}, {pnl}, {d}."},
-    "status.other": {"ru": " В работе {n} {trades} других сигналов CRYPTO NOVA.",
-                     "en": " Other CRYPTO NOVA signals in progress: {n} {trades}.",
-                     "uk": " У роботі {n} {trades} інших сигналів CRYPTO NOVA.",
-                     "el": " Σε εξέλιξη {n} {trades} άλλων σημάτων του CRYPTO NOVA.",
-                     "es": " En curso: {n} {trades} de otras señales de CRYPTO NOVA."},
+    "status.other": {"ru": " В работе {n} {trades} других сигналов CRYPTO NOVA AI.",
+                     "en": " Other CRYPTO NOVA AI signals in progress: {n} {trades}.",
+                     "uk": " У роботі {n} {trades} інших сигналів CRYPTO NOVA AI.",
+                     "el": " Σε εξέλιξη {n} {trades} άλλων σημάτων του CRYPTO NOVA AI.",
+                     "es": " En curso: {n} {trades} de otras señales de CRYPTO NOVA AI."},
     "futures.about": {"ru": "Один демо-счёт $10 000 по настоящим ценам: система сама делит его между проверенными стратегиями. "
                             "Сделки «в проверке» войдут в итог после 30 закрытых сделок.",
                       "en": "One $10 000 demo account at real prices: the system splits it between proven strategies itself. "
@@ -555,12 +555,12 @@ T: dict[str, dict[str, str]] = {
     "buy.grade.possible": {"ru": "можно рассмотреть", "en": "possible", "uk": "можливий", "el": "πιθανός", "es": "posible"},
     "sources.soon": {"ru": "арбитраж, рынки прогнозов", "en": "arbitrage, prediction markets", "uk": "арбітраж, ринки прогнозів",
                      "el": "αρμπιτράζ, αγορές προβλέψεων", "es": "arbitraje, mercados de predicción"},
-    "home.note": {"ru": "Демо-счета CRYPTO NOVA. Прошлые результаты не гарантируют будущих. Не финансовый совет.",
-                  "en": "CRYPTO NOVA demo accounts. Past results don't guarantee future ones. Not financial advice.",
-                  "uk": "Демо-рахунки CRYPTO NOVA. Минулі результати не гарантують майбутніх. Не фінансова порада.",
-                  "el": "Λογαριασμοί demo του CRYPTO NOVA. Οι προηγούμενες αποδόσεις δεν εγγυώνται τις μελλοντικές. Δεν "
+    "home.note": {"ru": "Демо-счета CRYPTO NOVA AI. Прошлые результаты не гарантируют будущих. Не финансовый совет.",
+                  "en": "CRYPTO NOVA AI demo accounts. Past results don't guarantee future ones. Not financial advice.",
+                  "uk": "Демо-рахунки CRYPTO NOVA AI. Минулі результати не гарантують майбутніх. Не фінансова порада.",
+                  "el": "Λογαριασμοί demo του CRYPTO NOVA AI. Οι προηγούμενες αποδόσεις δεν εγγυώνται τις μελλοντικές. Δεν "
                         "αποτελεί επενδυτική συμβουλή.",
-                  "es": "Cuentas demo de CRYPTO NOVA. Los resultados pasados no garantizan los futuros. No es asesoramiento "
+                  "es": "Cuentas demo de CRYPTO NOVA AI. Los resultados pasados no garantizan los futuros. No es asesoramiento "
                         "financiero."},
 
     # ---------------------------------------------------------------- the spot portfolio's last action (spot.last_action.text)
@@ -716,45 +716,45 @@ T: dict[str, dict[str, str]] = {
                            "πυρήνα στις πτώσεις.",
                      "es": "El sistema siempre guarda al menos el 10% de la cartera en dólares: con ellos refuerza el núcleo en "
                            "las caídas."},
-    "pub.why.spot": {"ru": "Спот — портфель CRYPTO NOVA, без плеча. Ядро — биткоин 30%, эфир 10%, солана 5% — держим долго; монеты "
+    "pub.why.spot": {"ru": "Спот — портфель CRYPTO NOVA AI, без плеча. Ядро — биткоин 30%, эфир 10%, солана 5% — держим долго; монеты "
                            "которые проходят проверки системы, — по 7,5% со стопом −20%; рискованные — по 2,5%; не меньше 10% — "
                            "в долларах. Всего не больше 8 монет вместе с ядром. Ещё 10% счёта — дополнительное ядро: BTC, ETH и SOL в тех же "
                            "пропорциях 30 / 10 / 5.",
-                     "en": "Spot is the CRYPTO NOVA portfolio, with no leverage. The core — Bitcoin 30%, Ether 10%, Solana 5% — is "
+                     "en": "Spot is the CRYPTO NOVA AI portfolio, with no leverage. The core — Bitcoin 30%, Ether 10%, Solana 5% — is "
                            "held for the long run; coins the table marks «can buy» get 7.5% each with a −20% stop; risky ones "
                            "2.5% each; at least 10% stays in dollars. At most 8 coins including the core. Another 10% of the account is extra "
                            "core: BTC, ETH and SOL in the same 30 / 10 / 5 proportions.",
-                     "uk": "Спот — портфель CRYPTO NOVA, без плеча. Ядро — біткоїн 30%, ефір 10%, солана 5% — тримаємо довго; "
+                     "uk": "Спот — портфель CRYPTO NOVA AI, без плеча. Ядро — біткоїн 30%, ефір 10%, солана 5% — тримаємо довго; "
                            "монети з позначкою таблиці «можна брати» — по 7,5% зі стопом −20%; ризикові — по 2,5%; щонайменше "
                            "10% — у доларах. Усього не більше 8 монет разом з ядром. Ще 10% рахунку — додаткове ядро: BTC, ETH і SOL у тих "
                            "самих пропорціях 30 / 10 / 5.",
-                     "el": "Το spot είναι το χαρτοφυλάκιο του CRYPTO NOVA, χωρίς μόχλευση. Ο πυρήνας — Bitcoin 30%, Ether 10%, "
+                     "el": "Το spot είναι το χαρτοφυλάκιο του CRYPTO NOVA AI, χωρίς μόχλευση. Ο πυρήνας — Bitcoin 30%, Ether 10%, "
                            "Solana 5% — κρατιέται μακροπρόθεσμα· τα νομίσματα που ο πίνακας σημειώνει «μπορούμε να αγοράσουμε» "
                            "παίρνουν 7,5% το καθένα με stop −20%· τα ριψοκίνδυνα 2,5%· τουλάχιστον 10% μένει σε δολάρια. Έως "
                            "8 νομίσματα μαζί με τον πυρήνα. Ακόμη 10% του λογαριασμού είναι επιπλέον πυρήνας: BTC, ETH και SOL στις ίδιες "
                            "αναλογίες 30 / 10 / 5.",
-                     "es": "El spot es la cartera de CRYPTO NOVA, sin apalancamiento. El núcleo —Bitcoin 30%, Ether 10%, Solana "
+                     "es": "El spot es la cartera de CRYPTO NOVA AI, sin apalancamiento. El núcleo —Bitcoin 30%, Ether 10%, Solana "
                            "5%— se mantiene a largo plazo; las monedas que la tabla marca «se puede comprar» llevan un 7,5% cada "
                            "una con stop en −20%; las arriesgadas, un 2,5%; al menos un 10% queda en dólares. Como máximo 8 "
                            "monedas con el núcleo. Otro 10% de la cuenta es núcleo adicional: BTC, ETH y SOL en las mismas "
                            "proporciones 30 / 10 / 5."},
-    "pub.why.futures": {"ru": "Фьючерсы — отобранные сигналы CRYPTO NOVA: в счёт идут только стратегии, прошедшие проверку на "
+    "pub.why.futures": {"ru": "Фьючерсы — отобранные сигналы CRYPTO NOVA AI: в счёт идут только стратегии, прошедшие проверку на "
                               "истории. У каждой сделки есть стоп; риск — {risk}% фьючерсного бюджета на сделку, у основной стратегии не больше "
                               "{max_open} сделок одновременно. Минус тоже бывает: "
                               "убыточную сделку закрывает стоп.",
-                        "en": "Futures are CRYPTO NOVA's selected signals: only strategies that passed the test on history trade "
+                        "en": "Futures are CRYPTO NOVA AI's selected signals: only strategies that passed the test on history trade "
                               "this account. Every trade has a stop; the risk is {risk}% of the futures budget per trade, and the main "
                               "strategy holds no more than {max_open} trades at once. Losses happen too: the stop closes a losing trade.",
-                        "uk": "Ф’ючерси — відібрані сигнали CRYPTO NOVA: у рахунок ідуть лише стратегії, що пройшли перевірку на "
+                        "uk": "Ф’ючерси — відібрані сигнали CRYPTO NOVA AI: у рахунок ідуть лише стратегії, що пройшли перевірку на "
                               "історії. У кожної угоди є стоп; ризик — {risk}% ф’ючерсного бюджету на угоду, в основної стратегії не більше "
                               "{max_open} угод одночасно. Мінус теж буває: збиткову "
                               "угоду закриває стоп.",
-                        "el": "Τα futures είναι τα επιλεγμένα σήματα του CRYPTO NOVA: στον λογαριασμό μπαίνουν μόνο στρατηγικές "
+                        "el": "Τα futures είναι τα επιλεγμένα σήματα του CRYPTO NOVA AI: στον λογαριασμό μπαίνουν μόνο στρατηγικές "
                               "που πέρασαν τον έλεγχο στο ιστορικό. Κάθε συναλλαγή έχει stop· το ρίσκο είναι {risk}% του "
                               "προϋπολογισμού για futures ανά συναλλαγή και η κύρια στρατηγική κρατά έως {max_open} συναλλαγές ταυτόχρονα. "
                               "Συμβαίνουν και απώλειες: τη "
                               "ζημιογόνα συναλλαγή την κλείνει το stop.",
-                        "es": "Los futuros son las señales seleccionadas de CRYPTO NOVA: en la cuenta solo operan estrategias que "
+                        "es": "Los futuros son las señales seleccionadas de CRYPTO NOVA AI: en la cuenta solo operan estrategias que "
                               "pasaron la prueba con el histórico. Cada operación tiene stop; el riesgo es el {risk}% del presupuesto de "
                               "futuros por operación, y la estrategia principal no tiene más de {max_open} operaciones a la vez. "
                               "También hay pérdidas: el "
@@ -779,9 +779,9 @@ T: dict[str, dict[str, str]] = {
 
     # ---------------------------------------------------------------- build 46 (28.10): app_home "public_portfolio" — the PUBLIC mode
     # = the real CRYPTO NOVA account on OKX since 22.10 (web/public_real.json), its allocation, spot / futures parts and real actions
-    "pp.title": {"ru": "Публичный портфель CRYPTO NOVA", "en": "CRYPTO NOVA public portfolio", "uk": "Публічний портфель CRYPTO NOVA",
-                 "el": "Δημόσιο χαρτοφυλάκιο CRYPTO NOVA", "es": "Cartera pública de CRYPTO NOVA"},
-    "pp.note": {"ru": "Реальный счёт CRYPTO NOVA на OKX. История начинается {d}, стартовый капитал {usd}. Фьючерсы и спот ведёт система CRYPTO NOVA AI. Прошлый результат не гарантирует будущий.", "en": "CRYPTO NOVA's real account on OKX. The history starts on {d} with a starting capital of {usd}. Futures and spot are run by the CRYPTO NOVA AI system. Past results don't guarantee future ones.", "uk": "Реальний рахунок CRYPTO NOVA на OKX. Історія починається {d}, стартовий капітал {usd}. Ф'ючерси і спот веде система CRYPTO NOVA AI. Минулий результат не гарантує майбутнього.", "el": "Ο πραγματικός λογαριασμός του CRYPTO NOVA στο OKX. Το ιστορικό ξεκινά στις {d} με αρχικό κεφάλαιο {usd}. Τα futures και το spot τα διαχειρίζεται το σύστημα CRYPTO NOVA AI. Οι προηγούμενες αποδόσεις δεν εγγυώνται τις μελλοντικές.", "es": "La cuenta real de CRYPTO NOVA en OKX. El historial empieza el {d} con un capital inicial de {usd}. Los futuros y el spot los lleva el sistema CRYPTO NOVA AI. Los resultados pasados no garantizan los futuros."},
+    "pp.title": {"ru": "Публичный портфель CRYPTO NOVA AI", "en": "CRYPTO NOVA AI public portfolio", "uk": "Публічний портфель CRYPTO NOVA AI",
+                 "el": "Δημόσιο χαρτοφυλάκιο CRYPTO NOVA AI", "es": "Cartera pública de CRYPTO NOVA AI"},
+    "pp.note": {"ru": "Реальный счёт CRYPTO NOVA AI на OKX. История начинается {d}, стартовый капитал {usd}. Фьючерсы и спот ведёт система CRYPTO NOVA AI. Прошлый результат не гарантирует будущий.", "en": "CRYPTO NOVA AI's real account on OKX. The history starts on {d} with a starting capital of {usd}. Futures and spot are run by the CRYPTO NOVA AI system. Past results don't guarantee future ones.", "uk": "Реальний рахунок CRYPTO NOVA AI на OKX. Історія починається {d}, стартовий капітал {usd}. Ф'ючерси і спот веде система CRYPTO NOVA AI. Минулий результат не гарантує майбутнього.", "el": "Ο πραγματικός λογαριασμός του CRYPTO NOVA AI στο OKX. Το ιστορικό ξεκινά στις {d} με αρχικό κεφάλαιο {usd}. Τα futures και το spot τα διαχειρίζεται το σύστημα CRYPTO NOVA AI. Οι προηγούμενες αποδόσεις δεν εγγυώνται τις μελλοντικές.", "es": "La cuenta real de CRYPTO NOVA AI en OKX. El historial empieza el {d} con un capital inicial de {usd}. Los futuros y el spot los lleva el sistema CRYPTO NOVA AI. Los resultados pasados no garantizan los futuros."},
     "pp.stale": {"ru": "Данные могли устареть: показываем последние подтверждённые цифры счёта.",
                  "en": "The data may be out of date: these are the account's last confirmed numbers.",
                  "uk": "Дані могли застаріти: показуємо останні підтверджені цифри рахунку.",
@@ -806,11 +806,11 @@ T: dict[str, dict[str, str]] = {
                  "uk": "Поповнення й виведення не рахуються результатом: {usd}.",
                  "el": "Οι καταθέσεις και οι αναλήψεις δεν μετράνε ως αποτέλεσμα: {usd}.",
                  "es": "Los depósitos y retiros no cuentan como resultado: {usd}."},
-    "pub.why.fut_rec": {"ru": "Реальный счёт CRYPTO NOVA с {since}: закрыто фьючерсных сделок — {n}, из них в плюсе {w}.",
-                        "en": "CRYPTO NOVA's real account since {since}: {n} futures trades closed, {w} of them in profit.",
-                        "uk": "Реальний рахунок CRYPTO NOVA з {since}: закрито ф'ючерсних угод — {n}, з них у плюсі {w}.",
-                        "el": "Πραγματικός λογαριασμός CRYPTO NOVA από τις {since}: έκλεισαν {n} συναλλαγές futures, κερδοφόρες οι {w}.",
-                        "es": "Cuenta real de CRYPTO NOVA desde el {since}: {n} operaciones de futuros cerradas, {w} de ellas con ganancia."},
+    "pub.why.fut_rec": {"ru": "Реальный счёт CRYPTO NOVA AI с {since}: закрыто фьючерсных сделок — {n}, из них в плюсе {w}.",
+                        "en": "CRYPTO NOVA AI's real account since {since}: {n} futures trades closed, {w} of them in profit.",
+                        "uk": "Реальний рахунок CRYPTO NOVA AI з {since}: закрито ф'ючерсних угод — {n}, з них у плюсі {w}.",
+                        "el": "Πραγματικός λογαριασμός CRYPTO NOVA AI από τις {since}: έκλεισαν {n} συναλλαγές futures, κερδοφόρες οι {w}.",
+                        "es": "Cuenta real de CRYPTO NOVA AI desde el {since}: {n} operaciones de futuros cerradas, {w} de ellas con ganancia."},
     # 28.10 (build 47 §6.4): the per-part note no longer says «перевод» — no money moves between spot and futures on OKX (one USDT
     # balance, acctLv 2); the system re-splits the account's current value (see "pp.moved.why.*" and public_portfolio.moved)
     "pp.moved": {"ru": "Перераспределение внутри одного счёта: {usd}. Это не перевод денег и не прибыль или убыток.",
@@ -1019,21 +1019,21 @@ T: dict[str, dict[str, str]] = {
                      "el": "Ανοιχτές συναλλαγές futures στον πραγματικό λογαριασμό: {n}· η καθεμία έχει stop, και τώρα βρίσκονται "
                            "στα {usd}.",
                      "es": "Operaciones de futuros abiertas en la cuenta real: {n}; cada una tiene su stop y ahora están en {usd}."},
-    "mv.sys.real_open": {"ru": "Реальный счёт CRYPTO NOVA: открыто фьючерсных сделок — {n}, у каждой стоп на бирже.",
-                         "en": "CRYPTO NOVA's real account: {n} open futures trades, each with its stop on the exchange.",
-                         "uk": "Реальний рахунок CRYPTO NOVA: відкрито ф'ючерсних угод — {n}, у кожної стоп на біржі.",
-                         "el": "Πραγματικός λογαριασμός CRYPTO NOVA: ανοιχτές συναλλαγές futures — {n}, η καθεμία με stop στο "
+    "mv.sys.real_open": {"ru": "Реальный счёт CRYPTO NOVA AI: открыто фьючерсных сделок — {n}, у каждой стоп на бирже.",
+                         "en": "CRYPTO NOVA AI's real account: {n} open futures trades, each with its stop on the exchange.",
+                         "uk": "Реальний рахунок CRYPTO NOVA AI: відкрито ф'ючерсних угод — {n}, у кожної стоп на біржі.",
+                         "el": "Πραγματικός λογαριασμός CRYPTO NOVA AI: ανοιχτές συναλλαγές futures — {n}, η καθεμία με stop στο "
                                "ανταλλακτήριο.",
-                         "es": "Cuenta real de CRYPTO NOVA: {n} operaciones de futuros abiertas, cada una con su stop en el exchange."},
-    "mv.sys.real_none": {"ru": "Реальный счёт CRYPTO NOVA: открытых фьючерсных сделок сейчас нет — система открывает их только по своим "
+                         "es": "Cuenta real de CRYPTO NOVA AI: {n} operaciones de futuros abiertas, cada una con su stop en el exchange."},
+    "mv.sys.real_none": {"ru": "Реальный счёт CRYPTO NOVA AI: открытых фьючерсных сделок сейчас нет — система открывает их только по своим "
                                "сигналам.",
-                         "en": "CRYPTO NOVA's real account: no open futures trades right now — the system opens them only on its own "
+                         "en": "CRYPTO NOVA AI's real account: no open futures trades right now — the system opens them only on its own "
                                "signals.",
-                         "uk": "Реальний рахунок CRYPTO NOVA: відкритих ф'ючерсних угод зараз немає — система відкриває їх лише за "
+                         "uk": "Реальний рахунок CRYPTO NOVA AI: відкритих ф'ючерсних угод зараз немає — система відкриває їх лише за "
                                "своїми сигналами.",
-                         "el": "Πραγματικός λογαριασμός CRYPTO NOVA: δεν υπάρχουν ανοιχτές συναλλαγές futures αυτή τη στιγμή — το "
+                         "el": "Πραγματικός λογαριασμός CRYPTO NOVA AI: δεν υπάρχουν ανοιχτές συναλλαγές futures αυτή τη στιγμή — το "
                                "σύστημα τις ανοίγει μόνο με τα δικά του σήματα.",
-                         "es": "Cuenta real de CRYPTO NOVA: ahora no hay operaciones de futuros abiertas; el sistema solo las abre con "
+                         "es": "Cuenta real de CRYPTO NOVA AI: ahora no hay operaciones de futuros abiertas; el sistema solo las abre con "
                                "sus propias señales."},
     "mv.sys.last": {"ru": "Последнее действие ({d}): {text}", "en": "Last action ({d}): {text}", "uk": "Остання дія ({d}): {text}",
                     "el": "Τελευταία ενέργεια ({d}): {text}", "es": "Última acción ({d}): {text}"},
@@ -1069,15 +1069,15 @@ T: dict[str, dict[str, str]] = {
                              "Αποτέλεσμα {pct} από την είσοδο.",
                        "es": "Vendido {sym}: el precio se acercó al stop y el sistema dejó de recomendar la moneda. Resultado: {pct} "
                              "desde la entrada."},
-    "act2.sell_okx": {"ru": "Продано {sym}: этой монеты нет на споте OKX, а портфель повторяет реальный счёт CRYPTO NOVA на OKX. Итог {pct} "
+    "act2.sell_okx": {"ru": "Продано {sym}: этой монеты нет на споте OKX, а портфель повторяет реальный счёт CRYPTO NOVA AI на OKX. Итог {pct} "
                             "от входа.",
-                      "en": "Sold {sym}: this coin isn't on OKX spot, and the portfolio is repeated by CRYPTO NOVA's real account on OKX. "
+                      "en": "Sold {sym}: this coin isn't on OKX spot, and the portfolio is repeated by CRYPTO NOVA AI's real account on OKX. "
                             "The result is {pct} from the entry.",
-                      "uk": "Продано {sym}: цієї монети немає на споті OKX, а портфель повторює реальний рахунок CRYPTO NOVA на OKX. "
+                      "uk": "Продано {sym}: цієї монети немає на споті OKX, а портфель повторює реальний рахунок CRYPTO NOVA AI на OKX. "
                             "Підсумок {pct} від входу.",
                       "el": "Πουλήθηκε το {sym}: αυτό το νόμισμα δεν υπάρχει στο spot του OKX, και το χαρτοφυλάκιο το επαναλαμβάνει ο "
-                            "πραγματικός λογαριασμός του CRYPTO NOVA στο OKX. Αποτέλεσμα {pct} από την είσοδο.",
-                      "es": "Vendido {sym}: esta moneda no está en el spot de OKX, y la cartera la repite la cuenta real de CRYPTO NOVA "
+                            "πραγματικός λογαριασμός του CRYPTO NOVA AI στο OKX. Αποτέλεσμα {pct} από την είσοδο.",
+                      "es": "Vendido {sym}: esta moneda no está en el spot de OKX, y la cartera la repite la cuenta real de CRYPTO NOVA AI "
                             "en OKX. Resultado: {pct} desde la entrada."},
     "act2.buy_owner": {"ru": "Куплено {sym} на небольшую долю ({w}% портфеля) по решению владельца: монета в его списке доверия, хотя "
                              "оценка системы пока ниже порога. Стоп {stop}.",
@@ -1097,10 +1097,10 @@ T: dict[str, dict[str, str]] = {
                       "es": "Reforzado {sym} (+{w}% de la cartera): el dinero de las monedas vendidas pasó al núcleo de la cartera."},
     # ---------------------------------------------------------------- build 46 (28.10) #6: app_home "report" — NOVA's spoken report on
     # the PUBLIC portfolio, written for the ear (amounts in words, no $), read by the server's male voice (cnq/api/tts.py)
-    "rep.value": {"ru": "Публичный портфель CRYPTO NOVA сейчас — {v}.", "en": "The CRYPTO NOVA public portfolio is now at {v}.",
-                  "uk": "Публічний портфель CRYPTO NOVA зараз — {v}.",
-                  "el": "Το δημόσιο χαρτοφυλάκιο του CRYPTO NOVA είναι τώρα στα {v}.",
-                  "es": "La cartera pública de CRYPTO NOVA está ahora en {v}."},
+    "rep.value": {"ru": "Публичный портфель CRYPTO NOVA AI сейчас — {v}.", "en": "The CRYPTO NOVA AI public portfolio is now at {v}.",
+                  "uk": "Публічний портфель CRYPTO NOVA AI зараз — {v}.",
+                  "el": "Το δημόσιο χαρτοφυλάκιο του CRYPTO NOVA AI είναι τώρα στα {v}.",
+                  "es": "La cartera pública de CRYPTO NOVA AI está ahora en {v}."},
     "rep.today": {"ru": "За сегодня {chg}, это {pct}.", "en": "Today: {chg}, that's {pct}.", "uk": "За сьогодні {chg}, це {pct}.",
                   "el": "Σήμερα: {chg}, δηλαδή {pct}.", "es": "Hoy: {chg}, es decir, {pct}."},
     "rep.since": {"ru": "С {d} — {chg}, это {pct}.", "en": "Since {d}: {chg}, that's {pct}.", "uk": "З {d} — {chg}, це {pct}.",
@@ -1129,9 +1129,9 @@ T: dict[str, dict[str, str]] = {
                  "uk": "Дані завантажуються — скажу трохи згодом.", "el": "Τα δεδομένα φορτώνουν — θα σας πω σε λίγο.",
                  "es": "Los datos se están cargando; te lo digo en un momento."},
     # build 51: calm wording when something is late (no «перебои», «неточные», «могут быть неактуальны»)
-    "rep.value_asof": {"ru": "Публичный портфель CRYPTO NOVA — {v}.", "en": "The CRYPTO NOVA public portfolio: {v}.",
-                       "uk": "Публічний портфель CRYPTO NOVA — {v}.", "el": "Το δημόσιο χαρτοφυλάκιο CRYPTO NOVA: {v}.",
-                       "es": "La cartera pública de CRYPTO NOVA: {v}."},
+    "rep.value_asof": {"ru": "Публичный портфель CRYPTO NOVA AI — {v}.", "en": "The CRYPTO NOVA AI public portfolio: {v}.",
+                       "uk": "Публічний портфель CRYPTO NOVA AI — {v}.", "el": "Το δημόσιο χαρτοφυλάκιο CRYPTO NOVA AI: {v}.",
+                       "es": "La cartera pública de CRYPTO NOVA AI: {v}."},
     "rep.asof": {"ru": "Цифры на {d}.", "en": "Figures as of {d}.", "uk": "Цифри на {d}.", "el": "Στοιχεία της {d}.", "es": "Cifras del {d}."},
     "rep.plus": {"ru": "плюс", "en": "plus", "uk": "плюс", "el": "συν", "es": "más"},
     "rep.minus": {"ru": "минус", "en": "minus", "uk": "мінус", "el": "μείον", "es": "menos"},
@@ -1143,9 +1143,9 @@ T: dict[str, dict[str, str]] = {
     # /v2/tts instead of this report's ready mp3 — so these words are the app's own calm ones, and the ready mp3 is played
     "rep.ok": {"ru": "Система работает в обычном режиме.", "en": "The system is working normally.", "uk": "Система працює у звичайному режимі.",
                "el": "Το σύστημα δουλεύει όπως συνήθως.", "es": "El sistema funciona como siempre."},
-    "rep.pf": {"ru": "Публичный портфель CRYPTO NOVA — {v}, с {d} {chg}.", "en": "The CRYPTO NOVA public portfolio is {v}, {chg} since {d}.",
-               "uk": "Публічний портфель CRYPTO NOVA — {v}, з {d} {chg}.", "el": "Το δημόσιο χαρτοφυλάκιο CRYPTO NOVA είναι {v}, {chg} από {d}.",
-               "es": "La cartera pública de CRYPTO NOVA es de {v}, {chg} desde el {d}."},
+    "rep.pf": {"ru": "Публичный портфель CRYPTO NOVA AI — {v}, с {d} {chg}.", "en": "The CRYPTO NOVA AI public portfolio is {v}, {chg} since {d}.",
+               "uk": "Публічний портфель CRYPTO NOVA AI — {v}, з {d} {chg}.", "el": "Το δημόσιο χαρτοφυλάκιο CRYPTO NOVA AI είναι {v}, {chg} από {d}.",
+               "es": "La cartera pública de CRYPTO NOVA AI es de {v}, {chg} desde el {d}."},
     "rep.btc_regime": {"ru": "Биткоин стоит {v}, за сутки {pct}; режим рынка по правилам системы — «{regime}».",
                        "en": "Bitcoin is at {v}, {pct} over the day; by the system's rules the market regime is «{regime}».",
                        "uk": "Біткоїн коштує {v}, за добу {pct}; режим ринку за правилами системи — «{regime}».",
@@ -1259,21 +1259,21 @@ T: dict[str, dict[str, str]] = {
     # §12.1 «Если покупать сегодня»: each coin's real state in the spot portfolio (web/spot_pipeline.json) — never «рекомендовано»
     "buy.note": {
         "ru": "Система проверила {n} {coins} по графику: цена выше средней за 200 дней, отскоки от поддержки, RSI, оценка проекта и "
-              "рыночные данные. Это кандидаты по графику, а не покупки: портфель CRYPTO NOVA покупает только монеты, которые "
+              "рыночные данные. Это кандидаты по графику, а не покупки: портфель CRYPTO NOVA AI покупает только монеты, которые "
               "прошли его таблицу и правила. Статус рядом с монетой — что с ней сейчас в портфеле.",
         "en": "The system checked {n} {coins} on the chart: price above its 200-day average, bounces off a support, RSI, the project's "
-              "score and market data. These are chart candidates, not buys: the CRYPTO NOVA portfolio buys only "
+              "score and market data. These are chart candidates, not buys: the CRYPTO NOVA AI portfolio buys only "
               "coins that pass its table and rules. The status next to a coin shows where it stands in the portfolio now.",
         "uk": "Система перевірила {n} {coins} за графіком: ціна вище за 200-денну середню, відскоки від підтримки, RSI, оцінка проєкту "
-              "й ринкові дані. Це кандидати за графіком, а не покупки: портфель CRYPTO NOVA купує лише монети, які пройшли "
+              "й ринкові дані. Це кандидати за графіком, а не покупки: портфель CRYPTO NOVA AI купує лише монети, які пройшли "
               "його таблицю й правила. Статус біля монети — що з нею зараз у портфелі.",
         "el": "Το σύστημα έλεγξε {n} {coins} στο γράφημα: τιμή πάνω από τον μέσο όρο 200 ημερών, αναπηδήσεις από στήριξη, RSI, "
               "βαθμολογία του έργου και δεδομένα αγοράς. Είναι υποψήφια από το γράφημα, όχι αγορές: το χαρτοφυλάκιο "
-              "CRYPTO NOVA αγοράζει μόνο νομίσματα που περνούν τον πίνακα και τους κανόνες του. Η κατάσταση δίπλα σε κάθε νόμισμα "
+              "CRYPTO NOVA AI αγοράζει μόνο νομίσματα που περνούν τον πίνακα και τους κανόνες του. Η κατάσταση δίπλα σε κάθε νόμισμα "
               "δείχνει πού βρίσκεται τώρα στο χαρτοφυλάκιο.",
         "es": "El sistema revisó {n} {coins} en el gráfico: precio por encima de su media de 200 días, rebotes en un soporte, RSI, la "
               "puntuación del proyecto y datos de mercado. Son candidatas por el gráfico, no compras: la cartera "
-              "CRYPTO NOVA compra solo monedas que pasan su tabla y sus reglas. El estado junto a cada moneda muestra dónde está ahora "
+              "CRYPTO NOVA AI compra solo monedas que pasan su tabla y sus reglas. El estado junto a cada moneda muestra dónde está ahora "
               "en la cartera."},
     "bst.watch": {"ru": "наблюдение", "en": "watching", "uk": "спостереження", "el": "παρακολούθηση", "es": "en observación"},
     "bst.analysis": {"ru": "анализ", "en": "under analysis", "uk": "аналіз", "el": "υπό ανάλυση", "es": "en análisis"},
@@ -1341,15 +1341,15 @@ T: dict[str, dict[str, str]] = {
                           "uk": "Пройшла таблицю й правила портфеля: портфель купує її на найближчому прогоні.",
                           "el": "Πέρασε τον πίνακα και τους κανόνες του χαρτοφυλακίου: το χαρτοφυλάκιο το αγοράζει στον επόμενο κύκλο.",
                           "es": "Pasó la tabla y las reglas de la cartera: la cartera la compra en su próxima ejecución."},
-    "bst.n.pending": {"ru": "Портфель CRYPTO NOVA её купил, реальный счёт OKX ещё не повторил покупку.",
-                      "en": "The CRYPTO NOVA portfolio bought it; the real OKX account hasn't repeated the buy yet.",
-                      "uk": "Портфель CRYPTO NOVA її купив, реальний рахунок OKX ще не повторив купівлю.",
-                      "el": "Το χαρτοφυλάκιο CRYPTO NOVA το αγόρασε· ο πραγματικός λογαριασμός OKX δεν έχει επαναλάβει ακόμη την αγορά.",
-                      "es": "La cartera CRYPTO NOVA la compró; la cuenta real de OKX aún no repitió la compra."},
-    "bst.n.open": {"ru": "Монета в портфеле CRYPTO NOVA и на реальном счёте OKX.", "en": "The coin is in the CRYPTO NOVA portfolio and on the real OKX account.",
-                   "uk": "Монета в портфелі CRYPTO NOVA і на реальному рахунку OKX.",
-                   "el": "Το νόμισμα είναι στο χαρτοφυλάκιο CRYPTO NOVA και στον πραγματικό λογαριασμό OKX.",
-                   "es": "La moneda está en la cartera CRYPTO NOVA y en la cuenta real de OKX."},
+    "bst.n.pending": {"ru": "Портфель CRYPTO NOVA AI её купил, реальный счёт OKX ещё не повторил покупку.",
+                      "en": "The CRYPTO NOVA AI portfolio bought it; the real OKX account hasn't repeated the buy yet.",
+                      "uk": "Портфель CRYPTO NOVA AI її купив, реальний рахунок OKX ще не повторив купівлю.",
+                      "el": "Το χαρτοφυλάκιο CRYPTO NOVA AI το αγόρασε· ο πραγματικός λογαριασμός OKX δεν έχει επαναλάβει ακόμη την αγορά.",
+                      "es": "La cartera CRYPTO NOVA AI la compró; la cuenta real de OKX aún no repitió la compra."},
+    "bst.n.open": {"ru": "Монета в портфеле CRYPTO NOVA AI и на реальном счёте OKX.", "en": "The coin is in the CRYPTO NOVA AI portfolio and on the real OKX account.",
+                   "uk": "Монета в портфелі CRYPTO NOVA AI і на реальному рахунку OKX.",
+                   "el": "Το νόμισμα είναι στο χαρτοφυλάκιο CRYPTO NOVA AI και στον πραγματικό λογαριασμό OKX.",
+                   "es": "La moneda está en la cartera CRYPTO NOVA AI y en la cuenta real de OKX."},
     "bst.n.unknown": {"ru": "Статус в портфеле сейчас не проверен: данные портфеля не обновлялись.",
                       "en": "Its status in the portfolio isn't checked right now: the portfolio data hasn't been updated.",
                       "uk": "Статус у портфелі зараз не перевірено: дані портфеля не оновлювалися.",
@@ -1421,11 +1421,11 @@ T: dict[str, dict[str, str]] = {
                      "es": "el servidor de la app"},
     "rep.part.check": {"ru": "проверка состояния системы", "en": "the system health check", "uk": "перевірка стану системи",
                        "el": "ο έλεγχος κατάστασης του συστήματος", "es": "la comprobación del estado del sistema"},
-    "rep.value_stale": {"ru": "По последним подтверждённым данным на {d} публичный портфель CRYPTO NOVA — {v}.",
-                        "en": "By the last confirmed data, as of {d}, the CRYPTO NOVA public portfolio was at {v}.",
-                        "uk": "За останніми підтвердженими даними на {d} публічний портфель CRYPTO NOVA — {v}.",
-                        "el": "Σύμφωνα με τα τελευταία επιβεβαιωμένα δεδομένα, στις {d}, το δημόσιο χαρτοφυλάκιο CRYPTO NOVA ήταν {v}.",
-                        "es": "Según los últimos datos confirmados, del {d}, la cartera pública de CRYPTO NOVA estaba en {v}."},
+    "rep.value_stale": {"ru": "По последним подтверждённым данным на {d} публичный портфель CRYPTO NOVA AI — {v}.",
+                        "en": "By the last confirmed data, as of {d}, the CRYPTO NOVA AI public portfolio was at {v}.",
+                        "uk": "За останніми підтвердженими даними на {d} публічний портфель CRYPTO NOVA AI — {v}.",
+                        "el": "Σύμφωνα με τα τελευταία επιβεβαιωμένα δεδομένα, στις {d}, το δημόσιο χαρτοφυλάκιο CRYPTO NOVA AI ήταν {v}.",
+                        "es": "Según los últimos datos confirmados, del {d}, la cartera pública de CRYPTO NOVA AI estaba en {v}."},
     # §13.6 the connection states of «Подключиться к системе CRYPTO NOVA AI» (app_config.connect_states): what each means and the next
     # step. CRYPTO NOVA has no technical link to a user's OKX account, so «confirmed» is never shown today (available: false).
     # The OKX section names are the app guide's own («Копитрейдинг» → «Мои копирования» / My copies).
@@ -1444,14 +1444,14 @@ T: dict[str, dict[str, str]] = {
                                     "el": "Χρειάζεται ένα βήμα στο ανταλλακτήριο", "es": "Falta un paso en el exchange"},
     "cs.action_on_exchange.text": {
         "ru": "Следующий шаг делается в приложении или на сайте OKX: регистрация, проверка личности, пополнение счёта или включение "
-              "копирования CRYPTO NOVA.",
-        "en": "The next step happens in the OKX app or website: sign-up, identity check, a deposit, or turning on copying of CRYPTO NOVA.",
+              "копирования CRYPTO NOVA AI.",
+        "en": "The next step happens in the OKX app or website: sign-up, identity check, a deposit, or turning on copying of CRYPTO NOVA AI.",
         "uk": "Наступний крок робиться в застосунку або на сайті OKX: реєстрація, перевірка особи, поповнення рахунку або ввімкнення "
-              "копіювання CRYPTO NOVA.",
+              "копіювання CRYPTO NOVA AI.",
         "el": "Το επόμενο βήμα γίνεται στην εφαρμογή ή στον ιστότοπο του OKX: εγγραφή, έλεγχος ταυτότητας, κατάθεση ή ενεργοποίηση "
-              "της αντιγραφής του CRYPTO NOVA.",
+              "της αντιγραφής του CRYPTO NOVA AI.",
         "es": "El siguiente paso se hace en la app o la web de OKX: registro, verificación de identidad, depósito o activar la copia "
-              "de CRYPTO NOVA."},
+              "de CRYPTO NOVA AI."},
     "cs.action_on_exchange.next": {"ru": "Откройте OKX, завершите шаг и вернитесь к инструкции.",
                                    "en": "Open OKX, finish the step and come back to the guide.",
                                    "uk": "Відкрийте OKX, завершіть крок і поверніться до інструкції.",
@@ -1459,22 +1459,22 @@ T: dict[str, dict[str, str]] = {
                                    "es": "Abre OKX, termina el paso y vuelve a la guía."},
     "cs.waiting.title": {"ru": "Ожидается подтверждение", "en": "Waiting for confirmation", "uk": "Очікується підтвердження",
                          "el": "Αναμονή επιβεβαίωσης", "es": "Esperando confirmación"},
-    "cs.waiting.text": {"ru": "Биржа ещё проверяет ваши данные или зачисляет пополнение. Это делает OKX, а не CRYPTO NOVA.",
-                        "en": "The exchange is still checking your details or crediting your deposit. OKX does this, not CRYPTO NOVA.",
-                        "uk": "Біржа ще перевіряє ваші дані або зараховує поповнення. Це робить OKX, а не CRYPTO NOVA.",
-                        "el": "Το ανταλλακτήριο ακόμη ελέγχει τα στοιχεία σας ή πιστώνει την κατάθεσή σας. Αυτό το κάνει το OKX, όχι το CRYPTO NOVA.",
-                        "es": "El exchange aún está revisando tus datos o abonando tu depósito. Lo hace OKX, no CRYPTO NOVA."},
+    "cs.waiting.text": {"ru": "Биржа ещё проверяет ваши данные или зачисляет пополнение. Это делает OKX, а не CRYPTO NOVA AI.",
+                        "en": "The exchange is still checking your details or crediting your deposit. OKX does this, not CRYPTO NOVA AI.",
+                        "uk": "Біржа ще перевіряє ваші дані або зараховує поповнення. Це робить OKX, а не CRYPTO NOVA AI.",
+                        "el": "Το ανταλλακτήριο ακόμη ελέγχει τα στοιχεία σας ή πιστώνει την κατάθεσή σας. Αυτό το κάνει το OKX, όχι το CRYPTO NOVA AI.",
+                        "es": "El exchange aún está revisando tus datos o abonando tu depósito. Lo hace OKX, no CRYPTO NOVA AI."},
     "cs.waiting.next": {"ru": "Дождитесь уведомления OKX и затем продолжите инструкцию.", "en": "Wait for OKX's notification, then continue the guide.",
                         "uk": "Дочекайтеся сповіщення OKX і потім продовжте інструкцію.",
                         "el": "Περιμένετε την ειδοποίηση του OKX και μετά συνεχίστε τον οδηγό.",
                         "es": "Espera la notificación de OKX y luego continúa la guía."},
     "cs.confirmed.title": {"ru": "Подключение подтверждено", "en": "Connection confirmed", "uk": "Підключення підтверджено",
                            "el": "Η σύνδεση επιβεβαιώθηκε", "es": "Conexión confirmada"},
-    "cs.confirmed.text": {"ru": "Биржа подтвердила, что копирование CRYPTO NOVA на вашем счёте активно.",
-                          "en": "The exchange confirmed that copying CRYPTO NOVA is active on your account.",
-                          "uk": "Біржа підтвердила, що копіювання CRYPTO NOVA на вашому рахунку активне.",
-                          "el": "Το ανταλλακτήριο επιβεβαίωσε ότι η αντιγραφή του CRYPTO NOVA είναι ενεργή στον λογαριασμό σας.",
-                          "es": "El exchange confirmó que la copia de CRYPTO NOVA está activa en tu cuenta."},
+    "cs.confirmed.text": {"ru": "Биржа подтвердила, что копирование CRYPTO NOVA AI на вашем счёте активно.",
+                          "en": "The exchange confirmed that copying CRYPTO NOVA AI is active on your account.",
+                          "uk": "Біржа підтвердила, що копіювання CRYPTO NOVA AI на вашому рахунку активне.",
+                          "el": "Το ανταλλακτήριο επιβεβαίωσε ότι η αντιγραφή του CRYPTO NOVA AI είναι ενεργή στον λογαριασμό σας.",
+                          "es": "El exchange confirmó que la copia de CRYPTO NOVA AI está activa en tu cuenta."},
     "cs.confirmed.next": {"ru": "Следите за сделками в приложении. Остановить копирование можно в OKX в любой момент.",
                           "en": "Follow the trades in the app. You can stop copying in OKX at any time.",
                           "uk": "Стежте за угодами в застосунку. Зупинити копіювання можна в OKX у будь-який момент.",
@@ -1501,20 +1501,20 @@ T: dict[str, dict[str, str]] = {
                               "uk": "Перевірити із застосунку не можна", "el": "Δεν ελέγχεται από την εφαρμογή",
                               "es": "No se puede comprobar desde la app"},
     "cs.unverifiable.text": {
-        "ru": "У CRYPTO NOVA нет технической связи с вашим счётом на OKX, поэтому приложение не видит, включено ли копирование. Это не "
+        "ru": "У CRYPTO NOVA AI нет технической связи с вашим счётом на OKX, поэтому приложение не видит, включено ли копирование. Это не "
               "ошибка.",
-        "en": "CRYPTO NOVA has no technical link to your OKX account, so the app can't see whether copying is on. This is not an error.",
-        "uk": "У CRYPTO NOVA немає технічного зв'язку з вашим рахунком на OKX, тому застосунок не бачить, чи ввімкнено копіювання. Це "
+        "en": "CRYPTO NOVA AI has no technical link to your OKX account, so the app can't see whether copying is on. This is not an error.",
+        "uk": "У CRYPTO NOVA AI немає технічного зв'язку з вашим рахунком на OKX, тому застосунок не бачить, чи ввімкнено копіювання. Це "
               "не помилка.",
-        "el": "Το CRYPTO NOVA δεν έχει τεχνική σύνδεση με τον λογαριασμό σας στο OKX, οπότε η εφαρμογή δεν βλέπει αν η αντιγραφή είναι "
+        "el": "Το CRYPTO NOVA AI δεν έχει τεχνική σύνδεση με τον λογαριασμό σας στο OKX, οπότε η εφαρμογή δεν βλέπει αν η αντιγραφή είναι "
               "ενεργή. Δεν είναι σφάλμα.",
-        "es": "CRYPTO NOVA no tiene conexión técnica con tu cuenta de OKX, así que la app no ve si la copia está activa. No es un error."},
+        "es": "CRYPTO NOVA AI no tiene conexión técnica con tu cuenta de OKX, así que la app no ve si la copia está activa. No es un error."},
     "cs.unverifiable.next": {
-        "ru": "Проверьте сами в OKX: «Копитрейдинг» → «Мои копирования» (My copies) — там должен быть CRYPTO NOVA со статусом «активно».",
-        "en": "Check it yourself in OKX: “Copy trading” → “My copies”: CRYPTO NOVA should be there with the status “active”.",
-        "uk": "Перевірте самі в OKX: «Копітрейдинг» → «Мої копіювання» (My copies) — там має бути CRYPTO NOVA зі статусом «активно».",
-        "el": "Ελέγξτε το μόνοι σας στο OKX: «Copy trading» → «My copies» — εκεί πρέπει να υπάρχει το CRYPTO NOVA με κατάσταση «ενεργό».",
-        "es": "Compruébalo tú en OKX: «Copy trading» → «Mis copias» (My copies): ahí debe aparecer CRYPTO NOVA con el estado «activo»."},
+        "ru": "Проверьте сами в OKX: «Копитрейдинг» → «Мои копирования» (My copies) — там должен быть CRYPTO NOVA AI со статусом «активно».",
+        "en": "Check it yourself in OKX: “Copy trading” → “My copies”: CRYPTO NOVA AI should be there with the status “active”.",
+        "uk": "Перевірте самі в OKX: «Копітрейдинг» → «Мої копіювання» (My copies) — там має бути CRYPTO NOVA AI зі статусом «активно».",
+        "el": "Ελέγξτε το μόνοι σας στο OKX: «Copy trading» → «My copies» — εκεί πρέπει να υπάρχει το CRYPTO NOVA AI με κατάσταση «ενεργό».",
+        "es": "Compruébalo tú en OKX: «Copy trading» → «Mis copias» (My copies): ahí debe aparecer CRYPTO NOVA AI con el estado «activo»."},
 }
 
 # plural words: ru / uk — (1, 2–4, 5+) in the case the sentence needs; en / el / es — (1, other)
@@ -1581,6 +1581,7 @@ def polish(text, lang: str = DEFAULT, native: bool = False):
         return text
     s = _BRAND.sub(lambda m: m.group(0).replace(" ", NBSP).replace(NBSP + NBSP, NBSP), text)
     s = re.sub(r"CRYPTO[ \u00a0]+(NOV[AΛ])", "CRYPTO" + NBSP + r"\1", s)
+    s = re.sub(r"(CRYPTO\u00a0NOV[AΛ]) AI\b", r"\1" + NBSP + "AI", s)        # 07.11: «CRYPTO NOVA AI» never breaks across lines
     s = _MINUS.sub(MINUS, s)
     if lang != "en":
         keep = native and lang in ("el", "es")

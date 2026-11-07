@@ -128,7 +128,7 @@ def spoken(text: str, lang: str) -> str:
     s = re.sub(r"\s+", " ", str(text or "")).replace("*", "").replace("NOVΛ", "NOVA")   # NBSP → space first
     s = say_dates(s, lang).replace("\u2212", "-")
     if lang in ("ru", "uk"):
-        s = s.replace("CRYPTO NOVA", f"Крипто Но{STRESS}ва").replace("NOVA AI", f"Но{STRESS}ва").replace("NOVA", f"Но{STRESS}ва")
+        s = s.replace("CRYPTO NOVA AI", f"Крипто Но{STRESS}ва Эй-Ай").replace("CRYPTO NOVA", f"Крипто Но{STRESS}ва").replace("NOVA AI", f"Но{STRESS}ва").replace("NOVA", f"Но{STRESS}ва")
     else:
         s = s.replace("CRYPTO NOVA", "Crypto Nova").replace("NOVA AI", "Nova AI").replace("NOVA", "Nova")
     return re.sub(r"\s+", " ", s).strip()

@@ -1,5 +1,5 @@
 """«Настроение опционов» — an INFORMATION tile, not a desk and not a signal (owner 30.10.2026, docs/research/options-2026-10-30.md,
-variant «в»: CRYPTO NOVA does not trade options — none on OKX Europe, none in copy trading, no gain on 2023–2026 history).
+variant «в»: CRYPTO NOVA AI does not trade options — none on OKX Europe, none in copy trading, no gain on 2023–2026 history).
 
 What it reads, from public APIs, stdlib only:
   • DVOL — Deribit's 30-day implied-volatility index for BTC (what the options market expects BTC to move, % a year), its daily
@@ -141,7 +141,7 @@ def _text_ru(dvol, pct, put_call, src) -> str:
     if put_call is not None:
         bits.append(f"Путов (страховок от падения) к коллам по открытому интересу {put_call:.2f}"
                     + (" — страховку берут заметно чаще обычного." if put_call >= 0.9 else " — путов больше обычного." if put_call >= 0.7 else "."))
-    bits.append("Это информация о настроении, не сигнал: CRYPTO NOVA опционами не торгует."
+    bits.append("Это информация о настроении, не сигнал: CRYPTO NOVA AI опционами не торгует."
                 + (" Источник: OKX (Deribit не ответил)." if src == "okx" else ""))
     return " ".join(bits)
 

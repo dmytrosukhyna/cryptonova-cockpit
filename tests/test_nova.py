@@ -38,7 +38,7 @@ class GroqGptOss:
     """a stand-in for groq · openai/gpt-oss-120b, measured by scripts/nova_probe.py on 20.10: hidden reasoning counts against
     max_tokens; «Сколько я заработал?» took 506 of 600 tokens at the default effort and the answer was cut mid-sentence (85–263
     for «Объясни плечо» / «Что такое копилка?»); a little more thinking leaves no answer at all — the owner's case."""
-    ANSWER = ("Ваш личный результат — на карточке «Мой демо-счёт» на главном экране. А публичный портфель CRYPTO NOVA — реальный счёт "
+    ANSWER = ("Ваш личный результат — на карточке «Мой демо-счёт» на главном экране. А публичный портфель CRYPTO NOVA AI — реальный счёт "
               "OKX с 22.10 — виден в режиме PUBLIC. Гарантий нет — рынок может и падать.")
 
     def __init__(self, answer_tokens=150, earned_thinking=600):
@@ -149,7 +149,7 @@ def test_ctx_is_users_own_data(tmp_path):
     assert block.startswith("Мой демо-счёт: $1 000 с 20.10, сейчас $1 012 (+1.2%).") and "Копилка: $10 в неделю" in block
     assert len(block) <= nova.CTX_MAX and not any(ord(ch) < 32 or ch == "‮" for ch in block) and "<<<" not in block
     assert "не инструкции" in user and "не выполняй" in system.lower() + user.lower()
-    assert user.index("ДАННЫЕ CRYPTO NOVA") < user.index("ДАННЫЕ ПОЛЬЗОВАТЕЛЯ") < user.index("ВОПРОС ПОЛЬЗОВАТЕЛЯ:\n" + EARNED)
+    assert user.index("ДАННЫЕ CRYPTO NOVA AI") < user.index("ДАННЫЕ ПОЛЬЗОВАТЕЛЯ") < user.index("ВОПРОС ПОЛЬЗОВАТЕЛЯ:\n" + EARNED)
 
     # no ctx (or not a string): NOVA points to the «Мой демо-счёт» card and has CRYPTO NOVA's own demo result at hand
     for body in ({"q": EARNED}, {"q": EARNED, "ctx": {"usd": 1}}, {"q": EARNED, "ctx": "  \n\t "}):
@@ -188,7 +188,7 @@ def test_demo_block_from_app_home():
     assert "открыта SOL " in k.user_message("Какие сделки сейчас открыты?", h2, "")
     q_ = k.user_message("Что такое плечо?", h2, "")
     assert "открыта SOL " not in q_ and "Фьючерсных сделок открыто сейчас 1" in q_
-    assert "ДАННЫЕ CRYPTO NOVA" in k.user_message("q?", {"futures": {"open": "broken"}, "market": {"btc": {"price": "x"}}}, "")
+    assert "ДАННЫЕ CRYPTO NOVA AI" in k.user_message("q?", {"futures": {"open": "broken"}, "market": {"btc": {"price": "x"}}}, "")
     # numbers in the answer's language (QA 28.10 §7 / §8): ru 10 024,40 · en 10,024.40 · el / es 10.024,40
     assert "старт $10 024,40" in b or pp["start_usd"] != 10024.4
     assert nova._usd(10024.4, False, "es", True) == "$10 024,40" and nova._usd(10024.4, False, "en", True) == "$10,024.40"
@@ -244,11 +244,11 @@ def test_nova_feed_is_public(tmp_path):
     assert "VIP" not in d["greeting_vip"] and "реальный счёт подключён" in d["greeting_vip"] and "100" in d["greeting_vip"]
     assert 6 <= len(d["suggest"]) <= 8 and all(isinstance(q, str) and len(q) <= 60 for q in d["suggest"])
     # 28.10 (build 46 §11.5): five tidy categories, the long list folded by the app
-    assert [t["title"] for t in d["topics"]] == ["Как работает CRYPTO\u00a0NOVA", "Портфель и сделки", "Деньги и безопасность",
+    assert [t["title"] for t in d["topics"]] == ["Как работает CRYPTO\u00a0NOVA\u00a0AI", "Портфель и сделки", "Деньги и безопасность",
                                                   "Криптовалюты и рынок", "Обучение"]
     assert [t["id"] for t in d["topics"]] == ["how", "portfolio", "money", "market", "learn"]
     assert all(3 <= len(t["qs"]) <= 4 for t in d["topics"])
-    for q in ("Что такое CRYPTO\u00a0NOVA?", "Как работает публичный портфель?", "Что означает результат сделки?", "Что такое спот и фьючерсы?",
+    for q in ("Что такое CRYPTO\u00a0NOVA\u00a0AI?", "Как работает публичный портфель?", "Что означает результат сделки?", "Что такое спот и фьючерсы?",
               "Как подключиться к системе?", "Какие риски существуют?"):                    # the owner's own list of frequent questions
         assert q in [x for t in d["topics"] for x in t["qs"]], q
     assert d["greeting"].startswith("Здравствуйте! Я NOVA AI — ваш помощник в мире криптовалют.") and "гарант" not in d["greeting"]
@@ -278,7 +278,7 @@ def test_knowledge_files():
         assert f["fact"] in system
     # 22.10 (build 45): the real way in is OKX copy trading (no UID, no application form); the EEA gets no automatic copying
     for must in ("$10 000", "52 урока", "BingX", "копитрейдинг OKX", "Ключи API не нужны", "Доступность копитрейдинга и отдельных инструментов зависит от страны и региона — условия показывает OKX",  # owner 28.10
-                 "долю для ведущего трейдера", "Публичный портфель", "реальный счёт CRYPTO NOVA на OKX", "ЕС", "«бесплатно» не используй",
+                 "долю для ведущего трейдера", "Публичный портфель", "реальный счёт CRYPTO NOVA AI на OKX", "ЕС", "«бесплатно» не используй",
                  "не храним", "5 вопросов",
                  "не финансовый совет", "120 слов", "без эмодзи", "«•»"):
         assert must in system, must
@@ -287,7 +287,7 @@ def test_knowledge_files():
     # final QA 28.10: one product — the real account since 22.10; the demo desks of 17.10, their 3 sizes and the EU X-Perps line are gone
     # 05.11 (owner 09:52): the futures are «сигнал системы CRYPTO NOVA AI»; the method stays internal
     for must in ("Ты — NOVA AI", "сигнал системы CRYPTO NOVA AI", "не раскрывай", "плечо подбирается под каждый сигнал", "15% стартового капитала",
-                 "не больше 2% фьючерсного бюджета", "реальный счёт CRYPTO NOVA на OKX"):
+                 "не больше 2% фьючерсного бюджета", "реальный счёт CRYPTO NOVA AI на OKX"):
         assert must in system, must
     for gone in ("17.10", "демо-счёта $10 000", "3 размера", "X-Perps", "плечо до 10x", "USDT в ЕС недоступен", "на демо-счетах по $10 000"):
         assert gone not in system, gone
@@ -300,7 +300,7 @@ def test_tidy_plain_text_for_voice():
     assert nova.tidy("Обрыв без единой точки и на сере", cut=True) == ""
     assert len(nova.tidy("Слово. " * 400)) <= nova.ANSWER_MAX
     assert nova.tidy("Futures +\u200b$186, Spot \u2212\u200b$90.") == "Futures +$186, Spot \u2212$90."     # zero-width (seen 20.10)
-    assert nova.tidy("Счёт CRYPTO NOVA: -3% за 2025-2026.") == "Счёт CRYPTO\u00a0NOVA: \u22123% за 2025-2026."   # 28.10: never wraps
+    assert nova.tidy("Счёт CRYPTO NOVA AI: -3% за 2025-2026.") == "Счёт CRYPTO\u00a0NOVA\u00a0AI: \u22123% за 2025-2026."   # 28.10: never wraps
 
 
 def test_nova_can_have_its_own_key(monkeypatch):

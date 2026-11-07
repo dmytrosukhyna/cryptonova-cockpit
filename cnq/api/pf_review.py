@@ -1,13 +1,13 @@
-"""«Разбор портфеля» (build 45, owner 22.10): the user's coins checked by CRYPTO NOVA's own rules and data. Deterministic, stdlib.
+"""«Разбор портфеля» (build 45, owner 22.10): the user's coins checked by CRYPTO NOVA AI's own rules and data. Deterministic, stdlib.
 
   review(holdings, data, lang)  → total, a row per coin (share, status, one plain reason), 3–5 recommendations each citing the
-                                  rule it comes from, «как выглядел бы этот портфель по модели CRYPTO NOVA», the disclaimer
+                                  rule it comes from, «как выглядел бы этот портфель по модели CRYPTO NOVA AI», the disclaimer
   Data(web_dir)                 the four files of the system, re-read when they change:
       web/ideas.json      «Что брать на спот»: status (можно брать / добрать / небольшой суммой / ждём / не брать), its reason
                           (dilution, overheating, ATH, volume, meme desk …) and today's price
       web/quality.json    the altcoin quality check (place among ~89 alts)
       web/altseason.json  the «ядро + альтсезон» model (target shares)
-      web/portfolio.json  «CRYPTO NOVA портфель» (its rules and today's shares)
+      web/portfolio.json  «CRYPTO NOVA AI портфель» (its rules and today's shares)
       web/markets.json    prices of the top coins (a price for a coin the table does not rate)
   message(code, lang)           the sentence the app shows for an error code
   Limiter                       per-user request limits, in memory
@@ -42,9 +42,9 @@ def _L(ru, en, uk, el, es):
 SRC = {
     "ideas": _L("таблица «Что брать на спот»", "the “What to buy on spot” table", "таблиця «Що брати на спот»",
                 "πίνακας «Τι να αγοράσω στο spot»", "la tabla «Qué comprar en spot»"),
-    "pf": _L("CRYPTO NOVA портфель", "CRYPTO NOVA portfolio", "Портфель CRYPTO NOVA", "Χαρτοφυλάκιο CRYPTO NOVA", "Cartera CRYPTO NOVA"),
-    "real": _L("спот реального счёта CRYPTO NOVA", "the spot part of CRYPTO NOVA's real account", "спот реального рахунку CRYPTO NOVA",
-               "το spot του πραγματικού λογαριασμού του CRYPTO NOVA", "el spot de la cuenta real de CRYPTO NOVA"),
+    "pf": _L("CRYPTO NOVA AI портфель", "CRYPTO NOVA AI portfolio", "Портфель CRYPTO NOVA AI", "Χαρτοφυλάκιο CRYPTO NOVA AI", "Cartera CRYPTO NOVA AI"),
+    "real": _L("спот реального счёта CRYPTO NOVA AI", "the spot part of CRYPTO NOVA AI's real account", "спот реального рахунку CRYPTO NOVA AI",
+               "το spot του πραγματικού λογαριασμού του CRYPTO NOVA AI", "el spot de la cuenta real de CRYPTO NOVA AI"),
     "alt": _L("модель «ядро + альтсезон»", "the “core + altseason” model", "модель «ядро + альтсезон»",
               "μοντέλο «πυρήνας + altseason»", "modelo «núcleo + altseason»"),
     "q": _L("оценка качества альткоинов", "the altcoin quality check", "анкета якості альтів", "έλεγχος ποιότητας altcoins",
@@ -230,22 +230,22 @@ GENERIC = {
     "avoid": _L("Не проходит проверки таблицы — не берём", "Fails the table's checks — we don't take it",
                 "Не проходить перевірки таблиці — не беремо", "Δεν περνά τους ελέγχους του πίνακα — δεν το παίρνουμε",
                 "No supera los controles de la tabla: no la compramos"),
-    "cash": _L("Запас в долларах — портфель CRYPTO NOVA держит от 10%", "Dollar reserve — the CRYPTO NOVA portfolio keeps 10% or more",
-               "Запас у доларах — портфель CRYPTO NOVA тримає від 10%", "Αποθεματικό σε δολάρια — το χαρτοφυλάκιο CRYPTO NOVA κρατά από 10%",
-               "Reserva en dólares: la cartera CRYPTO NOVA mantiene un 10% o más"),
-    "market": _L("Нет в таблице CRYPTO NOVA — система эту монету не проверяет",
-                 "Not in the CRYPTO NOVA table — the system doesn't check this coin",
-                 "Немає в таблиці CRYPTO NOVA — система цю монету не перевіряє",
-                 "Δεν είναι στον πίνακα CRYPTO NOVA — το σύστημα δεν ελέγχει αυτό το νόμισμα",
-                 "No está en la tabla CRYPTO NOVA: el sistema no revisa esta moneda"),
-    "unknown": _L("Нет в данных CRYPTO NOVA — ни цены, ни проверок", "Not in CRYPTO NOVA's data — no price, no checks",
-                  "Немає в даних CRYPTO NOVA — ні ціни, ні перевірок", "Δεν υπάρχει στα δεδομένα του CRYPTO NOVA — ούτε τιμή ούτε έλεγχοι",
-                  "No está en los datos de CRYPTO NOVA: sin precio ni controles"),
-    "unknown_file": _L("Нет в данных CRYPTO NOVA — цена из вашего файла, проверок нет",
-                       "Not in CRYPTO NOVA's data — the price comes from your file, no checks",
-                       "Немає в даних CRYPTO NOVA — ціна з вашого файлу, перевірок немає",
-                       "Δεν υπάρχει στα δεδομένα του CRYPTO NOVA — η τιμή είναι από το αρχείο σας, χωρίς ελέγχους",
-                       "No está en los datos de CRYPTO NOVA: el precio sale de tu archivo, sin controles"),
+    "cash": _L("Запас в долларах — портфель CRYPTO NOVA AI держит от 10%", "Dollar reserve — the CRYPTO NOVA AI portfolio keeps 10% or more",
+               "Запас у доларах — портфель CRYPTO NOVA AI тримає від 10%", "Αποθεματικό σε δολάρια — το χαρτοφυλάκιο CRYPTO NOVA AI κρατά από 10%",
+               "Reserva en dólares: la cartera CRYPTO NOVA AI mantiene un 10% o más"),
+    "market": _L("Нет в таблице CRYPTO NOVA AI — система эту монету не проверяет",
+                 "Not in the CRYPTO NOVA AI table — the system doesn't check this coin",
+                 "Немає в таблиці CRYPTO NOVA AI — система цю монету не перевіряє",
+                 "Δεν είναι στον πίνακα CRYPTO NOVA AI — το σύστημα δεν ελέγχει αυτό το νόμισμα",
+                 "No está en la tabla CRYPTO NOVA AI: el sistema no revisa esta moneda"),
+    "unknown": _L("Нет в данных CRYPTO NOVA AI — ни цены, ни проверок", "Not in CRYPTO NOVA AI's data — no price, no checks",
+                  "Немає в даних CRYPTO NOVA AI — ні ціни, ні перевірок", "Δεν υπάρχει στα δεδομένα του CRYPTO NOVA AI — ούτε τιμή ούτε έλεγχοι",
+                  "No está en los datos de CRYPTO NOVA AI: sin precio ni controles"),
+    "unknown_file": _L("Нет в данных CRYPTO NOVA AI — цена из вашего файла, проверок нет",
+                       "Not in CRYPTO NOVA AI's data — the price comes from your file, no checks",
+                       "Немає в даних CRYPTO NOVA AI — ціна з вашого файлу, перевірок немає",
+                       "Δεν υπάρχει στα δεδομένα του CRYPTO NOVA AI — η τιμή είναι από το αρχείο σας, χωρίς ελέγχους",
+                       "No está en los datos de CRYPTO NOVA AI: el precio sale de tu archivo, sin controles"),
 }
 
 RULE = {   # the rule a recommendation comes from: «its name» · where it is written
@@ -279,47 +279,47 @@ RULE = {   # the rule a recommendation comes from: «its name» · where it is w
 
 REC = {
     "avoid": _L(
-        "Статус «не брать» сейчас у {coins} — это {you} портфеля. Пример — {top}: {reason}. Портфель CRYPTO NOVA такие монеты не держит и продаёт на следующем прогоне.",
-        "“Avoid” is now the status of {coins} — {you} of the portfolio. For example, {top}: {reason}. The CRYPTO NOVA portfolio doesn't hold such coins and sells them on its next run.",
-        "Статус «не брати» зараз у {coins} — це {you} портфеля. Приклад — {top}: {reason}. Портфель CRYPTO NOVA такі монети не тримає і продає на наступному прогоні.",
-        "Την ένδειξη «αποφυγή» έχουν τώρα: {coins} — {you} του χαρτοφυλακίου. Παράδειγμα — {top}: {reason}. Το χαρτοφυλάκιο CRYPTO NOVA δεν κρατά τέτοια νομίσματα και τα πουλά στον επόμενο κύκλο.",
-        "Con el estado «evitar» están ahora: {coins}, el {you} de la cartera. Por ejemplo, {top}: {reason}. La cartera CRYPTO NOVA no tiene estas monedas y las vende en su siguiente pasada."),
+        "Статус «не брать» сейчас у {coins} — это {you} портфеля. Пример — {top}: {reason}. Портфель CRYPTO NOVA AI такие монеты не держит и продаёт на следующем прогоне.",
+        "“Avoid” is now the status of {coins} — {you} of the portfolio. For example, {top}: {reason}. The CRYPTO NOVA AI portfolio doesn't hold such coins and sells them on its next run.",
+        "Статус «не брати» зараз у {coins} — це {you} портфеля. Приклад — {top}: {reason}. Портфель CRYPTO NOVA AI такі монети не тримає і продає на наступному прогоні.",
+        "Την ένδειξη «αποφυγή» έχουν τώρα: {coins} — {you} του χαρτοφυλακίου. Παράδειγμα — {top}: {reason}. Το χαρτοφυλάκιο CRYPTO NOVA AI δεν κρατά τέτοια νομίσματα και τα πουλά στον επόμενο κύκλο.",
+        "Con el estado «evitar» están ahora: {coins}, el {you} de la cartera. Por ejemplo, {top}: {reason}. La cartera CRYPTO NOVA AI no tiene estas monedas y las vende en su siguiente pasada."),
     "avoid1": _L(
-        "Статус «не брать» сейчас у {top} — это {you} портфеля: {reason}. Портфель CRYPTO NOVA такие монеты не держит и продаёт на следующем прогоне.",
-        "“Avoid” is now the status of {top} — {you} of the portfolio: {reason}. The CRYPTO NOVA portfolio doesn't hold such coins and sells them on its next run.",
-        "Статус «не брати» зараз у {top} — це {you} портфеля: {reason}. Портфель CRYPTO NOVA такі монети не тримає і продає на наступному прогоні.",
-        "Την ένδειξη «αποφυγή» έχει τώρα το {top} — {you} του χαρτοφυλακίου: {reason}. Το χαρτοφυλάκιο CRYPTO NOVA δεν κρατά τέτοια νομίσματα και τα πουλά στον επόμενο κύκλο.",
-        "{top} está ahora en «evitar», el {you} de la cartera: {reason}. La cartera CRYPTO NOVA no tiene estas monedas y las vende en su siguiente pasada."),
+        "Статус «не брать» сейчас у {top} — это {you} портфеля: {reason}. Портфель CRYPTO NOVA AI такие монеты не держит и продаёт на следующем прогоне.",
+        "“Avoid” is now the status of {top} — {you} of the portfolio: {reason}. The CRYPTO NOVA AI portfolio doesn't hold such coins and sells them on its next run.",
+        "Статус «не брати» зараз у {top} — це {you} портфеля: {reason}. Портфель CRYPTO NOVA AI такі монети не тримає і продає на наступному прогоні.",
+        "Την ένδειξη «αποφυγή» έχει τώρα το {top} — {you} του χαρτοφυλακίου: {reason}. Το χαρτοφυλάκιο CRYPTO NOVA AI δεν κρατά τέτοια νομίσματα και τα πουλά στον επόμενο κύκλο.",
+        "{top} está ahora en «evitar», el {you} de la cartera: {reason}. La cartera CRYPTO NOVA AI no tiene estas monedas y las vende en su siguiente pasada."),
     "core_low": _L(
-        "Ядро — BTC, ETH и SOL — у вас {you}. В портфеле CRYPTO NOVA ядро по плану 45%, сейчас {model}. Ядро система держит без стопа.",
-        "Your core — BTC, ETH and SOL — is {you}. In the CRYPTO NOVA portfolio the core is 45% by plan, {model} now. The system holds the core without a stop.",
-        "Ядро — BTC, ETH і SOL — у вас {you}. У портфелі CRYPTO NOVA ядро за планом 45%, зараз {model}. Ядро система тримає без стопу.",
-        "Ο πυρήνας σας — BTC, ETH και SOL — είναι {you}. Στο χαρτοφυλάκιο CRYPTO NOVA ο πυρήνας είναι 45% με βάση το πλάνο, τώρα {model}. Το σύστημα κρατά τον πυρήνα χωρίς stop.",
-        "Tu núcleo — BTC, ETH y SOL — es el {you}. En la cartera CRYPTO NOVA el núcleo es del 45% según el plan, ahora {model}. El sistema mantiene el núcleo sin stop."),
+        "Ядро — BTC, ETH и SOL — у вас {you}. В портфеле CRYPTO NOVA AI ядро по плану 45%, сейчас {model}. Ядро система держит без стопа.",
+        "Your core — BTC, ETH and SOL — is {you}. In the CRYPTO NOVA AI portfolio the core is 45% by plan, {model} now. The system holds the core without a stop.",
+        "Ядро — BTC, ETH і SOL — у вас {you}. У портфелі CRYPTO NOVA AI ядро за планом 45%, зараз {model}. Ядро система тримає без стопу.",
+        "Ο πυρήνας σας — BTC, ETH και SOL — είναι {you}. Στο χαρτοφυλάκιο CRYPTO NOVA AI ο πυρήνας είναι 45% με βάση το πλάνο, τώρα {model}. Το σύστημα κρατά τον πυρήνα χωρίς stop.",
+        "Tu núcleo — BTC, ETH y SOL — es el {you}. En la cartera CRYPTO NOVA AI el núcleo es del 45% según el plan, ahora {model}. El sistema mantiene el núcleo sin stop."),
     "core_high": _L(
-        "{coin} — {you} портфеля. В портфеле CRYPTO NOVA план для {coin} — {plan}, и лишнее продают, когда доля больше плановой в 1,5 раза: одна монета не должна решать судьбу всего счёта.",
-        "{coin} is {you} of the portfolio. The CRYPTO NOVA portfolio plans {plan} for {coin} and sells the excess when the share passes 1.5× the plan: one coin shouldn't decide the whole account.",
-        "{coin} — {you} портфеля. У портфелі CRYPTO NOVA план для {coin} — {plan}, і зайве продають, коли частка більша за планову в 1,5 раза: одна монета не має вирішувати долю всього рахунку.",
-        "Το {coin} είναι {you} του χαρτοφυλακίου. Το χαρτοφυλάκιο CRYPTO NOVA προβλέπει {plan} για το {coin} και πουλά το πλεόνασμα όταν το μερίδιο ξεπεράσει το 1,5× του πλάνου: ένα νόμισμα δεν πρέπει να κρίνει όλο τον λογαριασμό.",
-        "{coin} es el {you} de la cartera. La cartera CRYPTO NOVA prevé un {plan} para {coin} y vende el exceso cuando el peso pasa de 1,5× el plan: una sola moneda no debe decidir toda la cuenta."),
+        "{coin} — {you} портфеля. В портфеле CRYPTO NOVA AI план для {coin} — {plan}, и лишнее продают, когда доля больше плановой в 1,5 раза: одна монета не должна решать судьбу всего счёта.",
+        "{coin} is {you} of the portfolio. The CRYPTO NOVA AI portfolio plans {plan} for {coin} and sells the excess when the share passes 1.5× the plan: one coin shouldn't decide the whole account.",
+        "{coin} — {you} портфеля. У портфелі CRYPTO NOVA AI план для {coin} — {plan}, і зайве продають, коли частка більша за планову в 1,5 раза: одна монета не має вирішувати долю всього рахунку.",
+        "Το {coin} είναι {you} του χαρτοφυλακίου. Το χαρτοφυλάκιο CRYPTO NOVA AI προβλέπει {plan} για το {coin} και πουλά το πλεόνασμα όταν το μερίδιο ξεπεράσει το 1,5× του πλάνου: ένα νόμισμα δεν πρέπει να κρίνει όλο τον λογαριασμό.",
+        "{coin} es el {you} de la cartera. La cartera CRYPTO NOVA AI prevé un {plan} para {coin} y vende el exceso cuando el peso pasa de 1,5× el plan: una sola moneda no debe decidir toda la cuenta."),
     "conc": _L(
-        "{coins} — {you} портфеля. В портфеле CRYPTO NOVA одна монета вне ядра занимает не больше 7,5%, рискованная — 2,5%: если она сильно упадёт, весь счёт не провалится.",
-        "{coins}: {you} of the portfolio. In the CRYPTO NOVA portfolio one coin outside the core takes no more than 7.5%, a risky one 2.5%: if it falls hard, the whole account doesn't sink.",
-        "{coins} — {you} портфеля. У портфелі CRYPTO NOVA одна монета поза ядром займає не більше 7,5%, ризикова — 2,5%: якщо вона сильно впаде, весь рахунок не провалиться.",
-        "{coins}: {you} του χαρτοφυλακίου. Στο χαρτοφυλάκιο CRYPTO NOVA ένα νόμισμα εκτός πυρήνα πιάνει έως 7,5%, ένα ριψοκίνδυνο έως 2,5%: αν πέσει πολύ, δεν βουλιάζει όλος ο λογαριασμός.",
-        "{coins}: el {you} de la cartera. En la cartera CRYPTO NOVA una moneda fuera del núcleo ocupa como mucho un 7,5%, una arriesgada un 2,5%: si cae mucho, no se hunde toda la cuenta."),
+        "{coins} — {you} портфеля. В портфеле CRYPTO NOVA AI одна монета вне ядра занимает не больше 7,5%, рискованная — 2,5%: если она сильно упадёт, весь счёт не провалится.",
+        "{coins}: {you} of the portfolio. In the CRYPTO NOVA AI portfolio one coin outside the core takes no more than 7.5%, a risky one 2.5%: if it falls hard, the whole account doesn't sink.",
+        "{coins} — {you} портфеля. У портфелі CRYPTO NOVA AI одна монета поза ядром займає не більше 7,5%, ризикова — 2,5%: якщо вона сильно впаде, весь рахунок не провалиться.",
+        "{coins}: {you} του χαρτοφυλακίου. Στο χαρτοφυλάκιο CRYPTO NOVA AI ένα νόμισμα εκτός πυρήνα πιάνει έως 7,5%, ένα ριψοκίνδυνο έως 2,5%: αν πέσει πολύ, δεν βουλιάζει όλος ο λογαριασμός.",
+        "{coins}: el {you} de la cartera. En la cartera CRYPTO NOVA AI una moneda fuera del núcleo ocupa como mucho un 7,5%, una arriesgada un 2,5%: si cae mucho, no se hunde toda la cuenta."),
     "risky": _L(
-        "Мемы и монеты высокого риска — {you} портфеля ({coins}). По правилам CRYPTO NOVA их берут только небольшой суммой: до 2,5% на монету и не больше 3 таких монет.",
-        "Memes and high-risk coins are {you} of the portfolio ({coins}). By CRYPTO NOVA's rules they are bought only in small amounts: up to 2.5% per coin and no more than 3 such coins.",
-        "Меми та монети високого ризику — {you} портфеля ({coins}). За правилами CRYPTO NOVA їх беруть лише невеликою сумою: до 2,5% на монету і не більше 3 таких монет.",
-        "Τα meme και τα νομίσματα υψηλού κινδύνου είναι {you} του χαρτοφυλακίου ({coins}). Με τους κανόνες του CRYPTO NOVA αγοράζονται μόνο σε μικρά ποσά: έως 2,5% ανά νόμισμα και όχι πάνω από 3 τέτοια νομίσματα.",
-        "Los memes y las monedas de alto riesgo son el {you} de la cartera ({coins}). Según las reglas de CRYPTO NOVA solo se compran en poca cantidad: hasta un 2,5% por moneda y no más de 3 monedas así."),
+        "Мемы и монеты высокого риска — {you} портфеля ({coins}). По правилам CRYPTO NOVA AI их берут только небольшой суммой: до 2,5% на монету и не больше 3 таких монет.",
+        "Memes and high-risk coins are {you} of the portfolio ({coins}). By CRYPTO NOVA AI's rules they are bought only in small amounts: up to 2.5% per coin and no more than 3 such coins.",
+        "Меми та монети високого ризику — {you} портфеля ({coins}). За правилами CRYPTO NOVA AI їх беруть лише невеликою сумою: до 2,5% на монету і не більше 3 таких монет.",
+        "Τα meme και τα νομίσματα υψηλού κινδύνου είναι {you} του χαρτοφυλακίου ({coins}). Με τους κανόνες του CRYPTO NOVA AI αγοράζονται μόνο σε μικρά ποσά: έως 2,5% ανά νόμισμα και όχι πάνω από 3 τέτοια νομίσματα.",
+        "Los memes y las monedas de alto riesgo son el {you} de la cartera ({coins}). Según las reglas de CRYPTO NOVA AI solo se compran en poca cantidad: hasta un 2,5% por moneda y no más de 3 monedas así."),
     "cash_low": _L(
-        "Запас в долларах (USDT, USDC) у вас {you}. Портфель CRYPTO NOVA всегда держит не меньше 10% — чтобы было чем докупить ядро, если оно подешевеет.",
-        "Your dollar reserve (USDT, USDC) is {you}. The CRYPTO NOVA portfolio always keeps at least 10% — so there is something to add to the core with if it gets cheaper.",
-        "Запас у доларах (USDT, USDC) у вас {you}. Портфель CRYPTO NOVA завжди тримає не менше 10% — щоб було чим докупити ядро, якщо воно подешевшає.",
-        "Το αποθεματικό σας σε δολάρια (USDT, USDC) είναι {you}. Το χαρτοφυλάκιο CRYPTO NOVA κρατά πάντα τουλάχιστον 10% — για να υπάρχει κάτι για τον πυρήνα αν φθηνύνει.",
-        "Tu reserva en dólares (USDT, USDC) es del {you}. La cartera CRYPTO NOVA siempre mantiene al menos un 10%, para poder ampliar el núcleo si se abarata."),
+        "Запас в долларах (USDT, USDC) у вас {you}. Портфель CRYPTO NOVA AI всегда держит не меньше 10% — чтобы было чем докупить ядро, если оно подешевеет.",
+        "Your dollar reserve (USDT, USDC) is {you}. The CRYPTO NOVA AI portfolio always keeps at least 10% — so there is something to add to the core with if it gets cheaper.",
+        "Запас у доларах (USDT, USDC) у вас {you}. Портфель CRYPTO NOVA AI завжди тримає не менше 10% — щоб було чим докупити ядро, якщо воно подешевшає.",
+        "Το αποθεματικό σας σε δολάρια (USDT, USDC) είναι {you}. Το χαρτοφυλάκιο CRYPTO NOVA AI κρατά πάντα τουλάχιστον 10% — για να υπάρχει κάτι για τον πυρήνα αν φθηνύνει.",
+        "Tu reserva en dólares (USDT, USDC) es del {you}. La cartera CRYPTO NOVA AI siempre mantiene al menos un 10%, para poder ampliar el núcleo si se abarata."),
     "overheat": _L(
         "Резкий рост за последние дни: {coins}. По правилу таблицы после рывка (+40% за 7 дней или +120% за 30) система не докупает, а ждёт отката.",
         "A sharp jump in recent days: {coins}. By the table's rule, after a spike (+40% in 7 days or +120% in 30) the system doesn't add, it waits for a pullback.",
@@ -333,23 +333,23 @@ REC = {
         "{coins}: σε κυκλοφορία είναι λιγότερα από τα μισά tokens ή έρχεται ξεκλείδωμα — νέα νομίσματα βγαίνουν στην αγορά και πιέζουν την τιμή. Το σύστημα δεν τα παίρνει προς το παρόν.",
         "{coins}: hay menos de la mitad de los tokens en circulación o se acerca un desbloqueo; las monedas nuevas llegan al mercado y presionan el precio. El sistema no las compra por ahora."),
     "cex": _L(
-        "Токен биржи: {coins}. Портфели CRYPTO NOVA такие монеты не берут.",
-        "Exchange token: {coins}. CRYPTO NOVA portfolios don't take such coins.",
-        "Токен біржі: {coins}. Портфелі CRYPTO NOVA такі монети не беруть.",
-        "Token ανταλλακτηρίου: {coins}. Τα χαρτοφυλάκια CRYPTO NOVA δεν παίρνουν τέτοια νομίσματα.",
-        "Token de exchange: {coins}. Las carteras CRYPTO NOVA no compran estas monedas."),
+        "Токен биржи: {coins}. Портфели CRYPTO NOVA AI такие монеты не берут.",
+        "Exchange token: {coins}. CRYPTO NOVA AI portfolios don't take such coins.",
+        "Токен біржі: {coins}. Портфелі CRYPTO NOVA AI такі монети не беруть.",
+        "Token ανταλλακτηρίου: {coins}. Τα χαρτοφυλάκια CRYPTO NOVA AI δεν παίρνουν τέτοια νομίσματα.",
+        "Token de exchange: {coins}. Las carteras CRYPTO NOVA AI no compran estas monedas."),
     "unknown": _L(
-        "Для {coins} ({you}) у CRYPTO NOVA нет оценки: таблица проверяет {n} монет. Без проверки не видно ни разлоков, ни падения от максимума.",
-        "CRYPTO NOVA has no rating for {coins} ({you}): the table checks {n} coins. Without a check you can't see unlocks or the fall from the high.",
-        "Для {coins} ({you}) у CRYPTO NOVA немає оцінки: таблиця перевіряє {n} монет. Без перевірки не видно ні розлоків, ні падіння від максимуму.",
-        "Το CRYPTO NOVA δεν έχει αξιολόγηση για τα {coins} ({you}): ο πίνακας ελέγχει {n} νομίσματα. Χωρίς έλεγχο δεν φαίνονται ούτε ξεκλειδώματα ούτε η πτώση από το υψηλό.",
-        "CRYPTO NOVA no tiene evaluación para {coins} ({you}): la tabla revisa {n} monedas. Sin revisión no se ven ni los desbloqueos ni la caída desde el máximo."),
+        "Для {coins} ({you}) у CRYPTO NOVA AI нет оценки: таблица проверяет {n} монет. Без проверки не видно ни разлоков, ни падения от максимума.",
+        "CRYPTO NOVA AI has no rating for {coins} ({you}): the table checks {n} coins. Without a check you can't see unlocks or the fall from the high.",
+        "Для {coins} ({you}) у CRYPTO NOVA AI немає оцінки: таблиця перевіряє {n} монет. Без перевірки не видно ні розлоків, ні падіння від максимуму.",
+        "Το CRYPTO NOVA AI δεν έχει αξιολόγηση για τα {coins} ({you}): ο πίνακας ελέγχει {n} νομίσματα. Χωρίς έλεγχο δεν φαίνονται ούτε ξεκλειδώματα ούτε η πτώση από το υψηλό.",
+        "CRYPTO NOVA AI no tiene evaluación para {coins} ({you}): la tabla revisa {n} monedas. Sin revisión no se ven ni los desbloqueos ni la caída desde el máximo."),
     "count": _L(
-        "У вас {count}. В портфеле CRYPTO NOVA их не больше 8 вместе с ядром — так за каждой можно следить.",
-        "You hold {count}. The CRYPTO NOVA portfolio holds no more than 8, core included — so each one can be watched.",
-        "У вас {count}. У портфелі CRYPTO NOVA їх не більше 8 разом із ядром — так за кожною можна стежити.",
-        "Έχετε {count}. Το χαρτοφυλάκιο CRYPTO NOVA κρατά έως 8 μαζί με τον πυρήνα — έτσι παρακολουθείται το καθένα.",
-        "Tienes {count}. La cartera CRYPTO NOVA tiene como mucho 8 con el núcleo: así se puede seguir cada una."),
+        "У вас {count}. В портфеле CRYPTO NOVA AI их не больше 8 вместе с ядром — так за каждой можно следить.",
+        "You hold {count}. The CRYPTO NOVA AI portfolio holds no more than 8, core included — so each one can be watched.",
+        "У вас {count}. У портфелі CRYPTO NOVA AI їх не більше 8 разом із ядром — так за кожною можна стежити.",
+        "Έχετε {count}. Το χαρτοφυλάκιο CRYPTO NOVA AI κρατά έως 8 μαζί με τον πυρήνα — έτσι παρακολουθείται το καθένα.",
+        "Tienes {count}. La cartera CRYPTO NOVA AI tiene como mucho 8 con el núcleo: así se puede seguir cada una."),
     "quality": _L(
         "В нижней трети оценки качества из {n} альткоинов: {coins}. На истории 2022–2026 лучше были альты с выручкой и долгой историей торгов; прошлое не обещает будущего.",
         "In the bottom third of the quality check of {n} altcoins: {coins}. In 2022–2026, alts with revenue and a long trading history did better; the past promises nothing.",
@@ -357,17 +357,17 @@ REC = {
         "Στο κάτω τρίτο του ελέγχου ποιότητας {n} altcoins: {coins}. Το 2022–2026 τα πήγαν καλύτερα τα altcoins με έσοδα και μεγάλο ιστορικό συναλλαγών· το παρελθόν δεν υπόσχεται τίποτα.",
         "En el tercio inferior de la ficha de calidad de {n} altcoins: {coins}. En 2022–2026 fueron mejor las altcoins con ingresos y un largo historial; el pasado no promete nada."),
     "core_ok": _L(
-        "Ядро — BTC, ETH и SOL — у вас {you}: основа на месте. В портфеле CRYPTO NOVA ядро сейчас {model}.",
-        "Your core — BTC, ETH and SOL — is {you}: the base is in place. In the CRYPTO NOVA portfolio the core is {model} now.",
-        "Ядро — BTC, ETH і SOL — у вас {you}: основа на місці. У портфелі CRYPTO NOVA ядро зараз {model}.",
-        "Ο πυρήνας σας — BTC, ETH και SOL — είναι {you}: η βάση είναι στη θέση της. Στο χαρτοφυλάκιο CRYPTO NOVA ο πυρήνας είναι τώρα {model}.",
-        "Tu núcleo — BTC, ETH y SOL — es el {you}: la base está en su sitio. En la cartera CRYPTO NOVA el núcleo es ahora el {model}."),
+        "Ядро — BTC, ETH и SOL — у вас {you}: основа на месте. В портфеле CRYPTO NOVA AI ядро сейчас {model}.",
+        "Your core — BTC, ETH and SOL — is {you}: the base is in place. In the CRYPTO NOVA AI portfolio the core is {model} now.",
+        "Ядро — BTC, ETH і SOL — у вас {you}: основа на місці. У портфелі CRYPTO NOVA AI ядро зараз {model}.",
+        "Ο πυρήνας σας — BTC, ETH και SOL — είναι {you}: η βάση είναι στη θέση της. Στο χαρτοφυλάκιο CRYPTO NOVA AI ο πυρήνας είναι τώρα {model}.",
+        "Tu núcleo — BTC, ETH y SOL — es el {you}: la base está en su sitio. En la cartera CRYPTO NOVA AI el núcleo es ahora el {model}."),
     "cash_ok": _L(
-        "Запас в долларах {you} — не меньше 10%, как в портфеле CRYPTO NOVA.",
-        "Your dollar reserve is {you} — at least 10%, as in the CRYPTO NOVA portfolio.",
-        "Запас у доларах {you} — не менше 10%, як у портфелі CRYPTO NOVA.",
-        "Το αποθεματικό σε δολάρια είναι {you} — τουλάχιστον 10%, όπως στο χαρτοφυλάκιο CRYPTO NOVA.",
-        "Tu reserva en dólares es del {you}: al menos un 10%, como en la cartera CRYPTO NOVA."),
+        "Запас в долларах {you} — не меньше 10%, как в портфеле CRYPTO NOVA AI.",
+        "Your dollar reserve is {you} — at least 10%, as in the CRYPTO NOVA AI portfolio.",
+        "Запас у доларах {you} — не менше 10%, як у портфелі CRYPTO NOVA AI.",
+        "Το αποθεματικό σε δολάρια είναι {you} — τουλάχιστον 10%, όπως στο χαρτοφυλάκιο CRYPTO NOVA AI.",
+        "Tu reserva en dólares es del {you}: al menos un 10%, como en la cartera CRYPTO NOVA AI."),
     "buy_ok": _L(
         "Подходят для покупки по правилам системы: {coins} — они проходят все её проверки.",
         "Marked “worth buying” or “worth adding to”: {coins} — they pass all the table's checks.",
@@ -375,24 +375,24 @@ REC = {
         "Με ένδειξη «για αγορά» ή «για συμπλήρωση»: {coins} — περνούν όλους τους ελέγχους του πίνακα.",
         "En «para comprar» o «para ampliar»: {coins}; superan todos los controles de la tabla."),
     "count_ok": _L(
-        "У вас {count} — в пределах 8, как в портфеле CRYPTO NOVA.",
-        "You hold {count} — within 8, as in the CRYPTO NOVA portfolio.",
-        "У вас {count} — у межах 8, як у портфелі CRYPTO NOVA.",
-        "Έχετε {count} — έως 8, όπως στο χαρτοφυλάκιο CRYPTO NOVA.",
-        "Tienes {count}: dentro de 8, como en la cartera CRYPTO NOVA."),
+        "У вас {count} — в пределах 8, как в портфеле CRYPTO NOVA AI.",
+        "You hold {count} — within 8, as in the CRYPTO NOVA AI portfolio.",
+        "У вас {count} — у межах 8, як у портфелі CRYPTO NOVA AI.",
+        "Έχετε {count} — έως 8, όπως στο χαρτοφυλάκιο CRYPTO NOVA AI.",
+        "Tienes {count}: dentro de 8, como en la cartera CRYPTO NOVA AI."),
 }
 
 TXT = {
     "title": _L("Разбор портфеля", "Portfolio review", "Розбір портфеля", "Ανάλυση χαρτοφυλακίου", "Análisis de cartera"),
-    "intro": _L("Я проверил {n} по данным CRYPTO NOVA на {date}.", "I checked {n} against CRYPTO NOVA's data of {date}.",
-                "Я перевірив {n} за даними CRYPTO NOVA на {date}.", "Έλεγξα {n} με τα δεδομένα του CRYPTO NOVA της {date}.",
-                "He revisado {n} con los datos de CRYPTO NOVA del {date}."),
+    "intro": _L("Я проверил {n} по данным CRYPTO NOVA AI на {date}.", "I checked {n} against CRYPTO NOVA AI's data of {date}.",
+                "Я перевірив {n} за даними CRYPTO NOVA AI на {date}.", "Έλεγξα {n} με τα δεδομένα του CRYPTO NOVA AI της {date}.",
+                "He revisado {n} con los datos de CRYPTO NOVA AI del {date}."),
     "total": _L("Итого", "Total", "Разом", "Σύνολο", "Total"),
     "unpriced": _L("Без цены, в итог не вошли: {coins}.", "No price, left out of the total: {coins}.",
                    "Без ціни, до підсумку не ввійшли: {coins}.", "Χωρίς τιμή, εκτός συνόλου: {coins}.", "Sin precio, fuera del total: {coins}."),
-    "cmp_title": _L("Как выглядел бы этот портфель по модели CRYPTO NOVA", "How this portfolio would look by the CRYPTO NOVA model",
-                    "Як виглядав би цей портфель за моделлю CRYPTO NOVA", "Πώς θα ήταν αυτό το χαρτοφυλάκιο με το μοντέλο CRYPTO NOVA",
-                    "Cómo sería esta cartera con el modelo CRYPTO NOVA"),
+    "cmp_title": _L("Как выглядел бы этот портфель по модели CRYPTO NOVA AI", "How this portfolio would look by the CRYPTO NOVA AI model",
+                    "Як виглядав би цей портфель за моделлю CRYPTO NOVA AI", "Πώς θα ήταν αυτό το χαρτοφυλάκιο με το μοντέλο CRYPTO NOVA AI",
+                    "Cómo sería esta cartera con el modelo CRYPTO NOVA AI"),
     "you": _L("у вас", "you", "у вас", "εσείς", "tú"),
     "model": _L("модель", "model", "модель", "μοντέλο", "modelo"),
     "b_core": _L("Ядро BTC · ETH · SOL", "Core BTC · ETH · SOL", "Ядро BTC · ETH · SOL", "Πυρήνας BTC · ETH · SOL", "Núcleo BTC · ETH · SOL"),
@@ -403,27 +403,27 @@ TXT = {
                   "«Αναμονή», «αποφυγή», χωρίς αξιολόγηση", "«Esperar», «evitar», sin evaluar"),
     "b_cash": _L("Доллары (USDT, USDC)", "Dollars (USDT, USDC)", "Долари (USDT, USDC)", "Δολάρια (USDT, USDC)", "Dólares (USDT, USDC)"),
     "cash_word": _L("доллары", "dollars", "долари", "δολάρια", "dólares"),
-    "model_hold": _L("На ваши {total} портфель CRYPTO NOVA держал бы: {items}.", "With your {total}, the CRYPTO NOVA portfolio would hold: {items}.",
-                     "На ваші {total} портфель CRYPTO NOVA тримав би: {items}.", "Με τα {total} σας, το χαρτοφυλάκιο CRYPTO NOVA θα κρατούσε: {items}.",
-                     "Con tus {total}, la cartera CRYPTO NOVA tendría: {items}."),
-    "match": _L("Совпадение с портфелем CRYPTO NOVA: {p}", "Overlap with the CRYPTO NOVA portfolio: {p}", "Збіг із портфелем CRYPTO NOVA: {p}",
-                "Επικάλυψη με το χαρτοφυλάκιο CRYPTO NOVA: {p}", "Coincidencia con la cartera CRYPTO NOVA: {p}"),
+    "model_hold": _L("На ваши {total} портфель CRYPTO NOVA AI держал бы: {items}.", "With your {total}, the CRYPTO NOVA AI portfolio would hold: {items}.",
+                     "На ваші {total} портфель CRYPTO NOVA AI тримав би: {items}.", "Με τα {total} σας, το χαρτοφυλάκιο CRYPTO NOVA AI θα κρατούσε: {items}.",
+                     "Con tus {total}, la cartera CRYPTO NOVA AI tendría: {items}."),
+    "match": _L("Совпадение с портфелем CRYPTO NOVA AI: {p}", "Overlap with the CRYPTO NOVA AI portfolio: {p}", "Збіг із портфелем CRYPTO NOVA AI: {p}",
+                "Επικάλυψη με το χαρτοφυλάκιο CRYPTO NOVA AI: {p}", "Coincidencia con la cartera CRYPTO NOVA AI: {p}"),
     # 28.10 (build 46 QA): the model is the real account now — how its money is split (okx_alloc shares), not «ядро + альтсезон»
-    "split": _L("Весь реальный счёт CRYPTO NOVA делится так: спот-портфель {spot}, фьючерсы {fut}, активный спот {act}.",
-                "CRYPTO NOVA's whole real account is split like this: the spot portfolio {spot}, futures {fut}, active spot {act}.",
-                "Весь реальний рахунок CRYPTO NOVA поділено так: спот-портфель {spot}, ф'ючерси {fut}, активний спот {act}.",
-                "Ολόκληρος ο πραγματικός λογαριασμός του CRYPTO NOVA μοιράζεται έτσι: χαρτοφυλάκιο spot {spot}, futures {fut}, ενεργό spot {act}.",
-                "Toda la cuenta real de CRYPTO NOVA se reparte así: cartera spot {spot}, futuros {fut}, spot activo {act}."),
+    "split": _L("Весь реальный счёт CRYPTO NOVA AI делится так: спот-портфель {spot}, фьючерсы {fut}, активный спот {act}.",
+                "CRYPTO NOVA AI's whole real account is split like this: the spot portfolio {spot}, futures {fut}, active spot {act}.",
+                "Весь реальний рахунок CRYPTO NOVA AI поділено так: спот-портфель {spot}, ф'ючерси {fut}, активний спот {act}.",
+                "Ολόκληρος ο πραγματικός λογαριασμός του CRYPTO NOVA AI μοιράζεται έτσι: χαρτοφυλάκιο spot {spot}, futures {fut}, ενεργό spot {act}.",
+                "Toda la cuenta real de CRYPTO NOVA AI se reparte así: cartera spot {spot}, futuros {fut}, spot activo {act}."),
     # 28.10 (owner's decision): + the extra core BTC / ETH / SOL (alloc core_pct)
-    "split_core": _L("Весь реальный счёт CRYPTO NOVA делится так: спот-портфель {spot}, дополнительное ядро BTC, ETH и SOL {core}, "
+    "split_core": _L("Весь реальный счёт CRYPTO NOVA AI делится так: спот-портфель {spot}, дополнительное ядро BTC, ETH и SOL {core}, "
                      "фьючерсы {fut}, активный спот {act}.",
-                     "CRYPTO NOVA's whole real account is split like this: the spot portfolio {spot}, extra core BTC, ETH and SOL {core}, "
+                     "CRYPTO NOVA AI's whole real account is split like this: the spot portfolio {spot}, extra core BTC, ETH and SOL {core}, "
                      "futures {fut}, active spot {act}.",
-                     "Весь реальний рахунок CRYPTO NOVA поділено так: спот-портфель {spot}, додаткове ядро BTC, ETH і SOL {core}, "
+                     "Весь реальний рахунок CRYPTO NOVA AI поділено так: спот-портфель {spot}, додаткове ядро BTC, ETH і SOL {core}, "
                      "ф'ючерси {fut}, активний спот {act}.",
-                     "Ολόκληρος ο πραγματικός λογαριασμός του CRYPTO NOVA μοιράζεται έτσι: χαρτοφυλάκιο spot {spot}, επιπλέον πυρήνας "
+                     "Ολόκληρος ο πραγματικός λογαριασμός του CRYPTO NOVA AI μοιράζεται έτσι: χαρτοφυλάκιο spot {spot}, επιπλέον πυρήνας "
                      "BTC, ETH και SOL {core}, futures {fut}, ενεργό spot {act}.",
-                     "Toda la cuenta real de CRYPTO NOVA se reparte así: cartera spot {spot}, núcleo adicional BTC, ETH y SOL {core}, "
+                     "Toda la cuenta real de CRYPTO NOVA AI se reparte así: cartera spot {spot}, núcleo adicional BTC, ETH y SOL {core}, "
                      "futuros {fut}, spot activo {act}."),
     "alt": _L("Модель «ядро + альтсезон» сейчас: ядро {core}, альт-корзина {alts} ({state}), кэш {cash}, фьючерсы-сигналы {fut}.",
               "The “core + altseason” model now: core {core}, alt basket {alts} ({state}), cash {cash}, futures signals {fut}.",
@@ -436,10 +436,10 @@ TXT = {
                   "ο δείκτης είναι ανενεργός — το κομμάτι των altcoins είναι σε BTC",
                   "el indicador está apagado: la parte de altcoins está en BTC"),
     "rule": _L("Правило", "Rule", "Правило", "Κανόνας", "Regla"),
-    "disclaimer": _L("Это разбор по правилам CRYPTO NOVA, а не финансовый совет.", "This is a review by CRYPTO NOVA's rules, not financial advice.",
-                     "Це розбір за правилами CRYPTO NOVA, а не фінансова порада.",
-                     "Αυτή είναι ανάλυση με τους κανόνες του CRYPTO NOVA, όχι επενδυτική συμβουλή.",
-                     "Este es un análisis según las reglas de CRYPTO NOVA, no un consejo financiero."),
+    "disclaimer": _L("Это разбор по правилам CRYPTO NOVA AI, а не финансовый совет.", "This is a review by CRYPTO NOVA AI's rules, not financial advice.",
+                     "Це розбір за правилами CRYPTO NOVA AI, а не фінансова порада.",
+                     "Αυτή είναι ανάλυση με τους κανόνες του CRYPTO NOVA AI, όχι επενδυτική συμβουλή.",
+                     "Este es un análisis según las reglas de CRYPTO NOVA AI, no un consejo financiero."),
     "and_more": _L("и ещё {n}", "and {n} more", "і ще {n}", "και άλλα {n}", "y {n} más"),
     "and": _L(" и ", " and ", " і ", " και ", " y "),
     "e_g": _L("например", "e.g.", "наприклад", "π.χ.", "p. ej."),
@@ -482,10 +482,10 @@ MSG = {   # error codes → what the app shows (parse and review)
     "rate": _L("Слишком много разборов подряд. Попробуйте через {m} мин.", "Too many reviews in a row. Try again in {m} min.",
                "Забагато розборів поспіль. Спробуйте за {m} хв.", "Πάρα πολλές αναλύσεις στη σειρά. Δοκιμάστε ξανά σε {m} λεπτά.",
                "Demasiados análisis seguidos. Inténtalo en {m} min."),
-    "no_data": _L("Данные CRYPTO NOVA сейчас обновляются. Попробуйте через пару минут.", "CRYPTO NOVA's data is updating. Try again in a couple of minutes.",
-                  "Дані CRYPTO NOVA зараз оновлюються. Спробуйте за кілька хвилин.",
-                  "Τα δεδομένα του CRYPTO NOVA ενημερώνονται. Δοκιμάστε ξανά σε λίγα λεπτά.",
-                  "Los datos de CRYPTO NOVA se están actualizando. Inténtalo en un par de minutos."),
+    "no_data": _L("Данные CRYPTO NOVA AI сейчас обновляются. Попробуйте через пару минут.", "CRYPTO NOVA AI's data is updating. Try again in a couple of minutes.",
+                  "Дані CRYPTO NOVA AI зараз оновлюються. Спробуйте за кілька хвилин.",
+                  "Τα δεδομένα του CRYPTO NOVA AI ενημερώνονται. Δοκιμάστε ξανά σε λίγα λεπτά.",
+                  "Los datos de CRYPTO NOVA AI se están actualizando. Inténtalo en un par de minutos."),
     "bad_holdings": _L("Список монет пуст. Добавьте хотя бы одну монету с количеством.", "The coin list is empty. Add at least one coin with an amount.",
                        "Список монет порожній. Додайте хоча б одну монету з кількістю.",
                        "Η λίστα νομισμάτων είναι κενή. Προσθέστε τουλάχιστον ένα νόμισμα με ποσότητα.",
@@ -677,7 +677,7 @@ def clean_holdings(items, cap: int = 100) -> list[dict]:
 
 # ------------------------------------------------------------------------------------------------ the model: the real account
 def real_model(real: dict, statuses: dict, lang: str = DEFAULT) -> dict | None:
-    """the spot part of the real CRYPTO NOVA account (web/public_real.json) as the review's model: {"model": {sym: % of the spot
+    """the spot part of the real CRYPTO NOVA AI account (web/public_real.json) as the review's model: {"model": {sym: % of the spot
     holdings}, "buckets", "cash" (%), "split": the account's spot / futures / active shares as text, "asof"}; None without it"""
     if not isinstance(real, dict) or not real.get("asof") or not isinstance(real.get("spot"), list):
         return None

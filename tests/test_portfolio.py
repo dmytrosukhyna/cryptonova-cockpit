@@ -293,7 +293,7 @@ def test_run_returns_six_portfolios(tmp_path):
     assert {p["symbol"] for p in res["portfolios"]["bal"]["positions"]} >= {"BTC", "ETH", "SOL"}
     assert res["portfolios"]["meme"]["index"] == 104.0
     ip = res["portfolios"]["ideas"]
-    assert {p["symbol"] for p in ip["positions"]} == {"BTC", "ETH"} and not ip["experiment"] and ip["ours"] and ip["name"] == "CRYPTO NOVA портфель"
+    assert {p["symbol"] for p in ip["positions"]} == {"BTC", "ETH"} and not ip["experiment"] and ip["ours"] and ip["name"] == "CRYPTO NOVA AI портфель"
     assert [a["symbol"] for a in ip["actions"] if a["action"] == "SKIP"] == ["GHOST"]          # no price source → skipped, said so
 
 
@@ -557,7 +557,7 @@ def test_ideas_first_run_weights_cash_and_unpriceable_skips():
     assert "8 мест" in nb["ADD1"] and all("кэш" in nb[m] for m in ("M3", "M4", "M5")) and "W1" not in nb and "X1" not in nb
     for k in ("key", "name", "about", "positions", "cash_pct", "invested_pct", "index", "history", "actions", "recent_actions"):
         assert k in st, k
-    assert st["key"] == "ideas" and st["name"] == "CRYPTO NOVA портфель" and st["ours"] and not st["experiment"] and "не обещаем" in st["about"]
+    assert st["key"] == "ideas" and st["name"] == "CRYPTO NOVA AI портфель" and st["ours"] and not st["experiment"] and "не обещаем" in st["about"]
     assert by["A1"]["bucket"] == "mid" and by["BTC"]["bucket"] == "core" and by["M1"]["bucket"] == "meme"
     assert by["A1"]["role_ru"] == "из таблицы: можно брать" and by["M1"]["role_ru"] == "на небольшую сумму"
     assert by["M1"]["price_src"] == "meme" and by["A1"]["price_src"] == "cg" and by["A1"]["price_live"]

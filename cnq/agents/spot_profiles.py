@@ -325,7 +325,7 @@ class RiskPortfolio:
 
 # ----------------------------------------------------------------------------- 6th profile: «По рекомендациям» (follows web/ideas.json)
 IDEAS = {
-    "key": "ideas", "name": "CRYPTO NOVA портфель", "prefix": "spot_ideas_", "status": "наш",
+    "key": "ideas", "name": "CRYPTO NOVA AI портфель", "prefix": "spot_ideas_", "status": "наш",
     # 18.10 (owner: «наш портфель … обязательно эфириум, солана … и высокорисковые»; lab: BTC+ETH+SOL +239 % vs top-50 alts −57 %
     # 2023-03 → 2026-10): core BTC / ETH / SOL 15 % each (topped back up when the market moves one under 11 %), other
     # «можно брать / добрать» coins 7.5 % each, high-risk «на небольшую сумму» 2.5 % each, at most 3 → 45 + 37.5 + 7.5 = 90 % + cash 10 %
@@ -355,7 +355,7 @@ IDEAS = {
     #    only the coin's own stop, its own take-profit rule and the Monday review sell. A coin the table sold («не брать») whose
     #    status is «можно брать / добрать» again inside the 14-day pause gets the pause lifted — at most once per pause.
 }
-IDEAS_ABOUT = ("Наш портфель CRYPTO NOVA: сам покупает то, что советует таблица «Что брать на спот». Старт $10 000. С 22.10 — только монеты со спот-парой на OKX: его повторяет реальный счёт CRYPTO NOVA. Ядро — BTC 30%, ETH 10%, "
+IDEAS_ABOUT = ("Наш портфель CRYPTO NOVA AI: сам покупает то, что советует таблица «Что брать на спот». Старт $10 000. С 22.10 — только монеты со спот-парой на OKX: его повторяет реальный счёт CRYPTO NOVA AI. Ядро — BTC 30%, ETH 10%, "
                "SOL 5% (доливаем, если доля упала ниже ¾ плана; продаём лишнее, если выросла больше чем в 1.5 раза), остальные «можно брать» и «можно добрать» — по 7.5%, всего не больше 8 монет вместе с ядром; «можно на небольшую сумму» — по 2.5%, "
                "не больше 3; кэш не меньше 10%, комиссия 0.1% с каждой сделки. Продаём, если таблица поставила «не брать»; стоп −20% от "
                "входа (ядро BTC, ETH, SOL — без стопа); для небольшой суммы стоп −35%, на ×2 продаём половину, остаток — до отката 35% от "
@@ -497,7 +497,7 @@ def smart_candidates(sm: dict | None, okx: set | None = None) -> list[dict]:
 
 
 def core_target(sym: str) -> float:
-    """The plan weight of a core coin in the CRYPTO NOVA портфель (BTC 30 % / ETH 10 % / SOL 5 %; another core coin 10 %)."""
+    """The plan weight of a core coin in the CRYPTO NOVA AI портфель (BTC 30 % / ETH 10 % / SOL 5 %; another core coin 10 %)."""
     cw = IDEAS["core_w"]
     return cw.get(sym, 0.10) if isinstance(cw, dict) else float(cw)
 
@@ -751,7 +751,7 @@ class IdeasPortfolio:
             if okx is not None and s not in okx and kind != "core":
                 rp._set_meta("okx_swap", (rp._meta("okx_swap") or 0.0) + self._mv(p, px))
                 self._sell(now, s, p, px, f"Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный "
-                           f"счёт CRYPTO NOVA. {s} на споте OKX нет — продаём, итог {res}; деньги — в ядро, пока таблица не "
+                           f"счёт CRYPTO NOVA AI. {s} на споте OKX нет — продаём, итог {res}; деньги — в ядро, пока таблица не "
                            "предложит монету с OKX.", actions)
             elif st == "avoid" and not cross_stop(r):
                 self._sell(now, s, p, px, f"Таблица поставила «не брать»: {r.get('why_ru') or 'проверки не пройдены'}. Продаём, итог {res}.", actions)
@@ -790,7 +790,7 @@ class IdeasPortfolio:
                 px = k = why_not = None
                 lifted = None
                 if okx is not None and s not in okx:
-                    why_not = "на споте OKX нет пары — портфель повторяет реальный счёт CRYPTO NOVA на OKX"
+                    why_not = "на споте OKX нет пары — портфель повторяет реальный счёт CRYPTO NOVA AI на OKX"
                 elif s in cool and not (lifted := self._cooldown_lift(now, s, st)):
                     t = self.conn.execute(f"SELECT MAX(time) FROM {rp.T_ACT} WHERE symbol=? AND action='SELL'", (s,)).fetchone()[0] or now
                     dd = lambda x: datetime.fromtimestamp(x / 1000, tz=timezone.utc).strftime("%d.%m")   # noqa: E731
@@ -944,7 +944,7 @@ class IdeasPortfolio:
                                "smart:smart"))
             if first:
                 rp._set_meta("smart_first", now)
-                print(f"SMART-MONEY FIRST BUY: {s} {SMART['w'] * 100:g}% of «CRYPTO NOVA портфель» at {px}", flush=True)
+                print(f"SMART-MONEY FIRST BUY: {s} {SMART['w'] * 100:g}% of «CRYPTO NOVA AI портфель» at {px}", flush=True)
             rp._set_cash(rp.cash() - cost * P["fee"])
             rp._set_meta(f"src:{s}", _SRC_CODE[k])
             rp._set_meta(f"px:{s}", px)

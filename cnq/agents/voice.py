@@ -125,8 +125,8 @@ def whales_line(out: str) -> str | None:
         return None
     c = wd.copies(out)
     oc, cc = c["open_copies"], c["copies_closed"]
-    # 05.11 (owner 09:52): spoken words say «система CRYPTO NOVA», never the method (whales, copies, traders)
-    s = "Фьючерсы ведёт система CRYPTO NOVA" + ("" if oc else ", открытых сделок сейчас нет")
+    # 05.11 (owner 09:52): spoken words say «система CRYPTO NOVA AI», never the method (whales, copies, traders)
+    s = "Фьючерсы ведёт система CRYPTO NOVA AI" + ("" if oc else ", открытых сделок сейчас нет")
     if cc:
         s += f"; за сутки закрыли {deals(len(cc), acc=True)}, итог {'около нуля' if abs(c['copies_usd']) < 5 else result(c['copies_usd'])}"
     s += "."

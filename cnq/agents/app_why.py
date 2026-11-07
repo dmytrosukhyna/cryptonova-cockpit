@@ -496,16 +496,16 @@ W55: dict[str, dict[str, str]] = {
 T.update(W55)
 
 
-# 05.11 (owner, 09:52: «нигде не надо писать, что это копии китов, копии трейдеров … везде должна быть система CRYPTO NOVA … людям
-# нужен только результат»): the real futures trade is explained as a signal of the system CRYPTO NOVA — the market at the entry
+# 05.11 (owner, 09:52: «нигде не надо писать, что это копии китов, копии трейдеров … везде должна быть система CRYPTO NOVA AI … людям
+# нужен только результат»): the real futures trade is explained as a signal of the system CRYPTO NOVA AI — the market at the entry
 # (trend, levels, BTC, funding, open interest), the plan (entry, stop, target) and the exit rule. No whale, no copy, no trader.
 # The document keeps the build 55 shape (title / signal / checks / plan / summary / target_line / sections …) so the app renders it.
 SY: dict[str, dict[str, str]] = {
-    "sy.title": _w("Сигнал системы CRYPTO NOVA", "CRYPTO NOVA system signal", "Сигнал системи CRYPTO NOVA", "Σήμα του συστήματος CRYPTO NOVA",
-                   "Señal del sistema CRYPTO NOVA"),
-    "sy.sig": _w("Система CRYPTO NOVA открыла сделку: {side} по {sym}.", "The CRYPTO NOVA system opened a trade: {side} on {sym}.",
-                 "Система CRYPTO NOVA відкрила угоду: {side} по {sym}.", "Το σύστημα CRYPTO NOVA άνοιξε συναλλαγή: {side} στο {sym}.",
-                 "El sistema CRYPTO NOVA abrió una operación: {side} en {sym}."),
+    "sy.title": _w("Сигнал системы CRYPTO NOVA AI", "CRYPTO NOVA AI system signal", "Сигнал системи CRYPTO NOVA AI", "Σήμα του συστήματος CRYPTO NOVA AI",
+                   "Señal del sistema CRYPTO NOVA AI"),
+    "sy.sig": _w("Система CRYPTO NOVA AI открыла сделку: {side} по {sym}.", "The CRYPTO NOVA AI system opened a trade: {side} on {sym}.",
+                 "Система CRYPTO NOVA AI відкрила угоду: {side} по {sym}.", "Το σύστημα CRYPTO NOVA AI άνοιξε συναλλαγή: {side} στο {sym}.",
+                 "El sistema CRYPTO NOVA AI abrió una operación: {side} en {sym}."),
     "sy.sig.why": _w(" Вход — по сигналу системы с учётом состояния рынка; у сделки сразу стоит стоп на бирже.",
                      " The entry follows the system's signal and the state of the market; the stop is on the exchange from the start.",
                      " Вхід — за сигналом системи з урахуванням стану ринку; стоп одразу стоїть на біржі.",
@@ -536,16 +536,16 @@ SY: dict[str, dict[str, str]] = {
     "sy.exit": _w("Сигнал развернулся — система закрыла позицию.", "The signal reversed, and the system closed the position.",
                   "Сигнал розвернувся — система закрила позицію.", "Το σήμα αντιστράφηκε και το σύστημα έκλεισε τη θέση.",
                   "La señal se invirtió y el sistema cerró la posición."),
-    "sy.sum": _w("Сигнал системы CRYPTO NOVA: {side} {sym}. Цель {tgt} ({tp}), стоп {stop}.",
-                 "CRYPTO NOVA system signal: {side} {sym}. Target {tgt} ({tp}), stop {stop}.",
-                 "Сигнал системи CRYPTO NOVA: {side} {sym}. Ціль {tgt} ({tp}), стоп {stop}.",
-                 "Σήμα του συστήματος CRYPTO NOVA: {side} {sym}. Στόχος {tgt} ({tp}), stop {stop}.",
-                 "Señal del sistema CRYPTO NOVA: {side} {sym}. Objetivo {tgt} ({tp}), stop {stop}."),
-    "sy.sum0": _w("Сигнал системы CRYPTO NOVA: {side} {sym}. Стоп стоит на бирже; система закроет позицию при развороте сигнала или по стопу.",
-                  "CRYPTO NOVA system signal: {side} {sym}. The stop is on the exchange; the system closes the position when the signal reverses or at the stop.",
-                  "Сигнал системи CRYPTO NOVA: {side} {sym}. Стоп стоїть на біржі; система закриє позицію при розвороті сигналу або за стопом.",
-                  "Σήμα του συστήματος CRYPTO NOVA: {side} {sym}. Το stop είναι στο ανταλλακτήριο· το σύστημα κλείνει τη θέση όταν αντιστραφεί το σήμα ή στο stop.",
-                  "Señal del sistema CRYPTO NOVA: {side} {sym}. El stop está en el exchange; el sistema cierra la posición cuando la señal se invierte o en el stop."),
+    "sy.sum": _w("Сигнал системы CRYPTO NOVA AI: {side} {sym}. Цель {tgt} ({tp}), стоп {stop}.",
+                 "CRYPTO NOVA AI system signal: {side} {sym}. Target {tgt} ({tp}), stop {stop}.",
+                 "Сигнал системи CRYPTO NOVA AI: {side} {sym}. Ціль {tgt} ({tp}), стоп {stop}.",
+                 "Σήμα του συστήματος CRYPTO NOVA AI: {side} {sym}. Στόχος {tgt} ({tp}), stop {stop}.",
+                 "Señal del sistema CRYPTO NOVA AI: {side} {sym}. Objetivo {tgt} ({tp}), stop {stop}."),
+    "sy.sum0": _w("Сигнал системы CRYPTO NOVA AI: {side} {sym}. Стоп стоит на бирже; система закроет позицию при развороте сигнала или по стопу.",
+                  "CRYPTO NOVA AI system signal: {side} {sym}. The stop is on the exchange; the system closes the position when the signal reverses or at the stop.",
+                  "Сигнал системи CRYPTO NOVA AI: {side} {sym}. Стоп стоїть на біржі; система закриє позицію при розвороті сигналу або за стопом.",
+                  "Σήμα του συστήματος CRYPTO NOVA AI: {side} {sym}. Το stop είναι στο ανταλλακτήριο· το σύστημα κλείνει τη θέση όταν αντιστραφεί το σήμα ή στο stop.",
+                  "Señal del sistema CRYPTO NOVA AI: {side} {sym}. El stop está en el exchange; el sistema cierra la posición cuando la señal se invierte o en el stop."),
     "sy.tline": _w("Цель {tgt} ({tp}{usd}). Выход: разворот сигнала системы или стоп {stop}.",
                    "Target {tgt} ({tp}{usd}). Exit: the system's signal reverses or the stop {stop}.",
                    "Ціль {tgt} ({tp}{usd}). Вихід: розворот сигналу системи або стоп {stop}.",
@@ -554,9 +554,9 @@ SY: dict[str, dict[str, str]] = {
     "sy.s.signal": _w("Сигнал", "Signal", "Сигнал", "Σήμα", "Señal"),
     "sy.s.entry": _w("Вход", "Entry", "Вхід", "Είσοδος", "Entrada"),
     "sy.s.stop": _w("Стоп", "Stop", "Стоп", "Stop", "Stop"),
-    "sy.signal.t": _w("Система CRYPTO NOVA открыла {side} {sym}{at}.", "The CRYPTO NOVA system opened a {side} on {sym}{at}.",
-                      "Система CRYPTO NOVA відкрила {side} {sym}{at}.", "Το σύστημα CRYPTO NOVA άνοιξε {side} στο {sym}{at}.",
-                      "El sistema CRYPTO NOVA abrió un {side} en {sym}{at}."),
+    "sy.signal.t": _w("Система CRYPTO NOVA AI открыла {side} {sym}{at}.", "The CRYPTO NOVA AI system opened a {side} on {sym}{at}.",
+                      "Система CRYPTO NOVA AI відкрила {side} {sym}{at}.", "Το σύστημα CRYPTO NOVA AI άνοιξε {side} στο {sym}{at}.",
+                      "El sistema CRYPTO NOVA AI abrió un {side} en {sym}{at}."),
     "sy.at": _w(" — {d}", " on {d}", " — {d}", " στις {d}", " el {d}"),
     "sy.entry": _w("Вход по {e}.", "Entry at {e}.", "Вхід за {e}.", "Είσοδος στα {e}.", "Entrada a {e}."),
     "sy.stop": _w("{stop} ({sp} от входа). Стоп стоит на бирже OKX и сработает, даже если система недоступна.",
@@ -849,7 +849,7 @@ def flat_real_why(w: dict | None) -> dict | None:
 
 def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, desk: dict | None, caps: dict, ctx: dict,
              lang: str = DEFAULT, closed: bool = False) -> dict:
-    """A real futures trade of the system's futures desk explained for people (owner 05.11 09:52: «сигнал системы CRYPTO NOVA»):
+    """A real futures trade of the system's futures desk explained for people (owner 05.11 09:52: «сигнал системы CRYPTO NOVA AI»):
     the market at the entry (trend from ctx["trend"], levels, BTC, funding, open interest — from real_why.json when recorded), the
     plan (entry, stop, the 2R target) and the exit rule; the demo account on the same signals. [wd]/[rec] are used for nothing a
     person sees (kept in the signature for the callers). The keys are those of build 55 so the app renders it unchanged."""

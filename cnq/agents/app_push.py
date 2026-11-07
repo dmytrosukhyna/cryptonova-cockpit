@@ -126,7 +126,7 @@ def day_summary(out: str, now_ms: int) -> tuple[str, str] | None:
     body = (f"Закрыто сделок: {len(cl)}, в плюсе {wins}; итог {_fmt_usd(tot)} на демо-счёте $10 000"
             + (f". Лучшая: {best.get('coin')} {_fmt_usd(float(best.get('pnl') or 0))}" if float(best.get("pnl") or 0) > 0 else "")
             + f". В работе {n_open}.")
-    return "Система CRYPTO NOVA за день · демо", body
+    return "Система CRYPTO NOVA AI за день · демо", body
 
 
 def week_summary(out: str, now_ms: int) -> tuple[str, str] | None:
@@ -136,7 +136,7 @@ def week_summary(out: str, now_ms: int) -> tuple[str, str] | None:
     if not cl:
         return None
     tot = sum(float(c.get("pnl") or 0) for c in cl)
-    return ("Итоги недели · система CRYPTO NOVA",
+    return ("Итоги недели · система CRYPTO NOVA AI",
             f"Сигналы системы на демо-счёте $10 000: закрыто сделок {len(cl)}, итог {_fmt_usd(tot)}. Подробности — в приложении.")
 
 

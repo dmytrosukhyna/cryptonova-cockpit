@@ -40,6 +40,26 @@ def test_report_numbers_wording_and_no_repeat(tmp_path):
     assert len({s[0] for s in seen}) == 5                       # 5 mornings, 5 different titles
 
 
+def test_every_language_file_same_numbers_ai_wording(tmp_path):
+    now = ms(8, 6, 45)
+    world(tmp_path, now)
+    M.build(str(tmp_path), sqlite3.connect(":memory:"), now, audio=False)
+    ru = json.load(open(tmp_path / "morning.json", encoding="utf-8"))
+    for lang in ("en", "uk", "el", "es"):
+        d = json.load(open(tmp_path / f"morning.{lang}.json", encoding="utf-8"))
+        assert d["lang"] == lang and d["picks"] == ru["picks"] and d["day"] == ru["day"]
+        assert "CRYPTO NOVA AI" in d["title"] and d["body"] and d["owner"]["body"]
+        for t in (d["title"], d["body"], d["owner"]["body"], d["text"]):
+            assert not METHOD.search(t), (lang, t)
+            if lang != "uk":
+                assert not re.search(r"[А-Яа-яЁёІіЇїЄє]", t), (lang, t)
+        assert "51" in d["body"]
+    assert "$9,139" in json.load(open(tmp_path / "morning.en.json"))["body"]
+    assert "$9 139" in json.load(open(tmp_path / "morning.es.json"))["body"]
+    from cnq import engine
+    assert {"morning.en.json", "morning.el.mp3"} <= set(engine.OWNED)
+
+
 def test_ensure_builds_once_in_the_morning_window(tmp_path):
     conn = sqlite3.connect(":memory:")
     world(tmp_path, ms(9, 6, 0))

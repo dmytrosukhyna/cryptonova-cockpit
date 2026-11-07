@@ -56,7 +56,7 @@ def test_default_settings_send_nothing(tmp_path):
     st.set_prefs("u1", {"trades": True})                                  # the person turns one switch on → only that one
     assert st.prefs("u1") == {"trades": True, "news": False, "piggy": False, "brief": False}
     app_push.run(conn, api, str(web), ms(20, 6, weekday_fri=True), f)
-    assert len(f.sent) == 1 and "ZEC +$104" in f.sent[0][2] and "Система CRYPTO NOVA" in f.sent[0][1]
+    assert len(f.sent) == 1 and "ZEC +$104" in f.sent[0][2] and "Система CRYPTO NOVA AI" in f.sent[0][1]
 
 
 def test_saved_settings_are_kept_and_only_sent_switches_are_stored(tmp_path):
@@ -83,7 +83,7 @@ def test_whale_summary_once_in_the_evening_never_per_trade(tmp_path):
     app_push.run(conn, api, str(web), ms(15), f)          # before 20:00 → wait for the evening
     assert f.sent == []
     r = app_push.run(conn, api, str(web), ms(20, 3), f)
-    assert r["sent"] == 1 and f.sent[0][1] == "Система CRYPTO NOVA за день · демо"
+    assert r["sent"] == 1 and f.sent[0][1] == "Система CRYPTO NOVA AI за день · демо"
     assert f.sent[0][2] == "Закрыто сделок: 3, в плюсе 1; итог +$82 на демо-счёте $10 000. Лучшая: ZEC +$104. В работе 5."
     for m_ in (10, 30, 59):
         app_push.run(conn, api, str(web), ms(20, m_), f)  # the same evening → still one
@@ -109,7 +109,7 @@ def test_friday_week_summary_of_the_whale_desk(tmp_path):
     f = FakeFcm()
     app_push.run(conn, api, str(web), ms(18, 20, weekday_fri=True), f)
     app_push.run(conn, api, str(web), ms(18, 40, weekday_fri=True), f)
-    briefs = [x for x in f.sent if x[1] == "Итоги недели · система CRYPTO NOVA"]
+    briefs = [x for x in f.sent if x[1] == "Итоги недели · система CRYPTO NOVA AI"]
     assert len(briefs) == 1 and "закрыто сделок 2, итог +$64" in briefs[0][2]
 
 

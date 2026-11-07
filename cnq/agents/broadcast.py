@@ -33,7 +33,7 @@ WEEK_MS = 7 * DAY_MS
 WORDS_PER_MIN = 130          # calm live speech
 SHOW_MIN_PER_SLIDE = 0.3     # time to switch and point at the card
 # 05.11: since 04.11 the real OKX account copies the top-5 verified traders; every other account of the deck is demo
-DISCLAIMER = "Не финансовая рекомендация. Реальный счёт ведёт система CRYPTO NOVA; остальные счета — демо."
+DISCLAIMER = "Не финансовая рекомендация. Реальный счёт ведёт система CRYPTO NOVA AI; остальные счета — демо."
 
 
 # ------------------------------------------------------------------ small helpers
@@ -562,7 +562,7 @@ def strategy_rows(ctx: dict) -> list[dict]:
 
 def s_whales(ctx: dict, now_ms: int) -> dict | None:
     """05.11: the real account and the system's futures — positions, the week's trades and result, the demo account on the same
-    signals, one market line. Owner 05.11 09:52: «везде должна быть система CRYPTO NOVA» — never the method (whales, copying)."""
+    signals, one market line. Owner 05.11 09:52: «везде должна быть система CRYPTO NOVA AI» — never the method (whales, copying)."""
     d = ctx.get("_dir")
     if not d:
         return None
@@ -574,7 +574,7 @@ def s_whales(ctx: dict, now_ms: int) -> dict | None:
     desk = wd.desk(d)
     opn, cl = c["open"], c["closed"]
     wk = sum(x["pnl"] for x in cl)
-    B, S = [], ["Как работает реальный счёт: фьючерсы и спот ведёт система CRYPTO NOVA, у каждой сделки стоп на бирже."]
+    B, S = [], ["Как работает реальный счёт: фьючерсы и спот ведёт система CRYPTO NOVA AI, у каждой сделки стоп на бирже."]
     B.append(f"Реальный счёт OKX: {usd(real['equity_usd'], sign=False)}, с 22.10 {usd(real.get('pnl_usd') or 0)} ({pct((real.get('pnl_pct') or 0) / 100)})")
     S.append(f"Реальный счёт на OKX — {say_usd(real['equity_usd'], sign=False)}; с 22 октября {say_usd(real.get('pnl_usd') or 0)}.")
     B.append("Позиции: " + (", ".join(f"{o['coin']} {'лонг' if o['side'] == 'long' else 'шорт'}" for o in opn[:5]) if opn else "открытых нет"))
@@ -587,7 +587,7 @@ def s_whales(ctx: dict, now_ms: int) -> dict | None:
     hl = wd.onchain_line(d) or wd.funds_line(d, now_ms)
     if hl:
         B.append(hl.rstrip("."))
-    return slide("whales", "Система CRYPTO NOVA: реальный счёт", "kpi", B[:5], S,
+    return slide("whales", "Система CRYPTO NOVA AI: реальный счёт", "kpi", B[:5], S,
                  {"open": len(opn), "week_closed": len(cl), "week_usd": round(wk, 2),
                   "desk": {k: desk[k] for k in ("pnl_usd", "trades", "wins")} if desk else None},
                  "Покажи верх панели: реальный счёт OKX и открытые позиции.")
@@ -828,8 +828,8 @@ def s_plan(ctx: dict, now_ms: int) -> dict | None:
     scan = (ctx.get("paper") or {}).get("scan") or {}
     if scan.get("need_breadth") is not None:
         facts["need_breadth"] = scan["need_breadth"]
-    B.append("Фьючерсы и спот ведёт система CRYPTO NOVA; основа спота — BTC, ETH, SOL")
-    S.append("Дальше система работает так же: фьючерсы и спот ведёт система CRYPTO NOVA, основа спота — биткоин, эфир и солана.")
+    B.append("Фьючерсы и спот ведёт система CRYPTO NOVA AI; основа спота — BTC, ETH, SOL")
+    S.append("Дальше система работает так же: фьючерсы и спот ведёт система CRYPTO NOVA AI, основа спота — биткоин, эфир и солана.")
     B.append(DISCLAIMER)
     S.append("Это не финансовая рекомендация; кроме реального счёта, все счета — демо. Спасибо, что были с нами!")
     return slide("plan", "Итог и план на неделю", "chartCard", B[-5:] if len(B) > 5 else B, S, facts,

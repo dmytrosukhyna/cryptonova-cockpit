@@ -108,9 +108,9 @@ KYIV = dt.timezone(dt.timedelta(hours=3))
 WHALE_MODELS = {
     "calm": {"about_ru": "Держим ядро BTC 30 / ETH 10 / SOL 5 (в этих пропорциях), без фьючерсов; когда BTC ниже своей 200-дневной "
                          "средней — большая часть уходит в доходные доллары."},
-    "balanced": {"about_ru": "Как реальный счёт: ядро BTC / ETH / SOL на споте и фьючерсы по сигналам системы CRYPTO NOVA; "
+    "balanced": {"about_ru": "Как реальный счёт: ядро BTC / ETH / SOL на споте и фьючерсы по сигналам системы CRYPTO NOVA AI; "
                              "доли система двигает сама — по рынку и по ставкам."},
-    "bold": {"about_ru": "Больше фьючерсов по сигналам системы CRYPTO NOVA — выше и доход, и риск. Защита та же: режим BTC, стоп у "
+    "bold": {"about_ru": "Больше фьючерсов по сигналам системы CRYPTO NOVA AI — выше и доход, и риск. Защита та же: режим BTC, стоп у "
                          "каждой сделки на бирже, плечо под каждый сигнал при риске сделки не больше 2% бюджета, резерв в кредитовании."},
 }
 WHALE_RULES = [
@@ -167,7 +167,7 @@ def lst_gate(out: str) -> tuple[bool, dict]:
 # short) get no money. Without the whale file the old model runs unchanged. The switch restarts the demo once (st["model"]).
 CORE_W = {"BTC": 30 / 45, "ETH": 10 / 45, "SOL": 5 / 45}
 CORE_REF = {"BTC": 80_000.0, "ETH": 2_400.0, "SOL": 96.0}          # fixed reference prices: only the ratio between runs matters
-WHALE_NAMES = {"spot": "Спот · ядро BTC / ETH / SOL", "futures": "Фьючерсы · система CRYPTO NOVA"}   # owner 05.11: never the method
+WHALE_NAMES = {"spot": "Спот · ядро BTC / ETH / SOL", "futures": "Фьючерсы · система CRYPTO NOVA AI"}   # owner 05.11: never the method
 
 
 def whale_mode(out: str) -> bool:
@@ -479,7 +479,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
         conn.execute("DELETE FROM capital_state")
         conn.execute("DELETE FROM capital_hist")
         st = {"previous": prev}
-        events.append(("Новая модель: фьючерсы — сигналы системы CRYPTO NOVA, спот — ядро BTC, ETH и SOL, как на "
+        events.append(("Новая модель: фьючерсы — сигналы системы CRYPTO NOVA AI, спот — ядро BTC, ETH и SOL, как на "
                        f"реальном счёте. Демо-счёт начат заново с ${START:,.0f} (прошлый запуск закончился на ${prev['value']:,.2f}).")
                       if wm else f"Модель реального счёта недоступна — демо-счёт начат заново с ${START:,.0f}.")
     if (st.get("sleeves") or st.get("models")) and st.get("version") != VERSION:   # the allocator changed → one clean restart

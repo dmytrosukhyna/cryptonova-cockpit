@@ -6,6 +6,9 @@ Rules:
 - trades (05.11, owner: the system copies the top-5 verified traders since 04.11): ONE evening summary of the «Киты» demo desk
   (whales_top.json desk) at 20:00 Kyiv — copies closed today, their result, how many are open; only when a closed copy moved at
   least $5 (no pushes about $1–2 trades); no push per trade, the retired rule desks are no longer pushed;
+- «Утренний доклад» (07.11, owner): 07:00–07:30 Kyiv, once a day — the ONE exception to the quiet hours; the text and the mp3 are
+  written by cnq/agents/morning.py (web/morning.json, web/morning.mp3); to the owner (CNQ_OWNER_EMAIL, his own account's words) and
+  to people with a confirmed real account (tier «vip») who switched on «brief» or «trades»;
 - piggy: one reminder on the buy day at 10:00 Kyiv; weekly summary («Киты» desk over 7 days): Friday 18:00 Kyiv;
 - «важное на рынке» (news switch): bitcoin moved ≥ 5% in 24 h — at most once a day, 10:00–21:00 Kyiv.
 Every trade message says «демо». Runs every engine cycle; reads data/api.sqlite (users, prefs, push tokens), web/whales_top.json
@@ -56,6 +59,42 @@ def _fmt_price(p) -> str:
 def _db(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE TABLE IF NOT EXISTS push_seen(key TEXT PRIMARY KEY, t INTEGER)")
     conn.execute("CREATE TABLE IF NOT EXISTS push_log(uid TEXT, kind TEXT, day TEXT, t INTEGER)")
+
+
+MORNING_HOUR = 7       # «Утренний доклад» at 07:00 Kyiv — an explicit exception to QUIET (owner 07.11)
+
+
+def morning_recipients(st) -> list[tuple[str, str, bool]]:
+    """[(uid, token, is_owner)]: the owner always; others only with a confirmed real account (tier «vip») and «brief» or «trades» on"""
+    try:
+        from cnq.api.owner_auth import is_owner
+    except Exception:  # noqa: BLE001
+        is_owner = lambda e, v=True: False  # noqa: E731
+    out = []
+    for uid, tok in st.push_tokens():
+        u = st.user(uid) or {}
+        own = bool(u.get("email")) and is_owner(u.get("email"))
+        p = st.prefs(uid)
+        if own or (u.get("tier") == "vip" and (p.get("brief") or p.get("trades"))):
+            out.append((uid, tok, own))
+    return out
+
+
+def _morning(conn, st, fcm, doc: dict, day: str, now_ms: int, results: dict) -> int:
+    n = 0
+    for uid, tok, own in morning_recipients(st):
+        if conn.execute("SELECT 1 FROM push_log WHERE uid=? AND kind='morning' AND day=?", (uid, day)).fetchone():
+            continue
+        m = doc.get("owner") if own and doc.get("owner") else doc
+        r = fcm.send(tok, m["title"], m["body"], {"open": "morning", "day": day, "audio": doc.get("audio") or ""})
+        results[r] = results.get(r, 0) + 1
+        if r == "gone":
+            st.drop_push(tok)
+        elif r in ("ok", "dry"):
+            conn.execute("INSERT INTO push_log VALUES(?,?,?,?)", (uid, "morning", day, now_ms))
+            n += 1
+    conn.commit()
+    return n
 
 
 def _desk(out: str) -> dict:
@@ -129,6 +168,12 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
     if first_run:
         conn.execute("INSERT OR IGNORE INTO push_seen VALUES('__init__', ?)", (now_ms,))
     conn.commit()
+    mdoc = None
+    try:                                              # 07.11: today's «Утренний доклад» is written from 06:40 Kyiv (text + mp3)
+        from . import morning
+        mdoc = morning.ensure(out, conn, now_ms)
+    except Exception as e:  # noqa: BLE001
+        print("morning:", repr(e)[:200], flush=True)
     if not os.path.exists(api_db):
         return {"sent": 0, "reason": "no api db"}
     from cnq.api.store import Store
@@ -148,6 +193,10 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
     move = _big_move(out)
     if move and 10 <= k.hour < 21:
         msgs.append(("news", move[0], move[1], {"open": "home"}))
+    morning_sent = 0
+    if mdoc and mdoc.get("day") == day and k.hour == MORNING_HOUR and k.minute < 30:
+        morning_sent = _morning(conn, st, fcm, mdoc, day, now_ms, results)
+        sent += morning_sent
     for pref, title, body, data in msgs:
         for uid, tok in st.push_tokens(pref=pref):
             if pref == "trades":
@@ -184,4 +233,4 @@ def run(conn: sqlite3.Connection, api_db: str, out: str = "web", now_ms: int | N
                 conn.execute("INSERT INTO push_log VALUES(?,?,?,?)", (uid, "piggy", day, now_ms))
                 sent += 1
     conn.commit()
-    return {"sent": sent, "dropped": dropped, "results": results, "summary": bool(summary), "quiet": quiet(now_ms)}
+    return {"sent": sent, "dropped": dropped, "results": results, "summary": bool(summary), "quiet": quiet(now_ms), "morning": morning_sent}

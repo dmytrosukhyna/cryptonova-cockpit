@@ -1,0 +1,10 @@
+{"backlog": 102, "run": 42375938430, "source": "binance ws_trips", "n": 1991, "traders": 34, "from": "2026-06-17", "to": "2026-11-06", "mid": "2026-10-21",
+ "share_down": {"R1_sma50": 0.443, "R2_r28": 0.552}, "passed_any": false,
+ "R1_d2_all": {"LONG_up": [0.359, 480, 1.25], "LONG_down": [0.231, 444, 1.23], "SHORT_up": [0.547, 628, 1.33], "SHORT_down": [0.472, 439, 1.35], "Ldiff": [-0.128, -0.29]},
+ "R1_d6_all": {"LONG_up": [0.331, 480, 1.23], "LONG_down": [0.265, 444, 1.27], "SHORT_up": [0.623, 628, 1.39], "SHORT_down": [0.707, 439, 1.55], "Ldiff": [-0.066, -0.17]},
+ "R1_d2_h1": {"LONG_up": [0.07, 424], "LONG_down": [5.756, 2], "SHORT_up": [0.637, 565], "SHORT_down": [0.52, 4]},
+ "R1_d2_h2": {"LONG_up": [2.542, 56], "LONG_down": [0.206, 442], "SHORT_up": [-0.255, 63], "SHORT_down": [0.472, 435]},
+ "R2_d2_all": {"LONG_up": [-0.119, 376, 0.92], "LONG_down": [0.582, 548, 1.59], "SHORT_up": [0.822, 516, 1.57], "SHORT_down": [0.23, 551, 1.14], "Ldiff": [0.701, 1.65]},
+ "R2_d2_h1": {"LONG_up": [-0.119, 376], "LONG_down": [1.719, 50], "SHORT_up": [0.822, 516], "SHORT_down": [-1.176, 53]},
+ "R2_d2_h2": {"LONG_down": [0.468, 498], "SHORT_down": [0.38, 498]},
+ "format": "[mean % per copy after costs, n, PF]; diff = [mean, Welch t]"}

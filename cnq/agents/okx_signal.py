@@ -1,4 +1,4 @@
-"""CRYPTO NOVA as a signal provider on the OKX Signal Marketplace (22.10.2026). OFF until the owner switches it on.
+"""CRYPTO NOVA AI as a signal provider on the OKX Signal Marketplace (22.10.2026). OFF until the owner switches it on.
 
 Why: the owner lives in Greece; OKX copy trading (lead trader) is closed to him, the Signal Marketplace is open. A provider creates a
 custom signal in OKX's Signal bot (MAIN account), gets a webhook URL and a signal token and sends TradingView-style alert messages;
@@ -8,7 +8,7 @@ What it sends: the trades of the panel header's futures desks («отобран�
 cnq/agents/desk_select.py + imp; 28.10 — a desk that leaves the set keeps sending the exits of its trades live on the signal), as OKX
 alert messages (OKX help «Trading Signal Bot Alert Message 2.0 Specifications», section B):
   • a desk opens a trade        → ENTER_LONG / ENTER_SHORT, market, investmentType percentage_investment, amount = the trade's share of
-                                   the CRYPTO NOVA account (Σ equity of the header desks, as the header counts it as ONE account);
+                                   the CRYPTO NOVA AI account (Σ equity of the header desks, as the header counts it as ONE account);
   • a desk takes a part off     → EXIT_LONG / EXIT_SHORT, investmentType percentage_position, amount = the part of what is still open;
   • a desk closes the trade     → EXIT_LONG / EXIT_SHORT, percentage_position 100.
 Stop-loss and take-profit are NOT in OKX's alert message (they are the bot's own settings): the desk's stop and targets reach the
@@ -45,7 +45,7 @@ from . import panel_header as ph
 from .panel_header import NOVA_BASE
 
 DESKS = NOVA_BASE                                   # the default; the live set is the header's: ph.nova_base(web/desk_select.json)
-DESK_RU = {"cons": "откуп падений", "bal": "откуп падений", "aggr": "откуп падений", "imp": "Импульс BTC", "own": "Сигналы CRYPTO NOVA"}
+DESK_RU = {"cons": "откуп падений", "bal": "откуп падений", "aggr": "откуп падений", "imp": "Импульс BTC", "own": "Сигналы CRYPTO NOVA AI"}
 ENV_ON, ENV_URL, ENV_TOKEN = "CNQ_OKX_SIGNAL", "CNQ_OKX_SIGNAL_URL", "CNQ_OKX_SIGNAL_TOKEN"
 MAX_LAG_S = 60                                      # OKX: [1, 3600], default 60 — a message older than this is not acted on
 MAX_AGE_MIN = 30                                    # a limit fill carries its 15-minute candle's open time → up to ~17 min old
@@ -169,7 +169,7 @@ def message(action: str, inst: str, token: str, now_ms: int, inv_type: str | Non
 
 
 def entry_pct(t: dict, desks: dict, cfg: dict) -> float:
-    """% of the subscriber's bot for an entry: the trade's notional ÷ Σ equity of the header desks (the CRYPTO NOVA account), so a
+    """% of the subscriber's bot for an entry: the trade's notional ÷ Σ equity of the header desks (the CRYPTO NOVA AI account), so a
     bot at leverage 1× holds what the panel's account holds. CNQ_OKX_SIGNAL_PCT overrides it. Bounded 1…50 %."""
     if cfg.get("pct"):
         return round(cfg["pct"], 2)
@@ -443,7 +443,7 @@ def public(conn: sqlite3.Connection, cfg: dict, now: int, swap_src: str | None =
             "desks": list(desk_keys or DESKS), "instruments": swap_src, "max_lag_s": MAX_LAG_S, "max_age_min": cfg["max_age_ms"] // 60_000,
             "sent": cnt.get("sent", 0), "pending": cnt.get("pending", 0), "failed": cnt.get("failed", 0), "skipped": cnt.get("skipped", 0),
             "last": last, "items": items,
-            "about_ru": ("Сигнал CRYPTO NOVA на OKX Signal Marketplace: сделки столов «отобранные сигналы» (откуп падений + Импульс BTC) "
+            "about_ru": ("Сигнал CRYPTO NOVA AI на OKX Signal Marketplace: сделки столов «отобранные сигналы» (откуп падений + Импульс BTC) "
                          "уходят в OKX как сообщения сигнала (вход, частичный выход, выход). Подписчик торгует своим ботом на своём счёте; "
                          "плечо и маржу он ставит сам. Прошлые результаты — не обещание. Сигнал бесплатный.")}
 

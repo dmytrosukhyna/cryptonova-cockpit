@@ -90,7 +90,7 @@ def test_channel_posts_follow_the_whale_model_and_fit_the_caption():
         assert "<b>Система CRYPTO NOVA AI</b>" in p and not METHOD.search(p), (slot, METHOD.search(p))
         assert len(re.sub(r"<[^>]+>", "", p)) <= 1024 and ch.lint(p, {}) == [], slot
         assert not RETIRED.search(p), (slot, RETIRED.search(p))
-        assert p.index("<b>Система CRYPTO NOVA AI</b>") < p.index("Вывод CRYPTO NOVA")
+        assert p.index("<b>Система CRYPTO NOVA AI</b>") < p.index("Вывод CRYPTO NOVA AI")
     ev = ch.post("evening", now=now.replace(hour=21, minute=40))
     assert "ZRO шорт: <b>+$2.13 (+4.2%)</b>, закрыта по сигналу системы" in ev and "SOL лонг" in ev
     assert "BNB шорт: в работе" not in ev                         # the system block lists the open positions; not listed twice
@@ -120,7 +120,7 @@ def test_weekly_post_speaks_about_the_real_account_and_the_whales():
             lv["kind"] = "support" if lv["hi"] <= c["price"] else "resistance"
     doc = weekly.run(sqlite3.connect(":memory:"), rep, os.path.join(tmp, "weekly.json"), now_ms)
     post, text = doc["post"], doc["text"]
-    assert post.startswith("📊") and "Реальный счёт CRYPTO NOVA на OKX: 9 650 $" in post and "С 22.10.2026: −$374.40 (−3.73%)" in post
+    assert post.startswith("📊") and "Реальный счёт CRYPTO NOVA AI на OKX: 9 650 $" in post and "С 22.10.2026: −$374.40 (−3.73%)" in post
     assert "Система CRYPTO NOVA AI\n— За неделю закрыто сделок: 2" in post and not METHOD.search(post) and not METHOD.search(text)
     assert "Спот — ядро: BTC 36%, ETH 13%, SOL 7% счёта" in post and "<b>" not in post
     for s in (post, text):
@@ -155,12 +155,12 @@ def test_app_demo_futures_is_the_whale_desk(tmp_path):
     assert not METHOD.search(json.dumps(card, ensure_ascii=False))
     for lang in ("en", "uk", "el", "es"):
         en, _ = app_home._whale_futures(tmp, now_ms, lang)
-        assert "CRYPTO NOVA" in en["about_ru"] and not re.search(r"whale|copy|trader|ballena|φάλαιν|кит|копі|трейдер", json.dumps(en, ensure_ascii=False), re.I)
+        assert "CRYPTO NOVA AI" in en["about_ru"] and not re.search(r"whale|copy|trader|ballena|φάλαιν|кит|копі|трейдер", json.dumps(en, ensure_ascii=False), re.I)
     assert app_home._whale_futures(str(tmp_path), now_ms, "ru") is None    # no desk → the old card stays
 
 
 def test_capital_demo_follows_the_whale_desk_and_the_core():
-    """05.11: the CRYPTO NOVA Портфолио demo = the real model — futures follow the «Киты» desk, spot the core BTC/ETH/SOL 30/10/5;
+    """05.11: the CRYPTO NOVA AI Портфолио demo = the real model — futures follow the «Киты» desk, spot the core BTC/ETH/SOL 30/10/5;
     no active spot or listing short; switching from the old desks model restarts the demo once (no jump in the numbers)"""
     from cnq.agents import capital as K
     from test_capital import world, T0

@@ -1,4 +1,4 @@
-"""«Реальный счёт CRYPTO NOVA на OKX» (cnq/execution/public_real.py → web/public_real.json → app_home public.real, the panel's line):
+"""«Реальный счёт CRYPTO NOVA AI на OKX» (cnq/execution/public_real.py → web/public_real.json → app_home public.real, the panel's line):
 the sub-account only (never the personal account), exactly the agreed keys, no key / IP / UID / order id, real numbers or
 "stale": true, a compact curve, today from a real day-start value, closed trades from OKX's own history.
 Every coin, key and amount is made-up test data; OKX and GitHub are never called."""
@@ -295,7 +295,7 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     pp = doc["public_portfolio"]
     assert pp["kind"] == "real" and pp["since"] == since and pp["start_usd"] == 10000.0 and pp["value_usd"] == 9970.0
     assert doc["public"]["base_usd"] == 20000.0                       # the demo header stays as it was (older builds, DEMO mode)
-    assert "22" not in pp["title"] and pp["note"].startswith("Реальный счёт CRYPTO\u00a0NOVA на OKX")
+    assert "22" not in pp["title"] and pp["note"].startswith("Реальный счёт CRYPTO\u00a0NOVA\u00a0AI на OKX")
     P = pp["periods"]
     assert P["all"] == {"from": since, "clipped": False, "available": True, "base_usd": 10000.0, "usd": -30.0, "pct": -0.3}
     assert P["day"]["from"] == day0 and P["day"]["usd"] == 30.0 and P["day"]["base_usd"] == 9940.0          # = today_usd
@@ -331,7 +331,7 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     assert pp["moved"]["dir"] == "futures→spot" and pp["moved"]["usd"] == 5.5 and pp["moved"]["is_pnl"] is False
     # «Рассчитать мой портфель»: the real account's own futures record, not the 17.10 demo desks'
     assert doc["public"]["calc"]["futures_why"].endswith(
-        f"Реальный счёт CRYPTO\u00a0NOVA с {app_home._date_text(since, 'ru')}: закрыто фьючерсных сделок — 3, из них в плюсе 1.")
+        f"Реальный счёт CRYPTO\u00a0NOVA\u00a0AI с {app_home._date_text(since, 'ru')}: закрыто фьючерсных сделок — 3, из них в плюсе 1.")
     # futures: the open SOL with the desk's own «why», the partly closed SOL stays under «open», stats from the closed ones
     (o,) = F["open"]
     assert o["sym"] == "SOL" and o["price"] == 201.0 and o["lev"] == 2.0 and o["why"] and o["why_title"] and o["closed_part_usd"] == 0.5
@@ -369,7 +369,7 @@ def test_market_view_spot_actions_and_demo_stats_in_plain_words(tmp_path):
              "why_ru": "Исключение владельца (22.10): HYPE из списка доверия — на небольшую сумму, хотя таблица пишет «Анкета 24/100 ниже "
                        "порога 40 — ждём». 2.5% счёта, стоп −35%, на ×2 продаём половину"},
             {"time": now - 3 * 3_600_000, "action": "SELL", "symbol": "XMR", "price": 609.84,
-             "why_ru": "Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный счёт CRYPTO NOVA. "
+             "why_ru": "Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный счёт CRYPTO NOVA AI. "
                        "XMR на споте OKX нет — продаём, итог +9% от входа; деньги — в ядро"},
             {"time": now - 4 * 3_600_000, "action": "ADD", "symbol": "BTC", "price": 81527.0,
              "why_ru": "Замена: монет без спот-пары на OKX в портфеле больше нет — их деньги в ядро по плану BTC 30 / ETH 10 / SOL 5, BTC +8.4% счёта."}]
@@ -392,7 +392,7 @@ def test_market_view_spot_actions_and_demo_stats_in_plain_words(tmp_path):
     A = [a["text"] for a in doc["spot"]["actions"]]
     assert A[0].startswith("Продано AAVE: монета перестала проходить проверку качества системы (оценка 38 из 100 при пороге 40)")
     assert A[1].startswith("Куплено HYPE на небольшую долю (2,5% портфеля) по решению владельца") and A[1].endswith("Стоп −35%.")
-    assert A[2] == "Продано XMR: этой монеты нет на споте OKX, а портфель повторяет реальный счёт CRYPTO\u00a0NOVA на OKX. Итог +9% от входа."
+    assert A[2] == "Продано XMR: этой монеты нет на споте OKX, а портфель повторяет реальный счёт CRYPTO\u00a0NOVA\u00a0AI на OKX. Итог +9% от входа."
     assert A[3] == "Докуплено BTC (+8,4% портфеля): деньги проданных монет переложены в ядро портфеля."
     for t_ in A:
         for jargon in ("Исключение владельца", "списка доверия", "Анкета", "ниже порога 40 — ждём"):

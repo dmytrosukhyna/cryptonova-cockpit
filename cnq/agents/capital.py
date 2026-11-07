@@ -1,13 +1,13 @@
-"""CRYPTO NOVA Портфолио — one sum, the system splits it between our desks (18.10.2026, owner: «человек пополняет $1000, система сама
+"""CRYPTO NOVA AI Портфолио — one sum, the system splits it between our desks (18.10.2026, owner: «человек пополняет $1000, система сама
 распределяет: спот, фьючерсы, фандинг… весь месяц работает, в конце подводит итоги: заработано столько-то, оплата 10%»; later the
 same day: «участвовать в разных источниках, в разных секторах — он сам распределит, поймёт, адаптирует; нам нужен результат по профиту»).
 
 A DEMO account of $10 000 (owner: «как будто я вложил настоящие свои 10 тысяч долларов» — his main screen). Seven sleeves, each
 follows a desk the server already runs:
-  • spot     — the model's spot portfolio: CRYPTO NOVA портфель (portfolios.ideas) or, for «Спокойная», «Консервативный»
+  • spot     — the model's spot portfolio: CRYPTO NOVA AI портфель (portfolios.ideas) or, for «Спокойная», «Консервативный»
                (portfolios.cons: BTC/ETH/SOL held)                                                              [directional]
   • active   — active spot trading: «Импульс BTC» on spot, no leverage, spot fees (paper.json profiles.imps)     [directional]
-  • futures  — CRYPTO NOVA signals: «Сбалансированная» (paper.json profiles.bal) + «Импульс BTC» (profiles.imp)  [directional]
+  • futures  — CRYPTO NOVA AI signals: «Сбалансированная» (paper.json profiles.bal) + «Импульс BTC» (profiles.imp)  [directional]
   • funding  — the funding-carry desk (funding.json equity_mtm)                                                  [no direction]
   • basis    — fixed-rate carry: spot + short dated futures on Deribit, rate locked at entry (basis.json)         [no direction]
   • yield    — stablecoin lending: Sky savings rate (sUSDS) + Aave v3 USDC + Aave savings GHO (yield.json)      [no direction]
@@ -57,7 +57,7 @@ CARRY = ("funding", "basis", "yield", "susde")
 # 18.10 backtest (scripts/lab/portfolio_rules.py): regime shares 0.5–0.7 × 0.10–0.35 — lower «off» better in 2025–26 every time
 RISK = {"spot": 4, "active": 4, "futures": 4, "funding": 3, "basis": 2, "yield": 2, "susde": 3, "listings": 4}
 LST_GATE = {"trades": 20, "avg_trade_pct": 1.0}
-OWN_GATE = {"trades": 30, "avg_trade_pct": 0.3}   # «Сигналы CRYPTO NOVA» join the futures sleeve after this live record (history: +0.76 % a trade)  # the listing short gets dollars only after this live record (criteria of «Концепция»)
+OWN_GATE = {"trades": 30, "avg_trade_pct": 0.3}   # «Сигналы CRYPTO NOVA AI» join the futures sleeve after this live record (history: +0.76 % a trade)  # the listing short gets dollars only after this live record (criteria of «Концепция»)
 DISCOUNT = {2: 0.0, 3: 1.5}                      # percentage points taken off a source's rate for its risk
 CAP = {"funding": 0.20, "basis": 0.30, "susde": 0.15}
 YIELD_FLOOR = 0.30                               # share of the carry part that always stays in lending (liquid reserve)
@@ -82,7 +82,7 @@ PROFILES = {"calm": {"on": 0.35, "off": 0.10, "fut": 0.0, "act": 0.0, "lst": 0.0
 MODELS = {
     "calm": {"name_ru": "Спокойная", "about_ru": "Держим ядро BTC 60% / ETH 20% / SOL 10% почти без сделок; когда BTC ниже своей 200-дневной "
                                                  "средней — большая часть уходит в доходные доллары. Без фьючерсов и активной торговли."},
-    "balanced": {"name_ru": "Сбалансированная", "about_ru": "CRYPTO NOVA портфель (ядро и отобранные альты), немного активной торговли на споте "
+    "balanced": {"name_ru": "Сбалансированная", "about_ru": "CRYPTO NOVA AI портфель (ядро и отобранные альты), немного активной торговли на споте "
                                                          "и фьючерсов; доли система двигает сама — по рынку и по ставкам."},
     "bold": {"name_ru": "Смелая", "about_ru": "Больше активной торговли на споте (Импульс BTC) и фьючерсов — выше и доход, и риск. Защита та же: "
                                              "режим BTC, стопы, не больше 5 активных позиций, резерв в кредитовании."},
@@ -95,7 +95,7 @@ OPTIONS = {   # toggles that shift a model (applied in order, then normalised)
     "no_futures": {"name_ru": "Без фьючерсов", "about_ru": "Фьючерсная часть уходит в спот и кредитование поровну.",
                    "zero": "futures"},
 }
-NAMES = {"spot": "Спот · портфель", "active": "Активный спот · Импульс BTC", "futures": "Фьючерсы · CRYPTO NOVA", "funding": "Фандинг (без направления)",
+NAMES = {"spot": "Спот · портфель", "active": "Активный спот · Импульс BTC", "futures": "Фьючерсы · CRYPTO NOVA AI", "funding": "Фандинг (без направления)",
          "basis": "Фикс-ставка на фьючерсах (BTC/ETH)", "yield": "Кредитование стейблкоинов (Aave, Sky)",
          "susde": "Доходные доллары (Ethena sUSDe)", "listings": "Шорт новых листингов"}
 SHORT = {"spot": "спот", "active": "активный спот", "futures": "фьючерсы", "funding": "фандинг", "basis": "фикс-ставка", "yield": "кредитование",
@@ -115,7 +115,7 @@ WHALE_MODELS = {
 }
 WHALE_RULES = [
     f"Демо-счёт ${START:,.0f} по модели реального счёта: спот — ядро BTC, ETH и SOL (30 / 10 / 5), фьючерсы — сигналы системы "
-    "CRYPTO NOVA (плечо подбирается под каждый сигнал, риск сделки — не больше 2% бюджета, стоп на бирже; позицию система закрывает "
+    "CRYPTO NOVA AI (плечо подбирается под каждый сигнал, риск сделки — не больше 2% бюджета, стоп на бирже; позицию система закрывает "
     "при развороте сигнала или по стопу).",
     "Часть со ставкой на рост (спот и фьючерсы) зависит от рынка: когда BTC выше своей 200-дневной средней и за 60 дней в плюсе — 70%, "
     "иначе — 20%. Направление, которое за 30 дней потеряло больше 5%, получает половину доли, заработавшее больше 5% — в 1.25 раза больше.",
@@ -147,7 +147,7 @@ def own_gate(out: str) -> tuple[bool, dict]:
 
 
 def fut_keys(out: str) -> tuple:
-    """The desks of FUTURES · CRYPTO NOVA as the panel header counts them (28.10): the main desk the selector chose
+    """The desks of FUTURES · CRYPTO NOVA AI as the panel header counts them (28.10): the main desk the selector chose
     (web/desk_select.json → panel_header.nova_base; none → «Агрессивная») + «Импульс BTC», + the own signals after their gate."""
     from . import panel_header as ph
     base = ph.nova_base(ph.load_sel(out))
@@ -558,7 +558,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
     arb = (_load(out, "arb.json").get("week") or {}).get("virtual_pnl_usd")
     tri = (_load(out, "tri.json").get("week") or {}).get("virtual_pnl_usd")
     w_now = main["weights"]
-    return {"asof": now, "name": "CRYPTO NOVA Портфолио", "version": VERSION, "start_usd": START, "started": st["started"],
+    return {"asof": now, "name": "CRYPTO NOVA AI Портфолио", "version": VERSION, "start_usd": START, "started": st["started"],
             "value_usd": round(total, 2), "pnl_usd": round(total - START, 2), "pnl_pct": round((total / START - 1) * 100, 2),
             "model": model,
             "sleeves": [{"key": k, "name_ru": (WHALE_NAMES.get(k) if wm else None) or NAMES[k], "kind": "directional" if k in DIRECTIONAL else ("short" if k == "listings" else "carry"), "risk": RISK[k],
@@ -593,7 +593,7 @@ def step(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> 
                 "Пересчёт — каждый понедельник, сразу при новом источнике и при смене режима рынка (не чаще раза в сутки). "
                 "Каждый пересчёт стоит 0.1% от переложенной суммы — это комиссии.",
                 "Рядом показан вариант «без перераспределения»: распределитель полезен, только если обгоняет его.",
-                "Три модели: Спокойная — держим ядро BTC/ETH/SOL почти без сделок; Сбалансированная — CRYPTO NOVA портфель, немного "
+                "Три модели: Спокойная — держим ядро BTC/ETH/SOL почти без сделок; Сбалансированная — CRYPTO NOVA AI портфель, немного "
                 "активной торговли и фьючерсов; Смелая — больше активной торговли и фьючерсов. Активная торговля — «Импульс BTC» на споте "
                 "(единственное активное правило, прошедшее проверку на 2025–2026). Через 4 недели сравниваем модели по доходу с учётом "
                 "просадки — лучшая становится основной.",

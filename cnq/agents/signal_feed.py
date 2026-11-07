@@ -1,7 +1,7 @@
 """Our own signals in Cornix format (18.10.2026, owner: «стоит ли вообще брать у них эту базу … или мы сможем генерировать
 собственные?»).
 
-The CRYPTO NOVA app shows signals that come from a Telegram channel («Ai Golden Crypto (Auto Bot)») through Cornix → TradeReader.
+The CRYPTO NOVA AI app shows signals that come from a Telegram channel («Ai Golden Crypto (Auto Bot)») through Cornix → TradeReader.
 Those signals lose money over their whole history (web/app_signals.json). This module turns the trades of OUR strategy
 (CNPTS «Сбалансированная», the `bal` paper desk) into Cornix-format messages:
   • a new trade on the desk → an «open» message (pair, side, leverage, entry, take-profit targets, stop);
@@ -31,7 +31,7 @@ SOURCES = [   # desk key, name for people, why it is in
     ("imp", "Импульс BTC", "прошла самую строгую проверку «Лаборатории»: 2025 и 2026 в плюсе, без 3 лучших дней тоже"),
     # 19.10 (owner: «нам нужны собственные сигналы … сигналы должны быть»): 729 listings on history, +2.6 % a trade, plus every year
     # 19.10: our own daily signals (own_desk.py): plus per trade in every year 2022–2026 on 40 coins and on 30 other coins
-    ("own", "сигналы CRYPTO NOVA: откат в тренде и пробой 20 дней", "раз в день на 40 самых торгуемых монетах, покупки только в "
+    ("own", "сигналы CRYPTO NOVA AI: откат в тренде и пробой 20 дней", "раз в день на 40 самых торгуемых монетах, покупки только в "
                                                                     "растущем рынке и только при объёме дня от 1.5× к обычному; честная "
                                                                     "история 2023–2026 (включая снятые с торгов монеты): около +2% в "
                                                                     "месяц, просадка до −23%, каждый год в плюсе. В итог счёта войдёт "
@@ -74,7 +74,7 @@ def targets(t: dict) -> list[float]:
 def open_text(t: dict) -> str:
     sym = t["symbol"].replace("-USDT", "").replace("USDT", "")
     g = t.get("grade", "")
-    lines = [f"⚡ CRYPTO NOVA · {RULE_RU.get(g, 'сигнал')}", f"#{sym}/USDT", "Long" if t["side"] == "LONG" else "Short",
+    lines = [f"⚡ CRYPTO NOVA AI · {RULE_RU.get(g, 'сигнал')}", f"#{sym}/USDT", "Long" if t["side"] == "LONG" else "Short",
              f"Leverage: Isolated {LEV.get(g, 3)}x", "Entry Targets:", f"1) {_fmt(float(t['entry']))}", "Take-Profit Targets:"]
     lines += [f"{i}) {_fmt(p)}" for i, p in enumerate(targets(t), 1)]
     lines += ["Stop Targets:", f"1) {_fmt(float(t['stop']))}"]
@@ -239,11 +239,11 @@ def public(conn: sqlite3.Connection, now: int | None = None) -> dict:
                 "why_ru": "выключено 19.10: на 3 037 сигналах за 10 месяцев цена доходит до цели против сигнала так же часто, как по "
                           "сигналу; все способы торговли ими в минусе (умный разворот −99% на демо-счёте)",
                 "live_30d": None})
-    return {"asof": now, "name": "CRYPTO NOVA", "profile": PROFILE, "mix": mix, "channel_on": bool(signals_chat(conn)),
+    return {"asof": now, "name": "CRYPTO NOVA AI", "profile": PROFILE, "mix": mix, "channel_on": bool(signals_chat(conn)),
             "stats": {"signals": sum(1 for r in rows if r["seeded"] == 0), "closed": len(done), "wins": wins,
                       "avg_pct": round(sum(r["pnl_pct"] for r in done) / len(done), 2) if done else None},
             "items": rows,
-            "about_ru": ("CRYPTO NOVA — один набор сигналов для приложения, смесь того, что сейчас работает. CNPTS постоянно проверяет "
+            "about_ru": ("CRYPTO NOVA AI — один набор сигналов для приложения, смесь того, что сейчас работает. CNPTS постоянно проверяет "
                          "все стратегии и решает, что входит в смесь: стратегия попадает сюда, если прошла проверку на истории или это живой "
                          "счёт CNPTS, и выпадает, если за 30 дней её закрытые сигналы в среднем в минусе. Формат — как у Cornix (пара, сторона, "
                          "плечо, вход, цели, стоп); выход по времени закрывается сообщением «Close».")}

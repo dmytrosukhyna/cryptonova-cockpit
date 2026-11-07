@@ -29,8 +29,8 @@ MEMORY_DAYS = 4                 # a phrasing used on any of the last 4 days is n
 SMALL = 10.0                    # under $10 a day is «почти в ноль» (no «хорошие сутки» for a few dollars)
 FNG_RU = {"extreme fear": "крайний страх", "fear": "страх", "neutral": "нейтрально", "greed": "жадность", "extreme greed": "крайняя жадность"}
 
-TITLES = ["Доброе утро · система CRYPTO NOVA AI", "Утренний доклад CRYPTO NOVA", "CRYPTO NOVA · как прошла ночь",
-          "С добрым утром от CRYPTO NOVA", "CRYPTO NOVA · коротко за сутки", "Новый день · система CRYPTO NOVA AI"]
+TITLES = ["Доброе утро · система CRYPTO NOVA AI", "Утренний доклад CRYPTO NOVA AI", "CRYPTO NOVA AI · как прошла ночь",
+          "С добрым утром от CRYPTO NOVA AI", "CRYPTO NOVA AI · коротко за сутки", "Новый день · система CRYPTO NOVA AI"]
 UP = ["За сутки система заработала {tot}: фьючерсы {fut}, спот {spot}.",
       "Плюс за сутки — {tot} (фьючерсы {fut}, спот {spot}).",
       "Сутки в плюсе: {tot}. Фьючерсы {fut}, спот {spot}.",
@@ -47,7 +47,7 @@ MARKET = ["Биткоин {btc} ({chg}), настроение рынка — {fn
           "Биткоин стоит {btc} ({chg} за сутки), на рынке {fng_ru}.",
           "BTC {btc}, {chg} за сутки. Настроение — {fng_ru}, {fng} из 100."]
 ACCOUNT = ["Счёт {eq}, с 22.10 {since}.", "Реальный счёт — {eq} ({since} с 22.10).", "На счёте {eq}; результат с 22.10 — {since}.",
-           "Реальный счёт CRYPTO NOVA: {eq}, с начала {since}."]
+           "Реальный счёт CRYPTO NOVA AI: {eq}, с начала {since}."]
 ACCOUNT_OWNER = ["Твой счёт {eq}, с 22.10 {since}; позиций открыто: {open}.", "На твоём счёте {eq} ({since} с 22.10), открыто позиций: {open}.",
                  "Счёт {eq}, с 22.10 {since}. В работе позиций: {open}."]
 DAY = ["Сегодня: {ev}.", "Что важно сегодня: {ev}.", "На сегодня в календаре: {ev}."]
@@ -148,7 +148,7 @@ L = {"ru": {"titles": TITLES, "up": UP, "down": DOWN, "flat": FLAT, "market": MA
             "market": ["Bitcoin {btc} ({chg}), market mood — {fng_ru} ({fng}).", "Market: bitcoin {btc}, {chg} in 24 h; fear & greed {fng} — {fng_ru}.",
                        "Bitcoin is at {btc} ({chg} in 24 h), the market shows {fng_ru}.", "BTC {btc}, {chg} in 24 h. Mood — {fng_ru}, {fng} of 100."],
             "account": ["Account {eq}, {since} since 22 Oct.", "Real account — {eq} ({since} since 22 Oct).", "Account at {eq}; result since 22 Oct — {since}.",
-                        "CRYPTO NOVA real account: {eq}, {since} since the start."],
+                        "CRYPTO NOVA AI real account: {eq}, {since} since the start."],
             "owner": ["Your account {eq}, {since} since 22 Oct; open positions: {open}.", "Your account is at {eq} ({since} since 22 Oct), open positions: {open}.",
                       "Account {eq}, {since} since 22 Oct. Positions open: {open}."],
             "day": ["Today: {ev}.", "What matters today: {ev}.", "On today's calendar: {ev}."], "flat0": "Over 24 hours: {tot}.", "nofng": "no reading",
@@ -167,7 +167,7 @@ L = {"ru": {"titles": TITLES, "up": UP, "down": DOWN, "flat": FLAT, "market": MA
             "market": ["Біткоїн {btc} ({chg}), настрій ринку — {fng_ru} ({fng}).", "Ринок: біткоїн {btc}, за добу {chg}; індекс страху й жадібності {fng} — {fng_ru}.",
                        "Біткоїн коштує {btc} ({chg} за добу), на ринку {fng_ru}.", "BTC {btc}, {chg} за добу. Настрій — {fng_ru}, {fng} зі 100."],
             "account": ["Рахунок {eq}, з 22.10 {since}.", "Реальний рахунок — {eq} ({since} з 22.10).", "На рахунку {eq}; результат з 22.10 — {since}.",
-                        "Реальний рахунок CRYPTO NOVA: {eq}, від початку {since}."],
+                        "Реальний рахунок CRYPTO NOVA AI: {eq}, від початку {since}."],
             "owner": ["Твій рахунок {eq}, з 22.10 {since}; відкритих позицій: {open}.", "На твоєму рахунку {eq} ({since} з 22.10), відкритих позицій: {open}.",
                       "Рахунок {eq}, з 22.10 {since}. У роботі позицій: {open}."],
             "day": ["Сьогодні: {ev}.", "Що важливо сьогодні: {ev}.", "На сьогодні в календарі: {ev}."], "flat0": "За добу {tot}.", "nofng": "без оцінки",
@@ -186,7 +186,7 @@ L = {"ru": {"titles": TITLES, "up": UP, "down": DOWN, "flat": FLAT, "market": MA
             "market": ["Bitcoin {btc} ({chg}), διάθεση αγοράς — {fng_ru} ({fng}).", "Αγορά: bitcoin {btc}, {chg} σε 24 ώρες· δείκτης φόβου και απληστίας {fng} — {fng_ru}.",
                        "Το bitcoin είναι στα {btc} ({chg} σε 24 ώρες), στην αγορά επικρατεί {fng_ru}.", "BTC {btc}, {chg} σε 24 ώρες. Διάθεση — {fng_ru}, {fng} στα 100."],
             "account": ["Λογαριασμός {eq}, από 22.10 {since}.", "Πραγματικός λογαριασμός — {eq} ({since} από 22.10).", "Στον λογαριασμό {eq}· αποτέλεσμα από 22.10 — {since}.",
-                        "Πραγματικός λογαριασμός CRYPTO NOVA: {eq}, από την αρχή {since}."],
+                        "Πραγματικός λογαριασμός CRYPTO NOVA AI: {eq}, από την αρχή {since}."],
             "owner": ["Ο λογαριασμός σου {eq}, από 22.10 {since}· ανοιχτές θέσεις: {open}.", "Στον λογαριασμό σου {eq} ({since} από 22.10), ανοιχτές θέσεις: {open}.",
                       "Λογαριασμός {eq}, από 22.10 {since}. Ανοιχτές θέσεις: {open}."],
             "day": ["Σήμερα: {ev}.", "Τι μετράει σήμερα: {ev}.", "Στο σημερινό ημερολόγιο: {ev}."], "flat0": "Σε 24 ώρες: {tot}.", "nofng": "χωρίς ένδειξη",
@@ -205,7 +205,7 @@ L = {"ru": {"titles": TITLES, "up": UP, "down": DOWN, "flat": FLAT, "market": MA
             "market": ["Bitcoin {btc} ({chg}), ánimo del mercado — {fng_ru} ({fng}).", "Mercado: bitcoin {btc}, {chg} en 24 h; índice de miedo y codicia {fng} — {fng_ru}.",
                        "Bitcoin está en {btc} ({chg} en 24 h), en el mercado hay {fng_ru}.", "BTC {btc}, {chg} en 24 h. Ánimo — {fng_ru}, {fng} de 100."],
             "account": ["Cuenta {eq}, {since} desde el 22.10.", "Cuenta real — {eq} ({since} desde el 22.10).", "En la cuenta {eq}; resultado desde el 22.10 — {since}.",
-                        "Cuenta real de CRYPTO NOVA: {eq}, {since} desde el inicio."],
+                        "Cuenta real de CRYPTO NOVA AI: {eq}, {since} desde el inicio."],
             "owner": ["Tu cuenta {eq}, {since} desde el 22.10; posiciones abiertas: {open}.", "Tu cuenta está en {eq} ({since} desde el 22.10), posiciones abiertas: {open}.",
                       "Cuenta {eq}, {since} desde el 22.10. Posiciones abiertas: {open}."],
             "day": ["Hoy: {ev}.", "Lo importante hoy: {ev}.", "En el calendario de hoy: {ev}."], "flat0": "En 24 horas: {tot}.", "nofng": "sin lectura",

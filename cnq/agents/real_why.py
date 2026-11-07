@@ -1,4 +1,4 @@
-"""«Почему эта сделка» for the real CRYPTO NOVA futures (04.11.2026, owner: «по каким правилам?», «по какой причине его шортишь?»).
+"""«Почему эта сделка» for the real CRYPTO NOVA AI futures (04.11.2026, owner: «по каким правилам?», «по какой причине его шортишь?»).
 
 web/real_why.json — a SIBLING of web/public_real.json (the autopilot writes that one with a strict whitelist; this file is built in the
 site workflow from public files only, no keys):
@@ -27,7 +27,7 @@ H1 = 3_600_000
 DAY = 86_400_000
 OUT = "web/real_why.json"
 DESK_RU = {"whales": "Киты · копирование топ-5", "aggr": "Агрессивная", "bal": "Сбалансированная", "cons": "Консервативная",
-           "imp": "Импульс BTC", "own": "Сигналы CRYPTO NOVA"}
+           "imp": "Импульс BTC", "own": "Сигналы CRYPTO NOVA AI"}
 
 
 def _f(x, d=None):

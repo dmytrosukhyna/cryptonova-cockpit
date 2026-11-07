@@ -127,7 +127,7 @@ def test_voice_brief_says_what_the_panel_shows(tmp_path):
     (d / "public_real.json").write_text(json.dumps({"since": 1792669322166, "equity_usd": 9877.17, "pnl_usd": -147.23, "futures": [],
                                                     "closed_n": 1, "fut_pnl_usd": 0.27, "stale": False}))
     text = voice.compose(str(d))
-    assert text.index("Реальный счёт CRYPTO NOVA на OKX — 9877 долларов: с 22.10 в минусе на 147 долларов.") < text.index("Спот — это ядро")
+    assert text.index("Реальный счёт CRYPTO NOVA AI на OKX — 9877 долларов: с 22.10 в минусе на 147 долларов.") < text.index("Спот — это ядро")
     # the «Киты» line: how many traders we copy, the day's copies, the demo copy desk — no Chinese nicknames in speech
     (d / "whales_top.json").write_text(json.dumps({"following": [{"addr": f"bn:{i}", "name": f"鸿{i}", "src": "bn"} for i in range(5)],
                                                    "desk": {"start": 10_000.0, "equity": 10_500.0, "pnl_usd": 500.0, "trades": 4, "wins": 3}}))
@@ -136,7 +136,7 @@ def test_voice_brief_says_what_the_panel_shows(tmp_path):
     assert "Демо-счёт системы на 10 тысяч долларов: в плюсе на 500 долларов." in text and "鸿" not in text and "кит" not in text.lower()
     assert "Фьючерсы реального счёта: открытых сделок нет; закрыто с начала: 1; итог около нуля." in text
     assert voice.compose.keys["parts"] == {"fut": 100, "spot": 300}          # the panel's keys are unchanged (it still plays the audio)
-    assert voice.spoken("CRYPTO NOVA портфель") == "Крипто Но́ва портфель"
+    assert voice.spoken("CRYPTO NOVA AI портфель") == "Крипто Но́ва Эй-Ай портфель"
 
 
 def test_voice_brief_neural_voices_in_order_and_a_failure_keeps_the_last_mp3(tmp_path, monkeypatch):

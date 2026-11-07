@@ -154,7 +154,7 @@ def test_app_home_in_every_language_from_the_same_data(tmp_path, main):
         assert rows["SEI"]["checks"] is None and rows["SEI"]["note"], lang                   # an old trade: a note, nothing invented
         if lang != "ru":                                                                     # translated, not copied
             same = {x for x in set(every[lang]) & set(every["ru"]) if len(x) > 12}
-            assert not same - {"CRYPTO NOVA"}, (lang, same)
+            assert not same - {"CRYPTO NOVA AI"}, (lang, same)
         if lang in ("en", "el", "es"):
             assert not [s for s in every[lang] if CYR.search(s)], lang
     en = {o["sym"]: o for o in docs["en"]["futures"]["open"]}
@@ -175,7 +175,7 @@ def test_app_home_in_every_language_from_the_same_data(tmp_path, main):
     el = {o["sym"]: o for o in docs["el"]["futures"]["open"]}
     assert el["SUI"]["work"].startswith("Τη στιγμή της εισόδου το σύστημα έλεγχε 60 altcoins") and el["SUI"]["risk"]["hold"].startswith("12 ώρες")
     es = {o["sym"]: o for o in docs["es"]["futures"]["open"]}
-    assert es["ETH"]["checks"][0]["t"] == "Desplome de la vela" and docs["es"]["note_ru"].startswith("Cuentas demo de CRYPTO\u00a0NOVA")
+    assert es["ETH"]["checks"][0]["t"] == "Desplome de la vela" and docs["es"]["note_ru"].startswith("Cuentas demo de CRYPTO\u00a0NOVA\u00a0AI")
 
 
 def test_app_home_status_and_actions_per_language(tmp_path):
@@ -196,10 +196,10 @@ def test_app_home_status_and_actions_per_language(tmp_path):
     assert ru["spot"]["last_action"]["text"] == "Изменение в портфеле: XMR." and "1 сделка других" in ru["futures"]["status_ru"]
     texts = {lang: json.load(open(os.path.join(d, i18n.file_name("app_home", lang)), encoding="utf-8"))["futures"]["status_ru"]
              for lang in i18n.LANGS}
-    assert texts["en"].endswith("Last trade: ARB, +$192, 18.10. Other CRYPTO\u00a0NOVA signals in progress: 1 trade.")
+    assert texts["en"].endswith("Last trade: ARB, +$192, 18.10. Other CRYPTO\u00a0NOVA\u00a0AI signals in progress: 1 trade.")
     assert "Остання угода: ARB, +$192" in texts["uk"] and "1 угода інших сигналів" in texts["uk"]
     assert "Τελευταία συναλλαγή: ARB" in texts["el"] and "1 συναλλαγή" in texts["el"]
-    assert texts["es"].endswith("En curso: 1 operación de otras señales de CRYPTO\u00a0NOVA.")
+    assert texts["es"].endswith("En curso: 1 operación de otras señales de CRYPTO\u00a0NOVA\u00a0AI.")
 
 
 def test_engine_owns_every_app_home_language():
@@ -259,7 +259,7 @@ def test_nova_feed_in_every_language():
         for q in chips:                                       # every chip has an exact FAQ answer in its language (the model may be down)
             assert q in faq and k.match(q, lang) is faq[q], (lang, q)
         titles[lang] = [t["title"] for t in d["topics"]]
-    assert titles["en"] == ["How CRYPTO\u00a0NOVA works", "Portfolio & trades", "Money & safety", "Crypto & the market", "Learn"]
+    assert titles["en"] == ["How CRYPTO\u00a0NOVA\u00a0AI works", "Portfolio & trades", "Money & safety", "Crypto & the market", "Learn"]
     connected = {"ru": "реальный счёт подключён", "en": "real account is connected", "uk": "реальний рахунок підключено",
                  "el": "πραγματικός σας λογαριασμός είναι συνδεδεμένος", "es": "cuenta real está conectada"}
     for lang, words in connected.items():
@@ -290,7 +290,7 @@ def test_faq_and_facts_in_every_language():
         if lang in ("en", "el", "es"):
             assert not [i["id"] for i in faq if CYR.search(i["q"] + i["a"])], lang
         # 28.10 (build 46 QA): «CRYPTO NOVA» never wraps, thousands with a no-break space (ru / uk / el / es)
-        assert not [i["id"] for i in faq if "CRYPTO NOVA" in i["q"] + i["a"]], lang
+        assert not [i["id"] for i in faq if "CRYPTO NOVA AI" in i["q"] + i["a"]], lang
         by = {i["id"]: i["a"].replace("\u00a0", " ") for i in faq}
         assert "PUBLIC" in by["how_much"] and "demo" not in by["how_much"].lower() and "демо" not in by["how_much"], lang
         assert "$10 000" in by["how_works"] and "18" in by["vip"] and "BingX" in by["vip"] and "UID" in by["uid"], lang
@@ -404,11 +404,11 @@ def test_gitignore_keeps_the_translations(lang):
 
 
 def test_polish_numbers_brand_and_minus_per_language():
-    """28.10 (build 46 QA): every server text as the app shows it — «CRYPTO NOVA» never wraps, the true minus, the language's
+    """28.10 (build 46 QA): every server text as the app shows it — «CRYPTO NOVA AI» never wraps, the true minus, the language's
     decimal comma and a no-break thousands space (ru / uk / el / es), English keeps its dot; dates and versions stay"""
     N = "\u00a0"
-    assert i18n.polish("CRYPTO NOVA: −3.5% и $1 234.50, цена 0.7760.", "ru") == f"CRYPTO{N}NOVA: −3,5% и $1{N}234,50, цена 0,7760."
-    assert i18n.polish("CRYPTO NOVA: -3.5% and $1,234.50", "en") == f"CRYPTO{N}NOVA: \u22123.5% and $1,234.50"
+    assert i18n.polish("CRYPTO NOVA AI: −3.5% и $1 234.50, цена 0.7760.", "ru") == f"CRYPTO{N}NOVA{N}AI: −3,5% и $1{N}234,50, цена 0,7760."
+    assert i18n.polish("CRYPTO NOVA AI: -3.5% and $1,234.50", "en") == f"CRYPTO{N}NOVA{N}AI: \u22123.5% and $1,234.50"
     assert i18n.polish("с 22.10.2026, на 22.10. Версия 2.0, 1.2.3, 2025-2026", "uk") == "с 22.10.2026, на 22.10. Версия 2.0, 1.2.3, 2025-2026"
     assert i18n.polish("https://x.io/a-1.5", "ru") == "https://x.io/a-1.5" and i18n.polish(7.5, "ru") == 7.5
     doc = i18n.polish_doc({"sym": "BTC-1.5", "text": "7.5%", "rows": [{"url": "a 1.5", "why": "1.5 раза"}], "n": 1.5}, "es")

@@ -59,7 +59,7 @@ def test_mix_seeds_each_new_source_and_drops_a_losing_one():
     ok, st = SF.live_ok(conn, "imp", T0 + 4)
     assert not ok and st["n"] == 10 and st["avg_pct"] < 0
     pub = SF.public(conn, T0 + 4)
-    assert pub["name"] == "CRYPTO NOVA" and [m["in_mix"] for m in pub["mix"] if m["key"] == "imp"] == [False]
+    assert pub["name"] == "CRYPTO NOVA AI" and [m["in_mix"] for m in pub["mix"] if m["key"] == "imp"] == [False]
 
 
 def test_run_on_a_fresh_db_and_on_an_old_table_without_source():

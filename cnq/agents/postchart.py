@@ -1,4 +1,4 @@
-"""Chart image for channel posts (Pillow, optional). Dark CRYPTO NOVA look: 1h wave of the last ~5 days built from the
+"""Chart image for channel posts (Pillow, optional). Dark CRYPTO NOVA AI look: 1h wave of the last ~5 days built from the
 15-minute candles in terminal.json, support/resistance zones, scenario A/B targets from calibration.json, price tag,
 fear & greed. Everything drawn comes from the same JSON the post text uses. Returns the PNG path or None."""
 from __future__ import annotations
@@ -220,7 +220,7 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
     d.rounded_rectangle([L + pw + 2, y - 13, W - 4, y + 13], radius=5, fill=(124, 196, 255))
     d.text((L + pw + 8, y - 8), _fmt(price), font=_font(13, True), fill=(3, 9, 20))
     # header
-    d.text((L, 22), "CRYPTO NOVA", font=f24, fill=(234, 246, 255))
+    d.text((L, 22), "CRYPTO NOVA AI", font=f24, fill=(234, 246, 255))
     d.text((L + 210, 30), title or "Биткоин · часовой график", font=f15, fill=(170, 195, 225))
     if when:
         d.text((L + 210, 52), when, font=f13, fill=(125, 147, 173))
@@ -247,7 +247,7 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
         if any(t_ > by0 - 40 for t_ in taken) and not any(t_ < T + 34 + bh + 40 for t_ in taken):
             by0 = T + 34; by1 = by0 + bh
         d.rounded_rectangle([bx0, by0, bx1, by1], radius=10, fill=(8, 16, 30, 225), outline=(124, 196, 255, 120))
-        d.text((bx0 + 12, by0 + 8), "ВЫВОД CRYPTO NOVA", font=_font(13, True), fill=(124, 196, 255))
+        d.text((bx0 + 12, by0 + 8), "ВЫВОД CRYPTO NOVA AI", font=_font(13, True), fill=(124, 196, 255))
         for k, ln in enumerate(lines):
             d.text((bx0 + 12, by0 + 30 + 20 * k), ln, font=fb, fill=(226, 238, 250))
     foot = []
@@ -399,7 +399,7 @@ def heatmap(markets: dict, out_path: str, when: str | None = None, n: int = 30) 
     img = Image.new("RGB", (W, H), (6, 11, 22)); d = ImageDraw.Draw(img, "RGBA")
     for i in range(40):
         d.rectangle([0, i * 6, W, i * 6 + 6], fill=(124, 196, 255, int(24 * (1 - i / 40))))
-    d.text((36, 22), "CRYPTO NOVA", font=_font(24, True), fill=TXT)
+    d.text((36, 22), "CRYPTO NOVA AI", font=_font(24, True), fill=TXT)
     d.text((246, 30), "Карта рынка · топ-30 монет за сутки", font=_font(15), fill=(170, 195, 225))
     if when:
         d.text((246, 52), when, font=_font(13), fill=MUTED)
@@ -550,7 +550,7 @@ def _viz_chain(d, box, lines: int, head: str):
 
 
 def engine_card(home: dict, conveyor: dict | None, risk: dict | None, scorecard: dict | None, out_path: str, when: str | None = None) -> str | None:
-    """«Двигатели CRYPTO NOVA сегодня»: six drawn turbines, each with its live number and a small live picture of what it
+    """«Двигатели CRYPTO NOVA AI сегодня»: six drawn turbines, each with its live number and a small live picture of what it
     does (pulse, funnel, conveyor, risk bars, portfolio curve, hash chain). Shows the technology people get. 1280 × 720."""
     if Image is None or not home:
         return None
@@ -558,7 +558,7 @@ def engine_card(home: dict, conveyor: dict | None, risk: dict | None, scorecard:
     img = Image.new("RGB", (W, H), (6, 11, 22)); d = ImageDraw.Draw(img, "RGBA")
     for i in range(40):
         d.rectangle([0, i * 6, W, i * 6 + 6], fill=(124, 196, 255, int(24 * (1 - i / 40))))
-    d.text((36, 22), "CRYPTO NOVA", font=_font(24, True), fill=TXT)
+    d.text((36, 22), "CRYPTO NOVA AI", font=_font(24, True), fill=TXT)
     d.text((246, 30), "Шесть двигателей системы · работают 24/7", font=_font(15), fill=(170, 195, 225))
     if when:
         d.text((246, 52), when, font=_font(13), fill=MUTED)
@@ -628,7 +628,7 @@ def trade_card(coin: dict | None, trade: dict, out_path: str, when: str | None =
     win = (trade.get("net_usd") or 0) >= 0
     col = UP if win else DOWN
     long_ = str(trade.get("side", "LONG")).upper() == "LONG"
-    d.text((36, 22), "CRYPTO NOVA", font=_font(24, True), fill=TXT)
+    d.text((36, 22), "CRYPTO NOVA AI", font=_font(24, True), fill=TXT)
     d.text((246, 30), "Сделка закрыта", font=_font(16, True), fill=(170, 195, 225))
     if when:
         d.text((246, 52), when, font=_font(13), fill=MUTED)

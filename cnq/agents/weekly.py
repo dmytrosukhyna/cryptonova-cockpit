@@ -146,7 +146,7 @@ def verify_last(prev: dict | None, market: dict) -> dict | None:
 
 
 def real_week(real: dict, now_ms: int) -> dict | None:
-    """31.10: the Telegram weekly post speaks about the REAL CRYPTO NOVA account on OKX (public_real.json), never demo desks"""
+    """31.10: the Telegram weekly post speaks about the REAL CRYPTO NOVA AI account on OKX (public_real.json), never demo desks"""
     if not real or real.get("stale") or real.get("equity_usd") is None:
         return None
     def change(curve):
@@ -202,7 +202,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
     # 05.11 (owner): the review speaks about the real OKX account since 22.10 and the system CRYPTO NOVA AI only (never the method:
     # owner 05.11 09:52); spot = the core BTC / ETH / SOL. The retired demo desks stay in the JSON (paper), not in the text.
     if real:
-        L.append("## Реальный счёт CRYPTO NOVA на OKX")
+        L.append("## Реальный счёт CRYPTO NOVA AI на OKX")
         L.append(f"- Счёт {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
                  + (f" (фьючерсы {_usd(real['fut_usd'])}, спот {_usd(real['spot_usd'])})" if real.get("fut_usd") is not None and real.get("spot_usd") is not None else "") + ".")
         if real.get("since_usd") is not None:
@@ -240,7 +240,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
         P.append(f"BTC {_pct(market['btc']['ret7'])}, в плюсе {market['up']}/{market['total']} монет" + (f", дни паники: {', '.join(market['stress_days'])}" if market["stress_days"] else ""))
     if real:
         P.append("")
-        P.append(f"Реальный счёт CRYPTO NOVA на OKX: {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
+        P.append(f"Реальный счёт CRYPTO NOVA AI на OKX: {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
                  + (f" (фьючерсы {_usd(real['fut_usd'])}, спот {_usd(real['spot_usd'])})" if real.get("fut_usd") is not None and real.get("spot_usd") is not None else ""))
         if real.get("since_usd") is not None:
             P.append(f"С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%)".replace("(-", "(−"))

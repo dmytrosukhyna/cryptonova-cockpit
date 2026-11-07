@@ -21,7 +21,7 @@ Sources (key → where it is published):
   band  the 2-of-3 price band for day / week / month, BTC ETH SOL (web/outlook.json) — one per window, windows never overlap
   base  «share of periods that ended higher in this BTC regime» (web/outlook.json), same windows
   news  the LLM news analyst's direction calls with confidence and horizon (web/decision.json news.impacts)
-  feed  CRYPTO NOVA signals (web/signals_feed.json — the app and the Telegram signal channel)
+  feed  CRYPTO NOVA AI signals (web/signals_feed.json — the app and the Telegram signal channel)
   app   the app's 1.x signals (Ai Golden Crypto bot via the app API; web/app_signals.json)
 
 Verify: python3 scripts/verify_scorecard.py. Engine step (cnq/engine.py FAST, «scorecard»): stdlib only, cheap, never raises —
@@ -74,7 +74,7 @@ SOURCES = {
     "news": {"kind": PROB, "name_ru": "Оценка новостей (LLM)", "name_en": "News calls (LLM)",
              "what_ru": "цена идёт в сторону, которую назвал аналитик; вероятность = 0.5 + уверенность / 2",
              "what_en": "price moves the way the analyst said; probability = 0.5 + confidence / 2"},
-    "feed": {"kind": SIGNAL, "name_ru": "Сигналы CRYPTO NOVA", "name_en": "CRYPTO NOVA signals",
+    "feed": {"kind": SIGNAL, "name_ru": "Сигналы CRYPTO NOVA AI", "name_en": "CRYPTO NOVA AI signals",
              "what_ru": "сделки ленты сигналов: вход, стоп, цели, выход как у демо-стола (комиссии учтены)",
              "what_en": "signal feed trades: entry, stop, targets, exit as on the demo desk (fees included)"},
     "app": {"kind": SIGNAL, "name_ru": "Сигналы приложения 1.x", "name_en": "App 1.x signals",
@@ -349,7 +349,7 @@ def _tps(text: str) -> list[float]:
 
 
 def collect_feed(feed: dict) -> list[dict]:
-    """web/signals_feed.json items: every signal of the CRYPTO NOVA feed (pub = 1 when it went out as a new signal, 0 when it was
+    """web/signals_feed.json items: every signal of the CRYPTO NOVA AI feed (pub = 1 when it went out as a new signal, 0 when it was
     «seeded» on the feed's first run or recorded while its source was out of the mix — both are scored, nothing is left out)"""
     out = []
     for it in (feed or {}).get("items") or []:

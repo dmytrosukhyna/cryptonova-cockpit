@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "stops (bn_whale_stops.py), size (backlog 92), impulse (backlog 96) or delay (bn_whale_delay.py, backlog 88)"
+        description: "stops (bn_whale_stops.py), size (backlog 92), impulse (backlog 96), delay (backlog 88) or daystop (backlog 90)"
         type: choice
-        options: [stops, size, impulse, delay]
+        options: [stops, size, impulse, delay, daystop]
         default: stops
 permissions:
   contents: read

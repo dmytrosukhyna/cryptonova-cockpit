@@ -70,7 +70,7 @@ METHOD = r"кит|копи|трейдер|whale|copy|trader|ballena|φάλαιν
 
 
 def test_system_signal_explains_itself_with_a_target_and_never_the_method():
-    """05.11 (owner 09:52): a real futures trade is «Сигнал системы CRYPTO NOVA» — the market at the entry, the plan (entry, stop,
+    """05.11 (owner 09:52): a real futures trade is «Сигнал системы CRYPTO NOVA AI» — the market at the entry, the plan (entry, stop,
     target) and the exit rule; never the whale, the copying or a trader's name, in any language; the build 55 shape stays"""
     import json, re
     desk = {"started": 1792316209001, "trades": 8, "wins": 6,
@@ -95,7 +95,7 @@ def test_system_signal_explains_itself_with_a_target_and_never_the_method():
         assert "2%" in d["risk"] and "$30" in d["risk"]
         assert len(d["sections"]) >= 5 and all(x["title"] and x["text"] for x in d["sections"])
     ru = aw.copy_why(row, wd, rec, why, desk, {"lev": 5, "risk_pct": 2.0}, ctx, "ru")
-    assert ru["title"] == "Сигнал системы CRYPTO NOVA" and ru["summary"].startswith("Сигнал системы CRYPTO NOVA: шорт PEPE. Цель 84.00")
+    assert ru["title"] == "Сигнал системы CRYPTO NOVA AI" and ru["summary"].startswith("Сигнал системы CRYPTO NOVA AI: шорт PEPE. Цель 84.00")
     assert "при развороте сигнала или по стопу" in ru["plan"]
     assert any("Тренд PEPE: цена ниже средней за 200 дней, среднесрочно вниз" == c["t"] for c in ru["checks"])
     assert any("поддержка 96.00, сопротивление 104.00" in c["t"] for c in ru["checks"])

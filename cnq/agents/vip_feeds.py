@@ -380,7 +380,7 @@ _S_ORDER = {k: i for i, k in enumerate(STATUS_RU)}
 _C_ORDER = {k: i for i, k in enumerate(("used", "validation", "testing", "paused", "rejected"))}
 _T_ORDER = {"futures": 0, "spot": 1, "other": 2}
 STATUS_RULES_RU = [
-    "Active — по ней сейчас торгует реальный счёт CRYPTO NOVA на OKX: фьючерсы — сигналы системы CRYPTO NOVA (с 04.11), "
+    "Active — по ней сейчас торгует реальный счёт CRYPTO NOVA на OKX: фьючерсы — сигналы системы CRYPTO NOVA AI (с 04.11), "
     "«Импульс BTC · спот 10%» — активный спот, «CRYPTO NOVA портфель» — спот 65% и доп. ядро BTC/ETH/SOL 10%.",
     "Approved — прошла ворота конвейера PAPER → READY (сейчас таких нет). На реальные деньги — только решением владельца или автовыбора.",
     "Validation — кандидат на реальные деньги, ждёт своих ворот: автовыбор основного стола (20 сделок, результат к просадке лучше на 20%) "
@@ -471,7 +471,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
         elif c.get("stage") == "ready":
             status, why = "Approved", "прошёл ворота конвейера PAPER → READY"
         elif whales_real and k in ("cons", "bal", "aggr", "imp"):
-            status, why = "Testing", "демо-счёт: с 04.11 реальные фьючерсы ведут сигналы системы CRYPTO NOVA"
+            status, why = "Testing", "демо-счёт: с 04.11 реальные фьючерсы ведут сигналы системы CRYPTO NOVA AI"
         elif k in ("cons", "bal", "aggr"):
             status, why = "Validation", ("размер семейства «Автопилот», которое сейчас ведёт реальные фьючерсы размером «"
                                          + ((prof.get(main) or {}).get("name") or main) + "»; автовыбор размеры не переключает (решение владельца 28.10)")
@@ -562,11 +562,11 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
     W = (whales or {}).get("desk") or {}
     if W:
         n = W.get("trades")
-        # 05.11 (owner: «везде должна быть система CRYPTO NOVA»): this public feed never names the method — the whale names and the
+        # 05.11 (owner: «везде должна быть система CRYPTO NOVA AI»): this public feed never names the method — the whale names and the
         # follow list are on the owner-only «Киты» page (vip/whales.js) only
         st_w, why_w = (("Active", "весь фьючерсный бюджет реального счёта с 04.11 (плечо под каждый сигнал, риск сделки — не больше 2% бюджета); здесь — те же "
                                   "сигналы на демо-счёте $10 000") if whales_real else ("Testing", "эксперимент на демо-счёте"))
-        out.append(_st("whales_copy", "Система CRYPTO NOVA · фьючерсы", "futures", st_w, why_w,
+        out.append(_st("whales_copy", "Система CRYPTO NOVA AI · фьючерсы", "futures", st_w, why_w,
                        real=({"sleeve": "futures", "share_pct": round(SHARES.get("futures", 0.15) * 100, 1)} if whales_real else None),
                        since=_ms(W.get("started")), trades=n, win_rate=_r(_num(W.get("winrate")) * 100, 1) if n and W.get("winrate") is not None else None,
                        net_usd=_r(W.get("pnl_usd"), 2), net_pct=_r(W.get("pnl_pct"), 2), max_dd_pct=_r(W.get("max_dd_pct"), 2),

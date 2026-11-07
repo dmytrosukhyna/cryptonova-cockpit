@@ -406,7 +406,7 @@
       "id": "leverage_real",
       "topic": "learn",
       "q": "What leverage does the real account use?",
-      "a": "Leverage is set for each CRYPTO NOVA system signal. Leverage doesn't change the amount at risk: the trade size comes from the stop, and one trade risks at most 2% of the futures budget; the stop is on the exchange from the start. The closer the stop, the higher the leverage can be, the farther — the lower: the trade's risk stays the same.",
+      "a": "Leverage is set for each CRYPTO NOVA AI system signal. Leverage doesn't change the amount at risk: the trade size comes from the stop, and one trade risks at most 2% of the futures budget; the stop is on the exchange from the start. The closer the stop, the higher the leverage can be, the farther — the lower: the trade's risk stays the same.",
       "tags": [
         "leverage",
         "why",

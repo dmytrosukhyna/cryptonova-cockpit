@@ -850,7 +850,7 @@ CONNECT_VERIFIABLE = False        # CRYPTO NOVA has no technical link to a user'
 
 
 def connect_states(lang: str = DEFAULT) -> dict:
-    """build 47 (§13.6): what each state of «Подключиться к системе CRYPTO NOVA» means and the next step, in this file's language.
+    """build 47 (§13.6): what each state of «Подключиться к системе CRYPTO NOVA AI» means and the next step, in this file's language.
     «confirmed» exists only when the system can really check (can_verify) — today it cannot, so it is "available": false and the
     app shows «unverifiable» after the guide instead of «Не подтверждено»."""
     return {"can_verify": CONNECT_VERIFIABLE, "after_guide": "confirmed" if CONNECT_VERIFIABLE else "unverifiable",
@@ -1089,7 +1089,7 @@ def _buy_now(out: str, now: int, lang: str = DEFAULT, real_syms: set | None = No
 
 
 # ---------------------------------------------------------------------------------------------------------------------------
-# 22.10 (owner, build 44): the app's PUBLIC portfolio is exactly «наша система CRYPTO NOVA» as the header of the closed system
+# 22.10 (owner, build 44): the app's PUBLIC portfolio is exactly «наша система CRYPTO NOVA AI» as the header of the closed system
 # shows it — FUTURES · CRYPTO NOVA («отобранные сигналы») + SPOT · CRYPTO NOVA портфель (portfolio.json → ideas), from 17.10,
 # «Заработано всего» = futures + spot (cnq/agents/panel_header.py = web/app.html hdrVals). The capital.json allocator (key
 # "portfolio") is a different model: it stays in the feed only for the site and the older app builds, never as the public one.
@@ -1569,7 +1569,7 @@ def _why_rows(real: dict, paper: dict, open_rows: list, closed: list, fut: dict,
         if not g:
             continue
         if str(sig).startswith("whales:"):
-            # 05.11 (owner 09:52): a futures trade of the system is explained as «Сигнал системы CRYPTO NOVA» — the market at the
+            # 05.11 (owner 09:52): a futures trade of the system is explained as «Сигнал системы CRYPTO NOVA AI» — the market at the
             # entry, the plan and the exit rule, never the whale; its reference target (2R) also feeds the live bar
             wd = aw.whale_trade(sig, wdesk)
             rec = aw.whale_record((wd or {}).get("whale"), whales)

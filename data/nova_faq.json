@@ -1,7 +1,7 @@
 {
   "v": 1,
   "updated": "2026-10-28",
-  "about": "What real people ask NOVA, with short honest answers (cnq/api/nova.py: the closest items go to the model as reference; when the model is down, a near-exact match is answered from here). Keep answers true to the app 2.0 and the terms (web/terms.html): no subscriptions (never the word «бесплатно»), demo, no money held, the real account = OKX copy trading (build 45): sign up on OKX by our link, identity check, USDT, «Копировать CRYPTO NOVA» in the app, OKX repeats the trades for the amount the user picks; no UID, no API keys, no application form; OKX keeps a share of the copier's profit for the lead trader (shown in the profile); a loss is possible; copy trading and some instruments depend on the country and region (OKX shows the terms); where OKX doesn't serve — BingX by our link, copying there later (users never see the word «VIP»). NOVA is male. «alt» = other wordings of the same question (the app's own chips) that match exactly. Translations: nova_faq.<lang>.json (en, uk, el, es) — the same ids; change an answer in every language.",
+  "about": "What real people ask NOVA, with short honest answers (cnq/api/nova.py: the closest items go to the model as reference; when the model is down, a near-exact match is answered from here). Keep answers true to the app 2.0 and the terms (web/terms.html): no subscriptions (never the word «бесплатно»), demo, no money held, the real account = OKX copy trading (build 45): sign up on OKX by our link, identity check, USDT, «Копировать CRYPTO NOVA» in the app, OKX repeats the trades for the amount the user picks; no UID, no API keys, no application form; OKX keeps a share of the copier's profit for the lead trader (shown in the profile); a loss is possible; copy trading and some instruments depend on the country and region (OKX shows the terms); where OKX doesn't serve — BingX by our link, copying there later (users never see the word «VIP»). NOVA is male. «alt» = other wordings of the same question (the app's own chips) that match exactly. Translations: nova_faq.<lang>.json (en, uk, el, es) — the same ids; change an answer in every language.",
   "items": [
     {
       "id": "safe",
@@ -402,7 +402,7 @@
       "id": "leverage_real",
       "topic": "learn",
       "q": "Какое плечо на реальном счёте?",
-      "a": "Плечо подбирается под каждый сигнал системы CRYPTO NOVA. Сумму риска плечо не меняет: размер сделки считается от стопа, и одна сделка рискует не больше 2% фьючерсного бюджета; стоп стоит на бирже сразу. Чем ближе стоп, тем выше может быть плечо, чем дальше — тем ниже: риск сделки остаётся тем же.",
+      "a": "Плечо подбирается под каждый сигнал системы CRYPTO NOVA AI. Сумму риска плечо не меняет: размер сделки считается от стопа, и одна сделка рискует не больше 2% фьючерсного бюджета; стоп стоит на бирже сразу. Чем ближе стоп, тем выше может быть плечо, чем дальше — тем ниже: риск сделки остаётся тем же.",
       "tags": [
         "плечо",
         "почему",

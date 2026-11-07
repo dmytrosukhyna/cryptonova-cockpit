@@ -21,7 +21,7 @@ CYR = re.compile(r"[А-Яа-яЁёІіЇїЄєҐґ]")
 GREEK_LATIN = {"atr", "btc", "binance", "bingx", "bitcoin", "crypto", "nova", "ether", "solana", "rsi", "short", "token", "altcoin",
                "altcoins", "demo", "funding", "future", "futures", "meme", "coins", "pump", "spot", "stop", "top", "r",
                "long", "traders", "okx", "eth", "sol", "usdt",        # 28.10: tickers, the exchange, «long» as Greek crypto texts write it
-               "copy", "trading", "my", "copies"}                       # build 47: OKX's own English menu names, quoted as the app guide does
+               "copy", "trading", "my", "copies", "ai"}                       # build 47: OKX's own English menu names, quoted as the app guide does
 
 
 # ------------------------------------------------------------------------------------------------ the catalog

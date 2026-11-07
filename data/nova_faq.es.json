@@ -399,7 +399,7 @@
       "id": "leverage_real",
       "topic": "learn",
       "q": "¿Qué apalancamiento usa la cuenta real?",
-      "a": "El apalancamiento se ajusta a cada señal del sistema CRYPTO NOVA. El apalancamiento no cambia la cantidad en riesgo: el tamaño de la operación se calcula desde el stop, y una operación arriesga como máximo el 2% del presupuesto de futuros; el stop está en el exchange desde el inicio. Cuanto más cerca el stop, mayor puede ser el apalancamiento, y cuanto más lejos, menor: el riesgo de la operación es el mismo.",
+      "a": "El apalancamiento se ajusta a cada señal del sistema CRYPTO NOVA AI. El apalancamiento no cambia la cantidad en riesgo: el tamaño de la operación se calcula desde el stop, y una operación arriesga como máximo el 2% del presupuesto de futuros; el stop está en el exchange desde el inicio. Cuanto más cerca el stop, mayor puede ser el apalancamiento, y cuanto más lejos, menor: el riesgo de la operación es el mismo.",
       "tags": [
         "apalancamiento",
         "por qué",

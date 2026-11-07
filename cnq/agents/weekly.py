@@ -173,7 +173,7 @@ def _usd(v: float) -> str:
     return (f"+${v:,.2f}" if v >= 0 else f"−${abs(v):,.2f}").replace(",", " ")
 
 
-MODEL_LINE = ("фьючерсы и спот реального счёта ведёт система CRYPTO NOVA (плечо подбирается под каждый сигнал, риск сделки — не "
+MODEL_LINE = ("фьючерсы и спот реального счёта ведёт система CRYPTO NOVA AI (плечо подбирается под каждый сигнал, риск сделки — не "
               "больше 2% бюджета, стоп на бирже); основа спота — BTC, ETH и SOL.")
 
 
@@ -199,7 +199,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
     else:
         L.append("- Дней широкого падения не было.")
     L.append("")
-    # 05.11 (owner): the review speaks about the real OKX account since 22.10 and the system CRYPTO NOVA only (never the method:
+    # 05.11 (owner): the review speaks about the real OKX account since 22.10 and the system CRYPTO NOVA AI only (never the method:
     # owner 05.11 09:52); spot = the core BTC / ETH / SOL. The retired demo desks stay in the JSON (paper), not in the text.
     if real:
         L.append("## Реальный счёт CRYPTO NOVA на OKX")
@@ -210,7 +210,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
         L.append(f"- Фьючерсных сделок закрыто за неделю: {real['n']}, в плюсе {real['wins']}; в работе {real['open']}, у каждой стоп на бирже.")
         L.append("")
     if whales:
-        L.append("## Система CRYPTO NOVA")
+        L.append("## Система CRYPTO NOVA AI")
         L += ["- " + ln.lstrip("— ") for ln in whales.split("\n")[1:]]
         L.append("")
     if real and real.get("spot_top"):
@@ -246,7 +246,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
             P.append(f"С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%)".replace("(-", "(−"))
     if whales:
         P.append("")
-        P.append("Система CRYPTO NOVA")
+        P.append("Система CRYPTO NOVA AI")
         P += whales.split("\n")[1:]
     if real and real.get("spot_top"):
         P.append("")
@@ -300,7 +300,7 @@ def run(conn: sqlite3.Connection, rep: dict, out_path: str, now_ms: int | None =
     except Exception:  # noqa: BLE001
         real = None
     whales = ""
-    try:   # 05.11: the «Система CRYPTO NOVA» block — the week's closed trades and result, open positions, market lines
+    try:   # 05.11: the «Система CRYPTO NOVA AI» block — the week's closed trades and result, open positions, market lines
         from . import whale_digest
         whales = _plain(whale_digest.block(os.path.dirname(out_path) or ".", now_ms, slot="evening", with_trades=True, hours=7 * 24,
                                            period_ru="За неделю", highlights=2))

@@ -1,4 +1,4 @@
-"""The «Система CRYPTO NOVA» block of the public texts (internally: the «Киты» desk) (05.11.2026, owner: «вся система должна быть подключена к лучшим трейдерам мира … всё подтянуть,
+"""The «Система CRYPTO NOVA AI» block of the public texts (internally: the «Киты» desk) (05.11.2026, owner: «вся система должна быть подключена к лучшим трейдерам мира … всё подтянуть,
 адаптировать, привести в порядок»).
 
 Since 04.11 the whole real futures budget copies the top-5 verified whales (Binance lead traders chosen by
@@ -180,9 +180,9 @@ SIDE_SHORT = {"long": "лонг", "short": "шорт"}
 
 def block(out: str, now_ms: float | None = None, slot: str = "evening", with_trades: bool = False, highlights: int = 1,
           hours: int = 24, period_ru: str = "За сутки") -> str:
-    """The short «Система CRYPTO NOVA» section of a post: the real account's open futures positions, the period's closed trades and
+    """The short «Система CRYPTO NOVA AI» section of a post: the real account's open futures positions, the period's closed trades and
     their result, one calm market line. 05.11 (owner, 09:52: «нигде не надо писать, что это копии китов … везде должна быть система
-    CRYPTO NOVA … людям нужен только результат»): no whales, no copying, no trader names or counts — only the system's result.
+    CRYPTO NOVA AI … людям нужен только результат»): no whales, no copying, no trader names or counts — only the system's result.
     Empty without the real account's file."""
     real = _load(out, "public_real.json")
     if not real or real.get("stale"):
@@ -203,10 +203,10 @@ def block(out: str, now_ms: float | None = None, slot: str = "evening", with_tra
         lines.append("— Открытых позиций сейчас нет: система ждёт свой следующий сигнал.")
     hl = [ln for ln in (onchain_line(out), funds_line(out, now_ms)) if ln]
     lines += ["— " + ln for ln in hl[:highlights]]
-    return "<b>Система CRYPTO NOVA</b>\n" + "\n".join(lines)
+    return "<b>Система CRYPTO NOVA AI</b>\n" + "\n".join(lines)
 
 
 def model_line() -> str:
     """How the system works, for people, in one sentence — never the method (owner 05.11)."""
-    return (f"Фьючерсы и спот реального счёта ведёт система CRYPTO NOVA: плечо подбирается под каждый сигнал, риск сделки — не больше "
+    return (f"Фьючерсы и спот реального счёта ведёт система CRYPTO NOVA AI: плечо подбирается под каждый сигнал, риск сделки — не больше "
             f"{RISK_PCT}% бюджета, стоп на бирже; основа спота — BTC, ETH и SOL.")

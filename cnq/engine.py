@@ -56,7 +56,8 @@ OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "al
          "okx_signal.json",                                                # 22.10: the OKX signal sender's public log (no token)
          "gold_desk.json",                                                 # 04.11: «Золото · тест» demo desk (SLOW step; desk_select reads it)
          "desk_select.json",                                               # 28.10: the main futures desk (state + decision; public)
-         "morning.json", "morning.mp3"]                                    # 07.11: «Утренний доклад» (apppush step, cnq/agents/morning.py)
+         "morning.json", "morning.mp3",
+         *[f"morning.{l}.{x}" for l in ("en", "uk", "el", "es") for x in ("json", "mp3")]]                                    # 07.11: «Утренний доклад» (apppush step, cnq/agents/morning.py)
 # the engine's own state — never overwritten by a pull (20.10: + the conveyor's state, the risk layer's kill switch, state, reset
 # request and log)
 DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json", "kill_switch.json", "risk_state.json", "risk_reset.json", "risk_log.jsonl"}

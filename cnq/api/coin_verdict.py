@@ -6,11 +6,11 @@
 What NOVA says, from the system's own data only:
   • the status of web/ideas.json (можно брать / добрать / небольшой суммой / ждём / не брать) and its reason, the checks
     анкета · консультант · перегрев · разлоки · «от максимума» (passed / not passed);
-  • whether «CRYPTO NOVA портфель» (web/portfolio.json → portfolios.ideas; else web/app_home.json spot) holds it: share, entry,
+  • whether «CRYPTO NOVA AI портфель» (web/portfolio.json → portfolios.ideas; else web/app_home.json spot) holds it: share, entry,
     stop and target (the point where it takes half);
   • «Поддержка проекта» (ideas.json support) when the table has it;
   • the futures desk's open trade on it (web/app_home.json futures.open);
-  • a plain verdict line first, then 3–5 bullets, then «Это оценка по правилам CRYPTO NOVA, а не финансовый совет».
+  • a plain verdict line first, then 3–5 bullets, then «Это оценка по правилам CRYPTO NOVA AI, а не финансовый совет».
   Two coins NOVA can't tell apart → one short question («Вы про SUI (Sui) или про SEI (Sei)?»). A coin outside the system's
   universe → said honestly. A «dead» coin (−90% and more from its all-time high, «не брать») → said plainly, no promises.
 
@@ -38,29 +38,29 @@ def _L(ru, en, uk, el, es):
 
 
 T = {
-    "verdict": _L("{coin}: по правилам CRYPTO NOVA сейчас — {label}.", "{coin}: by CRYPTO NOVA's rules, right now — {label}.",
-                  "{coin}: за правилами CRYPTO NOVA зараз — {label}.", "{coin}: με τους κανόνες του CRYPTO NOVA, τώρα — {label}.",
-                  "{coin}: según las reglas de CRYPTO NOVA, ahora — {label}."),
-    "dead": _L("{coin}: {label}. Цена на {p} ниже исторического максимума — по правилам CRYPTO NOVA такие монеты система не "
+    "verdict": _L("{coin}: по правилам CRYPTO NOVA AI сейчас — {label}.", "{coin}: by CRYPTO NOVA AI's rules, right now — {label}.",
+                  "{coin}: за правилами CRYPTO NOVA AI зараз — {label}.", "{coin}: με τους κανόνες του CRYPTO NOVA AI, τώρα — {label}.",
+                  "{coin}: según las reglas de CRYPTO NOVA AI, ahora — {label}."),
+    "dead": _L("{coin}: {label}. Цена на {p} ниже исторического максимума — по правилам CRYPTO NOVA AI такие монеты система не "
                "покупает, и обещать возврат цены я не буду.",
-               "{coin}: {label}. The price is {p} below its all-time high — by CRYPTO NOVA's rules that's a “dead” coin, and I "
+               "{coin}: {label}. The price is {p} below its all-time high — by CRYPTO NOVA AI's rules that's a “dead” coin, and I "
                "won't promise it comes back.",
-               "{coin}: {label}. Ціна на {p} нижча за історичний максимум — за правилами CRYPTO NOVA це «мертва» монета, і "
+               "{coin}: {label}. Ціна на {p} нижча за історичний максимум — за правилами CRYPTO NOVA AI це «мертва» монета, і "
                "обіцяти її повернення я не буду.",
-               "{coin}: {label}. Η τιμή είναι {p} κάτω από το ιστορικό υψηλό — με τους κανόνες του CRYPTO NOVA είναι «νεκρό» "
+               "{coin}: {label}. Η τιμή είναι {p} κάτω από το ιστορικό υψηλό — με τους κανόνες του CRYPTO NOVA AI είναι «νεκρό» "
                "νόμισμα και δεν θα υποσχεθώ ότι θα επιστρέψει.",
-               "{coin}: {label}. El precio está un {p} por debajo de su máximo histórico: según las reglas de CRYPTO NOVA es una "
+               "{coin}: {label}. El precio está un {p} por debajo de su máximo histórico: según las reglas de CRYPTO NOVA AI es una "
                "moneda «muerta» y no prometo que se recupere."),
-    "unrated": _L("{coin}: в таблице CRYPTO NOVA оценки для спота нет.", "{coin}: the CRYPTO NOVA table has no spot rating for it.",
-                  "{coin}: у таблиці CRYPTO NOVA оцінки для спота немає.",
-                  "{coin}: ο πίνακας του CRYPTO NOVA δεν έχει αξιολόγηση spot γι' αυτό.",
-                  "{coin}: la tabla de CRYPTO NOVA no tiene valoración de spot para ella."),
+    "unrated": _L("{coin}: в таблице CRYPTO NOVA AI оценки для спота нет.", "{coin}: the CRYPTO NOVA AI table has no spot rating for it.",
+                  "{coin}: у таблиці CRYPTO NOVA AI оцінки для спота немає.",
+                  "{coin}: ο πίνακας του CRYPTO NOVA AI δεν έχει αξιολόγηση spot γι' αυτό.",
+                  "{coin}: la tabla de CRYPTO NOVA AI no tiene valoración de spot para ella."),
     "why": _L("Почему: {r}", "Why: {r}", "Чому: {r}", "Γιατί: {r}", "Por qué: {r}"),
     "passed": _L("Пройдено: {x}.", "Passed: {x}.", "Пройдено: {x}.", "Πέρασε: {x}.", "Superado: {x}."),
     "failed": _L("Не пройдено: {x}.", "Not passed: {x}.", "Не пройдено: {x}.", "Δεν πέρασε: {x}.", "No superado: {x}."),
-    "held": _L("В споте CRYPTO NOVA: доля {w}, вход {e}, {s}, {t}.", "In the CRYPTO NOVA portfolio: {w} share, entry {e}, {s}, {t}.",
-               "У портфелі CRYPTO NOVA: частка {w}, вхід {e}, {s}, {t}.", "Στο χαρτοφυλάκιο CRYPTO NOVA: μερίδιο {w}, είσοδος {e}, {s}, {t}.",
-               "En la cartera de CRYPTO NOVA: peso {w}, entrada {e}, {s}, {t}."),
+    "held": _L("В споте CRYPTO NOVA AI: доля {w}, вход {e}, {s}, {t}.", "In the CRYPTO NOVA AI portfolio: {w} share, entry {e}, {s}, {t}.",
+               "У портфелі CRYPTO NOVA AI: частка {w}, вхід {e}, {s}, {t}.", "Στο χαρτοφυλάκιο CRYPTO NOVA AI: μερίδιο {w}, είσοδος {e}, {s}, {t}.",
+               "En la cartera de CRYPTO NOVA AI: peso {w}, entrada {e}, {s}, {t}."),
     "stop": _L("стоп {v}", "stop {v}", "стоп {v}", "stop {v}", "stop {v}"),
     "no_stop": _L("стопа нет", "no stop", "стопу немає", "χωρίς stop", "sin stop"),
     "target": _L("цель {v} (там фиксируем половину)", "target {v} (half is taken there)", "ціль {v} (там фіксуємо половину)",
@@ -85,14 +85,14 @@ T = {
                     "{coin} — у ядрі портфеля: частка вища за план, зайве система продасть на перегляді.",
                     "Το {coin} είναι στον πυρήνα του χαρτοφυλακίου: το μερίδιο είναι πάνω από το σχέδιο, το σύστημα θα πουλήσει το επιπλέον στην αναθεώρηση.",
                     "{coin} está en el núcleo de la cartera: su peso supera el plan y el sistema venderá lo que sobra en la revisión."),
-    "core_held": _L("Доля в споте CRYPTO NOVA: {w} (план {p}); ядро система держит без стопа и без цели.",
-                    "Share of CRYPTO NOVA's spot: {w} (plan {p}); the system holds the core with no stop and no target.",
-                    "Частка в споті CRYPTO NOVA: {w} (план {p}); ядро система тримає без стопа й без цілі.",
-                    "Μερίδιο στο spot του CRYPTO NOVA: {w} (σχέδιο {p})· τον πυρήνα το σύστημα τον κρατά χωρίς stop και χωρίς στόχο.",
-                    "Peso en el spot de CRYPTO NOVA: {w} (plan {p}); el sistema mantiene el núcleo sin stop y sin objetivo."),
-    "not_held": _L("В портфеле CRYPTO NOVA её сейчас нет.", "The CRYPTO NOVA portfolio doesn't hold it now.",
-                   "У портфелі CRYPTO NOVA її зараз немає.", "Το χαρτοφυλάκιο CRYPTO NOVA δεν το έχει τώρα.",
-                   "La cartera de CRYPTO NOVA no la tiene ahora."),
+    "core_held": _L("Доля в споте CRYPTO NOVA AI: {w} (план {p}); ядро система держит без стопа и без цели.",
+                    "Share of CRYPTO NOVA AI's spot: {w} (plan {p}); the system holds the core with no stop and no target.",
+                    "Частка в споті CRYPTO NOVA AI: {w} (план {p}); ядро система тримає без стопа й без цілі.",
+                    "Μερίδιο στο spot του CRYPTO NOVA AI: {w} (σχέδιο {p})· τον πυρήνα το σύστημα τον κρατά χωρίς stop και χωρίς στόχο.",
+                    "Peso en el spot de CRYPTO NOVA AI: {w} (plan {p}); el sistema mantiene el núcleo sin stop y sin objetivo."),
+    "not_held": _L("В портфеле CRYPTO NOVA AI её сейчас нет.", "The CRYPTO NOVA AI portfolio doesn't hold it now.",
+                   "У портфелі CRYPTO NOVA AI її зараз немає.", "Το χαρτοφυλάκιο CRYPTO NOVA AI δεν το έχει τώρα.",
+                   "La cartera de CRYPTO NOVA AI no la tiene ahora."),
     "support": _L("Поддержка проекта: {s} из 100.", "Project support: {s}/100.", "Підтримка проєкту: {s} зі 100.",
                   "Υποστήριξη έργου: {s}/100.", "Respaldo del proyecto: {s}/100."),
     "futures": _L("Фьючерсы: открыта сделка {side}, вход {e}, стоп {s}, цель {t}, сейчас {p}.",
@@ -103,20 +103,20 @@ T = {
     "long": _L("лонг (на рост)", "long (betting on a rise)", "лонг (на зростання)", "long (για άνοδο)", "long (al alza)"),
     "short": _L("шорт (на падение)", "short (betting on a fall)", "шорт (на падіння)", "short (για πτώση)", "short (a la baja)"),
     "price": _L("Цена сейчас: {p}.", "Price now: {p}.", "Ціна зараз: {p}.", "Τιμή τώρα: {p}.", "Precio ahora: {p}."),
-    "nfa": _L("Это оценка по правилам CRYPTO NOVA, а не финансовый совет.",
-              "This is an assessment by CRYPTO NOVA's rules, not financial advice.",
-              "Це оцінка за правилами CRYPTO NOVA, а не фінансова порада.",
-              "Αυτή είναι αξιολόγηση με τους κανόνες του CRYPTO NOVA, όχι επενδυτική συμβουλή.",
-              "Es una valoración según las reglas de CRYPTO NOVA, no asesoramiento financiero."),
-    "no_data": _L("По {coin} у CRYPTO NOVA данных нет: этой монеты нет в списке, который система проверяет, поэтому оценку по "
+    "nfa": _L("Это оценка по правилам CRYPTO NOVA AI, а не финансовый совет.",
+              "This is an assessment by CRYPTO NOVA AI's rules, not financial advice.",
+              "Це оцінка за правилами CRYPTO NOVA AI, а не фінансова порада.",
+              "Αυτή είναι αξιολόγηση με τους κανόνες του CRYPTO NOVA AI, όχι επενδυτική συμβουλή.",
+              "Es una valoración según las reglas de CRYPTO NOVA AI, no asesoramiento financiero."),
+    "no_data": _L("По {coin} у CRYPTO NOVA AI данных нет: этой монеты нет в списке, который система проверяет, поэтому оценку по "
                   "нашим правилам я дать не могу. Гадать не буду.",
-                  "CRYPTO NOVA has no data on {coin}: it isn't in the list of coins the system checks, so I can't give an "
+                  "CRYPTO NOVA AI has no data on {coin}: it isn't in the list of coins the system checks, so I can't give an "
                   "assessment by our rules. I won't guess.",
-                  "Щодо {coin} у CRYPTO NOVA даних немає: цієї монети немає в списку, який перевіряє система, тому оцінку за "
+                  "Щодо {coin} у CRYPTO NOVA AI даних немає: цієї монети немає в списку, який перевіряє система, тому оцінку за "
                   "нашими правилами я дати не можу. Вгадувати не буду.",
-                  "Το CRYPTO NOVA δεν έχει δεδομένα για το {coin}: δεν είναι στη λίστα που ελέγχει το σύστημα, οπότε δεν μπορώ "
+                  "Το CRYPTO NOVA AI δεν έχει δεδομένα για το {coin}: δεν είναι στη λίστα που ελέγχει το σύστημα, οπότε δεν μπορώ "
                   "να δώσω αξιολόγηση με τους κανόνες μας. Δεν θα μαντέψω.",
-                  "CRYPTO NOVA no tiene datos sobre {coin}: no está en la lista de monedas que revisa el sistema, así que no puedo "
+                  "CRYPTO NOVA AI no tiene datos sobre {coin}: no está en la lista de monedas que revisa el sistema, así que no puedo "
                   "dar una valoración según nuestras reglas. No voy a adivinar."),
     "ask": _L("Вы про {a} или про {b}?", "Do you mean {a} or {b}?", "Ви про {a} чи про {b}?", "Εννοείτε το {a} ή το {b};",
               "¿Te refieres a {a} o a {b}?"),
@@ -138,8 +138,8 @@ T = {
               "{p} από το ιστορικό υψηλό (όριο {m})", "{p} desde su máximo histórico (límite {m})"),
 }
 
-SYSTEM = """Ты — NOVA, AI-помощник приложения CRYPTO NOVA. {voice}
-Тебе дают JSON: оценку монеты по правилам CRYPTO NOVA (coins) и готовый черновик ответа (draft). Перескажи черновик живо и очень простыми словами — ответ читают вслух с экрана телефона.
+SYSTEM = """Ты — NOVA, AI-помощник приложения CRYPTO NOVA AI. {voice}
+Тебе дают JSON: оценку монеты по правилам CRYPTO NOVA AI (coins) и готовый черновик ответа (draft). Перескажи черновик живо и очень простыми словами — ответ читают вслух с экрана телефона.
 ПРАВИЛА:
 • Структура как в черновике: первая строка — короткий вердикт, в ней дословно status_label монеты; затем 3–5 строк, каждая начинается с «• »; последняя строка — ровно disclaimer из JSON. Монет две — так для каждой, disclaimer один в конце.
 • Числа — только из JSON и только как они там записаны. Ничего не считай, не округляй по-своему, не добавляй своих чисел, дат и прогнозов цены.

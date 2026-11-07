@@ -1,4 +1,4 @@
-"""The CRYPTO NOVA portfolio for the mobile app (19.10.2026, owner: «в разделе Портфель пользователь будет видеть то, что сейчас
+"""The CRYPTO NOVA AI portfolio for the mobile app (19.10.2026, owner: «в разделе Портфель пользователь будет видеть то, что сейчас
 видит у нас, вводит свою сумму, и наша система делает ему балансировку … демо-портфель, что у него конкретно на балансе»).
 
 One small public file — web/app_portfolio.json (https://cryptonova.vip/app_portfolio.json) — from the panel's «CRYPTO NOVA
@@ -53,13 +53,13 @@ def run(conn: sqlite3.Connection, out: str = "web", now: int | None = None) -> d
     pos.sort(key=lambda x: -x["weight"])
     acts = [{"time": a.get("time"), "action": a.get("action"), "symbol": a.get("symbol"), "price": a.get("price"),
              "why_ru": (a.get("why_ru") or a.get("reason") or "")[:200]} for a in (pf.get("recent_actions") or [])[:15]]
-    doc = {"asof": now, "available": bool(pos), "name": pf.get("name") or "CRYPTO NOVA портфель", "started": pf.get("started"),
+    doc = {"asof": now, "available": bool(pos), "name": pf.get("name") or "CRYPTO NOVA AI портфель", "started": pf.get("started"),
            "index": pf.get("index"), "cash_pct": pf.get("cash_pct"), "positions": pos, "history": hist, "recent_actions": acts,
            "about_ru": (pf.get("about") or "")[:600],
-           "how_ru": ("Введите сумму — приложение покажет, сколько каждой монеты было бы куплено на неё по долям портфеля CRYPTO NOVA, "
+           "how_ru": ("Введите сумму — приложение покажет, сколько каждой монеты было бы куплено на неё по долям портфеля CRYPTO NOVA AI, "
                       "и как эта сумма меняется вместе с портфелем с момента, когда вы её ввели. Портфель сам докупает, фиксирует и "
                       "перекладывает деньги — это демо-расчёт, без реальных покупок."),
-           "disclaimer_ru": "Демо-расчёт на основе портфеля CRYPTO NOVA. Это не финансовый совет и не обещание дохода."}
+           "disclaimer_ru": "Демо-расчёт на основе портфеля CRYPTO NOVA AI. Это не финансовый совет и не обещание дохода."}
     with open(os.path.join(out, "app_portfolio.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False)
     return doc

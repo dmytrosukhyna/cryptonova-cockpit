@@ -1346,7 +1346,7 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
 
 
 def okx_spot_list(conn, now: int, get=None) -> set | None:
-    """22.10 (owner): coins with an OKX spot pair (USDT/USDC) — the CRYPTO NOVA portfolio buys only these, because the owner's real
+    """22.10 (owner): coins with an OKX spot pair (USDT/USDC) — the CRYPTO NOVA AI portfolio buys only these, because the owner's real
     OKX account repeats it. The same daily cache the spot meme check keeps (meme_spot «okx_spot»); a failed fetch → the last list;
     nothing at all → None (no filter this run)."""
     try:

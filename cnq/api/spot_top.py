@@ -4,10 +4,10 @@ the system's table lets one look at. GET /v2/spot/top?lang=… (public, no login
   rows   the first 10 coins of web/ideas.json with the status «можно брать», «можно добрать» or «на небольшую сумму», in the
          table's own order (its rows first, then the same statuses it did not show, by score); each with one plain reason in the
          app's language (cnq/api/pf_review.reason), the table's score, the 7-day move, the fall from the 30-day high, the
-         project-support score when the table has one ("support", optional), whether «CRYPTO NOVA портфель» holds it (its share,
+         project-support score when the table has one ("support", optional), whether «CRYPTO NOVA AI портфель» holds it (its share,
          entry, stop and the point where it takes half), and whether OKX / BingX list it on spot (null = not known yet)
   prices today's price of every coin the table rates — the app values the coins the user added to the demo portfolio
-Nothing is a recommendation to buy: the app ends the list with «Список по правилам CRYPTO NOVA, а не финансовый совет»."""
+Nothing is a recommendation to buy: the app ends the list with «Список по правилам CRYPTO NOVA AI, а не финансовый совет»."""
 from __future__ import annotations
 
 import json

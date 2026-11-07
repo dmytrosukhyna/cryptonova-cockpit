@@ -1,4 +1,4 @@
-"""Портфель «Ядро + альтсезон» — a model spot portfolio with an altseason switch, and its signals to the owner's signals channel (CRYPTO NOVA FUTURES)
+"""Портфель «Ядро + альтсезон» — a model spot portfolio with an altseason switch, and its signals to the owner's signals channel (CRYPTO NOVA AI FUTURES)
 channel (19.10.2026, owner: «все рассказывают про альтсезон … с альтами есть перспектива на X5, X7 … предложи правильный,
 самый лучший вариант»; «туда же и портфель надо законнектить наш»).
 
@@ -43,7 +43,7 @@ BEAR_KEEP = 0.35
 #   (for reference, the alt part always in BTC: ×3.08, −25 %). Today both hold the alts; the owner picks the exit rule.
 EXIT = "gauge"
 MODEL_V = 2                        # 19.10: alt part 20 %, the basket by 180-day volume — a change posts once to the channel
-NAME = "Портфель CRYPTO NOVA · ядро + альтсезон"
+NAME = "Портфель CRYPTO NOVA AI · ядро + альтсезон"
 
 
 def gauge(conn: sqlite3.Connection) -> dict | None:

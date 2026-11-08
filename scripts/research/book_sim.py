@@ -101,15 +101,15 @@ def report(trades, mark, cost, tag, emit=print):
             "B_time7d": simulate(time_exit(trades, mark, cost), mark, cost),
             "C_no_cap": simulate(trades, mark, cost, max_pos=None)}
     for k, S in sims.items():
-        cell = {x: S[x] for x in ("taken", "busy", "evicted", "taken_mean", "skip_mean")}
-        for p, (a, b) in parts: cell[p] = D.curve_stats(S["days"], a, b)
+        cell = {x: (float(S[x]) if S[x] is not None else None) for x in ("taken", "busy", "evicted", "taken_mean", "skip_mean")}
+        for p, (a, b) in parts: cell[p] = {k2: (float(v) if v is not None else None) for k2, v in D.curve_stats(S["days"], a, b).items()}
         R[k] = cell
         emit(f"::notice title={tag} {k}::taken {cell['taken']} mean {cell['taken_mean']}% (all {R['mean_all']}%) busy {cell['busy']} "
              f"skip-mean {cell['skip_mean']}% evicted {cell['evicted']} | all {cell['all']} | h1 {cell['h1']['total']} | h2 {cell['h2']['total']}")
     for alt in ("A_new_first", "B_time7d", "C_no_cap"):
         P = {p: D.paired(sims[alt]["days"], sims["base"]["days"], a, b) for p, (a, b) in parts}
         b0, b1 = R["base"]["all"], R[alt]["all"]
-        P["risk_ok"] = (b1["worst_day"] >= 1.25 * b0["worst_day"]) and (b1["max_dd"] >= 1.25 * b0["max_dd"])
+        P["risk_ok"] = bool((b1["worst_day"] >= 1.25 * b0["worst_day"]) and (b1["max_dd"] >= 1.25 * b0["max_dd"]))
         P["pass_here"] = bool(P["h1"]["t"] and P["h2"]["t"] and P["h1"]["t"] >= 2.5 and P["h2"]["t"] >= 2.5 and P["all"]["d"] > 0 and P["risk_ok"])
         R[alt + "_minus_base"] = P
         emit(f"::notice title={tag} {alt}−base::{P}")

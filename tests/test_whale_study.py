@@ -563,3 +563,17 @@ def test_the_desk_closes_the_copies_of_a_whale_who_left_the_fixed_list():
     assert not cl["open"] and cl["closed"][-1]["why"] == "кит убран из списка" and cl["closed"][-1]["pnl"] > 0
     empty = W.desk_step(json.loads(json.dumps(d)), [], {}, {"SOL": 90.0}, now, close_unfollowed=True)
     assert [x["coin"] for x in empty["open"]] == ["SOL"]                                     # an empty list never closes anything
+
+
+def test_locked_whale_outside_leaderboard_slice_is_still_studied():
+    """08.11 (backlog 111): a locked whale missing from the day's candidates is studied by address, not dropped as «нет данных»"""
+    conn = sqlite3.connect(":memory:")
+    W.ensure_schema(conn)
+    conn.execute("INSERT INTO ws_whale (addr, lb) VALUES (?,?)",
+                 ("bn:111", json.dumps({"src": "bn", "addr": "bn:111", "code": "111", "name": "Mike", "win_ratio": 0.9})))
+    study = {"rule": W.LOCK_RULE, "top": [{"addr": "bn:111", "name": "Mike"}, {"addr": "bn:222", "name": "In"},
+                                          {"addr": "okx:ABC", "short": "Okx"}, {"addr": "0xdead", "name": "Hl"}]}
+    lo, le = W.locked_rows(conn, study, [{"addr": "bn:222"}])
+    assert [r["addr"] for r in le] == ["bn:111"] and le[0]["code"] == "111" and le[0]["win_ratio"] == 0.9 and le[0]["locked"]
+    assert [(r["addr"], r["code"], r["src"]) for r in lo] == [("okx:ABC", "ABC", "okx")]
+    assert W.locked_rows(conn, {**study, "rule": "old"}, []) == ([], [])

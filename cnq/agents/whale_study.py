@@ -952,6 +952,31 @@ def lock_follow(study: dict, ranked: list[dict], byaddr: dict, desk: dict | None
     return top, why, lock_t, passing
 
 
+def locked_rows(conn, study: dict, have: list[dict]) -> tuple[list[dict], list[dict]]:
+    """08.11 (backlog 111): a locked whale who slipped out of the day's leaderboard slice (Binance: 35 of ~260 by 30-day P&L) was
+    not studied, and after 24 h the lock dropped him as «нет данных о ките больше суток» and closed his copies (07.11 乾坤策略量化),
+    although his record is one request away. Such whales are studied by address from their stored row → (okx rows, added-source rows).
+    Only data coverage: the bar and the lock's hard reasons are unchanged."""
+    if study.get("rule") != LOCK_RULE:
+        return [], []
+    seen = {r.get("addr") for r in have}
+    lo, le = [], []
+    for x in study.get("top") or []:
+        a = str((x or {}).get("addr") or "")
+        if not a or a in seen or ":" not in a:
+            continue
+        k = WS.src_of(a)
+        if not k and not a.startswith("okx:"):
+            continue
+        lb = WS.lb_of(conn, a)
+        nm = lb.get("name") or x.get("name") or x.get("short") or a
+        row = {**lb, "src": k or "okx", "addr": a, "code": lb.get("code") or a.split(":", 1)[1], "name": nm,
+               "short": lb.get("short") or x.get("short") or nm[:18], "locked": True}
+        (le if k else lo).append(row)
+        seen.add(a)
+    return lo, le
+
+
 def copy_ok(p: dict) -> bool:
     """04.11 22:35: copyable = the delayed-copy test at the server's real delay (2 min) is positive; a profile from before the 2-minute
     test → the 30-minute one"""
@@ -1496,6 +1521,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             kv_set(conn, "candidates", cand)
     rows, orows = cand.get("rows") or [], cand.get("okx_rows") or []
     erows = [r for x in (cand.get("ext") or {}).values() for r in x.get("rows") or [] if WS.src_of(r.get("addr"))]
+    lo, le = locked_rows(conn, kv_get(conn, "study") or {}, rows + orows + erows)
+    orows, erows = lo + orows, le + erows                     # locked whales first: the budget reaches them
     # 2. prices (names for mapping, marks for the desk)
     mids = {}
     try:

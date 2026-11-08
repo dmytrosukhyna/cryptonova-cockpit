@@ -952,7 +952,27 @@ def lock_follow(study: dict, ranked: list[dict], byaddr: dict, desk: dict | None
     return top, why, lock_t, passing
 
 
-def locked_rows(conn, study: dict, have: list[dict]) -> tuple[list[dict], list[dict]]:
+# 08.11 (owner via the coordinator): a whale dropped from the locked list by OUR bug (not by the rules) is reinstated once — only if he
+# passes the full bar in this run (studied by address), into a free place of the lock, with his original join date (no newcomer wait).
+# config/whale_reinstate.json {"id", "addrs": {addr: {"joined": ms, "name"}}, "why_ru"}; applied ids are kept in ws_kv «reinstated».
+REINSTATE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "whale_reinstate.json")
+
+
+def reinstate_cfg(path: str | None = None) -> dict:
+    try:
+        with open(path or REINSTATE, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) and d.get("id") and isinstance(d.get("addrs"), dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def reinstate_pending(conn, cfg: dict) -> dict:
+    done = (kv_get(conn, "reinstated") or {}).get(cfg.get("id") or "", {}) if cfg else {}
+    return {a: v for a, v in (cfg.get("addrs") or {}).items() if a not in done}
+
+
+def locked_rows(conn, study: dict, have: list[dict], extra: dict | None = None) -> tuple[list[dict], list[dict]]:
     """08.11 (backlog 111): a locked whale who slipped out of the day's leaderboard slice (Binance: 35 of ~260 by 30-day P&L) was
     not studied, and after 24 h the lock dropped him as «нет данных о ките больше суток» and closed his copies (07.11 乾坤策略量化),
     although his record is one request away. Such whales are studied by address from their stored row → (okx rows, added-source rows).
@@ -961,7 +981,7 @@ def locked_rows(conn, study: dict, have: list[dict]) -> tuple[list[dict], list[d
         return [], []
     seen = {r.get("addr") for r in have}
     lo, le = [], []
-    for x in study.get("top") or []:
+    for x in list(study.get("top") or []) + [{"addr": a, "name": (v or {}).get("name")} for a, v in (extra or {}).items()]:
         a = str((x or {}).get("addr") or "")
         if not a or a in seen or ":" not in a:
             continue
@@ -1521,7 +1541,9 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             kv_set(conn, "candidates", cand)
     rows, orows = cand.get("rows") or [], cand.get("okx_rows") or []
     erows = [r for x in (cand.get("ext") or {}).values() for r in x.get("rows") or [] if WS.src_of(r.get("addr"))]
-    lo, le = locked_rows(conn, kv_get(conn, "study") or {}, rows + orows + erows)
+    rcfg = reinstate_cfg()
+    rpend = reinstate_pending(conn, rcfg)
+    lo, le = locked_rows(conn, kv_get(conn, "study") or {}, rows + orows + erows, rpend)
     orows, erows = lo + orows, le + erows                     # locked whales first: the budget reaches them
     # 2. prices (names for mapping, marks for the desk)
     mids = {}
@@ -1692,10 +1714,34 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     byaddr = {p["addr"]: p for p in profs}
     hard_why: dict = {}
     lock_t, passing, joined = study.get("lock_t"), study.get("passing"), dict(study.get("joined") or {})
+    reinstate_out = {}
     if complete and profs:
+        ranked0 = list(follow_new)
         follow_new, hard_why, lock_t, passing = lock_follow(study, follow_new, byaddr, desk, now)
         prev = {x["addr"] for x in study.get("top") or []} if study.get("rule") == LOCK_RULE else set()
         joined = {a: (joined.get(a) if a in prev else now) for a in (x["addr"] for x in follow_new)}
+        # 08.11: a whale dropped by our bug comes back once, only if he passes the full bar now and a place is free
+        for a, v in rpend.items():
+            r = next((x for x in ranked0 if x["addr"] == a), None)
+            q = byaddr.get(a)
+            if r is None:
+                reinstate_out[a] = {"ok": False, "why_ru": (q or {}).get("excluded_ru") or (["не изучен в этом прогоне"] if not q else
+                                                                                         ["не проходит тест копирования или скрывает позиции"])}
+                continue
+            if a in {x["addr"] for x in follow_new}:
+                reinstate_out[a] = {"ok": True, "why_ru": ["уже в списке"]}
+            elif len(follow_new) >= LOCK_N:
+                reinstate_out[a] = {"ok": False, "why_ru": [f"в закреплённом списке нет места ({LOCK_N})"]}
+                continue
+            else:
+                follow_new.append(r)
+                j0 = int(_f((v or {}).get("joined"))) or int(_f(((study.get("passing") or {}).get(a) or [now])[0])) or now
+                joined[a] = j0
+                passing = {**(passing or {}), a: [j0, now]}
+                reinstate_out[a] = {"ok": True, "why_ru": [rcfg.get("why_ru") or "возвращён: выбыл из-за ошибки системы"], "joined": j0}
+            rd = kv_get(conn, "reinstated") or {}
+            rd.setdefault(rcfg["id"], {})[a] = now
+            kv_set(conn, "reinstated", rd)
     else:
         follow_new = follow_new[:LOCK_N]
     fset = {x["addr"] for x in follow_new}
@@ -1740,6 +1786,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     st_now = kv_get(conn, "study") or {}
     out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []) + owner_picks(),
            "follow_dropped": st_now.get("dropped", []), "archive": arch, "bench": bench,
+           "reinstate": reinstate_out,          # 08.11: one-time reinstatement of a whale dropped by our bug (config/whale_reinstate.json)
            # 06.11 (owner): the list is fixed between reviews; whale_live closes the copies of a whale who left it
            "follow_lock": ({"rule": LOCK_RULE, "t": st_now.get("lock_t"), "next_t": int(st_now["lock_t"]) + LOCK_MS, "n": LOCK_N,
                             "passing": st_now.get("passing") or {}, "joined": st_now.get("joined") or {},

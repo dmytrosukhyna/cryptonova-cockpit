@@ -173,3 +173,28 @@ def test_run_reports_per_source_counts_and_the_sources_not_connected():
               max_requests=80, budget_s=60, src_get={"bn": fake_bn(hist_rows=_hist())})
     assert d["by_source"]["bn"] == {"studied": 1, "passed": 1, "following": 1} and d["by_source"]["okx"]["studied"] == 0
     assert {"bybit", "bitget", "gate", "mexc", "bingx"} <= set(d["sources_off"])
+
+
+def test_a_whale_dropped_by_our_bug_is_reinstated_once_if_he_passes_the_bar_with_his_join_date(tmp_path, monkeypatch):
+    """08.11: 乾坤策略量化 was dropped as «нет данных» by our candidate-cut bug — back once, only if he passes the full bar now"""
+    W.time.sleep = WS.time.sleep = lambda s: None
+    addr = "bn:5278353437811897601"
+    cfg = tmp_path / "re.json"
+    cfg.write_text(json.dumps({"id": "re-1", "why_ru": "ошибка системы", "addrs": {addr: {"name": "X", "joined": NOW - 2 * DAY}}}))
+    monkeypatch.setattr(W, "REINSTATE", str(cfg))
+    conn = sqlite3.connect(":memory:")
+    W.ensure_schema(conn)
+    W.kv_set(conn, "study", {"t": NOW - 3600_000, "rule": W.LOCK_RULE, "lock_t": NOW - 3600_000, "top": [], "passing": {}, "joined": {}})
+    kw = dict(post=_hl_post(NOW), get_lb=lambda: {"leaderboardRows": []}, okx_get=lambda p, q: [{"ranks": []}] if "lead-traders" in p else [],
+              max_requests=80, budget_s=60)
+    d = W.run(conn, now=NOW, src_get={"bn": fake_bn(hist_rows=_hist())}, **kw)
+    assert d["reinstate"][addr]["ok"] and d["reinstate"][addr]["joined"] == NOW - 2 * DAY
+    assert addr in [x["addr"] for x in d["following"]] and d["follow_lock"]["joined"][addr] == NOW - 2 * DAY
+    assert W.reinstate_pending(conn, W.reinstate_cfg()) == {}                         # once only
+    # a whale who fails the bar is not reinstated (and stays pending)
+    conn2 = sqlite3.connect(":memory:")
+    W.ensure_schema(conn2)
+    W.kv_set(conn2, "study", {"t": NOW - 3600_000, "rule": W.LOCK_RULE, "lock_t": NOW - 3600_000, "top": [], "passing": {}, "joined": {}})
+    d2 = W.run(conn2, now=NOW, src_get={"bn": fake_bn(hist_rows=_hist(n_win=6, n_loss=6))}, **kw)
+    assert not d2["reinstate"][addr]["ok"] and addr not in [x["addr"] for x in d2["following"]]
+    assert W.reinstate_pending(conn2, W.reinstate_cfg()) != {}

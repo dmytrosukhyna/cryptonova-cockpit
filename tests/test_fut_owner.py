@@ -75,3 +75,32 @@ def test_the_owner_card_is_owner_only_in_both_panels():
     assert "if (V.auth.owner() && window.CNFutOwner)" in fut
     js = open("web/fut_owner.js", encoding="utf-8").read()
     assert "window.CNFutOwner = { html, mount }" in js
+
+
+def test_whale_copies_are_never_labelled_as_the_news_rule():
+    """08.11 (owner): real positions with «whales:W-…» ids read «сделка по новости» (KIND_RU.W) — owner: «копия: <трейдер>», guests:
+    «сигнал системы CRYPTO NOVA AI»; other desks keep their rule names"""
+    import re
+    import shutil
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    html = open(os.path.join(root, "web", "app.html"), encoding="utf-8").read()
+    assert "function realDesk(sig,x){ return realDeskOf(" in html and "realDesk(x.sig)" not in html
+    assert "futRule(k,o.grade)" not in html and "(k==='whales'||k==='ivan'||(o&&isWhaleCopy(o.sig,o.strategy)))?whaleLabel(" in html
+    node = shutil.which("node")
+    if not node:
+        return
+    a, b = html.index("// WHALE_LABEL_START"), html.index("// WHALE_LABEL_END")
+    kind = re.search(r"const KIND_RU=(\{[^}]*\});", html).group(1)
+    js = html[a:b] + f"""
+const KIND_RU={kind}, kindRu=g=>KIND_RU[g]||g, names={{bal:{{name:'Сбалансированная'}},whales:{{name:'Киты'}}}};
+const trades=[{{sig:'whales:W-XRP-S-1794084285861', whale_name:'法兰西基金'}}];
+const r=(sig,st,guest)=>realDeskOf(sig,st,guest,guest?[]:trades,names,kindRu);
+process.stdout.write(JSON.stringify([r('whales:W-XRP-S-1794084285861',null,false), r('whales:W-BTC-L-1794084285861',null,false),
+  r('ivan:W-ETH-L-1',null,false), r('whales:W-XRP-S-1794084285861',null,true), r('x:W-ZEC-S-1','whales',true), r('bal:B-ETH-1',null,true)]));"""
+    p = os.path.join(tempfile.mkdtemp(), "w.js")
+    open(p, "w", encoding="utf-8").write(js)
+    out = json.loads(subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout)
+    assert out == ["копия: 法兰西基金", "копия трейдера", "копия: Иван", "сигнал системы CRYPTO NOVA AI", "сигнал системы CRYPTO NOVA AI",
+                   "Сбалансированная · откуп каскада"]
+    assert not any("новост" in x for x in out)

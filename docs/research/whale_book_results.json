@@ -1,0 +1,432 @@
+{
+ "backlog": 101,
+ "made": "2026-11-08",
+ "okx_hl": {
+  "made": 1793810278130,
+  "whales": 30,
+  "top10": {
+   "n": 2648,
+   "mean_all": 0.349,
+   "days": 90,
+   "base": {
+    "taken": 266.0,
+    "busy": 162.0,
+    "evicted": 0.0,
+    "taken_mean": -0.087,
+    "skip_mean": 0.564,
+    "all": {
+     "total": -4.33,
+     "n_days": 90.0,
+     "worst_day": -5.04,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h1": {
+     "total": 0.99,
+     "n_days": 45.0,
+     "worst_day": -3.58,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -5.33,
+     "n_days": 45.0,
+     "worst_day": -5.04,
+     "max_dd": -7.27,
+     "lose_streak": 3.0
+    }
+   },
+   "A_new_first": {
+    "taken": 369.0,
+    "busy": 314.0,
+    "evicted": 10.0,
+    "taken_mean": -0.327,
+    "skip_mean": 0.571,
+    "all": {
+     "total": -20.3,
+     "n_days": 90.0,
+     "worst_day": -8.61,
+     "max_dd": -38.89,
+     "lose_streak": 5.0
+    },
+    "h1": {
+     "total": -24.13,
+     "n_days": 45.0,
+     "worst_day": -8.61,
+     "max_dd": -24.13,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": 3.84,
+     "n_days": 45.0,
+     "worst_day": -5.33,
+     "max_dd": -15.55,
+     "lose_streak": 5.0
+    }
+   },
+   "B_time7d": {
+    "taken": 403.0,
+    "busy": 325.0,
+    "evicted": 0.0,
+    "taken_mean": -0.469,
+    "skip_mean": -0.217,
+    "all": {
+     "total": -35.44,
+     "n_days": 90.0,
+     "worst_day": -7.47,
+     "max_dd": -48.03,
+     "lose_streak": 4.0
+    },
+    "h1": {
+     "total": -21.06,
+     "n_days": 45.0,
+     "worst_day": -7.47,
+     "max_dd": -24.55,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -14.38,
+     "n_days": 45.0,
+     "worst_day": -5.52,
+     "max_dd": -26.97,
+     "lose_streak": 3.0
+    }
+   },
+   "C_no_cap": {
+    "taken": 270.0,
+    "busy": 143.0,
+    "evicted": 0.0,
+    "taken_mean": -0.061,
+    "skip_mean": 0.344,
+    "all": {
+     "total": -3.09,
+     "n_days": 90.0,
+     "worst_day": -5.04,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h1": {
+     "total": 1.35,
+     "n_days": 45.0,
+     "worst_day": -3.58,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -4.44,
+     "n_days": 45.0,
+     "worst_day": -5.04,
+     "max_dd": -7.27,
+     "lose_streak": 3.0
+    }
+   },
+   "A_new_first_minus_base": {
+    "all": {
+     "d": -15.96,
+     "n": 53,
+     "t": -0.97
+    },
+    "h1": {
+     "d": -25.13,
+     "n": 16,
+     "t": -2.46
+    },
+    "h2": {
+     "d": 9.16,
+     "n": 37,
+     "t": 0.8
+    },
+    "risk_ok": false,
+    "pass_here": false
+   },
+   "B_time7d_minus_base": {
+    "all": {
+     "d": -31.1,
+     "n": 48,
+     "t": -1.78
+    },
+    "h1": {
+     "d": -22.05,
+     "n": 19,
+     "t": -2.08
+    },
+    "h2": {
+     "d": -9.05,
+     "n": 29,
+     "t": -0.66
+    },
+    "risk_ok": false,
+    "pass_here": false
+   },
+   "C_no_cap_minus_base": {
+    "all": {
+     "d": 1.24,
+     "n": 7,
+     "t": 0.85
+    },
+    "h1": {
+     "d": 0.36,
+     "n": 6,
+     "t": 0.29
+    },
+    "h2": {
+     "d": 0.88,
+     "n": 1,
+     "t": null
+    },
+    "risk_ok": true,
+    "pass_here": false
+   }
+  },
+  "all_bar": {
+   "n": 3316,
+   "mean_all": 0.351,
+   "days": 90,
+   "base": {
+    "taken": 248.0,
+    "busy": 163.0,
+    "evicted": 0.0,
+    "taken_mean": -0.273,
+    "skip_mean": 0.345,
+    "all": {
+     "total": -12.68,
+     "n_days": 90.0,
+     "worst_day": -3.89,
+     "max_dd": -15.37,
+     "lose_streak": 6.0
+    },
+    "h1": {
+     "total": -2.13,
+     "n_days": 45.0,
+     "worst_day": -3.58,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -10.54,
+     "n_days": 45.0,
+     "worst_day": -3.89,
+     "max_dd": -14.6,
+     "lose_streak": 6.0
+    }
+   },
+   "A_new_first": {
+    "taken": 287.0,
+    "busy": 174.0,
+    "evicted": 8.0,
+    "taken_mean": -1.02,
+    "skip_mean": -0.166,
+    "all": {
+     "total": -54.96,
+     "n_days": 90.0,
+     "worst_day": -8.61,
+     "max_dd": -54.96,
+     "lose_streak": 4.0
+    },
+    "h1": {
+     "total": -27.05,
+     "n_days": 45.0,
+     "worst_day": -8.61,
+     "max_dd": -27.05,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -27.91,
+     "n_days": 45.0,
+     "worst_day": -6.02,
+     "max_dd": -28.12,
+     "lose_streak": 4.0
+    }
+   },
+   "B_time7d": {
+    "taken": 425.0,
+    "busy": 420.0,
+    "evicted": 0.0,
+    "taken_mean": -0.284,
+    "skip_mean": 0.1,
+    "all": {
+     "total": -22.63,
+     "n_days": 90.0,
+     "worst_day": -7.47,
+     "max_dd": -35.29,
+     "lose_streak": 5.0
+    },
+    "h1": {
+     "total": -21.06,
+     "n_days": 45.0,
+     "worst_day": -7.47,
+     "max_dd": -24.55,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -1.57,
+     "n_days": 45.0,
+     "worst_day": -3.89,
+     "max_dd": -15.54,
+     "lose_streak": 5.0
+    }
+   },
+   "C_no_cap": {
+    "taken": 257.0,
+    "busy": 138.0,
+    "evicted": 0.0,
+    "taken_mean": -0.23,
+    "skip_mean": 0.123,
+    "all": {
+     "total": -11.1,
+     "n_days": 90.0,
+     "worst_day": -3.89,
+     "max_dd": -15.37,
+     "lose_streak": 5.0
+    },
+    "h1": {
+     "total": -1.67,
+     "n_days": 45.0,
+     "worst_day": -3.58,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -9.43,
+     "n_days": 45.0,
+     "worst_day": -3.89,
+     "max_dd": -14.37,
+     "lose_streak": 5.0
+    }
+   },
+   "A_new_first_minus_base": {
+    "all": {
+     "d": -42.28,
+     "n": 51,
+     "t": -2.81
+    },
+    "h1": {
+     "d": -24.92,
+     "n": 16,
+     "t": -2.41
+    },
+    "h2": {
+     "d": -17.36,
+     "n": 35,
+     "t": -1.68
+    },
+    "risk_ok": false,
+    "pass_here": false
+   },
+   "B_time7d_minus_base": {
+    "all": {
+     "d": -9.96,
+     "n": 55,
+     "t": -0.52
+    },
+    "h1": {
+     "d": -18.92,
+     "n": 20,
+     "t": -1.67
+    },
+    "h2": {
+     "d": 8.97,
+     "n": 35,
+     "t": 0.6
+    },
+    "risk_ok": false,
+    "pass_here": false
+   },
+   "C_no_cap_minus_base": {
+    "all": {
+     "d": 1.58,
+     "n": 10,
+     "t": 0.76
+    },
+    "h1": {
+     "d": 0.47,
+     "n": 5,
+     "t": 0.38
+    },
+    "h2": {
+     "d": 1.12,
+     "n": 5,
+     "t": 0.67
+    },
+    "risk_ok": true,
+    "pass_here": false
+   }
+  }
+ },
+ "binance": {
+  "note": "Binance: from check-run annotations of run 42514294675 (artifact download blocked in this session); missing cells = not in annotations",
+  "top10": {
+   "n_days": 64,
+   "base": {
+    "taken": 279,
+    "taken_mean": 0.511,
+    "all_mean": 0.156,
+    "busy": 88,
+    "skip_mean": 0.269,
+    "total": 26.75,
+    "h1": 12.14,
+    "h2": 14.61,
+    "worst_day": -7.22,
+    "max_dd": -18.05
+   },
+   "A_new_first": {
+    "same_as_base": true,
+    "evicted": 0
+   },
+   "C_no_cap": {
+    "same_as_base": true
+   },
+   "B_time7d": {
+    "total": 23.52,
+    "h1": 9.88,
+    "h2": 13.63,
+    "worst_day": -9.22,
+    "max_dd": -15.37,
+    "minus_base": {
+     "all": {
+      "d": -3.23,
+      "t": -0.18
+     },
+     "h1": {
+      "d": -2.26,
+      "t": -0.68
+     },
+     "h2": {
+      "d": -0.98,
+      "t": -0.06
+     }
+    }
+   }
+  },
+  "all_bar": {
+   "base": {
+    "taken": 334,
+    "taken_mean": 0.352,
+    "all_mean": 0.238,
+    "busy": 121,
+    "skip_mean": 0.752,
+    "total": 22.02,
+    "h1": 12.14,
+    "h2": 9.87,
+    "worst_day": -6.89,
+    "max_dd": -23.5
+   },
+   "A_new_first": {
+    "total": 33.21,
+    "h1": 12.14,
+    "h2": 21.07,
+    "evicted": 9,
+    "worst_day": -6.11,
+    "max_dd": -23.5
+   },
+   "B_time7d": {
+    "total": 28.62,
+    "h1": 9.88,
+    "h2": 18.73,
+    "worst_day": -6.89,
+    "max_dd": -20.1
+   }
+  }
+ },
+ "verdict": "not passed"
+}

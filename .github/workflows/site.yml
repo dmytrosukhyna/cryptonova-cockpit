@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: write
+  actions: read          # 09.11: scripts/ci_runs.py reads the workflow runs for «Состояние системы»
 
 concurrency:
   group: site
@@ -275,6 +276,10 @@ jobs:
         env:
           TWELVE_DATA_KEY: ${{ secrets.TWELVE_DATA_KEY }}
         run: python -m cnq.cli fx-gaps
+      - name: Owner watch ADA / AVAX / LIT (levels, order-book walls, funding / OI, traders, unlocks, sourced news) → web/owner_watch.json
+        continue-on-error: true
+        timeout-minutes: 3
+        run: python -m cnq.agents.owner_watch
       - name: Spoken brief (neural voice) → web/brief.mp3 + web/brief.json
         continue-on-error: true
         env:
@@ -294,12 +299,22 @@ jobs:
         continue-on-error: true
         timeout-minutes: 2
         run: python -m cnq.cli vipfeeds --out web
+      - name: GitHub runs (read-only) → web/gh_runs.json
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/ci_runs.py
+      - name: Owner «Состояние системы» → web/owner_health.json
+        continue-on-error: true
+        timeout-minutes: 1
+        run: python -m cnq.agents.owner_health
       - name: Commit refreshed data (state also survives in the cache)
         continue-on-error: true
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
-          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/whale_watch.json web/stock_whales.json web/smart_money.json web/smart_money_signal.json web/real_why.json web/fut_owner.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/options_mood.json web/tokenomics.json web/channel_watch.json web/channel_opps.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 web/spot_pipeline.json web/strategies.json web/opportunities.json web/system_status.json; do [ -f "$f" ] && git add "$f"; done
+          for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/whale_watch.json web/stock_whales.json web/smart_money.json web/smart_money_signal.json web/real_why.json web/fut_owner.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/options_mood.json web/tokenomics.json web/channel_watch.json web/channel_opps.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 web/spot_pipeline.json web/strategies.json web/opportunities.json web/system_status.json web/owner_watch.json web/owner_health.json web/gh_runs.json; do [ -f "$f" ] && git add "$f"; done
           # 04.11: our own whale-trade history (cnq/agents/whale_study.archive_trades) — one dated JSONL a day, kept for 6+ months
           if [ -d data/whale_trades ]; then git add data/whale_trades || echo "::warning title=whale_trades::not added"; fi
           # 04.11: «Куда инвестируют киты» — the daily signal log and its 1/7/30-day outcomes (cnq/agents/smart_money.py)

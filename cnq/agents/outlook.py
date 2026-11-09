@@ -51,7 +51,7 @@ TARGET = 2 / 3
 OOS_DAYS = 730
 WD_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 PARAMS_RU = ("Что используем: волатильность последних 90 дней, история дневных закрытий {period}, режим BTC (выше или ниже "
-             "200-дневной средней), наш прогноз A/B и его проверка, календарь событий, макро-панель, панель наблюдения "
+             "средней цены за всю нашу историю дневных свечей, но не больше 200 дней), наш прогноз A/B и его проверка, календарь событий, макро-панель, панель наблюдения "
              "автопилота, индекс страха и жадности.")
 
 
@@ -322,7 +322,10 @@ def panel_regime(term: dict | None, btc_hist: dict[int, float]) -> dict:
     if bull is None:
         out["label_ru"] = "режим BTC неизвестен"
     else:
-        out["label_ru"] = "бычий: BTC выше 200-дневной средней" if bull else "не бычий: BTC ниже 200-дневной средней или 90 дней в минусе"
+        from ..terminal.report import long_avg_ru      # 10.11: the window the panel rule really uses (~106 days now)
+        out["label_ru"] = (f"бычий: BTC выше {long_avg_ru(reg)}" if bull else
+                           f"не бычий: BTC ниже {long_avg_ru(reg)} или 90 дней в минусе")
+        out["sma_days_panel"] = reg.get("sma_days")
     if bull is not None and hist_label is not None and (hist_label == "BULL") != bool(bull):
         out["note_ru"] = ("Панель и полная история расходятся в режиме: на сервере меньше 200 дней свечей, средняя считается по тому, что есть. "
                           "Условие берём по панели.")
@@ -401,7 +404,9 @@ def drivers(h: str, N: int, ctx: dict, now_ms: int, regime: dict) -> list[dict]:
         sma = regime.get("sma200_hist") or regime.get("sma200_panel")
         if h == "month" and sma:
             d = regime["price"] / sma - 1
-            out.append({"kind": "regime", "text_ru": f"BTC {'выше' if d > 0 else 'ниже'} 200-дневной средней ({fmt_price(sma)}) на {pct(abs(d), 1, False)}. "
+            nm = ("200-дневной средней" if regime.get("sma200_hist") else
+                  f"средней цены за {regime.get('sma_days_panel')} дней" if regime.get("sma_days_panel") else "средней цены по нашей истории свечей")
+            out.append({"kind": "regime", "text_ru": f"BTC {'выше' if d > 0 else 'ниже'} {nm} ({fmt_price(sma)}) на {pct(abs(d), 1, False)}. "
                                                       f"Закрытие дня {'ниже' if d > 0 else 'выше'} неё меняет режим."})
         mid = regime.get("mid")
         if mid in ("UP_NO_BREAKOUT", "LONG") and regime.get("hh20"):
@@ -490,7 +495,8 @@ def system_plan(ctx: dict, regime: dict, price: float | None) -> dict | None:
         ]))
     if sma:
         note = (f"по полной истории {fmt_price(sma_full)} $" if sma_full and abs(sma / sma_full - 1) > 0.01 else None)
-        L.append(lv("sma200", "200-дневная средняя", sma, [
+        dd = regime.get("sma_days_panel") if regime.get("sma200_panel") else 200
+        L.append(lv("sma200", "200-дневная средняя" if not dd or dd >= 200 else f"Средняя за {dd} дней", sma, [
             # spot_ideas.py: not bull → reason «BTC в медвежьем режиме — покупаем только ядро» (status changes in the table)
             {"text_ru": "Закрытие ниже → режим «осторожно»: в таблице спота только ядро BTC/ETH/SOL, альты — «ждём».",
              "src": "cnq/agents/spot_ideas.py (reason regime)"},

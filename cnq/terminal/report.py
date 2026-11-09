@@ -39,6 +39,10 @@ def long_avg_ru(reg: dict) -> str:
     return name + (f" (${fmt_price(s)})" if s else "")
 
 
+# for the rule texts written once (the window grows with the stored history up to 200 days)
+LONG_AVG_RULE_RU = "средней цены за всю нашу историю дневных свечей, но не больше 200 дней"
+
+
 def long_text_ru(reg: dict) -> str:
     """exactly what the long regime checks: BULL = price above that average AND above its level 90 days ago; BEAR = below the
     average; MIXED = above the average but not above 90 days ago"""
@@ -204,9 +208,9 @@ def coin_brief(sym: str, price: float, reg: dict, levels: list[dict], setups: li
         m_txt += f" Триггер режима: закрытие дня {'выше' if reg['r28'] > 0 else 'ниже'} {fmt_price(trig)}."
     lines.append(m_txt)
     # long term
-    l_map = {"BULL": "бычий (цена выше 200-дневной средней)", "BEAR": "медвежий (ниже 200-дневной средней)", "MIXED": "смешанный"}
+    l_map = {"BULL": f"бычий (цена выше {long_avg_ru(reg)})", "BEAR": f"медвежий (ниже {long_avg_ru(reg)})", "MIXED": "смешанный"}
     r90 = f", за 90 дней {reg['r90']*100:+.1f}%" if not (isinstance(reg["r90"], float) and math.isnan(reg["r90"])) else ""
-    lines.append(f"Долгосрок (1–3 месяца): {l_map[reg['long']]}{r90}. SMA200 = {fmt_price(reg['sma200'])}. "
+    lines.append(f"Долгосрок (1–3 месяца): {l_map[reg['long']]}{r90}. "
                  f"Размер по волатильности: {reg['vol_weight']*100:.0f}% от базового (годовая вола {reg['rv30']*100:.0f}%).")
     # derivatives
     if deriv.get("available"):
@@ -243,11 +247,12 @@ def market_brief(coins: list[dict], asof: int, portfolio: dict | None = None) ->
     bear = [c["symbol"] for c in coins if c["regime"]["mid"] == "SHORT"]
     long_bull = sum(c["regime"]["long"] == "BULL" for c in coins)
     head = [f"CRYPTO NOVΛ — рынок на {dt}",
-            f"Режим: {long_bull} из {len(coins)} монет выше 200-дневной. Лонг-режим по тренду: {', '.join(bull) or 'нет'}. "
+            f"Режим: {long_bull} из {len(coins)} монет выше своей {LONG_AVG_RULE_RU}. Лонг-режим по тренду: {', '.join(bull) or 'нет'}. "
             f"Шорт-режим: {', '.join(bear) or 'нет'}."]
     if portfolio:
         p = portfolio
-        head.append(f"BTC {'выше' if p['btc_bull'] else 'ниже'} SMA200 → трендовые лонги по альтам {'разрешены' if p['btc_bull'] else 'заблокированы'}. "
+        btc_reg = next((c["regime"] for c in coins if c["symbol"].startswith("BTC")), {})
+        head.append(f"BTC {'выше' if p['btc_bull'] else 'ниже'} {long_avg_ru(btc_reg)} → трендовые лонги по альтам {'разрешены' if p['btc_bull'] else 'заблокированы'}. "
                     f"Сигналы тренда сейчас: {', '.join(p['trend_longs']) or 'нет'}"
                     + (f" (заблокированы фильтром BTC: {', '.join(p['trend_longs_blocked'])})" if p['trend_longs_blocked'] else "") + ".")
         head.append("Лидеры 21 дня: " + ", ".join(f"{s.replace('USDT','')} {r*100:+.0f}%" for s, r in p["xs_top"]) +
@@ -309,7 +314,8 @@ def build_report(universe: dict[str, list[Candle]], masters: dict[str, dict] | N
                  "trend_longs_blocked": [c["symbol"] for c in coins if c["regime"]["mid"] == "LONG" and not btc_bull],
                  "xs_top": [(s, r21[s]) for s in ranked21[:3]], "xs_bottom": [(s, r21[s]) for s in ranked21[-3:]],
                  "note": ("Правило тренда: дневное закрытие, 28 дней > 0 и максимум 20 дней, держать 5 дней, стоп 2 ATR; "
-                          "только лонг и только когда BTC выше SMA200. Лидеры/аутсайдеры 21 дня — для недельной ротации "
+                          f"только лонг и только когда BTC в бычьем режиме (выше {LONG_AVG_RULE_RU}). "
+                          "Лидеры/аутсайдеры 21 дня — для недельной ротации "
                           "(лонг лидеры / шорт аутсайдеры, равными долями).")}
     for c in coins:
         c["r21"] = r21[c["symbol"]]

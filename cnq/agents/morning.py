@@ -281,21 +281,27 @@ def compose(F: dict, day: str, hist: list[dict], lang: str = "ru") -> dict:
 def synth(text: str, path: str) -> tuple[str | None, list[str]]:
     """the spoken report into path (mp3) with the brief's voices; (voice or None, errors). A failure keeps the old file."""
     errs, tmp = [], path + ".tmp"
+    from .voice import azure_to
+    v = azure_to(text, path, errs)                     # 10.11: Azure Speech first when its key is set
+    if v:
+        return v, errs
     try:
         import asyncio
         import edge_tts
         from .voice import RATE, brief_voices, spoken
         for v in brief_voices():
-            try:
-                async def go(v=v):
-                    await edge_tts.Communicate(spoken(text), v, rate=RATE).save(tmp)
-                asyncio.run(go())
-                if os.path.getsize(tmp) > 2000:
-                    os.replace(tmp, path)
-                    return v, errs
-                errs.append(f"{v}: short audio")
-            except Exception as e:  # noqa: BLE001
-                errs.append(f"{v}: {str(e)[:60]}")
+            for attempt in range(2):                   # 10.11: Dmitry / Svetlana are refused now and then — a second try first
+                try:
+                    async def go(v=v):
+                        await edge_tts.Communicate(spoken(text), v, rate=RATE).save(tmp)
+                    asyncio.run(go())
+                    if os.path.getsize(tmp) > 2000:
+                        os.replace(tmp, path)
+                        return v, errs
+                    errs.append(f"{v}#{attempt + 1}: short audio")
+                except Exception as e:  # noqa: BLE001
+                    errs.append(f"{v}#{attempt + 1}: {str(e)[:60]}")
+                    time.sleep(2)
     except Exception as e:  # noqa: BLE001
         errs.append(str(e)[:80])
     finally:

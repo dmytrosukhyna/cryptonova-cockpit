@@ -167,8 +167,47 @@ def key(text: str, lang: str) -> str:
     return hashlib.sha256(f"{VOICES[lang]}|{RATE}|{spoken(text, lang)}".encode()).hexdigest()[:24]
 
 
+# 10.11 (owner: «NOVA voice is yellow»): Microsoft's free Edge «read aloud» service (edge-tts) refuses ru-RU-DmitryNeural most of
+# the time and sometimes Svetlana too («No audio was received» — the service, not our text: the same text speaks a moment later), so
+# the brief and the morning report fell back to an English multilingual voice. The paid Azure Speech service has the same neural
+# voices without refusals: when AZURE_SPEECH_KEY (+ AZURE_SPEECH_REGION, default westeurope) is set — GitHub secrets for the pipeline,
+# /etc/cnq.env on the server — every voice is asked from Azure first, edge-tts stays the fallback. The key is never logged.
+AZURE_URL = "https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+
+
+def azure_cfg() -> tuple[str, str] | None:
+    k = (os.environ.get("AZURE_SPEECH_KEY") or os.environ.get("CNQ_AZURE_SPEECH_KEY") or "").strip()
+    r = (os.environ.get("AZURE_SPEECH_REGION") or os.environ.get("CNQ_AZURE_SPEECH_REGION") or "westeurope").strip()
+    return (k, r) if k else None
+
+
+def azure_mp3(text: str, voice: str, timeout: float = 15.0, opener=None) -> bytes:
+    """the text as an mp3 from Azure Speech in that neural voice and the common RATE; raises without a key or on any failure"""
+    import urllib.request
+    from xml.sax.saxutils import escape
+    cfg = azure_cfg()
+    if not cfg:
+        raise RuntimeError("no Azure Speech key")
+    key_, region = cfg
+    loc = "-".join(voice.split("-")[:2])
+    ssml = (f"<speak version='1.0' xml:lang='{loc}'><voice name='{voice}'><prosody rate='{RATE}'>{escape(text)}</prosody></voice></speak>")
+    req = urllib.request.Request(AZURE_URL.format(region=region), data=ssml.encode("utf-8"), method="POST",
+                                 headers={"Ocp-Apim-Subscription-Key": key_, "Content-Type": "application/ssml+xml",
+                                          "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3", "User-Agent": "cnq-tts"})
+    try:
+        with (opener or urllib.request.urlopen)(req, timeout=timeout) as r:
+            data = r.read()
+    except Exception as e:  # noqa: BLE001 — the message never carries the key
+        raise RuntimeError(f"Azure Speech: {type(e).__name__} {getattr(e, 'code', '')}".strip()) from None
+    if len(data) <= 1000:
+        raise RuntimeError("Azure Speech: no audio")
+    return data
+
+
 def available() -> bool:
-    """edge-tts is importable (a pip install on the server works without a restart)"""
+    """Azure Speech is configured, or edge-tts is importable (a pip install on the server works without a restart)"""
+    if azure_cfg():
+        return True
     try:
         importlib.invalidate_caches()
         return importlib.util.find_spec("edge_tts") is not None
@@ -244,9 +283,20 @@ def synth(text: str, lang: str, timeout: float = TIMEOUT_S, live: bool = False) 
     voice failed. live (29.10: a request the app waits for, 8 s at most) → the voice and all its fallbacks start together (race
     below): one request of the voice, up to FALLBACK_REQUESTS of each fallback. Every attempt is timed into _used.attempts (voice, outcome, connect / first audio / total ms)."""
     t00 = time.perf_counter()
-    edge_tts = importlib.import_module("edge_tts")
     lang = norm_lang(lang)
     say = spoken(text, lang)
+    if azure_cfg():                                     # 10.11: Azure first (no refusals), edge-tts behind it
+        rec = {"voice": "azure:" + VOICES[lang], "at_ms": 0}
+        try:
+            data = azure_mp3(say, VOICES[lang], timeout=min(timeout, 10.0))
+            rec.update(ms=round((time.perf_counter() - t00) * 1000), outcome="ok")
+            _used.voice, _used.attempts, _used.prep_ms = VOICES[lang], [rec], 0
+            return data
+        except Exception as e:  # noqa: BLE001
+            rec.update(ms=round((time.perf_counter() - t00) * 1000), outcome=str(e)[:60])
+            if importlib.util.find_spec("edge_tts") is None:
+                raise
+    edge_tts = importlib.import_module("edge_tts")
     ms = lambda t: round((time.perf_counter() - t) * 1000)  # noqa: E731
     attempts: list[dict] = []
     with _INFLIGHT_LOCK:

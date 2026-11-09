@@ -284,6 +284,8 @@ jobs:
         continue-on-error: true
         env:
           CNQ_OWNER_NAME: ${{ vars.CNQ_OWNER_NAME }}
+          AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}        # 10.11: optional — Azure Speech first, edge-tts behind it
+          AZURE_SPEECH_REGION: ${{ vars.AZURE_SPEECH_REGION }}
         run: python -m cnq.cli voice --out web
       - name: Trading journal → web/journal.json
         continue-on-error: true

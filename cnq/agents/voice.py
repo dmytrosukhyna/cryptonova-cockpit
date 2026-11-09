@@ -11,7 +11,7 @@ import re
 import time
 
 VOICE = os.environ.get("CNQ_TTS_VOICE", "ru-RU-DmitryNeural")
-RETRY_PAUSE_S = (2, 5)             # after a refused attempt of a voice (1st, 2nd); 29.10: 2 attempts a voice, 4 voices
+RETRY_PAUSE_S = (2, 5, 9)          # after a refused attempt of a voice; 10.11: 3 attempts a voice (Dmitry, then Svetlana) before English
 NAME = os.environ.get("CNQ_OWNER_NAME") or "Дмитрий"
 # 30.10 (owner, build 51: «голос говорит достаточно медленно — хотелось бы быстрее»): the one tempo of every spoken text — the brief,
 # NOVA AI answers and the app's report (cnq/api/tts.py RATE) and the app's bundled recordings (CryptoNova scripts/app_voice.py)
@@ -229,6 +229,22 @@ def compose(out: str = "web") -> str:
     return " ".join(L)
 
 
+def azure_to(text: str, path: str, errs: list) -> str | None:
+    """the brief / morning text spoken by Azure Speech in Dmitry's voice into path; the voice name, or None (no key / it failed)"""
+    try:
+        from ..api import tts
+        if not tts.azure_cfg():
+            return None
+        data = tts.azure_mp3(spoken(text), VOICE)
+        with open(path + ".az", "wb") as f:
+            f.write(data)
+        os.replace(path + ".az", path)
+        return "azure:" + VOICE
+    except Exception as e:  # noqa: BLE001
+        errs.append(str(e)[:80])
+        return None
+
+
 def brief_voices() -> list[str]:
     """the voices tried for the brief, in order: Dmitry, then the API's Russian fallbacks (cnq/api/tts.py FALLBACK["ru"]: 29.10
     owner 15:42 — a good Microsoft NEURAL voice of either gender is fine, delays are worse; Dmitry is refused most of the time).
@@ -252,10 +268,13 @@ def run(out: str = "web") -> dict:
     errs = []
     path = os.path.join(out, "brief.mp3")
     tmp = path + ".tmp"
+    v = azure_to(text, path, errs)                       # 10.11: Azure Speech first when its key is set
+    if v:
+        res["audio"], res["voice"] = "brief.mp3", v
     try:
         import asyncio
         import edge_tts
-        for voice in brief_voices():
+        for voice in ([] if res["audio"] else brief_voices()):
             for attempt in range(len(RETRY_PAUSE_S)):
                 try:
                     async def synth(v=voice):

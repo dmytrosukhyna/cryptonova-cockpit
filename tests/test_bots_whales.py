@@ -92,7 +92,8 @@ def test_channel_posts_follow_the_whale_model_and_fit_the_caption():
         assert not RETIRED.search(p), (slot, RETIRED.search(p))
         assert p.index("<b>Система CRYPTO NOVA AI</b>") < p.index("Вывод CRYPTO NOVA AI")
     ev = ch.post("evening", now=now.replace(hour=21, minute=40))
-    assert "ZRO шорт: <b>+$2.13 (+4.2%)</b>, закрыта по сигналу системы" in ev and "SOL лонг" in ev
+    assert "— В плюсе: ZRO шорт +$2.13." in ev and "— В минусе: SOL лонг −$0.24." in ev     # 09.11: one compact list
+    assert "закрыто сделок" not in ev and ev.count("Закрыто 2 сделки, итог <b>+$1.89</b>") == 1      # counted once
     assert "BNB шорт: в работе" not in ev                         # the system block lists the open positions; not listed twice
     sl = ch.facts(ch.ctx(), now)["system_line"]
     assert "Фьючерсы ведёт система CRYPTO NOVA AI" in sl and "Спот — ядро BTC, ETH и SOL" in sl and not RETIRED.search(sl) and not METHOD.search(sl)

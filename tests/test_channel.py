@@ -1,4 +1,4 @@
-import json, os, sqlite3, tempfile, datetime as dt
+import json, os, re, sqlite3, tempfile, datetime as dt
 from cnq.agents import channel
 
 
@@ -270,11 +270,60 @@ def _closed_trade_body():
     ch2 = channel.Channel(sqlite3.connect(":memory:"), tmp); ch2.TRADE_POSTS = True
     assert ch2.trade_posts(lambda t: True, None, now.replace(hour=3)) == []     # no posts at night
     blk = ch.trades_block(ch.ctx())
-    assert blk.startswith("<b>Сделки за день (реальный счёт OKX):</b>") and "ARB лонг: <b>+$19 (+9.6%)</b>" in blk and "DOT" in blk
+    assert blk.startswith("<b>Сделки за день (реальный счёт OKX):</b>\n— Закрыто 2 сделки, итог <b>+$18.28</b>.")
+    assert "— В плюсе: ARB лонг +$19.06." in blk and "— В минусе: DOT лонг −$0.78." in blk
     assert "SOL" not in blk and "XRP" not in blk and "OP лонг: в работе, стоп на бирже" in blk
     dr = ch.day_result(ch.ctx())
     assert dr["total"] == "+$51" and dr["futures"] == "+$17" and dr["spot"] == "+$33" and dr["futures_trades_closed"] == 2
+    assert dr["futures_line"] == "<b>+$17</b> (закрытые сделки +$18.28, открытые позиции −$1.00)"
     ev = ch.post("evening", now=now.replace(hour=21, minute=40))
     assert "<b>Сделки за день (реальный счёт OKX):</b>" in ev and ev.index("Сделки за день") < ev.index("Вывод CRYPTO NOVA AI")
     assert "−$212" not in ev and "−$213" not in ev and "реальный счёт CRYPTO NOVA AI на OKX" in ev
     assert ch.lint(ev, {}) == []
+
+
+def test_evening_one_day_one_list_all_positions_and_sourced_news():
+    """09.11 (owner): the evening post listed 2 trades while «Система» said 14 closed; «Фьючерсы: +$18» vs closed −$8.87; the open
+    positions were cut with «…»; a headline must come from the news feed with its source. One source and one period (the Kyiv
+    day) for every count; all trades named or «и ещё N сделок на …» that adds up; the futures line splits closed / open."""
+    real_time = channel.time.time
+    now = dt.datetime.now(channel.KYIV).replace(hour=21, minute=40, second=0, microsecond=0)
+    channel.time.time = lambda: now.timestamp()
+    try:
+        tmp = tempfile.mkdtemp(); _web(tmp)
+        ms = int(now.timestamp() * 1000)
+        d0 = int(now.replace(hour=0, minute=0).timestamp() * 1000)
+        pnls = [10.87, -14.54, 2.16, 0.27, -4.43, 13.67, -15.81, 4.97, 3.47, -1.45, 0.91, -0.05, 1.11, -0.42]
+        closed = [{"inst": f"C{i}-USDT-SWAP", "side": "long" if i % 3 else "short", "pnl_usd": p, "opened": d0, "closed": d0 + (i + 1) * 3600_000,
+                   "partial": False} for i, p in enumerate(pnls)]
+        closed.append({"inst": "OLD-USDT-SWAP", "side": "long", "pnl_usd": 99.0, "closed": d0 - 3600_000, "partial": False})   # yesterday
+        fut = [{"inst": f"P{i}-USDT-SWAP", "side": "short" if i == 6 else "long", "upnl_usd": 1.0, "sig": f"whales:W-P{i}-L-1"} for i in range(7)]
+        real = {"exchange": "okx", "since": ms - 9 * 86400_000, "equity_usd": 9000.0, "pnl_usd": -900.0, "pnl_pct": -9.0, "stale": False,
+                "closed": closed, "futures": fut, "curve": [[d0 - 3600_000, -800.0], [ms, -790.0]], "fut_curve": [[d0 - 3600_000, 0.0], [ms, 18.0]]}
+        json.dump(real, open(os.path.join(tmp, "public_real.json"), "w"))
+        ch = channel.Channel(sqlite3.connect(":memory:"), tmp)
+        x = ch.ctx()
+        tot = round(sum(pnls), 2)
+        blk = ch.trades_block(x, open_lines=False, now_ms=ms)
+        assert f"— Закрыто 14 сделок, итог <b>{ch._usd2(tot)}</b>." in blk and "OLD" not in blk
+        named = [float(v.replace("−", "-").replace("$", "")) for v in re.findall(r"C\d+ (?:лонг|шорт) ([+−]\$\d+\.\d\d)", blk)]
+        rest = re.search(r"И ещё (\d+) \w+ на ([+−])\$(\d+\.\d\d)", blk)
+        rest_sum = (float(rest.group(3)) * (1 if rest.group(2) == "+" else -1)) if rest else 0.0
+        assert len(named) + (int(rest.group(1)) if rest else 0) == 14 and abs(sum(named) + rest_sum - tot) < 0.02
+        small = ch.trades_block(x, open_lines=False, now_ms=ms, budget=120)
+        assert "И ещё" in small and "C5 лонг +$13.67" in small and "C6 шорт −$15.81" in small    # the biggest win and loss stay
+        dr = ch.day_result(x)
+        assert dr["futures_line"] == f"<b>+$18</b> (закрытые сделки {ch._usd2(tot)}, открытые позиции {ch._usd2(18 - tot)})"
+        ev = ch.post("evening", now=now)
+        assert ev.count("закрыто сделок") == 0 and "Закрыто 14 сделок" in ev and "открытые позиции" in ev
+        assert len(re.sub(r"<[^>]+>", "", ch.shrink(ev))) <= 1024
+        from cnq.agents import whale_digest
+        wb = whale_digest.block(tmp, ms, slot="evening", closed_line=False)
+        assert "В работе 7: P0 лонг, P1 лонг, P2 лонг, P3 лонг, P4 лонг, P5 лонг, P6 шорт;" in wb and "…" not in wb and "закрыто" not in wb
+        news = [{"title": "AVAX вырос после сделки с NYSE", "source": "cointelegraph", "link": "https://x"},
+                {"title": "Выдумка без источника", "source": None, "link": None}]
+        t = ch.sourced_events("<b>Итоги дня</b>\n\n<b>Главные события:</b>\n1. Что-то придуманное\n\n<b>Вывод</b>\nx", news)
+        assert "— AVAX вырос после сделки с NYSE (Cointelegraph)" in t and "придуманное" not in t and "Выдумка" not in t
+        assert "Сильных новостей не было" in ch.sourced_events("<b>Итоги дня</b>\n\n<b>Главное за день</b>\n— x", news[1:])
+    finally:
+        channel.time.time = real_time

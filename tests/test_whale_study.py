@@ -529,13 +529,14 @@ def test_the_list_is_fixed_for_3_days_and_a_whale_leaves_only_for_a_hard_reason(
     re = [_w(f"bn:{i}") for i in (9, 8, 7, 6, 5, 4, 3, 2, 1)]
     top2, why2, lt2, p2 = W.lock_follow(st, re, {x["addr"]: {**x, "positions": []} for x in re}, {"equity": 7000.0}, later)
     assert [x["addr"] for x in top2] == [x["addr"] for x in top] and lt2 == now and not why2
-    # hard reasons: 60 days negative; copies on our desk lost > 10 % of his share (7000 / 7 = 1000 → −$100)
+    # hard reason: 60 days negative. 09.11 (owner): copies on our desk down > 10 % of his share (7000 / 7 = 1000 → −$110 here) is
+    # NOT a reason any more — he stays until the review
     bad = {x["addr"]: {**x, "positions": []} for x in re}
     bad["bn:1"]["pnl_60d"] = -5.0
     desk = {"equity": 7000.0, "closed": [{"whale": "bn:2", "pnl": -80.0, "closed_t": later}], "open": [{"whale": "bn:2", "upnl": -30.0}]}
     top3, why3, _, _ = W.lock_follow({**st, "passing": p2}, re, bad, desk, later + 1)
-    assert set(why3) == {"bn:1", "bn:2"} and "ушёл в минус" in why3["bn:1"][0] and "больше 10%" in why3["bn:2"][0]
-    assert {x["addr"] for x in top3} == {f"bn:{i}" for i in (0, 3, 4, 5, 6)}
+    assert set(why3) == {"bn:1"} and "ушёл в минус" in why3["bn:1"][0]
+    assert {x["addr"] for x in top3} == {f"bn:{i}" for i in (0, 2, 3, 4, 5, 6)}
 
 
 def test_at_the_review_a_newcomer_needs_3_days_in_a_row_in_the_bar():
@@ -552,17 +553,33 @@ def test_at_the_review_a_newcomer_needs_3_days_in_a_row_in_the_bar():
     assert [x["addr"] for x in top] == [f"bn:{i}" for i in range(1, 7)] + ["bn:new_old"]
 
 
-def test_the_desk_closes_the_copies_of_a_whale_who_left_the_fixed_list():
+def test_a_leavers_copies_run_to_his_exit_and_only_blind_ones_close():
+    """09.11 (owner, backlog 117): a whale who left the fixed list is not copied any more, but copies he already holds run to his own
+    exit (or our stop); only a blind copy closes — he hides his positions, or we have not seen them for UNFOLLOW_BLIND_MS"""
     now = 1_800_000_000_000
     o = {"whale": "bn:gone", "coin": "SOL", "side": "SHORT", "entry": 100.0, "notional": 500.0, "margin": 100.0, "opened_t": now - W.DAY,
          "stop": 120.0}
-    d = {"start": 10000.0, "cash": 10000.0, "open": [dict(o)], "closed": [], "seen": {}, "history": [], "started": now - 2 * W.DAY}
-    kept = W.desk_step(json.loads(json.dumps(d)), ["bn:a"], {}, {"SOL": 90.0}, now)
-    assert [x["coin"] for x in kept["open"]] == ["SOL"]                                      # old rule: held until the whale exits
-    cl = W.desk_step(json.loads(json.dumps(d)), ["bn:a"], {}, {"SOL": 90.0}, now, close_unfollowed=True)
-    assert not cl["open"] and cl["closed"][-1]["why"] == "кит убран из списка" and cl["closed"][-1]["pnl"] > 0
-    empty = W.desk_step(json.loads(json.dumps(d)), [], {}, {"SOL": 90.0}, now, close_unfollowed=True)
+    d = {"start": 10000.0, "cash": 10000.0, "open": [dict(o)], "closed": [], "seen": {"bn:gone": {"SOL": "SHORT"}}, "history": [],
+         "started": now - 2 * W.DAY, "seen_t": {"bn:gone": now - 60_000}}
+    cp = lambda: json.loads(json.dumps(d))  # noqa: E731
+    pos = [{"coin": "SOL", "side": "SHORT", "entry": 101.0}]
+    held = W.desk_step(cp(), ["bn:a"], {"bn:gone": pos}, {"SOL": 90.0}, now, close_unfollowed=True)
+    assert [x["coin"] for x in held["open"]] == ["SOL"]                                      # he still holds it → so do we
+    gone = W.desk_step(cp(), ["bn:a"], {"bn:gone": []}, {"SOL": 90.0}, now, close_unfollowed=True)
+    assert not gone["open"] and gone["closed"][-1]["why"] == "кит закрыл" and gone["closed"][-1]["pnl"] > 0
+    hid = W.desk_step(cp(), ["bn:a"], {"bn:gone": [{"coin": None}]}, {"SOL": 90.0}, now, close_unfollowed=True)
+    assert not hid["open"] and "скрыл позиции" in hid["closed"][-1]["why"]
+    short_blind = W.desk_step(cp(), ["bn:a"], {}, {"SOL": 90.0}, now, close_unfollowed=True)
+    assert [x["coin"] for x in short_blind["open"]] == ["SOL"]                               # one missed poll is not blind
+    late = cp(); late["seen_t"]["bn:gone"] = now - W.UNFOLLOW_BLIND_MS - 1
+    blind = W.desk_step(late, ["bn:a"], {}, {"SOL": 90.0}, now, close_unfollowed=True)
+    assert not blind["open"] and "не видно больше часа" in blind["closed"][-1]["why"]
+    late2 = cp(); late2["seen_t"]["bn:gone"] = 0
+    empty = W.desk_step(late2, [], {}, {"SOL": 90.0}, now, close_unfollowed=True)
     assert [x["coin"] for x in empty["open"]] == ["SOL"]                                     # an empty list never closes anything
+    newer = W.desk_step(cp(), ["bn:a"], {"bn:gone": pos + [{"coin": "ETH", "side": "LONG", "entry": 2000.0}]}, {"SOL": 90.0, "ETH": 2000.0},
+                        now, close_unfollowed=True)
+    assert [x["coin"] for x in newer["open"]] == ["SOL"]                                     # his new position is not copied
 
 
 def test_locked_whale_outside_leaderboard_slice_is_still_studied():

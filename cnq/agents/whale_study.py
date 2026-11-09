@@ -74,13 +74,18 @@ BENCH_N = 10
 # надо сразу его вычёркивать»; chose «7 китов на 3 дня»): the list was rebuilt from zero every run (PF moves with the whales' open
 # positions, a whale not reached by this run's budget fell out as «не изучен») — 10+ changes a day. Now it is FIXED for LOCK_MS: at a
 # review the incumbents that still pass stay, free places go to whales that passed the bar for PROVEN_MS in a row (the first lock:
-# the best now). Between reviews a whale leaves only for a hard reason (lock_hard): hides his positions, 60 days went negative, no
-# data for a day, or his copies on our desk lost more than LOCK_LOSS of his share (desk equity ÷ LOCK_N). A whale who leaves the list
-# has his open copies closed by the desk (desk_step close_unfollowed) and goes to the bench / follow_dropped to be watched.
+# the best now). Between reviews a whale leaves only for a hard reason (lock_hard): hides his positions, 60 days went negative or no
+# data for a day. A whale who leaves the list goes to the bench / follow_dropped to be watched; his new decisions are not copied.
+# 09.11 (owner, explicit yes, backlog 117: «не надо выбрасывать … сделки должны дойти до своих значений»): (1) the «copies lost more
+# than LOCK_LOSS of his share» reason is OFF (LOCK_LOSS_ON) — a whale changes only at the review; (2) copies a leaver already holds
+# are NOT closed: they run to his own exit (or our stop / day stop). Only a blind copy is closed: he hides his positions or we have
+# not seen them for UNFOLLOW_BLIND_MS (desk_step close_unfollowed).
 LOCK_N = 7
 LOCK_MS = 3 * 86_400_000
 PROVEN_MS = 3 * 86_400_000
 LOCK_LOSS = 0.10
+LOCK_LOSS_ON = False                  # 09.11 owner: the loss reason is off (kept for the record / research)
+UNFOLLOW_BLIND_MS = 3_600_000         # 09.11: a leaver's copy we cannot see for 1 h is closed (cannot see his exit)
 LOCK_RULE = "lock-v1"
 MIN_AV, MIN_ALL = 300_000.0, 500_000.0
 MAX_VLM_X, MAX_ROI_M = 400.0, 10.0
@@ -902,7 +907,7 @@ def lock_hard(a: str, q: dict | None, passing: dict, desk: dict | None, since: i
     elif now - int(_f((passing.get(a) or [0, 0])[1])) > 86_400_000:
         return ["нет данных о ките больше суток"]
     loss = whale_desk_pnl(desk, a, since)
-    if share > 0 and loss <= -LOCK_LOSS * share:
+    if LOCK_LOSS_ON and share > 0 and loss <= -LOCK_LOSS * share:
         return [f"на столе −${-loss:,.0f} с входа в список — больше {LOCK_LOSS * 100:.0f}% его доли ${share:,.0f}".replace(",", " ")]
     return []
 
@@ -1115,13 +1120,19 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             w = ov.blocked(owner, o["coin"], o["side"], o.get("opened_t"))
             if w:
                 close(o, w)
-    # 06.11 (owner: «если кит выбывает, а позиции открыты, их надо закрывать автоматически»): with the fixed list a whale leaves it
-    # only at a review or for a hard reason — his copies are closed now (never on an empty list: a feed problem is not a decision)
+    # 06.11 (owner) the copies of a whale who left the fixed list were closed at once. 09.11 (owner, explicit yes, backlog 117: on
+    # history such copies ended better with the whale's own exit in 4 of 4 samples): they are held to his exit / our stop; only a
+    # BLIND copy is closed — he hides his positions, or we have not seen them for UNFOLLOW_BLIND_MS (never on an empty list)
     if close_unfollowed and follow:
         fs = set(follow)
         for o in list(d["open"]):
-            if o["whale"] not in fs:
-                close(o, "кит убран из списка")
+            if o["whale"] in fs:
+                continue
+            pos = states.get(o["whale"])
+            if pos is not None and hidden(pos):
+                close(o, "кит убран из списка и скрыл позиции")
+            elif pos is None and now - int((d.get("seen_t") or {}).get(o["whale"]) or 0) > UNFOLLOW_BLIND_MS:
+                close(o, "кит убран из списка, его позиций не видно больше часа")
     for addr, pos in states.items():
         if hidden(pos):                    # 04.11: OKX hides this lead trader's instruments — we cannot tell what he holds: no
             d["events"].append({"t": now, "kind": "hidden", "whale": addr})     # close and no open for him this run (stops still work)
@@ -1787,13 +1798,13 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []) + owner_picks(),
            "follow_dropped": st_now.get("dropped", []), "archive": arch, "bench": bench,
            "reinstate": reinstate_out,          # 08.11: one-time reinstatement of a whale dropped by our bug (config/whale_reinstate.json)
-           # 06.11 (owner): the list is fixed between reviews; whale_live closes the copies of a whale who left it
+           # 06.11 (owner): the list is fixed between reviews; 09.11: a leaver's open copies run to his exit (only blind ones close)
            "follow_lock": ({"rule": LOCK_RULE, "t": st_now.get("lock_t"), "next_t": int(st_now["lock_t"]) + LOCK_MS, "n": LOCK_N,
                             "passing": st_now.get("passing") or {}, "joined": st_now.get("joined") or {},
                             "ru": f"Список закреплён: {LOCK_N} китов, пересмотр раз в {LOCK_MS // 86_400_000} дня. Между пересмотрами кит "
-                                  f"уходит только если скрыл позиции, 60 дней ушли в минус, данных нет больше суток или его копии на столе "
-                                  f"потеряли больше {LOCK_LOSS * 100:.0f}% его доли. Новичок входит на пересмотре, если {PROVEN_MS // 86_400_000} "
-                                  f"дня подряд проходил отбор. Копии ушедшего кита закрываются сразу."}
+                                  f"уходит только если скрыл позиции, 60 дней ушли в минус или данных нет больше суток. Новичок входит на пересмотре, "
+                                  f"если {PROVEN_MS // 86_400_000} дня подряд проходил отбор. Новые сделки ушедшего кита не копируются, "
+                                  f"а открытые копии доживают до его выхода (или нашего стопа)."}
                            if st_now.get("rule") == LOCK_RULE and st_now.get("lock_t") else None),
            "close_unfollowed": st_now.get("rule") == LOCK_RULE,
            # 04.11 21:14: per source — candidates studied, passed the 60-day bar, followed (+ sources checked and not connectable)

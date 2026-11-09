@@ -75,7 +75,10 @@
       const mv = (H && H.market_view) || null;
       const X = V.spotModel ? await V.spotModel() : null;
       const P = X && V.spotPipe ? V.spotPipe(M, X) : null;
-      return `<div class="ph"><div><h2>Обзор</h2><p>Рынок, состояние системы и публичный портфель CRYPTO NOVA — на одном экране.</p></div></div>
+      // 09.11 (owner 21:40): «Состояние системы» in plain words at the very top, owner views only (vip/health.js)
+      let HL = '';
+      try { HL = V.ownerHealthCard && V.auth.owner() ? await V.ownerHealthCard() : ''; } catch (e) { HL = ''; }
+      return `${HL}<div class="ph"><div><h2>Обзор</h2><p>Рынок, состояние системы и публичный портфель CRYPTO NOVA — на одном экране.</p></div></div>
       <div class="ov-grid">
         ${marketCard(mv, MK, CAL, OM)}${systemCard(S)}${financeCard(M)}${chartCard()}${positionsCard(M)}${recoCard(IDEAS, PF, DS, P, X)}${stratCard(ST)}${oppsCard(OP)}
       </div>`;

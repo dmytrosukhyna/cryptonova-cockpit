@@ -370,3 +370,10 @@ body.compact .tbl td{padding:5px 8px}body.compact .li{padding:6px 0}body.compact
   .wl-sym{grid-area:sym}.wl-n{grid-area:n}.wl-chg{grid-area:chg;min-width:62px}.wl-st{grid-area:st}.wl-fl{grid-area:fl;text-align:right}
   .wl-n:before{content:'китов ';color:var(--muted);font-size:11px}}
 .pat td,.pat th{white-space:normal}.pat td small{display:block}
+
+/* 09.11 owner cards: «Под наблюдением владельца», «Состояние системы» */
+.ow-coin{border-top:1px solid var(--line,rgba(127,127,127,.2));padding-top:12px;margin-top:12px}
+.ow-h{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline}
+.ow-l{margin:4px 0 8px 18px;padding:0;line-height:1.5;font-size:13px}
+.hl-tbl td{vertical-align:top}
+.hl-dot{font-size:14px;white-space:nowrap}

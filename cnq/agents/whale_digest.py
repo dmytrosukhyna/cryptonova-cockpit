@@ -179,7 +179,7 @@ SIDE_SHORT = {"long": "лонг", "short": "шорт"}
 
 
 def block(out: str, now_ms: float | None = None, slot: str = "evening", with_trades: bool = False, highlights: int = 1,
-          hours: int = 24, period_ru: str = "За сутки") -> str:
+          hours: int = 24, period_ru: str = "За сутки", closed_line: bool = True) -> str:
     """The short «Система CRYPTO NOVA AI» section of a post: the real account's open futures positions, the period's closed trades and
     their result, one calm market line. 05.11 (owner, 09:52: «нигде не надо писать, что это копии китов … везде должна быть система
     CRYPTO NOVA AI … людям нужен только результат»): no whales, no copying, no trader names or counts — only the system's result.
@@ -190,8 +190,10 @@ def block(out: str, now_ms: float | None = None, slot: str = "evening", with_tra
     c = copies(out, now_ms, hours)
     opn = c["open"]
     lines = []
-    pos = ", ".join(f"{o['coin']} {SIDE_SHORT.get(o['side'], o['side'])}" for o in opn[:5]) + (" …" if len(opn) > 5 else "")
-    if slot == "evening" or with_trades:
+    # 09.11 (owner): every open position is named — never cut with «…»; past 8 the rest are counted and still named
+    nm = [f"{o['coin']} {SIDE_SHORT.get(o['side'], o['side'])}" for o in opn]
+    pos = ", ".join(nm) if len(nm) <= 8 else ", ".join(nm[:7]) + f" и ещё {len(nm) - 7} ({', '.join(nm[7:])})"
+    if (slot == "evening" or with_trades) and closed_line:     # the evening post counts the day's trades in «Сделки за день»
         cl = c["closed"]
         if cl:
             lines.append(f"— {period_ru} закрыто сделок: {len(cl)}, итог <b>{_usd(sum(x['pnl'] for x in cl))}</b>.")

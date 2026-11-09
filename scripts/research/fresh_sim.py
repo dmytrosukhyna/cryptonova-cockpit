@@ -48,6 +48,10 @@ def report(trades, mark, tag, emit=print):
     d0 = min(t["t_in"] for t in trades) // DAY; d1 = max(t["t_out"] for t in trades) // DAY; mid = (d0 + d1) // 2
     parts = (("all", (d0, d1)), ("h1", (d0, mid)), ("h2", (mid + 1, d1)))
     R = {"n": len(trades), "days": d1 - d0 + 1}
+    ws = [t["win14"] for t in trades if t["n14"] >= 5 and t["win14"] is not None]
+    R["form"] = {"n14ge5": len(ws), "out_all": sum(1 for t in trades if is_out(t)),
+                 "win14_q": [round(q, 3) for q in st.quantiles(ws, n=10)] if len(ws) >= 10 else None,
+                 "win14_lt70": sum(1 for w in ws if w < 0.70), "out_all_mean": _m([t["ret"] for t in trades if is_out(t)])}
     base = K.simulate(trades, mark)
     var = K.simulate([t for t in trades if not is_out(t)], mark)
     R["base"] = {p: D.curve_stats(base["days"], a, b) for p, (a, b) in parts}
@@ -67,6 +71,6 @@ def report(trades, mark, tag, emit=print):
     P["risk_ok"] = bool(R["skip"]["all"]["worst_day"] >= R["base"]["all"]["worst_day"])
     P["pass_here"] = bool(P["h1"]["t"] and P["h2"]["t"] and P["h1"]["t"] >= 2.5 and P["h2"]["t"] >= 2.5 and P["risk_ok"] and worse)
     R["vs_base"] = P
-    emit(f"::notice title={tag} fresh::n {len(trades)} | base {R['base']['all']} h1 {R['base']['h1']['total']} h2 {R['base']['h2']['total']} "
+    emit(f"::notice title={tag} fresh::n {len(trades)} form {R['form']} | base {R['base']['all']} h1 {R['base']['h1']['total']} h2 {R['base']['h2']['total']} "
          f"| skip {R['skip']['all']} h1 {R['skip']['h1']['total']} h2 {R['skip']['h2']['total']} | split {split} | vs {P}")
     return R

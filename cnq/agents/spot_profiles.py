@@ -341,6 +341,9 @@ IDEAS = {
     "trusted_small": ("HYPE",),
     "min_cash": 0.10, "fee": 0.001,       # cash ≥ 10 % after a buy; 0.1 % of every traded notional (the 10 % / 2.5 % include it)
     "stop_buy": -0.20,                    # buy/add coins except core (the table's «ядро» BTC/ETH/SOL — no stop)
+    # 09.11 22:12 (owner: «зарабатывали, а не теряли»): medium-risk take-profit — at +30 % from the entry a third is sold, the rest
+    # trails 20 % under its high, never below the entry (the exchange stop on OKX follows this level, okx_spot_stops)
+    "mid_tp": 0.30, "mid_tp_part": 1 / 3, "mid_trail": 0.20,
     "stop_small": -0.35, "body_x": 2.0, "trail": 0.35,   # «small»: stop, ×2 → sell half (body back), the rest trails 35 % from the peak
     "review_pnl": -0.10,                  # weekly (Monday) review: table «wait» and P&L ≤ −10 % → sold
     "cooldown_d": 14,                     # a sold coin is not bought again for 14 days
@@ -762,6 +765,14 @@ class IdeasPortfolio:
                                 f"Остаток держим до отката {P['trail']*100:.0f}% от пика.", actions)
             elif est == "small" and fixes and px <= high * (1 - P["trail"]):
                 self._sell(now, s, p, px, f"Трейлинг: {s} на {(1 - px / high) * 100:.0f}% ниже пика {_fp(high)} — остаток продаём ({res}).", actions)
+            elif est != "small" and kind not in ("core", "smart") and not fixes and ret >= P["mid_tp"]:
+                part = p["weight"] * P["mid_tp_part"]
+                actions.append(rp._act(now, s, "TRIM", p["weight"] - part, px, f"Фиксируем треть: {s} {res} — продаём 1/3, остаток держим "
+                                       f"с трейлингом {P['mid_trail'] * 100:.0f}% от максимума, не ниже входа.", fixes=fixes + 1, last_fix=px))
+                rp._set_cash(rp.cash() - part * px / p["entry"] * P["fee"])
+            elif est != "small" and kind not in ("core", "smart") and fixes and px <= max(p["entry"], high * (1 - P["mid_trail"])):
+                self._sell(now, s, p, px, f"Трейлинг: {s} {res}, на {(1 - px / high) * 100:.0f}% ниже максимума {_fp(high)} после фиксации трети "
+                           "— остаток продаём.", actions)
             elif est != "small" and kind != "core" and ret <= P["stop_buy"]:
                 self._sell(now, s, p, px, f"Стоп {_pc(P['stop_buy'])}: {s} {res}. Убыток режем; {P['cooldown_d']} дней монету не берём.", actions)
             elif weekly and (st == "wait" or cross_stop(r)) and ret <= P["review_pnl"] and s not in P["trusted_small"]:
@@ -1183,8 +1194,11 @@ class IdeasPortfolio:
             hz = {"horizon": h, "horizon_ru": f"{HORIZONS[h]['name_ru']} · {HORIZONS[h]['period_ru']}", "horizon_days": list(HORIZONS[h]["days"]),
                   "held_days": round(held, 1) if held is not None else None,
                   "horizon_over": bool(held is not None and held > HORIZONS[h]["days"][1]),
-                  "levels": {"stop": round(p["entry"] * (1 + (SMART["stop"] if kind == "smart" else P["stop_small"] if h == "short" else P["stop_buy"])), 8)
-                             if h != "long" and p.get("entry") else None,
+                  "levels": {"stop": (round(max(p["entry"], (p.get("high") or p["entry"]) * (1 - P["mid_trail"])), 8)
+                                      if h == "mid" and kind not in ("smart",) and p.get("fixes") and p.get("entry") else
+                                      round(p["entry"] * (1 + (SMART["stop"] if kind == "smart" else P["stop_small"] if h == "short" else P["stop_buy"])), 8)
+                                      if h != "long" and p.get("entry") else None),
+                             "take_third": round(p["entry"] * (1 + P["mid_tp"]), 8) if h == "mid" and p.get("entry") and not p.get("fixes") else None,
                              "take_half": round(p["entry"] * P["body_x"], 8) if h == "short" and p.get("entry") and not p.get("fixes") else None}}
             out.append({**p, **hz, "bucket": kind, "kind_ru": KIND_RU.get(kind, kind), "role": est, "role_ru": IDEAS_ROLE_RU.get(est, est),
                         "name": names.get(s) or s, "weight": round(mv / V, 4), "cost_weight": round(p["weight"], 6),

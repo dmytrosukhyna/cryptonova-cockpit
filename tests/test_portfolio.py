@@ -711,8 +711,8 @@ def test_ideas_alt_above_plan_is_trimmed_on_monday_and_the_cash_tops_up_btc():
     port = sp.IdeasPortfolio(conn)
     port.step(src, _ideas(rows, T0), T0)                                              # Wednesday: bought at plan
     src1 = copy.deepcopy(src)
-    src1["cg"]["A1"] *= 1.6                                                           # an alt runs to ≈ 11–12 % of the account
-    src1["cg"]["BTC"] *= 0.55                                                         # BTC falls under ¾ of its 30 % plan
+    src1["cg"]["A1"] *= 1.28                                                          # an alt runs to > 9 % of the account (below the +30 % take-third)
+    src1["cg"]["BTC"] *= 0.40                                                         # BTC falls under ¾ of its plan
     rows1 = copy.deepcopy(rows)
     _set(rows1, "A1", price=src1["cg"]["A1"])
     _set(rows1, "BTC", price=src1["cg"]["BTC"])
@@ -1181,3 +1181,24 @@ def test_smart_sleeve_does_not_leave_when_only_a_market_maker_sells():
     all_sold = {"status": "продают", "holders": [{"label": "Jump", "kind": "маркетмейкер"}]}
     assert not sp.smart_exit(mm_sold) and sp.smart_exit(all_sold) and sp.smart_exit({"status": "выбыла", "holders": []})
     assert not sp.smart_exit({"status": "накопление", "holders": []})
+
+
+def test_medium_risk_takes_a_third_at_plus_30_and_trails_the_rest():
+    """09.11 22:12 (owner: «зарабатывали, а не теряли»): a medium alt sells 1/3 at +30 %, the rest trails 20 % under its high (≥ entry)"""
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    st = port.step(src, _ideas(rows, T0), T0)
+    a1 = next(p for p in st["positions"] if p["symbol"] == "A1")
+    assert a1["levels"]["take_third"] and abs(a1["levels"]["take_third"] - a1["entry"] * 1.3) < 1e-9
+    s1 = copy.deepcopy(src); s1["cg"]["A1"] = a1["entry"] * 1.35
+    r1 = copy.deepcopy(rows); _set(r1, "A1", price=s1["cg"]["A1"])
+    st = port.step(s1, _ideas(r1, T0 + 3600_000), T0 + 3600_000)
+    t = next(a for a in st["actions"] if a["symbol"] == "A1")
+    assert t["action"] == "TRIM" and "треть" in t["reason"]
+    a1 = next(p for p in st["positions"] if p["symbol"] == "A1")
+    assert a1["fixes"] == 1 and abs(a1["levels"]["stop"] - max(a1["entry"], a1["entry"] * 1.35 * 0.8)) < 1e-6
+    s2 = copy.deepcopy(s1); s2["cg"]["A1"] = a1["entry"] * 1.05                       # back near the entry → trailing exit
+    r2 = copy.deepcopy(rows); _set(r2, "A1", price=s2["cg"]["A1"])
+    st = port.step(s2, _ideas(r2, T0 + 7200_000), T0 + 7200_000)
+    assert next(a for a in st["actions"] if a["symbol"] == "A1")["action"] == "SELL" and "A1" not in {p["symbol"] for p in st["positions"]}

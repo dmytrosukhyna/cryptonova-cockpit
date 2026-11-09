@@ -74,7 +74,8 @@ CLOSED_KEYS = ("inst", "side", "open_px", "close_px", "move_pct", "pnl_usd", "le
 CLOSED_MAX = 50
 ACTION_KEYS = ("t", "kind", "sym", "side", "usd", "px", "sig")
 ACTION_KINDS = ("spot_buy", "spot_sell", "active_buy", "active_sell", "fut_open", "fut_close", "fut_reduce", "fut_gone",
-                "active_park", "active_unpark")        # 28.10 (owner's decision): «Импульс BTC» between its trades in BTC
+                "active_park", "active_unpark",        # 28.10 (owner's decision): «Импульс BTC» between its trades in BTC
+                "spot_stop_set", "spot_stop_cancel", "spot_stop_fired")   # 09.11: spot stops on the exchange (okx_spot_stops)
 ACTIONS_MAX = 30
 TAIL_BYTES = 512 * 1024
 SYM_RE = re.compile(r"^[A-Z0-9]{1,20}$")
@@ -208,6 +209,8 @@ def actions(since: int, logs: dict | None = None) -> list[dict]:
     for ev in _tail(logs["spot"]):
         if ev.get("ev") == "order" and (ms._f(ev.get("filled")) or 0) > 0 and ev.get("side") in ("buy", "sell"):
             add(ev, "spot_" + ev["side"], ev.get("ccy"), usd=ms._f(ev.get("usd")), px=ev.get("avg_px"))
+        elif ev.get("ev") in ("spot_stop_set", "spot_stop_cancel", "spot_stop_fired"):   # 09.11: stops on OKX (px = trigger)
+            add(ev, ev["ev"], ev.get("ccy"), usd=ms._f(ev.get("usd")), px=ev.get("px"))
     for ev in _tail(logs["active"]):
         if ev.get("ev") in ("buy", "sell", "park", "unpark") and (ms._f(ev.get("filled")) or 0) > 0:
             add(ev, "active_" + {"buy": "buy", "sell": "sell", "park": "park", "unpark": "unpark"}[ev["ev"]], ev.get("ccy") or ev.get("inst"),

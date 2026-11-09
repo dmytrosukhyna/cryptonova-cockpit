@@ -280,7 +280,7 @@ class FakeOkx:
                 return {"code": "1", "msg": "", "data": [{"sCode": "51277", "sMsg": "TP/SL rejected"}]}
             self.n += 1
             self.algos.append({"algoId": f"a{self.n}", "algoClOrdId": b.get("algoClOrdId"), "instId": b["instId"], "ordType": "conditional",
-                               "sz": "", "closeFraction": b.get("closeFraction", ""), "slTriggerPx": b.get("slTriggerPx"),
+                               "sz": b.get("sz", ""), "closeFraction": b.get("closeFraction", ""), "slTriggerPx": b.get("slTriggerPx"),
                                "tpTriggerPx": b.get("tpTriggerPx", "")})
             return ok([{"algoId": f"a{self.n}", "sCode": "0"}])
         if path == "/api/v5/trade/cancel-algos":

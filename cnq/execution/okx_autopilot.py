@@ -644,6 +644,8 @@ def build(cl: Okx, env=None, model=None) -> dict:
     if sweeps and held.get(VIA, {}).get("usd", 0) >= SWEEP_MIN:
         notes.append(f"{VIA} ≈ {usd(held[VIA]['usd'])} считаются долларами; свободные {VIA} автопилот вернёт в USDT в конце прохода.")
     band = max(MIN_ORDER, BAND * total)
+    from . import okx_spot_stops as _ss
+    held_off, ss_hold_days = _ss.held_off(load_state(env)), _ss.HOLD_MS // 86_400_000
 
     def chunks(qty: float, usd_: float, lot: float) -> list:
         n = max(1, math.ceil(usd_ / lim["max_order"]))
@@ -683,6 +685,8 @@ def build(cl: Okx, env=None, model=None) -> dict:
                     sells.append({"ccy": c, "inst": inst_id, "side": "sell", "sz": fmt(q, inst["lotSz"]), "px": px, "usd": round(q * bid * k, 2),
                                   "lot": inst["lotSz"], "min": mn, "via": via, "pxq": inst_id.split("-")[1],
                                   "act": "sell" if tgt == 0 else "trim", "target_pct": round(t_pct, 2), "now_pct": round(now_pct, 2), "why": why})
+        elif gap > 0 and c in held_off:                               # 09.11: its exchange stop fired — not bought back for now
+            diffs.append(f"{c}: стоп на OKX сработал — не докупаю {ss_hold_days} дн., пока модель держит монету")
         elif gap > 0 and gap >= (MIN_ORDER if now_usd < MIN_ORDER else band):   # buy: a new coin, or under its share
             ask = ms._f((tk or {}).get("askPx")) or ms._f((tk or {}).get("last"))
             if not inst or not ask:
@@ -948,6 +952,12 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
                    "total_usd": b["total_usd"], "quote": b["quote"]}
         log({"ev": "done", **summary}, log_path)
         return {"ok": True, **summary, "plan": b, "cl": cl}
+    if b["sells"] and st.get("spot_stops"):          # 09.11: a coin being sold has its exchange stop removed first
+        from . import okx_spot_stops as _ss
+        try:
+            _ss.release(cl, sorted({o["ccy"] for o in b["sells"]} & set(st["spot_stops"])), st, lambda ev: log(ev, log_path), b["quote"])
+        except Exception as e:  # noqa: BLE001
+            log({"ev": "spot_stop_error", "error": str(e)[:200]}, log_path)
     res = execute(cl, b, st, env, now, sleep, log_path)
     summary = {"t": now, "reason": reason, "mode": mode, **res, "total_usd": b["total_usd"], "quote": b["quote"]}
     st.update({"last_run": now, "last_sig": b["sig"], "last": summary, "mode": mode, "split": b["split"], "same": b["same"],
@@ -958,6 +968,30 @@ def run_once(env=None, opener=None, model=None, now: int | None = None, sleep=ti
         save_state(st, env)
     log({"ev": "done", **summary}, log_path)
     return {"ok": True, **summary, "plan": b, "cl": cl}
+
+
+def spot_stops(env=None, opener=None, model=None, now: int | None = None, sleep=time.sleep) -> str | None:
+    """09.11: one sync of the spot stops on OKX (okx_spot_stops.sync) — only for an armed, not stopped, live-gated autopilot"""
+    from . import okx_spot_stops as ss
+    if not (enabled(env) and creds(env) and ss.enabled(env)):
+        return None
+    st = load_state(env)
+    if not st.get("armed") or stopped(env):
+        return None
+    now = int(now or time.time() * 1000)
+    pf = model if model is not None else al.fetch_portfolio()
+    if not al.ideas(pf):
+        return None
+    g = lease.gate(env, now)
+    if not g["ok"]:
+        return None
+    cl = connect(env, opener, st, sleep)
+    cl.lease_deadline = lease.deadline(g, now)
+    raw = ms.read_raw(cl.fetch, cl.host)
+    r = ss.sync(cl, pf, st, now, log, pick_quote(cl, env) or "USDT", ss.totals(raw))
+    save_state(st, env)
+    parts = [f"поставлен {x['ccy']} ≤ {x['px']:g}" for x in r["set"]] + [f"снят {c}" for c in r["cancelled"]] + [f"сработал {c}" for c in r["fired"]]
+    return ("Стопы спота на OKX: " + ", ".join(parts)) if parts else None
 
 
 def due(st: dict, pf: dict, now: int, env=None) -> str | None:
@@ -1391,6 +1425,12 @@ def _main(argv=None) -> int:
                             print(time.strftime("%H:%M ") + msg, flush=True)
                     except Exception as e:  # noqa: BLE001
                         print(time.strftime("%H:%M ") + describe_error(e), flush=True)
+                    try:                                   # 09.11 (owner): the model's spot stops sit on OKX as conditional sells
+                        msg = spot_stops()
+                        if msg:
+                            print(time.strftime("%H:%M ") + msg, flush=True)
+                    except Exception as e:  # noqa: BLE001
+                        print(time.strftime("%H:%M ") + "Стопы спота: " + describe_error(e).replace("Автопилот OKX: ", ""), flush=True)
             try:                                       # the cycle is over: a planned restart onto new code, if there is one
                 restart, msg = upd.check()
             except Exception:  # noqa: BLE001

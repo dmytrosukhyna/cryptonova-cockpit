@@ -1,0 +1,335 @@
+{
+ "backlog": 117,
+ "made": "2026-11-09",
+ "okx_hl": {
+  "made": 1793810278130,
+  "whales": 30,
+  "top10": {
+   "n": 2648,
+   "days": 90,
+   "whales": 27,
+   "live": {
+    "taken": 506,
+    "busy": 654,
+    "drops": 40,
+    "cut_n": 94,
+    "cut_mean": -4.181,
+    "own_exit_mean": -3.183,
+    "cut_saved_budget": -17.6,
+    "skipped_out_n": 312,
+    "skipped_out_mean": -0.153,
+    "skipped_out_sum_budget": -8.94,
+    "all": {
+     "total": -10.32,
+     "n_days": 90.0,
+     "worst_day": -6.46,
+     "max_dd": -44.4,
+     "lose_streak": 7.0
+    },
+    "h1": {
+     "total": -21.37,
+     "n_days": 45.0,
+     "worst_day": -6.46,
+     "max_dd": -27.69,
+     "lose_streak": 7.0
+    },
+    "h2": {
+     "total": 11.05,
+     "n_days": 45.0,
+     "worst_day": -4.34,
+     "max_dd": -17.1,
+     "lose_streak": 6.0
+    }
+   },
+   "B_none": {
+    "taken": 266,
+    "busy": 162,
+    "drops": 0,
+    "cut_n": 0,
+    "cut_mean": null,
+    "own_exit_mean": null,
+    "cut_saved_budget": 0.0,
+    "skipped_out_n": 0,
+    "skipped_out_mean": null,
+    "skipped_out_sum_budget": 0.0,
+    "all": {
+     "total": -4.33,
+     "n_days": 90.0,
+     "worst_day": -5.04,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h1": {
+     "total": 0.99,
+     "n_days": 45.0,
+     "worst_day": -3.58,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -5.33,
+     "n_days": 45.0,
+     "worst_day": -5.04,
+     "max_dd": -7.27,
+     "lose_streak": 3.0
+    }
+   },
+   "C_pause7": {
+    "taken": 443,
+    "busy": 554,
+    "drops": 32,
+    "cut_n": 84,
+    "cut_mean": -3.001,
+    "own_exit_mean": -1.41,
+    "cut_saved_budget": -25.05,
+    "skipped_out_n": 938,
+    "skipped_out_mean": 0.268,
+    "skipped_out_sum_budget": 47.2,
+    "all": {
+     "total": -15.73,
+     "n_days": 90.0,
+     "worst_day": -6.39,
+     "max_dd": -43.22,
+     "lose_streak": 6.0
+    },
+    "h1": {
+     "total": -14.06,
+     "n_days": 45.0,
+     "worst_day": -6.39,
+     "max_dd": -27.07,
+     "lose_streak": 6.0
+    },
+    "h2": {
+     "total": -1.67,
+     "n_days": 45.0,
+     "worst_day": -5.16,
+     "max_dd": -17.91,
+     "lose_streak": 3.0
+    }
+   },
+   "B_none_minus_live": {
+    "all": {
+     "d": 5.98,
+     "n": 81,
+     "t": 0.25
+    },
+    "h1": {
+     "d": 22.36,
+     "n": 40,
+     "t": 1.53
+    },
+    "h2": {
+     "d": -16.38,
+     "n": 41,
+     "t": -0.91
+    },
+    "risk_ok": true,
+    "pass_here": false
+   },
+   "C_pause7_minus_live": {
+    "all": {
+     "d": -5.42,
+     "n": 68,
+     "t": -0.26
+    },
+    "h1": {
+     "d": 7.3,
+     "n": 32,
+     "t": 0.55
+    },
+    "h2": {
+     "d": -12.72,
+     "n": 36,
+     "t": -0.83
+    },
+    "risk_ok": true,
+    "pass_here": false
+   }
+  },
+  "all_bar": {
+   "n": 3316,
+   "days": 90,
+   "whales": 30,
+   "live": {
+    "taken": 503,
+    "busy": 473,
+    "drops": 42,
+    "cut_n": 97,
+    "cut_mean": -4.082,
+    "own_exit_mean": -3.626,
+    "cut_saved_budget": -8.3,
+    "skipped_out_n": 345,
+    "skipped_out_mean": -0.337,
+    "skipped_out_sum_budget": -21.77,
+    "all": {
+     "total": -27.44,
+     "n_days": 90.0,
+     "worst_day": -6.46,
+     "max_dd": -50.49,
+     "lose_streak": 7.0
+    },
+    "h1": {
+     "total": -27.04,
+     "n_days": 45.0,
+     "worst_day": -6.46,
+     "max_dd": -32.97,
+     "lose_streak": 7.0
+    },
+    "h2": {
+     "total": -0.4,
+     "n_days": 45.0,
+     "worst_day": -5.42,
+     "max_dd": -17.51,
+     "lose_streak": 3.0
+    }
+   },
+   "B_none": {
+    "taken": 248,
+    "busy": 163,
+    "drops": 0,
+    "cut_n": 0,
+    "cut_mean": null,
+    "own_exit_mean": null,
+    "cut_saved_budget": 0.0,
+    "skipped_out_n": 0,
+    "skipped_out_mean": null,
+    "skipped_out_sum_budget": 0.0,
+    "all": {
+     "total": -12.68,
+     "n_days": 90.0,
+     "worst_day": -3.89,
+     "max_dd": -15.37,
+     "lose_streak": 6.0
+    },
+    "h1": {
+     "total": -2.13,
+     "n_days": 45.0,
+     "worst_day": -3.58,
+     "max_dd": -15.37,
+     "lose_streak": 4.0
+    },
+    "h2": {
+     "total": -10.54,
+     "n_days": 45.0,
+     "worst_day": -3.89,
+     "max_dd": -14.6,
+     "lose_streak": 6.0
+    }
+   },
+   "C_pause7": {
+    "taken": 516,
+    "busy": 560,
+    "drops": 28,
+    "cut_n": 68,
+    "cut_mean": -3.094,
+    "own_exit_mean": -3.163,
+    "cut_saved_budget": 0.88,
+    "skipped_out_n": 895,
+    "skipped_out_mean": 0.1,
+    "skipped_out_sum_budget": 16.84,
+    "all": {
+     "total": 9.18,
+     "n_days": 90.0,
+     "worst_day": -6.39,
+     "max_dd": -27.07,
+     "lose_streak": 6.0
+    },
+    "h1": {
+     "total": -7.58,
+     "n_days": 45.0,
+     "worst_day": -6.39,
+     "max_dd": -27.07,
+     "lose_streak": 6.0
+    },
+    "h2": {
+     "total": 16.76,
+     "n_days": 45.0,
+     "worst_day": -4.68,
+     "max_dd": -7.25,
+     "lose_streak": 3.0
+    }
+   },
+   "B_none_minus_live": {
+    "all": {
+     "d": 14.76,
+     "n": 82,
+     "t": 0.69
+    },
+    "h1": {
+     "d": 24.91,
+     "n": 40,
+     "t": 1.71
+    },
+    "h2": {
+     "d": -10.15,
+     "n": 42,
+     "t": -0.67
+    },
+    "risk_ok": true,
+    "pass_here": false
+   },
+   "C_pause7_minus_live": {
+    "all": {
+     "d": 36.62,
+     "n": 72,
+     "t": 2.2
+    },
+    "h1": {
+     "d": 19.46,
+     "n": 33,
+     "t": 1.41
+    },
+    "h2": {
+     "d": 17.16,
+     "n": 39,
+     "t": 1.83
+    },
+    "risk_ok": true,
+    "pass_here": false
+   }
+  }
+ },
+ "binance_run": 42625483703,
+ "binance_annotations": [
+  {
+   "message": "{'all': {'d': 9.33, 'n': 23, 't': 0.92}, 'h1': {'d': -6.24, 'n': 7, 't': -1.04}, 'h2': {'d': 15.57, 'n': 16, 't': 2.21}, 'risk_ok': True, 'pass_here': False}",
+   "title": "bn all-bar C_pause7−live"
+  },
+  {
+   "message": "{'all': {'d': -3.93, 'n': 37, 't': -0.19}, 'h1': {'d': 0.18, 'n': 10, 't': 0.03}, 'h2': {'d': -4.11, 'n': 27, 't': -0.21}, 'risk_ok': False, 'pass_here': False}",
+   "title": "bn all-bar B_none−live"
+  },
+  {
+   "message": "taken 414 drops 9 cut 25 (cut -4.472% vs own exit -4.992%, saved 2.44%) skipped-out 259 mean 0.083% | all {'total': 39.74, 'n_days': 65.0, 'worst_day': -3.69, 'max_dd': -4.54, 'lose_streak': 3.0} | h1 7.29 | h2 32.45",
+   "title": "bn all-bar C_pause7"
+  },
+  {
+   "message": "taken 359 drops 0 cut 0 (cut None% vs own exit None%, saved 0.0%) skipped-out 0 mean None% | all {'total': 26.48, 'n_days': 65.0, 'worst_day': -6.89, 'max_dd': -23.5, 'lose_streak': 3.0} | h1 13.7 | h2 12.77",
+   "title": "bn all-bar B_none"
+  },
+  {
+   "message": "taken 426 drops 15 cut 33 (cut -4.812% vs own exit -3.874%, saved -5.81%) skipped-out 137 mean -0.197% | all {'total': 30.41, 'n_days': 65.0, 'worst_day': -3.62, 'max_dd': -9.64, 'lose_streak': 3.0} | h1 13.53 | h2 16.88",
+   "title": "bn all-bar live"
+  },
+  {
+   "message": "{'all': {'d': -4.11, 'n': 25, 't': -0.24}, 'h1': {'d': -6.24, 'n': 7, 't': -1.04}, 'h2': {'d': 2.13, 'n': 18, 't': 0.13}, 'risk_ok': True, 'pass_here': False}",
+   "title": "bn top10 C_pause7−live"
+  },
+  {
+   "message": "{'all': {'d': -0.42, 'n': 39, 't': -0.02}, 'h1': {'d': 0.18, 'n': 10, 't': 0.03}, 'h2': {'d': -0.6, 'n': 29, 't': -0.03}, 'risk_ok': False, 'pass_here': False}",
+   "title": "bn top10 B_none−live"
+  },
+  {
+   "message": "taken 328 drops 12 cut 33 (cut -4.778% vs own exit -4.907%, saved 0.8%) skipped-out 275 mean -0.089% | all {'total': 22.18, 'n_days': 65.0, 'worst_day': -4.93, 'max_dd': -7.75, 'lose_streak': 3.0} | h1 7.29 | h2 14.89",
+   "title": "bn top10 C_pause7"
+  },
+  {
+   "message": "taken 290 drops 0 cut 0 (cut None% vs own exit None%, saved 0.0%) skipped-out 0 mean None% | all {'total': 25.86, 'n_days': 65.0, 'worst_day': -7.22, 'max_dd': -18.05, 'lose_streak': 3.0} | h1 13.7 | h2 12.15",
+   "title": "bn top10 B_none"
+  },
+  {
+   "message": "taken 367 drops 16 cut 40 (cut -3.709% vs own exit -2.36%, saved -10.11%) skipped-out 118 mean -1.115% | all {'total': 26.28, 'n_days': 65.0, 'worst_day': -4.95, 'max_dd': -20.84, 'lose_streak': 5.0} | h1 13.53 | h2 12.75",
+   "title": "bn top10 live"
+  }
+ ]
+}

@@ -512,10 +512,11 @@ SY: dict[str, dict[str, str]] = {
                      " Η είσοδος γίνεται με σήμα του συστήματος και με βάση την κατάσταση της αγοράς· το stop μπαίνει αμέσως στο ανταλλακτήριο.",
                      " La entrada sigue la señal del sistema y el estado del mercado; el stop está en el exchange desde el inicio."),
     "sy.chk.trend": _w("Тренд {sym}: {x}", "{sym} trend: {x}", "Тренд {sym}: {x}", "Τάση {sym}: {x}", "Tendencia de {sym}: {x}"),
-    "sy.tr.bull": _w("цена выше средней за 200 дней", "the price is above its 200-day average", "ціна вища за середню за 200 днів",
-                     "η τιμή είναι πάνω από τον μέσο όρο 200 ημερών", "el precio está por encima de su media de 200 días"),
-    "sy.tr.bear": _w("цена ниже средней за 200 дней", "the price is below its 200-day average", "ціна нижча за середню за 200 днів",
-                     "η τιμή είναι κάτω από τον μέσο όρο 200 ημερών", "el precio está por debajo de su media de 200 días"),
+    # 10.11: {d} = the days the regime's average really covers (terminal regime sma_days: ~106 now, up to 200)
+    "sy.tr.bull": _w("цена выше средней за {d} дней", "the price is above its {d}-day average", "ціна вища за середню за {d} днів",
+                     "η τιμή είναι πάνω από τον μέσο όρο {d} ημερών", "el precio está por encima de su media de {d} días"),
+    "sy.tr.bear": _w("цена ниже средней за {d} дней", "the price is below its {d}-day average", "ціна нижча за середню за {d} днів",
+                     "η τιμή είναι κάτω από τον μέσο όρο {d} ημερών", "el precio está por debajo de su media de {d} días"),
     "sy.tr.up": _w("среднесрочно вверх", "up over the medium term", "середньостроково вгору", "ανοδική μεσοπρόθεσμα", "al alza a medio plazo"),
     "sy.tr.down": _w("среднесрочно вниз", "down over the medium term", "середньостроково вниз", "πτωτική μεσοπρόθεσμα", "a la baja a medio plazo"),
     "sy.chk.levels": _w("Уровни при входе: {x}", "Levels at the entry: {x}", "Рівні під час входу: {x}", "Επίπεδα στην είσοδο: {x}",
@@ -866,7 +867,7 @@ def copy_why(row: dict, wd: dict | None, rec: dict | None, why: dict | None, des
     tr = (ctx.get("trend") or {}).get(sym) or {}
     tparts = []
     if tr.get("long") in ("BULL", "BEAR"):
-        tparts.append(t(lang, "sy.tr.bull" if tr["long"] == "BULL" else "sy.tr.bear"))
+        tparts.append(t(lang, "sy.tr.bull" if tr["long"] == "BULL" else "sy.tr.bear", d=int(tr.get("sma_days") or 200)))
     if tr.get("mid") in ("LONG", "SHORT"):
         tparts.append(t(lang, "sy.tr.up" if tr["mid"] == "LONG" else "sy.tr.down"))
     lv = []

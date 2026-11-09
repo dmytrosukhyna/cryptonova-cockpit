@@ -56,3 +56,14 @@ def test_regime_text_names_the_real_average():
     assert long_text_ru(r) == "цена ниже средней цены за 105 дней ($76 651)"
     assert long_text_ru(dict(r, sma_days=200, long="BULL")) == "цена выше 200-дневной средней ($76 651) и выше, чем 90 дней назад"
     assert "ниже, чем 90 дней назад" in long_text_ru(dict(r, long="MIXED"))
+
+
+def test_short_window_is_named_everywhere():
+    from cnq.agents import app_why
+    from cnq.agents.i18n import t
+    assert t("ru", "sy.tr.bear", d=106) == "цена ниже средней за 106 дней" and t("en", "sy.tr.bull", d=106) == "the price is above its 106-day average"
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for f in ("cnq/agents/turbo_desk.py", "cnq/agents/sweep_desk.py", "cnq/terminal/report.py"):
+        src = open(os.path.join(root, f), encoding="utf-8").read()
+        assert "SMA200 =" not in src and "выше 200-дневной средней и за 60" not in src and "выше SMA200" not in src, f
+    assert app_why  # imported: the catalog registers sy.tr.* with {d}

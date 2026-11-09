@@ -124,6 +124,11 @@ def slot_for(now: dt.datetime) -> str | None:
     return None
 
 
+
+def _long_text(r: dict) -> str:
+    from ..terminal.report import long_text_ru
+    return long_text_ru(r)
+
 class Channel:
     def __init__(self, conn: sqlite3.Connection, out: str = "web"):
         self.conn = conn
@@ -202,7 +207,8 @@ class Channel:
         if not c:
             return ""
         r = c.get("regime") or {}
-        long_ = "долгосрок бычий — цена выше 200-дневной" if r.get("long") == "BULL" else "долгосрок медвежий — цена ниже 200-дневной"
+        from ..terminal.report import long_text_ru
+        long_ = ("долгосрок бычий — " if r.get("long") == "BULL" else "долгосрок не бычий — ") + long_text_ru(r)
         mid = {"LONG": "среднесрок лонг", "SHORT": "среднесрок шорт", "UP_WAIT": "среднесрок ждёт подтверждения вверх", "DOWN_WAIT": "среднесрок ждёт подтверждения вниз"}.get(r.get("mid"), "среднесрок без режима")
         short = {"UP": "импульс вверх", "DOWN": "импульс вниз", "FLAT": "боковик"}.get(r.get("short"), "")
         stress = (x["paper"].get("stress") or {})
@@ -349,8 +355,9 @@ class Channel:
             s += f" Фьючерсы: система CRYPTO NOVA AI ведёт {Channel._deals(n)}, у каждой стоп на бирже."
         else:
             s += " Фьючерсы: открытых сделок сейчас нет — система ждёт свой следующий сигнал."
-        if "медвеж" in lt:
-            s += " Спот — ядро BTC, ETH и SOL; биткоин ниже своей долгосрочной средней, поэтому крупных покупок не делаем."
+        if lt and (facts.get("btc_regime") or {}).get("long") != "BULL":
+            # 10.11 (owner): the exact indicator of the spot rule (terminal regime «long»: the average + 90 days), never «долгосрочная средняя»
+            s += f" Спот — ядро BTC, ETH и SOL; у биткоина {lt.split(': ', 1)[-1]}, а по правилу спота в таком режиме новые монеты не берём — только ядро."
         else:
             s += " Спот — ядро BTC, ETH и SOL держим в долгую."
         return s
@@ -371,7 +378,8 @@ class Channel:
                "btc_dominance": f"{g.get('btc_dom', 0):.1f}%" if g.get("btc_dom") else None,
                "fear_greed": None,   # 16.10: owner asked to drop market-mood indices from posts and panel
                "events": self.events(now),
-               "btc_regime": {"long_term": "бычий: цена выше 200-дневной средней" if r.get("long") == "BULL" else "медвежий: цена ниже 200-дневной средней",
+               "btc_regime": {"long_term": ("бычий: " if r.get("long") == "BULL" else "медвежий: " if r.get("long") == "BEAR" else "смешанный: ") + _long_text(r),
+                              "long": r.get("long"),
                               "mid_term": {"LONG": "тренд вверх", "SHORT": "тренд вниз", "UP_WAIT": "готовится к росту, ждём пробоя", "DOWN_WAIT": "готовится к снижению, ждём пробоя"}.get(r.get("mid"), "без выраженного тренда"),
                               "impulse": {"UP": "импульс вверх", "DOWN": "импульс вниз", "FLAT": "боковик"}.get(r.get("short"), "")} if r else None,
                "market_stress": {0: "спокойный", 1: "нервный", 2: "распродажа — большинство монет падает", 3: "паника — падает почти всё"}.get(lvl, "спокойный") if lvl is not None else None}

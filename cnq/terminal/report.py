@@ -30,6 +30,23 @@ def fmt_price(p: float) -> str:
 
 
 # ------------------------------------------------------------------ regime
+def long_avg_ru(reg: dict) -> str:
+    """10.11 (owner: «никогда не делай расплывчатых утверждений, которые можно прочитать как ложь»): the average the «long» regime
+    really uses — «200-дневной средней» only when 200 daily bars exist; with less history it is the average of what there is
+    (on the pipeline ~105 days), so the text names those days and the number"""
+    d, s = reg.get("sma_days"), reg.get("sma200")
+    name = "200-дневной средней" if d and d >= 200 else f"средней цены за {d} дней" if d else "средней цены по нашей истории свечей"
+    return name + (f" (${fmt_price(s)})" if s else "")
+
+
+def long_text_ru(reg: dict) -> str:
+    """exactly what the long regime checks: BULL = price above that average AND above its level 90 days ago; BEAR = below the
+    average; MIXED = above the average but not above 90 days ago"""
+    a = long_avg_ru(reg)
+    return {"BULL": f"цена выше {a} и выше, чем 90 дней назад", "BEAR": f"цена ниже {a}",
+            "MIXED": f"цена выше {a}, но ниже, чем 90 дней назад"}.get(reg.get("long"), "режим не определён")
+
+
 def regime(cs15: list[Candle]) -> dict:
     """Three horizons from daily bars: short (3d), mid (28d trend rule), long (90d / 200d SMA)."""
     d = resample(cs15, 96)
@@ -57,7 +74,7 @@ def regime(cs15: list[Candle]) -> dict:
     long_ = "BULL" if last > sma200 and (math.isnan(r90) or r90 > 0) else ("BEAR" if last < sma200 else "MIXED")
     return {"short": short, "mid": mid, "mid_note": mid_note, "long": long_,
             "r3": r3, "r7": r7, "r28": r28, "r60": r60, "r90": r90, "hh20": float(hh20), "ll20": float(ll20),
-            "sma200": float(sma200), "atr_d": float(atr_d[-1]), "atr_pct": float(atr_d[-1] / last * 100),
+            "sma200": float(sma200), "sma_days": int(min(n, 200)), "atr_d": float(atr_d[-1]), "atr_pct": float(atr_d[-1] / last * 100),
             "rv30": rv30, "vol_weight": min(1.0, 0.30 / rv30) if rv30 > 0 else 0.0}
 
 

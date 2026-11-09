@@ -317,6 +317,7 @@ def test_evening_one_day_one_list_all_positions_and_sourced_news():
         ev = ch.post("evening", now=now)
         assert ev.count("закрыто сделок") == 0 and "Закрыто 14 сделок" in ev and "открытые позиции" in ev
         assert len(re.sub(r"<[^>]+>", "", ch.shrink(ev))) <= 1024
+        assert "долгосрочной средней" not in ev                    # 10.11: the exact indicator, never a vague claim
         from cnq.agents import whale_digest
         wb = whale_digest.block(tmp, ms, slot="evening", closed_line=False)
         assert "В работе 7: P0 лонг, P1 лонг, P2 лонг, P3 лонг, P4 лонг, P5 лонг, P6 шорт;" in wb and "…" not in wb and "закрыто" not in wb

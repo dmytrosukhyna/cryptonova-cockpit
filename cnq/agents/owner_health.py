@@ -170,8 +170,9 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     st = {"ok": GREEN, "stale": YELLOW}.get(api.get("status"), RED) if api else YELLOW
     B = _load(out, "brief.json")
     note = ""
-    if st == GREEN and B.get("error"):
-        st, note = YELLOW, "голос работает запасной"
+    bv = str(B.get("voice") or "")
+    if st == GREEN and B and (not B.get("audio") or "ru-RU" not in bv):
+        st, note = YELLOW, "голос отчёта запасной (не русский)" if B.get("audio") else "отчёт без озвучки"
     rows.append(_row("nova", "NOVA: чат и голос", "Отвечает на вопросы в приложении и озвучивает отчёты.",
                      api.get("last_ok") or vc.get("last_ok"), st, note, ASK.format(x="NOVA (API приложения /v2/health)")))
     worst = RED if any(r["status"] == RED for r in rows) else YELLOW if any(r["status"] == YELLOW for r in rows) else GREEN

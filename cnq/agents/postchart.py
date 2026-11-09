@@ -255,7 +255,9 @@ def render(coin: dict, cal_open: dict | None, fng: dict | None, out_path: str, t
         foot.append(f"страх и жадность {fng['value']} · {fng.get('label', '')}")
     r = coin.get("regime") or {}
     if r.get("long"):
-        foot.append("режим: " + ("бычий (выше 200-дневной средней)" if r["long"] == "BULL" else "медвежий (ниже 200-дневной средней)"))
+        from ..terminal.report import long_avg_ru
+        foot.append("режим: " + ("бычий" if r["long"] == "BULL" else "медвежий" if r["long"] == "BEAR" else "смешанный")
+                    + f" ({'выше' if r['long'] != 'BEAR' else 'ниже'} {long_avg_ru(r)})")
     d.text((L, H - 30), " · ".join(foot) + " · сценарии — оценка, не гарантия · не финансовый совет", font=f12, fill=(125, 147, 173))
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     img.save(out_path, "PNG", optimize=True)

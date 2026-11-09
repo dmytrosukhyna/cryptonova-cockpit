@@ -120,7 +120,7 @@ def next_week(rep: dict) -> list:
         out.append({"symbol": c["symbol"].replace("-USDT", ""), "price": c["price"],
                     "support": {"lo": sup[0]["lo"], "hi": sup[0]["hi"], "touches": sup[0]["touches"]} if sup else None,
                     "resistance": {"lo": res[0]["lo"], "hi": res[0]["hi"], "touches": res[0]["touches"]} if res else None,
-                    "bull": (c.get("regime") or {}).get("long") == "BULL", "mid": (c.get("regime") or {}).get("mid"), "mid_note": (c.get("regime") or {}).get("mid_note")})
+                    "bull": (c.get("regime") or {}).get("long") == "BULL", "regime": c.get("regime") or {}, "mid": (c.get("regime") or {}).get("mid"), "mid_note": (c.get("regime") or {}).get("mid_note")})
     return out
 
 
@@ -229,7 +229,9 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
             parts.append(f"поддержка {_fmt(n['support']['lo'])}–{_fmt(n['support']['hi'])} ({n['support']['touches']}× касаний) — там ждём покупателей")
         if n["resistance"]:
             parts.append(f"сопротивление {_fmt(n['resistance']['lo'])}–{_fmt(n['resistance']['hi'])} ({n['resistance']['touches']}× касаний) — там продавцы")
-        mode = ("Цена выше средней за 200 дней" if n["bull"] else "Цена ниже средней за 200 дней") + (f"; {n['mid_note']}" if n.get("mid_note") else "")
+        from ..terminal.report import long_text_ru
+        lt = long_text_ru(n.get("regime") or {"long": "BULL" if n["bull"] else "BEAR"})
+        mode = lt[:1].upper() + lt[1:] + (f"; {n['mid_note']}" if n.get("mid_note") else "")
         L.append(f"- {n['symbol']} {_fmt(n['price'])}: " + "; ".join(parts) + f". {mode}.")
     L.append("")
     L.append("Как работает система: " + MODEL_LINE)

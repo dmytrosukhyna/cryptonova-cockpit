@@ -338,6 +338,14 @@ def build(out: str = "web", conn=None, now: int | None = None, audio: bool = Tru
     docs = {}
     for lang in [x for x in LANGS if x != "ru"] + ["ru"]:              # Russian last: its file says «all languages written»
         doc = {"day": day, "asof": now, "lang": lang, **render(F, picks, lang), "picks": picks, "facts": fx, "audio": None}
+        if lang == "ru":                   # 09.11 (owner 21:40): the owner's version names what changed on ADA / AVAX / LIT
+            try:
+                from . import owner_watch
+                ow = owner_watch.owner_line(out, now)
+            except Exception:  # noqa: BLE001
+                ow = None
+            if ow:
+                doc["owner"] = {**doc["owner"], "body": doc["owner"]["body"] + " " + ow}
         if audio:
             v, errs = _synth_lang(doc["text"], lang, os.path.join(out, file_name(lang, "mp3")))
             doc["audio"], doc["voice"] = (file_name(lang, "mp3") if v else None), v

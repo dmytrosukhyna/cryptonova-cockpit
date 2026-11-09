@@ -26,7 +26,11 @@
       let SM = '';
       // 05.11 (owner): «Куда инвестируют киты» — only in the owner's view (CNAuth.state.isOwner)
       try { SM = V.smartMoneyCard && V.auth.owner() ? await V.smartMoneyCard() : ''; } catch (e) { SM = ''; }
+      // 09.11 (owner 21:40): «Под наблюдением владельца» — ADA, AVAX, LIT on top, owner views only (vip/watch.js)
+      let OW = '';
+      try { OW = V.ownerWatchCard && V.auth.owner() ? await V.ownerWatchCard() : ''; } catch (e) { OW = ''; }
       return `<div class="ph"><div><h2>Спот</h2><p>Спотовая часть публичного портфеля CRYPTO NOVA на OKX с ${V.PUBLIC_START_LABEL}: что куплено, сколько вложено, что делает система и почему.</p></div></div>
+        ${OW}
         ${summary(M, X)}
         ${assets(M, X)}
         ${journal(M, X)}

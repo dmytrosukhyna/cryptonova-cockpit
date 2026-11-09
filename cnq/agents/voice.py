@@ -212,6 +212,14 @@ def compose(out: str = "web") -> str:
                 and time.time() * 1000 - (i.get("created") or 0) < 24 * 3600_000 and not _latin(i["reasoning"])), None)
     if imp:
         L.append("Из новостей стоит отметить: " + re.sub(r"\.$", "", imp.get("title") or imp["reasoning"]) + ".")
+    if hour >= 18:                         # 09.11 (owner 21:40): the evening digest names what changed on ADA / AVAX / LIT
+        try:
+            from . import owner_watch
+            ow = owner_watch.owner_line(out)
+        except Exception:  # noqa: BLE001
+            ow = None
+        if ow:
+            L.append(ow)
     L.append("Если понадоблюсь — на связи.")
     # the same shape as the panel's briefKeys(): fut 'nova', spot 'ideas', open trades of «Сбалансированная», total = futures + spot
     compose.keys = {"fut": "nova" if fut_res is not None else "bal", "spot": sp_key, "fut_open": len(prof.get("open") or []) if prof else None,

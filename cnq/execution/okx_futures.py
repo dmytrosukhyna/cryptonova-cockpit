@@ -86,6 +86,17 @@ LIQ_ROOM = 0.8              # leverage ≤ 0.8 ÷ stop distance: the stop always
 WHALES = "whales"           # the copy desk's key (desk_select stages, the trade ids «whales:<id>»)
 IVAN = "ivan"               # 06.11 (owner): Ivan's copies come from the same whale desk, held as «ivan:<id>» (the panel's «sig»), same budget
 WHALES_STALE_MS = 3 * 3_600_000
+COPY_PREFIXES = (WHALES + ":", IVAN + ":")    # 10.11: the only signals the real sleeve may open
+NOT_COPY = "не сигнал копирования — отклонено"
+
+
+def copy_sig(tid, env=None) -> bool:
+    """10.11: may the real sleeve open this desk trade? Only «whales:…» / «ivan:…». OKX_FUT_ALLOW_DESKS (TESTS ONLY — never set on the
+    server) lists more desk keys, «*» = any; the mechanics tests of the other desks use it"""
+    if str(tid).startswith(COPY_PREFIXES):
+        return True
+    extra = str((env or {}).get("OKX_FUT_ALLOW_DESKS") or "").strip()
+    return extra == "*" or (bool(extra) and str(tid).split(":", 1)[0] in {x.strip() for x in extra.split(",")})
 # 05.11 15:18 (owner, real money, «и 1, и 2, и 3 запускать»): 3 % of the futures budget per trade (was 2 %); back to RISK_BACK (2 %)
 # automatically while the rolling 7-day realised result is below −RISK_BACK_DD (−5 %) of the budget (logged «risk_back»)
 RISK_CAP = 0.03
@@ -1078,7 +1089,13 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
         st[k] = {x: v for x, v in st[k].items() if x in want}
     st["skip"] = {x: v for x, v in st["skip"].items() if v != BUSY}     # legacy final «busy» skips are retried (05.11)
     st["skip"] = {x: v for x, v in st["skip"].items() if str(v).startswith(FINAL_SIZE_SKIPS) or not _size_skip(v)}   # 06.11: retried
+    # 10.11 (owner, copy audit): the real sleeve opens ONLY copy signals — «whales:…» / «ivan:…»; anything else is rejected for good
+    for tid in want:
+        if not copy_sig(tid, env) and tid not in st["trades"] and tid not in st["skip"] and tid not in st["done"]:
+            st["skip"][tid] = NOT_COPY
+            log({"ev": "not_copy_signal", "id": tid, "why": NOT_COPY}, log_path)
     fresh = [(tid, w) for tid, w in want.items() if tid not in st["trades"] and tid not in st["skip"] and tid not in st["done"]
+             and copy_sig(tid, env)
              and w[0].get("follow") is not False]      # 06.11: never a NEW entry for a whale no longer on the follow list
     if fresh:
         cap = caps(env)

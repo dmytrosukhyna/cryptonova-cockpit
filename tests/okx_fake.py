@@ -329,7 +329,8 @@ def env(tmp=None, **kw):
          "OKX_FUT_STATE": os.path.join(tmp, "fut.json"), "OKX_ACT_STATE": os.path.join(tmp, "act.json"),
          "OKX_LEASE_FILE": os.path.join(tmp, "lease.json"),     # the lease (okx_lease.py) in a local file, never GitHub
          # 05.11: the defaults are now futures 25 % / active 0 — these tests keep the 28.10 split they were written for
-         "OKX_FUT_SHARE": "0.15", "OKX_ACT_SHARE": "0.10"}
+         "OKX_FUT_SHARE": "0.15", "OKX_ACT_SHARE": "0.10",
+         "OKX_FUT_ALLOW_DESKS": "*"}     # 10.11: the mechanics tests use rule desks too; the real gate is tested with "" 
     e.update(kw)
     return e
 

@@ -574,3 +574,20 @@ def test_a_fresh_whale_entry_skipped_for_a_zero_share_is_copied_once_the_share_r
     assert "whales:W-SOL-L-77" not in st["skip"] and st["copy_skips"][-1]["sig"] == "whales:W-SOL-L-77"
     r = fu.step(e, desks=[("whales", {"equity": 10000.0, "open": [w]})], now=NOW + 60_000, sleep=F.nosleep, cl=cl)
     assert r["opened"] == 1
+
+
+def test_the_real_sleeve_opens_only_copy_signals_and_logs_the_rejection():
+    """10.11 (owner, copy audit): only «whales:…» / «ivan:…» trades are opened on the real account; a rule desk's trade is rejected
+    for good and shown in copy_skips as «не сигнал копирования — отклонено»"""
+    fk = F.FakeOkx()
+    e = F.env(OKX_FUT_ALLOW_DESKS="")
+    cl = ap.connect(e, fk, {}, F.nosleep)
+    w = {**F.trade("W1", "SOL"), "whale": "bn:1", "follow": True}
+    r = fu.step(e, desks=[("aggr", {"equity": 10000.0, "open": [F.trade("A1", "BTC", "SHORT", 100000.0, 102000.0, 90000.0)]}),
+                          ("whales", {"equity": 10000.0, "open": [w]})], now=NOW, sleep=F.nosleep, cl=cl)
+    st = fu.load_state(e)
+    assert list(st["trades"]) == ["whales:W1"] and r["opened"] == 1
+    assert st["skip"]["aggr:A1"] == fu.NOT_COPY
+    sk = {x["sig"]: x for x in st["copy_skips"]}
+    assert "aggr:A1" in sk and "не сигнал копирования — отклонено" in sk["aggr:A1"]["why"]
+    assert fu.copy_sig("ivan:x") and fu.copy_sig("whales:x") and not fu.copy_sig("aggr:x") and not fu.copy_sig("aggr:x", {})

@@ -1,9 +1,9 @@
 {
- "asof": 1794326191312,
+ "asof": 1794327073493,
  "name": "Настроение опционов",
  "source": "deribit",
  "error": null,
- "dvol": 40.5,
+ "dvol": 40.45,
  "dvol_pct_1y": 48,
  "dvol_hist_days": 365,
  "put_call_oi": 0.73,

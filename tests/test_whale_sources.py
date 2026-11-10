@@ -122,8 +122,7 @@ def test_run_studies_binance_portfolios_and_gives_them_a_30_day_record():
     n0 = len(get.calls)       # 10.11: whales of config/ (reinstate, loss watch) are studied by address too — look at all of run 2
     d2 = W.run(conn, now=NOW + 1800_000, post=_hl_post(NOW), get_lb=lambda: {"leaderboardRows": []},
                okx_get=lambda p, q: [{"ranks": []}] if "lead-traders" in p else [], max_requests=80, budget_s=60, src_get={"bn": get})
-    assert d2["desk"] is not None
-    assert any("lead-data/positions" in c and "5278353437811897601" in c for c in get.calls[n0:])
+    assert d2["desk"] is None             # 10.11: the GitHub run keeps no desk of its own — the server's live desk is the only one
     json.dumps(d2)
 
 

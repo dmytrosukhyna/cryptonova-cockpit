@@ -29,6 +29,29 @@ def _load(out: str, name: str) -> dict:
         return {}
 
 
+_LIVE: dict = {}
+
+
+def _live(out: str, name: str) -> dict:
+    """10.11 (owner: «Ленты приложения» yellow all morning while the app was fresh): the pipeline reads its own checkout, made
+    ~20 minutes before this step, while the server pushes app_home / engine / public_real / whales_live every 2–3 minutes. In the
+    pipeline (GITHUB_ACTIONS) the newest pushed version is read from origin/main; elsewhere — the local file."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        import subprocess
+        if "fetched" not in _LIVE:
+            _LIVE["fetched"] = subprocess.run(["git", "fetch", "-q", "--depth=1", "origin", "main"], capture_output=True, timeout=60).returncode == 0
+        if _LIVE["fetched"]:
+            try:
+                r = subprocess.run(["git", "show", f"FETCH_HEAD:web/{name}"], capture_output=True, timeout=30)
+                if r.returncode == 0:
+                    d = json.loads(r.stdout.decode("utf-8"))
+                    if isinstance(d, dict):
+                        return d
+            except Exception:  # noqa: BLE001
+                pass
+    return _load(out, name)
+
+
 def _ms(v) -> int | None:
     try:
         v = float(v)
@@ -51,7 +74,11 @@ def _comp(S: dict, key: str) -> dict:
     return next((c for c in S.get("components") or [] if isinstance(c, dict) and c.get("key") == key), {})
 
 
-def _row(key, name, what, last, status, note, todo) -> dict:
+def _row(key, name, what, last, status, note, todo, now: int | None = None) -> dict:
+    if status != GREEN and not note:                 # 10.11: a yellow / red row always says why, in plain words
+        a = _age_min(last, now or int(time.time() * 1000))
+        note = (f"последнее обновление {int(a)} мин назад" if a is not None and a < 120 else
+                f"последнее обновление {a / 60:.0f} ч назад" if a is not None else "нет отметки времени")
     return {"key": key, "name": name, "what": what, "last": _ms(last), "status": status, "icon": ICON[status], "word": WORD[status],
             "note": note, "todo": todo if status == RED else None}
 
@@ -81,12 +108,12 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     now = int(now or time.time() * 1000)
     kyiv = dt.datetime.fromtimestamp(now / 1000, KYIV)
     today = kyiv.strftime("%Y-%m-%d")
-    S, E, R = _load(out, "system_status.json"), _load(out, "engine.json"), _load(out, "gh_runs.json")
+    S, E, R = _load(out, "system_status.json"), _live(out, "engine.json"), _load(out, "gh_runs.json")
     rows = []
 
     # 1. the real account's autopilot
     ap, pr = _comp(S, "autopilot"), _comp(S, "public_real")
-    t_pr = _ms(_load(out, "public_real.json").get("asof")) or pr.get("last_ok")
+    t_pr = _ms(_live(out, "public_real.json").get("asof")) or pr.get("last_ok")
     st = _by_age(t_pr, now, 35, 75)
     note = ""
     if ap.get("status") == "stopped":
@@ -95,18 +122,18 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
         st, note = RED, ap.get("note_ru") or "замок автопилота не продлевается"
     rows.append(_row("autopilot", "Автопилот реального счёта (фьючерсы + спот)",
                      "Сам ведёт реальный счёт на OKX: открывает и закрывает сделки по сигналам системы, держит спот-ядро.",
-                     t_pr, st, note, "Позиции при этом защищены стопами на бирже. " + ASK.format(x="автопилот на сервере")))
+                     t_pr, st, note, "Позиции при этом защищены стопами на бирже. " + ASK.format(x="автопилот на сервере"), now))
     # 2. trader polling
-    t_w = max(_ms(_load(out, "whales_live.json").get("asof")) or 0, _ms(_load(out, "whale_watch.json").get("asof")) or 0) or None
+    t_w = max(_ms(_live(out, "whales_live.json").get("asof")) or 0, _ms(_load(out, "whale_watch.json").get("asof")) or 0) or None
     rows.append(_row("traders", "Опрос трейдеров",
                      "Каждые несколько минут смотрит, что делают отобранные трейдеры, — отсюда сигналы для фьючерсов.",
-                     t_w, _by_age(t_w, now, 45, 120), "", ASK.format(x="опрос трейдеров")))
+                     t_w, _by_age(t_w, now, 45, 120), "", ASK.format(x="опрос трейдеров"), now))
     # 3. the GitHub data pipeline
     t_site = max(_ms(_load(out, "status.json").get("time")) or 0, _ms(_load(out, "version.json").get("time")) or 0) or None
     st, note, t = _gh(R, "site", now, 75, 180, t_site)
     rows.append(_row("pipeline", "Конвейер данных (GitHub, раз в 30 минут)",
                      "Собирает новости, рынок, спот-портфель, отчёты и посты; затем обновляет сайт.", t, st, note,
-                     ASK.format(x="конвейер данных site.yml")))
+                     ASK.format(x="конвейер данных site.yml"), now))
     # 4. publishing the panel
     st, note, t = _gh(R, "publish", now, 60, 180, R.get("pages_t"))
     if R.get("pages_t") and _age_min(R["pages_t"], now) is not None:
@@ -114,7 +141,7 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
         st = st2 if st == GREEN else st
     rows.append(_row("publish", "Публикация панели (сайт cryptonova.vip)",
                      "Выкладывает свежие данные на сайт — то, что вы видите на этой панели.", R.get("pages_t") or t, st, note,
-                     ASK.format(x="публикацию сайта")))
+                     ASK.format(x="публикацию сайта"), now))
     # 5. TG channel posts
     last_post, slots = None, set()
     if conn is not None:
@@ -134,9 +161,9 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
         st, note = (GREEN if last_post else YELLOW), ""
     rows.append(_row("channel", "Посты в Telegram-канал",
                      "Утренний обзор, главные новости и вечерние итоги в канале @crypto_nova_news (с 23:00 до 08:00 тишина).",
-                     last_post, st, note, ASK.format(x="посты в канал")))
+                     last_post, st, note, ASK.format(x="посты в канал"), now))
     # 6. the morning report
-    M = _load(out, "morning.json")
+    M = _live(out, "morning.json")
     if M.get("day") == today:
         st, note = (GREEN if M.get("audio") else YELLOW), ("" if M.get("audio") else "текст есть, озвучка не получилась")
     elif kyiv.hour < 7 or (kyiv.hour == 7 and kyiv.minute < 30):
@@ -144,12 +171,12 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     else:
         st, note = RED, "сегодняшний доклад не собран"
     rows.append(_row("morning", "Утренний доклад (07:00)", "Короткий доклад о ночи и счёте: пуш в приложение и голос.",
-                     M.get("asof"), st, note, ASK.format(x="утренний доклад")))
+                     M.get("asof"), st, note, ASK.format(x="утренний доклад"), now))
     # 7. the researcher
     rc = _comp(S, "researcher")
     st = {"ok": GREEN, "stale": YELLOW}.get(rc.get("status"), RED) if rc else RED
     rows.append(_row("researcher", "Дежурный исследователь (раз в час)", "Раз в час проверяет рынок и сделки и пишет короткую запись в журнал дежурства.",
-                     rc.get("last_ok"), st, "", ASK.format(x="дежурного исследователя")))
+                     rc.get("last_ok"), st, "", ASK.format(x="дежурного исследователя"), now))
     # 8. the trading journal
     J = _load(out, "journal.json")
     jd = ((J.get("entries") or [{}])[0] or {}).get("date")
@@ -157,14 +184,14 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     st = GREEN if jd == today or (jd == yday and kyiv.hour < 11) else YELLOW if jd == yday else RED
     jt = int(dt.datetime.strptime(jd, "%Y-%m-%d").replace(hour=9, tzinfo=KYIV).timestamp() * 1000) if jd else None
     rows.append(_row("journal", "Дневник сделок (раз в сутки, ~09:00)", "Каждое утро записывает итог суток: счёт, сделки, что было важно.",
-                     jt, st, "" if st == GREEN else f"последняя запись — {jd or 'нет'}", ASK.format(x="дневник сделок")))
+                     jt, st, "" if st == GREEN else f"последняя запись — {jd or 'нет'}", ASK.format(x="дневник сделок"), now))
     # 9. the app's feeds (the server engine)
-    t_a = _ms(_load(out, "app_home.json").get("asof"))
+    t_a = _ms(_live(out, "app_home.json").get("asof"))
     st = _by_age(t_a, now, 10, 30)
     if E.get("errors"):
         st = RED if st == RED else YELLOW
     rows.append(_row("feeds", "Ленты приложения (сервер, каждую минуту)", "Главный экран, сигналы и пуши приложения — их пересчитывает сервер.",
-                     t_a, st, ("ошибки шагов: " + ", ".join(map(str, E["errors"]))[:120]) if E.get("errors") else "", ASK.format(x="сервер и ленты приложения")))
+                     t_a, st, ("ошибки шагов: " + ", ".join(map(str, E["errors"]))[:120]) if E.get("errors") else "", ASK.format(x="сервер и ленты приложения"), now))
     # 10. NOVA chat and voice
     api, vc = _comp(S, "api"), _comp(S, "voice")
     st = {"ok": GREEN, "stale": YELLOW}.get(api.get("status"), RED) if api else YELLOW
@@ -174,7 +201,7 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     if st == GREEN and B and (not B.get("audio") or "ru-RU" not in bv):
         st, note = YELLOW, "голос отчёта запасной (не русский)" if B.get("audio") else "отчёт без озвучки"
     rows.append(_row("nova", "NOVA: чат и голос", "Отвечает на вопросы в приложении и озвучивает отчёты.",
-                     api.get("last_ok") or vc.get("last_ok"), st, note, ASK.format(x="NOVA (API приложения /v2/health)")))
+                     api.get("last_ok") or vc.get("last_ok"), st, note, ASK.format(x="NOVA (API приложения /v2/health)"), now))
     worst = RED if any(r["status"] == RED for r in rows) else YELLOW if any(r["status"] == YELLOW for r in rows) else GREEN
     return {"asof": now, "overall": worst, "icon": ICON[worst], "rows": rows,
             "about_ru": "🟢 работает · 🟡 задержка (обычно проходит сама) · 🔴 сбой — нужна помощь. Время — последний успешный запуск."}

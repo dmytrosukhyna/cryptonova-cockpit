@@ -239,8 +239,16 @@ def build(out: str = "web", now: int | None = None) -> dict:
     unattr = [t for t in trades if (t["strategy"] == "whales" and not t.get("whale")) or t["strategy"] == "unknown"]
     v1 = [t for t in trades if t["strategy"] == "v1"]
     # the demo desk «Киты» and the copy quality
-    D = wt.get("desk") or {}
-    dcl = [c for c in (wl.get("desk") or {}).get("closed") or D.get("closed") or [] if isinstance(c, dict)]
+    D = dict(wt.get("desk") or {})
+    X = wl.get("desk") or {}
+    if X.get("equity") is not None and (wl.get("asof") or 0) > (wt.get("asof") or 0):
+        # 10.11 (owner): the server's live desk (whales_live.json, on every change) beats the pipeline's 30-minute snapshot
+        xc = [c for c in X.get("closed") or [] if isinstance(c, dict)]
+        st_ = float(X.get("start") or D.get("start") or 10_000.0)
+        D.update(start=st_, equity=float(X["equity"]), pnl_usd=float(X["equity"]) - st_, pnl_pct=(float(X["equity"]) / st_ - 1) * 100,
+                 trades=len(xc), wins=sum(1 for c in xc if float(c.get("pnl") or 0) > 0), started=X.get("started") or D.get("started"),
+                 history=X.get("history") or D.get("history"))
+    dcl = [c for c in X.get("closed") or D.get("closed") or [] if isinstance(c, dict)]
     d_before = sum(float(c.get("pnl") or 0) for c in dcl if (c.get("closed_t") or 0) < SWITCH_T)
     d_start = float(D.get("start") or 10_000.0)
     d_eq = float(D.get("equity") or d_start)

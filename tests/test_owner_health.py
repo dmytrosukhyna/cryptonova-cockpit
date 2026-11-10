@@ -54,3 +54,29 @@ def test_rows_plain_statuses_and_what_to_do():
     rows2 = {r["key"]: r for r in H.build(_web(two), _conn(["morning"]), late)["rows"]}
     assert rows2["pipeline"]["status"] == "fail" and "два запуска подряд" in rows2["pipeline"]["note"]
     assert rows2["channel"]["status"] == "fail" and "вечерний" in rows2["channel"]["note"]
+
+
+def test_yellow_rows_say_why_and_ci_reads_the_newest_push(monkeypatch):
+    """10.11: «Ленты приложения» was yellow with an empty note — the pipeline read its own 20-minute-old checkout"""
+    ok = [{"status": "completed", "conclusion": "success", "t_end": NOW - 20 * M}]
+    d = _web(ok)
+    json.dump({"asof": NOW - 22 * M}, open(os.path.join(d, "app_home.json"), "w"))
+    row = {r["key"]: r for r in H.build(d, _conn(["morning"]), NOW)["rows"]}["feeds"]
+    assert row["status"] == "delay" and row["note"] == "последнее обновление 22 мин назад"
+    # in the pipeline the server's newest push (origin/main) is read, not the checkout
+    import subprocess
+
+    class R:
+        def __init__(self, rc, out=b""):
+            self.returncode, self.stdout = rc, out
+    calls = []
+
+    def fake(cmd, **k):
+        calls.append(cmd)
+        return R(0, json.dumps({"asof": NOW - M}).encode()) if cmd[:2] == ["git", "show"] else R(0)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setattr(subprocess, "run", fake)
+    H._LIVE.clear()
+    row = {r["key"]: r for r in H.build(d, _conn(["morning"]), NOW)["rows"]}["feeds"]
+    H._LIVE.clear()
+    assert row["status"] == "ok" and ["git", "show", "FETCH_HEAD:web/app_home.json"] in calls

@@ -337,6 +337,15 @@ def _conveyor(base: str | None) -> dict:
     return out
 
 
+def _retired(base: str | None) -> set:
+    """desks the conveyor retired (stage = retired): the gate still blocks them, the risk state does not turn WARN for them"""
+    doc, _err = G.read_json(L.path(L.CONVEYOR_FILE, base))
+    try:
+        return {k for k, v in ((doc or {}).get("desks") or {}).items() if isinstance(v, dict) and str(v.get("stage") or "").lower() == "retired"}
+    except AttributeError:
+        return set()
+
+
 def _skips(agents_db: str | None, now: int) -> dict:
     out = {"today": 0, "recent": []}
     if not agents_db or not os.path.exists(agents_db):
@@ -419,8 +428,13 @@ def compute(paper: dict, prev: dict, now: int, *, base: str | None = None, agent
     conv = _conveyor(base)
     rows = limit_rows(ix, accounts, coins, cls, data, comb)
     blocks = blocks_of(rows, accounts, coins, cls, comb, latch, kill, conv, data)
+    retired = _retired(base)
+    for b in blocks:
+        if b["kind"] == "conveyor" and b.get("desk") in retired:
+            b["retired"] = True              # 10.11: retired on purpose — still blocked, but not a warning by itself
     halt = any(b["kind"] in ("kill", "daily_halt", "drawdown_halt", "stale_data") for b in blocks)
-    state = "HALT" if halt else "WARN" if blocks or any(r["status"] != "ok" for r in rows) else "OK"
+    live = [b for b in blocks if not b.get("retired")]
+    state = "HALT" if halt else "WARN" if live or any(r["status"] != "ok" for r in rows) else "OK"
     if state != prev.get("state"):
         G.log_event("state", {"from": prev.get("state"), "to": state, "blocks": [b["kind"] for b in blocks]}, base, now)
         if prev.get("state"):

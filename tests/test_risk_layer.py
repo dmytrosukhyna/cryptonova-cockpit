@@ -308,6 +308,11 @@ def test_gate_reads_the_conveyor_contract(tmp_path=None):
     assert e.allow("aggr", "BTC", "LONG", 10, now)[0]                                    # not in the file → allowed
     st = e.step({"a": (10_000.0, [], 1)}, now + MIN)
     assert set(st["conveyor"]) == {"bal", "lab"} and e.public()["conveyor_paused"] == ["bal", "lab"]
+    assert st["state"] == "WARN"                                                         # the paused desk still warns
+    G.write_json(p, {"desks": {"lab": {"stage": "retired", "paused": False, "reason_ru": "не прошла проверку"}}})
+    st = e.step({"a": (10_000.0, [], 1)}, now + 2 * MIN)
+    assert not e.allow("lab", "BTC", "LONG", 10, now + 2 * MIN)[0]                      # retired → still blocked
+    assert any(b["kind"] == "conveyor" and b.get("retired") for b in st["blocks"]) and st["state"] == "OK"
     for bad in ("[1, 2]", "{broken", json.dumps({"desks": ["bal"]}), json.dumps({"desks": {"bal": "paused"}})):
         with open(p, "w") as f:
             f.write(bad)

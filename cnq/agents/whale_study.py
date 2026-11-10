@@ -989,6 +989,7 @@ def rejoin_check(q: dict | None, t_drop: int, now: int) -> dict:
 # A leaver's open copies follow the «кит ушёл» path (run to his exit / our stop; blind ones close) — a fast exit closes them at once.
 ROT_B_N = 13
 ROT_DAYS = 3
+ROT_KEEP_MS = 14 * 86_400_000         # a trader moved out of A stays in B (studied, not copied) at least this long
 ROT_RULE_RU = (f"Колонка A — {LOCK_N} копируемых трейдеров (+ Иван вне ротации). Колонка B — до {ROT_B_N} следующих лучших: изучаем каждый "
                f"прогон, не копируем. Из A уходят: быстро — если наши копии потеряли больше {LOCK_LOSS * 100:.0f}% его доли (копии закрываем сразу); "
                f"медленно — если его собственные сделки {ROT_DAYS} дня подряд закрылись в минус; и если скрыл позиции, 60 дней в минусе или "
@@ -1093,8 +1094,9 @@ def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict 
         review = now - lock_t >= LOCK_MS or not (rot or {}).get("bench_t")
         if review:                                           # the 3-day review refreshes B only
             for a in list(bench):
-                if a in ok or a in out_now or (a not in byaddr and (bench[a] or {}).get("from_a")):
-                    continue
+                fa = (bench[a] or {}).get("from_a")
+                if a in ok or a in out_now or (fa and now - int(_f((bench[a] or {}).get("since"))) <= ROT_KEEP_MS):
+                    continue                                 # a trader moved out of A stays watched (ROT_KEEP_MS) even below the bar
                 move(a, "B", "—", "убран из B: не проходит отбор" if a in byaddr else "убран из B: не изучен", {"name": bench[a].get("name")})
                 bench.pop(a)
             have = {x["addr"] for x in top} | set(bench)
@@ -1950,9 +1952,12 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     lock_t, passing, joined = study.get("lock_t"), study.get("passing"), dict(study.get("joined") or {})
     reinstate_out = {}
     rot = kv_get(conn, "rotation") or {}
-    if not rot.get("bench") and lwatch:                      # 10.11: the loss watch (BTC杰师傅) becomes column B of the rotation
-        rot = {**rot, "bench": {a_: {"name": (v or {}).get("name"), "since": (v or {}).get("t"), "why_ru": (v or {}).get("why_ru"),
-                                     "from_a": True, "fast": False} for a_, v in lwatch.items()}}
+    if lwatch:                                               # 10.11: the loss watch (BTC杰师傅) is part of column B of the rotation
+        tops = {x["addr"] for x in study.get("top") or []}
+        rot = {**rot, "bench": {**(rot.get("bench") or {}),
+                                **{a_: {"name": (v or {}).get("name"), "since": int(_f((v or {}).get("t"))) or now,
+                                        "why_ru": (v or {}).get("why_ru"), "from_a": True, "fast": False}
+                                   for a_, v in lwatch.items() if a_ not in tops}}}
     real = real_copies(pub_path)
     rot_pub = None
     if complete and profs:

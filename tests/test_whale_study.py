@@ -638,3 +638,15 @@ def test_desk_closes_copies_of_a_fast_exit_at_once():
     d = {"start": 10000.0, "cash": 10000.0, "open": [dict(o)], "closed": [], "seen": {"bn:x": {"SOL": "LONG"}}, "history": [], "started": now}
     d2 = W.desk_step(d, ["bn:y"], {}, {"SOL": 99.0}, now, close_unfollowed=True, close_whales={"bn:x"})
     assert not d2["open"] and "быстрый выход" in d2["closed"][-1]["why"]
+
+
+def test_a_trader_moved_out_of_a_stays_in_b_below_the_bar_and_cannot_return():
+    now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
+    A = [_w(f"bn:{i}") for i in range(7)]
+    prof = {x["addr"]: _rq(x["addr"], [1, 1, 1], now) for x in A}
+    prof["bn:out"] = {**_rq("bn:out", [5, 5, 5], now), "eligible": False}           # studied, below the bar now
+    st = {"rule": W.LOCK_RULE, "top": A[:6], "lock_t": now - 3 * W.DAY, "joined": {x["addr"]: now - 5 * W.DAY for x in A[:6]},
+          "passing": {}}
+    rot = {"bench": {"bn:out": {"name": "Out", "since": now - W.DAY, "from_a": True}}, "bench_t": now - 3 * W.DAY}
+    R = W.rotate(st, rot, A[:6], prof, {"equity": 7000.0}, now)
+    assert "bn:out" in R["rot"]["bench"] and "bn:out" not in [x["addr"] for x in R["top"]] and len(R["top"]) == 6

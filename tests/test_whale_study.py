@@ -695,3 +695,57 @@ def test_uncopyable_set_is_sticky_and_reads_the_config(tmp_path):
     u = W.uncopyable_set(conn, [{"addr": "0xb", "too_active": True}], 1, str(cfg))
     assert u == {"0xa": "решение владельца", "0xb": W.TOO_ACTIVE_RU}
     assert "0xb" in W.uncopyable_set(conn, [{"addr": "0xb", "too_active": False}], 2, str(cfg))
+
+
+def _deskd(now):
+    return {"start": 10000.0, "cash": 10000.0, "open": [], "closed": [], "seen": {}, "history": [], "started": now, "seen_t": {}}
+
+
+def _pos(coin, side, notional, entry=100.0):
+    return {"coin": coin, "side": side, "notional": notional, "entry": entry, "lev": 5.0, "size": 1.0, "upnl": 0.0}
+
+
+def test_okx_phantom_sides_dominant_side_two_poll_confirmation_and_flip_freeze():
+    """10.11 (copy audit, Michael123456789): both sides of a coin in one poll → the larger one; an OKX side opens only after 2 polls
+    in a row; a «развернулся» close needs 2 polls; > 2 flips in an hour → the coin is frozen for him for 6 h with an alert"""
+    now = 1_800_000_000_000
+    a = "okx:M"
+    mids = {"ADA": 100.0, "SOL": 100.0}
+    d = W.desk_step(_deskd(now), [a], {a: []}, mids, now)                       # baseline
+    both = [_pos("ADA", "SHORT", 5000.0), _pos("ADA", "LONG", 300.0)]           # his short + a small opposite sub-position
+    d = W.desk_step(d, [a], {a: both}, mids, now + 30_000)
+    assert d["open"] == [] and d["seen"][a] == {"ADA": "SHORT"}                  # first sight: not copied yet, side = the big one
+    assert any("обе стороны" in e.get("why", "") for e in d["events"]) and any("подтверждения стороны" in e.get("why", "") for e in d["events"])
+    d = W.desk_step(d, [a], {a: list(reversed(both))}, mids, now + 60_000)      # same short again (order does not matter) → copied
+    assert [(o["coin"], o["side"]) for o in d["open"]] == [("ADA", "SHORT")]
+    d = W.desk_step(d, [a], {a: [_pos("ADA", "LONG", 5000.0)]}, mids, now + 90_000)   # one poll of a «reversal» → kept
+    assert [(o["coin"], o["side"]) for o in d["open"]] == [("ADA", "SHORT")]
+    assert any("ждём подтверждения (2" in e.get("why", "") for e in d["events"])
+    d = W.desk_step(d, [a], {a: [_pos("ADA", "SHORT", 5000.0)]}, mids, now + 120_000)  # back to short: still held, no churn
+    assert len(d["open"]) == 1 and not d["closed"]
+    d = W.desk_step(d, [a], {a: [_pos("ADA", "LONG", 5000.0)]}, mids, now + 150_000)   # the 3rd flip within the hour → frozen
+    assert f"{a}|ADA" in d["frozen"] and any(e.get("kind") == "alert" for e in d["events"])
+    d = W.desk_step(d, [a], {a: [_pos("ADA", "LONG", 5000.0)]}, mids, now + 180_000)   # a confirmed reversal still closes our short
+    assert d["closed"][-1]["why"] == "кит развернулся" and d["open"] == []
+    d = W.desk_step(d, [a], {a: [_pos("ADA", "LONG", 5000.0)]}, mids, now + 210_000)   # but the frozen coin is not re-copied
+    assert d["open"] == [] and any("заморожена" in e.get("why", "") for e in d["events"])
+    d = W.desk_step(d, [a], {a: [_pos("ADA", "LONG", 5000.0)]}, mids, now + 7 * 3_600_000)  # after 6 h (a stale look → baseline)
+    d = W.desk_step(d, [a], {a: [_pos("ADA", "LONG", 5000.0)]}, mids, now + 7 * 3_600_000 + 30_000)   # … it is copied again
+    assert [(o["coin"], o["side"]) for o in d["open"]] == [("ADA", "LONG")]
+
+
+def test_hyperliquid_opens_at_once_but_a_reversal_needs_two_polls_and_skips_are_logged_once():
+    now = 1_800_000_000_000
+    h, h2 = "0x" + "a" * 40, "0x" + "b" * 40
+    mids = {"ETH": 100.0}
+    d = W.desk_step(_deskd(now), [h, h2], {h: [], h2: []}, mids, now)
+    d = W.desk_step(d, [h, h2], {h: [_pos("ETH", "LONG", 5000.0)], h2: []}, mids, now + 30_000)
+    assert [(o["whale"], o["side"]) for o in d["open"]] == [(h, "LONG")]       # HL: copied on the first poll as before
+    d = W.desk_step(d, [h, h2], {h: [_pos("ETH", "LONG", 5000.0)], h2: [_pos("ETH", "SHORT", 5000.0)]}, mids, now + 60_000)
+    n = sum(1 for e in d["events"] if "уже скопирована у другого трейдера" in e.get("why", ""))
+    d = W.desk_step(d, [h, h2], {h: [_pos("ETH", "LONG", 5000.0)], h2: [_pos("ETH", "SHORT", 5000.0)]}, mids, now + 90_000)
+    assert n == 1 and sum(1 for e in d["events"] if "уже скопирована у другого трейдера" in e.get("why", "")) == 1   # logged once
+    d = W.desk_step(d, [h, h2], {h: [_pos("ETH", "SHORT", 5000.0)], h2: []}, mids, now + 120_000)
+    assert d["open"] and d["open"][0]["side"] == "LONG"                        # one poll of a reversal: held
+    d = W.desk_step(d, [h, h2], {h: [_pos("ETH", "SHORT", 5000.0)], h2: []}, mids, now + 150_000)
+    assert d["closed"][-1]["why"] == "кит развернулся"

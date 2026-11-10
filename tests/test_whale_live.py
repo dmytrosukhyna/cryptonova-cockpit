@@ -44,6 +44,7 @@ def test_a_new_whale_position_is_copied_on_the_next_pass_and_its_close_on_the_on
     d = WL.step(wtop(), now=NOW, **kw)
     assert d["open"] == [] and d["live"]["polled"] == 2                       # the first look is a baseline
     f.okx = [("ETH", "long", 2500, NOW + 30_000)]                               # the OKX whale opens ETH 30 s after our pass
+    WL.step(wtop(), now=NOW + 40_000, **kw)  # 10.11: an OKX side is copied after 2 polls in a row
     d = WL.step(wtop(), now=NOW + MIN, **kw)
     assert [t["symbol"] for t in d["open"]] == ["ETH"] and d["live"]["lag_s_last"] == 30      # copied in the next pass, 30 s later
     assert d["live"]["lag_by_src"] == {"okx": {"med": 30, "n": 1}}                # the lag is told per source
@@ -74,6 +75,7 @@ def test_a_stale_follow_list_opens_nothing_but_closes_still_follow(tmp_path):
     kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
     WL.step(wtop(), now=NOW, **kw)
     f.okx = [("ETH", "long", 2500, NOW + 1000)]
+    WL.step(wtop(), now=NOW + 40_000, **kw)  # 10.11: an OKX side is copied after 2 polls in a row
     assert len(WL.step(wtop(), now=NOW + MIN, **kw)["open"]) == 1
     f.okx = [("ETH", "long", 2500, NOW + 1000), ("SOL", "long", 100, NOW + MIN + 1000)]
     old = wtop(asof=NOW - 7 * 3_600_000)
@@ -93,6 +95,7 @@ def test_publish_only_on_change_and_at_most_every_two_minutes(tmp_path):
     WL.step(wtop(), now=NOW + MIN, **kw)
     assert len(docs) == 1                                                        # nothing changed
     f.okx = [("ETH", "long", 2500, NOW + MIN)]
+    WL.step(wtop(), now=NOW + 2 * MIN, **kw)  # 10.11: an OKX side is copied after 2 polls in a row (first sight: nothing to publish)
     WL.step(wtop(), now=NOW + 2 * MIN + 1000, **kw)
     assert len(docs) == 2 and docs[-1]["desk"]["open"][0]["coin"] == "ETH"
 
@@ -103,6 +106,7 @@ def test_a_failed_poll_changes_nothing_for_that_whale(tmp_path):
     kw = dict(env=env, post=f.post, put=lambda doc: True, sleep=lambda s: None)
     WL.step(wtop(), now=NOW, okx_get=f.okx_get, **kw)
     f.okx = [("ETH", "long", 2500, NOW + 1000)]
+    WL.step(wtop(), now=NOW + 40_000, okx_get=f.okx_get, **kw)  # 10.11: an OKX side is copied after 2 polls in a row
     WL.step(wtop(), now=NOW + MIN, okx_get=f.okx_get, **kw)
 
     def down(path, params):
@@ -146,6 +150,7 @@ def test_a_lead_trader_gone_from_okx_for_30_min_has_his_copies_closed(tmp_path):
     kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
     WL.step(wtop(), now=NOW, **kw)
     f.okx = [("ETH", "long", 2500, NOW + 30_000)]
+    WL.step(wtop(), now=NOW + 40_000, **kw)  # 10.11: an OKX side is copied after 2 polls in a row
     d = WL.step(wtop(), now=NOW + MIN, **kw)
     assert [t["symbol"] for t in d["open"]] == ["ETH"]
     dropped = wtop()
@@ -166,6 +171,7 @@ def test_a_followed_whale_or_a_plain_error_never_closes_copies(tmp_path):
     kw = dict(env=env, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
     WL.step(wtop(), now=NOW, **kw)
     f.okx = [("ETH", "long", 2500, NOW + 30_000)]
+    WL.step(wtop(), now=NOW + 40_000, **kw)  # 10.11: an OKX side is copied after 2 polls in a row
     WL.step(wtop(), now=NOW + MIN, **kw)
     gone_get = lambda path, params: (_ for _ in ()).throw(RuntimeError("OKX 60004: Trader doesn't exist"))  # noqa: E731
     timeout = lambda path, params: (_ for _ in ()).throw(RuntimeError("timeout"))  # noqa: E731
@@ -184,6 +190,7 @@ def test_copies_carry_the_follow_flag_and_whales_are_polled_concurrently(tmp_pat
     kw = dict(env={"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json")}, post=f.post, okx_get=f.okx_get, put=lambda doc: True, sleep=lambda s: None)
     WL.step(wtop(), now=NOW, **kw)
     f.okx = [("ETH", "long", 2500, NOW + 1000)]
+    WL.step(wtop(), now=NOW + 40_000, **kw)  # 10.11: an OKX side is copied after 2 polls in a row
     d = WL.step(wtop(), now=NOW + MIN, **kw)
     assert d["open"][0]["follow"] is True and d["live"]["poll_s"] is not None
 

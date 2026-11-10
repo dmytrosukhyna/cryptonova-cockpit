@@ -50,6 +50,14 @@ JOIN_MAX = 0.01
 # 04.11 17:41 (owner: «бывает, цена откатилась в другую сторону — возможно, тренд уже изменился»): the window is two-sided — a
 # price more than JOIN_BETTER better than his entry means the whale is down > 3 % on price → no join, wait for his next trade
 JOIN_BETTER = 0.03
+# 10.11 (owner, copy audit docs/research/copy-audit-2026-11-10.md): Michael123456789 (OKX) — 43 of 44 desk copies closed as «кит
+# развернулся» (−$225) while he only held shorts. Cause: a coin can show BOTH sides at once in his sub-positions (OKX net mode lists
+# opposite-sign sub-positions, e.g. while a part is being closed), and the desk kept the LAST side per coin of a list sorted by size —
+# the smaller one — so the side flipped from poll to poll. Now: one side per coin = the larger notional (dominant_sides); an OKX
+# trader's new side is copied only after CONFIRM_N polls in a row on that side; a «развернулся» close needs CONFIRM_N polls too
+# (every source); a coin flipping more than FLIP_MAX times in FLIP_WINDOW_MS is frozen for that trader for FREEZE_MS (alert event).
+CONFIRM_N = 2
+FLIP_MAX, FLIP_WINDOW_MS, FREEZE_MS = 2, 3_600_000, 6 * 3_600_000
 JOIN_REDO_MS = 7 * 86_400_000    # a copy of this whale's position stopped out → that same position is not re-joined for 7 days
 GOOD_WIN, GOOD_PF = 0.70, 1.5    # several candidates at once → whales with a 30-day record of ≥ 70 % wins and PF ≥ 1.5 go first
 LB = "https://stats-data.hyperliquid.xyz/Mainnet/leaderboard"
@@ -1322,6 +1330,20 @@ def good_whale(q: dict | None) -> bool:
     return _f(q.get("win")) >= GOOD_WIN and _f(q.get("pf")) >= GOOD_PF
 
 
+def dominant_sides(pos: list[dict], prev: dict | None = None) -> tuple[dict, list[str]]:
+    """{coin: position} with ONE side per coin — the larger notional (a tie keeps the side seen before); + the coins that showed both"""
+    by: dict[str, list] = {}
+    for p in pos or []:
+        by.setdefault(p["coin"], []).append(p)
+    out, both = {}, []
+    for c, ps in by.items():
+        if len({p["side"] for p in ps}) > 1:
+            both.append(c)
+        ps = sorted(ps, key=lambda p: (-_f(p.get("notional")), 0 if (prev or {}).get(c) == p["side"] else 1))
+        out[c] = ps[0]
+    return out, both
+
+
 def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, now: int, owner: dict | None = None,
               quality: dict | None = None, close_unfollowed: bool = False, close_whales=None) -> dict:
     """One run of the paper copy desk. states = {addr: [positions]} for the whales fetched this run (missing addr = not
@@ -1336,6 +1358,12 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
     d.setdefault("by_whale_day", {})
     seen = d["seen"]
     cands: list[tuple] = []
+    skip_prev, skip_now = d.get("skip_seen") or {}, {}
+
+    def skip_once(key, ev):                  # 10.11: a decision we do not copy — its reason is logged once while it lasts
+        skip_now[key] = ev.get("why")
+        if skip_prev.get(key) != ev.get("why"):
+            d["events"].append(ev)
 
     def mark(o):
         px = _f(mids.get(o["coin"]))
@@ -1400,7 +1428,32 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             d["events"].append({"t": now, "kind": "hidden", "whale": addr})     # close and no open for him this run (stops still work)
             d["events"] = d["events"][-200:]
             continue
-        cur = {p["coin"]: p for p in pos}
+        prev_seen = seen.get(addr) or {}
+        cur, both = dominant_sides(pos, prev_seen)
+        for c in both:
+            skip_once(f"{addr}|{c}|both", {"t": now, "kind": "skip", "coin": c, "whale": addr,
+                                             "why": "у трейдера в этой монете видны обе стороны — берём большую по объёму"})
+        conf = d.setdefault("confirm", {}).setdefault(addr, {})
+        for c, p in cur.items():                            # polls in a row on the same side (+ the kind at first sight)
+            k0 = conf.get(c)
+            if k0 and k0[0] == p["side"]:
+                k0[1] += 1
+            else:
+                conf[c] = [p["side"], 1, "join" if prev_seen.get(c) == p["side"] else "new"]
+            ps = prev_seen.get(c)
+            if ps and ps != p["side"]:                      # a flip since the previous poll
+                fk = f"{addr}|{c}"
+                fl = [t for t in (d.setdefault("flips", {}).get(fk) or []) if now - t <= FLIP_WINDOW_MS] + [now]
+                d["flips"][fk] = fl
+                if len(fl) > FLIP_MAX and int(_f((d.get("frozen") or {}).get(fk))) <= now:
+                    d.setdefault("frozen", {})[fk] = now + FREEZE_MS
+                    d["events"].append({"t": now, "kind": "alert", "coin": c, "whale": addr,
+                                        "why": f"сторона {c} у трейдера сменилась {len(fl)} раза за час — монета заморожена для него на "
+                                               f"{FREEZE_MS // 3_600_000} ч (новых копий нет)"})
+        for c in [c for c in conf if c not in cur]:
+            conf.pop(c)
+        d["flips"] = {k: v for k, v in (d.get("flips") or {}).items() if v and now - v[-1] <= FLIP_WINDOW_MS}
+        d["frozen"] = {k: v for k, v in (d.get("frozen") or {}).items() if int(_f(v)) > now}
         prev = seen.get(addr)
         # 04.11 bug fix: a whale looked at long ago (e.g. dropped from the follow list, then back) has a stale «seen» — every position
         # he opened in between looked «new» and was copied late (HYPE/ZRO shorts of SilkBtc, 04.11 06:33 UTC, his entries far from
@@ -1413,7 +1466,11 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             if p is None:
                 close(o, "кит закрыл")
             elif p["side"] != o["side"]:
-                close(o, "кит развернулся")
+                if conf.get(o["coin"], [None, 0])[1] >= CONFIRM_N:
+                    close(o, "кит развернулся")
+                else:
+                    skip_once(f"{addr}|{o['coin']}|rev", {"t": now, "kind": "skip", "coin": o["coin"], "side": p["side"], "whale": addr,
+                                                         "why": f"трейдер как будто развернулся — ждём подтверждения ({CONFIRM_N} опроса подряд)"})
             elif p.get("sl"):                                  # the whale moved his stop → ours follows when it is usable
                 ns, src = stop_for(o["side"], o["entry"], p.get("sl"))
                 if src == "стоп кита":
@@ -1423,6 +1480,21 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         if prev is not None and addr in follow:
             for coin, p in cur.items():
                 kind = "join" if prev.get(coin) == p["side"] else "new"
+                fz = int(_f((d.get("frozen") or {}).get(f"{addr}|{coin}")))
+                if fz > now:
+                    if not any(o["whale"] == addr and o["coin"] == coin for o in d["open"]):
+                        skip_once(f"{addr}|{coin}|frozen", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                                          "why": "монета заморожена для этого трейдера: сторона прыгала — новых копий нет "
+                                                                 f"до {dt.datetime.fromtimestamp(fz / 1000, tz=dt.timezone.utc):%H:%M} UTC"})
+                    continue
+                if addr.startswith("okx:"):
+                    k0 = conf.get(coin) or [p["side"], 1, kind]
+                    if k0[1] < CONFIRM_N:
+                        if not any(o["whale"] == addr and o["coin"] == coin and o["side"] == p["side"] for o in d["open"]):
+                            skip_once(f"{addr}|{coin}|{p['side']}|conf", {"t": now, "kind": "skip", "coin": coin, "side": p["side"],
+                                                                          "whale": addr, "why": f"ждём подтверждения стороны ({CONFIRM_N} опроса подряд)"})
+                        continue
+                    kind = k0[2]
                 cands.append((addr, coin, p, kind))
         seen[addr] = {c: p["side"] for c, p in cur.items()}
         # 06.11 (owner, Ivan: «never copy his adds / averaging-down»): an owner pick's entry is FIXED at first sight — his later
@@ -1452,13 +1524,24 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
     rank.sort(key=lambda r: r[:3])
     for _q, _k, _g, addr, coin, p, kind, px, gap in rank:
         key = f"{addr}|{coin}|{p['side']}"
-        if any(o["coin"] == coin for o in d["open"]) or len(d["open"]) >= DESK_MAX_OPEN:
+        if any(o["coin"] == coin for o in d["open"]):
+            if not any(o["coin"] == coin and o["whale"] == addr for o in d["open"]):
+                skip_once(key + "|held", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                          "why": "эта монета уже скопирована у другого трейдера — одна копия на монету"})
+            continue
+        if len(d["open"]) >= DESK_MAX_OPEN:
+            skip_once(key + "|max", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                     "why": f"на столе уже {DESK_MAX_OPEN} копий — предел"})
             continue
         if not px:
+            skip_once(key + "|px", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                    "why": "нет цены монеты (Hyperliquid) — копировать не по чему"})
             continue
         gap_pct = round(gap * 100, 2) if gap is not None else None
         if kind == "join":
             if gap is None:
+                skip_once(key + "|gap", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                         "why": "вход трейдера неизвестен — окно входа не проверить"})
                 continue                                     # the whale's entry is unknown — cannot measure the gap
             if gap > JOIN_MAX:
                 note_wait(key, {"t": now, "kind": "join_wait", "coin": coin, "side": p["side"], "whale": addr, "gap_pct": gap_pct,
@@ -1470,9 +1553,13 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                                        f"ждём его следующую сделку"})
                 continue
             if f"{addr}|{coin}|{p['side']}" in (d.get("owner_closed") or {}):
+                skip_once(key + "|owner", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                           "why": "владелец закрыл нашу копию этой позиции вручную — не повторяем"})
                 continue                                     # the owner closed our copy of this very position by hand
             if any(c["whale"] == addr and c["coin"] == coin and c["side"] == p["side"] and str(c.get("why", "")).startswith("стоп")
                    and now - int(c.get("closed_t") or 0) < JOIN_REDO_MS for c in d["closed"]):
+                skip_once(key + "|stop", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
+                                          "why": "наша копия этой позиции закрылась по стопу — повторно не входим 7 дней"})
                 continue                                     # our copy of this very position was stopped out — no re-entry
         if owner and ov.blocked(owner, coin, p["side"], now):
             ev = {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr, "why": ov.blocked(owner, coin, p["side"], now)}
@@ -1515,6 +1602,8 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         d["events"].append({"t": now, "kind": "join" if kind == "join" else "open", "coin": coin, "side": p["side"], "whale": addr,
                             "px": px, "whale_entry": p.get("entry"), "gap_pct": gap_pct, "lev": lev, "lev_note": lev_note})
     d["join_wait"] = wait_now
+    d["skip_seen"] = {**{k: v for k, v in skip_prev.items() if k.split("|", 1)[0] not in states}, **skip_now}
+    d["events"] = d["events"][-200:]
     for o in d["open"]:                                        # copies opened before 04.11 get their protective stop now
         if not o.get("stop"):
             stp, src = stop_for(o["side"], o["entry"])

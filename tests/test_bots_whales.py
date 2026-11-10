@@ -81,6 +81,17 @@ def test_quiet_hours_23_to_8_kyiv():
 
 
 def test_channel_posts_follow_the_whale_model_and_fit_the_caption():
+    # 11.11: the evening lists the Kyiv day's trades — the clock is fixed at 21:40 Kyiv so the trades closed «4–5 h ago» are today's
+    real_time = channel.time.time
+    t0 = channel.kyiv_now().replace(hour=21, minute=40, second=0, microsecond=0).timestamp()
+    channel.time.time = lambda: t0
+    try:
+        _channel_posts_body()
+    finally:
+        channel.time.time = real_time
+
+
+def _channel_posts_body():
     tmp, now_ms = _tmp()
     ch = channel.Channel(sqlite3.connect(":memory:"), tmp)
     now = channel.kyiv_now(now_ms)

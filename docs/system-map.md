@@ -62,4 +62,5 @@
 | Канал | `cnq/agents/channel.py`, `whale_digest.py` | посты (`data/agents.sqlite` → `channel_posts`) |
 | Дневник | `scripts/ci_journal.py` | `journal.json` |
 | Наблюдение ADA/AVAX/LIT | `cnq/agents/owner_watch.py` | `owner_watch.json` |
+| Питер (MT5, наблюдение) | `tools/mt5/CryptoNovaBridge.mq5`, `cnq/api/peter.py` | только на сервере: `/v2/owner/peter` |
 | Состояние системы | `cnq/agents/owner_health.py`, `cnq/agents/vip_feeds.py` | `owner_health.json`, `system_status.json` |

@@ -1333,8 +1333,9 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
                 smart = json.load(f)
         except Exception:  # noqa: BLE001
             smart = None
+        from .entry_support import load as _support   # 10.11 (owner, option A): «no chase» — buy only near a support
         profiles["ideas"] = IdeasPortfolio(conn).step({"cg": price, "meme": meme_px, "hl": hl_px}, load_ideas(), now, sma200=sma,
-                                                      tradeable=okx_spot_list(conn, now), smart=smart)
+                                                      tradeable=okx_spot_list(conn, now), smart=smart, support=_support("web"))
     except Exception as e:  # noqa: BLE001
         profiles["ideas"] = {"key": "ideas", "name": IDEAS["name"], "about": IDEAS_ABOUT, "experiment": True, "error": str(e), **empty}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),

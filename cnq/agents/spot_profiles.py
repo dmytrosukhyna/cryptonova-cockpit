@@ -39,6 +39,7 @@ import re
 import sqlite3
 import time
 from datetime import datetime, timezone
+from . import entry_support as _es
 
 PROFILES = {
     # 18.10 (owner: «всё больше верю в биткоин — самый надёжный актив»): BTC 60 / ETH 20 / SOL 10 (was 50 / 25 / 15). Test 2023-06 →
@@ -696,13 +697,15 @@ class IdeasPortfolio:
         self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
 
     def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None,
-             tradeable: set | None = None, smart: dict | None = None) -> dict:
+             tradeable: set | None = None, smart: dict | None = None, support: dict | None = None) -> dict:
         """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
         "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas()); `sma200` (20.10) —
         {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map). `tradeable` (22.10, owner) — coins with an
         OKX spot pair: the owner's real OKX account repeats this portfolio, so a coin OKX does not list is not bought, and a held one
-        is sold (None — the list is unknown this run: nothing is filtered)."""
+        is sold (None — the list is unknown this run: nothing is filtered). `support` (10.11, owner, option A) — entry_support.load():
+        a non-core coin is bought only within 3 % above a support and while BTC is not breaking down (None — no such check)."""
         okx = {str(c).upper() for c in tradeable} if tradeable else None
+        self._support = support
         now = now or int(time.time() * 1000)
         P, rp = IDEAS, self.rp
         src = {k: {str(s).upper(): float(v) for s, v in ((sources or {}).get(k) or {}).items() if _posnum(v)} for k in IDEAS_SRC}
@@ -814,6 +817,10 @@ class IdeasPortfolio:
                     eligible_seen = True          # 28.10: an eligible coin blocked only by the cash floor — not «idle cash»
                 else:
                     px, k, why_not = self._entry_price(s, r, src)
+                    if px is not None and r.get("kind") != "core" and support is not None:
+                        ok_in, entry_why = _es.check(s, px, support)   # 10.11 «no chase»: only near a support, BTC not breaking down
+                        if not ok_in:
+                            px, why_not = None, entry_why
                     if px is None:
                         actions.append({"time": now, "symbol": s, "action": "SKIP", "weight": 0, "price": r.get("price"),
                                         "reason": f"Не покупаем {s} («{st_ru}»): {why_not}."})
@@ -831,8 +838,10 @@ class IdeasPortfolio:
                         f"{P['trail']*100:.0f}% от пика" if small else "ядро — без стопа" if kind == "core" else f"стоп {_pc(P['stop_buy'])} от входа")
                 head = (f"Исключение владельца (22.10): {s} из списка доверия — на небольшую сумму, хотя таблица пишет «{r.get('why_ru') or 'ждём'}»"
                         if trusted else f"Из таблицы «{st_ru}»: {r.get('why_ru') or '—'}")
+                entry_ru = _es.check(s, px, support)[1] if kind != "core" and support is not None else ""
                 actions.append(rp._act(now, s, "BUY", cost, px, f"{head}. {w*100:g}% счёта, {rule}; "
-                                       "продаём и при статусе «не брать»." + (f" {lifted}" if lifted else ""), f"{kind}:{'small' if trusted else st}"))
+                                       "продаём и при статусе «не брать»." + (f" {lifted}" if lifted else "")
+                                       + (f" {entry_ru[:1].upper() + entry_ru[1:]}." if entry_ru else ""), f"{kind}:{'small' if trusted else st}"))
                 rp._set_cash(rp.cash() - cost * P["fee"])
                 rp._set_meta(f"src:{s}", _SRC_CODE[k])
                 rp._set_meta(f"px:{s}", px)
@@ -932,6 +941,16 @@ class IdeasPortfolio:
                 c["why_ru"] = [f"цена не сверилась: {why_not}"]
                 c["ok"] = False
                 continue
+            sup = getattr(self, "_support", None)
+            entry_ru = ""
+            if sup is not None:     # 10.11 «no chase»: BTC not breaking down; the support level too when we have one for the token
+                known = s in (sup.get("sma200") or {}) or bool((sup.get("walls") or {}).get(s))
+                ok_in, entry_ru = _es.check(s, px, sup) if known else (not _es.btc_breaking(sup), _es.btc_breaking(sup) or "")
+                if not ok_in:
+                    c["why_ru"] = [entry_ru]
+                    c["ok"] = False
+                    continue
+                entry_ru = entry_ru if known else ""
             cost = SMART["w"] * V / (1 + P["fee"])
             need = cost - (rp.cash() - P["min_cash"] * V)
             if need > 0:
@@ -951,7 +970,8 @@ class IdeasPortfolio:
             out.append(rp._act(now, s, "BUY", cost, px, (f"ПЕРВАЯ ПОКУПКА рукава «смарт-мани» (05.11, решение владельца). " if first else "")
                                + f"Смарт-мани: {s} набирают {c.get('n')} умных кошелька, проверка риска пройдена (ликвидность "
                                f"${(c.get('liq') or 0) / 1e6:.1f}M, топ-10 {c.get('top10_pct'):.0f}%, {c.get('age_days'):.0f} дн.). "
-                               f"{SMART['w'] * 100:g}% счёта, стоп {_pc(SMART['stop'])}, выход через {SMART['days']} дней или когда кошельки продают.",
+                               f"{SMART['w'] * 100:g}% счёта, стоп {_pc(SMART['stop'])}, выход через {SMART['days']} дней или когда кошельки продают."
+                               + (f" {entry_ru[:1].upper() + entry_ru[1:]}." if entry_ru else ""),
                                "smart:smart"))
             if first:
                 rp._set_meta("smart_first", now)

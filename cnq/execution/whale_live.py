@@ -228,7 +228,8 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     # 06.11 (owner): the fixed list (whales_top.json «close_unfollowed»); 09.11: a leaver's copies run to his exit — only blind ones
     # (hidden positions / not seen for 1 h) are closed; only on a fresh feed. Leavers stay polled: watch = follow + open copies
     desk = W.desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), quality,
-                       close_unfollowed=bool(fresh and wtop.get("close_unfollowed")))
+                       close_unfollowed=bool(fresh and wtop.get("close_unfollowed")),
+                       close_whales=set(wtop.get("close_now") or {}) if fresh else None)   # 10.11: fast exits from column A
     why = "кит исчез с OKX (Trader doesn't exist ≥ 30 мин)"
     for x in (desk.get("events") or []) + (desk.get("closed") or []):
         if x.get("whale") in vanished and x.get("why") == "кит закрыл" and (x.get("t") == now or x.get("closed_t") == now):

@@ -517,42 +517,6 @@ def _w(a, pf=5.0):
     return {"addr": a, "short": a, "name": a, "src": "bn", "win": 0.9, "pf": pf, "pnl_60d": 1000.0}
 
 
-def test_the_list_is_fixed_for_3_days_and_a_whale_leaves_only_for_a_hard_reason():
-    now = 1_800_000_000_000
-    ranked = [_w(f"bn:{i}") for i in range(10)]
-    prof = {x["addr"]: {**x, "positions": []} for x in ranked}
-    top, why, lock_t, passing = W.lock_follow({}, ranked, prof, {"equity": 7000.0}, now)       # the first lock: the best 7 now
-    assert [x["addr"] for x in top] == [f"bn:{i}" for i in range(7)] and lock_t == now and not why
-    st = {"rule": W.LOCK_RULE, "top": top, "lock_t": lock_t, "passing": passing, "joined": {x["addr"]: now for x in top}}
-    # 12 h later the ranking is different and bn:0 is not studied at all: nobody leaves (no «не изучен», no PF shuffle)
-    later = now + W.DAY // 2
-    re = [_w(f"bn:{i}") for i in (9, 8, 7, 6, 5, 4, 3, 2, 1)]
-    top2, why2, lt2, p2 = W.lock_follow(st, re, {x["addr"]: {**x, "positions": []} for x in re}, {"equity": 7000.0}, later)
-    assert [x["addr"] for x in top2] == [x["addr"] for x in top] and lt2 == now and not why2
-    # hard reason: 60 days negative. 09.11 (owner): copies on our desk down > 10 % of his share (7000 / 7 = 1000 → −$110 here) is
-    # NOT a reason any more — he stays until the review
-    bad = {x["addr"]: {**x, "positions": []} for x in re}
-    bad["bn:1"]["pnl_60d"] = -5.0
-    desk = {"equity": 7000.0, "closed": [{"whale": "bn:2", "pnl": -80.0, "closed_t": later}], "open": [{"whale": "bn:2", "upnl": -30.0}]}
-    top3, why3, _, _ = W.lock_follow({**st, "passing": p2}, re, bad, desk, later + 1)
-    assert set(why3) == {"bn:1"} and "ушёл в минус" in why3["bn:1"][0]
-    assert {x["addr"] for x in top3} == {f"bn:{i}" for i in (0, 2, 3, 4, 5, 6)}
-
-
-def test_at_the_review_a_newcomer_needs_3_days_in_a_row_in_the_bar():
-    now = 1_800_000_000_000
-    old = [_w(f"bn:{i}") for i in range(7)]
-    passing = {x["addr"]: [now - 4 * W.DAY, now - 600_000] for x in old}
-    passing["bn:new_old"] = [now - 4 * W.DAY, now - 600_000]          # passed the bar for 4 days
-    passing["bn:new_fresh"] = [now - W.DAY, now - 600_000]             # only for 1 day
-    st = {"rule": W.LOCK_RULE, "top": old, "lock_t": now - 3 * W.DAY, "passing": passing}
-    ranked = [_w("bn:new_fresh", 50), _w("bn:new_old", 40)] + [_w(f"bn:{i}") for i in range(1, 7)]   # bn:0 studied and failed
-    prof = {x["addr"]: {**x, "positions": []} for x in ranked + [_w("bn:0")]}
-    top, why, lock_t, _ = W.lock_follow(st, ranked, prof, None, now)
-    assert lock_t == now and "bn:0" not in {x["addr"] for x in top}
-    assert [x["addr"] for x in top] == [f"bn:{i}" for i in range(1, 7)] + ["bn:new_old"]
-
-
 def test_a_leavers_copies_run_to_his_exit_and_only_blind_ones_close():
     """09.11 (owner, backlog 117): a whale who left the fixed list is not copied any more, but copies he already holds run to his own
     exit (or our stop); only a blind copy closes — he hides his positions, or we have not seen them for UNFOLLOW_BLIND_MS"""
@@ -596,48 +560,81 @@ def test_locked_whale_outside_leaderboard_slice_is_still_studied():
     assert W.locked_rows(conn, {**study, "rule": "old"}, []) == ([], [])
 
 
-def test_loss_watch_whale_is_benched_and_returns_after_3_profitable_days_and_the_bar(tmp_path):
-    """10.11 (owner, real money): a whale dropped by the loss rule is watched (not copied, still studied); he returns at the next
-    check after his own decisions closed in profit 3 full UTC days in a row since the drop AND he passes the bar"""
-    import json as _j
-    import sqlite3 as _sq
-    now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
-    t_drop = now - 5 * W.DAY
-    d0 = t_drop // W.DAY
-    q = {"day_pnl": {str(d0 + 1): 50.0, str(d0 + 2): -10.0, str(d0 + 3): 20.0, str(d0 + 4): 30.0}}
-    c = W.rejoin_check(q, t_drop, now)                                 # full days d0+1 … d0+4: the last two positive → 2 of 3
-    assert not c["ok"] and c["streak"] == 2 and len(c["days"]) == 4
-    q["day_pnl"][str(d0 + 2)] = 5.0
-    assert W.rejoin_check(q, t_drop, now)["ok"]
-    q2 = {"day_pnl": {str(d0 + 1): 50.0, str(d0 + 2): 10.0, str(d0 + 4): 30.0}}  # a day with nothing closed breaks the run
-    assert not W.rejoin_check(q2, t_drop, now)["ok"]
-    assert W.rejoin_check({"day_pnl": {}}, now - 3600_000, now)["days"] == []   # dropped today: no full day yet
-    # between reviews: a watched whale in the list leaves it; a qualified one returns into a free place at this check
-    old = [_w(f"bn:{i}") for i in range(7)]
-    st = {"rule": W.LOCK_RULE, "top": old, "lock_t": now - W.DAY, "passing": {x["addr"]: [now - 4 * W.DAY, now - 600_000] for x in old}}
-    prof = {x["addr"]: {**x, "positions": []} for x in old}
-    watch = {"bn:6": {"t": t_drop}}
-    top, why, _, _ = W.lock_follow(st, old, prof, None, now, watch, set())
-    assert "bn:6" not in {x["addr"] for x in top} and why["bn:6"] == [W.LOSS_WATCH_RU]
-    st2 = {**st, "top": top}
-    top2, why2, _, _ = W.lock_follow(st2, old, prof, None, now + 600_000, watch, {"bn:6"})
-    assert "bn:6" in {x["addr"] for x in top2} and not why2
-    # at a review a watched whale who does not qualify is not a newcomer either, even after 3 days in the bar
-    st3 = {**st2, "lock_t": now - 3 * W.DAY}
-    top3, _, _, _ = W.lock_follow(st3, old, prof, None, now, watch, set())
-    assert "bn:6" not in {x["addr"] for x in top3}
-    # the config adds a whale once
-    cfg = tmp_path / "lw.json"
-    cfg.write_text(_j.dumps({"id": "x1", "addrs": {"bn:6": {"t": t_drop, "name": "Six"}}}))
-    conn = _sq.connect(":memory:")
-    W.ensure_schema(conn)
-    w = W.loss_watch(conn, now, str(cfg))
-    assert w["bn:6"]["t"] == t_drop and w["bn:6"]["name"] == "Six"
-    W.kv_set(conn, "loss_watch", {})
-    assert W.loss_watch(conn, now, str(cfg)) == {}                     # applied once: not re-added after he left the watch
-
-
 def test_profile_day_pnl_groups_closed_decisions_by_utc_day():
     now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
     closed = [{"close_t": now - W.DAY, "pnl": 10.0}, {"close_t": now - W.DAY + 60_000, "pnl": -4.0}, {"close_t": now - 30 * W.DAY, "pnl": 99.0}]
     assert W.day_pnl(closed, now) == {str(now // W.DAY - 1): 6.0}
+
+
+def _rq(a, days_pnl, now, pf=5.0):
+    """a studied profile with his own closed P&L on the last full days (oldest first)"""
+    today = now // W.DAY
+    dp = {str(today - len(days_pnl) + i): v for i, v in enumerate(days_pnl)}
+    return {**_w(a, pf), "positions": [], "day_pnl": dp}
+
+
+def test_rotation_fast_and_slow_exits_back_fill_from_b_and_empty_seat():
+    """10.11 09:40 (owner): column A of 7 is changed only by the exit rules; the seat is back-filled at once by the best B trader
+    (PF) who passes the bar and has 3 plus days in a row; nobody qualifies → the seat stays empty"""
+    now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
+    A = [_w(f"bn:{i}") for i in range(7)]
+    st = {"rule": W.LOCK_RULE, "top": A, "lock_t": now - W.DAY, "joined": {x["addr"]: now - 2 * W.DAY for x in A},
+          "passing": {x["addr"]: [now - 9 * W.DAY, now - 600_000] for x in A}}
+    prof = {x["addr"]: _rq(x["addr"], [1, 1, 1], now) for x in A}
+    prof["bn:1"] = _rq("bn:1", [-5, -3, -1], now)                          # slow exit: 3 minus days in a row
+    prof["bn:2"] = _rq("bn:2", [-5, 0, -1], now)                           # a day with nothing closed breaks the run → stays
+    b_good, b_best_but_red, b_two = _rq("bn:b1", [2, 3, 4], now, 6.0), _rq("bn:b0", [2, -1, 4], now, 9.0), _rq("bn:b2", [1, 1], now, 7.0)
+    for q in (b_good, b_best_but_red, b_two):
+        prof[q["addr"]] = q
+    ranked = sorted([prof[a] for a in prof], key=lambda x: -x["pf"])
+    rot = {"bench": {a: {"name": a, "since": now - W.DAY, "from_a": False} for a in ("bn:b0", "bn:b1", "bn:b2")}, "bench_t": now - W.DAY}
+    desk = {"equity": 7000.0, "closed": [{"whale": "bn:3", "pnl": -80.0, "closed_t": now - 3600_000}], "open": [{"whale": "bn:3", "upnl": -30.0}]}
+    R = W.rotate(st, rot, ranked, prof, desk, now)
+    top = [x["addr"] for x in R["top"]]
+    assert "bn:1" not in top and "медленный выход" in R["why"]["bn:1"][0]
+    assert "bn:3" not in top and "быстрый выход" in R["why"]["bn:3"][0] and R["fast"] == ["bn:3"]
+    assert "bn:2" in top
+    assert "bn:b1" in top and "bn:b0" not in top and "bn:b2" not in top and len(top) == 6      # one seat stays empty
+    assert {m["addr"]: (m["from"], m["to"]) for m in R["moves"]} == {"bn:1": ("A", "B"), "bn:3": ("A", "B"), "bn:b1": ("B", "A")}
+    assert R["rot"]["bench"]["bn:3"]["fast"] and "bn:3" in R["rot"]["close_now"] and "bn:b1" not in R["rot"]["bench"]
+    pub = W.rotation_public(R["top"], R["rot"], prof, desk, now, None, R["joined"])
+    b = {r["addr"]: r for r in pub["b"]}
+    assert pub["empty_seats"] == 1 and b["bn:b2"]["plus_ru"] == "2 из 3 дней в плюсе" and b["bn:1"]["from_a"]
+    assert next(r for r in pub["a"] if r["addr"] == "bn:2")["minus_ru"] == "минус 1 из 3 дней"
+    # next run: bn:b2 now has 3 plus days → takes the empty seat, between reviews
+    prof["bn:b2"] = _rq("bn:b2", [1, 1, 1], now + W.DAY, 7.0)
+    st2 = {**st, "top": R["top"], "joined": R["joined"], "passing": R["passing"]}
+    R2 = W.rotate(st2, R["rot"], sorted(prof.values(), key=lambda x: -x["pf"]), prof, {"equity": 7000.0}, now + W.DAY)
+    assert "bn:b2" in [x["addr"] for x in R2["top"]] and len(R2["top"]) == 7
+
+
+def test_rotation_review_refreshes_b_only_and_real_copies_count_for_the_fast_exit():
+    now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
+    A = [_w(f"bn:{i}") for i in range(7)]
+    prof = {x["addr"]: _rq(x["addr"], [1, 1, 1], now) for x in A}
+    st = {"rule": W.LOCK_RULE, "top": A, "lock_t": now - 3 * W.DAY, "joined": {x["addr"]: now - 5 * W.DAY for x in A},
+          "passing": {x["addr"]: [now - 9 * W.DAY, now - 600_000] for x in A}}
+    new = [_rq(f"bn:n{i}", [1, 1, 1], now, 3.0) for i in range(20)]
+    for q in new:
+        prof[q["addr"]] = q
+    gone = {"name": "Failing", "since": now - 2 * W.DAY, "from_a": False}
+    prof["bn:fail"] = {**_rq("bn:fail", [1, 1, 1], now), "eligible": False}
+    ranked = A + new                                                       # bn:fail is studied but not in the bar
+    real = {"share": 300.0, "trades": [{"whale": "bn:4", "opened": now - W.DAY, "pnl_usd": -31.0},
+                                       {"whale": "bn:4", "opened": now - 9 * W.DAY, "pnl_usd": -500.0}]}   # before he joined: not counted
+    R = W.rotate(st, {"bench": {"bn:fail": gone}, "bench_t": now - 3 * W.DAY}, ranked, prof, {"equity": 7000.0}, now, real)
+    top = [x["addr"] for x in R["top"]]
+    assert "bn:4" not in top and "реальном счёте" in R["why"]["bn:4"][0]
+    b = R["rot"]["bench"]
+    assert "bn:fail" not in b and "bn:4" in b and len(b) == W.ROT_B_N - 1    # filled to 13 (the leaver incl.), then one went to A
+    assert R["lock_t"] == now and len(top) == 7 and top[-1] == "bn:n0"     # the seat taken by the best qualified B trader
+    assert all(m["to"] != "A" or m["from"] == "B" for m in R["moves"])     # newcomers go to B first, never straight to A
+
+
+def test_desk_closes_copies_of_a_fast_exit_at_once():
+    now = 1_800_000_000_000
+    o = {"whale": "bn:x", "coin": "SOL", "side": "LONG", "entry": 100.0, "notional": 500.0, "margin": 100.0, "opened_t": now - W.DAY,
+         "stop": 80.0}
+    d = {"start": 10000.0, "cash": 10000.0, "open": [dict(o)], "closed": [], "seen": {"bn:x": {"SOL": "LONG"}}, "history": [], "started": now}
+    d2 = W.desk_step(d, ["bn:y"], {}, {"SOL": 99.0}, now, close_unfollowed=True, close_whales={"bn:x"})
+    assert not d2["open"] and "быстрый выход" in d2["closed"][-1]["why"]

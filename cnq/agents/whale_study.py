@@ -85,7 +85,7 @@ LOCK_N = 7
 LOCK_MS = 3 * 86_400_000
 PROVEN_MS = 3 * 86_400_000
 LOCK_LOSS = 0.10
-LOCK_LOSS_ON = False                  # 09.11 owner: the loss reason is off (kept for the record / research)
+LOCK_LOSS_ON = True                   # 10.11 owner (rotation): back on as the FAST EXIT of column A (rotate), desk or real copies
 UNFOLLOW_BLIND_MS = 3_600_000         # 09.11: a leaver's copy we cannot see for 1 h is closed (cannot see his exit)
 LOCK_RULE = "lock-v1"
 MIN_AV, MIN_ALL = 300_000.0, 500_000.0
@@ -925,68 +925,6 @@ def lock_hard(a: str, q: dict | None, passing: dict, desk: dict | None, since: i
     return []
 
 
-def lock_follow(study: dict, ranked: list[dict], byaddr: dict, desk: dict | None, now: int,
-                watch: dict | None = None, watch_ok: set | None = None) -> tuple[list, dict, int, dict]:
-    """06.11 (owner): the fixed list. ranked = whales passing the full bar now (eligible, copy test positive, positions visible), best
-    first; byaddr = every profile studied this run. → (top, why_dropped {addr: [why]}, lock_t, passing {addr: [first_t, last_t]})
-    10.11 (owner): `watch` = the loss watch (whales dropped by the loss rule, {addr: {...}}): not in the list and not a newcomer
-    until they qualify; `watch_ok` = the ones that qualified this run (3 profitable days in a row since the drop AND passing the bar
-    now) — they come back at THIS check into a free place (at a review: before the newcomers)."""
-    watch, watch_ok = watch or {}, watch_ok or set()
-    passing = {a: list(v) for a, v in (study.get("passing") or {}).items() if isinstance(v, (list, tuple)) and len(v) == 2}
-    ok = {x["addr"]: x for x in ranked}
-    for a in ok:
-        passing[a] = [(passing.get(a) or [now])[0], now]
-    for a in list(passing):
-        if (a in byaddr and a not in ok) or now - int(_f(passing[a][1])) > 7 * 86_400_000:
-            passing.pop(a)                                    # studied and failed (or not seen for a week) → the streak starts again
-    old = list(study.get("top") or []) if study.get("rule") == LOCK_RULE else []
-    lock_t = int(_f(study.get("lock_t"))) if study.get("rule") == LOCK_RULE else 0
-    joined = dict(study.get("joined") or {}) if study.get("rule") == LOCK_RULE else {}
-    share = _f((desk or {}).get("equity") or DESK_START) / LOCK_N
-    why: dict = {}
-    if not lock_t:                                            # the first lock: the best now
-        top = ranked[:LOCK_N]
-        lock_t = now
-    elif now - lock_t >= LOCK_MS:                             # the review
-        keep = []
-        for x in old:
-            a = x["addr"]
-            if a in watch and a not in watch_ok:
-                why[a] = [LOSS_WATCH_RU]
-                continue
-            if a in ok or (a not in byaddr and now - int(_f((passing.get(a) or [0, 0])[1])) <= 86_400_000):
-                h = lock_hard(a, byaddr.get(a), passing, desk, int(_f(joined.get(a))) or lock_t, share, now)
-                if h:
-                    why[a] = h
-                else:
-                    keep.append(ok.get(a, x))
-        keep.sort(key=lambda x: next((i for i, r in enumerate(ranked) if r["addr"] == x["addr"]), len(ranked)))
-        ks = {x["addr"] for x in keep}
-        back = [ok[a] for a in ok if a in watch_ok and a not in ks]
-        ks |= {x["addr"] for x in back}
-        fill = [x for x in ranked if x["addr"] not in ks and x["addr"] not in watch and now - int(_f(passing[x["addr"]][0])) >= PROVEN_MS]
-        top = (keep + back + fill)[:LOCK_N]
-        lock_t = now
-    else:                                                     # between reviews: only hard reasons
-        top = []
-        for x in old:
-            a = x["addr"]
-            if a in watch and a not in watch_ok:
-                why[a] = [LOSS_WATCH_RU]
-                continue
-            h = lock_hard(a, byaddr.get(a), passing, desk, int(_f(joined.get(a))) or lock_t, share, now)
-            if h:
-                why[a] = h
-            else:
-                top.append(ok.get(a, x))
-        have = {x["addr"] for x in top}
-        for a in ok:                                          # 10.11: a qualified loss-watch whale returns at this check
-            if a in watch_ok and a not in have and len(top) < LOCK_N:
-                top.append(ok[a]); have.add(a)
-    return top, why, lock_t, passing
-
-
 # 10.11 (owner, real money): a whale dropped by the loss rule («копии потеряли больше 10% его доли») goes to the LOSS WATCH: not
 # copied, still studied every run (by address), and back only when his OWN decisions closed net profitable on REJOIN_DAYS UTC days in
 # a row after the drop day (each full day > 0; a day with nothing closed is 0 and breaks the run) AND he passes the full bar. He
@@ -1036,6 +974,202 @@ def rejoin_check(q: dict | None, t_drop: int, now: int) -> dict:
     ok = streak >= REJOIN_DAYS
     return {"ok": ok, "days": days[-7:], "streak": streak,
             "why_ru": (f"{streak} из {REJOIN_DAYS} дней подряд в плюсе" if not ok else f"{REJOIN_DAYS} дня подряд в плюсе")}
+
+
+# 10.11 09:40 (owner: «подумай, как лучше, и давай так и сделаем») — ONE rotation model of the copied traders:
+#   A (active, copied): LOCK_N = 7 traders (+ Ivan, the owner pick, outside the rotation);
+#   B (bench, not copied, studied every run by address): the next best passing the bar + everyone moved out of A, up to ROT_B_N;
+#   leaving A (then the seat is back-filled from B at once):
+#     fast exit — our desk or real copies of him lost more than LOCK_LOSS of his budget share since he joined A (his copies close now);
+#     slow exit — his own decisions closed net negative on ROT_DAYS full UTC days in a row;
+#     hard reasons (lock_hard) — hid his positions, 60 days negative, no data for more than a day;
+#   back-fill / return B → A: the best B trader by PF (open included) who passes the bar AND whose own decisions closed net positive on
+#     each of his last ROT_DAYS full days; nobody qualifies → the seat stays empty (its budget waits in reserve);
+#   the 3-day review only refreshes B (new candidates in, failing ones out); A changes only by the rules above.
+# A leaver's open copies follow the «кит ушёл» path (run to his exit / our stop; blind ones close) — a fast exit closes them at once.
+ROT_B_N = 13
+ROT_DAYS = 3
+ROT_RULE_RU = (f"Колонка A — {LOCK_N} копируемых трейдеров (+ Иван вне ротации). Колонка B — до {ROT_B_N} следующих лучших: изучаем каждый "
+               f"прогон, не копируем. Из A уходят: быстро — если наши копии потеряли больше {LOCK_LOSS * 100:.0f}% его доли (копии закрываем сразу); "
+               f"медленно — если его собственные сделки {ROT_DAYS} дня подряд закрылись в минус; и если скрыл позиции, 60 дней в минусе или "
+               f"данных нет больше суток. Освободившееся место сразу занимает лучший из B по PF, который проходит отбор и у кого "
+               f"{ROT_DAYS} последних дня подряд в плюсе; если такого нет — место пустует, деньги ждут в резерве. Раз в 3 дня обновляется "
+               "только колонка B.")
+
+
+def day_run(q: dict | None, now: int, sign: int, since: int | None = None) -> tuple[int, list]:
+    """(how many of the last full UTC days in a row his own closed decisions were net > 0 (sign 1) / < 0 (sign −1), the last
+    ROT_DAYS days as [[ISO day, pnl], …]); days before `since` (ms) do not count; a day with nothing closed is 0"""
+    dp = (q or {}).get("day_pnl") or {}
+    today = now // DAY
+    d0 = int(since) // DAY + 1 if since else today - 14
+    n, days, counting = 0, [], True
+    for d in range(today - 1, max(d0, today - 14) - 1, -1):
+        v = _f(dp.get(str(d)))
+        if len(days) < ROT_DAYS:
+            days.append([(dt.date(1970, 1, 1) + dt.timedelta(days=d)).isoformat(), round(v, 2)])
+        if counting and v * sign > 0:
+            n += 1
+        else:
+            counting = False
+        if not counting and len(days) >= ROT_DAYS:
+            break
+    return n, list(reversed(days))
+
+
+def _usd(x: float) -> str:
+    return f"${x:,.0f}".replace(",", " ")
+
+
+def real_loss(real: dict | None, a: str, since: int) -> tuple[float, float]:
+    """(P&L of our REAL copies of `a` opened since `since`, his real budget share); real = {"share", "trades": [{whale, opened, pnl_usd}]}"""
+    if not real:
+        return 0.0, 0.0
+    pnl = sum(_f(t.get("pnl_usd")) for t in real.get("trades") or [] if t.get("whale") == a and int(_f(t.get("opened"))) >= since)
+    return pnl, _f(real.get("share"))
+
+
+def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict | None, now: int, real: dict | None = None) -> dict:
+    """one complete run of the rotation → {"top", "why", "rot", "moves", "lock_t", "passing", "joined", "fast"}"""
+    passing = {a: list(v) for a, v in (study.get("passing") or {}).items() if isinstance(v, (list, tuple)) and len(v) == 2}
+    ok = {x["addr"]: x for x in ranked}
+    for a in ok:
+        passing[a] = [(passing.get(a) or [now])[0], now]
+    for a in list(passing):
+        if (a in byaddr and a not in ok) or now - int(_f(passing[a][1])) > 7 * 86_400_000:
+            passing.pop(a)
+    lk = study.get("rule") == LOCK_RULE
+    old = list(study.get("top") or []) if lk else []
+    lock_t = int(_f(study.get("lock_t"))) if lk else 0
+    joined = dict(study.get("joined") or {}) if lk else {}
+    bench = {a: dict(v) for a, v in ((rot or {}).get("bench") or {}).items()}
+    close_now = dict((rot or {}).get("close_now") or {})
+    share = _f((desk or {}).get("equity") or DESK_START) / LOCK_N
+    why: dict = {}
+    moves: list[dict] = []
+    nm = lambda a, x=None: ((x or {}).get("name") or (byaddr.get(a) or {}).get("name") or (bench.get(a) or {}).get("name")  # noqa: E731
+                            or (x or {}).get("short") or a)
+
+    def move(a, frm, to, why_ru, x=None):
+        moves.append({"t": now, "addr": a, "name": nm(a, x), "from": frm, "to": to, "why_ru": why_ru})
+
+    if not lock_t:                                           # the very first lock: the best now (as lock-v1 did)
+        top = ranked[:LOCK_N]
+        lock_t = now
+        for x in top:
+            joined[x["addr"]] = now
+            move(x["addr"], "—", "A", "первый состав: лучшие по PF, проходят отбор", x)
+    else:
+        top, out_now = [], set()
+        for x in old:
+            a = x["addr"]
+            q = byaddr.get(a)
+            since = int(_f(joined.get(a))) or lock_t
+            h = lock_hard(a, q, passing, desk, since, 0.0, now)
+            fast = False
+            if not h and LOCK_LOSS_ON:
+                dl = whale_desk_pnl(desk, a, since)
+                rl, rs = real_loss(real, a, since)
+                if share > 0 and dl <= -LOCK_LOSS * share:
+                    h, fast = [f"быстрый выход: копии на столе потеряли {_usd(-dl)} с входа в A — больше {LOCK_LOSS * 100:.0f}% его доли "
+                               f"{_usd(share)}"], True
+                elif rs > 0 and rl <= -LOCK_LOSS * rs:
+                    h, fast = [f"быстрый выход: копии на реальном счёте потеряли {_usd(-rl)} с входа в A — больше "
+                               f"{LOCK_LOSS * 100:.0f}% его доли {_usd(rs)}"], True
+            if not h and q is not None:
+                n, days = day_run(q, now, -1)
+                if n >= ROT_DAYS:
+                    h = [f"медленный выход: его собственные сделки {ROT_DAYS} дня подряд закрылись в минус ("
+                         + ", ".join(f"{d[8:10]}.{d[5:7]} {_usd(v).replace('$-', '−$')}" for d, v in days) + ")"]
+            if h:
+                why[a] = h
+                out_now.add(a)
+                bench[a] = {"name": nm(a, x), "since": now, "why_ru": h[0], "from_a": True, "fast": fast}
+                if fast:
+                    close_now[a] = now
+                move(a, "A", "B", h[0], x)
+            else:
+                top.append(ok.get(a, x))
+        review = now - lock_t >= LOCK_MS or not (rot or {}).get("bench_t")
+        if review:                                           # the 3-day review refreshes B only
+            for a in list(bench):
+                if a in ok or a in out_now or (a not in byaddr and (bench[a] or {}).get("from_a")):
+                    continue
+                move(a, "B", "—", "убран из B: не проходит отбор" if a in byaddr else "убран из B: не изучен", {"name": bench[a].get("name")})
+                bench.pop(a)
+            have = {x["addr"] for x in top} | set(bench)
+            for x in ranked:
+                if len(bench) >= ROT_B_N:
+                    break
+                if x["addr"] not in have:
+                    bench[x["addr"]] = {"name": nm(x["addr"], x), "since": now, "why_ru": "новый кандидат: проходит отбор", "from_a": False}
+                    move(x["addr"], "—", "B", "новый кандидат: проходит отбор", x)
+            lock_t = now if now - lock_t >= LOCK_MS else lock_t
+            rot = {**(rot or {}), "bench_t": now}
+        have = {x["addr"] for x in top}
+        for x in ranked:                                     # back-fill: best by PF in B, passing the bar, 3 plus days in a row
+            if len(top) >= LOCK_N:
+                break
+            a = x["addr"]
+            if a not in bench or a in have or a in out_now:
+                continue
+            n, days = day_run(byaddr.get(a), now, 1)
+            if n < ROT_DAYS:
+                continue
+            top.append(x); have.add(a)
+            joined[a] = now
+            close_now.pop(a, None)
+            b = bench.pop(a)
+            move(a, "B", "A", f"в A: проходит отбор и его сделки {ROT_DAYS} дня подряд в плюсе ("
+                 + ", ".join(f"{d[8:10]}.{d[5:7]} +{_usd(v)}" for d, v in days) + ")" + (" — вернулся" if b.get("from_a") else ""), x)
+    joined = {x["addr"]: joined.get(x["addr"]) or now for x in top}
+    close_now = {a: t for a, t in close_now.items() if a not in joined and now - int(_f(t)) <= 7 * DAY}
+    rot = {**(rot or {}), "bench": bench, "close_now": close_now, "moves": (moves + list((rot or {}).get("moves") or []))[:60]}
+    return {"top": top, "why": why, "rot": rot, "moves": moves, "lock_t": lock_t, "passing": passing, "joined": joined,
+            "fast": [a for a, t in close_now.items() if t == now]}
+
+
+def real_copies(pub_path: str | None) -> dict | None:
+    """our REAL copies per trader from web/fut_owner.json (next to whales_top.json): {"share": futures budget / LOCK_N, "trades"}"""
+    if not pub_path:
+        return None
+    try:
+        d = json.load(open(os.path.join(os.path.dirname(pub_path) or ".", "fut_owner.json"), encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    b = _f((d.get("kpi") or {}).get("budget_usd"))
+    tr = [{"whale": t.get("whale"), "opened": t.get("opened"), "pnl_usd": t.get("pnl_usd")} for t in d.get("trades") or [] if t.get("whale")]
+    return {"share": b / LOCK_N if b else 0.0, "trades": tr}
+
+
+def rotation_public(top: list, rot: dict, byaddr: dict, desk: dict | None, now: int, real: dict | None = None,
+                    joined: dict | None = None) -> dict:
+    """whales_top.json «rotation»: A and B with their counters, the moves with reasons (Russian)"""
+    share = _f((desk or {}).get("equity") or DESK_START) / LOCK_N
+    a_rows = []
+    for x in top:
+        a = x["addr"]
+        since = int(_f((joined or {}).get(a))) or now
+        neg, days = day_run(byaddr.get(a), now, -1)
+        dl = whale_desk_pnl(desk, a, since)
+        rl, rs = real_loss(real, a, since)
+        a_rows.append({"addr": a, "name": x.get("name") or x.get("short"), "src": x.get("src"), "pf": x.get("pf"), "win": x.get("win"),
+                       "joined": since, "minus_days": neg, "days": days,
+                       "minus_ru": f"минус {neg} из {ROT_DAYS} дней", "desk_pnl": round(dl, 2), "desk_limit": round(-LOCK_LOSS * share, 2),
+                       "real_pnl": round(rl, 2), "real_limit": round(-LOCK_LOSS * rs, 2) if rs else None,
+                       "loss_ru": (f"копии: стол {_usd(dl).replace('$-', '−$')} (порог −{_usd(LOCK_LOSS * share)})"
+                                   + (f", реальный счёт {_usd(rl).replace('$-', '−$')} (порог −{_usd(LOCK_LOSS * rs)})" if rs else ""))})
+    b_rows = []
+    for a, v in (rot.get("bench") or {}).items():
+        q = byaddr.get(a) or {}
+        pos, days = day_run(q, now, 1)
+        b_rows.append({"addr": a, "name": v.get("name") or q.get("name") or a, "src": q.get("src"), "pf": q.get("pf"), "win": q.get("win"),
+                       "since": v.get("since"), "why_ru": v.get("why_ru"), "from_a": bool(v.get("from_a")), "plus_days": pos, "days": days,
+                       "plus_ru": f"{pos} из {ROT_DAYS} дней в плюсе", "studied": bool(q)})
+    b_rows.sort(key=lambda r: -(r["pf"] if r["pf"] is not None else -99))
+    return {"rule": "rotation-v1", "n_a": LOCK_N, "n_b": ROT_B_N, "days": ROT_DAYS, "a": a_rows, "b": b_rows,
+            "empty_seats": max(0, LOCK_N - len(top)), "moves": list(rot.get("moves") or [])[:30], "close_now": rot.get("close_now") or {},
+            "ru": ROT_RULE_RU}
 
 
 # 08.11 (owner via the coordinator): a whale dropped from the locked list by OUR bug (not by the rules) is reinstated once — only if he
@@ -1146,7 +1280,7 @@ def good_whale(q: dict | None) -> bool:
 
 
 def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, now: int, owner: dict | None = None,
-              quality: dict | None = None, close_unfollowed: bool = False) -> dict:
+              quality: dict | None = None, close_unfollowed: bool = False, close_whales=None) -> dict:
     """One run of the paper copy desk. states = {addr: [positions]} for the whales fetched this run (missing addr = not
     fetched → nothing changes for him). desk['seen'][addr] = {coin: side} from the previous run.
     04.11: every copy carries a stop (the whale's, else −8 %) checked every run at the current mid; one whale's copies never hold
@@ -1204,6 +1338,10 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
     # 06.11 (owner) the copies of a whale who left the fixed list were closed at once. 09.11 (owner, explicit yes, backlog 117: on
     # history such copies ended better with the whale's own exit in 4 of 4 samples): they are held to his exit / our stop; only a
     # BLIND copy is closed — he hides his positions, or we have not seen them for UNFOLLOW_BLIND_MS (never on an empty list)
+    # 10.11 (owner, rotation): a FAST exit from column A (copies lost > 10 % of his share) closes his copies at once
+    for o in list(d["open"]):
+        if close_whales and o["whale"] in close_whales and o["whale"] not in set(follow or ()):
+            close(o, "быстрый выход трейдера из колонки A: копии потеряли больше 10% его доли — закрываем сразу")
     if close_unfollowed and follow:
         fs = set(follow)
         for o in list(d["open"]):
@@ -1635,9 +1773,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     erows = [r for x in (cand.get("ext") or {}).values() for r in x.get("rows") or [] if WS.src_of(r.get("addr"))]
     rcfg = reinstate_cfg()
     rpend = reinstate_pending(conn, rcfg)
-    lwatch = loss_watch(conn, now)                            # 10.11: whales on the loss watch are studied every run too
+    lwatch = loss_watch(conn, now)                            # 10.11: column B (and the old loss watch) is studied every run by address
+    rb = (kv_get(conn, "rotation") or {}).get("bench") or {}
     lo, le = locked_rows(conn, kv_get(conn, "study") or {}, rows + orows + erows,
-                         {**{a: {"name": (v or {}).get("name")} for a, v in lwatch.items()}, **rpend})
+                         {**{a: {"name": (v or {}).get("name")} for a, v in {**lwatch, **rb}.items()}, **rpend})
     orows, erows = lo + orows, le + erows                     # locked whales first: the budget reaches them
     # 2. prices (names for mapping, marks for the desk)
     mids = {}
@@ -1690,7 +1829,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
                 notes.append(f"позиции {a[:12]}: {str(e)[:100]}")
             time.sleep(0.25)
         desk = desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), kv_get(conn, "quality") or {},
-                         close_unfollowed=study.get("rule") == LOCK_RULE)
+                         close_unfollowed=study.get("rule") == LOCK_RULE,
+                         close_whales=set(((kv_get(conn, "rotation") or {}).get("close_now") or {})))
         kv_set(conn, "desk", desk)
         conn.commit()
     # 4. study data, budgeted and resumable; both sources take turns so neither waits for the other
@@ -1809,31 +1949,18 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     hard_why: dict = {}
     lock_t, passing, joined = study.get("lock_t"), study.get("passing"), dict(study.get("joined") or {})
     reinstate_out = {}
-    watch_out: dict = {}
+    rot = kv_get(conn, "rotation") or {}
+    if not rot.get("bench") and lwatch:                      # 10.11: the loss watch (BTC杰师傅) becomes column B of the rotation
+        rot = {**rot, "bench": {a_: {"name": (v or {}).get("name"), "since": (v or {}).get("t"), "why_ru": (v or {}).get("why_ru"),
+                                     "from_a": True, "fast": False} for a_, v in lwatch.items()}}
+    real = real_copies(pub_path)
+    rot_pub = None
     if complete and profs:
         ranked0 = list(follow_new)
-        rset = {x["addr"] for x in ranked0}
-        wcheck = {a: rejoin_check(byaddr.get(a), int(_f((v or {}).get("t"))), now) for a, v in lwatch.items()}
-        watch_ok = {a for a, c in wcheck.items() if c["ok"] and a in rset}
-        follow_new, hard_why, lock_t, passing = lock_follow(study, follow_new, byaddr, desk, now, lwatch, watch_ok)
-        fs = {x["addr"] for x in follow_new}
-        for a, h in hard_why.items():                         # the loss rule (when it is on) sends the whale to the loss watch
-            if h and str(h[0]).startswith("на столе") and a not in lwatch:
-                lwatch[a] = {"t": now, "name": (byaddr.get(a) or {}).get("name") or a, "why_ru": h[0]}
-                wcheck[a] = rejoin_check(byaddr.get(a), now, now)
-        for a, v in list(lwatch.items()):
-            c = wcheck.get(a) or {}
-            back = a in watch_ok and a in fs
-            watch_out[a] = {"name": (v or {}).get("name"), "since": (v or {}).get("t"), "why_ru": (v or {}).get("why_ru"),
-                            "days": c.get("days"), "streak": c.get("streak"), "rejoined": back,
-                            "status_ru": ("вернулся в список: " + c.get("why_ru", "") + ", проходит отбор" if back else
-                                          (c.get("why_ru") or "") + (" — но сейчас не проходит отбор" if c.get("ok") and a not in rset else
-                                                                     f" — нет свободного места ({LOCK_N})" if c.get("ok") else ""))}
-            if back:
-                lwatch.pop(a)
-        kv_set(conn, "loss_watch", lwatch)
-        prev = {x["addr"] for x in study.get("top") or []} if study.get("rule") == LOCK_RULE else set()
-        joined = {a: (joined.get(a) if a in prev else now) for a in (x["addr"] for x in follow_new)}
+        R = rotate(study, rot, follow_new, byaddr, desk, now, real)
+        follow_new, hard_why, lock_t, passing, joined, rot = R["top"], R["why"], R["lock_t"], R["passing"], R["joined"], R["rot"]
+        kv_set(conn, "rotation", rot)
+        kv_set(conn, "loss_watch", {})                       # folded into B
         # 08.11: a whale dropped by our bug comes back once, only if he passes the full bar now and a place is free
         for a, v in rpend.items():
             r = next((x for x in ranked0 if x["addr"] == a), None)
@@ -1849,22 +1976,27 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
                 continue
             else:
                 follow_new.append(r)
-                j0 = int(_f((v or {}).get("joined"))) or int(_f(((study.get("passing") or {}).get(a) or [now])[0])) or now
+                j0 = int(_f((v or {}).get("joined"))) or now
                 joined[a] = j0
                 passing = {**(passing or {}), a: [j0, now]}
+                (rot.get("bench") or {}).pop(a, None)
                 reinstate_out[a] = {"ok": True, "why_ru": [rcfg.get("why_ru") or "возвращён: выбыл из-за ошибки системы"], "joined": j0}
             rd = kv_get(conn, "reinstated") or {}
             rd.setdefault(rcfg["id"], {})[a] = now
             kv_set(conn, "reinstated", rd)
+        rot_pub = rotation_public(follow_new, rot, byaddr, desk, now, real, joined)
     else:
         follow_new = follow_new[:LOCK_N]
     fset = {x["addr"] for x in follow_new}
-    bench = [{"addr": p["addr"], "name": p["name"] or p["short"], "src": p["src"], "win": p.get("win"), "pf": p.get("pf"), "decisions": p.get("decisions"),
-              "hold_med_h": p.get("hold_med_h"), "pnl_60d": p.get("pnl_60d"),
-              "why_ru": (LOSS_WATCH_RU if p["addr"] in lwatch else "скрывает открытые позиции" if hidden(p.get("positions") or []) else
-                         f"тест копирования с опозданием {COPY_DELAY} мин в минусе" if not p.get("copy_ok", copy_ok(p)) else
-                         "ждёт пересмотра списка (раз в 3 дня; новичок — после 3 дней подряд в отборе)")}
-             for p in elig if p["addr"] not in fset][:BENCH_N]
+    # 10.11: «bench» = column B of the rotation (same fields as before + the «N из 3 дней» counter)
+    bench = [{"addr": r["addr"], "name": r["name"], "src": r["src"], "win": r["win"], "pf": r["pf"],
+              "decisions": (byaddr.get(r["addr"]) or {}).get("decisions"), "hold_med_h": (byaddr.get(r["addr"]) or {}).get("hold_med_h"),
+              "pnl_60d": (byaddr.get(r["addr"]) or {}).get("pnl_60d"),
+              "why_ru": f"{r['why_ru'] or 'в колонке B'} · {r['plus_ru']}", "plus_days": r["plus_days"], "plus_ru": r["plus_ru"],
+              "from_a": r["from_a"]}
+             for r in ((rot_pub or {}).get("b") or []) if r["addr"] not in fset]
+    if rot_pub is None:
+        bench = list((load_published(pub_path) or {}).get("bench") or [])
     # 04.11: a complete run always sets the list — also when the stricter bar leaves fewer (or no) whales; a partial run only
     # fills an empty list. Who left the list and why is kept for the panel and the report.
     if (complete and profs) or (follow_new and not study.get("top")):        # a run that studied nobody never empties the list
@@ -1901,8 +2033,12 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []) + owner_picks(),
            "follow_dropped": st_now.get("dropped", []), "archive": arch, "bench": bench,
            "reinstate": reinstate_out,          # 08.11: one-time reinstatement of a whale dropped by our bug (config/whale_reinstate.json)
-           "loss_watch": watch_out,             # 10.11: dropped by the loss rule → watched; back after 3 profitable days in a row + the bar
-           "loss_watch_ru": LOSS_WATCH_RU,
+           "rotation": rot_pub or (load_published(pub_path) or {}).get("rotation"),   # 10.11: columns A / B, counters, moves
+           "close_now": (rot_pub or (load_published(pub_path) or {}).get("rotation") or {}).get("close_now") or {},  # fast exits
+           "loss_watch": {r["addr"]: {"name": r["name"], "since": r["since"], "why_ru": r["why_ru"], "streak": r["plus_days"],
+                                      "status_ru": r["plus_ru"], "rejoined": False}
+                          for r in ((rot_pub or {}).get("b") or []) if r["from_a"]},
+           "loss_watch_ru": ROT_RULE_RU,
            # 06.11 (owner): the list is fixed between reviews; 09.11: a leaver's open copies run to his exit (only blind ones close)
            "follow_lock": ({"rule": LOCK_RULE, "t": st_now.get("lock_t"), "next_t": int(st_now["lock_t"]) + LOCK_MS, "n": LOCK_N,
                             "passing": st_now.get("passing") or {}, "joined": st_now.get("joined") or {},

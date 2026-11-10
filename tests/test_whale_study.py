@@ -570,7 +570,7 @@ def _rq(a, days_pnl, now, pf=5.0):
     """a studied profile with his own closed P&L on the last full days (oldest first)"""
     today = now // W.DAY
     dp = {str(today - len(days_pnl) + i): v for i, v in enumerate(days_pnl)}
-    return {**_w(a, pf), "positions": [], "day_pnl": dp}
+    return {**_w(a, pf), "positions": [], "day_pnl": dp, "eligible": True, "copy": {"2": {"n": 5, "avg_pct": 1.0}}}
 
 
 def test_rotation_fast_and_slow_exits_back_fill_from_b_and_empty_seat():
@@ -650,3 +650,48 @@ def test_a_trader_moved_out_of_a_stays_in_b_below_the_bar_and_cannot_return():
     rot = {"bench": {"bn:out": {"name": "Out", "since": now - W.DAY, "from_a": True}}, "bench_t": now - 3 * W.DAY}
     R = W.rotate(st, rot, A[:6], prof, {"equity": 7000.0}, now)
     assert "bn:out" in R["rot"]["bench"] and "bn:out" not in [x["addr"] for x in R["top"]] and len(R["top"]) == 6
+
+
+def test_an_uncopyable_trader_only_watches_from_b_and_a_removed_one_is_logged_back():
+    """10.11: back-fill needs the FULL bar incl. the delayed-copy and fill-frequency checks; a trader marked uncopyable (config or
+    ever «too active») never enters A — his B row says «только наблюдение — скопировать нельзя»"""
+    now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
+    A = [_w(f"bn:{i}") for i in range(6)]
+    prof = {x["addr"]: {**_rq(x["addr"], [1, 1, 1], now), "eligible": True} for x in A}
+    silk = {**_rq("0xsilk", [9, 9, 9], now, 1300.0), "eligible": True}
+    bad_copy = {**_rq("bn:late", [9, 9, 9], now, 900.0), "eligible": True, "copy": {"2": {"n": 5, "avg_pct": -1.0}}}
+    ok_one = {**_rq("bn:ok", [1, 1, 1], now, 3.0), "eligible": True}
+    for q in (silk, bad_copy, ok_one):
+        prof[q["addr"]] = q
+    ranked = [silk, bad_copy] + A + [ok_one]
+    st = {"rule": W.LOCK_RULE, "top": A, "lock_t": now - W.DAY, "joined": {x["addr"]: now - 2 * W.DAY for x in A}, "passing": {}}
+    rot = {"bench": {a: {"name": a, "since": now - W.DAY, "from_a": False} for a in ("0xsilk", "bn:late", "bn:ok")}, "bench_t": now - W.DAY,
+           "moves": [{"t": now - 600_000, "addr": "bn:ok", "name": "ok", "from": "B", "to": "—", "why_ru": "убран из B"}]}
+    unc = {"0xsilk": "слишком частые сделки"}
+    R = W.rotate(st, rot, ranked, prof, {"equity": 7000.0}, now, None, unc)
+    top = [x["addr"] for x in R["top"]]
+    assert "0xsilk" not in top and "bn:late" not in top and "bn:ok" in top
+    pub = W.rotation_public(R["top"], R["rot"], prof, None, now, None, R["joined"], unc)
+    b = {r["addr"]: r for r in pub["b"]}
+    assert b["0xsilk"]["observe_only"] and b["0xsilk"]["observe_ru"].startswith("только наблюдение — скопировать нельзя")
+    assert b["bn:late"]["observe_only"]                                   # the delayed-copy test is negative
+    # a trader in A who turns out uncopyable leaves A
+    R2 = W.rotate({**st, "top": A + [silk]}, {"bench": {}, "bench_t": now}, ranked, prof, {"equity": 7000.0}, now, None, unc)
+    assert "0xsilk" not in [x["addr"] for x in R2["top"]] and "скопировать нельзя" in R2["why"]["0xsilk"][0]
+    # the «возвращён в B» line for a trader whose last move had removed him from B
+    rot3 = {"bench": {"bn:j": {"name": "J", "since": now - W.DAY, "from_a": True}}, "bench_t": now,
+            "moves": [{"t": now - 600_000, "addr": "bn:j", "name": "J", "from": "B", "to": "—", "why_ru": "убран из B"}]}
+    R3 = W.rotate({**st, "top": A + [_w("bn:x")]}, rot3, A, {**prof, "bn:x": _rq("bn:x", [1], now)}, {"equity": 7000.0}, now)
+    m = [x for x in R3["moves"] if x["addr"] == "bn:j"]
+    assert m and m[0]["to"] == "B" and m[0]["why_ru"].startswith("возвращён в B")
+    R4 = W.rotate({**st, "top": R3["top"]}, R3["rot"], A, {**prof, "bn:x": _rq("bn:x", [1], now)}, {"equity": 7000.0}, now + 60_000)
+    assert not [x for x in R4["moves"] if x["addr"] == "bn:j"]           # once
+
+
+def test_uncopyable_set_is_sticky_and_reads_the_config(tmp_path):
+    import sqlite3 as _sq
+    conn = _sq.connect(":memory:"); W.ensure_schema(conn)
+    cfg = tmp_path / "u.json"; cfg.write_text('{"addrs": {"0xa": {"why_ru": "решение владельца"}}}')
+    u = W.uncopyable_set(conn, [{"addr": "0xb", "too_active": True}], 1, str(cfg))
+    assert u == {"0xa": "решение владельца", "0xb": W.TOO_ACTIVE_RU}
+    assert "0xb" in W.uncopyable_set(conn, [{"addr": "0xb", "too_active": False}], 2, str(cfg))

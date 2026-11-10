@@ -1030,8 +1030,38 @@ def real_loss(real: dict | None, a: str, since: int) -> tuple[float, float]:
     return pnl, _f(real.get("share"))
 
 
-def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict | None, now: int, real: dict | None = None) -> dict:
-    """one complete run of the rotation → {"top", "why", "rot", "moves", "lock_t", "passing", "joined", "fast"}"""
+UNCOPY_CFG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "whale_uncopyable.json")
+TOO_ACTIVE_RU = "слишком частые сделки (больше 10000 исполнений за 75 дней)"
+
+
+def uncopyable_set(conn, profs: list[dict], now: int, path: str | None = None) -> dict:
+    """{addr: why_ru}: config/whale_uncopyable.json (lifted only there, by the owner) + every profile ever seen «too active» (sticky:
+    a later partial fill history must not make him look copyable)"""
+    try:
+        with open(path or UNCOPY_CFG, encoding="utf-8") as f:
+            cfg = {a: (v or {}).get("why_ru") or "скопировать нельзя" for a, v in (json.load(f).get("addrs") or {}).items()}
+    except Exception:  # noqa: BLE001
+        cfg = {}
+    seen = dict(kv_get(conn, "uncopyable") or {})
+    for p in profs:
+        if p.get("too_active") and p["addr"] not in seen:
+            seen[p["addr"]] = {"t": now, "why_ru": TOO_ACTIVE_RU}
+    kv_set(conn, "uncopyable", seen)
+    return {**{a: (v or {}).get("why_ru") or TOO_ACTIVE_RU for a, v in seen.items()}, **cfg}
+
+
+def copyable(q: dict | None) -> bool:
+    """10.11: the FULL bar for a seat in A — eligible (every record check, incl. the fill-frequency check), the delayed-copy test
+    positive, open positions visible, not «too active»"""
+    return bool(q) and bool(q.get("eligible")) and copy_ok(q) and not hidden(q.get("positions") or []) and not q.get("too_active")
+
+
+def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict | None, now: int, real: dict | None = None,
+           uncopyable: dict | None = None) -> dict:
+    """one complete run of the rotation → {"top", "why", "rot", "moves", "lock_t", "passing", "joined", "fast"}.
+    `uncopyable` {addr: why_ru} — traders found uncopyable (config/whale_uncopyable.json + every «too active» profile seen): never
+    enter A (observation in B only); one in A leaves it"""
+    uncopyable = uncopyable or {}
     passing = {a: list(v) for a, v in (study.get("passing") or {}).items() if isinstance(v, (list, tuple)) and len(v) == 2}
     ok = {x["addr"]: x for x in ranked}
     for a in ok:
@@ -1055,7 +1085,7 @@ def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict 
         moves.append({"t": now, "addr": a, "name": nm(a, x), "from": frm, "to": to, "why_ru": why_ru})
 
     if not lock_t:                                           # the very first lock: the best now (as lock-v1 did)
-        top = ranked[:LOCK_N]
+        top = [x for x in ranked if x["addr"] not in uncopyable and copyable(byaddr.get(x["addr"]) or x)][:LOCK_N]
         lock_t = now
         for x in top:
             joined[x["addr"]] = now
@@ -1067,6 +1097,8 @@ def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict 
             q = byaddr.get(a)
             since = int(_f(joined.get(a))) or lock_t
             h = lock_hard(a, q, passing, desk, since, 0.0, now)
+            if not h and a in uncopyable:
+                h = [f"скопировать нельзя: {uncopyable[a]}"]
             fast = False
             if not h and LOCK_LOSS_ON:
                 dl = whale_desk_pnl(desk, a, since)
@@ -1113,8 +1145,8 @@ def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict 
             if len(top) >= LOCK_N:
                 break
             a = x["addr"]
-            if a not in bench or a in have or a in out_now:
-                continue
+            if a not in bench or a in have or a in out_now or a in uncopyable or not copyable(byaddr.get(a)):
+                continue                                     # the full bar incl. the delayed-copy and fill-frequency checks
             n, days = day_run(byaddr.get(a), now, 1)
             if n < ROT_DAYS:
                 continue
@@ -1125,6 +1157,12 @@ def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict 
             move(a, "B", "A", f"в A: проходит отбор и его сделки {ROT_DAYS} дня подряд в плюсе ("
                  + ", ".join(f"{d[8:10]}.{d[5:7]} +{_usd(v)}" for d, v in days) + ")" + (" — вернулся" if b.get("from_a") else ""), x)
     joined = {x["addr"]: joined.get(x["addr"]) or now for x in top}
+    hist = moves + list((rot or {}).get("moves") or [])
+    for a, v in bench.items():                               # in B again after a «убран из B» line → say so once
+        last = next((m for m in hist if m.get("addr") == a), None)
+        if last and last.get("to") == "—":
+            move(a, "—", "B", "возвращён в B: трейдер, выведенный из A, наблюдается 14 дней, даже если ниже отбора"
+                 if v.get("from_a") else "возвращён в B", {"name": v.get("name")})
     close_now = {a: t for a, t in close_now.items() if a not in joined and now - int(_f(t)) <= 7 * DAY}
     rot = {**(rot or {}), "bench": bench, "close_now": close_now, "moves": (moves + list((rot or {}).get("moves") or []))[:60]}
     return {"top": top, "why": why, "rot": rot, "moves": moves, "lock_t": lock_t, "passing": passing, "joined": joined,
@@ -1145,7 +1183,7 @@ def real_copies(pub_path: str | None) -> dict | None:
 
 
 def rotation_public(top: list, rot: dict, byaddr: dict, desk: dict | None, now: int, real: dict | None = None,
-                    joined: dict | None = None) -> dict:
+                    joined: dict | None = None, uncopyable: dict | None = None) -> dict:
     """whales_top.json «rotation»: A and B with their counters, the moves with reasons (Russian)"""
     share = _f((desk or {}).get("equity") or DESK_START) / LOCK_N
     a_rows = []
@@ -1168,6 +1206,9 @@ def rotation_public(top: list, rot: dict, byaddr: dict, desk: dict | None, now: 
         b_rows.append({"addr": a, "name": v.get("name") or q.get("name") or a, "src": q.get("src"), "pf": q.get("pf"), "win": q.get("win"),
                        "since": v.get("since"), "why_ru": v.get("why_ru"), "from_a": bool(v.get("from_a")), "plus_days": pos, "days": days,
                        "plus_ru": f"{pos} из {ROT_DAYS} дней в плюсе", "studied": bool(q)})
+        if a in (uncopyable or {}) or (q and not copyable(q)):
+            b_rows[-1]["observe_only"] = True
+            b_rows[-1]["observe_ru"] = "только наблюдение — скопировать нельзя" + (f" ({(uncopyable or {})[a]})" if a in (uncopyable or {}) else "")
     b_rows.sort(key=lambda r: -(r["pf"] if r["pf"] is not None else -99))
     return {"rule": "rotation-v1", "n_a": LOCK_N, "n_b": ROT_B_N, "days": ROT_DAYS, "a": a_rows, "b": b_rows,
             "empty_seats": max(0, LOCK_N - len(top)), "moves": list(rot.get("moves") or [])[:30], "close_now": rot.get("close_now") or {},
@@ -1962,7 +2003,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     rot_pub = None
     if complete and profs:
         ranked0 = list(follow_new)
-        R = rotate(study, rot, follow_new, byaddr, desk, now, real)
+        unc = uncopyable_set(conn, profs, now)
+        R = rotate(study, rot, follow_new, byaddr, desk, now, real, unc)
         follow_new, hard_why, lock_t, passing, joined, rot = R["top"], R["why"], R["lock_t"], R["passing"], R["joined"], R["rot"]
         kv_set(conn, "rotation", rot)
         kv_set(conn, "loss_watch", {})                       # folded into B
@@ -1989,7 +2031,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             rd = kv_get(conn, "reinstated") or {}
             rd.setdefault(rcfg["id"], {})[a] = now
             kv_set(conn, "reinstated", rd)
-        rot_pub = rotation_public(follow_new, rot, byaddr, desk, now, real, joined)
+        rot_pub = rotation_public(follow_new, rot, byaddr, desk, now, real, joined, unc)
     else:
         follow_new = follow_new[:LOCK_N]
     fset = {x["addr"] for x in follow_new}
@@ -1997,8 +2039,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     bench = [{"addr": r["addr"], "name": r["name"], "src": r["src"], "win": r["win"], "pf": r["pf"],
               "decisions": (byaddr.get(r["addr"]) or {}).get("decisions"), "hold_med_h": (byaddr.get(r["addr"]) or {}).get("hold_med_h"),
               "pnl_60d": (byaddr.get(r["addr"]) or {}).get("pnl_60d"),
-              "why_ru": f"{r['why_ru'] or 'в колонке B'} · {r['plus_ru']}", "plus_days": r["plus_days"], "plus_ru": r["plus_ru"],
-              "from_a": r["from_a"]}
+              "why_ru": (r.get("observe_ru") or f"{r['why_ru'] or 'в колонке B'}") + f" · {r['plus_ru']}", "plus_days": r["plus_days"],
+              "plus_ru": r["plus_ru"], "from_a": r["from_a"], "observe_only": bool(r.get("observe_only"))}
              for r in ((rot_pub or {}).get("b") or []) if r["addr"] not in fset]
     if rot_pub is None:
         bench = list((load_published(pub_path) or {}).get("bench") or [])

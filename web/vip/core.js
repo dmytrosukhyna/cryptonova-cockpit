@@ -11,7 +11,7 @@
 
   /* ── owner-only data through CNAuth.fetchOwner(path) — the server decrypts for a signed-in owner (cnq/api/owner_data.py);
         the panel never asks for the old per-section passphrases ── */
-  V.OWNER_PATHS = { ivan: '/v2/owner/ivan', myspot: '/v2/owner/myspot', overview: '/v2/owner/overview' };
+  V.OWNER_PATHS = { peter: '/v2/owner/peter', ivan: '/v2/owner/ivan', myspot: '/v2/owner/myspot', overview: '/v2/owner/overview' };
 
   /* ── number format: ru, one style everywhere («$9 923,43», «−1,3%») ─── */
   const MINUS = '−';
@@ -290,6 +290,8 @@
     // 04.11: watchlist — crypto + stock market (vip/whales.js). 05.11 (owner: «то, что мы копируем китов, — только для нашего
     // внутреннего понимания»): owner-only — hidden from the menu and refused by the router unless CNAuth.state.isOwner
     { id: 'whales', name: 'Киты', short: 'Киты', icon: 'whales', owner: true },
+    // 11.11: «Питер» — MT5 gold trader under observation (vip/peter.js, ../peter.js), owner-only like «Киты»
+    { id: 'peter', name: 'Питер', short: 'Питер', icon: 'strategies', owner: true },
     { id: 'opps', name: 'Другие возможности', short: 'Другое', icon: 'opps' },
     { id: 'demo', name: 'Live Demo', short: 'Live', icon: 'demo' },
     { id: 'system', name: 'Система', short: 'Система', icon: 'system' },

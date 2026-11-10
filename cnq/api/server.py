@@ -54,6 +54,7 @@ from cnq.agents.llm import LLM, PROVIDERS
 
 from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, owner_auth, owner_data, pf_parse, \
     pf_review, spot_top, tts
+from . import peter as peter_desk
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -130,6 +131,8 @@ class Api:
         self.owner_auth = owner_auth.OwnerAuth(store, verifier)
         self.console.owner_auth = self.owner_auth            # /v2/admin/* accepts the owner session too
         self.owner_data = owner_data.OwnerData(web_dir)
+        # 11.11: «Питер» — MT5 gold trader, observation only (cnq/api/peter.py); its data stays in <run>/data/peter, never in web/
+        self.peter = peter_desk.Peter(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "peter"), web_dir=web_dir)
         self.nova = knowledge or nova.Knowledge()
         self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
         self.selftest: dict | None = None        # GET /v2/agent/selftest: the last real model call on a fixed question
@@ -332,7 +335,8 @@ class Api:
             return 200, {"ok": True, "version": VERSION, "home_age_sec": age, "ready": ready, "agent_last": self.agent_last,
                          "panel_last": self.panel_last, "news_last": self.news.last, "tts_last": self.tts.last,
                          "tts_install": self.tts.install_state(), "tts_rate": tts.RATE,
-                         "portfolio": {"vision": bool(self.vision), "last": self.pf_last}}
+                         "portfolio": {"vision": bool(self.vision), "last": self.pf_last},
+                         "peter": self.peter.status()}           # 11.11: timestamps only (the MT5 bridge's heartbeat)
         if method == "GET" and path == "/v2/diag":
             return 200, self._diag()
         if method == "GET" and path == "/v2/agent/selftest":
@@ -390,6 +394,9 @@ class Api:
         if method == "POST" and path == "/v2/admin/nova":                # the closed system's NOVA chat through the server's key
             deny = self.console.check(headers)
             return deny if deny else self._panel_nova(body)
+        if method == "POST" and path == "/v2/peter/ingest":              # 11.11: the MT5 bridge (its own token; observation only)
+            ip = str(headers.get("x-real-ip") or headers.get("x-forwarded-for") or "local").split(",")[0].strip()[:64]
+            return self.peter.ingest(headers, body, ip)
         if path.startswith("/v2/auth/"):                                  # 28.10: the owner's sign-in (cnq/api/owner_auth.py)
             return self.owner_auth.handle(method, path, headers, body)
         if path == "/v2/owner" or path.startswith("/v2/owner/"):          # 28.10: the owner's private sections, owner session only
@@ -479,6 +486,10 @@ class Api:
                          "configured": {**self.owner_data.configured(),
                                         "admin_token": len((os.environ.get("CNQ_ADMIN_TOKEN") or "").strip()) >= admin_console.MIN_TOKEN},
                          "now": int(time.time() * 1000)}
+        if path == "/v2/owner/peter":                                  # 11.11: «Питер» (MT5), owner only
+            return self.peter.desk()
+        if path == "/v2/owner/peter/token":
+            return self.peter.token_view()
         m = re.fullmatch(r"/v2/owner/(myspot|ivan)", path)
         if m:
             return self.owner_data.get(m.group(1))

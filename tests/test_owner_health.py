@@ -39,7 +39,7 @@ def test_rows_plain_statuses_and_what_to_do():
     ok = [{"status": "completed", "conclusion": "success", "t_end": NOW - 20 * M}]
     d = H.build(_web(ok), _conn(["morning", "evening"]), NOW)
     rows = {r["key"]: r for r in d["rows"]}
-    assert list(rows) == ["autopilot", "traders", "pipeline", "publish", "channel", "morning", "researcher", "journal", "feeds", "nova"]
+    assert list(rows) == ["autopilot", "traders", "pipeline", "publish", "channel", "morning", "researcher", "journal", "feeds", "nova", "peter"]
     assert all(r["what"] and r["icon"] in "🟢🟡🔴" and r["word"] in ("работает", "задержка", "сбой") for r in rows.values())
     assert rows["autopilot"]["status"] == "ok" and rows["pipeline"]["status"] == "ok" and rows["channel"]["status"] == "ok"
     assert rows["nova"]["status"] == "fail" and "Claude" in rows["nova"]["todo"] and d["overall"] == "fail"

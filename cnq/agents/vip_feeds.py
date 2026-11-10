@@ -913,7 +913,9 @@ def system_status(out: str, now: int, lease: dict | None, api: tuple | None, pre
         code, body = api
         ok = code == 200 and isinstance(body, dict) and body.get("ok", True) is not False
         comps.append(_comp("api", "API приложения (/v2/health)", "ok" if ok else "error", now if ok else pa.get("last_ok"), now,
-                           f"HTTP {code}" + ("" if ok else f": {json.dumps(body, ensure_ascii=False)[:160]}")))
+                           f"HTTP {code}" + ("" if ok else f": {json.dumps(body, ensure_ascii=False)[:160]}"),
+                           # 11.11: «Питер» (MT5 bridge) — timestamps only, for «Состояние системы»
+                           peter=(body.get("peter") if isinstance(body, dict) and isinstance(body.get("peter"), dict) else None)))
     worst = "error" if any(c["status"] == "error" for c in comps) else "stale" if any(c["status"] in ("stale", "stopped") for c in comps) else "ok"
     return {"asof": now, "overall": worst, "components": comps,
             "about_ru": "Только реальные отметки времени из файлов системы. age_min — на момент asof; панель пересчитывает возраст по last_ok. "

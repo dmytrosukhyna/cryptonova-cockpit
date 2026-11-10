@@ -557,6 +557,7 @@ details.pfirm{border:1px solid var(--line2);border-radius:14px;background:var(--
 .fdesk .fsw{flex-wrap:wrap!important;overflow:visible!important}.fsw.sub{margin-top:-2px;padding-left:14px;border-left:2px solid rgba(124,196,255,.35)}.fsw.sub button{font-size:11.5px}.fabout{font-size:11.5px;margin:2px 0 8px;line-height:1.45}
 .romanbox{border:1px dashed var(--line2);border-radius:12px;padding:14px;display:grid;gap:6px;font-size:12.5px}
 body.tab-futures:not(.fsys-nova) #sigCard,body.tab-futures:not(.fsys-ivan):not(.fut-own) #ivanCard,body.tab-futures:not(.fsys-whales) #wtopCard,body.tab-futures:not(.fsys-chan) #chwCard,body:not(.tab-futures) #chwCard,body.guest #chwCard{display:none!important}
+#peterCard{display:none!important}body.tab-futures:not(.guest) #peterCard:not([hidden]){display:block!important;order:-1}
 body.tab-futures #fdeskBox{order:-50!important}#fOwnCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard:not([hidden]){display:block!important;order:-60!important}
 @media (max-width:760px){.fsys{grid-template-columns:1fr 1fr 1fr;gap:6px}.fsys button{padding:7px 8px}.fsys button small{display:none}.fsys button b{font-size:12px}}
 /* compact cards: a fixed preview with «развернуть» instead of a scroll box inside the page */
@@ -981,6 +982,7 @@ body.ls-min .lspanel .lsb,body.ls-min .lspanel .lsmeta{display:none}
   <section class="col">
     <div class="card" id="fOwnCard" hidden></div>     <div class="card" id="fdeskBox" hidden></div>
     <div class="card" id="ivanCard" hidden></div>
+    <div class="card" id="peterCard" hidden></div>
     <div class="card" id="sigCard" hidden></div>
     <div class="card" id="wtopCard" hidden></div>
     <div class="card" id="chwCard" hidden></div>
@@ -4779,6 +4781,18 @@ async function renderFOwn(){ const el=document.getElementById('fOwnCard'); if(!e
   if(el.__sig===sig) return; el.__sig=sig; el.hidden=false;
   el.innerHTML=CNFutOwner.html(FOWN,{ivan:I.ivan, ivanStats:I.stats}); CNFutOwner.mount(el); }
 setTimeout(renderFOwn,1200); setInterval(renderFOwn,60000);
+</script>
+<script src="peter.js?v=1"></script>
+<script>
+// 11.11: «Питер» — MT5 gold trader under observation (GET /v2/owner/peter, owner session only); never for guests or the public
+let PETER=null, PETER_T=0, PETER_ERR='';
+async function renderPeter(){ const el=document.getElementById('peterCard'); if(!el||!window.CNPeter) return;
+  const own=(typeof ownerSigned==='function'&&ownerSigned())&&!!(window.CNAuth&&CNAuth.state&&CNAuth.state.isOwner)&&!document.body.classList.contains('guest');
+  if(!own){ el.hidden=true; el.innerHTML=''; return; }
+  if(Date.now()-PETER_T>2*60000){ PETER_T=Date.now(); try{ PETER=await CNAuth.fetchOwner('/v2/owner/peter'); PETER_ERR=''; }catch(e){ PETER_ERR='Не загрузилось: '+((e&&e.message)||e); } }
+  const sig=JSON.stringify([PETER&&PETER.asof, PETER_ERR]); if(el.__sig===sig) return; el.__sig=sig; el.hidden=false;
+  el.innerHTML=CNPeter.html(PETER,{err:PETER_ERR}); CNPeter.mount(el,{fetchToken:()=>CNAuth.fetchOwner('/v2/owner/peter/token')}); }
+setTimeout(renderPeter,1500); setInterval(renderPeter,60000);
 </script>
 </body>
 </html>

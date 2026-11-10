@@ -202,6 +202,23 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
         st, note = YELLOW, "голос отчёта запасной (не русский)" if B.get("audio") else "отчёт без озвучки"
     rows.append(_row("nova", "NOVA: чат и голос", "Отвечает на вопросы в приложении и озвучивает отчёты.",
                      api.get("last_ok") or vc.get("last_ok"), st, note, ASK.format(x="NOVA (API приложения /v2/health)"), now))
+    # 11.11: «Питер (MT5)» — the MT5 bridge's heartbeat (API /v2/health → system_status api.peter); observation only
+    pt = (api or {}).get("peter") or {}
+    from cnq.api.peter import HB_STALE_MIN, gold_market_open
+    hb = _ms(pt.get("last_hb"))
+    mkt = gold_market_open(now)
+    if not pt:
+        st, note = YELLOW, "нет данных от API в этом прогоне"
+    elif not pt.get("configured"):
+        st, note = YELLOW, "токен Питера ещё не создан на сервере (CNQ_PETER_TOKEN)"
+    elif not hb:
+        st, note = YELLOW, "советник у Питера ещё ни разу не подключался"
+    elif mkt and _age_min(hb, now) > HB_STALE_MIN:
+        st, note = YELLOW, f"нет связи с терминалом Питера {int(_age_min(hb, now))} мин (рынок золота открыт)"
+    else:
+        st, note = GREEN, "" if mkt else "рынок золота закрыт"
+    rows.append(_row("peter", "Питер (MT5)", "Наблюдение за сделками трейдера по золоту в MetaTrader 5 — только чтение, без ордеров.",
+                     hb, st, note, ASK.format(x="мост MT5 Питера"), now))
     worst = RED if any(r["status"] == RED for r in rows) else YELLOW if any(r["status"] == YELLOW for r in rows) else GREEN
     return {"asof": now, "overall": worst, "icon": ICON[worst], "rows": rows,
             "about_ru": "🟢 работает · 🟡 задержка (обычно проходит сама) · 🔴 сбой — нужна помощь. Время — последний успешный запуск."}

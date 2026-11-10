@@ -21,3 +21,12 @@ def test_agents_sqlite_not_in_unconditional_add_list():
 
 def test_rebase_autostash():
     assert "git rebase --autostash" in _commit_step()
+
+
+def test_rebase_replays_only_our_commit():
+    """10.11: shallow checkout + `rebase origin/main` replayed the checked-out tip as a whole tree and rolled web files back."""
+    step = _commit_step()
+    assert re.search(r'base=\$\(git rev-parse HEAD\)\n\s*git commit', step)
+    assert '--onto origin/main "$base"' in step
+    al = (WF.parent / "autolab.yml").read_text(encoding="utf-8")
+    assert '--onto origin/main "$base"' in al and "base=$(git rev-parse HEAD)" in al

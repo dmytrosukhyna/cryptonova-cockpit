@@ -326,8 +326,11 @@ jobs:
           sz=$(stat -c %s data/agents.sqlite 2>/dev/null || echo 0)
           if [ "${{ steps.state.outputs.stale }}" = "true" ]; then echo "::warning title=state::stale database — not committed"; elif [ "$sz" -lt 95000000 ]; then git add data/agents.sqlite; else echo "::warning title=agents.sqlite::$((sz/1000000)) MB — kept in the cache only, not committed (GitHub limit 100 MB)"; fi
           git status --short | head -20
+          # 10.11: the checkout is shallow (depth 1); a plain `rebase origin/main` replayed the checked-out tip as a whole-tree
+          # commit and with -X theirs rolled engine.json / risk.json / whales_live.json back by minutes (4× on 10.11). Replay only our commit.
+          base=$(git rev-parse HEAD)
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
-          for i in 1 2 3; do git fetch origin main && git rebase --autostash -X theirs origin/main && git push origin HEAD:main && break || { echo "::warning title=push::attempt $i failed"; git rebase --abort || true; sleep 15; }; done
+          for i in 1 2 3; do git fetch origin main && git rebase --autostash -X theirs --onto origin/main "$base" && git push origin HEAD:main && break || { echo "::warning title=push::attempt $i failed"; git rebase --abort || true; sleep 15; }; done
       # 04.11 23:20: also when the run STARTED from an already-stale fallback cache (a hit, but not the pinned key): saving cannot make
       # the newest cache any older, and the whale study's refetched history (it runs on a stale database, never_backwards) survives.
       # A cache miss on a stale database is still never saved.

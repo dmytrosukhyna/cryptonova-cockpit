@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "stops (bn_whale_stops.py), size (backlog 92), impulse (backlog 96), delay (backlog 88), daystop (backlog 90), join (backlog 103), regime (backlog 102), dispute (backlog 112), book (backlog 101), cohort (backlog 106), fresh (backlog 116) or lockloss (backlog 117)"
+        description: "stops (bn_whale_stops.py), size (backlog 92), impulse (backlog 96), delay (backlog 88), daystop (backlog 90), join (backlog 103), regime (backlog 102), dispute (backlog 112), book (backlog 101), cohort (backlog 106), fresh (backlog 116), lockloss (backlog 117) or norepeat (backlog 123)"
         type: choice
-        options: [stops, size, impulse, delay, daystop, join, regime, dispute, book, cohort, fresh, lockloss]
+        options: [stops, size, impulse, delay, daystop, join, regime, dispute, book, cohort, fresh, lockloss, norepeat]
         default: stops
 permissions:
   contents: read

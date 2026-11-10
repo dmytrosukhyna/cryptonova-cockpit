@@ -30,6 +30,7 @@ Output: web/whales_top.json. Stdlib only.
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import math
 import os
@@ -470,6 +471,17 @@ def _wl(xs: list[dict]) -> tuple[float | None, float | None, float, float]:
     return win, pf, gp, gl
 
 
+def day_pnl(closed: list[dict], now: int, days: int = 14) -> dict[str, float]:
+    """{UTC day number (str): net P&L of his decisions closed that day} over the last `days` days"""
+    out: dict[str, float] = {}
+    for t in closed:
+        ct = int(_f(t.get("close_t")))
+        if ct >= now - days * DAY:
+            k = str(ct // DAY)
+            out[k] = round(out.get(k, 0.0) + _f(t.get("pnl")), 2)
+    return out
+
+
 def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list, candles: dict, now: int, too_active: bool) -> dict:
     """60-day record of one whale in DECISIONS, open positions counted at the mark (04.11, owner + research): trips → decisions
     closed in the window or still open; hidden open positions (OKX shows only their P&L) in loss = losing decisions."""
@@ -522,7 +534,8 @@ def profile(c: dict, trips: list, total: float, pf_stats: dict, positions: list,
          "recent": sorted(dec, key=lambda t: -t["close_t"])[:12], "copy": {str(d): v for d, v in copies.items()},
          "portfolio": pf_stats, "too_active": too_active, "open_trips": len(open_tr), "open_upnl": round(open_upnl, 2),
          "open_loss": round(open_loss, 2), "hidden_open": len(hid), "hidden_loss_n": len(hid_loss),
-         "max_dd_usd": _vw.max_dd(allx)}         # 04.11: VIP «Киты» watchlist (display only, not a selection rule)
+         "max_dd_usd": _vw.max_dd(allx),         # 04.11: VIP «Киты» watchlist (display only, not a selection rule)
+         "day_pnl": day_pnl(closed, now)}        # 10.11: his own closed P&L per UTC day (the loss-watch rejoin rule)
     why = []
     if too_active:
         why.append("слишком частые сделки (больше 10000 исполнений за 75 дней) — скопировать нельзя")
@@ -912,9 +925,14 @@ def lock_hard(a: str, q: dict | None, passing: dict, desk: dict | None, since: i
     return []
 
 
-def lock_follow(study: dict, ranked: list[dict], byaddr: dict, desk: dict | None, now: int) -> tuple[list, dict, int, dict]:
+def lock_follow(study: dict, ranked: list[dict], byaddr: dict, desk: dict | None, now: int,
+                watch: dict | None = None, watch_ok: set | None = None) -> tuple[list, dict, int, dict]:
     """06.11 (owner): the fixed list. ranked = whales passing the full bar now (eligible, copy test positive, positions visible), best
-    first; byaddr = every profile studied this run. → (top, why_dropped {addr: [why]}, lock_t, passing {addr: [first_t, last_t]})"""
+    first; byaddr = every profile studied this run. → (top, why_dropped {addr: [why]}, lock_t, passing {addr: [first_t, last_t]})
+    10.11 (owner): `watch` = the loss watch (whales dropped by the loss rule, {addr: {...}}): not in the list and not a newcomer
+    until they qualify; `watch_ok` = the ones that qualified this run (3 profitable days in a row since the drop AND passing the bar
+    now) — they come back at THIS check into a free place (at a review: before the newcomers)."""
+    watch, watch_ok = watch or {}, watch_ok or set()
     passing = {a: list(v) for a, v in (study.get("passing") or {}).items() if isinstance(v, (list, tuple)) and len(v) == 2}
     ok = {x["addr"]: x for x in ranked}
     for a in ok:
@@ -934,6 +952,9 @@ def lock_follow(study: dict, ranked: list[dict], byaddr: dict, desk: dict | None
         keep = []
         for x in old:
             a = x["addr"]
+            if a in watch and a not in watch_ok:
+                why[a] = [LOSS_WATCH_RU]
+                continue
             if a in ok or (a not in byaddr and now - int(_f((passing.get(a) or [0, 0])[1])) <= 86_400_000):
                 h = lock_hard(a, byaddr.get(a), passing, desk, int(_f(joined.get(a))) or lock_t, share, now)
                 if h:
@@ -942,19 +963,79 @@ def lock_follow(study: dict, ranked: list[dict], byaddr: dict, desk: dict | None
                     keep.append(ok.get(a, x))
         keep.sort(key=lambda x: next((i for i, r in enumerate(ranked) if r["addr"] == x["addr"]), len(ranked)))
         ks = {x["addr"] for x in keep}
-        fill = [x for x in ranked if x["addr"] not in ks and now - int(_f(passing[x["addr"]][0])) >= PROVEN_MS]
-        top = (keep + fill)[:LOCK_N]
+        back = [ok[a] for a in ok if a in watch_ok and a not in ks]
+        ks |= {x["addr"] for x in back}
+        fill = [x for x in ranked if x["addr"] not in ks and x["addr"] not in watch and now - int(_f(passing[x["addr"]][0])) >= PROVEN_MS]
+        top = (keep + back + fill)[:LOCK_N]
         lock_t = now
     else:                                                     # between reviews: only hard reasons
         top = []
         for x in old:
             a = x["addr"]
+            if a in watch and a not in watch_ok:
+                why[a] = [LOSS_WATCH_RU]
+                continue
             h = lock_hard(a, byaddr.get(a), passing, desk, int(_f(joined.get(a))) or lock_t, share, now)
             if h:
                 why[a] = h
             else:
                 top.append(ok.get(a, x))
+        have = {x["addr"] for x in top}
+        for a in ok:                                          # 10.11: a qualified loss-watch whale returns at this check
+            if a in watch_ok and a not in have and len(top) < LOCK_N:
+                top.append(ok[a]); have.add(a)
     return top, why, lock_t, passing
+
+
+# 10.11 (owner, real money): a whale dropped by the loss rule («копии потеряли больше 10% его доли») goes to the LOSS WATCH: not
+# copied, still studied every run (by address), and back only when his OWN decisions closed net profitable on REJOIN_DAYS UTC days in
+# a row after the drop day (each full day > 0; a day with nothing closed is 0 and breaks the run) AND he passes the full bar. He
+# returns at the next check after that (a free place now; at a review before the newcomers), not only at the 3-day review.
+# State: ws_kv «loss_watch» {addr: {"t": drop ms, "name", "why_ru"}}; config/whale_loss_watch.json adds whales once (applied ids in
+# ws_kv «loss_watch_applied»). His open copies follow the usual «кит ушёл» path (09.11: they run to his exit; blind ones close).
+REJOIN_DAYS = 3
+LOSS_WATCH_RU = (f"на скамейке после потерь: не копируем, изучаем каждый прогон; вернётся, когда его собственные сделки закроются в плюс "
+                 f"{REJOIN_DAYS} дня подряд и он пройдёт отбор")
+LOSS_WATCH_CFG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "whale_loss_watch.json")
+
+
+def loss_watch(conn, now: int, path: str | None = None) -> dict:
+    """the loss watch with the config's one-time additions applied"""
+    w = dict(kv_get(conn, "loss_watch") or {})
+    try:
+        with open(path or LOSS_WATCH_CFG, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:  # noqa: BLE001
+        cfg = {}
+    cid = cfg.get("id") if isinstance(cfg, dict) else None
+    if cid and isinstance(cfg.get("addrs"), dict):
+        done = kv_get(conn, "loss_watch_applied") or {}
+        if cid not in done:
+            for a, v in cfg["addrs"].items():
+                w[a] = {"t": int(_f((v or {}).get("t"))) or now, "name": (v or {}).get("name") or a,
+                        "why_ru": cfg.get("why_ru") or "копии потеряли больше 10% его доли"}
+            kv_set(conn, "loss_watch", w)
+            kv_set(conn, "loss_watch_applied", {**done, cid: now})
+    return w
+
+
+def rejoin_check(q: dict | None, t_drop: int, now: int) -> dict:
+    """{"ok", "days": [[day ISO, pnl], …] since the drop (full UTC days), "streak", "why_ru"} — `ok` = the last REJOIN_DAYS full
+    days are all > 0 (the bar is checked by the caller)"""
+    if not q:
+        return {"ok": False, "days": [], "streak": 0, "why_ru": "не изучен в этом прогоне"}
+    dp = q.get("day_pnl") or {}
+    d0, today = int(t_drop) // DAY + 1, now // DAY
+    days = [[(dt.date(1970, 1, 1) + dt.timedelta(days=d)).isoformat(), round(_f(dp.get(str(d))), 2)] for d in range(d0, today)]
+    streak = 0
+    for _, v in reversed(days):
+        if v > 0:
+            streak += 1
+        else:
+            break
+    ok = streak >= REJOIN_DAYS
+    return {"ok": ok, "days": days[-7:], "streak": streak,
+            "why_ru": (f"{streak} из {REJOIN_DAYS} дней подряд в плюсе" if not ok else f"{REJOIN_DAYS} дня подряд в плюсе")}
 
 
 # 08.11 (owner via the coordinator): a whale dropped from the locked list by OUR bug (not by the rules) is reinstated once — only if he
@@ -1554,7 +1635,9 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     erows = [r for x in (cand.get("ext") or {}).values() for r in x.get("rows") or [] if WS.src_of(r.get("addr"))]
     rcfg = reinstate_cfg()
     rpend = reinstate_pending(conn, rcfg)
-    lo, le = locked_rows(conn, kv_get(conn, "study") or {}, rows + orows + erows, rpend)
+    lwatch = loss_watch(conn, now)                            # 10.11: whales on the loss watch are studied every run too
+    lo, le = locked_rows(conn, kv_get(conn, "study") or {}, rows + orows + erows,
+                         {**{a: {"name": (v or {}).get("name")} for a, v in lwatch.items()}, **rpend})
     orows, erows = lo + orows, le + erows                     # locked whales first: the budget reaches them
     # 2. prices (names for mapping, marks for the desk)
     mids = {}
@@ -1726,9 +1809,29 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     hard_why: dict = {}
     lock_t, passing, joined = study.get("lock_t"), study.get("passing"), dict(study.get("joined") or {})
     reinstate_out = {}
+    watch_out: dict = {}
     if complete and profs:
         ranked0 = list(follow_new)
-        follow_new, hard_why, lock_t, passing = lock_follow(study, follow_new, byaddr, desk, now)
+        rset = {x["addr"] for x in ranked0}
+        wcheck = {a: rejoin_check(byaddr.get(a), int(_f((v or {}).get("t"))), now) for a, v in lwatch.items()}
+        watch_ok = {a for a, c in wcheck.items() if c["ok"] and a in rset}
+        follow_new, hard_why, lock_t, passing = lock_follow(study, follow_new, byaddr, desk, now, lwatch, watch_ok)
+        fs = {x["addr"] for x in follow_new}
+        for a, h in hard_why.items():                         # the loss rule (when it is on) sends the whale to the loss watch
+            if h and str(h[0]).startswith("на столе") and a not in lwatch:
+                lwatch[a] = {"t": now, "name": (byaddr.get(a) or {}).get("name") or a, "why_ru": h[0]}
+                wcheck[a] = rejoin_check(byaddr.get(a), now, now)
+        for a, v in list(lwatch.items()):
+            c = wcheck.get(a) or {}
+            back = a in watch_ok and a in fs
+            watch_out[a] = {"name": (v or {}).get("name"), "since": (v or {}).get("t"), "why_ru": (v or {}).get("why_ru"),
+                            "days": c.get("days"), "streak": c.get("streak"), "rejoined": back,
+                            "status_ru": ("вернулся в список: " + c.get("why_ru", "") + ", проходит отбор" if back else
+                                          (c.get("why_ru") or "") + (" — но сейчас не проходит отбор" if c.get("ok") and a not in rset else
+                                                                     f" — нет свободного места ({LOCK_N})" if c.get("ok") else ""))}
+            if back:
+                lwatch.pop(a)
+        kv_set(conn, "loss_watch", lwatch)
         prev = {x["addr"] for x in study.get("top") or []} if study.get("rule") == LOCK_RULE else set()
         joined = {a: (joined.get(a) if a in prev else now) for a in (x["addr"] for x in follow_new)}
         # 08.11: a whale dropped by our bug comes back once, only if he passes the full bar now and a place is free
@@ -1758,7 +1861,7 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     fset = {x["addr"] for x in follow_new}
     bench = [{"addr": p["addr"], "name": p["name"] or p["short"], "src": p["src"], "win": p.get("win"), "pf": p.get("pf"), "decisions": p.get("decisions"),
               "hold_med_h": p.get("hold_med_h"), "pnl_60d": p.get("pnl_60d"),
-              "why_ru": ("скрывает открытые позиции" if hidden(p.get("positions") or []) else
+              "why_ru": (LOSS_WATCH_RU if p["addr"] in lwatch else "скрывает открытые позиции" if hidden(p.get("positions") or []) else
                          f"тест копирования с опозданием {COPY_DELAY} мин в минусе" if not p.get("copy_ok", copy_ok(p)) else
                          "ждёт пересмотра списка (раз в 3 дня; новичок — после 3 дней подряд в отборе)")}
              for p in elig if p["addr"] not in fset][:BENCH_N]
@@ -1798,6 +1901,8 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []) + owner_picks(),
            "follow_dropped": st_now.get("dropped", []), "archive": arch, "bench": bench,
            "reinstate": reinstate_out,          # 08.11: one-time reinstatement of a whale dropped by our bug (config/whale_reinstate.json)
+           "loss_watch": watch_out,             # 10.11: dropped by the loss rule → watched; back after 3 profitable days in a row + the bar
+           "loss_watch_ru": LOSS_WATCH_RU,
            # 06.11 (owner): the list is fixed between reviews; 09.11: a leaver's open copies run to his exit (only blind ones close)
            "follow_lock": ({"rule": LOCK_RULE, "t": st_now.get("lock_t"), "next_t": int(st_now["lock_t"]) + LOCK_MS, "n": LOCK_N,
                             "passing": st_now.get("passing") or {}, "joined": st_now.get("joined") or {},

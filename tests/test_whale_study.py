@@ -594,3 +594,50 @@ def test_locked_whale_outside_leaderboard_slice_is_still_studied():
     assert [r["addr"] for r in le] == ["bn:111"] and le[0]["code"] == "111" and le[0]["win_ratio"] == 0.9 and le[0]["locked"]
     assert [(r["addr"], r["code"], r["src"]) for r in lo] == [("okx:ABC", "ABC", "okx")]
     assert W.locked_rows(conn, {**study, "rule": "old"}, []) == ([], [])
+
+
+def test_loss_watch_whale_is_benched_and_returns_after_3_profitable_days_and_the_bar(tmp_path):
+    """10.11 (owner, real money): a whale dropped by the loss rule is watched (not copied, still studied); he returns at the next
+    check after his own decisions closed in profit 3 full UTC days in a row since the drop AND he passes the bar"""
+    import json as _j
+    import sqlite3 as _sq
+    now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
+    t_drop = now - 5 * W.DAY
+    d0 = t_drop // W.DAY
+    q = {"day_pnl": {str(d0 + 1): 50.0, str(d0 + 2): -10.0, str(d0 + 3): 20.0, str(d0 + 4): 30.0}}
+    c = W.rejoin_check(q, t_drop, now)                                 # full days d0+1 … d0+4: the last two positive → 2 of 3
+    assert not c["ok"] and c["streak"] == 2 and len(c["days"]) == 4
+    q["day_pnl"][str(d0 + 2)] = 5.0
+    assert W.rejoin_check(q, t_drop, now)["ok"]
+    q2 = {"day_pnl": {str(d0 + 1): 50.0, str(d0 + 2): 10.0, str(d0 + 4): 30.0}}  # a day with nothing closed breaks the run
+    assert not W.rejoin_check(q2, t_drop, now)["ok"]
+    assert W.rejoin_check({"day_pnl": {}}, now - 3600_000, now)["days"] == []   # dropped today: no full day yet
+    # between reviews: a watched whale in the list leaves it; a qualified one returns into a free place at this check
+    old = [_w(f"bn:{i}") for i in range(7)]
+    st = {"rule": W.LOCK_RULE, "top": old, "lock_t": now - W.DAY, "passing": {x["addr"]: [now - 4 * W.DAY, now - 600_000] for x in old}}
+    prof = {x["addr"]: {**x, "positions": []} for x in old}
+    watch = {"bn:6": {"t": t_drop}}
+    top, why, _, _ = W.lock_follow(st, old, prof, None, now, watch, set())
+    assert "bn:6" not in {x["addr"] for x in top} and why["bn:6"] == [W.LOSS_WATCH_RU]
+    st2 = {**st, "top": top}
+    top2, why2, _, _ = W.lock_follow(st2, old, prof, None, now + 600_000, watch, {"bn:6"})
+    assert "bn:6" in {x["addr"] for x in top2} and not why2
+    # at a review a watched whale who does not qualify is not a newcomer either, even after 3 days in the bar
+    st3 = {**st2, "lock_t": now - 3 * W.DAY}
+    top3, _, _, _ = W.lock_follow(st3, old, prof, None, now, watch, set())
+    assert "bn:6" not in {x["addr"] for x in top3}
+    # the config adds a whale once
+    cfg = tmp_path / "lw.json"
+    cfg.write_text(_j.dumps({"id": "x1", "addrs": {"bn:6": {"t": t_drop, "name": "Six"}}}))
+    conn = _sq.connect(":memory:")
+    W.ensure_schema(conn)
+    w = W.loss_watch(conn, now, str(cfg))
+    assert w["bn:6"]["t"] == t_drop and w["bn:6"]["name"] == "Six"
+    W.kv_set(conn, "loss_watch", {})
+    assert W.loss_watch(conn, now, str(cfg)) == {}                     # applied once: not re-added after he left the watch
+
+
+def test_profile_day_pnl_groups_closed_decisions_by_utc_day():
+    now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
+    closed = [{"close_t": now - W.DAY, "pnl": 10.0}, {"close_t": now - W.DAY + 60_000, "pnl": -4.0}, {"close_t": now - 30 * W.DAY, "pnl": 99.0}]
+    assert W.day_pnl(closed, now) == {str(now // W.DAY - 1): 6.0}

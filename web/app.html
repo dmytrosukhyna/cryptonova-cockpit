@@ -4791,7 +4791,7 @@ async function renderPeter(){ const el=document.getElementById('peterCard'); if(
   if(!own){ el.hidden=true; el.innerHTML=''; return; }
   if(Date.now()-PETER_T>2*60000){ PETER_T=Date.now(); try{ PETER=await CNAuth.fetchOwner('/v2/owner/peter'); PETER_ERR=''; }catch(e){ PETER_ERR='Не загрузилось: '+((e&&e.message)||e); } }
   const sig=JSON.stringify([PETER&&PETER.asof, PETER_ERR]); if(el.__sig===sig) return; el.__sig=sig; el.hidden=false;
-  el.innerHTML=CNPeter.html(PETER,{err:PETER_ERR}); CNPeter.mount(el,{fetchToken:()=>CNAuth.fetchOwner('/v2/owner/peter/token')}); }
+  el.innerHTML=CNPeter.html(PETER,{err:PETER_ERR}); CNPeter.mount(el,{fetchToken:()=>CNAuth.fetchOwner('/v2/owner/peter/token'),rotateToken:()=>CNAuth.fetchOwner('/v2/owner/peter/token/rotate',{method:'POST'})}); }
 setTimeout(renderPeter,1500); setInterval(renderPeter,60000);
 </script>
 </body>

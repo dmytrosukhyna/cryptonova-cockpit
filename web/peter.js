@@ -55,10 +55,11 @@
       <td>${hold(t.hold_min)}</td><td class="${cls(t.pct)}">${pct(t.pct)}</td><td class="pt-m">${ctxLine(t.entry_ctx)}</td></tr>`).join('');
     const dist = (s.hold_dist || []).filter((x) => x.n).map((x) => `<span>${esc(x.label)}: <b>${x.n}</b></span>`).join('');
     const conn = `<details class="edet"><summary>Подключение терминала Питера</summary><p class="pt-m">Адрес для «Разрешить WebRequest»: <b>https://app.crypto-capital.app</b>.
-      Инструкция для Питера — docs/peter-mt5-setup.md. Токен видно только здесь, в сессии владельца: передай его Питеру лично.</p>
-      <button class="ib sm" type="button" data-pt="token">Показать токен</button> <code data-pt="tok"></code></details>`;
+      Инструкция для Питера — docs/peter-mt5-setup.md. Токен сервер создаёт сам; видно его только здесь, в сессии владельца — передай его Питеру лично.</p>
+      <button class="ib sm" type="button" data-pt="token">Показать токен</button> <button class="ib sm" type="button" data-pt="rotate">Новый токен</button>
+      <code data-pt="tok" style="user-select:all;word-break:break-all"></code>
+      <p class="pt-m">«Новый токен» сразу отключает старый: Питеру нужно будет вставить новый в InpToken.</p></details>`;
     return `<style>${CSS}</style><div class="pt">${head}
-      ${!(R.configured != null ? R.configured : L.configured) ? '<p class="pt-m">⚠ Токен на сервере ещё не создан (CNQ_PETER_TOKEN) — см. «Подключение» ниже.</p>' : ''}
       ${!hb ? '<p class="pt-m">Терминал Питера ещё не подключался.</p>' : late ? `<p class="pt-m">⚠ Нет связи с терминалом с ${dt(hb)} — сделки придут из очереди, когда он снова включится.</p>` : `<p class="pt-m">Связь с терминалом: ${dt(hb)}.</p>`}
       ${kp}${curve(L.curve)}
       <div class="pt-h"><b>Открытые позиции${(L.open || []).length ? ' · ' + L.open.length : ''}</b></div>
@@ -71,12 +72,16 @@
 
   function mount(el, opts) {
     opts = opts || {};
-    const b = el.querySelector('[data-pt="token"]'), out = el.querySelector('[data-pt="tok"]');
-    if (b && out && typeof opts.fetchToken === 'function') b.addEventListener('click', async () => {
-      b.disabled = true;
-      try { const r = await opts.fetchToken(); out.textContent = r && r.token ? r.token : (r && r.how_ru) || 'токен не настроен'; }
+    const b = el.querySelector('[data-pt="token"]'), rb = el.querySelector('[data-pt="rotate"]'), out = el.querySelector('[data-pt="tok"]');
+    const show = async (btn, fn) => {
+      btn.disabled = true;
+      try { const r = await fn(); out.textContent = r && r.token ? r.token : 'токен не получен'; }
       catch (e) { out.textContent = 'не получилось: ' + (e && e.message || e); }
-      b.disabled = false;
+      btn.disabled = false;
+    };
+    if (b && out && typeof opts.fetchToken === 'function') b.addEventListener('click', () => show(b, opts.fetchToken));
+    if (rb && out && typeof opts.rotateToken === 'function') rb.addEventListener('click', () => {
+      if (window.confirm('Создать новый токен? Старый перестанет работать сразу.')) show(rb, opts.rotateToken);
     });
   }
   window.CNPeter = { html, mount };

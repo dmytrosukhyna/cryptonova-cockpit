@@ -133,6 +133,10 @@ class Api:
         self.owner_data = owner_data.OwnerData(web_dir)
         # 11.11: «Питер» — MT5 gold trader, observation only (cnq/api/peter.py); its data stays in <run>/data/peter, never in web/
         self.peter = peter_desk.Peter(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "peter"), web_dir=web_dir)
+        try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
+            self.peter.ensure_token()
+        except OSError:
+            pass
         self.nova = knowledge or nova.Knowledge()
         self.agent_last: dict | None = None      # the last NOVA call: result + time, shown in /v2/health
         self.selftest: dict | None = None        # GET /v2/agent/selftest: the last real model call on a fixed question
@@ -477,6 +481,8 @@ class Api:
         s, deny = self.owner_auth.require(headers)
         if deny:
             return deny
+        if method == "POST" and path == "/v2/owner/peter/token/rotate":     # 11.11: «Новый токен» for Peter's MT5 bridge
+            return self.peter.token_view(rotate=True)
         if method != "GET":
             return 405, {"error": "method"}
         if path == "/v2/owner/overview":

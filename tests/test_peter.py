@@ -63,7 +63,7 @@ def test_token_trades_curve_and_context():
     assert "balance" not in json.dumps(L["account"])                      # the desk never shows his balance in $
     assert os.path.exists(os.path.join(d, "peter_live.json"))
     st = p.status()
-    assert st["configured"] and st["last_hb"] == H0 and set(st) == {"configured", "last_hb", "last_deal"}
+    assert st["configured"] and st["last_hb"] == H0 and set(st) == {"configured", "token_set", "last_hb", "last_deal"}
     tv = p.token_view()[1]
     assert tv["token"] == TOK and tv["whitelist"] == "https://app.crypto-capital.app"
 
@@ -102,3 +102,21 @@ def test_panels_owner_only():
     assert 'id="peterCard" hidden' in app and "CNAuth.state.isOwner" in app and "/v2/owner/peter" in app
     for f in os.listdir(os.path.join(root, "web")):         # the desk is never a public file
         assert not f.startswith("peter_live"), f
+
+
+def test_server_makes_and_rotates_the_token_itself():
+    """11.11 (owner has no shell): the token is made by the server, kept with mode 600, shown only to the owner endpoint"""
+    import stat
+    d = tempfile.mkdtemp()
+    p = P.Peter(d, env={})
+    assert not p.status()["token_set"] and _post(p, [])[0] == 503
+    code, r = p.token_view()
+    assert code == 200 and len(r["token"]) == 48 and p.status()["token_set"]
+    assert stat.S_IMODE(os.stat(os.path.join(d, "token")).st_mode) == 0o600
+    assert p.token_view()[1]["token"] == r["token"]                     # stable until rotated
+    assert _post(p, [], tok=r["token"])[0] == 200
+    new = p.token_view(rotate=True)[1]["token"]
+    assert new != r["token"] and _post(p, [], tok=r["token"])[0] == 401 and _post(p, [], tok=new)[0] == 200
+    assert P.Peter(d, env={P.TOKEN_ENV: TOK}).token() == new             # the server's own token wins over the env line
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cnq", "api", "server.py"), encoding="utf-8").read()
+    assert '"/v2/owner/peter/token/rotate"' in src and "self.peter.ensure_token()" in src

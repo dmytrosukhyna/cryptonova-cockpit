@@ -210,7 +210,7 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     if not pt:
         st, note = YELLOW, "нет данных от API в этом прогоне"
     elif not pt.get("configured"):
-        st, note = YELLOW, "токен Питера ещё не создан на сервере (CNQ_PETER_TOKEN)"
+        st, note = YELLOW, "токен Питера ещё не создан — сервер создаст его сам после перезапуска API"
     elif not hb:
         st, note = YELLOW, "советник у Питера ещё ни разу не подключался"
     elif mkt and _age_min(hb, now) > HB_STALE_MIN:

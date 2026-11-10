@@ -10,7 +10,8 @@
       return `<div class="card">${window.CNPeter ? window.CNPeter.html(LAST, { err: ERR }) : V.nodata('peter.js не загрузился')}</div>`;
     },
     mount(el) {
-      if (window.CNPeter) window.CNPeter.mount(el, { fetchToken: () => window.CNAuth.fetchOwner('/v2/owner/peter/token') });
+      if (window.CNPeter) window.CNPeter.mount(el, { fetchToken: () => window.CNAuth.fetchOwner('/v2/owner/peter/token'),
+        rotateToken: () => window.CNAuth.fetchOwner('/v2/owner/peter/token/rotate', { method: 'POST' }) });
     },
   };
 })();

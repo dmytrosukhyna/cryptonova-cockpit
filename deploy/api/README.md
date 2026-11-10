@@ -33,10 +33,10 @@ Settings in `/etc/cnq.env`:
   sign in once in «Управление» with «Запомнить на этом устройстве»; Settings → «Проверить ИИ» shows the time or the exact error.
 
 - `CNQ_PETER_TOKEN` (11.11) — the token of «Питер»'s MetaTrader 5 bridge (`tools/mt5/CryptoNovaBridge.mq5` →
-  `POST /v2/peter/ingest`, `cnq/api/peter.py`; observation only, no orders). Created on the server, never sent to chat or git:
-  `grep -q '^CNQ_PETER_TOKEN=' /etc/cnq.env || echo "CNQ_PETER_TOKEN=$(openssl rand -hex 24)" >> /etc/cnq.env && systemctl restart cnq-api`.
+  `POST /v2/peter/ingest`, `cnq/api/peter.py`; observation only, no orders). Nothing to do by hand: the API makes it at start
+  (`<run>/data/peter/token`, mode 600; a CNQ_PETER_TOKEN line in /etc/cnq.env is used only when that file is absent).
   The owner reads it in his panel (cryptonova.vip → «Питер» → «Подключение» → «Показать токен», owner session only) and passes
-  it to Peter himself; Peter's guide is `docs/peter-mt5-setup.md`. New token = replace the line and restart; the old one stops at once.
+  it to Peter himself; Peter's guide is `docs/peter-mt5-setup.md`. «Новый токен» on the same card makes a new one; the old one stops at once.
 
 - Build 45 «Разбор портфеля» (`/v2/portfolio/*`, `cnq/api/pf_parse.py`, `cnq/api/pf_review.py`): CSV / XLSX / PDF work with
   no settings. Two one-time steps on the server (root):

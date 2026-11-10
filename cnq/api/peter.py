@@ -21,6 +21,7 @@ import hmac
 import json
 import math
 import os
+import secrets
 import sqlite3
 import threading
 import time
@@ -138,9 +139,36 @@ class Peter:
         self.db.commit()
 
     # ------------------------------------------------------------------ config
+    def _tok_path(self) -> str:
+        return os.path.join(self.dir, "token")
+
     def token(self) -> str:
+        """11.11 (owner has no shell): the token made by the server itself (<run>/data/peter/token, mode 600) wins; else
+        CNQ_PETER_TOKEN from /etc/cnq.env. Never logged, never echoed except to the owner endpoint."""
+        try:
+            with open(self._tok_path(), encoding="utf-8") as f:
+                t = f.read().strip()
+            if len(t) >= 24:
+                return t
+        except OSError:
+            pass
         env = os.environ if self.env is None else self.env
         return (env.get(TOKEN_ENV) or "").strip()
+
+    def new_token(self) -> str:
+        """a fresh token, written atomically with mode 600; the old one stops working at once"""
+        t = secrets.token_hex(24)
+        p = self._tok_path()
+        fd = os.open(p + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(t)
+        os.chmod(p + ".tmp", 0o600)
+        os.replace(p + ".tmp", p)
+        return t
+
+    def ensure_token(self) -> str:
+        t = self.token()
+        return t if len(t) >= 24 else self.new_token()
 
     def _meta(self, k: str, v=None):
         if v is None:
@@ -152,7 +180,8 @@ class Peter:
         """for /v2/health and «Состояние системы»: timestamps only — nothing about the account"""
         with self.lock:
             hb, last = self._meta("last_hb"), self.db.execute("SELECT MAX(t) FROM deals").fetchone()[0]
-        return {"configured": len(self.token()) >= 24, "last_hb": hb, "last_deal": last}
+        ok = len(self.token()) >= 24
+        return {"configured": ok, "token_set": ok, "last_hb": hb, "last_deal": last}
 
     # ------------------------------------------------------------------ ingest
     def ingest(self, headers: dict, body: bytes, ip: str = "local", now: int | None = None) -> tuple[int, dict]:
@@ -381,12 +410,12 @@ class Peter:
         d["configured"] = len(self.token()) >= 24
         return 200, {"name": "peter", "title": NAME, "asof": d["asof"], "data": d, "configured": len(self.token()) >= 24}
 
-    def token_view(self) -> tuple[int, dict]:
-        """GET /v2/owner/peter/token — for the owner to pass to Peter; only its fingerprint is ever logged"""
-        tok = self.token()
-        if len(tok) < 24:
-            return 503, {"error": "not_configured",
-                         "how_ru": "На сервере один раз: grep -q '^CNQ_PETER_TOKEN=' /etc/cnq.env || echo \"CNQ_PETER_TOKEN=$(openssl rand -hex 24)\" "
-                                   ">> /etc/cnq.env && systemctl restart cnq-api"}
+    def token_view(self, rotate: bool = False) -> tuple[int, dict]:
+        """GET /v2/owner/peter/token (made on the first call when missing) · POST /v2/owner/peter/token/rotate — owner only"""
+        try:
+            with self.lock:
+                tok = self.new_token() if rotate else self.ensure_token()
+        except OSError as e:
+            return 500, {"error": "cannot_store", "detail": type(e).__name__}
         return 200, {"token": tok, "fingerprint": hashlib.sha256(tok.encode()).hexdigest()[:8], "url": URL,
                      "whitelist": URL.split("/v2/")[0]}

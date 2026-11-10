@@ -180,7 +180,7 @@ def test_run_end_to_end_with_fake_api():
     # next run: the desk starts watching the followed whale (no copy of positions it already had)
     d2 = W.run(conn, now=now + 1800_000, post=post, get_lb=lambda: lb, okx_get=okx_get, max_requests=50, budget_s=60,
               src_get={"bn": lambda path, body=None: {"list": []}})
-    assert d2["desk"] is None              # 10.11: no simulated desk here — the server's live desk (whales_live.json) is the only one
+    assert d2["desk"] and d2["desk"]["open"] == [] and d2["desk"]["equity"] == 10_000
     json.dumps(d2)
 
 
@@ -749,24 +749,3 @@ def test_hyperliquid_opens_at_once_but_a_reversal_needs_two_polls_and_skips_are_
     assert d["open"] and d["open"][0]["side"] == "LONG"                        # one poll of a reversal: held
     d = W.desk_step(d, [h, h2], {h: [_pos("ETH", "SHORT", 5000.0)], h2: []}, mids, now + 150_000)
     assert d["closed"][-1]["why"] == "кит развернулся"
-
-
-def test_the_live_desk_is_the_only_desk_whatever_its_age_and_no_sim_runs(tmp_path):
-    """10.11 (consistency): whales_top.json «desk» = the server's live desk (whales_live.json) even when its file is hours old (it is
-    published on change only); the GitHub run never simulates a second desk"""
-    now = T0 + 40 * W.DAY
-    live = {"start": 10000.0, "cash": 10500.0, "equity": 10600.0, "open": [{"whale": "okx:Q", "coin": "ETH", "side": "LONG", "entry": 2500.0,
-            "opened_t": now - W.DAY, "margin": 1000.0, "lev": 5.0, "notional": 5000.0, "stop": 2300.0, "upnl": 100.0}],
-            "closed": [{"whale": "okx:Q", "coin": "SOL", "side": "LONG", "entry": 100.0, "exit": 110.0, "opened_t": now - 2 * W.DAY,
-                        "closed_t": now - W.DAY, "pnl": 50.0, "margin": 100.0}], "history": [[now - 3 * 3600_000, 10600.0]]}
-    lp = tmp_path / "whales_live.json"
-    lp.write_text(json.dumps({"asof": now - 3 * 3600_000, "desk": live}))
-    assert W.live_desk(str(lp), now) is None and W.live_desk(str(lp), now, None)["live"]["age_min"] == 180.0
-    conn = sqlite3.connect(":memory:"); W.ensure_schema(conn)
-    W.kv_set(conn, "desk", {"start": 10000.0, "cash": 9000.0, "open": [], "closed": [{"whale": "x", "coin": "BTC", "side": "LONG",
-             "pnl": -99.0, "closed_t": now - 600_000, "margin": 1.0}], "seen": {}, "history": [[now - 600_000, 9000.0]]})   # an old sim
-    d = W.run(conn, now=now, post=lambda body: {"BTC": "1", "ETH": "2500"} if body["type"] == "allMids" else {"assetPositions": []},
-              get_lb=lambda: {"leaderboardRows": []}, okx_get=lambda path, q: [{"ranks": []}] if "lead-traders" in path else [],
-              max_requests=5, budget_s=5, src_get={"bn": lambda path, body=None: {"list": []}}, live_path=str(lp))
-    assert d["desk"]["equity"] == 10600.0 and [c["coin"] for c in d["desk"]["closed"]] == ["SOL"] and d["desk"]["live"]["source"] == "server"
-    assert W.kv_get(conn, "desk")["equity"] == 10600.0          # the rotation's desk loss reads this same desk

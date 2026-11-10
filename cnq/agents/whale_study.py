@@ -1850,19 +1850,16 @@ def never_backwards(desk: dict | None, study: dict, pub: dict, now: int) -> tupl
     return desk, study, notes
 
 
-def live_desk(path: str | None, now: int, max_age: int | None = LIVE_FRESH_MS) -> dict | None:
-    """the server's live desk (web/whales_live.json «desk»); `max_age` None = whatever its age (10.11: the live desk is the ONLY
-    desk — it is published on change only, so a quiet desk has an old «asof» and is still the truth); else None if older"""
+def live_desk(path: str | None, now: int) -> dict | None:
+    """the server's live desk (web/whales_live.json «desk») when it is at most LIVE_FRESH_MS old, else None"""
     if not path:
         return None
     try:
         with open(path, encoding="utf-8") as f:
             doc = json.load(f)
         d = doc.get("desk")
-        age = now - int(_f(doc.get("asof")))
-        if isinstance(d, dict) and isinstance(d.get("open"), list) and (max_age is None or age <= max_age):
-            return {**d, "seen": {}, "live": {**(d.get("live") or {}), "source": "server", "file_asof": int(_f(doc.get("asof"))),
-                                              "age_min": round(age / 60_000, 1)}}
+        if isinstance(d, dict) and isinstance(d.get("open"), list) and now - int(_f(doc.get("asof"))) <= LIVE_FRESH_MS:
+            return {**d, "seen": {}, "live": {**(d.get("live") or {}), "source": "server"}}
     except Exception:  # noqa: BLE001
         return None
     return None
@@ -1931,22 +1928,43 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             kv_set(conn, "study", study2)
         study = study2
     follow = [p["addr"] for p in study.get("top", [])]
-    # 04.11 22:35: the server copies the followed whales (cnq/execution/whale_live.py → web/whales_live.json). 10.11 (consistency fix):
-    # that live desk is the ONLY desk — trades, equity, stats, the rotation's desk loss, whale_watch.json and the VIP headline all read
-    # it through whales_top.json «desk». The GitHub run no longer simulates a second desk (at 12:16 UTC 10.11 its own sim had a closed
-    # trade the live desk never had): when the live file is missing, the last known desk is republished as it is and marked so.
-    live = live_desk(live_path, now, None)
+    # 04.11 22:35: the server copies the followed whales every ~60 s (cnq/execution/whale_live.py → web/whales_live.json). While that
+    # desk is fresh it IS the desk: published here as it is, no second desk_step (one desk for the panel, desk_select and the account)
+    live = live_desk(live_path, now)
     if live is not None:
         desk = live
         kv_set(conn, "desk", desk)
-    elif desk:
-        if desk.get("equity") is None:                       # a desk taken back from the published file: its equity as published
-            desk["equity"] = round(_f(desk.get("cash"), _f(desk.get("start"), DESK_START)) + sum(_f(o.get("upnl")) for o in desk.get("open") or []), 2)
-        desk = {**desk, "live": {**(desk.get("live") or {}), "source": "last_known",
-                                 "note_ru": "живой стол сервера недоступен — показан последний известный, своя симуляция не ведётся"}}
-        notes.append("живой стол сервера (whales_live.json) недоступен — показан последний известный стол")
-    states: dict = {}                                        # no positions are polled for a desk here any more
-    conn.commit()
+    watch = list(dict.fromkeys(follow + [o["whale"] for o in (desk or {}).get("open", [])])) if live is None else []
+    states = {}
+    if watch and mids:
+        okx_codes = {r["addr"]: r["code"] for r in orows}
+        for a in watch:
+            if not budget.take():
+                break
+            try:
+                if WS.src_of(a):
+                    sv = WS.SOURCES[WS.src_of(a)]
+                    cur = sv["current"](sget[WS.src_of(a)], {**WS.lb_of(conn, a), "addr": a, "code": a.split(":", 1)[1]})
+                    pos = sv["positions"](cur)
+                    conn.execute("UPDATE ws_whale SET state=?, state_t=? WHERE addr=?", (json.dumps(cur), now, a))
+                elif a.startswith("okx:"):
+                    code = okx_codes.get(a) or a[4:]
+                    cur = okx_get("/api/v5/copytrading/public-current-subpositions", {"instType": "SWAP", "uniqueCode": code, "limit": 100})
+                    pos = okx_positions({"okx": cur})
+                    conn.execute("UPDATE ws_whale SET state=?, state_t=? WHERE addr=?", (json.dumps({"okx": cur}), now, a))
+                else:
+                    stt = post({"type": "clearinghouseState", "user": a})
+                    pos = norm_positions(stt)
+                    conn.execute("UPDATE ws_whale SET state=?, state_t=? WHERE addr=?", (json.dumps(stt), now, a))
+                states[a] = [{**x, "coin": hl_name(x["coin"], mids) or x["coin"]} for x in pos]
+            except Exception as e:  # noqa: BLE001
+                notes.append(f"позиции {a[:12]}: {str(e)[:100]}")
+            time.sleep(0.25)
+        desk = desk_step(desk, follow, states, mids, now, ov.active(ov.load(), now), kv_get(conn, "quality") or {},
+                         close_unfollowed=study.get("rule") == LOCK_RULE,
+                         close_whales=set(((kv_get(conn, "rotation") or {}).get("close_now") or {})))
+        kv_set(conn, "desk", desk)
+        conn.commit()
     # 4. study data, budgeted and resumable; both sources take turns so neither waits for the other
     if kv_get(conn, "fills_v") != FILLS_V:
         # 04.11 (v3): the window grew to 60 days — Hyperliquid fills and OKX histories are read again once (Binance keeps 90 days already)

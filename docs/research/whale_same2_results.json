@@ -1,0 +1,77 @@
+{
+ "run": 42823291750,
+ "source": "Binance ws_trips 106 days",
+ "top10": {
+  "base": {
+   "taken": 336,
+   "busy": 95,
+   "total": 39.89,
+   "worst_day": -6.11,
+   "max_dd": -18.05,
+   "h1": 10.63,
+   "h2": 29.26
+  },
+  "S2": {
+   "taken": 361,
+   "busy": 71,
+   "total": 42.59,
+   "worst_day": -6.11,
+   "max_dd": -18.78,
+   "h1": 10.63,
+   "h2": 31.96
+  },
+  "added": {
+   "n": 28,
+   "mean": 1.12,
+   "win": 0.821,
+   "h1_n": 0,
+   "h2_n": 28
+  },
+  "S2_minus_base": {
+   "all": {
+    "d": 2.7,
+    "t": 0.59
+   },
+   "h1": {
+    "d": 0.0,
+    "t": null
+   },
+   "h2": {
+    "d": 2.7,
+    "t": 0.59
+   },
+   "risk_ok": true,
+   "pass": false
+  }
+ },
+ "all_bar": {
+  "base": {
+   "taken": 332,
+   "busy": 136,
+   "total": 33.33,
+   "max_dd": -23.5
+  },
+  "S2": {
+   "taken": 371,
+   "busy": 124,
+   "total": 45.37,
+   "max_dd": -23.65
+  },
+  "added": {
+   "n": 34,
+   "mean": 0.935,
+   "win": 0.824
+  },
+  "S2_minus_base": {
+   "all": {
+    "d": 12.03,
+    "t": 1.26
+   },
+   "h1": {
+    "d": 0.0,
+    "t": null
+   },
+   "pass": false
+  }
+ }
+}

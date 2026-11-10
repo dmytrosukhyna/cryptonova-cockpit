@@ -51,20 +51,39 @@ def long_text_ru(reg: dict) -> str:
             "MIXED": f"цена выше {a}, но ниже, чем 90 дней назад"}.get(reg.get("long"), "режим не определён")
 
 
-def regime(cs15: list[Candle]) -> dict:
-    """Three horizons from daily bars: short (3d), mid (28d trend rule), long (90d / 200d SMA)."""
+DAY_MS = 86_400_000
+
+
+def long_closes(d: list[Candle], older: dict[int, float] | None) -> np.ndarray:
+    """10.11 (owner): daily closes for the long regime = the stored daily history (UTC day → close; the 1d candles in the store,
+    the repo's seed of daily closes) before the 15m window, then the days built from the 15m candles. The first 15m day is
+    usually partial — the full daily close replaces it when the history has that day."""
+    m = {k.open_time // DAY_MS: k.close for k in d}
+    if older:
+        first = min(m) if m else None
+        for day, cl in older.items():
+            if first is None or day < first or (day == first and cl):
+                m[day] = cl
+    return np.array([m[k] for k in sorted(m)], dtype=float)
+
+
+def regime(cs15: list[Candle], older: dict[int, float] | None = None) -> dict:
+    """Three horizons from daily bars: short (3d), mid (28d trend rule), long (90d / 200d SMA).
+    10.11: the long horizon (200-day SMA, 90-day change) uses `older` daily closes too, so it is a true 200-day average even
+    when the 15m store holds ~106 days."""
     d = resample(cs15, 96)
     a = arrays(d)
     c = a["c"]; n = len(c)
+    cl = long_closes(d, older); nl = len(cl)
     if n < 60:
         return {"short": "UNAVAILABLE", "mid": "UNAVAILABLE", "long": "UNAVAILABLE"}
     atr_d = atr(a["h"], a["l"], a["c"], 14)
     last = c[-1]
     r3 = last / c[-4] - 1; r7 = last / c[-8] - 1; r28 = last / c[-29] - 1
-    r90 = last / c[-91] - 1 if n > 91 else float("nan")
+    r90 = last / cl[-91] - 1 if nl > 91 else float("nan")
     r60 = last / c[-61] - 1 if n > 61 else float("nan")       # 18.10: the allocator's regime uses 60 days (robustness test)
     hh20 = a["h"][-21:-1].max(); ll20 = a["l"][-21:-1].min()
-    sma200 = c[-200:].mean() if n >= 200 else c.mean()
+    sma200 = cl[-200:].mean() if nl >= 200 else cl.mean()
     rv30 = float(np.std(np.diff(np.log(c[-31:]))) * math.sqrt(365))
     short = "UP" if r3 > 0.5 * atr_d[-1] / last else ("DOWN" if r3 < -0.5 * atr_d[-1] / last else "FLAT")
     if r28 > 0 and last >= hh20:
@@ -78,7 +97,7 @@ def regime(cs15: list[Candle]) -> dict:
     long_ = "BULL" if last > sma200 and (math.isnan(r90) or r90 > 0) else ("BEAR" if last < sma200 else "MIXED")
     return {"short": short, "mid": mid, "mid_note": mid_note, "long": long_,
             "r3": r3, "r7": r7, "r28": r28, "r60": r60, "r90": r90, "hh20": float(hh20), "ll20": float(ll20),
-            "sma200": float(sma200), "sma_days": int(min(n, 200)), "atr_d": float(atr_d[-1]), "atr_pct": float(atr_d[-1] / last * 100),
+            "sma200": float(sma200), "sma_days": int(min(nl, 200)), "atr_d": float(atr_d[-1]), "atr_pct": float(atr_d[-1] / last * 100),
             "rv30": rv30, "vol_weight": min(1.0, 0.30 / rv30) if rv30 > 0 else 0.0}
 
 
@@ -267,8 +286,9 @@ def market_brief(coins: list[dict], asof: int, portfolio: dict | None = None) ->
 
 # ------------------------------------------------------------------ main
 def build_report(universe: dict[str, list[Candle]], masters: dict[str, dict] | None = None,
-                 ladders: dict[str, dict] | None = None, chart_bars: int = 96 * 10) -> dict:
-    masters = masters or {}; ladders = ladders or {}
+                 ladders: dict[str, dict] | None = None, chart_bars: int = 96 * 10,
+                 daily: dict[str, dict[int, float]] | None = None) -> dict:
+    masters = masters or {}; ladders = ladders or {}; daily = daily or {}
     coins = []
     asof = 0
     for sym, cs in universe.items():
@@ -276,7 +296,7 @@ def build_report(universe: dict[str, list[Candle]], masters: dict[str, dict] | N
             continue
         price = cs[-1].close
         asof = max(asof, cs[-1].close_time)
-        reg = regime(cs)
+        reg = regime(cs, daily.get(sym))
         lv = level_map(cs)
         st = setups_now(cs)
         dv = derivatives_snapshot(masters.get(sym))

@@ -6,6 +6,7 @@ re-checked 400 days of gaps and funding for 54 coins each time. Now:
   CNQ_REFRESH=quick — only the bars after the last stored one (the 18 core coins + the 36 lab coins unless CNQ_REFRESH_EXTRA=0);
                       a coin with no history still gets its full backfill;
   CNQ_REFRESH=full  — the old full check (gaps, funding, lab coins).
+Both modes also keep ≥ 250 days of 1d candles per core coin (cnq/terminal/daily.py — the long regime's true 200-day average).
 Default (GitHub): full once every 6 hours (UTC hour % 6 == 0, first 20 minutes), quick otherwise. The server engine
 (cnq/engine.py) runs quick every minute and full every 15 minutes."""
 import datetime as dt
@@ -18,6 +19,7 @@ from cnq.bingx.rest import BingXRest  # noqa: E402
 from cnq.collector.backfill import backfill  # noqa: E402
 from cnq.config import Config  # noqa: E402
 from cnq.store.db import Store  # noqa: E402
+from cnq.terminal import daily  # noqa: E402
 
 
 def mode() -> str:
@@ -70,7 +72,8 @@ def main() -> int:
         elif "/" in extra:                   # "k/n": the k-th of n slices of the lab coins (the engine spreads them over cycles)
             k, n_ = (int(x) for x in extra.split("/"))
             quick(store, list(cfg.b_extra)[k::n_], rest)
-        print(f"quick refresh {ok}/{len(core)} symbols in {time.time() - t0:.0f}s")
+        nd = daily.refresh(store, rest, core, int(time.time() * 1000))
+        print(f"quick refresh {ok}/{len(core)} symbols, {nd} daily bars in {time.time() - t0:.0f}s")
         return 0 if ok else 1
     ok = 0
     for bx in core:
@@ -81,6 +84,8 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print("backfill failed", bx, repr(e))
     print(f"backfilled {ok}/{len(core)} symbols in {time.time() - t0:.0f}s")
+    # 10.11: daily candles for the true 200-day average of the long regime (≥ 250 days kept), the lab coins included
+    print("daily bars:", daily.refresh(store, BingXRest(cfg.bingx), core + list(cfg.b_extra), int(time.time() * 1000)))
     for bx in cfg.b_extra:   # lab-only alt coins: 75 days is enough (σ over 30 days, 14-day range, store check needs 60)
         try:
             r = backfill(Config(symbol=bx), store, days=75, intervals=("15m",))

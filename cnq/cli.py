@@ -161,7 +161,10 @@ def main(argv: list[str] | None = None) -> int:
             from .terminal.report import build_report
             cs = store.candles("BTC-USDT", "15m")
             if len(cs) >= 96 * 60:
-                btc_bull = build_report({"BTC-USDT": cs})["coins"][0]["regime"]["long"] == "BULL"
+                import time as _tb
+                from .terminal import daily as _daily   # 10.11: the same true 200-day average as the terminal
+                btc_bull = build_report({"BTC-USDT": cs}, daily=_daily.history(store, ["BTC-USDT"], int(_tb.time() * 1000))
+                                        )["coins"][0]["regime"]["long"] == "BULL"
         except Exception:  # noqa: BLE001
             pass
         llm = LLM()
@@ -595,7 +598,10 @@ def main(argv: list[str] | None = None) -> int:
                 universe[bx] = cs
         if not universe:
             print("no 15m candles in the store — run: CNQ_SYMBOL=BTC-USDT python -m cnq.cli backfill (per symbol)"); return 1
-        rep = build_report(universe)
+        from .terminal import daily as _daily      # 10.11: older daily closes → a true 200-day average in the long regime
+        _hist = _daily.history(store, list(universe) + list(cfg.b_extra), int(_t.time() * 1000))
+        rep = build_report(universe, daily=_hist)
+        rep["daily_sma200"] = _daily.sma_map(_hist, rep)   # 10.11: support for the spot «no chase» entry rule (lab coins included)
         os.makedirs(args.out, exist_ok=True)
         write_report(rep, os.path.join(args.out, "terminal.json"))
         if args.cmd == "terminal":

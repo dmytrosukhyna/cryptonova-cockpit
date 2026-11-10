@@ -104,3 +104,25 @@ process.stdout.write(JSON.stringify([r('whales:W-XRP-S-1794084285861',null,false
     assert out == ["копия: 法兰西基金", "копия трейдера", "копия: Иван", "сигнал системы CRYPTO NOVA AI", "сигнал системы CRYPTO NOVA AI",
                    "Сбалансированная · откуп каскада"]
     assert not any("новост" in x for x in out)
+
+
+def test_the_whales_desk_comes_from_the_live_file_when_newer():
+    """10.11 (owner): the real ETH long of 13:50 was missing from whales_top.json's desk at 14:16 — the pipeline snapshot; the
+    server's whales_live.json is the desk the real account mirrors"""
+    import shutil
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    html = open(os.path.join(root, "web", "app.html"), encoding="utf-8").read()
+    assert "WTOP=liveDesk(WTOP,r.ok?await r.json():null)" in html
+    node = shutil.which("node")
+    if not node:
+        return
+    a, b = html.index("// LIVE_DESK_START"), html.index("// LIVE_DESK_END")
+    T = {"asof": 100, "desk": {"start": 10000, "equity": 11000, "open": [{"coin": "BTC", "whale": "a"}], "closed": [], "trades": 1, "wins": 1}}
+    L = {"asof": 200, "names": {"b": "Trader B"}, "desk": {"start": 10000, "equity": 11500, "open": [{"coin": "BTC", "whale": "a"}, {"coin": "ETH", "whale": "b"}],
+                                                          "closed": [{"coin": "SOL", "pnl": 5, "closed_t": 1}, {"coin": "XRP", "pnl": -2, "closed_t": 2}]}}
+    p = os.path.join(tempfile.mkdtemp(), "l.js")
+    open(p, "w", encoding="utf-8").write(html[a:b] + f"\nconst R=liveDesk({json.dumps(T)},{json.dumps(L)}).desk, S=liveDesk({json.dumps(T)},{json.dumps(dict(L, asof=50))}).desk;"
+                                         "process.stdout.write(JSON.stringify([R.open.map(o=>o.coin+':'+o.whale_ru),R.pnl_usd,R.trades,R.wins,R.closed[0].coin,S.open.length]));")
+    out = json.loads(subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout)
+    assert out == [["BTC:a", "ETH:Trader B"], 1500, 2, 1, "XRP", 1]

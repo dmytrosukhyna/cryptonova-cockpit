@@ -126,3 +126,28 @@ def test_the_whales_desk_comes_from_the_live_file_when_newer():
                                          "process.stdout.write(JSON.stringify([R.open.map(o=>o.coin+':'+o.whale_ru),R.pnl_usd,R.trades,R.wins,R.closed[0].coin,S.open.length]));")
     out = json.loads(subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout)
     assert out == [["BTC:a", "ETH:Trader B"], 1500, 2, 1, "XRP", 1]
+
+
+def test_research_factors_without_data_read_no_data_not_weak():
+    """11.11: research.json cards have factors_nodata (missing factors are removed from factors) — the panel shows «нет данных»,
+    never a zero bar or «слабая сторона», and does not break when team / community are absent"""
+    import shutil
+    import subprocess
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    html = open(os.path.join(root, "web", "app.html"), encoding="utf-8").read()
+    assert "${factorBars(c)}" in html and "${factorLine(c)}" in html and "const f=c.factors; const best=Object.entries(f)" not in html
+    node = shutil.which("node")
+    if not node:
+        return
+    a, b = html.index("// FACTORS_START"), html.index("// FACTORS_END")
+    cards = [{"factors": {"economics": 91, "team": 100, "market": 41, "narrative": 80}, "factors_nodata": ["community"]},
+             {"factors": {"market": 55}, "factors_nodata": ["team", "community", "economics", "narrative"]},
+             {"factors_nodata": ["team"]}, {}, {"factors": {"economics": 70, "team": None, "market": 30}}]
+    p = os.path.join(tempfile.mkdtemp(), "f.js")
+    open(p, "w", encoding="utf-8").write(html[a:b] + f"\nconst C={json.dumps(cards)};process.stdout.write(JSON.stringify(C.map(c=>[factorLine(c),factorBars(c)])));")
+    out = json.loads(subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout)
+    assert out[0][0] == "Сильная сторона — команда (100), слабая — рынок (41). Нет данных: сообщество."
+    assert out[0][1].count("нет данных") == 1 and "<small>сообщество</small>" in out[0][1] and "undefined" not in out[0][1]
+    assert out[1][0].startswith("Оценка есть только по одному фактору: рынок (55). Нет данных: команда, сообщество")
+    assert out[2][0] == "Нет данных: команда." and out[3] == ["", ""]
+    assert out[4][0] == "Сильная сторона — экономика (70), слабая — рынок (30). Нет данных: команда." and "NaN" not in out[4][1]

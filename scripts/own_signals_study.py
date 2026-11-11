@@ -265,6 +265,127 @@ def account(trades, share=0.10, max_open=10, risk=None, per_day=None):
             "last_months_pct": {m: round(r * 100, 1) for m, r in list(mo.items())[-6:]}}
 
 
+def altshift():
+    """11.11 (owner's idea, research only): «датчик альтсезона включён → часть ядра в альты» on the REAL spot profile, honestly:
+    every Binance perp (delisted included), the gauge on the point-in-time top 40 alts, the alt basket = the 10 largest alts by
+    180-day volume with ≥ 1 year of history at each rebalance. Baseline (shares of the spot sleeve, as the account holds them now):
+    core 80 % in the plan proportions BTC 30 / ETH 10 / SOL 5, 10 % other coins (the same basket while BTC is «рост», else BTC — a
+    stand-in for the medium / high-risk / smart-money places), 10 % dollars at 4 %. Variants: while the gauge is ON, X % of the
+    sleeve moves from the core (pro rata) into the basket; OFF → back. 0.2 % of the turnover per rebalance; weekly rebalance and on
+    every gauge change. Null: the same shift with the gauge series rotated by a random offset (300 draws) — the share of random
+    timings the real gauge beats."""
+    import random
+    D, CL, days_all = _wide_data()
+    day_top, bull_arr, t0 = _WIDE["day_top"], _WIDE["bull"], _WIDE["t0"]
+    B = D["BTC"]
+    days = [int(t) for t in B["t"]]
+    bullv = {int(t): (b == 1) for t, b in zip(B["t"], bull_arr)}
+    cl = {s: {int(t): float(c) for t, c in zip(K["t"], K["c"])} for s, K in D.items()}
+    first = {s: int(K["t"][0]) for s, K in D.items()}
+    alt_ok = lambda s: s not in ("BTC", "ETH", "SOL")  # noqa: E731
+    idx, rlist, gauge = 1.0, [], {}
+    for i, d in enumerate(days):
+        top = [s for s in day_top.get(d, []) if s not in ("BTC", "ETH")][:40]
+        if i and top:
+            p = days[i - 1]
+            rs = [cl[s][d] / cl[s][p] - 1 for s in top if p in cl[s] and d in cl[s] and cl[s][p] > 0]
+            idx *= 1 + (float(np.mean(rs)) if rs else 0.0)
+        rlist.append(idx / cl["BTC"][d])
+        if i >= 91 and top:
+            d0 = days[i - 91]
+            b_ret = cl["BTC"][d] / cl["BTC"][d0] - 1
+            beat = [cl[s][d] / cl[s][d0] - 1 > b_ret for s in top if d0 in cl[s] and d in cl[s]]
+            br = sum(beat) / len(beat) if len(beat) >= 10 else 0
+            gauge[d] = bool(bullv.get(d) and br >= 0.60 and rlist[-1] > float(np.mean(rlist[-91:])))
+    vol180 = {}
+    for s_, K in D.items():
+        v = sma(K["bv"] * K["c"], 180)
+        vol180[s_] = {int(t): float(x) for t, x in zip(K["t"], v) if not np.isnan(x)}
+
+    def basket(d):
+        c_ = [(vol180[s][d], s) for s in vol180 if d in vol180[s] and alt_ok(s) and d - first[s] >= 365 * DAY]
+        return [s for _v, s in sorted(c_, reverse=True)[:10]]
+    CORE_ = {"BTC": 80 * 30 / 45, "ETH": 80 * 10 / 45, "SOL": 80 * 5 / 45}
+    start = next(i for i, d in enumerate(days) if d >= t0)
+
+    def sim(shift, g=None, other="regime"):
+        g = gauge if g is None else g
+        V, hold, prev, curve = 1.0, None, None, []
+        for i in range(start, len(days) - 1):
+            d, d1 = days[i], days[i + 1]
+            on, bull = bool(g.get(d, False)), bool(bullv.get(d))
+            state = (on, bull)
+            if hold is None or state != prev or (d // DAY) % 7 == 0:
+                k = 1 - (shift / 80.0 if on else 0.0)
+                t = {s: w * k for s, w in CORE_.items()}
+                bk = basket(d)
+                alt_w = (shift if on else 0.0) + (10.0 if (other == "regime" and bull and bk) else 0.0)
+                if other == "regime" and not (bull and bk):
+                    t["BTC"] += 10.0
+                if other == "btc":
+                    t["BTC"] += 10.0
+                if alt_w and bk:
+                    for s in bk:
+                        t[s] = t.get(s, 0) + alt_w / len(bk)
+                elif alt_w:
+                    t["BTC"] += alt_w
+                new = {s: w / 100 * V for s, w in t.items()}
+                new["_cash"] = V - sum(new.values())
+                if hold is not None:
+                    turn = sum(abs(new.get(s, 0) - hold.get(s, 0)) for s in set(new) | set(hold)) / 2
+                    V -= turn * 0.002
+                    kk = V / sum(new.values())
+                    new = {s: v * kk for s, v in new.items()}
+                hold, prev = new, state
+            for s in list(hold):
+                if s == "_cash":
+                    hold[s] *= 1 + 0.04 / 365
+                elif d in cl.get(s, {}) and d1 in cl.get(s, {}):
+                    hold[s] *= cl[s][d1] / cl[s][d]
+            V = sum(hold.values())
+            curve.append((d1, V))
+        eq = np.array([v for _, v in curve])
+        dd = float((eq / np.maximum.accumulate(eq) - 1).min())
+        yrs, pv = [], 1.0
+        for y in YEARS:
+            pts = [v for t, v in curve if dt.datetime.fromtimestamp(t / 1000, dt.timezone.utc).strftime("%Y") == y]
+            if pts:
+                yrs.append(round((pts[-1] / pv - 1) * 100))
+                pv = pts[-1]
+        return [round(float(eq[-1]), 3), round(dd * 100), *yrs]
+    res = {"fixed shares (as now)": sim(0)}
+    gd = [d for d in days if d >= t0]
+    gv = [bool(gauge.get(d, False)) for d in gd]
+    rnd = random.Random(11)
+    for x in (10, 20, 30):
+        real = sim(x)
+        beat = 0
+        N = 300
+        for _ in range(N):
+            off = rnd.randrange(30, len(gd) - 30)
+            fake = {d: gv[(j + off) % len(gd)] for j, d in enumerate(gd)}
+            beat += real[0] > sim(x, fake)[0]
+        res[f"gauge ON → {x} % of the sleeve from the core into alts"] = real + [f"beats {round(beat / N * 100)} % of random timings"]
+        res[f"always {x} % in alts instead of core (no gauge)"] = sim(x, {d: True for d in gd})
+    res["core 90 %, no other coins (10 % in BTC)"] = sim(0, other="btc")
+    # the gauge's episodes: when it was on and what the basket did against BTC in each
+    eps, a = [], None
+    for j, d in enumerate(gd):
+        if gv[j] and a is None:
+            a = d
+        if a is not None and (not gv[j] or j == len(gd) - 1):
+            bk = basket(a)
+            r_alt = float(np.mean([cl[s][d] / cl[s][a] - 1 for s in bk if a in cl[s] and d in cl[s]])) if bk else 0.0
+            eps.append([dt.datetime.fromtimestamp(a / 1000, dt.timezone.utc).strftime("%Y-%m-%d"), round((d - a) / DAY),
+                        round(r_alt * 100), round((cl["BTC"][d] / cl["BTC"][a] - 1) * 100)])
+            a = None
+    res["gauge days on since 2022"] = sum(gv)
+    res["gauge now"] = gauge.get(days[-1])
+    res["episodes [start, days, basket %, BTC %]"] = eps
+    res["basket now"] = basket(days[-1])
+    note("altshift · real spot profile [x, dd %, 2022…2026 %]", json.dumps(res, ensure_ascii=False))
+
+
 def main():
     with ThreadPoolExecutor(12) as ex:
         raw = dict(zip(COINS, ex.map(lambda s: daily(s + "USDT"), COINS)))
@@ -2203,4 +2324,4 @@ def ls_robust():
 
 
 if __name__ == "__main__":
-    (pyramid() if "--pyramid" in sys.argv else ls_robust() if "--lsrob" in sys.argv else ls_neutral() if "--ls" in sys.argv else quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())
+    (pyramid() if "--pyramid" in sys.argv else ls_robust() if "--lsrob" in sys.argv else ls_neutral() if "--ls" in sys.argv else quality() if "--quality" in sys.argv else factors() if "--factors" in sys.argv else spot_probe() if "--spotprobe" in sys.argv else altshift() if "--altshift" in sys.argv else altport2() if "--altport2" in sys.argv else own_bear() if "--bear" in sys.argv else pool_probe() if "--pool" in sys.argv else wide2() if "--wide2" in sys.argv else wide() if "--wide" in sys.argv else flow3() if "--flow3" in sys.argv else flow2() if "--flow2" in sys.argv else flow() if "--flow" in sys.argv else altport() if "--altport" in sys.argv else tune() if "--tune" in sys.argv else export() if "--export" in sys.argv else combo() if "--combo" in sys.argv else sizing() if "--sizing" in sys.argv else spot() if "--spot" in sys.argv else main())

@@ -1,0 +1,23 @@
+name: research-rh-hl-memes
+# Manual only. RESEARCH ONLY (paper): Robinhood Chain / Arc meme season + the Hyperliquid ecosystem (scripts/rh_hl_memes_study.py).
+# No orders, no keys, no wallets. Results are published as job annotations. Nothing is committed.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "empty = everything, --no-hl = sources and chains only"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/rh_hl_memes_study.py ${{ inputs.mode }}

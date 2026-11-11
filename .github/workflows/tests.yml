@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install -q numpy pillow pytest
+      - run: pip install -q numpy pillow pytest cryptography
       - name: tests/run.py against the known failures
         run: |
           python -u tests/run.py > tests.log 2>&1 || true

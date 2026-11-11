@@ -61,7 +61,8 @@ def main() -> int:
                 n += 1
             except Exception as e:  # noqa: BLE001
                 print("funding failed", bx, repr(e))
-        print(f"funding {n}/{len(core)} in {time.time() - t0:.0f}s")
+        nd = daily.refresh(store, rest, core + list(cfg.b_extra), now, max_n=10)   # 11.11: daily bars hourly, ≤ 10 coins, off the minute loop
+        print(f"funding {n}/{len(core)}, {nd} daily bars in {time.time() - t0:.0f}s")
         return 0
     if m == "quick":
         rest = BingXRest(cfg.bingx)          # the documented limit is 1 request a second per IP — kept (18 coins ≈ 20 s)
@@ -72,7 +73,9 @@ def main() -> int:
         elif "/" in extra:                   # "k/n": the k-th of n slices of the lab coins (the engine spreads them over cycles)
             k, n_ = (int(x) for x in extra.split("/"))
             quick(store, list(cfg.b_extra)[k::n_], rest)
-        nd = daily.refresh(store, rest, core, int(time.time() * 1000))
+        # 11.11: the server's minute loop (CNQ_REFRESH_EXTRA «k/n») never fetches daily bars — it does that once an hour in the
+        # «funding» mode; a quick refresh on GitHub still keeps them (each coin at most once per daily.RETRY_MS)
+        nd = daily.refresh(store, rest, core, int(time.time() * 1000)) if "/" not in extra else 0
         print(f"quick refresh {ok}/{len(core)} symbols, {nd} daily bars in {time.time() - t0:.0f}s")
         return 0 if ok else 1
     ok = 0

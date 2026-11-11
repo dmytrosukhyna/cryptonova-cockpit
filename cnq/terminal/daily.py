@@ -62,19 +62,48 @@ def history(store, symbols, now_ms: int, seed_path: str = SEED, local_path: str 
     return out
 
 
-def refresh(store, rest, symbols, now_ms: int, log=print) -> int:
+RETRY_MS = 6 * 3_600_000      # 11.11: a coin whose daily fetch failed / came back empty is tried again at most every 6 hours
+TRIES = os.path.join("data", "daily_refresh.json")
+
+
+def _tries(path: str) -> dict:
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def refresh(store, rest, symbols, now_ms: int, log=print, tries_path: str | None = None, max_n: int | None = None) -> int:
     """Keep ≥ MIN_DAYS of 1d candles per coin: a short history is refetched over KEEP_DAYS, otherwise only the tail — and
     only when the last stored bar is over 2 days old, so at most about once a day per coin. One BingX request per coin when it does anything."""
     n = 0
+    tp = tries_path or TRIES
+    tried = _tries(tp)
+    changed = False
     for bx in symbols:
         try:
             first, last, cnt = store.candle_bounds(bx, "1d")
             if last is not None and last >= now_ms - 2 * DAY_MS:
                 continue                                  # fresh enough: the 15m candles cover the recent days anyway
+            if now_ms - int(tried.get(bx) or 0) < RETRY_MS:
+                continue                                  # tried recently (BingX had no newer daily bar) — not every minute
+            if max_n is not None and sum(1 for v in tried.values() if v == now_ms) >= max_n:
+                break                                     # this call's share is done — the rest next time
+            tried[bx], changed = now_ms, True
             short = last is None or cnt < MIN_DAYS or first > now_ms - MIN_DAYS * DAY_MS
             n += store.upsert_candles(bx, "1d", rest.klines_range(bx, "1d", now_ms - KEEP_DAYS * DAY_MS if short else last, now_ms))
         except Exception as e:  # noqa: BLE001
             log("daily refresh failed", bx, repr(e))
+    if changed:
+        try:
+            os.makedirs(os.path.dirname(tp) or ".", exist_ok=True)
+            with open(tp + ".tmp", "w", encoding="utf-8") as f:
+                json.dump(tried, f)
+            os.replace(tp + ".tmp", tp)
+        except Exception:  # noqa: BLE001
+            pass
     return n
 
 

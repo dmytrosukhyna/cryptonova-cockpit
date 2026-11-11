@@ -60,8 +60,9 @@ def test_daily_history_merges_seed_and_store_and_refresh_keeps_250_days(tmp_path
             return [Candle(t, 1, 1, 1, 50.0, 1, t + DAY - 1, 1, 1, 1, 1) for t in range(a // DAY * DAY, b, DAY)]
 
     st, now = Store(), T0 + 3600_000
-    assert daily.refresh(st, Rest(), ["ZEC-USDT"], now) >= 400        # empty → the whole 400-day window
-    assert daily.refresh(st, Rest(), ["ZEC-USDT"], now + 3600_000) == 0 and len(calls) == 1   # fresh → nothing
+    tp = str(tmp_path / "tries.json")
+    assert daily.refresh(st, Rest(), ["ZEC-USDT"], now, tries_path=tp) >= 400        # empty → the whole 400-day window
+    assert daily.refresh(st, Rest(), ["ZEC-USDT"], now + 3600_000, tries_path=tp) == 0 and len(calls) == 1   # fresh → nothing
     seed = tmp_path / "seed.json"
     seed.write_text('{"symbols": {"ZEC": {"start_day": %d, "closes": [10.0, 11.0]}}}' % (T0 // DAY - 420))
     h = daily.history(st, ["ZEC-USDT"], now, seed_path=str(seed), local_path=str(tmp_path / "none.json"))["ZEC-USDT"]
@@ -124,3 +125,30 @@ def test_ideas_portfolio_buys_alts_only_near_support_and_logs_why():
     skip = next(a for a in st["actions"] if a["symbol"] == "FAR1")
     assert skip["action"] == "SKIP" and "не догоняем" in skip["reason"]
     assert any(n["symbol"] == "FAR1" and "не догоняем" in n["why_ru"] for n in st["not_bought"])
+
+
+def test_daily_refresh_retries_a_coin_at_most_every_6_hours_and_caps_a_call(tmp_path):
+    """11.11 (server minute loop over its 60 s budget): a coin BingX gives no newer daily bar is not asked again every minute"""
+    calls = []
+
+    class Store:
+        def candle_bounds(self, s, i):
+            return (T0 - 300 * DAY, T0 - 5 * DAY, 296)       # stale last bar
+        def upsert_candles(self, s, i, cs):
+            return len(cs)
+
+    class Rest:
+        def klines_range(self, s, i, a, b):
+            calls.append(s)
+            return []                                           # BingX has nothing newer
+
+    tp = str(tmp_path / "tries.json")
+    syms = [f"C{i}-USDT" for i in range(15)]
+    daily.refresh(Store(), Rest(), syms, T0, tries_path=tp, max_n=10)
+    assert len(calls) == 10                                     # capped
+    daily.refresh(Store(), Rest(), syms, T0 + 60_000, tries_path=tp, max_n=10)
+    assert len(calls) == 15                                     # the other 5; the first 10 wait
+    daily.refresh(Store(), Rest(), syms, T0 + 120_000, tries_path=tp)
+    assert len(calls) == 15                                     # nobody retried within 6 h
+    daily.refresh(Store(), Rest(), syms, T0 + daily.RETRY_MS + 1, tries_path=tp)
+    assert len(calls) == 25                                     # the first 10 again; the other 5 were tried a minute later

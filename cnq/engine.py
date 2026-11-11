@@ -312,7 +312,10 @@ def cycle(n: int, env: dict) -> dict:
     if n % 60 == 1:
         for cmd in HOURLY:
             steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
-    out = {k: {"ok": v[0], "sec": v[1], **({} if v[0] else {"err": v[2][-300:]})} for k, v in steps.items()}
+    # 11.11 (cycle over its 60 s budget): the candle steps' own summary line («quick refresh 18/18 symbols, 0 daily bars in 26s»)
+    note = lambda o: ([x for x in str(o or "").strip().splitlines() if x.strip()] or [""])[-1][-160:]   # noqa: E731
+    out = {k: {"ok": v[0], "sec": v[1], **({} if v[0] else {"err": v[2][-300:]}),
+               **({"note": note(v[2])} if v[0] and k in ("candles", "funding") else {})} for k, v in steps.items()}
     out["_peak_mb"] = {"ok": True, "sec": 0, "mb": _peak_mb()}
     return out
 

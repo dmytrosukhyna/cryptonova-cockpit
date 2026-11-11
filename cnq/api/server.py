@@ -158,6 +158,9 @@ class Api:
         self._report_ready: dict[str, tuple[float, dict]] = {}       # build 50: language → (since when, the last report with its voice ready)
 
     # ---------------------------------------------------------------- helpers
+    def _data_dir(self) -> str:
+        return os.path.join(os.path.dirname(os.path.abspath(self.web)), "data")
+
     def _read(self, path: str) -> dict | None:
         try:
             with open(path, encoding="utf-8") as f:
@@ -401,6 +404,12 @@ class Api:
         if method == "POST" and path == "/v2/admin/nova":                # the closed system's NOVA chat through the server's key
             deny = self.console.check(headers)
             return deny if deny else self._panel_nova(body)
+        if method == "GET" and path == "/v2/pubkey":                     # 11.11: the key the pipeline seals owner files to (public by nature)
+            from cnq import sealed
+            try:
+                return 200, {"alg": "x25519", "key": sealed.public_key(self._data_dir())}
+            except Exception as e:  # noqa: BLE001
+                return 503, {"error": "unavailable", "detail": type(e).__name__}
         if method == "POST" and path == "/v2/peter/ingest":              # 11.11: the MT5 bridge (its own token; observation only)
             ip = str(headers.get("x-real-ip") or headers.get("x-forwarded-for") or "local").split(",")[0].strip()[:64]
             return self.peter.ingest(headers, body, ip)
@@ -505,6 +514,13 @@ class Api:
                          "configured": {**self.owner_data.configured(),
                                         "admin_token": len((os.environ.get("CNQ_ADMIN_TOKEN") or "").strip()) >= admin_console.MIN_TOKEN},
                          "now": int(time.time() * 1000)}
+        m = re.fullmatch(r"/v2/owner/sealed/([a-z_]+)", path)          # 11.11: owner files the pipeline publishes only encrypted
+        if m:
+            from cnq import sealed
+            d = sealed.load(self.web, self._data_dir(), m.group(1)) if m.group(1) in sealed.NAMES else None
+            if d is None:
+                return 503, {"error": "no_data"}
+            return 200, {"name": m.group(1), "asof": d.get("asof"), "data": d}
         if path == "/v2/owner/reversal":                               # 11.11: «Разворот (тест)», owner only
             return self.reversal.desk()
         if path == "/v2/owner/peter":                                  # 11.11: «Питер» (MT5), owner only

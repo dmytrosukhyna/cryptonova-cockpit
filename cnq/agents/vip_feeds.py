@@ -889,6 +889,8 @@ def system_status(out: str, now: int, lease: dict | None, api: tuple | None, pre
                        f"Проверено вариантов: {A.get('tested')}, прошли: {A.get('passed')}." if A else "autolab.json нет."))
     # the researcher (hourly watch, docs/research/watch_log.md)
     wt, wl = watch
+    # 11.11 (the repo is public): the public status keeps the market part of the note only — never how the futures are run
+    wl = re.split(r"\s*(?:Копирован|Копи[яи]\b|Кит[ыаов]?\b|Трейдер)", wl or "", maxsplit=1, flags=re.I)[0].rstrip(" .,;—-") + ("." if wl else "")
     comps.append(_comp("researcher", "Дежурный исследователь (раз в час)", _fresh(wt, now, 130) if wt else "error", wt, now,
                        (wl[:220] + ("…" if len(wl) > 220 else "")) if wl else "Журнал дежурства не прочитан."))
     # 28.10: «Иван тест» and «Мой портфель» — the read-only monitors (the server's timer since 28.10, before that the Mac mirror)

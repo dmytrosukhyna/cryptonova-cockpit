@@ -14,6 +14,7 @@ Alerts (kept 3 days): a bid wall ≥ $1M appears / disappears, the price crosses
 a long, a smart wallet buys. Every number is from a named source; nothing is estimated."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -192,7 +193,9 @@ def coin_doc(coin: str, raw: dict, prev: dict, out: str, now: int) -> tuple[dict
     for w in _load(out, "whale_watch.json").get("whales") or []:
         for p in (w.get("positions") or []) if isinstance(w, dict) else []:
             if isinstance(p, dict) and p.get("coin") == coin and not p.get("hidden"):
-                big.append({"who": w.get("name") or w.get("short") or "трейдер", "side": p.get("side"), "usd": round(float(p.get("notional") or 0)),
+                # 11.11 (repo is public): never a trader's name or address here — a short stable tag only (for «new long» alerts)
+                tag = hashlib.sha256(str(w.get("addr") or w.get("name") or "").encode()).hexdigest()[:4]
+                big.append({"who": f"трейдер #{tag}", "side": p.get("side"), "usd": round(float(p.get("notional") or 0)),
                             "entry": p.get("entry")})
     doc["traders"] = sorted(big, key=lambda b: -b["usd"])[:5]
     old_long = {(b["who"], b["side"]) for b in prev.get("traders") or []}
@@ -200,7 +203,7 @@ def coin_doc(coin: str, raw: dict, prev: dict, out: str, now: int) -> tuple[dict
         for b in doc["traders"]:
             if b["side"] == "LONG" and (b["who"], "LONG") not in old_long:
                 alerts.append({"t": now, "coin": coin, "kind": "whale",
-                               "text": f"{coin}: крупный трейдер {b['who']} открыл лонг на {_m(b['usd'])}."})
+                               "text": f"{coin}: крупный {b['who']} открыл лонг на {_m(b['usd'])}."})
     sm = []
     M = _load(out, "smart_money.json")
     for t in ((M.get("watch") or {}).get("tokens") or []) + (M.get("signals") or []):

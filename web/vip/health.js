@@ -5,7 +5,10 @@
   'use strict';
   const V = window.VIP, esc = V.esc, A = V.arr;
   V.ownerHealthCard = async function () {
-    const [D] = await V.feeds(['owner_health.json']);
+    // 11.11: the file is published only sealed (web/sealed/) — the server opens it for the owner; the old public file is a fallback
+    let D = null;
+    try { D = await V.ownerData('/v2/owner/sealed/owner_health'); } catch (e) { D = null; }
+    if (!D || !A(D.rows).length) { try { [D] = await V.feeds(['owner_health.json']); } catch (e) { D = null; } }
     if (!D || !A(D.rows).length) return '';
     const rows = A(D.rows).map((r) => `<tr class="${r.status === 'fail' ? 'bad' : ''}">
         <td class="hl-dot">${esc(r.icon)} ${esc(r.word)}</td>

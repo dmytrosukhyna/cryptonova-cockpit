@@ -69,7 +69,7 @@ jobs:
         id: state
         run: python scripts/ci_state_guard.py
       - name: Pillow for post charts, edge-tts for the spoken brief
-        run: pip install -q pillow edge-tts
+        run: pip install -q pillow edge-tts cryptography      # cryptography: scripts/ci_seal.py (owner files are published only sealed)
       - name: Server engine alive? (web/engine.json fresher than 10 min → its desks are skipped here; quiet → taken back)
         id: engine
         run: python scripts/ci_engine_check.py | tee -a "$GITHUB_OUTPUT"
@@ -311,12 +311,17 @@ jobs:
         continue-on-error: true
         timeout-minutes: 1
         run: python -m cnq.agents.owner_health
+      - name: Seal the owner's internal files (web/sealed/*.json, encrypted to the server's key; the plaintext leaves the commit)
+        continue-on-error: true
+        timeout-minutes: 1
+        run: python scripts/ci_seal.py
       - name: Commit refreshed data (state also survives in the cache)
         continue-on-error: true
         run: |
           git config user.name "cnq-bot"
           git config user.email "cnq-bot@users.noreply.github.com"
           for f in web/terminal.json web/decision.json web/portfolio.json web/app_portfolio.json web/app_home.json web/app_home.en.json web/app_home.uk.json web/app_home.el.json web/app_home.es.json web/app_btc.json web/altseason.json web/quality.json web/paper.json web/funding.json web/macro.json web/memes.json web/ideas.json web/arb.json web/tri.json web/calendar.json web/weekly.json web/calibration.json web/outlook.json web/broadcast.json web/app_signals.json web/markets.json web/research.json web/whales.json web/whales_top.json web/whale_watch.json web/stock_whales.json web/smart_money.json web/smart_money_signal.json web/real_why.json web/fut_owner.json web/signals_feed.json web/capital.json web/yield.json web/basis.json web/options_mood.json web/tokenomics.json web/channel_watch.json web/channel_opps.json web/books.json web/version.json web/status.json web/brief.json web/brief.mp3 web/spot_pipeline.json web/strategies.json web/opportunities.json web/system_status.json web/owner_watch.json web/owner_health.json web/gh_runs.json; do [ -f "$f" ] && git add "$f"; done
+          git add web/sealed 2>/dev/null || true
           # 04.11: our own whale-trade history (cnq/agents/whale_study.archive_trades) — one dated JSONL a day, kept for 6+ months
           if [ -d data/whale_trades ]; then git add data/whale_trades || echo "::warning title=whale_trades::not added"; fi
           # 04.11: «Куда инвестируют киты» — the daily signal log and its 1/7/30-day outcomes (cnq/agents/smart_money.py)

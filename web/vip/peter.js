@@ -11,7 +11,8 @@
     },
     mount(el) {
       if (window.CNPeter) window.CNPeter.mount(el, { fetchToken: () => window.CNAuth.fetchOwner('/v2/owner/peter/token'),
-        rotateToken: () => window.CNAuth.fetchOwner('/v2/owner/peter/token/rotate', { method: 'POST' }) });
+        rotateToken: () => window.CNAuth.fetchOwner('/v2/owner/peter/token/rotate', { method: 'POST' }),
+        cloud:{get:()=>window.CNAuth.fetchOwner('/v2/owner/peter/cloud'),save:b=>window.CNAuth.fetchOwner('/v2/owner/peter/cloud',{method:'POST',body:b}),check:()=>window.CNAuth.fetchOwner('/v2/owner/peter/cloud/check',{method:'POST',body:{}}),off:()=>window.CNAuth.fetchOwner('/v2/owner/peter/cloud/disconnect',{method:'POST',body:{}})} });
     },
   };
 })();

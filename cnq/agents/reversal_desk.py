@@ -2,7 +2,11 @@
 обратную, прыгать по уровням»). TEST, owner-only, demo money. It is NOT in web/paper.json and has no «whales:» / «ivan:» signal id,
 so the real account can never open its trades (okx_futures opens only those two prefixes).
 
-What it does, every pipeline run (cli «whalestudy», after the copy desk is published):
+11.11 evening: the desk runs on the SERVER inside the API (cnq/api/reversal.py, every 10 minutes) and its file stays in
+<run>/data/reversal — served only to a signed-in owner (GET /v2/owner/reversal). It is no longer run by the GitHub pipeline and
+web/reversal_desk.json is no longer written: web/ is published, and the rule text speaks about our copies.
+
+What it does on every run:
   1. reads OUR closed copies (web/whales_live.json desk «closed») that closed after the desk started and moved ≥ MIN in our favour;
   2. for each, the OPPOSITE side becomes a candidate; the entry rule of the registered variant (config/reversal_desk.json — the
      best of the 54 variants registered before the backtest, docs/research/reversal-desk-2026-11-11.md) decides:
@@ -11,7 +15,7 @@ What it does, every pipeline run (cli «whalestudy», after the copy desk is pub
        «candle» — at the close of the first 4-hour block within 24 h that moves ≥ 1.5 % in the reversal direction;
   3. a paper position: 10 % of the desk's equity, no leverage, one per coin, at most 5; a stop (−8 % / −16 %) and a time exit
      (1 / 3 / 7 days); 0.10 % costs per round trip, funding from OKX at the close.
-Prices: OKX {COIN}-USDT-SWAP (ticker, hourly candles) — public data, no keys. State: ws_kv «reversal_desk». → web/reversal_desk.json."""
+Prices: OKX {COIN}-USDT-SWAP (ticker, hourly candles) — public data, no keys. State and output: <run>/data/reversal (server only)."""
 from __future__ import annotations
 
 import json
@@ -224,11 +228,13 @@ def public(d: dict, v: dict, now: int) -> dict:
             "waiting": d.get("cands") or [], "events": (d.get("events") or [])[-40:]}
 
 
-def run(conn, out: str = "web", now: int | None = None, kv_get=None, kv_set=None, **kw) -> dict:
+def run(conn, out: str = "web", now: int | None = None, kv_get=None, kv_set=None, src: str | None = None, **kw) -> dict:
+    """11.11 (owner: copying is internal, never public): `out` is where the desk's file is written — on the server the API's
+    private folder <run>/data/reversal (cnq/api/reversal.py), never the published web/; `src` is where whales_live.json is read."""
     now = int(now or time.time() * 1000)
     v = cfg()
     try:
-        with open(os.path.join(out, "whales_live.json"), encoding="utf-8") as f:
+        with open(os.path.join(src or out, "whales_live.json"), encoding="utf-8") as f:
             closed = (json.load(f).get("desk") or {}).get("closed") or []
     except Exception:  # noqa: BLE001
         closed = []

@@ -54,7 +54,7 @@ from cnq.agents.llm import LLM, PROVIDERS
 
 from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, owner_auth, owner_data, pf_parse, \
     pf_review, spot_top, tts
-from . import peter as peter_desk, peter_cloud
+from . import peter as peter_desk, peter_cloud, reversal as reversal_api
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -133,6 +133,8 @@ class Api:
         self.owner_data = owner_data.OwnerData(web_dir)
         # 11.11: «Питер» — MT5 gold trader, observation only (cnq/api/peter.py); its data stays in <run>/data/peter, never in web/
         self.peter = peter_desk.Peter(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "peter"), web_dir=web_dir)
+        # 11.11: the paper test desk «Разворот» — owner-only, kept in <run>/data/reversal, never in web/ (cnq/api/reversal.py)
+        self.reversal = reversal_api.Reversal(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "reversal"), web_dir)
         self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
         try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
             self.peter.ensure_token()
@@ -503,6 +505,8 @@ class Api:
                          "configured": {**self.owner_data.configured(),
                                         "admin_token": len((os.environ.get("CNQ_ADMIN_TOKEN") or "").strip()) >= admin_console.MIN_TOKEN},
                          "now": int(time.time() * 1000)}
+        if path == "/v2/owner/reversal":                               # 11.11: «Разворот (тест)», owner only
+            return self.reversal.desk()
         if path == "/v2/owner/peter":                                  # 11.11: «Питер» (MT5), owner only
             return self.peter.desk()
         if path == "/v2/owner/peter/token":
@@ -864,6 +868,7 @@ def main() -> int:
     port = int(os.environ.get("CNQ_API_PORT", "8090"))
     # build 50: the server installs NOVA's voice (edge-tts) by itself when it is missing — once, in the background (cnq/api/tts.py)
     api.tts.attach_installer()
+    api.reversal.start()                     # 11.11: «Разворот (тест)» — paper, every 10 minutes, owner-only output
     api.peter_cloud.start()                  # 11.11: «Питер» through MetaApi — polls only while the owner has connected it
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))
     print(f"cnq-api {VERSION} on 127.0.0.1:{port}", flush=True)
@@ -872,7 +877,7 @@ def main() -> int:
         here = os.path.dirname(os.path.realpath(__file__))
         agents = os.path.join(os.path.dirname(here), "agents")            # what the API imports from the engine's package
         files = lambda: [os.path.join(here, f) for f in os.listdir(here) if f.endswith(".py")] + \
-            [os.path.join(agents, f) for f in ("i18n.py", "llm.py") if os.path.exists(os.path.join(agents, f))]
+            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py") if os.path.exists(os.path.join(agents, f))]
         stamp = lambda: max(os.path.getmtime(p) for p in files())
         first = stamp()
         while True:

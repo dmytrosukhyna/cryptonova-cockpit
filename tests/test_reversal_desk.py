@@ -60,3 +60,37 @@ def test_the_desk_is_a_labelled_test_and_can_never_reach_the_real_account(tmp_pa
     assert doc["test"] and doc["owner_only"] and doc["paper"] and doc["real_account"] is False and "ТЕСТ" in doc["label_ru"]
     assert doc["variant"] == {"entry": "candle", "min_profit": 0.05, "hold_days": 3, "stop": 0.16} and doc["backtest"]["n"] == 426
     assert not fu.copy_sig("reversal:R-ZEC-L-1") and not fu.copy_sig("razvorot:x", {})
+
+
+def test_the_desk_is_owner_only_and_never_a_public_file(tmp_path):
+    """11.11 (owner: copying / whales are internal, never public): the desk runs inside the API, its file stays in <run>/data/reversal
+    and is served only by /v2/owner/reversal (owner session); web/ and the pipeline no longer carry it"""
+    import json
+    import os
+    from cnq.api import reversal as A
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    r = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()
+    assert not [f for f in os.listdir(os.path.join(root, "web")) if "reversal_desk" in f]
+    assert "reversal_desk" not in r(".github", "workflows", "site.yml") and "reversal_desk.run(" not in r("cnq", "cli.py")
+    from cnq import engine
+    assert not [f for f in engine.OWNED if "reversal" in f]
+    web, data = tmp_path / "web", tmp_path / "data"
+    web.mkdir()
+    (web / "whales_live.json").write_text(json.dumps({"asof": T0, "desk": {"open": [], "closed": []}}))
+    api = A.Reversal(str(data), str(web))
+    assert api.desk()[0] == 503
+    doc = api.tick(now=T0, px_of=lambda c: None)
+    assert doc["name"] == "Разворот (тест)" and os.path.exists(data / "reversal_desk.json") and os.path.exists(data / "state.json")
+    assert sorted(os.listdir(web)) == ["whales_live.json"]                    # nothing is written next to the published files
+    code, d = api.desk()
+    assert code == 200 and d["data"]["rule_ru"] and d["data"]["backtest"]["note_ru"]
+    assert api.tick(now=T0 + 600_000, px_of=lambda c: None)["started"] == doc["started"]      # the state survives between runs
+    srv = r("cnq", "api", "server.py")
+    i = srv.index("def _owner(")
+    assert 'path == "/v2/owner/reversal"' in srv[i:] and srv.index("self.owner_auth.require(headers)", i) < srv.index('path == "/v2/owner/reversal"', i)
+    assert srv.count("reversal.desk()") == 1 and "api.reversal.start()" in srv           # no other route serves it
+    core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
+    assert "{ id: 'reversal', name: 'Разворот (тест)', short: 'Разворот', icon: 'strategies', owner: true }" in core
+    assert '<script src="vip/reversal.js"></script>' in vip and 'id="reversalCard" hidden' in app and "/v2/owner/reversal" in app
+    js = r("web", "reversal.js")
+    assert "Оговорки" in js and "Правило" in js and "fetch('./reversal" not in js and "reversal_desk.json" not in app + js + r("web", "vip", "reversal.js")

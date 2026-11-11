@@ -1000,7 +1000,8 @@ ROT_DAYS = 3
 ROT_KEEP_MS = 14 * 86_400_000         # a trader moved out of A stays in B (studied, not copied) at least this long
 ROT_RULE_RU = (f"Колонка A — {LOCK_N} копируемых трейдеров (+ Иван вне ротации). Колонка B — до {ROT_B_N} следующих лучших: изучаем каждый "
                f"прогон, не копируем. Из A уходят: быстро — если наши копии потеряли больше {LOCK_LOSS * 100:.0f}% его доли (копии закрываем сразу); "
-               f"медленно — если его собственные сделки {ROT_DAYS} дня подряд закрылись в минус; и если скрыл позиции, 60 дней в минусе или "
+               f"медленно — если его собственные сделки {ROT_DAYS} дня подряд закрылись в минус, или 5 наших копий подряд закрылись в минус "
+               f"(на столе или на реальном счёте, решение владельца 11.11); и если скрыл позиции, 60 дней в минусе или "
                f"данных нет больше суток. Освободившееся место сразу занимает лучший из B по PF, который проходит отбор и у кого "
                f"{ROT_DAYS} последних дня подряд в плюсе; если такого нет — место пустует, деньги ждут в резерве. Раз в 3 дня обновляется "
                "только колонка B.")
@@ -1030,12 +1031,56 @@ def _usd(x: float) -> str:
     return f"${x:,.0f}".replace(",", " ")
 
 
+# 11.11 (owner: «5 копий подряд в минусе — убирать автоматически, на досмотр, вместо него — у кого хорошие показатели»):
+#   a trader in A whose last STREAK_N CLOSED copies since he joined A all lost (on the desk OR on the real account) moves to B — a slow
+#   exit (his open copies run to his exit / our stop), the seat is back-filled from B by the usual rule (best PF, full bar, 3 plus
+#   days), and he returns by the same rule. Rare by design (on the desk book since 26.10 no trader had 5 losers in a row), so no churn.
+STREAK_N = 5
+
+
+def loss_streak(rows: list, key_t: str, key_pnl: str) -> int:
+    """how many of the latest closed copies (sorted by close time) lost in a row (pnl < 0)"""
+    n = 0
+    for r in sorted(rows, key=lambda r: -int(_f(r.get(key_t)))):
+        if _f(r.get(key_pnl)) < 0:
+            n += 1
+        else:
+            break
+    return n
+
+
+def copy_streak(desk: dict | None, real: dict | None, a: str, since: int) -> tuple[int, str]:
+    """(the longer losing streak of his closed copies since `since`, «на столе» / «на реальном счёте»)"""
+    dk = [c for c in (desk or {}).get("closed") or [] if c.get("whale") == a and int(_f(c.get("closed_t"))) >= since]
+    rl = [t for t in (real or {}).get("trades") or [] if t.get("whale") == a and t.get("closed") and int(_f(t.get("closed_t"))) >= since]
+    d, r = loss_streak(dk, "closed_t", "pnl"), loss_streak(rl, "closed_t", "pnl_usd")
+    return (d, "на столе") if d >= r else (r, "на реальном счёте")
+
+
 def real_loss(real: dict | None, a: str, since: int) -> tuple[float, float]:
     """(P&L of our REAL copies of `a` opened since `since`, his real budget share); real = {"share", "trades": [{whale, opened, pnl_usd}]}"""
     if not real:
         return 0.0, 0.0
     pnl = sum(_f(t.get("pnl_usd")) for t in real.get("trades") or [] if t.get("whale") == a and int(_f(t.get("opened"))) >= since)
     return pnl, _f(real.get("share"))
+
+
+OWNER_OUT_CFG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "whale_owner_out.json")
+
+
+def owner_out_pending(conn, path: str | None = None) -> tuple[str | None, dict]:
+    """(config id, {addr: why_ru}) of config/whale_owner_out.json if its id was not applied yet (ws_kv «owner_out_applied»): the
+    owner moves a trader from A to B once; he returns later only by the usual B → A rule"""
+    try:
+        with open(path or OWNER_OUT_CFG, encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception:  # noqa: BLE001
+        return None, {}
+    cid = cfg.get("id") if isinstance(cfg, dict) else None
+    if not cid or cid in (kv_get(conn, "owner_out_applied") or {}) or not isinstance(cfg.get("addrs"), dict):
+        return None, {}
+    why = cfg.get("why_ru") or "решение владельца: на досмотр в B"
+    return cid, {a: (v or {}).get("why_ru") or why for a, v in cfg["addrs"].items()}
 
 
 UNCOPY_CFG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "whale_uncopyable.json")
@@ -1065,11 +1110,12 @@ def copyable(q: dict | None) -> bool:
 
 
 def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict | None, now: int, real: dict | None = None,
-           uncopyable: dict | None = None) -> dict:
+           uncopyable: dict | None = None, owner_out: dict | None = None) -> dict:
     """one complete run of the rotation → {"top", "why", "rot", "moves", "lock_t", "passing", "joined", "fast"}.
     `uncopyable` {addr: why_ru} — traders found uncopyable (config/whale_uncopyable.json + every «too active» profile seen): never
     enter A (observation in B only); one in A leaves it"""
     uncopyable = uncopyable or {}
+    owner_out = owner_out or {}                              # {addr: why_ru} — the owner moves a trader A → B once (config)
     passing = {a: list(v) for a, v in (study.get("passing") or {}).items() if isinstance(v, (list, tuple)) and len(v) == 2}
     ok = {x["addr"]: x for x in ranked}
     for a in ok:
@@ -1117,6 +1163,12 @@ def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict 
                 elif rs > 0 and rl <= -LOCK_LOSS * rs:
                     h, fast = [f"быстрый выход: копии на реальном счёте потеряли {_usd(-rl)} с входа в A — больше "
                                f"{LOCK_LOSS * 100:.0f}% его доли {_usd(rs)}"], True
+            if not h and a in owner_out:
+                h = [owner_out[a]]
+            if not h:
+                sn, ssrc = copy_streak(desk, real, a, since)
+                if sn >= STREAK_N:
+                    h = [f"серия: {sn} копий подряд в минусе {ssrc} — на досмотр в B, место занимает лучший из B"]
             if not h and q is not None:
                 n, days = day_run(q, now, -1)
                 if n >= ROT_DAYS:
@@ -1186,7 +1238,8 @@ def real_copies(pub_path: str | None) -> dict | None:
     except Exception:  # noqa: BLE001
         return None
     b = _f((d.get("kpi") or {}).get("budget_usd"))
-    tr = [{"whale": t.get("whale"), "opened": t.get("opened"), "pnl_usd": t.get("pnl_usd")} for t in d.get("trades") or [] if t.get("whale")]
+    tr = [{"whale": t.get("whale"), "opened": t.get("opened"), "pnl_usd": t.get("pnl_usd"), "closed": bool(t.get("closed")),
+           "closed_t": t.get("closed_t")} for t in d.get("trades") or [] if t.get("whale")]
     return {"share": b / LOCK_N if b else 0.0, "trades": tr}
 
 
@@ -2075,7 +2128,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
     if complete and profs:
         ranked0 = list(follow_new)
         unc = uncopyable_set(conn, profs, now)
-        R = rotate(study, rot, follow_new, byaddr, desk, now, real, unc)
+        oo_id, oo = owner_out_pending(conn)
+        R = rotate(study, rot, follow_new, byaddr, desk, now, real, unc, oo)
+        if oo_id:
+            kv_set(conn, "owner_out_applied", {**(kv_get(conn, "owner_out_applied") or {}), oo_id: now})
         follow_new, hard_why, lock_t, passing, joined, rot = R["top"], R["why"], R["lock_t"], R["passing"], R["joined"], R["rot"]
         kv_set(conn, "rotation", rot)
         kv_set(conn, "loss_watch", {})                       # folded into B

@@ -770,3 +770,33 @@ def test_the_live_desk_is_the_only_desk_whatever_its_age_and_no_sim_runs(tmp_pat
               max_requests=5, budget_s=5, src_get={"bn": lambda path, body=None: {"list": []}}, live_path=str(lp))
     assert d["desk"]["equity"] == 10600.0 and [c["coin"] for c in d["desk"]["closed"]] == ["SOL"] and d["desk"]["live"]["source"] == "server"
     assert W.kv_get(conn, "desk")["equity"] == 10600.0          # the rotation's desk loss reads this same desk
+
+
+def test_rotation_five_losing_copies_in_a_row_move_to_b_and_owner_out_once():
+    """11.11 (owner): 5 closed copies in a row lost (desk OR real account) → A → B (slow exit), seat back-filled from B;
+    4 losers, or a winner inside the run, keep him; config owner_out moves a trader A → B once"""
+    now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
+    A = [_w(f"bn:{i}") for i in range(7)]
+    st = {"rule": W.LOCK_RULE, "top": A, "lock_t": now - W.DAY, "joined": {x["addr"]: now - 5 * W.DAY for x in A},
+          "passing": {x["addr"]: [now - 9 * W.DAY, now - 600_000] for x in A}}
+    prof = {x["addr"]: _rq(x["addr"], [1, 1, 1], now) for x in A}
+    b1 = _rq("bn:b1", [2, 3, 4], now, 6.0)
+    prof["bn:b1"] = b1
+    ranked = sorted(prof.values(), key=lambda x: -x["pf"])
+    rot = {"bench": {"bn:b1": {"name": "b1", "since": now - W.DAY, "from_a": False}}, "bench_t": now - W.DAY}
+    h = 3600_000
+    cl = [{"whale": "bn:1", "pnl": -1.0, "closed_t": now - k * h} for k in range(1, 6)]                     # 5 small losers → out
+    cl += [{"whale": "bn:2", "pnl": -1.0, "closed_t": now - k * h} for k in range(1, 5)]                    # 4 losers → stays
+    cl += [{"whale": "bn:3", "pnl": -1.0, "closed_t": now - k * h} for k in (1, 2, 4, 5, 6)] + \
+          [{"whale": "bn:3", "pnl": 2.0, "closed_t": now - 3 * h}]                                          # a winner breaks it
+    cl += [{"whale": "bn:4", "pnl": -1.0, "closed_t": now - 6 * W.DAY - k * h} for k in range(1, 6)]       # before he joined A
+    real = {"share": 300.0, "trades": [{"whale": "bn:5", "pnl_usd": -0.5, "closed": True, "closed_t": now - k * h, "opened": now - 9 * h}
+                                       for k in range(1, 6)]}                                              # real account counts too
+    R = W.rotate(st, rot, ranked, prof, {"equity": 7000.0, "closed": cl}, now, real)
+    top = [x["addr"] for x in R["top"]]
+    assert "bn:1" not in top and "5 копий подряд в минусе на столе" in R["why"]["bn:1"][0]
+    assert "bn:5" not in top and "на реальном счёте" in R["why"]["bn:5"][0]
+    assert {"bn:2", "bn:3", "bn:4"} <= set(top) and "bn:b1" in top and len(top) == 6
+    assert R["fast"] == [] and not R["rot"]["bench"]["bn:1"]["fast"]                  # slow exit: open copies run to his exit
+    R2 = W.rotate(st, rot, ranked, prof, {"equity": 7000.0}, now, None, None, {"bn:6": "решение владельца: на досмотр"})
+    assert "bn:6" not in [x["addr"] for x in R2["top"]] and R2["why"]["bn:6"] == ["решение владельца: на досмотр"]

@@ -1515,8 +1515,15 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             print("app_home why_full:", repr(e)[:200], flush=True)
     raw_acts = [a for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
     rule = _pp_rule_kinds(raw_acts)
-    acts = [{**{k: a.get(k) for k in ("t", "kind", "sym", "side", "usd", "px")}, "text": _pp_action(a, lang, rule.get(id(a)))}
-            for a in raw_acts]
+    acts = []
+    for a in raw_acts:
+        # 11.11: a new action kind without a text («spot_stop_set», «spot_stop_skip» since 09.11) raised here and the WHOLE public
+        # portfolio became null in the app's feed. An action the feed cannot word is left out — it never takes the portfolio down.
+        try:
+            txt = _pp_action(a, lang, rule.get(id(a)))
+        except Exception:  # noqa: BLE001
+            continue
+        acts.append({**{k: a.get(k) for k in ("t", "kind", "sym", "side", "usd", "px")}, "text": txt})
     return {"kind": "real", "exchange": real.get("exchange") or "OKX", "title": t(lang, "pp.title"), "since": since,
             "start_usd": _r(s0), "value_usd": _r(eq), "pnl_usd": _r(pnl), "pnl_pct": real.get("pnl_pct"),
             "today_usd": real.get("today_usd"), "today_pct": real.get("today_pct"), "asof": asof, "stale": bool(real.get("stale")),

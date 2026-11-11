@@ -148,3 +148,24 @@ def test_stage4_app_home_has_neutral_trade_ids_and_the_app_logic_still_resolves(
                     assert (r_.get("why_full") or {}).get("copy") is True, (f, r_.get("sym"))
     inner_sigs = [x["sig"] for x in rows(ru) if isinstance(x.get("sig"), str)]
     assert all(not s.startswith("cn:") for s in inner_sigs)                              # run() returns the internal document
+
+
+def test_an_action_kind_without_a_text_never_nulls_the_public_portfolio():
+    """11.11: «spot_stop_set» / «spot_stop_skip» (no i18n text) raised in _real_portfolio → public_portfolio was null in the app's
+    feed since 09.11. Unknown kinds are left out of the list; the portfolio stays. On the repo's data every system row carries both
+    flags the app uses."""
+    import time
+    from cnq.agents import app_home as AH
+    web = os.path.join(ROOT, "web")
+    real = json.load(open(os.path.join(web, "public_real.json"), encoding="utf-8"))
+    real = {**real, "stale": False, "actions": (real.get("actions") or []) + [{"t": real.get("asof"), "kind": "brand_new_kind", "sym": "LIT", "usd": 5.0},
+                                                                             {"t": real.get("asof"), "kind": "spot_stop_set", "sym": "LIT", "usd": 48.6, "px": 2.7}]}
+    for lang in ("ru", "en", "el"):
+        p = AH._real_portfolio(real, AH._load(web, "paper.json"), int(real.get("asof") or time.time() * 1000), lang,
+                               AH._load(web, "whales_top.json"), AH._load(web, "real_why.json"))
+        assert isinstance(p, dict) and p["kind"] == "real", lang
+        assert not [a for a in p["actions"] if a["kind"] in ("brand_new_kind", "spot_stop_set")] and all(a["text"] for a in p["actions"])
+        f = p.get("futures") or {}
+        for r_ in (f.get("open") or []) + (f.get("closed") or []):
+            if str(r_.get("sig") or "").startswith("whales:"):
+                assert r_.get("copy_whale") is True and (r_.get("why_full") or {}).get("copy") is True, (lang, r_.get("sym"))

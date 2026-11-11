@@ -76,11 +76,18 @@ def test_server_routes_and_health_row():
     assert 'path == "/v2/peter/ingest"' in src and 'path == "/v2/owner/peter"' in src and '"peter": self.peter.status()' in src
     d = tempfile.mkdtemp()
     w = lambda n, o: json.dump(o, open(os.path.join(d, n), "w"))
-    for hb, want in ((H0 - 5 * M, "ok"), (H0 - 45 * M, "delay"), (None, "delay")):
+    for hb, want in ((H0 - 5 * M, "ok"), (H0 - 45 * M, "delay"), (None, "info")):
         w("system_status.json", {"components": [{"key": "api", "status": "ok", "last_ok": H0,
                                                  "peter": {"configured": True, "last_hb": hb, "last_deal": None}}]})
-        row = {r["key"]: r for r in OH.build(d, None, H0)["rows"]}["peter"]
+        doc = OH.build(d, None, H0)
+        row = {r["key"]: r for r in doc["rows"]}["peter"]
         assert row["name"] == "Питер (MT5)" and row["status"] == want and (want == "ok" or row["note"]), (hb, row)
+        others = [r["status"] for r in doc["rows"] if r["key"] != "peter"]
+        if want == "info":           # never connected yet: ⚪, and «overall» is decided by the other rows only
+            assert row["icon"] == "⚪" and row["word"] == "ждёт подключения" and row["todo"] is None
+            assert doc["overall"] == ("fail" if "fail" in others else "delay" if "delay" in others else "ok")
+        if want == "delay":
+            assert doc["overall"] in ("delay", "fail")
 
 
 def test_ea_is_read_only_and_never_holds_secrets():

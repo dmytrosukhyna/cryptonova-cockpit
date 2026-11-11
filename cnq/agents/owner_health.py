@@ -13,9 +13,9 @@ import time
 from zoneinfo import ZoneInfo
 
 KYIV = ZoneInfo("Europe/Kyiv")
-GREEN, YELLOW, RED = "ok", "delay", "fail"
-ICON = {GREEN: "🟢", YELLOW: "🟡", RED: "🔴"}
-WORD = {GREEN: "работает", YELLOW: "задержка", RED: "сбой"}
+GREEN, YELLOW, RED, INFO = "ok", "delay", "fail", "info"
+ICON = {GREEN: "🟢", YELLOW: "🟡", RED: "🔴", INFO: "⚪"}
+WORD = {GREEN: "работает", YELLOW: "задержка", RED: "сбой", INFO: "ждёт подключения"}   # INFO never counts in «overall»
 # a failed GitHub step that is GitHub's own trouble, not ours: it passes on the next run by itself
 TRANSIENT = re.compile(r"set up job|checkout|setup-python|cache|restore|commit refreshed|push|upload|download|post |complete job", re.I)
 ASK = "Напишите Claude: «проверь {x}» — он посмотрит журнал и починит."
@@ -75,7 +75,7 @@ def _comp(S: dict, key: str) -> dict:
 
 
 def _row(key, name, what, last, status, note, todo, now: int | None = None) -> dict:
-    if status != GREEN and not note:                 # 10.11: a yellow / red row always says why, in plain words
+    if status not in (GREEN, INFO) and not note:                 # 10.11: a yellow / red row always says why, in plain words
         a = _age_min(last, now or int(time.time() * 1000))
         note = (f"последнее обновление {int(a)} мин назад" if a is not None and a < 120 else
                 f"последнее обновление {a / 60:.0f} ч назад" if a is not None else "нет отметки времени")
@@ -211,8 +211,8 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
         st, note = YELLOW, "нет данных от API в этом прогоне"
     elif not pt.get("configured"):
         st, note = YELLOW, "токен Питера ещё не создан — сервер создаст его сам после перезапуска API"
-    elif not hb:
-        st, note = YELLOW, "советник у Питера ещё ни разу не подключался"
+    elif not hb:                                 # 11.11: before his first heartbeat ever — information, not a delay
+        st, note = INFO, "советник у Питера ещё ни разу не подключался"
     elif mkt and _age_min(hb, now) > HB_STALE_MIN:
         st, note = YELLOW, f"нет связи с терминалом Питера {int(_age_min(hb, now))} мин (рынок золота открыт)"
     else:
@@ -221,7 +221,7 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
                      hb, st, note, ASK.format(x="мост MT5 Питера"), now))
     worst = RED if any(r["status"] == RED for r in rows) else YELLOW if any(r["status"] == YELLOW for r in rows) else GREEN
     return {"asof": now, "overall": worst, "icon": ICON[worst], "rows": rows,
-            "about_ru": "🟢 работает · 🟡 задержка (обычно проходит сама) · 🔴 сбой — нужна помощь. Время — последний успешный запуск."}
+            "about_ru": "🟢 работает · 🟡 задержка (обычно проходит сама) · 🔴 сбой — нужна помощь · ⚪ ждёт подключения (не считается). Время — последний успешный запуск."}
 
 
 def run(out: str = "web", conn=None, now: int | None = None) -> dict:

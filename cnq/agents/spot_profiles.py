@@ -988,7 +988,11 @@ class IdeasPortfolio:
                     ok_in, ew = _es.check(c, px, support) if support is not None else (False, "нет данных о поддержке")
                     if not ok_in:
                         px, why = None, f"часть {n + 1} из {n_tr} ждёт поддержку: {ew}"
-            cost = min(b / n_tr, rp.cash()) / (1 + P["fee"])
+            # budget_k (11.11): the real account's free spot cash was smaller than the model's cash share (the real spot sleeve is
+            # under its plan) — the picks' total is b·k; part 1 was bought at b / n, the later parts share what is left of b·k
+            bk = b * min(1.0, max(0.0, float(cfg.get("budget_k") or 1.0)))
+            part = b / n_tr if n == 0 else max(0.0, bk - n * b / n_tr) / (n_tr - n)
+            cost = min(part, rp.cash()) / (1 + P["fee"])
             if px is not None and cost < 0.001:
                 px, why = None, "свободный кэш кончился — оставшиеся части не покупаем"
             if px is None:

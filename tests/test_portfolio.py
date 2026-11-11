@@ -1274,3 +1274,22 @@ def test_an_owner_pick_takes_its_first_third_at_plus_50_not_30():
     st = port.step(up, _ideas(r2, T0 + 7200_000, {**stm2, "VVV": {"status": "wait", "price": 30.5}}), T0 + 7200_000, picks=cfg)
     t = [a for a in st["actions"] if a["action"] == "TRIM"]
     assert [a["symbol"] for a in t] == ["VVV"] and "треть" in t[0]["reason"]
+
+
+def test_owner_picks_budget_k_shrinks_the_later_parts():
+    """11.11: the real free spot cash was smaller than the model's — the total is budget·k, the later parts share the rest"""
+    H = 3_600_000
+    rows = [_irow("BTC", "buy", 80000, "core")]
+    stm = {"BTC": {"status": "buy", "price": 80000}, "VVV": {"status": "wait", "price": 20.0}}
+    src = {"cg": {"BTC": 80000, "VVV": 20.0}, "meme": {}, "hl": {}}
+    sup = {"sma200": {"VVV": 19.9}, "walls": {}, "btc": {"price": 80000, "ll20": 70000, "mid": "LONG"}}
+    cfg = {"id": "t3", "coins": ["VVV"], "tranches": 3, "gap_h": 24, "budget_k": 0.74}
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    port.step(src, _ideas(rows, T0, stm), T0, support=sup)
+    b = port.rp.cash()
+    port.step(src, _ideas(rows, T0 + H, stm), T0 + H, support=sup, picks=cfg)
+    w1 = next(p for p in port.rp.positions() if p["symbol"] == "VVV")["weight"]
+    port.step(src, _ideas(rows, T0 + 26 * H, stm), T0 + 26 * H, support=sup, picks=cfg)
+    w2 = next(p for p in port.rp.positions() if p["symbol"] == "VVV")["weight"]
+    f = 1 + sp.IDEAS["fee"]
+    assert abs(w1 - b / 3 / f) < 1e-9 and abs((w2 - w1) - (0.74 * b - b / 3) / 2 / f) < 1e-9

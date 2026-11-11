@@ -1,0 +1,159 @@
+{
+ "okx_hl": {
+  "made": 1793810278130,
+  "whales": 88,
+  "rot": {
+   "n_decisions": 9171,
+   "whales": 88,
+   "v1_failing_copied": {
+    "n": 149,
+    "mean": 0.094,
+    "pf": 1.11
+   },
+   "v1": {
+    "changes": 13,
+    "selected": 1920,
+    "sel_mean": 0.381,
+    "sel_pf": 1.32,
+    "taken": 366,
+    "busy": 239,
+    "all": {
+     "total": -25.0,
+     "n_days": 87.0,
+     "worst_day": -8.6,
+     "max_dd": -28.48,
+     "lose_streak": 3.0
+    },
+    "h1": {
+     "total": -16.43,
+     "n_days": 44.0,
+     "worst_day": -8.6,
+     "max_dd": -25.64,
+     "lose_streak": 3.0
+    },
+    "h2": {
+     "total": -8.58,
+     "n_days": 43.0,
+     "worst_day": -3.1,
+     "max_dd": -8.58,
+     "lose_streak": 2.0
+    }
+   },
+   "bar2": {
+    "changes": 25,
+    "selected": 2049,
+    "sel_mean": 0.385,
+    "sel_pf": 1.29,
+    "taken": 343,
+    "busy": 199,
+    "all": {
+     "total": -11.0,
+     "n_days": 87.0,
+     "worst_day": -7.04,
+     "max_dd": -16.07,
+     "lose_streak": 3.0
+    },
+    "h1": {
+     "total": -5.23,
+     "n_days": 44.0,
+     "worst_day": -7.04,
+     "max_dd": -12.53,
+     "lose_streak": 3.0
+    },
+    "h2": {
+     "total": -5.77,
+     "n_days": 43.0,
+     "worst_day": -3.89,
+     "max_dd": -9.31,
+     "lose_streak": 3.0
+    }
+   },
+   "bar2_minus_v1": {
+    "all": {
+     "d": 14.01,
+     "n": 55,
+     "t": 0.83
+    },
+    "h1": {
+     "d": 11.2,
+     "n": 30,
+     "t": 0.72
+    },
+    "h2": {
+     "d": 2.81,
+     "n": 25,
+     "t": 0.42
+    },
+    "risk_ok": true,
+    "pass_here": false
+   }
+  }
+ },
+ "binance": {
+  "bar2_minus_v1": {
+   "all": {
+    "d": 2.62,
+    "n": 39,
+    "t": 0.22
+   },
+   "h1": {
+    "d": -4.95,
+    "n": 8,
+    "t": -0.8
+   },
+   "h2": {
+    "d": 7.57,
+    "n": 31,
+    "t": 0.74
+   },
+   "risk_ok": true,
+   "pass_here": false
+  },
+  "v1_failing_copied": {
+   "n": 73,
+   "mean": -1.121,
+   "pf": 0.67
+  },
+  "bar2": {
+   "changes": 15,
+   "selected": 742,
+   "sel_mean": 0.461,
+   "sel_pf": 1.38,
+   "taken": 214,
+   "busy": 123,
+   "all": {
+    "total": 22.45,
+    "n_days": 106.0,
+    "worst_day": -4.9,
+    "max_dd": -13.16
+   },
+   "h1": {
+    "total": 8.99
+   },
+   "h2": {
+    "total": 13.46
+   }
+  },
+  "v1": {
+   "changes": 13,
+   "selected": 819,
+   "sel_mean": 0.333,
+   "sel_pf": 1.24,
+   "taken": 281,
+   "busy": 125,
+   "all": {
+    "total": 19.83,
+    "n_days": 106.0,
+    "worst_day": -5.68,
+    "max_dd": -14.44
+   },
+   "h1": {
+    "total": 13.94
+   },
+   "h2": {
+    "total": 5.89
+   }
+  },
+  "run": 42978382182
+ }
+}

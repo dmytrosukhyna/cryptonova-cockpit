@@ -7,7 +7,7 @@ up to ~30 minutes after its 15-minute candle closed. Here the desks act within a
 Layout on the server (deploy/engine/install.sh):
   /opt/cnq/repo — a clean git checkout: pull and push only;
   /opt/cnq/run  — where the engine works: data/ (its own agents.sqlite and candle store), web/ (outputs), links to the repo code.
-Every minute (cycle): new 15-minute candles of the 18 core coins (only the missing bars) and a fifth of the 36 lab coins → the
+Every minute (cycle): new 15-minute candles of the 18 core coins (only the missing bars); every second cycle a fifth of the 36 lab coins (11.11: each every 10 min) → the
 CNPTS desks (paper), listing shorts, our own signals, the neutral basket, turbo, the signal feed (Telegram; the app bridge on
 the same server reads run/web/signals_feed.json directly). Every 60 cycles: funding. Every 30: the quality card and «ядро +
 альтсезон» (each does its daily work once a day). The 11-minute full candle check runs only once, in start.sh.
@@ -324,13 +324,20 @@ def _bg_start(cmds: list[str], env: dict) -> bool:
     return True
 
 
+def lab_slice(n: int) -> str:
+    """CNQ_REFRESH_EXTRA for cycle n: «k/5» on even cycles (each lab coin every 10 cycles), «0» (none) on odd ones"""
+    return f"{(n // 2) % 5}/5" if n % 2 == 0 else "0"
+
+
 def cycle(n: int, env: dict) -> dict:
     steps = {}
     py = sys.executable
     # new bars of the 18 core coins every cycle + a fifth of the 36 lab coins (each lab coin every 5 minutes); funding once an hour.
     # Never the 11-minute full check here — it would stop the minute loop (start.sh runs it once before the service starts).
+    # 11.11 (cycle at its 60 s budget; coordinator: option 2): the lab coins (demo desks only) every 10 minutes — a fifth of them on
+    # every EVEN cycle, none on odd ones; the 18 core coins every cycle as before
     steps["candles"] = sh([py, "scripts/ci_refresh.py"], RUN, 120,
-                          {**env, "CNQ_REFRESH": "quick", "CNQ_REFRESH_EXTRA": f"{n % 5}/5"})
+                          {**env, "CNQ_REFRESH": "quick", "CNQ_REFRESH_EXTRA": lab_slice(n)})
     if n % 10 == 5:                          # 11.11: the hourly funding (+ daily bars) in 6 slices, one every 10 cycles (~4 s, not ~25 s)
         steps["funding"] = sh([py, "scripts/ci_refresh.py"], RUN, 120,
                               {**env, "CNQ_REFRESH": "funding", "CNQ_REFRESH_SLICE": f"{(n // 10) % 6}/6"})

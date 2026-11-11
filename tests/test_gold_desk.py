@@ -134,3 +134,15 @@ def test_engine_spreads_the_hourly_funding_over_six_cycles(monkeypatch):
         engine.cycle(n, {})
     sl = [s for k, s in calls if k == "funding"]
     assert sorted(sl) == [f"{k}/6" for k in range(6)]
+
+
+def test_lab_coins_every_ten_minutes_core_every_minute():
+    """11.11 (option 2): each lab coin's candles every 10 cycles (a fifth on even cycles), none on odd ones"""
+    from cnq import engine
+    seen = {}
+    for n in range(10):
+        sl = engine.lab_slice(n)
+        if sl != "0":
+            seen[sl] = seen.get(sl, 0) + 1
+    assert sorted(seen) == [f"{k}/5" for k in range(5)] and set(seen.values()) == {1}
+    assert engine.lab_slice(1) == "0" and engine.lab_slice(3) == "0"

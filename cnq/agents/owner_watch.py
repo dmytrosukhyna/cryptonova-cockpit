@@ -190,7 +190,8 @@ def coin_doc(coin: str, raw: dict, prev: dict, out: str, now: int) -> tuple[dict
         doc["oi_usd"], doc["oi_chg24"] = round(oi[-1][1]), round((oi[-1][1] / base - 1) * 100, 1) if base else None
     # big traders (whale_watch) and smart wallets (smart_money)
     big = []
-    for w in _load(out, "whale_watch.json").get("whales") or []:
+    WW = _load(out, "whale_watch.json")
+    for w in WW.get("whales") or []:
         for p in (w.get("positions") or []) if isinstance(w, dict) else []:
             if isinstance(p, dict) and p.get("coin") == coin and not p.get("hidden"):
                 # 11.11 (repo is public): never a trader's name or address here — a short stable tag only (for «new long» alerts)
@@ -198,8 +199,10 @@ def coin_doc(coin: str, raw: dict, prev: dict, out: str, now: int) -> tuple[dict
                 big.append({"who": f"трейдер #{tag}", "side": p.get("side"), "usd": round(float(p.get("notional") or 0)),
                             "entry": p.get("entry")})
     doc["traders"] = sorted(big, key=lambda b: -b["usd"])[:5]
+    if not WW:                                   # 11.11: the watchlist is published only sealed — without this run's file keep what was seen
+        doc["traders"] = prev.get("traders") or []
     old_long = {(b["who"], b["side"]) for b in prev.get("traders") or []}
-    if prev.get("asof"):
+    if prev.get("asof") and WW and prev.get("traders") is not None:
         for b in doc["traders"]:
             if b["side"] == "LONG" and (b["who"], "LONG") not in old_long:
                 alerts.append({"t": now, "coin": coin, "kind": "whale",

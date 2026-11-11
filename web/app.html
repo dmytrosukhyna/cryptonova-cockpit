@@ -1348,10 +1348,12 @@ function jrMd(md){ const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;'); co
     const m=ln.match(/^\s*(?:-|\d+\.)\s+(.*)/); if(m){ if(!list){ out+='<ul>'; list=true; } out+=`<li>${inl(m[1])}</li>`; continue; }
     if(list){ out+='</ul>'; list=false; } if(ln.trim()) out+=`<p>${inl(ln)}</p>`; }
   flushT(); if(list) out+='</ul>'; return out; }
-function renderTJ(){ const b=$('#jrBody'); if(!b) return; const E=(JOURNAL&&JOURNAL.entries)||[]; if(!E.length){ b.innerHTML='<div class="muted">Первая запись появится завтра в 08:52.</div>'; return; }
+function renderTJ(){ const b=$('#jrBody'); if(!b) return; const E=(JOURNAL&&JOURNAL.entries)||[]; if(!E.length){ b.innerHTML='<div class="muted">Дневник виден после входа владельца. Если вы вошли — данные временно недоступны.</div>'; return; }
   $('#jrDates').innerHTML=E.slice(0,14).map((e,i)=>`<button data-i="${i}" aria-pressed="${i===JR_SEL}">${e.date.slice(8,10)}.${e.date.slice(5,7)}</button>`).join(''); $$('#jrDates button').forEach(x=>x.addEventListener('click',()=>{ JR_SEL=+x.dataset.i; renderTJ(); }));
   const e=E[Math.min(JR_SEL,E.length-1)]; const title=(e.md.match(/^#\s+(.*)/m)||[])[1]||e.date; $('#jrMeta').textContent=`${E.length} ${plur(E.length,'запись','записи','записей')} · каждый день в 08:52`; b.innerHTML=`<div class="jrt">${title.replace(/</g,'&lt;')}</div>`+jrMd(e.md); }
-async function loadTJ(){ try{ JOURNAL=await (await fetch('./journal.json?'+Math.floor(Date.now()/600000),{cache:'no-store'})).json(); }catch(e){ JOURNAL=null; } renderTJ(); }
+// 11.11: the diary is published only sealed — the owner's session reads it through the server; the old public file is a fallback while it exists
+async function loadTJ(){ JOURNAL=null; try{ if(typeof ownerSigned==='function'&&ownerSigned()){ const r=await CNAuth.fetchOwner('/v2/owner/sealed/journal'); JOURNAL=(r&&r.data)||null; } }catch(e){ JOURNAL=null; }
+  if(!JOURNAL){ try{ const r=await fetch('./journal.json?'+Math.floor(Date.now()/600000),{cache:'no-store'}); JOURNAL=r.ok?await r.json():null; }catch(e){ JOURNAL=null; } } renderTJ(); }
 setTimeout(()=>{ loadTJ(); setInterval(loadTJ,30*60000); },1500);
 let MAP_TF=load('cnq_map_tf','4h');
 const SEG7={0:'abcdef',1:'bc',2:'abged',3:'abgcd',4:'fgbc',5:'afgcd',6:'afgedc',7:'abc',8:'abcdefg',9:'abcdfg'};

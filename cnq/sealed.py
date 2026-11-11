@@ -15,7 +15,7 @@ import time
 
 INFO = b"cnq-sealed-v1"
 KEY_FILE = "owner_seal_key.pem"
-NAMES = ("owner_health", "gh_runs")          # sealed today; a name is added only when nothing in the pipeline reads its plaintext back
+NAMES = ("owner_health", "gh_runs", "journal", "whale_watch")   # 11.11 stage 2: + the diary and the trader watchlist; a name is added only when nothing in the pipeline reads its plaintext back
 
 
 def available() -> bool:

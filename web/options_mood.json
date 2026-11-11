@@ -1,5 +1,5 @@
 {
- "asof": 1794406745058,
+ "asof": 1794407161817,
  "name": "Настроение опционов",
  "source": "deribit",
  "error": null,
@@ -8,7 +8,7 @@
  "dvol_hist_days": 365,
  "put_call_oi": 0.746,
  "puts_oi": 148088.0,
- "calls_oi": 198423.3,
+ "calls_oi": 198429.2,
  "label": "tense",
  "label_ru": "напряжённо",
  "label_en": "tense",

@@ -56,8 +56,13 @@ def record(conn: sqlite3.Connection, bases: list[str], now: int | None = None, f
     for b in bases:
         if b in okx:
             conn.execute("INSERT OR REPLACE INTO oi_hist VALUES(?,?,?,?)", (b, now, okx[b], "okx")); n["okx"] += 1
+    # 11.11 (the server's minute loop at its 60 s limit): the per-coin BingX requests run 6 at a time — the same answers, ~4 s less;
+    # the database is written here, in this thread only
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(6) as ex:
+        got = dict(zip(bases, ex.map(fetch_bingx, bases)))
     for b in bases:
-        v = fetch_bingx(b)
+        v = got.get(b)
         if v:
             conn.execute("INSERT OR REPLACE INTO oi_hist VALUES(?,?,?,?)", (b, now, v, "bingx")); n["bingx"] += 1
         if hl is None:

@@ -269,6 +269,9 @@ class Okx:
             cls = ms.KeyRejected if code in ms.KEY_REJECTED else OkxError
             data = out.get("data") or []
             msg = (data[0].get("sMsg") if data and isinstance(data[0], dict) else "") or out.get("msg") or ""
+            sc = str(data[0].get("sCode") or "") if data and isinstance(data[0], dict) else ""
+            if sc and sc != "0":                                    # 11.11: OKX's own order code in every error text (sCode)
+                msg = f"[sCode {sc}] {msg}"
             raise cls(code, msg, path)
         return out.get("data") or []
 

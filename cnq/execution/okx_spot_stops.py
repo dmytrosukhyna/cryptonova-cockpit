@@ -203,7 +203,7 @@ def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict
                  "why": f"стоп-лосс модели на бирже ({inst_id}): продать {qty:g} {c} по рынку, если цена ≤ {trig}"})
         except Exception as e:  # noqa: BLE001 — one coin's failure never leaves the others without a stop
             known.pop(c, None) if c not in mine else None
-            skip(c, f"стоп не поставился: {str(e)[:140]}")
+            skip(c, f"стоп не поставился: {str(e)[:260]}")
             log({"ev": "spot_stop_error", "ccy": c, "t": now, "error": str(e)[:200]})
     st["spot_stop_missing"] = miss
     st["spot_hold"] = hold

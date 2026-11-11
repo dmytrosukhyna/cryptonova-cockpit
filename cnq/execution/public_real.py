@@ -440,7 +440,7 @@ def spot_stops(env=None) -> list:
         st = okx_autopilot.load_state(env)
         out = [{"sym": c, "ok": True, "px": ms._f((v or {}).get("px")) or None, "since": None, "why": None}
                for c, v in sorted((st.get("spot_stops") or {}).items()) if c not in (st.get("spot_stop_missing") or {})]
-        out += [{"sym": c, "ok": False, "px": None, "since": int((v or {}).get("t") or 0) or None, "why": str((v or {}).get("why") or "")[:200]}
+        out += [{"sym": c, "ok": False, "px": None, "since": int((v or {}).get("t") or 0) or None, "why": str((v or {}).get("why") or "")[:320]}
                 for c, v in sorted((st.get("spot_stop_missing") or {}).items())]
         return out
     except Exception:  # noqa: BLE001
@@ -501,7 +501,7 @@ def clean(doc: dict) -> dict:
                           "inst": x["inst"] if INST_RE.match(str(x.get("inst") or "")) else None, "why": str(x.get("why") or "")[:200]}
                          for x in (doc.get("copy_skips") or [])[-COPY_SKIPS_MAX:] if isinstance(x, dict) and num(x.get("t"))]
     out["spot_stops"] = [{"sym": x["sym"], "ok": bool(x.get("ok")), "px": num(x.get("px")), "since": int(x["since"]) if num(x.get("since")) else None,
-                          "why": str(x.get("why") or "")[:200] or None}
+                          "why": str(x.get("why") or "")[:320] or None}
                          for x in (doc.get("spot_stops") or [])[:40] if isinstance(x, dict) and SYM_RE.match(str(x.get("sym") or ""))]
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None

@@ -331,8 +331,9 @@ def cycle(n: int, env: dict) -> dict:
     # Never the 11-minute full check here — it would stop the minute loop (start.sh runs it once before the service starts).
     steps["candles"] = sh([py, "scripts/ci_refresh.py"], RUN, 120,
                           {**env, "CNQ_REFRESH": "quick", "CNQ_REFRESH_EXTRA": f"{n % 5}/5"})
-    if n % 60 == 30:
-        steps["funding"] = sh([py, "scripts/ci_refresh.py"], RUN, 120, {**env, "CNQ_REFRESH": "funding"})
+    if n % 10 == 5:                          # 11.11: the hourly funding (+ daily bars) in 6 slices, one every 10 cycles (~4 s, not ~25 s)
+        steps["funding"] = sh([py, "scripts/ci_refresh.py"], RUN, 120,
+                              {**env, "CNQ_REFRESH": "funding", "CNQ_REFRESH_SLICE": f"{(n // 10) % 6}/6"})
     for cmd in FAST:
         steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
     if n % 30 == 0:

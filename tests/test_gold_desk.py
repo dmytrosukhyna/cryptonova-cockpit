@@ -120,3 +120,17 @@ def test_engine_runs_the_db_free_slow_steps_in_the_background_one_batch_at_a_tim
     engine._BG["thread"].join(5)
     assert ran == ["buynow", "golddesk"] and set(engine._BG["steps"]) == {"buynow", "golddesk"}
     assert "buynow" in engine.SLOW_BG and "buynow" not in engine.SLOW and "quality" in engine.SLOW
+
+
+def test_engine_spreads_the_hourly_funding_over_six_cycles(monkeypatch):
+    """11.11: every core coin's funding still once an hour, in 6 slices of ~4 s instead of one ~25 s step"""
+    from cnq import engine
+    calls = []
+    monkeypatch.setattr(engine, "sh", lambda args, cwd, timeout=120, env=None: (calls.append(((env or {}).get("CNQ_REFRESH"),
+                                                                                          (env or {}).get("CNQ_REFRESH_SLICE"))) or (True, 0.0, "")))
+    monkeypatch.setattr(engine, "FAST", [])
+    monkeypatch.setattr(engine, "_bg_start", lambda cmds, env: True)
+    for n in range(1, 61):
+        engine.cycle(n, {})
+    sl = [s for k, s in calls if k == "funding"]
+    assert sorted(sl) == [f"{k}/6" for k in range(6)]

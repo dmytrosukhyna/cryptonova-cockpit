@@ -55,13 +55,20 @@ def main() -> int:
     core = [bx for bx, _ in cfg.universe]
     if m == "funding":                       # the server engine, once an hour: the last 2 days of funding for the core coins
         rest, now, n = BingXRest(cfg.bingx), int(time.time() * 1000), 0
+        sl = os.environ.get("CNQ_REFRESH_SLICE", "")
+        if "/" in sl:                        # 11.11: «k/n» — the k-th of n slices (the engine spreads the hour over 6 cycles)
+            k, n_ = (int(x) for x in sl.split("/"))
+            core = core[k::n_]
+            extra_daily = list(cfg.b_extra)[k::n_]
+        else:
+            extra_daily = list(cfg.b_extra)
         for bx in core:
             try:
                 store.upsert_funding(bx, rest.funding_history(bx, start_ms=now - 2 * 86_400_000, end_ms=now))
                 n += 1
             except Exception as e:  # noqa: BLE001
                 print("funding failed", bx, repr(e))
-        nd = daily.refresh(store, rest, core + list(cfg.b_extra), now, max_n=10)   # 11.11: daily bars hourly, ≤ 10 coins, off the minute loop
+        nd = daily.refresh(store, rest, core + extra_daily, now, max_n=2)   # 11.11: daily bars, ≤ 2 coins a slice, off the minute loop
         print(f"funding {n}/{len(core)}, {nd} daily bars in {time.time() - t0:.0f}s")
         return 0
     if m == "quick":

@@ -96,6 +96,27 @@ def test_desk_select_reads_the_gold_feed_as_a_staged_candidate_never_real(tmp_pa
 
 def test_engine_owns_the_gold_feed_and_the_pipeline_ignores_it():
     from cnq import engine
-    assert "golddesk" in engine.SLOW and "gold_desk.json" in engine.OWNED and "gold_desk.jsonl" in engine.DATA_OWNED
+    assert "golddesk" in engine.SLOW + engine.SLOW_BG and "gold_desk.json" in engine.OWNED and "gold_desk.jsonl" in engine.DATA_OWNED
     site = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".github", "workflows", "site.yml"), encoding="utf-8").read()
     assert '"web/gold_desk.json"' in site
+
+
+def test_engine_runs_the_db_free_slow_steps_in_the_background_one_batch_at_a_time(monkeypatch):
+    """11.11 (cycle over its 60 s budget): buy_now / gold desk do not hold up the minute loop; a batch is never started twice"""
+    import threading
+    from cnq import engine
+    gate = threading.Event()
+    ran = []
+
+    def fake_sh(args, cwd, timeout=120, env=None):
+        gate.wait(5)
+        ran.append(args[-3])
+        return True, 0.1, "ok"
+    monkeypatch.setattr(engine, "sh", fake_sh)
+    engine._BG.update(thread=None, steps={})
+    assert engine._bg_start(["buynow", "golddesk"], {}) is True
+    assert engine._bg_start(["buynow", "golddesk"], {}) is False          # still running → not started again
+    gate.set()
+    engine._BG["thread"].join(5)
+    assert ran == ["buynow", "golddesk"] and set(engine._BG["steps"]) == {"buynow", "golddesk"}
+    assert "buynow" in engine.SLOW_BG and "buynow" not in engine.SLOW and "quality" in engine.SLOW

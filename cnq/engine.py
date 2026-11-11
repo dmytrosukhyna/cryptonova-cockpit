@@ -40,8 +40,11 @@ FAST = ["risk", "paper", "listings", "own", "lsn", "turbo", "signalfeed",
         "okxsignal",       # 22.10: CRYPTO NOVA on the OKX Signal Marketplace (cnq/agents/okx_signal.py) — off unless CNQ_OKX_SIGNAL=on
         "apphome", "apppush",
         "scorecard"]       # 20.10: last — it records what the steps above (and the GitHub feeds) just published → web/scorecard.json
-SLOW = ["quality", "altport", "buynow",     # 22.10: «Если покупать сегодня» for the app (cnq/agents/buy_now.py), every 30 minutes
-        "golddesk"]                          # 04.11: «Золото · тест» demo desk (cnq/agents/gold_desk.py, 4-hour bars) → web/gold_desk.json
+SLOW = ["quality", "altport"]
+# 11.11 (cycle 61–85 s of its 60 s): the slow steps that touch no database and write their file atomically run in the BACKGROUND —
+# the minute loop does not wait for them (buy_now ≈ 26 s of network); one batch at a time, its result shown in the next status
+SLOW_BG = ["buynow",      # 22.10: «Если покупать сегодня» for the app (cnq/agents/buy_now.py), every 30 minutes
+           "golddesk"]    # 04.11: «Золото · тест» demo desk (cnq/agents/gold_desk.py, 4-hour bars) → web/gold_desk.json
 # 20.10: strategy conveyor LAB → PAPER → READY → RETIRED (cnq/agents/conveyor.py): once an hour (cycle 1 = soon after a restart, then
 # every 60 cycles), after the desks; it writes data/conveyor_state.json (read by the risk gate) and web/conveyor.json
 HOURLY = ["conveyor",
@@ -161,6 +164,9 @@ def _write_now(doc: dict) -> None:
 def _now_step(args: list[str], timeout: int) -> None:
     """web/engine_now.json: which step the engine is in right now (the API's /v2/diag shows it) — a hang or a restart loop is
     visible from outside without logging in to the server"""
+    import threading
+    if threading.current_thread() is not threading.main_thread():
+        return                                   # 11.11: a background step never overwrites what the minute loop is doing
     _write_now({"step": _step_name(args), "since": int(time.time() * 1000), "timeout": timeout})
 
 
@@ -175,6 +181,9 @@ def _rss_mb(pid: int) -> int:
 
 
 def _now_rss(mb: int) -> None:
+    import threading
+    if threading.current_thread() is not threading.main_thread():
+        return
     try:
         p = os.path.join(RUN, "web", "engine_now.json")
         d = json.load(open(p, encoding="utf-8"))
@@ -295,6 +304,26 @@ def sync(push: bool = True) -> dict:
     return {"pulled": ok, "pushed": pushed, "committed": ok_c}
 
 
+_BG: dict = {"thread": None, "steps": {}}
+
+
+def _bg_start(cmds: list[str], env: dict) -> bool:
+    """run `cmds` one after another in a background thread; False when the previous batch is still running"""
+    import threading
+    th = _BG.get("thread")
+    if th is not None and th.is_alive():
+        return False
+    py = sys.executable
+
+    def work():
+        for cmd in cmds:
+            _BG["steps"][cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
+    th = threading.Thread(target=work, name="engine-slow", daemon=True)
+    _BG["thread"] = th
+    th.start()
+    return True
+
+
 def cycle(n: int, env: dict) -> dict:
     steps = {}
     py = sys.executable
@@ -309,6 +338,10 @@ def cycle(n: int, env: dict) -> dict:
     if n % 30 == 0:
         for cmd in SLOW:
             steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
+        if not _bg_start(SLOW_BG, env):
+            steps["slow_bg"] = (False, 0.0, "the previous background batch is still running — skipped this time")
+    for cmd in list(_BG["steps"]):                          # a finished background step reports in the cycle after it
+        steps[cmd] = _BG["steps"].pop(cmd)
     if n % 60 == 1:
         for cmd in HOURLY:
             steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)

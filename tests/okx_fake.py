@@ -292,6 +292,9 @@ class FakeOkx:
             return ok([{"subPosId": x["subPosId"], "instId": x["instId"], "instType": "SPOT", "subPos": str(x["subPos"]),
                         "availSubPos": str(x["subPos"]), "openAvgPx": str(x["openAvgPx"]), "openOrdId": x.get("openOrdId", "")}
                        for x in self.lead_subs if not q.get("instId") or x["instId"] == q["instId"]])
+        if path == "/api/v5/copytrading/algo-order" and b.get("instType") == "SPOT":     # 11.11: a stop on a spot lead sub-position
+            self.lead_calls.append(("spot_stop", dict(b)))
+            return ok([{"subPosId": b["subPosId"], "sCode": "0"}])
         if path == "/api/v5/copytrading/close-subposition" and b.get("instType") == "SPOT":
             self.lead_calls.append(("close", b))
             x = next((x for x in self.lead_subs if x["subPosId"] == b["subPosId"]), None)

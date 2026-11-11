@@ -88,3 +88,25 @@ def test_health_row_is_yellow_when_a_stop_is_missing_over_15_minutes(tmp_path):
     (tmp_path / "public_real.json").write_text(json.dumps(doc))
     row = next(r for r in oh.build(str(tmp_path), None, now)["rows"] if r["key"] == "spot_stops")
     assert row["status"] != oh.YELLOW and "VVV" in row["note"]
+
+
+def test_a_coin_held_in_lead_sub_positions_gets_its_stop_on_them():
+    """11.11 (the real cause for MORPHO / LIT: OKX «available balance is insufficient»): on a spot lead-trader account the coin sits
+    in lead sub-positions — the stop is set on each of them, not as an ordinary conditional order"""
+    fk = F.FakeOkx(balances={"USDT": 1000.0, "AAA": 50.0})
+    cl = ap.connect(F.env(), fk, {}, F.nosleep)
+    st, logs = {}, []
+    lead = {"AAA": {"qty": 50.0, "avail": 50.0, "insts": ["AAA-USDT"], "subs": [("sp1", "AAA-USDT", 30.0), ("sp2", "AAA-USDT", 20.0)]}}
+    r = ss.sync(cl, pf(), st, NOW, logs.append, avail={"AAA": 50.0}, lead=lead)
+    stops = [b for k, b in fk.lead_calls if k == "spot_stop"]
+    assert [(b["subPosId"], b["instType"]) for b in stops] == [("sp1", "SPOT"), ("sp2", "SPOT")] and all(b["slTriggerPx"].startswith("8") for b in stops)
+    assert not [b for b in fk.algo_posts if b["instId"].startswith("AAA")]          # no ordinary order on a balance that is not available
+    assert st["spot_stops"]["AAA"]["lead"] == {"sp1": 8.0, "sp2": 8.0} and "AAA" not in st["spot_stop_missing"]
+    assert sum(1 for x in r["set"] if x["ccy"] == "AAA") == 2
+    n = len(fk.lead_calls)
+    ss.sync(cl, pf(), st, NOW + 1, logs.append, avail={"AAA": 50.0}, lead=lead)
+    assert len(fk.lead_calls) == n and "AAA" in st["spot_stops"]                    # in sync → nothing re-sent, not «fired»
+    ss.sync(cl, pf(stop_aaa=9.0), st, NOW + 2, logs.append, avail={"AAA": 50.0}, lead=lead)
+    assert [b["slTriggerPx"][:1] for k, b in fk.lead_calls[n:]] == ["9", "9"]       # a moved stop → both sub-positions
+    r = ss.sync(cl, pf(stop_aaa=9.0), st, NOW + 3, logs.append, avail={}, lead={})  # sub-positions and the coin gone → it fired
+    assert r["fired"] == ["AAA"] and "AAA" in ss.held_off(st, NOW + 4)

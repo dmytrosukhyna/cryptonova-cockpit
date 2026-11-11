@@ -58,6 +58,10 @@ def _fmt(x: float, step: str) -> str:
     return fmt(x, step)
 
 
+def last_of(rt: dict, cl, inst_id: str) -> float:
+    return _f((rt.get("tk") or cl.ticker(inst_id) or {}).get("last"))
+
+
 def pending(cl) -> list:
     try:
         return [a for a in cl.call("GET", "/api/v5/trade/orders-algo-pending", {"ordType": "conditional", "instType": "SPOT"}) or []
@@ -66,7 +70,10 @@ def pending(cl) -> list:
         return []
 
 
-def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict | None = None) -> dict:
+LEAD_ALGO = "/api/v5/copytrading/algo-order"
+
+
+def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict | None = None, lead: dict | None = None) -> dict:
     """one pass → {"set": [...], "cancelled": [...], "fired": [...], "skipped": [...]}; st (autopilot state) keeps «spot_stops»
     {coin: {algoId, px, sz}} and «spot_hold» {coin: until ms}"""
     from .okx_autopilot import floor_to, route, via_rate
@@ -89,7 +96,18 @@ def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict
     known = st.setdefault("spot_stops", {})
     hold = {c: t for c, t in (st.get("spot_hold") or {}).items() if int(t) > now}
     # fired: a stop we placed is gone without our cancel
+    lead = lead or {}
     for c, k in list(known.items()):
+        if k.get("lead") and not k.get("algoId"):                    # a lead position's stop lives on its sub-positions
+            if (lead.get(c) or {}).get("subs"):
+                continue
+            known.pop(c)
+            if c in want and not (avail or {}).get(c):               # the sub-positions are gone and so is the coin: the stop fired
+                hold[c] = now + HOLD_MS
+                res["fired"].append(c)
+                log({"ev": "spot_stop_fired", "ccy": c, "px": k.get("px"), "t": now,
+                     "why": f"стоп {c} (лид-позиция) на OKX сработал ({k.get('px')}) — монету не докупаем {HOLD_MS // 86_400_000} дней"})
+            continue
         if c not in mine:
             known.pop(c)
             if c in want:
@@ -119,6 +137,32 @@ def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict
             k = via_rate(cl, memo) if rt.get("via") else 1.0             # dollars per unit of the pair's quote
             tick, lot, mn = info["tickSz"], info["lotSz"], _f(info.get("minSz"))
             have_q = have.get(c, 0.0) if avail is not None else cl.avail(c)
+            # 11.11 (the real cause for MORPHO / LIT: «available balance is insufficient»): on a spot LEAD-trader account a coin
+            # bought on a copy-enabled pair sits in lead sub-positions — an ordinary conditional order cannot sell it. Its stop is
+            # set on every sub-position (POST /api/v5/copytrading/algo-order, instType SPOT); what is left outside them gets the
+            # ordinary stop below.
+            subs = [x for x in ((lead.get(c) or {}).get("subs") or []) if x and x[0]]
+            if subs:
+                kl = dict((known.get(c) or {}).get("lead") or {})
+                done, lq = {}, 0.0
+                for sid, s_inst, sq in subs:
+                    s_info = cl.instrument(s_inst) or info
+                    s_k = via_rate(cl, memo) if s_inst.endswith("-USDC") and quote == "USDT" else 1.0
+                    s_trig = _fmt(px / s_k, s_info["tickSz"])
+                    lq += _f(sq)
+                    if kl.get(sid) and abs(_f(kl[sid]) / float(s_trig) - 1) <= TOL_PX:
+                        done[sid] = kl[sid]
+                        continue
+                    cl.call("POST", LEAD_ALGO, body={"instType": "SPOT", "subPosId": sid, "slTriggerPx": s_trig, "slTriggerPxType": "last"})
+                    done[sid] = float(s_trig)
+                    res["set"].append({"ccy": c, "px": float(s_trig), "sz": _f(sq)})
+                    log({"ev": "spot_stop_set", "ccy": c, "px": float(s_trig), "sz": _f(sq), "usd": round(_f(sq) * (last_of(rt, cl, inst_id) or px), 2),
+                         "t": now, "why": f"стоп-лосс модели на лид-позиции {s_inst}: продать {_f(sq):g} {c} по рынку, если цена ≤ {s_trig}"})
+                known[c] = {**{k_: v for k_, v in (known.get(c) or {}).items() if k_ in ("algoId", "sz", "inst")},
+                            "lead": done, "px": next(iter(done.values()))}
+                have_q = max(0.0, have_q - lq)
+                if floor_to(have_q, float(lot)) < mn:
+                    continue                                            # everything is in lead positions — done
             qty = floor_to(have_q, float(lot))
             last = _f((rt.get("tk") or cl.ticker(inst_id) or {}).get("last"))
             px_q = px / k
@@ -142,7 +186,8 @@ def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict
                 continue
             trig = _fmt(px_q, tick)
             if a and abs(_f(a.get("slTriggerPx")) / float(trig) - 1) <= TOL_PX and abs(_f(a.get("sz")) / qty - 1) <= TOL_SZ:
-                known[c] = {"algoId": a["algoId"], "px": float(trig), "sz": _f(a.get("sz")), "inst": inst_id}
+                known[c] = {**({"lead": known[c]["lead"]} if (known.get(c) or {}).get("lead") else {}),
+                            "algoId": a["algoId"], "px": float(trig), "sz": _f(a.get("sz")), "inst": inst_id}
                 continue
             if a:
                 cl.call("POST", "/api/v5/trade/cancel-algos", body=[{"instId": inst_id, "algoId": a["algoId"]}])
@@ -151,7 +196,8 @@ def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict
                     "slTriggerPx": trig, "slOrdPx": "-1", "slTriggerPxType": "last", "algoClOrdId": f"{PREFIX}{c.lower()[:8]}{now // 1000}"[:32]}
             d = cl.call("POST", "/api/v5/trade/order-algo", body=body)
             aid = (d[0] if d else {}).get("algoId")
-            known[c] = {"algoId": aid, "px": float(trig), "sz": qty, "inst": inst_id}
+            known[c] = {**({"lead": known[c]["lead"]} if (known.get(c) or {}).get("lead") else {}),
+                        "algoId": aid, "px": float(trig), "sz": qty, "inst": inst_id}
             res["set"].append({"ccy": c, "px": float(trig), "sz": qty})
             log({"ev": "spot_stop_set", "ccy": c, "px": float(trig), "sz": qty, "usd": round(qty * (last or px_q) * k, 2), "t": now,
                  "why": f"стоп-лосс модели на бирже ({inst_id}): продать {qty:g} {c} по рынку, если цена ≤ {trig}"})

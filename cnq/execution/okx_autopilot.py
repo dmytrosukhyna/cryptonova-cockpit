@@ -988,7 +988,13 @@ def spot_stops(env=None, opener=None, model=None, now: int | None = None, sleep=
     cl = connect(env, opener, st, sleep)
     cl.lease_deadline = lease.deadline(g, now)
     raw = ms.read_raw(cl.fetch, cl.host)
-    r = ss.sync(cl, pf, st, now, log, pick_quote(cl, env) or "USDT", ss.totals(raw))
+    lead_held = {}
+    try:                                   # 11.11: a spot lead trader's coins sit in lead sub-positions — their stops go there
+        lctx = ld.context(lambda p, q=None: cl.call("GET", p, q), raw.get("cfg") or {}, env, raw)
+        lead_held = lctx.get("held") or {}
+    except Exception:  # noqa: BLE001
+        lead_held = {}
+    r = ss.sync(cl, pf, st, now, log, pick_quote(cl, env) or "USDT", ss.totals(raw), lead_held)
     save_state(st, env)
     parts = [f"поставлен {x['ccy']} ≤ {x['px']:g}" for x in r["set"]] + [f"снят {c}" for c in r["cancelled"]] + [f"сработал {c}" for c in r["fired"]]
     return ("Стопы спота на OKX: " + ", ".join(parts)) if parts else None

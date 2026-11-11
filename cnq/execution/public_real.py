@@ -64,7 +64,7 @@ from . import myspot_watch as ms
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
         "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve",
-        "actions", "flows", "copy_skips")
+        "actions", "flows", "copy_skips", "spot_stops")
 # 06.11 (owner: «счёт не копирует новые позиции китов»): why the futures sleeve did NOT open a desk trade — the latest reason per
 # trade, last COPY_SKIPS_MAX, from okx_futures state «copy_skips» (desk trade id = «sig», OKX instrument, plain Russian reason)
 COPY_SKIPS_MAX = 30
@@ -75,7 +75,8 @@ CLOSED_MAX = 50
 ACTION_KEYS = ("t", "kind", "sym", "side", "usd", "px", "sig")
 ACTION_KINDS = ("spot_buy", "spot_sell", "active_buy", "active_sell", "fut_open", "fut_close", "fut_reduce", "fut_gone",
                 "active_park", "active_unpark",        # 28.10 (owner's decision): «Импульс BTC» between its trades in BTC
-                "spot_stop_set", "spot_stop_cancel", "spot_stop_fired")   # 09.11: spot stops on the exchange (okx_spot_stops)
+                "spot_stop_set", "spot_stop_cancel", "spot_stop_fired",   # 09.11: spot stops on the exchange (okx_spot_stops)
+                "spot_stop_skip")                                         # 11.11: a wanted stop that could not be placed (why → «spot_stops»)
 ACTIONS_MAX = 30
 TAIL_BYTES = 512 * 1024
 SYM_RE = re.compile(r"^[A-Z0-9]{1,20}$")
@@ -209,7 +210,7 @@ def actions(since: int, logs: dict | None = None) -> list[dict]:
     for ev in _tail(logs["spot"]):
         if ev.get("ev") == "order" and (ms._f(ev.get("filled")) or 0) > 0 and ev.get("side") in ("buy", "sell"):
             add(ev, "spot_" + ev["side"], ev.get("ccy"), usd=ms._f(ev.get("usd")), px=ev.get("avg_px"))
-        elif ev.get("ev") in ("spot_stop_set", "spot_stop_cancel", "spot_stop_fired"):   # 09.11: stops on OKX (px = trigger)
+        elif ev.get("ev") in ("spot_stop_set", "spot_stop_cancel", "spot_stop_fired", "spot_stop_skip"):   # 09.11: stops on OKX (px = trigger)
             add(ev, ev["ev"], ev.get("ccy"), usd=ms._f(ev.get("usd")), px=ev.get("px"))
     for ev in _tail(logs["active"]):
         if ev.get("ev") in ("buy", "sell", "park", "unpark") and (ms._f(ev.get("filled")) or 0) > 0:
@@ -428,7 +429,22 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
             "stale": not running(s.get("lease")), "flows": fl,
             "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url"),
             "closed": list(closed_rows or [])[:CLOSED_MAX], "fut_curve": [[int(t), _r(v)] for t, v in fcurve],
-            "actions": list(acts or [])[:ACTIONS_MAX], "copy_skips": copy_skips()}
+            "actions": list(acts or [])[:ACTIONS_MAX], "copy_skips": copy_skips(), "spot_stops": spot_stops()}
+
+
+def spot_stops(env=None) -> list:
+    """11.11: the exchange stops of the non-core spot coins from the autopilot's state — [{sym, ok, px, since, why}]: ok = the stop is
+    on OKX at px; not ok = it is wanted but missing since `since`, with the reason"""
+    try:
+        from . import okx_autopilot
+        st = okx_autopilot.load_state(env)
+        out = [{"sym": c, "ok": True, "px": ms._f((v or {}).get("px")) or None, "since": None, "why": None}
+               for c, v in sorted((st.get("spot_stops") or {}).items()) if c not in (st.get("spot_stop_missing") or {})]
+        out += [{"sym": c, "ok": False, "px": None, "since": int((v or {}).get("t") or 0) or None, "why": str((v or {}).get("why") or "")[:200]}
+                for c, v in sorted((st.get("spot_stop_missing") or {}).items())]
+        return out
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def copy_skips(env=None) -> list:
@@ -484,6 +500,9 @@ def clean(doc: dict) -> dict:
     out["copy_skips"] = [{"t": int(x["t"]), "sig": x["sig"] if isinstance(x.get("sig"), str) and SIG_RE.match(x["sig"]) else None,
                           "inst": x["inst"] if INST_RE.match(str(x.get("inst") or "")) else None, "why": str(x.get("why") or "")[:200]}
                          for x in (doc.get("copy_skips") or [])[-COPY_SKIPS_MAX:] if isinstance(x, dict) and num(x.get("t"))]
+    out["spot_stops"] = [{"sym": x["sym"], "ok": bool(x.get("ok")), "px": num(x.get("px")), "since": int(x["since"]) if num(x.get("since")) else None,
+                          "why": str(x.get("why") or "")[:200] or None}
+                         for x in (doc.get("spot_stops") or [])[:40] if isinstance(x, dict) and SYM_RE.match(str(x.get("sym") or ""))]
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None
     return out
@@ -531,7 +550,7 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
             pass
     elif state.get("last"):
         # the last real numbers, their own asof — never invented ones (a «last» from before 28.10 gets the new keys empty)
-        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, "copy_skips": copy_skips(env),
+        doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, "copy_skips": copy_skips(env), "spot_stops": spot_stops(env),
                      **state["last"], "stale": True})
     else:
         return None

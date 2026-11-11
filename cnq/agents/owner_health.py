@@ -123,6 +123,15 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     rows.append(_row("autopilot", "Автопилот реального счёта (фьючерсы + спот)",
                      "Сам ведёт реальный счёт на OKX: открывает и закрывает сделки по сигналам системы, держит спот-ядро.",
                      t_pr, st, note, "Позиции при этом защищены стопами на бирже. " + ASK.format(x="автопилот на сервере"), now))
+    # 1b. 11.11: every non-core spot coin must have its stop ON THE EXCHANGE — yellow when one is missing for over 15 minutes
+    ss = [x for x in (_live(out, "public_real.json").get("spot_stops") or []) if isinstance(x, dict)]
+    late = [x for x in ss if not x.get("ok") and x.get("since") and now - int(x["since"]) > 15 * 60_000]
+    rows.append(_row("spot_stops", "Стопы спота на бирже",
+                     "У каждой монеты спота вне ядра (BTC / ETH / SOL — без стопа) должен стоять защитный стоп-ордер на OKX.",
+                     t_pr, YELLOW if late else st if st == RED else _by_age(t_pr, now, 35, 75),
+                     ("нет стопа на бирже: " + "; ".join(f"{x['sym']} — {x.get('why') or 'причина не записана'}" for x in late)) if late else
+                     (f"стопы стоят: {', '.join(x['sym'] for x in ss if x.get('ok'))}" if any(x.get("ok") for x in ss) else ""),
+                     "Монету без стопа защищает только проверка модели раз в 30 минут. " + ASK.format(x="стопы спота на OKX"), now))
     # 2. trader polling
     t_w = max(_ms(_live(out, "whales_live.json").get("asof")) or 0, _ms(_load(out, "whale_watch.json").get("asof")) or 0) or None
     rows.append(_row("traders", "Опрос трейдеров",

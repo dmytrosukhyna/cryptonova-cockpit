@@ -45,3 +45,46 @@ def test_a_stop_already_above_the_price_is_not_placed():
     cl = ap.connect(F.env(), fk, {}, F.nosleep)
     r = ss.sync(cl, pf(stop_aaa=12.0), {}, NOW, lambda e: None, avail={"AAA": 50.0})       # AAA trades at 10
     assert not [b for b in fk.algo_posts if b["instId"] == "AAA-USDT"] and "ниже стопа" in r["skipped"][0]["why"]
+
+
+def test_a_coin_traded_through_usdc_gets_its_stop_on_the_usdc_pair():
+    """11.11 (MORPHO / LIT bought, no stop for 35+ min, nothing logged): a coin with no USDT pair trades on {COIN}-USDC — its stop goes there"""
+    fk = F.FakeOkx(balances={"USDT": 1000.0, "AAA": 50.0}, usdc_only=("AAA",))
+    cl = ap.connect(F.env(), fk, {}, F.nosleep)
+    st, logs = {}, []
+    r = ss.sync(cl, pf(), st, NOW, logs.append, avail={"AAA": 50.0})
+    assert [b["instId"] for b in fk.algo_posts if b["instId"].startswith("AAA")] == ["AAA-USDC"]
+    assert "AAA" in {x["ccy"] for x in r["set"]} and st["spot_stops"]["AAA"]["inst"] == "AAA-USDC" and "AAA" not in st["spot_stop_missing"]
+
+
+def test_a_missing_stop_is_never_silent():
+    """every wanted stop that is not on the exchange: a «spot_stop_skip» log line once per reason + state «spot_stop_missing» → the
+    public file and the owner's health row"""
+    from cnq.agents import owner_health as oh
+    fk = F.FakeOkx(balances={"USDT": 1000.0})
+    cl = ap.connect(F.env(), fk, {}, F.nosleep)
+    st, logs = {}, []
+    extra = [{"symbol": "NOPAIR", "bucket": "mid", "weight": 0.01, "entry": 1.0, "levels": {"stop": 0.8}}]
+    r = ss.sync(cl, pf(extra=extra), st, NOW, logs.append, avail={"AAA": 0.0})
+    why = {x["ccy"]: x["why"] for x in r["skipped"]}
+    assert "нет пары" in why["NOPAIR"] and "монеты нет" in why["AAA"]
+    assert st["spot_stop_missing"]["AAA"]["t"] == NOW and sum(1 for e in logs if e["ev"] == "spot_stop_skip") == 3      # AAA, DOGE, NOPAIR
+    ss.sync(cl, pf(extra=extra), st, NOW + 60_000, logs.append, avail={"AAA": 0.0})
+    assert sum(1 for e in logs if e["ev"] == "spot_stop_skip") == 3 and st["spot_stop_missing"]["AAA"]["t"] == NOW       # once; since kept
+    ss.sync(cl, pf(), st, NOW + 120_000, logs.append, avail={"AAA": 50.0, "DOGE": 1000.0})
+    assert st["spot_stop_missing"] == {}                                                                               # placed → cleared
+
+
+def test_health_row_is_yellow_when_a_stop_is_missing_over_15_minutes(tmp_path):
+    import json
+    from cnq.agents import owner_health as oh
+    now = NOW
+    doc = {"asof": now - 60_000, "spot_stops": [{"sym": "VVV", "ok": True, "px": 15.18, "since": None, "why": None},
+                                               {"sym": "LIT", "ok": False, "px": None, "since": now - 20 * 60_000, "why": "на OKX нет пары LIT-USDT"}]}
+    (tmp_path / "public_real.json").write_text(json.dumps(doc))
+    row = next(r for r in oh.build(str(tmp_path), None, now)["rows"] if r["key"] == "spot_stops")
+    assert row["status"] == oh.YELLOW and "LIT — на OKX нет пары" in row["note"]
+    doc["spot_stops"][1]["since"] = now - 5 * 60_000
+    (tmp_path / "public_real.json").write_text(json.dumps(doc))
+    row = next(r for r in oh.build(str(tmp_path), None, now)["rows"] if r["key"] == "spot_stops")
+    assert row["status"] != oh.YELLOW and "VVV" in row["note"]

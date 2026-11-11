@@ -25,7 +25,8 @@ COINS = {"ADA": {"name": "Cardano", "words": ("cardano", " ada ", "ada ")},
          "LIT": {"name": "Lighter", "words": ("lighter", " lit ")},
          # 11.11 (owner asked about them for spot): watched with the same card and alerts — information only
          "MORPHO": {"name": "Morpho", "words": ("morpho",)},
-         "VVV": {"name": "Venice Token", "words": ("venice", " vvv ")}}
+         "VVV": {"name": "Venice Token", "words": ("venice", " vvv ")},
+         "GRASS": {"name": "Grass", "words": ("grass network", "getgrass", " grass ")}}   # 11.11: owner pick — support for its later parts
 # unlocks the tokenomics feed does not carry yet — each with its source
 UNLOCK_NOTES = {"LIT": [{"date": "2026-12-27", "kind": "cliff",
                          "text_ru": "27.12.2026 заканчивается годовой «замок» команды и инвесторов (50% всего выпуска: команда 26%, инвесторы 24%); "

@@ -69,8 +69,21 @@ def pending(cl) -> list:
 def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict | None = None) -> dict:
     """one pass → {"set": [...], "cancelled": [...], "fired": [...], "skipped": [...]}; st (autopilot state) keeps «spot_stops»
     {coin: {algoId, px, sz}} and «spot_hold» {coin: until ms}"""
-    from .okx_autopilot import floor_to
+    from .okx_autopilot import floor_to, route, via_rate
     res = {"set": [], "cancelled": [], "fired": [], "skipped": []}
+    miss_prev = st.get("spot_stop_missing") or {}
+    miss: dict = {}
+
+    def skip(c, why):
+        """11.11 (MORPHO / LIT held 35+ min with no stop and no trace): a wanted stop that is NOT on the exchange is never silent —
+        logged once per reason («spot_stop_skip»), kept in the state («spot_stop_missing» {coin: {t, why}}) for public_real.json
+        and the owner's health row"""
+        res["skipped"].append({"ccy": c, "why": why})
+        prev = miss_prev.get(c) or {}
+        miss[c] = {"t": int(prev.get("t") or now), "why": why}
+        if prev.get("why") != why:
+            log({"ev": "spot_stop_skip", "ccy": c, "t": now, "why": why})
+    memo: dict = {}
     want = wanted(pf)
     mine = {str(a.get("instId") or "").split("-")[0]: a for a in pending(cl)}
     known = st.setdefault("spot_stops", {})
@@ -95,44 +108,58 @@ def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict
                 res["skipped"].append({"ccy": c, "why": f"отмена не прошла: {str(e)[:100]}"})
     have = avail if avail is not None else {}
     for c, px in sorted(want.items()):
-        inst_id = f"{c}-{quote}"
-        info = cl.instrument(inst_id)
-        if not info:
-            res["skipped"].append({"ccy": c, "why": f"на OKX нет пары {inst_id}"})
-            continue
-        tick, lot, mn = info["tickSz"], info["lotSz"], _f(info.get("minSz"))
-        qty = floor_to(have.get(c, 0.0) if avail is not None else cl.avail(c), float(lot))
-        last = _f((cl.ticker(inst_id) or {}).get("last"))
-        a = mine.get(c)
-        if qty < mn or qty * (last or px) < 1.0:
+        try:
+            # 11.11: the pair the autopilot really trades the coin on — {COIN}-{quote}, or {COIN}-USDC for a coin with no USDT pair
+            # (the buy goes through USDC; the stop looked only at {COIN}-USDT, found nothing and said nothing)
+            rt = route(cl, c, quote, memo)
+            inst_id, info = rt["inst"], rt["info"]
+            if not info:
+                skip(c, f"на OKX нет пары {rt.get('none') or inst_id}")
+                continue
+            k = via_rate(cl, memo) if rt.get("via") else 1.0             # dollars per unit of the pair's quote
+            tick, lot, mn = info["tickSz"], info["lotSz"], _f(info.get("minSz"))
+            have_q = have.get(c, 0.0) if avail is not None else cl.avail(c)
+            qty = floor_to(have_q, float(lot))
+            last = _f((rt.get("tk") or cl.ticker(inst_id) or {}).get("last"))
+            px_q = px / k
+            a = mine.get(c)
+            if a and str(a.get("instId")) != inst_id:                    # ours on another pair of this coin → replaced below
+                cl.call("POST", "/api/v5/trade/cancel-algos", body=[{"instId": a["instId"], "algoId": a["algoId"]}])
+                a = None
+            if qty < mn or qty * (last or px_q) * k < 1.0:
+                if a:
+                    cl.call("POST", "/api/v5/trade/cancel-algos", body=[{"instId": inst_id, "algoId": a["algoId"]}])
+                    known.pop(c, None)
+                    res["cancelled"].append(c)
+                    log({"ev": "spot_stop_cancel", "ccy": c, "why": "на торговом счёте монеты меньше минимума OKX"})
+                elif have_q > 0:
+                    skip(c, f"на торговом счёте {have_q:g} {c} — меньше минимального ордера OKX ({mn:g})")
+                else:
+                    skip(c, f"модель держит {c}, а на торговом счёте OKX монеты нет (ещё не куплена, на Funding / Earn или в позиции лид-трейдера)")
+                continue
+            if last and last <= px_q:
+                skip(c, f"цена {last} уже ниже стопа {px_q:.6g} — продаст модель на своём ходе")
+                continue
+            trig = _fmt(px_q, tick)
+            if a and abs(_f(a.get("slTriggerPx")) / float(trig) - 1) <= TOL_PX and abs(_f(a.get("sz")) / qty - 1) <= TOL_SZ:
+                known[c] = {"algoId": a["algoId"], "px": float(trig), "sz": _f(a.get("sz")), "inst": inst_id}
+                continue
             if a:
                 cl.call("POST", "/api/v5/trade/cancel-algos", body=[{"instId": inst_id, "algoId": a["algoId"]}])
-                known.pop(c, None)
-                res["cancelled"].append(c)
-                log({"ev": "spot_stop_cancel", "ccy": c, "why": "на торговом счёте монеты меньше минимума OKX"})
-            continue
-        if last and last <= px:
-            res["skipped"].append({"ccy": c, "why": f"цена {last} уже ниже стопа {px:.6g} — продаст модель на своём ходе"})
-            continue
-        trig = _fmt(px, tick)
-        if a and abs(_f(a.get("slTriggerPx")) / float(trig) - 1) <= TOL_PX and abs(_f(a.get("sz")) / qty - 1) <= TOL_SZ:
-            known[c] = {"algoId": a["algoId"], "px": float(trig), "sz": _f(a.get("sz"))}
-            continue
-        if a:
-            cl.call("POST", "/api/v5/trade/cancel-algos", body=[{"instId": inst_id, "algoId": a["algoId"]}])
-            log({"ev": "spot_stop_cancel", "ccy": c, "why": f"стоп переставляется: {a.get('slTriggerPx')} → {trig}, размер → {qty:g}"})
-        body = {"instId": inst_id, "tdMode": "cash", "side": "sell", "ordType": "conditional", "sz": _fmt(qty, lot),
-                "slTriggerPx": trig, "slOrdPx": "-1", "slTriggerPxType": "last", "algoClOrdId": f"{PREFIX}{c.lower()[:8]}{now // 1000}"[:32]}
-        try:
+                log({"ev": "spot_stop_cancel", "ccy": c, "why": f"стоп переставляется: {a.get('slTriggerPx')} → {trig}, размер → {qty:g}"})
+            body = {"instId": inst_id, "tdMode": "cash", "side": "sell", "ordType": "conditional", "sz": _fmt(qty, lot),
+                    "slTriggerPx": trig, "slOrdPx": "-1", "slTriggerPxType": "last", "algoClOrdId": f"{PREFIX}{c.lower()[:8]}{now // 1000}"[:32]}
             d = cl.call("POST", "/api/v5/trade/order-algo", body=body)
             aid = (d[0] if d else {}).get("algoId")
-            known[c] = {"algoId": aid, "px": float(trig), "sz": qty}
+            known[c] = {"algoId": aid, "px": float(trig), "sz": qty, "inst": inst_id}
             res["set"].append({"ccy": c, "px": float(trig), "sz": qty})
-            log({"ev": "spot_stop_set", "ccy": c, "px": float(trig), "sz": qty, "usd": round(qty * (last or px), 2),
-                 "why": f"стоп-лосс модели на бирже: продать {qty:g} {c} по рынку, если цена ≤ {trig}"})
-        except Exception as e:  # noqa: BLE001
-            res["skipped"].append({"ccy": c, "why": f"стоп не поставился: {str(e)[:120]}"})
-            log({"ev": "spot_stop_error", "ccy": c, "error": str(e)[:200]})
+            log({"ev": "spot_stop_set", "ccy": c, "px": float(trig), "sz": qty, "usd": round(qty * (last or px_q) * k, 2), "t": now,
+                 "why": f"стоп-лосс модели на бирже ({inst_id}): продать {qty:g} {c} по рынку, если цена ≤ {trig}"})
+        except Exception as e:  # noqa: BLE001 — one coin's failure never leaves the others without a stop
+            known.pop(c, None) if c not in mine else None
+            skip(c, f"стоп не поставился: {str(e)[:140]}")
+            log({"ev": "spot_stop_error", "ccy": c, "t": now, "error": str(e)[:200]})
+    st["spot_stop_missing"] = miss
     st["spot_hold"] = hold
     st["spot_stops_t"] = now
     return res

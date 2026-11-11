@@ -550,6 +550,7 @@ def _posnum(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
 
 
+P_TP = IDEAS["mid_tp"]
 OWNER_PICKS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "spot_owner_picks.json")
 
 
@@ -721,6 +722,10 @@ class IdeasPortfolio:
         okx = {str(c).upper() for c in tradeable} if tradeable else None
         self._support = support
         blocked = {str(k).upper(): str(v) for k, v in ((picks or {}).get("block") or {}).items()}   # 11.11: owner «не брать»
+        # 11.11 10:43 (owner): the first take-profit of an owner pick — config «take_first» (+50 %), per coin in «take_first_by»;
+        # every other coin keeps IDEAS mid_tp (+30 %)
+        self._pick_tp = {str(c).upper(): float(((picks or {}).get("take_first_by") or {}).get(c, (picks or {}).get("take_first") or P_TP))
+                         for c in (picks or {}).get("coins") or []}
         now = now or int(time.time() * 1000)
         P, rp = IDEAS, self.rp
         src = {k: {str(s).upper(): float(v) for s, v in ((sources or {}).get(k) or {}).items() if _posnum(v)} for k in IDEAS_SRC}
@@ -783,7 +788,7 @@ class IdeasPortfolio:
                                 f"Остаток держим до отката {P['trail']*100:.0f}% от пика.", actions)
             elif est == "small" and fixes and px <= high * (1 - P["trail"]):
                 self._sell(now, s, p, px, f"Трейлинг: {s} на {(1 - px / high) * 100:.0f}% ниже пика {_fp(high)} — остаток продаём ({res}).", actions)
-            elif est != "small" and kind not in ("core", "smart") and not fixes and ret >= P["mid_tp"]:
+            elif est != "small" and kind not in ("core", "smart") and not fixes and ret >= self._tp(s, est):
                 part = p["weight"] * P["mid_tp_part"]
                 actions.append(rp._act(now, s, "TRIM", p["weight"] - part, px, f"Фиксируем треть: {s} {res} — продаём 1/3, остаток держим "
                                        f"с трейлингом {P['mid_trail'] * 100:.0f}% от максимума, не ниже входа.", fixes=fixes + 1, last_fix=px))
@@ -930,6 +935,10 @@ class IdeasPortfolio:
         self.conn.commit()
         return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
 
+    def _tp(self, sym: str, est: str) -> float:
+        """the first take-profit level of a medium position: an owner pick's own (config), else IDEAS mid_tp"""
+        return (getattr(self, "_pick_tp", None) or {}).get(sym, P_TP) if est == "pick" else P_TP
+
     def _owner_picks(self, cfg: dict, now: int, price: dict, live: set, psrc: dict, src: dict, smap: dict, okx, support,
                      not_bought: list) -> list[dict]:
         """11.11 10:34 (owner, explicit yes, real money): his picks (config/spot_owner_picks.json) are bought with the FREE CASH only —
@@ -989,7 +998,7 @@ class IdeasPortfolio:
             head = (f"Выбор владельца (11.11), часть {n + 1} из {n_tr}: {c} +{cost / V * 100:.2f}% счёта из свободного кэша"
                     + (" — первая часть сразу, чтобы потом не брать дороже; остальные — от поддержки." if n == 0 else
                        f" — {_es.check(c, px, support)[1]}."))
-            rule = f" Стоп {_pc(P['stop_buy'])} от средней цены (ордер на OKX), на +{P['mid_tp'] * 100:.0f}% продаём треть, остаток — трейлинг {P['mid_trail'] * 100:.0f}%, не ниже входа."
+            rule = f" Стоп {_pc(P['stop_buy'])} от средней цены (ордер на OKX), на +{self._tp(c, 'pick') * 100:.0f}% продаём треть, остаток — трейлинг {P['mid_trail'] * 100:.0f}%, не ниже входа."
             if c in held:
                 out.append(rp._act(now, c, "ADD", held[c]["weight"] + cost, px, head + rule, held[c]["bucket"]))
             else:
@@ -1311,7 +1320,7 @@ class IdeasPortfolio:
                                       if h == "mid" and kind not in ("smart",) and p.get("fixes") and p.get("entry") else
                                       round(p["entry"] * (1 + (SMART["stop"] if kind == "smart" else P["stop_small"] if h == "short" else P["stop_buy"])), 8)
                                       if h != "long" and p.get("entry") else None),
-                             "take_third": round(p["entry"] * (1 + P["mid_tp"]), 8) if h == "mid" and p.get("entry") and not p.get("fixes") else None,
+                             "take_third": round(p["entry"] * (1 + self._tp(s, est)), 8) if h == "mid" and p.get("entry") and not p.get("fixes") else None,
                              "take_half": round(p["entry"] * P["body_x"], 8) if h == "short" and p.get("entry") and not p.get("fixes") else None}}
             out.append({**p, **hz, "bucket": kind, "kind_ru": KIND_RU.get(kind, kind), "role": est, "role_ru": IDEAS_ROLE_RU.get(est, est),
                         "name": names.get(s) or s, "weight": round(mv / V, 4), "cost_weight": round(p["weight"], 6),

@@ -1253,3 +1253,24 @@ def test_owner_picks_use_only_the_free_cash_in_three_tranches_and_ada_is_blocked
     t4 = t3 + 30 * H
     st = port.step(src, _ideas(rows, t4, st_map), t4, tradeable=okx, support=sup, picks=cfg)
     assert "VVV" not in {p["symbol"] for p in st["positions"]} and not any(n["symbol"] == "VVV" for n in st["not_bought"])
+
+
+def test_an_owner_pick_takes_its_first_third_at_plus_50_not_30():
+    """11.11 10:43 (owner): owner picks fix 1/3 at +50 % (config take_first); every other coin stays at +30 %"""
+    rows = [_irow("BTC", "buy", 80000, "core"), _irow("A1", "buy", 10.0)]
+    stm = {"BTC": {"status": "buy", "price": 80000}, "A1": {"status": "buy", "price": 10.0}, "VVV": {"status": "wait", "price": 20.0}}
+    src = {"cg": {"BTC": 80000, "A1": 10.0, "VVV": 20.0}, "meme": {}, "hl": {}}
+    cfg = {"id": "t2", "coins": ["VVV"], "tranches": 3, "gap_h": 24, "take_first": 0.5}
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    st = port.step(src, _ideas(rows, T0, stm), T0, picks=cfg)
+    lv = {p["symbol"]: p["levels"] for p in st["positions"]}
+    assert abs(lv["VVV"]["take_third"] - 30.0) < 1e-9 and abs(lv["A1"]["take_third"] - 13.0) < 1e-9
+    up = {"cg": {"BTC": 80000, "A1": 13.5, "VVV": 27.0}, "meme": {}, "hl": {}}          # both +35 %
+    stm2 = {**stm, "A1": {"status": "buy", "price": 13.5}, "VVV": {"status": "wait", "price": 27.0}}
+    r2 = [_irow("BTC", "buy", 80000, "core"), _irow("A1", "buy", 13.5)]
+    st = port.step(up, _ideas(r2, T0 + 3600_000, stm2), T0 + 3600_000, picks=cfg)
+    assert {a["symbol"] for a in st["actions"] if a["action"] == "TRIM"} == {"A1"}
+    up["cg"]["VVV"] = 30.5
+    st = port.step(up, _ideas(r2, T0 + 7200_000, {**stm2, "VVV": {"status": "wait", "price": 30.5}}), T0 + 7200_000, picks=cfg)
+    t = [a for a in st["actions"] if a["action"] == "TRIM"]
+    assert [a["symbol"] for a in t] == ["VVV"] and "треть" in t[0]["reason"]

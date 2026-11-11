@@ -20,6 +20,7 @@ monthly demo buys at real prices. Demo only, not advice. Stdlib only."""
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -1897,6 +1898,32 @@ def _polished(doc: dict, lang: str) -> dict:
     return d
 
 
+_SIG_INTERNAL = re.compile(r"^[a-z_]+:")
+
+
+def public_sig(sig: str) -> str:
+    """the same trade always gets the same neutral id; nothing about the desk or the method can be read from it"""
+    return "cn:" + hashlib.sha256(("cnq-public-sig:" + sig).encode()).hexdigest()[:14]
+
+
+def public_edge(doc):
+    """11.11 (owner: the repo and the feed are public — the method is internal): the feed's copy with every internal trade id
+    («whales:W-…», «ivan:…», «aggr:E-…») replaced by a neutral one. ONLY at the output edge: everything above works with the
+    real ids. A row that was a system (copy) trade keeps saying so by its flag — the shipped app (builds 54–57) picks the
+    «Сделка системы» explanation by copy_whale / why_full.copy, and only as a last resort by the id's prefix."""
+    if isinstance(doc, list):
+        return [public_edge(x) for x in doc]
+    if not isinstance(doc, dict):
+        return doc
+    out = {k: public_edge(v) for k, v in doc.items()}
+    sig = doc.get("sig")
+    if isinstance(sig, str) and _SIG_INTERNAL.match(sig):
+        out["sig"] = public_sig(sig)
+        if sig.startswith("whales:") and "copy_whale" not in out:      # exactly the rows the app's prefix check caught
+            out["copy_whale"] = True
+    return out
+
+
 def _write(out: str, name: str, doc: dict) -> None:
     """write next to the old file and rename: the API never reads a half-written feed"""
     path = os.path.join(out, name)
@@ -1918,7 +1945,7 @@ def run(conn: sqlite3.Connection | None = None, out: str = "web", now: int | Non
           "live": _live_shares(out, now), "sys": sys_issues(out, now), "btc": _load(out, "app_btc.json"), "trend": _trend(out)}
     docs = {lang: _polished(build(paper, pf, mk, out, now, lang, ex), lang) for lang in LANGS}
     for lang in [x for x in LANGS if x != DEFAULT] + [DEFAULT]:          # Russian last: its mtime says «all languages written»
-        _write(out, file_name("app_home", lang), docs[lang])
+        _write(out, file_name("app_home", lang), public_edge(docs[lang]))     # 11.11: neutral trade ids in the public feed
     if int(now / 60000) % 60 == 0 or not os.path.exists(os.path.join(out, "app_btc.json")):
         b = btc_daily(conn, out)
         if b:

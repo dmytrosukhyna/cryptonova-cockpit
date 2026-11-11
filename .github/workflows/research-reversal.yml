@@ -1,0 +1,18 @@
+name: research-reversal
+# Manual only. RESEARCH ONLY (paper): the «Разворот» desk backtest (scripts/reversal_study.py) — the opposite side after a clearly
+# successful trade closes. No orders, no keys. Results are published as job annotations. Nothing is committed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/reversal_study.py

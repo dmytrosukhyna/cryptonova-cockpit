@@ -28,7 +28,7 @@
     async html(arg) {
       if (!V.auth.owner()) return `<div class="card">${V.nodata('раздел доступен только владельцу')}</div>`;   // 05.11: owner-only
       if (arg === 'stocks' || arg === 'crypto') ui.tab = arg;
-      const [W, S] = await V.feeds(['whale_watch.json', 'stock_whales.json']);
+      const [W, S] = await Promise.all([V.sealed('whale_watch'), V.feed('stock_whales.json')]);
       const nc = W ? A(W.whales).length : null, ns = S ? A(S.funds).length : null;
       return `<div class="ph"><div><h2>Киты</h2><p>Следим за топами: криптотрейдеры, которых изучает и копирует система, и крупнейшие фонды фондового рынка по официальным отчётам. Только информация, не финансовый совет.</p></div></div>
         <div class="seg wh-tabs" role="tablist" style="margin-bottom:var(--gap)">
@@ -48,7 +48,7 @@
 
   /* ── crypto ─────────────────────────────────────────────────────────── */
   function crypto(W) {
-    if (!W) return `<section class="card">${V.nodata('whale_watch.json ещё не опубликован — список появится после следующего прогона изучения китов')}</section>`;
+    if (!W) return `<section class="card">${V.nodata('список временно недоступен — он появится после следующего прогона или когда сервер снова ответит')}</section>`;
     // 04.11 22:35 (owner): traders in a minus, without decisions or far from the bar are not candidates — folded «не прошли» below
     const every = A(W.whales), all = every.filter((w) => w.status !== 'failed'), failed = every.filter((w) => w.status === 'failed');
     const c = W.counts || {}, bs = W.by_src || {}, dk = W.desk;
@@ -101,7 +101,7 @@
   }
 
   async function openWhale(addr) {
-    const W = await V.feed('whale_watch.json');
+    const W = await V.sealed('whale_watch');
     const w = A(W && W.whales).find((x) => x.addr === addr);
     if (!w) return;
     const pos = A(w.positions), rec = A(w.recent), cp = w.copies || {};

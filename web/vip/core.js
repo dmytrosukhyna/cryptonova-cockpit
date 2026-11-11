@@ -141,6 +141,14 @@
     if (r && typeof r === 'object' && r.data && typeof r.data === 'object' && ('age_sec' in r || 'name' in r)) r = Object.assign({ _asof: r.asof }, r.data);
     return r || null;
   };
+  // 11.11: internal files are published only sealed (web/sealed/) — the server opens them for the owner; the old public file is a
+  // fallback for the time it still exists. null = not available (API down, not the owner).
+  V.sealed = async function (name) {
+    let d = null;
+    try { d = await V.ownerData('/v2/owner/sealed/' + name); } catch (e) { d = null; }
+    if (!d) { try { d = await V.feed(name + '.json'); } catch (e) { d = null; } }
+    return d || null;
+  };
   V.lockBox = (title, text) => `<div class="lock">${V.ico('lock')}<div><b>${esc(title)}</b><p>${text}</p>
       <div style="margin-top:9px"><button class="btn sm" type="button" data-act="login">${V.auth.has() ? 'Войти' : 'Вход'}</button></div></div></div>`;
 

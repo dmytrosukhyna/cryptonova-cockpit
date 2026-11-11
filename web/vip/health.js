@@ -5,11 +5,9 @@
   'use strict';
   const V = window.VIP, esc = V.esc, A = V.arr;
   V.ownerHealthCard = async function () {
-    // 11.11: the file is published only sealed (web/sealed/) — the server opens it for the owner; the old public file is a fallback
-    let D = null;
-    try { D = await V.ownerData('/v2/owner/sealed/owner_health'); } catch (e) { D = null; }
-    if (!D || !A(D.rows).length) { try { [D] = await V.feeds(['owner_health.json']); } catch (e) { D = null; } }
-    if (!D || !A(D.rows).length) return '';
+    const D = await V.sealed('owner_health');
+    // the API is down or the file is not there: one calm public-safe line, no details
+    if (!D || !A(D.rows).length) return `<section class="card" style="margin-bottom:var(--gap)" data-owner="health"><div class="card-h"><h3>Состояние системы</h3></div><p class="note">Данные временно недоступны.</p></section>`;
     const rows = A(D.rows).map((r) => `<tr class="${r.status === 'fail' ? 'bad' : ''}">
         <td class="hl-dot">${esc(r.icon)} ${esc(r.word)}</td>
         <td class="l"><b>${esc(r.name)}</b><div class="muted">${esc(r.what)}</div>${r.note ? `<div>${esc(r.note)}</div>` : ''}${r.todo ? `<div><b>Что делать:</b> ${esc(r.todo)}</div>` : ''}</td>

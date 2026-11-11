@@ -26,7 +26,7 @@ import sqlite3
 import threading
 import time
 
-NAME = os.environ.get("CNQ_PETER_NAME") or "Питер"
+NAME = os.environ.get("CNQ_PETER_NAME") or "Golden Donut"       # 11.11 owner: the desk's display name (ids / paths stay «peter»)
 TOKEN_ENV = "CNQ_PETER_TOKEN"
 URL = os.environ.get("CNQ_PETER_URL") or "https://app.crypto-capital.app/v2/peter/ingest"
 START_USD = 10_000.0
@@ -180,8 +180,11 @@ class Peter:
         """for /v2/health and «Состояние системы»: timestamps only — nothing about the account"""
         with self.lock:
             hb, last = self._meta("last_hb"), self.db.execute("SELECT MAX(t) FROM deals").fetchone()[0]
+            cloud, src = self._meta("cloud") or {}, self._meta("source")
         ok = len(self.token()) >= 24
-        return {"configured": ok, "token_set": ok, "last_hb": hb, "last_deal": last}
+        return {"configured": ok, "token_set": ok, "last_hb": hb, "last_deal": last,
+                # 11.11 option B: the cloud reader (investor password through MetaApi) — flags and times only
+                "source": src or ("ea" if hb else None), "cloud_set": bool(cloud.get("set")), "cloud_last_ok": cloud.get("last_ok")}
 
     # ------------------------------------------------------------------ ingest
     def ingest(self, headers: dict, body: bytes, ip: str = "local", now: int | None = None) -> tuple[int, dict]:
@@ -237,6 +240,8 @@ class Peter:
             return True
         # heartbeat: open positions, balance / equity, the last closed bars
         self._meta("last_hb", now)
+        if acct != "cloud":
+            self._meta("source", "ea")
         self._meta("account", {"balance": _f(e.get("balance")), "equity": _f(e.get("equity")), "currency": str(e.get("currency") or "")[:8],
                                "leverage": _i(e.get("leverage")), "server_t": _i(e.get("t")), "terminal": str(e.get("terminal") or "")[:40]})
         self.db.execute("DELETE FROM positions")
@@ -279,6 +284,23 @@ class Peter:
             self.db.execute("INSERT OR REPLACE INTO contexts VALUES(?,?,?,?,?,?)",
                             (deal, row[1], "entry" if row[5] == "in" else "exit", row[2], json.dumps(ctx)[:200000], json.dumps(m)))
         return fresh
+
+    def ctx_from_store(self, sym: str, t_ms: int) -> dict:
+        """the raw context of a moment from the stored candles (the cloud reader has no terminal to ask): closed bars only —
+        48 × M5, 210 × H1, 210 × D1 — and the UTC day's open / high / low up to that moment. Call with self.lock held."""
+        ctx: dict = {}
+        for tf, n, ln in (("M5", 48, 300_000), ("H1", 210, 3600_000), ("D1", 210, 86400_000)):
+            rows = self.db.execute("SELECT t, o, h, l, c FROM candles WHERE symbol=? AND tf=? AND t<=? ORDER BY t DESC LIMIT ?",
+                                   (sym, tf, t_ms - ln, n)).fetchall()
+            ctx[tf] = [list(r) for r in reversed(rows)]
+        d0 = t_ms - t_ms % 86400_000
+        for tf in ("M5", "H1"):
+            day = self.db.execute("SELECT o, h, l FROM candles WHERE symbol=? AND tf=? AND t>=? AND t<? ORDER BY t", (sym, tf, d0, t_ms)).fetchall()
+            if day:
+                ctx["day"] = {"open": day[0][0], "high": max(r[1] for r in day), "low": min(r[2] for r in day), "from": tf}
+                break
+        ctx["calendar"], ctx["ext"], ctx["src"] = [], {}, "store"
+        return ctx
 
     def _our_calendar(self, t_ms: int) -> list:
         """events of web/calendar.json within ±24 h of the moment (the macro calendar the system already keeps)"""
@@ -389,7 +411,8 @@ class Peter:
                  "max_dd_pct": round(dd, 2), "trades_per_week": round(len(closed) / span_w, 2) if span_w else None,
                  "hold_median_min": sorted(holds)[len(holds) // 2] if holds else None, "hold_dist": dist,
                  "net_usd_account": round(sum(p["pnl"] for p in closed), 2)}
-        return {"asof": now, "name": NAME, "kind": "paper", "source": "MetaTrader 5 · мост CryptoNovaBridge", "start_usd": START_USD,
+        return {"asof": now, "name": NAME, "kind": "paper",
+                "source": "MetaTrader 5 · облако MetaApi (пароль инвестора)" if self._meta("source") == "cloud" else "MetaTrader 5 · мост CryptoNovaBridge", "start_usd": START_USD,
                 "equity_notional": round(eq, 2), "pnl_notional": round(eq - START_USD, 2), "pnl_pct": round((eq / START_USD - 1) * 100, 3),
                 "account": {"currency": acct.get("currency"), "leverage": acct.get("leverage")},      # never the balance in $
                 "last_hb": self._meta("last_hb"), "stats": stats, "curve": curve[-500:],

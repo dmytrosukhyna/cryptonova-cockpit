@@ -291,7 +291,7 @@
     // внутреннего понимания»): owner-only — hidden from the menu and refused by the router unless CNAuth.state.isOwner
     { id: 'whales', name: 'Киты', short: 'Киты', icon: 'whales', owner: true },
     // 11.11: «Питер» — MT5 gold trader under observation (vip/peter.js, ../peter.js), owner-only like «Киты»
-    { id: 'peter', name: 'Питер', short: 'Питер', icon: 'strategies', owner: true },
+    { id: 'peter', name: 'Golden Donut', short: 'Donut', icon: 'strategies', owner: true },
     { id: 'opps', name: 'Другие возможности', short: 'Другое', icon: 'opps' },
     { id: 'demo', name: 'Live Demo', short: 'Live', icon: 'demo' },
     { id: 'system', name: 'Система', short: 'Система', icon: 'system' },

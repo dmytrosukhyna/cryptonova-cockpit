@@ -54,7 +54,7 @@ from cnq.agents.llm import LLM, PROVIDERS
 
 from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, owner_auth, owner_data, pf_parse, \
     pf_review, spot_top, tts
-from . import peter as peter_desk
+from . import peter as peter_desk, peter_cloud
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -133,6 +133,7 @@ class Api:
         self.owner_data = owner_data.OwnerData(web_dir)
         # 11.11: «Питер» — MT5 gold trader, observation only (cnq/api/peter.py); its data stays in <run>/data/peter, never in web/
         self.peter = peter_desk.Peter(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "peter"), web_dir=web_dir)
+        self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
         try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
             self.peter.ensure_token()
         except OSError:
@@ -404,7 +405,7 @@ class Api:
         if path.startswith("/v2/auth/"):                                  # 28.10: the owner's sign-in (cnq/api/owner_auth.py)
             return self.owner_auth.handle(method, path, headers, body)
         if path == "/v2/owner" or path.startswith("/v2/owner/"):          # 28.10: the owner's private sections, owner session only
-            return self._owner(method, path, headers)
+            return self._owner(method, path, headers, body)
         if path == "/v2/admin" or path.startswith("/v2/admin/"):          # the owner's admin panel: its own token, not Firebase
             return self.console.handle(method, path, url.query, headers, body)
         # ------------------------------------------------------------ signed-in user
@@ -475,7 +476,7 @@ class Api:
         return 404, {"error": "not_found"}
 
     # ---------------------------------------------------------------- 28.10: the owner's private sections
-    def _owner(self, method: str, path: str, headers: dict) -> tuple[int, dict]:
+    def _owner(self, method: str, path: str, headers: dict, body: bytes = b"") -> tuple[int, dict]:
         """GET /v2/owner/overview · /v2/owner/myspot · /v2/owner/ivan — only with a valid owner session (checked here, on the
         server, on every call). Read-only: nothing here can change an account, a key or a trading setting."""
         s, deny = self.owner_auth.require(headers)
@@ -483,6 +484,16 @@ class Api:
             return deny
         if method == "POST" and path == "/v2/owner/peter/token/rotate":     # 11.11: «Новый токен» for Peter's MT5 bridge
             return self.peter.token_view(rotate=True)
+        if method == "POST" and path == "/v2/owner/peter/cloud":            # 11.11 option B: the form «Подключение через пароль инвестора»
+            try:
+                form = json.loads((body or b"{}").decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                return 400, {"error": "bad_json"}
+            return self.peter_cloud.connect(form if isinstance(form, dict) else {})
+        if method == "POST" and path == "/v2/owner/peter/cloud/check":
+            return self.peter_cloud.check()
+        if method == "POST" and path == "/v2/owner/peter/cloud/disconnect":
+            return self.peter_cloud.disconnect()
         if method != "GET":
             return 405, {"error": "method"}
         if path == "/v2/owner/overview":
@@ -496,6 +507,8 @@ class Api:
             return self.peter.desk()
         if path == "/v2/owner/peter/token":
             return self.peter.token_view()
+        if path == "/v2/owner/peter/cloud":                            # flags and a masked login only — never a secret
+            return 200, self.peter_cloud.view()
         m = re.fullmatch(r"/v2/owner/(myspot|ivan)", path)
         if m:
             return self.owner_data.get(m.group(1))
@@ -851,6 +864,7 @@ def main() -> int:
     port = int(os.environ.get("CNQ_API_PORT", "8090"))
     # build 50: the server installs NOVA's voice (edge-tts) by itself when it is missing — once, in the background (cnq/api/tts.py)
     api.tts.attach_installer()
+    api.peter_cloud.start()                  # 11.11: «Питер» through MetaApi — polls only while the owner has connected it
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))
     print(f"cnq-api {VERSION} on 127.0.0.1:{port}", flush=True)
 

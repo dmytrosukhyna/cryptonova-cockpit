@@ -63,7 +63,7 @@ def test_token_trades_curve_and_context():
     assert "balance" not in json.dumps(L["account"])                      # the desk never shows his balance in $
     assert os.path.exists(os.path.join(d, "peter_live.json"))
     st = p.status()
-    assert st["configured"] and st["last_hb"] == H0 and set(st) == {"configured", "token_set", "last_hb", "last_deal"}
+    assert st["configured"] and st["last_hb"] == H0 and set(st) == {"configured", "token_set", "last_hb", "last_deal", "source", "cloud_set", "cloud_last_ok"} and st["source"] == "ea"
     tv = p.token_view()[1]
     assert tv["token"] == TOK and tv["whitelist"] == "https://app.crypto-capital.app"
 
@@ -81,7 +81,7 @@ def test_server_routes_and_health_row():
                                                  "peter": {"configured": True, "last_hb": hb, "last_deal": None}}]})
         doc = OH.build(d, None, H0)
         row = {r["key"]: r for r in doc["rows"]}["peter"]
-        assert row["name"] == "Питер (MT5)" and row["status"] == want and (want == "ok" or row["note"]), (hb, row)
+        assert row["name"] == "Golden Donut (MT5)" and row["status"] == want and (want == "ok" or row["note"]), (hb, row)
         others = [r["status"] for r in doc["rows"] if r["key"] != "peter"]
         if want == "info":           # never connected yet: ⚪, and «overall» is decided by the other rows only
             assert row["icon"] == "⚪" and row["word"] == "ждёт подключения" and row["todo"] is None
@@ -104,8 +104,8 @@ def test_panels_owner_only():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     r = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()
     core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
-    assert "{ id: 'peter', name: 'Питер', short: 'Питер', icon: 'strategies', owner: true }" in core and "peter: '/v2/owner/peter'" in core
-    assert '<script src="vip/peter.js"></script>' in vip and '<script src="peter.js?v=1"></script>' in vip
+    assert "{ id: 'peter', name: 'Golden Donut', short: 'Donut', icon: 'strategies', owner: true }" in core and "peter: '/v2/owner/peter'" in core
+    assert '<script src="vip/peter.js"></script>' in vip and '<script src="peter.js?v=3"></script>' in vip
     assert 'id="peterCard" hidden' in app and "CNAuth.state.isOwner" in app and "/v2/owner/peter" in app
     for f in os.listdir(os.path.join(root, "web")):         # the desk is never a public file
         assert not f.startswith("peter_live"), f

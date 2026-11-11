@@ -219,15 +219,22 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     if not pt:
         st, note = YELLOW, "нет данных от API в этом прогоне"
     elif not pt.get("configured"):
-        st, note = YELLOW, "токен Питера ещё не создан — сервер создаст его сам после перезапуска API"
+        st, note = YELLOW, "токен моста ещё не создан — сервер создаст его сам после перезапуска API"
     elif not hb:                                 # 11.11: before his first heartbeat ever — information, not a delay
-        st, note = INFO, "советник у Питера ещё ни разу не подключался"
+        st, note = INFO, "счёт ещё ни разу не подключался"
     elif mkt and _age_min(hb, now) > HB_STALE_MIN:
-        st, note = YELLOW, f"нет связи с терминалом Питера {int(_age_min(hb, now))} мин (рынок золота открыт)"
+        st, note = YELLOW, f"нет связи с терминалом Golden Donut {int(_age_min(hb, now))} мин (рынок золота открыт)"
     else:
         st, note = GREEN, "" if mkt else "рынок золота закрыт"
-    rows.append(_row("peter", "Питер (MT5)", "Наблюдение за сделками трейдера по золоту в MetaTrader 5 — только чтение, без ордеров.",
-                     hb, st, note, ASK.format(x="мост MT5 Питера"), now))
+    src = {"cloud": "облако MetaApi", "ea": "советник в терминале"}.get(pt.get("source"))
+    if pt.get("cloud_set") and not hb:
+        st, note = INFO, "облако подключено, первых данных ещё не было"
+    elif pt.get("source") == "cloud" and st == YELLOW:
+        note = f"облако MetaApi не отдаёт данные {int(_age_min(hb, now))} мин (рынок золота открыт)"
+    row = _row("peter", "Golden Donut (MT5)", "Наблюдение за сделками трейдера по золоту в MetaTrader 5 — только чтение, без ордеров.",
+               hb, st, note, ASK.format(x="подключение Golden Donut (MT5)"), now)
+    row["source"] = src
+    rows.append(row)
     worst = RED if any(r["status"] == RED for r in rows) else YELLOW if any(r["status"] == YELLOW for r in rows) else GREEN
     return {"asof": now, "overall": worst, "icon": ICON[worst], "rows": rows,
             "about_ru": "🟢 работает · 🟡 задержка (обычно проходит сама) · 🔴 сбой — нужна помощь · ⚪ ждёт подключения (не считается). Время — последний успешный запуск."}

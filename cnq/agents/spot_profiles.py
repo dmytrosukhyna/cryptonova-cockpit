@@ -531,7 +531,8 @@ IDEAS_SRC = ("cg", "meme", "hl")          # price sources of portfolio.run in pr
 IDEAS_SRC_RU = {"cg": "CoinGecko", "meme": "список мемов", "hl": "спот Hyperliquid", "ideas": "цена из таблицы",
                 "last": "последняя известная цена"}
 _SRC_CODE = {"cg": 1.0, "meme": 2.0, "hl": 3.0}      # meta `src:SYM` (REAL column)
-IDEAS_ROLE_RU = {"buy": "из таблицы: можно брать", "add": "из таблицы: можно добрать", "small": "на небольшую сумму",
+IDEAS_ROLE_RU = {"pick": "выбор владельца",
+                 "buy": "из таблицы: можно брать", "add": "из таблицы: можно добрать", "small": "на небольшую сумму",
                  "smart": "смарт-мани: набирают умные кошельки"}
 KIND_RU = {"core": "ядро", "mid": "крупный альт", "high": "высокий риск", "meme": "мем", "smart": "смарт-мани"}
 
@@ -547,6 +548,19 @@ def _fp(x) -> str:
 
 def _posnum(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+
+
+OWNER_PICKS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "spot_owner_picks.json")
+
+
+def owner_picks_cfg(path: str | None = None) -> dict | None:
+    """config/spot_owner_picks.json {"id", "coins": [...], "tranches", "gap_h", "block": {SYM: why}} or None"""
+    try:
+        with open(path or OWNER_PICKS, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def load_ideas(path: str = "web/ideas.json") -> dict | None:
@@ -697,7 +711,7 @@ class IdeasPortfolio:
         self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
 
     def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None,
-             tradeable: set | None = None, smart: dict | None = None, support: dict | None = None) -> dict:
+             tradeable: set | None = None, smart: dict | None = None, support: dict | None = None, picks: dict | None = None) -> dict:
         """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
         "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas()); `sma200` (20.10) —
         {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map). `tradeable` (22.10, owner) — coins with an
@@ -706,6 +720,7 @@ class IdeasPortfolio:
         a non-core coin is bought only within 3 % above a support and while BTC is not breaking down (None — no such check)."""
         okx = {str(c).upper() for c in tradeable} if tradeable else None
         self._support = support
+        blocked = {str(k).upper(): str(v) for k, v in ((picks or {}).get("block") or {}).items()}   # 11.11: owner «не брать»
         now = now or int(time.time() * 1000)
         P, rp = IDEAS, self.rp
         src = {k: {str(s).upper(): float(v) for s, v in ((sources or {}).get(k) or {}).items() if _posnum(v)} for k in IDEAS_SRC}
@@ -759,7 +774,7 @@ class IdeasPortfolio:
                 self._sell(now, s, p, px, f"Правило с 22.10: портфель держит только монеты со спот-парой на OKX — его повторяет реальный "
                            f"счёт CRYPTO NOVA AI. {s} на споте OKX нет — продаём, итог {res}; деньги — в ядро, пока таблица не "
                            "предложит монету с OKX.", actions)
-            elif st == "avoid" and not cross_stop(r):
+            elif st == "avoid" and not cross_stop(r) and est != "pick":      # 11.11: an owner pick is not sold by the table
                 self._sell(now, s, p, px, f"Таблица поставила «не брать»: {r.get('why_ru') or 'проверки не пройдены'}. Продаём, итог {res}.", actions)
             elif est == "small" and not fixes and ret <= P["stop_small"]:
                 self._sell(now, s, p, px, f"Стоп {_pc(P['stop_small'])}: {s} {res} — небольшую сумму режем целиком.", actions)
@@ -778,7 +793,7 @@ class IdeasPortfolio:
                            "— остаток продаём.", actions)
             elif est != "small" and kind != "core" and ret <= P["stop_buy"]:
                 self._sell(now, s, p, px, f"Стоп {_pc(P['stop_buy'])}: {s} {res}. Убыток режем; {P['cooldown_d']} дней монету не берём.", actions)
-            elif weekly and (st == "wait" or cross_stop(r)) and ret <= P["review_pnl"] and s not in P["trusted_small"]:
+            elif weekly and (st == "wait" or cross_stop(r)) and ret <= P["review_pnl"] and s not in P["trusted_small"] and est != "pick":
                 self._sell(now, s, p, px, f"Недельный пересмотр: в таблице «ждём» ({r.get('why_ru') or '—'}), позиция {res} — "
                            "освобождаем место.", actions)
         # --- 3. buys: table order, buy/add 10 % (≤ 8), small 2.5 % (≤ 4), cash ≥ 10 %, 14-day cooldown, a reliable live price
@@ -786,9 +801,12 @@ class IdeasPortfolio:
         if fresh:
             self._idle_housekeeping()
             eligible_seen = False                 # 28.10: a coin passed every rule of the portfolio this run (bought or cash-blocked)
+            if picks:                             # 11.11 (owner): his picks first — tranche 1 now, 2–3 from support
+                actions += self._owner_picks(picks, now, price, live, psrc, src, smap, okx, support, not_bought)
             held = {p["symbol"]: p for p in rp.positions()}
-            n_buy = sum(1 for p in held.values() if self._split(p["bucket"])[1] != "small")
-            n_small = len(held) - n_buy
+            n_pick = sum(1 for p in held.values() if self._split(p["bucket"])[1] == "pick")      # picks take no table place
+            n_buy = sum(1 for p in held.values() if self._split(p["bucket"])[1] not in ("small", "pick"))
+            n_small = len(held) - n_buy - n_pick
             V = self.value(price)
             cool = rp.sold_recently(now, P["cooldown_d"])
             for r in rows:
@@ -803,7 +821,9 @@ class IdeasPortfolio:
                 st_ru = r.get("status_ru") or st
                 px = k = why_not = None
                 lifted = None
-                if okx is not None and s not in okx:
+                if s in blocked:
+                    why_not = f"владелец: не брать ({blocked[s]})"
+                elif okx is not None and s not in okx:
                     why_not = "на споте OKX нет пары — портфель повторяет реальный счёт CRYPTO NOVA AI на OKX"
                 elif s in cool and not (lifted := self._cooldown_lift(now, s, st)):
                     t = self.conn.execute(f"SELECT MAX(time) FROM {rp.T_ACT} WHERE symbol=? AND action='SELL'", (s,)).fetchone()[0] or now
@@ -910,6 +930,79 @@ class IdeasPortfolio:
         self.conn.commit()
         return self.snapshot(price, live, psrc, smap, fresh, note, actions, not_bought, now, ideas)
 
+    def _owner_picks(self, cfg: dict, now: int, price: dict, live: set, psrc: dict, src: dict, smap: dict, okx, support,
+                     not_bought: list) -> list[dict]:
+        """11.11 10:34 (owner, explicit yes, real money): his picks (config/spot_owner_picks.json) are bought with the FREE CASH only —
+        the cash at the first run split equally between the coins, each share in `tranches` parts: part 1 at once, the others
+        from a support by the «no chase» rule (entry_support), at least `gap_h` hours apart. The core, the other coins and the
+        futures are not touched. Exits: the medium rule (stop −20 % on OKX, 1/3 at +30 %, the rest trails 20 %, never below the
+        entry); the table's «не брать» / weekly review do not sell a pick. No OKX spot pair / the 14-day pause → the share stays
+        in cash and the reason is published (not_bought). A pick that was sold (stop / trailing) gets no more parts."""
+        rp, P = self.rp, IDEAS
+        cid = str(cfg.get("id") or "")
+        coins = [str(c).upper() for c in cfg.get("coins") or []]
+        if not cid or not coins:
+            return []
+        n_tr = max(1, int(cfg.get("tranches") or 3))
+        gap = float(cfg.get("gap_h") or 24) * 3_600_000
+        if rp._meta(f"op:{cid}") is None:
+            b = rp.cash() / len(coins)
+            for c in coins:
+                rp._set_meta(f"op_b:{c}", b)
+                rp._set_meta(f"op_n:{c}", 0.0)
+            rp._set_meta(f"op:{cid}", now)
+        out: list[dict] = []
+        cool = rp.sold_recently(now, P["cooldown_d"])
+        for c in coins:
+            n, b = int(rp._meta(f"op_n:{c}") or 0), rp._meta(f"op_b:{c}") or 0.0
+            held = {p["symbol"]: p for p in rp.positions()}
+            if n >= n_tr or b <= 0:
+                continue
+            if n >= 1 and c not in held:              # sold by its stop / trailing — the pick is over, the rest stays in cash
+                rp._set_meta(f"op_n:{c}", float(n_tr))
+                continue
+            why = None
+            px = k = None
+            if okx is not None and c not in okx:
+                why = "на споте OKX нет пары — доля остаётся в кэше"
+            elif n == 0 and c in cool:
+                why = f"монета продана меньше {P['cooldown_d']} дней назад — пауза, доля остаётся в кэше"
+            elif n == 0 and c in held:
+                why = "монета уже в портфеле по другому правилу — выбор владельца её не дублирует"
+            else:
+                px, k, w0 = self._entry_price(c, {"price": (smap.get(c) or {}).get("price")}, src)
+                if px is None:
+                    why = w0
+                elif n >= 1 and now - (rp._meta(f"op_t:{c}") or 0) < gap:
+                    px, why = None, f"часть {n + 1} из {n_tr}: между частями не меньше {gap / 3_600_000:g} ч"
+                elif n >= 1:
+                    ok_in, ew = _es.check(c, px, support) if support is not None else (False, "нет данных о поддержке")
+                    if not ok_in:
+                        px, why = None, f"часть {n + 1} из {n_tr} ждёт поддержку: {ew}"
+            cost = min(b / n_tr, rp.cash()) / (1 + P["fee"])
+            if px is not None and cost < 0.001:
+                px, why = None, "свободный кэш кончился — оставшиеся части не покупаем"
+            if px is None:
+                not_bought.append({"symbol": c, "status": "pick", "why_ru": f"Выбор владельца: {why}"})
+                continue
+            V = self.value(price)
+            head = (f"Выбор владельца (11.11), часть {n + 1} из {n_tr}: {c} +{cost / V * 100:.2f}% счёта из свободного кэша"
+                    + (" — первая часть сразу, чтобы потом не брать дороже; остальные — от поддержки." if n == 0 else
+                       f" — {_es.check(c, px, support)[1]}."))
+            rule = f" Стоп {_pc(P['stop_buy'])} от средней цены (ордер на OKX), на +{P['mid_tp'] * 100:.0f}% продаём треть, остаток — трейлинг {P['mid_trail'] * 100:.0f}%, не ниже входа."
+            if c in held:
+                out.append(rp._act(now, c, "ADD", held[c]["weight"] + cost, px, head + rule, held[c]["bucket"]))
+            else:
+                out.append(rp._act(now, c, "BUY", cost, px, head + rule, "mid:pick"))
+                rp._set_meta(f"src:{c}", _SRC_CODE[k])
+            rp._set_cash(rp.cash() - cost * P["fee"])
+            rp._set_meta(f"px:{c}", px)
+            rp._set_meta(f"op_n:{c}", float(n + 1))
+            rp._set_meta(f"op_t:{c}", now)
+            price[c], psrc[c] = px, k
+            live.add(c)
+        return out
+
     def _smart_w(self, price: dict) -> float:
         """the smart-money sleeve's share of the model now"""
         V = self.value(price) or 1.0
@@ -952,7 +1045,7 @@ class IdeasPortfolio:
                     continue
                 entry_ru = entry_ru if known else ""
             cost = SMART["w"] * V / (1 + P["fee"])
-            need = cost - (rp.cash() - P["min_cash"] * V)
+            need = cost - max(0.0, rp.cash() - P["min_cash"] * V)   # 11.11: cash under the floor (owner picks) is not refilled from the core
             if need > 0:
                 need -= self._idle_release(now, need, price, live, out, s)
             if need > 1e-9:                                       # the rest from the core itself, in plan proportions

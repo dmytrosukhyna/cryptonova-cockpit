@@ -1202,3 +1202,54 @@ def test_medium_risk_takes_a_third_at_plus_30_and_trails_the_rest():
     r2 = copy.deepcopy(rows); _set(r2, "A1", price=s2["cg"]["A1"])
     st = port.step(s2, _ideas(r2, T0 + 7200_000), T0 + 7200_000)
     assert next(a for a in st["actions"] if a["symbol"] == "A1")["action"] == "SELL" and "A1" not in {p["symbol"] for p in st["positions"]}
+
+
+def test_owner_picks_use_only_the_free_cash_in_three_tranches_and_ada_is_blocked():
+    """11.11 10:34 (owner, real money): MORPHO / GRASS / LIT / VVV on the free cash only, equal shares, 3 parts — part 1 at once, parts 2–3
+    from a support 24 h apart; no OKX pair → the share stays in cash; the table does not sell a pick; ADA is never bought"""
+    H = 3_600_000
+    rows = [_irow("BTC", "buy", 80000, "core"), _irow("ADA", "buy", 0.2), _irow("LIT", "avoid", 3.0, "high")]
+    st_map = {s: {"status": "wait", "price": px} for s, px in (("MORPHO", 2.0), ("GRASS", 0.5), ("LIT", 3.0), ("VVV", 20.0))}
+    st_map.update({"BTC": {"status": "buy", "price": 80000}, "ADA": {"status": "buy", "price": 0.2}, "LIT": {"status": "avoid", "price": 3.0}})
+    src = {"cg": {"BTC": 80000, "ADA": 0.2, "MORPHO": 2.0, "GRASS": 0.5, "LIT": 3.0, "VVV": 20.0}, "meme": {}, "hl": {}}
+    cfg = {"id": "t1", "coins": ["MORPHO", "GRASS", "LIT", "VVV"], "tranches": 3, "gap_h": 24, "block": {"ADA": "владелец"}}
+    sup = {"sma200": {"MORPHO": 1.98, "LIT": 2.0, "ADA": 0.199}, "walls": {}, "btc": {"price": 80000, "ll20": 70000, "mid": "LONG"}}
+    okx = {"BTC", "ADA", "MORPHO", "LIT", "VVV"}                               # GRASS has no OKX spot pair here
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    st = port.step(src, _ideas(rows, T0, st_map), T0, tradeable=okx, support=sup)        # before the decision: BTC only, cash left
+    cash0 = port.rp.cash()
+    btc_w = next(p for p in st["positions"] if p["symbol"] == "BTC")["cost_weight"]
+    assert "ADA" in {p["symbol"] for p in st["positions"]}                               # without the block ADA is a normal table buy
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows[:1], T0, st_map), T0, tradeable=okx, support=sup)
+    cash0 = port.rp.cash()
+    btc0 = next(p for p in port.rp.positions() if p["symbol"] == "BTC")["weight"]
+    st = port.step(src, _ideas(rows, T0 + H, st_map), T0 + H, tradeable=okx, support=sup, picks=cfg)
+    held = {p["symbol"]: p for p in st["positions"]}
+    assert set(held) == {"BTC", "MORPHO", "LIT", "VVV"}                                  # ADA blocked, GRASS has no pair
+    for c in ("MORPHO", "LIT", "VVV"):
+        assert held[c]["role"] == "pick" and abs(held[c]["cost_weight"] - cash0 / 4 / 3 / (1 + sp.IDEAS["fee"])) < 1e-6
+        assert held[c]["levels"]["stop"] and abs(held[c]["levels"]["stop"] - held[c]["entry"] * 0.8) < 1e-9
+    assert next(p for p in port.rp.positions() if p["symbol"] == "BTC")["weight"] == btc0          # the core is not touched
+    nb = {n["symbol"]: n["why_ru"] for n in st["not_bought"]}
+    assert "нет пары" in nb["GRASS"] and "владелец: не брать" in nb["ADA"]
+    assert any(a["symbol"] == "MORPHO" and "часть 1 из 3" in a["reason"] for a in st["actions"])
+    assert abs(port.rp.cash() - (cash0 - 3 * cash0 / 12)) < 1e-6                         # 3 first parts spent; GRASS's share + 2/3 in cash
+    st = port.step(src, _ideas(rows, T0 + 2 * H, st_map), T0 + 2 * H, tradeable=okx, support=sup, picks=cfg)
+    assert not [a for a in st["actions"] if a["action"] in ("BUY", "ADD")]               # part 2 not before 24 h
+    assert "LIT" in {p["symbol"] for p in st["positions"]}                               # the table's «не брать» does not sell a pick
+    t2 = T0 + 26 * H
+    st = port.step(src, _ideas(rows, t2, st_map), t2, tradeable=okx, support=sup, picks=cfg)
+    adds = {a["symbol"]: a for a in st["actions"] if a["action"] == "ADD"}
+    assert set(adds) == {"MORPHO"} and "часть 2 из 3" in adds["MORPHO"]["reason"]        # MORPHO +1 % over its average; LIT +50 %, VVV no data
+    nb = {n["symbol"]: n["why_ru"] for n in st["not_bought"]}
+    assert "не догоняем" in nb["LIT"] and "нет данных о поддержке" in nb["VVV"]
+    s3 = {**src, "cg": {**src["cg"], "VVV": 15.0}}                                       # VVV −25 %: its model stop → sold; no more parts
+    t3 = t2 + H
+    st = port.step(s3, _ideas(rows, t3, {**st_map, "VVV": {"status": "wait", "price": 15.0}}), t3, tradeable=okx, support=sup, picks=cfg)
+    assert "VVV" not in {p["symbol"] for p in st["positions"]}
+    t4 = t3 + 30 * H
+    st = port.step(src, _ideas(rows, t4, st_map), t4, tradeable=okx, support=sup, picks=cfg)
+    assert "VVV" not in {p["symbol"] for p in st["positions"]} and not any(n["symbol"] == "VVV" for n in st["not_bought"])

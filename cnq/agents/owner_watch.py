@@ -22,7 +22,10 @@ import urllib.request
 
 COINS = {"ADA": {"name": "Cardano", "words": ("cardano", " ada ", "ada ")},
          "AVAX": {"name": "Avalanche", "words": ("avalanche", "avax")},
-         "LIT": {"name": "Lighter", "words": ("lighter", " lit ")}}
+         "LIT": {"name": "Lighter", "words": ("lighter", " lit ")},
+         # 11.11 (owner asked about them for spot): watched with the same card and alerts — information only
+         "MORPHO": {"name": "Morpho", "words": ("morpho",)},
+         "VVV": {"name": "Venice Token", "words": ("venice", " vvv ")}}
 # unlocks the tokenomics feed does not carry yet — each with its source
 UNLOCK_NOTES = {"LIT": [{"date": "2026-12-27", "kind": "cliff",
                          "text_ru": "27.12.2026 заканчивается годовой «замок» команды и инвесторов (50% всего выпуска: команда 26%, инвесторы 24%); "

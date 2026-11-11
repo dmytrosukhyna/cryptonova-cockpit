@@ -21,3 +21,20 @@ def test_research_store_roundtrip():
     assert r.details("x") is None
     conn.execute("INSERT INTO coin_cards VALUES(?,?,?,?)", ("x", "X", 1, '{"updated":1,"categories":[]}'))
     assert r.details("x")["updated"] == 1
+
+
+def test_missing_team_and_community_data_is_no_data_not_zero():
+    """11.11: CoinGecko returns null developer / community numbers → those factors are left out of the rating (re-normalised), not 0"""
+    from cnq.agents import research as R
+    m = {"symbol": "MORPHO", "name": "Morpho", "id": "morpho", "rank": 60, "price": 2.0, "mcap": 1.4e9, "fdv": 2.0e9, "volume": 5e7,
+         "chg30": -18, "chg200": 9, "ath_chg": -51, "circ": 1, "total": 1.4}
+    nul = {"developer": {"stars": None, "forks": None, "commits_4w": None, "prs": None},
+           "community": {"twitter": None, "reddit": None, "telegram": None}, "age_days": None, "categories": ["Decentralized Finance (DeFi)"]}
+    c = R.build_card(m, nul, {"spot": {}, "perps": ["MORPHO"]}, True)
+    assert set(c["factors"]) == {"economics", "market", "narrative"} and c["factors_nodata"] == ["team", "community"]
+    W = (0.25, 0.20, 0.15)                                       # mod weights of economics, market, narrative
+    f = c["factors"]
+    assert abs(c["rating"] - (W[0] * f["economics"] + W[1] * f["market"] + W[2] * f["narrative"]) / sum(W)) <= 1
+    full = R.build_card(m, {**nul, "developer": {"commits_4w": 100, "stars": 1000}, "community": {"twitter": 1e6, "reddit": None},
+                            "age_days": 1000}, {"spot": {}, "perps": []}, True)
+    assert full["factors_nodata"] == [] and full["factors"]["team"] > 0 and full["factors"]["community"] > 0

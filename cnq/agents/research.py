@@ -130,17 +130,22 @@ def build_card(m: dict, det: dict | None, hl: dict, btc_bull: bool) -> dict:
     # economics: how much supply is still to come (dilution), FDV/MCAP, size
     dil = (1 - circ / total) if circ and total and total > 0 else 0.0
     f_eco = 0.45 * (100 - _lin(fdv / mcap if mcap else 1, 1.0, 3.0)) + 0.35 * (100 - _lin(dil, 0, 0.6)) + 0.20 * _log_score(mcap, 1e8, 1e12)
-    # team & activity (developer data) + age
+    # team & activity (developer data) + age; community. 11.11 (data fix): CoinGecko's free API now returns NO developer / community
+    # numbers (every field null) for practically every coin — they were scored 0 and pulled every rating down (MORPHO 31, VVV 34).
+    # The «нет данных» convention: a missing part is left out and the score is taken over what exists; a factor with no data at all
+    # is not in the rating (the weights are re-normalised) and is listed in «factors_nodata».
     dev = d.get("developer") or {}
     age = d.get("age_days")
-    f_team = 0.4 * _log_score(dev.get("commits_4w") or 0, 1, 1000) + 0.3 * _log_score(dev.get("stars") or 0, 10, 100000) + 0.3 * _lin(age or 0, 0, 2000)
-    if not dev and age is None:
-        f_team = 40.0   # no data → neutral-low, not zero
-    # community
+
+    def _part(items):
+        have = [(w, f) for w, x, f in items if x is not None]
+        return sum(w * f for w, f in have) / sum(w for w, _ in have) if have else None
+    f_team = _part([(0.4, dev.get("commits_4w"), _log_score(dev.get("commits_4w") or 0, 1, 1000)),
+                    (0.3, dev.get("stars"), _log_score(dev.get("stars") or 0, 10, 100000)),
+                    (0.3, age, _lin(age or 0, 0, 2000))])
     com = d.get("community") or {}
-    f_com = 0.6 * _log_score(com.get("twitter") or 0, 1e4, 1e7) + 0.4 * _log_score(com.get("reddit") or 0, 1e3, 5e6)
-    if not com:
-        f_com = 40.0
+    f_com = _part([(0.6, com.get("twitter"), _log_score(com.get("twitter") or 0, 1e4, 1e7)),
+                   (0.4, com.get("reddit"), _log_score(com.get("reddit") or 0, 1e3, 5e6))])
     # market: momentum, liquidity, position vs ATH
     vol_ratio = (m.get("volume") or 0) / mcap if mcap else 0
     f_mkt = 0.3 * _lin(m.get("chg30"), -40, 60) + 0.25 * _lin(m.get("chg200"), -60, 150) + 0.25 * _lin(vol_ratio, 0.01, 0.3) + 0.2 * _lin(m.get("ath_chg"), -95, 0)
@@ -154,7 +159,8 @@ def build_card(m: dict, det: dict | None, hl: dict, btc_bull: bool) -> dict:
     f_nar = min(100, f_nar)
     rc = risk_class(m, det, hl)
     W = {"cons": (0.30, 0.20, 0.15, 0.20, 0.15), "mod": (0.25, 0.25, 0.15, 0.20, 0.15), "high": (0.10, 0.10, 0.25, 0.35, 0.20)}[rc]
-    rating = W[0] * f_eco + W[1] * f_team + W[2] * f_com + W[3] * f_mkt + W[4] * f_nar
+    fs = (f_eco, f_team, f_com, f_mkt, f_nar)
+    rating = sum(w * f for w, f in zip(W, fs) if f is not None) / sum(w for w, f in zip(W, fs) if f is not None)
     if m.get("stable") or m.get("wrapped"):
         rating = 0
     price = m.get("price") or 0
@@ -183,7 +189,9 @@ def build_card(m: dict, det: dict | None, hl: dict, btc_bull: bool) -> dict:
     return {"symbol": sym, "name": m.get("name"), "id": m.get("id"), "rank": m.get("rank"), "price": price, "mcap": mcap, "fdv": fdv,
             "chg24": m.get("chg24"), "chg7": m.get("chg7"), "chg30": m.get("chg30"), "chg200": m.get("chg200"), "ath_chg": m.get("ath_chg"),
             "image": m.get("image"), "risk": rc, "rating": round(rating), "on_hl": on_hl, "tags": tags, "age_days": age,
-            "factors": {"economics": round(f_eco), "team": round(f_team), "community": round(f_com), "market": round(f_mkt), "narrative": round(f_nar)},
+            "factors": {k: round(v) for k, v in (("economics", f_eco), ("team", f_team), ("community", f_com), ("market", f_mkt),
+                                                 ("narrative", f_nar)) if v is not None},
+            "factors_nodata": [k for k, v in (("team", f_team), ("community", f_com)) if v is None],
             "detail_age_h": round((time.time() * 1000 - d["updated"]) / 3600000) if d.get("updated") else None,
             "dilution": round(dil * 100), "fdv_mcap": round(fdv / mcap, 2) if mcap else None,
             "targets": [{**t, "mult": round(t["mult"], 2), "price": round(price * t["mult"], 6 if price < 1 else 2)} for t in targets], "stop_pct": stop, "hold": hold,

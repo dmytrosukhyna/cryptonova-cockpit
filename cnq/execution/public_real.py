@@ -434,15 +434,15 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
 
 
 def spot_stops(env=None) -> list:
-    """11.11: the exchange stops of the non-core spot coins from the autopilot's state — [{sym, ok, px, since, why}]: ok = the stop is
-    on OKX at px; not ok = it is wanted but missing since `since`, with the reason"""
+    """11.11: a harmless PUBLIC summary of the protective spot stops — [{sym, ok, px, since}]: ok = on OKX at px; not ok = wanted but
+    missing since `since`. The reason (raw OKX text) stays in the autopilot state — owner-only (owner_health.with_stop_reasons)."""
     try:
         from . import okx_autopilot
         st = okx_autopilot.load_state(env)
-        out = [{"sym": c, "ok": True, "px": ms._f((v or {}).get("px")) or None, "since": None, "why": None}
-               for c, v in sorted((st.get("spot_stops") or {}).items()) if c not in (st.get("spot_stop_missing") or {})]
-        out += [{"sym": c, "ok": False, "px": None, "since": int((v or {}).get("t") or 0) or None, "why": str((v or {}).get("why") or "")[:320]}
-                for c, v in sorted((st.get("spot_stop_missing") or {}).items())]
+        miss = st.get("spot_stop_missing") or {}
+        out = [{"sym": c, "ok": True, "px": ms._f((v or {}).get("px")) or None, "since": None}
+               for c, v in sorted((st.get("spot_stops") or {}).items()) if c not in miss]
+        out += [{"sym": c, "ok": False, "px": None, "since": int((v or {}).get("t") or 0) or None} for c, v in sorted(miss.items())]
         return out
     except Exception:  # noqa: BLE001
         return []
@@ -501,8 +501,7 @@ def clean(doc: dict) -> dict:
     out["copy_skips"] = [{"t": int(x["t"]), "sig": x["sig"] if isinstance(x.get("sig"), str) and SIG_RE.match(x["sig"]) else None,
                           "inst": x["inst"] if INST_RE.match(str(x.get("inst") or "")) else None, "why": str(x.get("why") or "")[:200]}
                          for x in (doc.get("copy_skips") or [])[-COPY_SKIPS_MAX:] if isinstance(x, dict) and num(x.get("t"))]
-    out["spot_stops"] = [{"sym": x["sym"], "ok": bool(x.get("ok")), "px": num(x.get("px")), "since": int(x["since"]) if num(x.get("since")) else None,
-                          "why": str(x.get("why") or "")[:320] or None}
+    out["spot_stops"] = [{"sym": x["sym"], "ok": bool(x.get("ok")), "px": num(x.get("px")), "since": int(x["since"]) if num(x.get("since")) else None}
                          for x in (doc.get("spot_stops") or [])[:40] if isinstance(x, dict) and SYM_RE.match(str(x.get("sym") or ""))]
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None

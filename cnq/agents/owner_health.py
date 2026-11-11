@@ -129,7 +129,7 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     rows.append(_row("spot_stops", "Стопы спота на бирже",
                      "У каждой монеты спота вне ядра (BTC / ETH / SOL — без стопа) должен стоять защитный стоп-ордер на OKX.",
                      t_pr, YELLOW if late else st if st == RED else _by_age(t_pr, now, 35, 75),
-                     ("нет стопа на бирже: " + "; ".join(f"{x['sym']} — {x.get('why') or 'причина не записана'}" for x in late)) if late else
+                     ("нет стопа на бирже: " + ", ".join(x["sym"] for x in late) + " — причина в журнале автопилота") if late else
                      (f"стопы стоят: {', '.join(x['sym'] for x in ss if x.get('ok'))}" if any(x.get("ok") for x in ss) else ""),
                      "Монету без стопа защищает только проверка модели раз в 30 минут. " + ASK.format(x="стопы спота на OKX"), now))
     # 2. trader polling
@@ -257,3 +257,20 @@ if __name__ == "__main__":
         c = None
     for r in run("web", c)["rows"]:
         print(r["icon"], r["name"], "|", r["note"])
+
+
+def with_stop_reasons(doc: dict, state: dict | None) -> dict:
+    """11.11 (owner-only): the server, serving the sealed health file to the signed-in owner, adds the reason of every missing spot
+    stop from its own autopilot state («spot_stop_missing» {coin: {t, why}}) — the raw OKX text never goes into a public file"""
+    miss = (state or {}).get("spot_stop_missing") or {}
+    if not isinstance(doc, dict) or not miss:
+        return doc
+    rows = []
+    for r in doc.get("rows") or []:
+        if isinstance(r, dict) and r.get("key") == "spot_stops":
+            r = {**r, "reasons": [{"sym": c, "since": (v or {}).get("t"), "why": str((v or {}).get("why") or "")[:400]}
+                                  for c, v in sorted(miss.items())],
+                 "note": "нет стопа на бирже: " + "; ".join(f"{c} — {str((v or {}).get('why') or 'причина не записана')[:300]}"
+                                                         for c, v in sorted(miss.items()))}
+        rows.append(r)
+    return {**doc, "rows": rows}

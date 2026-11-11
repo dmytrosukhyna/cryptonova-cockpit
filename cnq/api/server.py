@@ -520,6 +520,13 @@ class Api:
             d = sealed.load(self.web, self._data_dir(), m.group(1)) if m.group(1) in sealed.NAMES else None
             if d is None:
                 return 503, {"error": "no_data"}
+            if m.group(1) == "owner_health":                         # 11.11: the missing spot stops' reasons — from this server only
+                try:
+                    from cnq.agents.owner_health import with_stop_reasons
+                    from cnq.execution import okx_autopilot
+                    d = with_stop_reasons(d, okx_autopilot.load_state())
+                except Exception:  # noqa: BLE001
+                    pass
             return 200, {"name": m.group(1), "asof": d.get("asof"), "data": d}
         if path == "/v2/owner/reversal":                               # 11.11: «Разворот (тест)», owner only
             return self.reversal.desk()

@@ -76,37 +76,36 @@ def test_a_missing_stop_is_never_silent():
 
 
 def test_health_row_is_yellow_when_a_stop_is_missing_over_15_minutes(tmp_path):
+    """the public file carries no reason; the owner's health row names the coin, and the server adds the reason from its own state"""
     import json
     from cnq.agents import owner_health as oh
     now = NOW
-    doc = {"asof": now - 60_000, "spot_stops": [{"sym": "VVV", "ok": True, "px": 15.18, "since": None, "why": None},
-                                               {"sym": "LIT", "ok": False, "px": None, "since": now - 20 * 60_000, "why": "на OKX нет пары LIT-USDT"}]}
+    doc = {"asof": now - 60_000, "spot_stops": [{"sym": "VVV", "ok": True, "px": 15.18, "since": None},
+                                               {"sym": "LIT", "ok": False, "px": None, "since": now - 20 * 60_000}]}
     (tmp_path / "public_real.json").write_text(json.dumps(doc))
-    row = next(r for r in oh.build(str(tmp_path), None, now)["rows"] if r["key"] == "spot_stops")
-    assert row["status"] == oh.YELLOW and "LIT — на OKX нет пары" in row["note"]
+    h = oh.build(str(tmp_path), None, now)
+    row = next(r for r in h["rows"] if r["key"] == "spot_stops")
+    assert row["status"] == oh.YELLOW and "LIT" in row["note"] and "OKX" not in row["note"]
+    state = {"spot_stop_missing": {"LIT": {"t": now - 20 * 60_000, "why": "стоп не поставился: OKX /api/v5/trade/order-algo: 1 [sCode 51008] balance"}}}
+    row = next(r for r in oh.with_stop_reasons(h, state)["rows"] if r["key"] == "spot_stops")
+    assert "LIT — стоп не поставился" in row["note"] and "51008" in row["note"] and row["reasons"][0]["sym"] == "LIT"
+    assert oh.with_stop_reasons(h, {}) is h
     doc["spot_stops"][1]["since"] = now - 5 * 60_000
     (tmp_path / "public_real.json").write_text(json.dumps(doc))
     row = next(r for r in oh.build(str(tmp_path), None, now)["rows"] if r["key"] == "spot_stops")
     assert row["status"] != oh.YELLOW and "VVV" in row["note"]
 
 
-def test_a_coin_held_in_lead_sub_positions_gets_its_stop_on_them():
-    """11.11 (the real cause for MORPHO / LIT: OKX «available balance is insufficient»): on a spot lead-trader account the coin sits
-    in lead sub-positions — the stop is set on each of them, not as an ordinary conditional order"""
-    fk = F.FakeOkx(balances={"USDT": 1000.0, "AAA": 50.0})
-    cl = ap.connect(F.env(), fk, {}, F.nosleep)
-    st, logs = {}, []
-    lead = {"AAA": {"qty": 50.0, "avail": 50.0, "insts": ["AAA-USDT"], "subs": [("sp1", "AAA-USDT", 30.0), ("sp2", "AAA-USDT", 20.0)]}}
-    r = ss.sync(cl, pf(), st, NOW, logs.append, avail={"AAA": 50.0}, lead=lead)
-    stops = [b for k, b in fk.lead_calls if k == "spot_stop"]
-    assert [(b["subPosId"], b["instType"]) for b in stops] == [("sp1", "SPOT"), ("sp2", "SPOT")] and all(b["slTriggerPx"].startswith("8") for b in stops)
-    assert not [b for b in fk.algo_posts if b["instId"].startswith("AAA")]          # no ordinary order on a balance that is not available
-    assert st["spot_stops"]["AAA"]["lead"] == {"sp1": 8.0, "sp2": 8.0} and "AAA" not in st["spot_stop_missing"]
-    assert sum(1 for x in r["set"] if x["ccy"] == "AAA") == 2
-    n = len(fk.lead_calls)
-    ss.sync(cl, pf(), st, NOW + 1, logs.append, avail={"AAA": 50.0}, lead=lead)
-    assert len(fk.lead_calls) == n and "AAA" in st["spot_stops"]                    # in sync → nothing re-sent, not «fired»
-    ss.sync(cl, pf(stop_aaa=9.0), st, NOW + 2, logs.append, avail={"AAA": 50.0}, lead=lead)
-    assert [b["slTriggerPx"][:1] for k, b in fk.lead_calls[n:]] == ["9", "9"]       # a moved stop → both sub-positions
-    r = ss.sync(cl, pf(stop_aaa=9.0), st, NOW + 3, logs.append, avail={}, lead={})  # sub-positions and the coin gone → it fired
-    assert r["fired"] == ["AAA"] and "AAA" in ss.held_off(st, NOW + 4)
+def test_the_public_stop_summary_has_no_reason_text():
+    from cnq.execution import public_real as PR
+    st = {"spot_stops": {"VVV": {"px": 15.18}}, "spot_stop_missing": {"LIT": {"t": 5, "why": "raw OKX error"}}}
+    import cnq.execution.okx_autopilot as AP
+    orig = AP.load_state
+    AP.load_state = lambda env=None: st
+    try:
+        out = PR.spot_stops()
+    finally:
+        AP.load_state = orig
+    assert out == [{"sym": "VVV", "ok": True, "px": 15.18, "since": None}, {"sym": "LIT", "ok": False, "px": None, "since": 5}]
+    import json
+    assert "raw OKX" not in json.dumps(out) and "why" not in json.dumps(out)

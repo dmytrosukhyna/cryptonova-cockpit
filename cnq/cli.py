@@ -225,6 +225,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"whale_watch.json: whales={ww['n']} counts={ww['counts']}")
         except Exception as e:  # noqa: BLE001
             print("whale_watch.json: not written:", str(e)[:200])
+        try:                                    # 11.11 (owner): the PAPER test desk «Разворот» — never routed to the real account
+            from .agents import reversal_desk
+            rv = reversal_desk.run(conn, args.out, kv_get=whale_study.kv_get, kv_set=whale_study.kv_set)
+            print(f"reversal_desk.json: equity={rv['equity']} open={len(rv['open'])} waiting={len(rv['waiting'])} closed={rv['trades']}")
+        except Exception as e:  # noqa: BLE001
+            print("reversal_desk.json: not written:", str(e)[:200])
         fn = d.get("funnel") or {}
         dk = d.get("desk") or {}
         print(f"whales_top.json: complete={d.get('complete')} studied={fn.get('studied')} eligible={fn.get('eligible')} top={fn.get('top')} "

@@ -159,13 +159,30 @@ def test_an_action_kind_without_a_text_never_nulls_the_public_portfolio():
     web = os.path.join(ROOT, "web")
     real = json.load(open(os.path.join(web, "public_real.json"), encoding="utf-8"))
     real = {**real, "stale": False, "actions": (real.get("actions") or []) + [{"t": real.get("asof"), "kind": "brand_new_kind", "sym": "LIT", "usd": 5.0},
-                                                                             {"t": real.get("asof"), "kind": "spot_stop_set", "sym": "LIT", "usd": 48.6, "px": 2.7}]}
+                                                                             {"t": real.get("asof"), "kind": "spot_stop_set", "sym": "LIT", "usd": 48.6, "px": 2.7},
+                                                                             {"t": real.get("asof"), "kind": "spot_stop_skip", "sym": "LIT"}]}
     for lang in ("ru", "en", "el"):
         p = AH._real_portfolio(real, AH._load(web, "paper.json"), int(real.get("asof") or time.time() * 1000), lang,
                                AH._load(web, "whales_top.json"), AH._load(web, "real_why.json"))
         assert isinstance(p, dict) and p["kind"] == "real", lang
-        assert not [a for a in p["actions"] if a["kind"] in ("brand_new_kind", "spot_stop_set")] and all(a["text"] for a in p["actions"])
+        assert not [a for a in p["actions"] if a["kind"] in ("brand_new_kind", "spot_stop_skip")] and all(a["text"] for a in p["actions"])
+        assert [a for a in p["actions"] if a["kind"] == "spot_stop_set"]           # 11.11: worded now, so it is shown
         f = p.get("futures") or {}
         for r_ in (f.get("open") or []) + (f.get("closed") or []):
             if str(r_.get("sig") or "").startswith("whales:"):
                 assert r_.get("copy_whale") is True and (r_.get("why_full") or {}).get("copy") is True, (lang, r_.get("sym"))
+
+
+def test_spot_stop_actions_have_texts_in_every_language_and_skips_stay_owner_only():
+    """11.11: «spot_stop_set / cancel / fired» are worded in all 5 languages (no «кит» / «копия»); «spot_stop_skip» never reaches the
+    public feed (it is not even a public action kind)"""
+    from cnq.agents import app_home as AH
+    from cnq.execution import public_real as PR
+    a = {"t": 1, "kind": "spot_stop_set", "sym": "LIT", "px": 2.696, "usd": 48.6}
+    for lang in ("ru", "en", "uk", "el", "es"):
+        for k in ("spot_stop_set", "spot_stop_cancel", "spot_stop_fired"):
+            txt = AH._pp_action({**a, "kind": k}, lang)
+            assert "LIT" in txt and "{" not in txt and not any(w in txt.lower() for w in ("кит", "копи", "whale", "copy"))
+        assert "2.696" in AH._pp_action(a, lang) or "2,696" in AH._pp_action(a, lang)
+        assert "{" not in AH._pp_action({**a, "px": None}, lang)
+    assert "spot_stop_skip" not in PR.ACTION_KINDS and "spot_stop_skip" in AH.OWNER_ONLY_KINDS

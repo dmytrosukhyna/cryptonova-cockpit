@@ -1359,9 +1359,16 @@ def _pp_rule_kinds(acts: list) -> dict:
                     else "core_" + a["kind"].split("_", 1)[1]) for a in core}
 
 
+OWNER_ONLY_KINDS = ("spot_stop_skip",)    # 11.11: a stop that could not be placed — the owner's health card only, never the public feed
+
+
 def _pp_action(a: dict, lang: str, key: str | None = None) -> str:
     k, sym = key or a["kind"], a["sym"]
     side = t(lang, "pp.side.long" if a.get("side") == "long" else "pp.side.short") if a.get("side") in ("long", "short") else ""
+    if k == "spot_stop_set":                                    # 11.11: protective stops on the exchange
+        return t(lang, "pp.a.spot_stop_set", sym=sym, px=_price(a["px"])) if a.get("px") else t(lang, "pp.a.spot_stop_set0", sym=sym)
+    if k in ("spot_stop_cancel", "spot_stop_fired"):
+        return t(lang, f"pp.a.{k}", sym=sym)
     if k.startswith(("spot_", "active_", "core_")):
         return t(lang, f"pp.a.{k}", sym=sym, usd=_usd_text(a["usd"], lang)) if a.get("usd") else t(lang, f"pp.a.{k}", sym=sym, usd="—")
     if k == "fut_open":
@@ -1513,7 +1520,7 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             _why_rows(real, paper, open_rows, closed, fut, lv, since, lang, whales, real_why, trend)
         except Exception as e:  # noqa: BLE001 — the feed never breaks because of an explanation
             print("app_home why_full:", repr(e)[:200], flush=True)
-    raw_acts = [a for a in real.get("actions") or [] if a.get("kind") and a.get("sym")]
+    raw_acts = [a for a in real.get("actions") or [] if a.get("kind") and a.get("sym") and a["kind"] not in OWNER_ONLY_KINDS]
     rule = _pp_rule_kinds(raw_acts)
     acts = []
     for a in raw_acts:

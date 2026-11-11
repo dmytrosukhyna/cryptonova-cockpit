@@ -95,3 +95,56 @@ def test_stage2_journal_and_watchlist_are_sealed_and_readers_cope():
     json.dump({"whales": [{"name": "A", "addr": "bn:1", "positions": [{"coin": "ADA", "side": "LONG", "notional": 2e6}]}]},
               open(os.path.join(d, "whale_watch.json"), "w"))
     assert not [a for a in W.build(d, {}, NOW + 3600_000)["alerts"] if a["kind"] == "whale"]    # the same trader back → not «new»
+
+
+def test_stage4_app_home_has_neutral_trade_ids_and_the_app_logic_still_resolves():
+    """11.11 stage 4 (app_home part): no internal trade id («whales:», «ivan:», «aggr:») in app_home*.json / /v2/home; the shipped
+    app (builds 54–57, FuturesScreen.copyWhy) still finds every system trade by copy_whale / why_full.copy"""
+    import re
+    import shutil
+    import sqlite3
+    from cnq.agents import app_home as AH
+
+    def app_is_copy(row):                       # FuturesScreen.kt: p.copyWhale == true || p.sig?.startsWith("whales:") == true || w?.copy == true
+        return row.get("copy_whale") is True or str(row.get("sig") or "").startswith("whales:") or (row.get("why_full") or {}).get("copy") is True
+
+    def rows(doc, acc=None):
+        acc = [] if acc is None else acc
+        if isinstance(doc, dict):
+            if "sig" in doc:
+                acc.append(doc)
+            for v in doc.values():
+                rows(v, acc)
+        elif isinstance(doc, list):
+            for v in doc:
+                rows(v, acc)
+        return acc
+    inner = {"asof": 1, "public_portfolio": {"open": [
+        {"sym": "ETH", "sig": "whales:W-ETH-L-1794311443596", "copy_whale": True, "why_full": {"title": "Сделка системы", "copy": True}},
+        {"sym": "BTC", "sig": "aggr:E-BTC-1794174300000", "why_full": {"title": "Откуп паники"}}],
+        "closed": [{"sym": "ZEC", "sig": "whales:W-ZEC-S-1793915173877", "copy_whale": True, "why_full": {"copy": True}}]},
+        "public": {"real": {"futures": [{"inst": "ETH-USDT-SWAP", "sig": "whales:W-ETH-L-1794311443596"}, {"inst": "X", "sig": "ivan:W-X-L-1"}],
+                            "copy_skips": [{"sig": "aggr:E-BCH-1794174300000", "why": "…"}], "actions": [{"kind": "spot_buy", "sig": None}]}}}
+    before = json.dumps(inner, ensure_ascii=False)
+    out = AH.public_edge(inner)
+    assert json.dumps(inner, ensure_ascii=False) == before                               # the internal document is untouched
+    txt = json.dumps(out, ensure_ascii=False)
+    assert not re.search(r"whales:|ivan:|aggr:|W-ETH|E-BTC", txt) and txt.count('"cn:') == 6
+    a, b = rows(inner), rows(out)
+    assert [app_is_copy(x) for x in a] == [app_is_copy(x) for x in b] == [True, False, True, True, False, False, False]
+    assert out["public_portfolio"]["open"][0]["why_full"]["title"] == "Сделка системы" and "copy_whale" not in out["public_portfolio"]["open"][1]
+    assert out["public"]["real"]["futures"][0]["sig"] == out["public_portfolio"]["open"][0]["sig"]      # one trade → one neutral id
+    assert AH.public_sig("whales:W-ETH-L-1") != AH.public_sig("whales:W-ETH-L-2") and len(AH.public_sig("x:1")) == 17
+    # the real builder on the repo's data: the files it writes carry no internal id, and the builder itself still sees them
+    tmp = tempfile.mkdtemp(); shutil.rmtree(tmp); shutil.copytree(os.path.join(ROOT, "web"), tmp)
+    ru = AH.run(sqlite3.connect(":memory:"), tmp)
+    for f in os.listdir(tmp):
+        if re.fullmatch(r"app_home(\.[a-z]{2})?\.json", f):
+            s = open(os.path.join(tmp, f), encoding="utf-8").read()
+            assert not re.search(r'"sig":"(?!cn:)[^"]', s), f
+            d = json.loads(s)
+            for r_ in rows(d.get("public_portfolio") or {}):
+                if r_.get("copy_whale"):
+                    assert (r_.get("why_full") or {}).get("copy") is True, (f, r_.get("sym"))
+    inner_sigs = [x["sig"] for x in rows(ru) if isinstance(x.get("sig"), str)]
+    assert all(not s.startswith("cn:") for s in inner_sigs)                              # run() returns the internal document

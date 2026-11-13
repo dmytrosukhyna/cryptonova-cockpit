@@ -1853,6 +1853,35 @@ def owner_picks(path: str | None = None) -> list[dict]:
 LIVE_FRESH_MS = 15 * 60_000
 
 
+# 13.11 (owner, backlog 160 «учитываем и используем»): DEMO desk «Киты-20» next to the real one — column A of up to K20_N traders
+# ranked by the SUM of the 2-minute delayed-copy test over 60 days (RA, research 150/159: better than the PF/win bar at every N),
+# pool = every studied trader with ≥ MIN_DECISIONS decisions, a positive copy sum and visible positions. The list is fixed for
+# LOCK_MS like the real one and reviewed then. Paper only (cnq/execution/whale20.py → web/whales20.json): the real account never
+# reads it; real money only after a 2-week comparison and the owner's separate «yes».
+K20_N, K20_RULE = 20, "ra60-v1"
+
+
+def k20_score(p: dict) -> float | None:
+    c = (p.get("copy") or {}).get(str(COPY_DELAY)) or {}
+    return _f(c.get("sum_pct")) if c.get("n") else None
+
+
+def k20_select(profs: list[dict], prev: dict | None, now: int) -> dict:
+    """→ {"rule", "t" (last review), "next_t", "n", "following": [...]}; between reviews the previous list is kept as it is"""
+    prev = prev if isinstance(prev, dict) else {}
+    if prev.get("rule") == K20_RULE and prev.get("following") and now - int(_f(prev.get("t"))) < LOCK_MS:
+        return {**prev, "next_t": int(_f(prev.get("t"))) + LOCK_MS}
+    pool = [p for p in profs if (p.get("decisions") or 0) >= MIN_DECISIONS and not p.get("too_active")
+            and not hidden(p.get("positions") or []) and (k20_score(p) or 0) > 0]
+    pool.sort(key=lambda p: -(k20_score(p) or 0))
+    fol = [{"addr": p["addr"], "short": p.get("short"), "name": p.get("name"), "src": p.get("src"), "ra": round(k20_score(p) or 0, 2),
+            "win": p.get("win"), "pf": p.get("pf"), "decisions": p.get("decisions"), "hold_med_h": p.get("hold_med_h"),
+            "per_day": p.get("per_day"), "pnl_60d": p.get("pnl_60d"), "lev_med": p.get("lev_med")} for p in pool[:K20_N]]
+    return {"rule": K20_RULE, "t": now, "next_t": now + LOCK_MS, "n": K20_N, "pool": len(pool), "following": fol,
+            "ru": f"Демо «Киты-20»: до {K20_N} трейдеров с наибольшей суммой теста копии (опоздание {COPY_DELAY} мин) за 60 дней среди всех "
+                  f"с ≥ {MIN_DECISIONS} решениями и видимыми позициями; список закреплён на {LOCK_MS // 86_400_000} дня. Только бумага."}
+
+
 def desk_from_public(wtop: dict, now: int) -> dict:
     """the published desk (whales_top.json «desk», desk_public shape) → a desk_step state with the same copies (same ids)"""
     pub = (wtop or {}).get("desk") or {}
@@ -2204,7 +2233,13 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
             k = w.split(" (")[0]
             excluded[k] = excluded.get(k, 0) + 1
     st_now = kv_get(conn, "study") or {}
-    out = {"asof": now, "complete": complete, "study_t": st_now.get("t"), "following": st_now.get("top", []) + owner_picks(),
+    k20_prev = (load_published(pub_path) or {}).get("k20")
+    try:                                                      # 13.11 (backlog 160): the demo «Киты-20» list — never blocks the study
+        k20 = k20_select(profs, k20_prev, now) if (complete and profs) else k20_prev
+    except Exception as e:  # noqa: BLE001
+        notes.append(f"Киты-20: {str(e)[:100]}")
+        k20 = k20_prev
+    out = {"asof": now, "complete": complete, "k20": k20, "study_t": st_now.get("t"), "following": st_now.get("top", []) + owner_picks(),
            "follow_dropped": st_now.get("dropped", []), "archive": arch, "bench": bench,
            "reinstate": reinstate_out,          # 08.11: one-time reinstatement of a whale dropped by our bug (config/whale_reinstate.json)
            "rotation": rot_pub or (load_published(pub_path) or {}).get("rotation"),   # 10.11: columns A / B, counters, moves

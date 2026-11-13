@@ -57,6 +57,7 @@ OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "al
          "risk.json",                                                      # 20.10: the risk layer's public summary
          "scorecard.json",                                                 # 20.10: the public prediction scorecard
          "okx_signal.json",                                                # 22.10: the OKX signal sender's public log (no token)
+         "whales20.json",                                                  # 13.11: «Киты-20» demo copy desk (background step, backlog 160)
          "gold_desk.json",                                                 # 04.11: «Золото · тест» demo desk (SLOW step; desk_select reads it)
          "desk_select.json",                                               # 28.10: the main futures desk (state + decision; public)
          "morning.json", "morning.mp3",
@@ -64,7 +65,7 @@ OWNED = ["paper.json", "signals_feed.json", "calendar.json", "quality.json", "al
 # the engine's own state — never overwritten by a pull (20.10: + the conveyor's state, the risk layer's kill switch, state, reset
 # request and log)
 DB_OWNED = {"agents.sqlite", "cnq.sqlite", "conveyor_state.json", "kill_switch.json", "risk_state.json", "risk_reset.json", "risk_log.jsonl"}
-STEP_TIMEOUT = {"risk": 60, "paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90, "buynow": 150,
+STEP_TIMEOUT = {"whales20": 90, "risk": 60, "paper": 150, "listings": 90, "own": 150, "lsn": 90, "turbo": 60, "signalfeed": 60, "quality": 240, "altport": 90, "buynow": 150,
                 "conveyor": 120, "scorecard": 60, "okxsignal": 60, "deskselect": 60, "golddesk": 60}
 # 20.10: the public scorecard's append-only, hash-chained ledgers (cnq/agents/scorecard.py) — two active files and the directory of
 # their closed segments. Unlike DB_OWNED they are public: the engine is their only writer, a pull never overwrites them, and every
@@ -324,6 +325,26 @@ def _bg_start(cmds: list[str], env: dict) -> bool:
     return True
 
 
+_BG20: dict = {"thread": None, "steps": {}}
+
+
+def _bg20_start(env: dict) -> bool:
+    """13.11 (backlog 160): the «Киты-20» demo desk (cnq/execution/whale20.py) — its own thread, never waits for or blocks the
+    minute loop or the other background batch; False when the previous pass is still running"""
+    import threading
+    th = _BG20.get("thread")
+    if th is not None and th.is_alive():
+        return False
+    py = sys.executable
+
+    def work():
+        _BG20["steps"]["whales20"] = sh([py, "-m", "cnq.cli", "whales20", "--out", "web"], RUN, STEP_TIMEOUT["whales20"], env)
+    th = threading.Thread(target=work, name="engine-whales20", daemon=True)
+    _BG20["thread"] = th
+    th.start()
+    return True
+
+
 def lab_slice(n: int) -> str:
     """CNQ_REFRESH_EXTRA for cycle n: «k/5» on even cycles (each lab coin every 10 cycles), «0» (none) on odd ones"""
     return f"{(n // 2) % 5}/5" if n % 2 == 0 else "0"
@@ -348,8 +369,12 @@ def cycle(n: int, env: dict) -> dict:
             steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)
         if not _bg_start(SLOW_BG, env):
             steps["slow_bg"] = (False, 0.0, "the previous background batch is still running — skipped this time")
-    for cmd in list(_BG["steps"]):                          # a finished background step reports in the cycle after it
-        steps[cmd] = _BG["steps"].pop(cmd)
+    if n % 2 == 1:                                          # 13.11: «Киты-20» demo desk in its own background thread (≈ every 2 min)
+        if not _bg20_start(env):
+            steps["whales20_bg"] = (True, 0.0, "the previous «Киты-20» pass is still running — skipped this time")
+    for bg in (_BG, _BG20):                                 # a finished background step reports in the cycle after it
+        for cmd in list(bg["steps"]):
+            steps[cmd] = bg["steps"].pop(cmd)
     if n % 60 == 1:
         for cmd in HOURLY:
             steps[cmd] = sh([py, "-m", "cnq.cli", cmd, "--out", "web"], RUN, STEP_TIMEOUT.get(cmd, 120), env)

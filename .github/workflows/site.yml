@@ -13,7 +13,7 @@ on:
                    # pushes the stats-only «Иван тест» file
                    "web/okx_signal.json", "web/buy_now.json", "web/ivan_stats.json",
                    # 04.11: the engine's gold demo desk
-                   "web/gold_desk.json", "data/gold_desk.jsonl",
+                   "web/gold_desk.json", "web/whales20.json", "data/gold_desk.jsonl",
                    # 07.11: «Утренний доклад» (engine apppush step)
                    "web/morning.json", "web/morning.mp3", "web/morning.en.json", "web/morning.en.mp3", "web/morning.uk.json", "web/morning.uk.mp3", "web/morning.el.json", "web/morning.el.mp3", "web/morning.es.json", "web/morning.es.mp3",
                    # 04.11: the daily whale-trade history written by this pipeline itself

@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         from .risk import cli as risk_cli
         return risk_cli.main(argv)
     ap = argparse.ArgumentParser(prog="cnq")
-    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood", "golddesk", "realwhy", "stockwhales", "smartmoney", "futowner"])
+    ap.add_argument("cmd", choices=["backfill", "stream", "status", "levels", "replay", "ev", "binance-sync", "binance-peek", "terminal", "brief", "alerts", "agents", "fx-gaps", "portfolio", "paper", "weekly", "calibrate", "research", "whales", "channel", "botmail", "voice", "funding", "arb", "tri", "memes", "macro", "ideas", "outlook", "broadcast", "appsignals", "whalestudy", "signalfeed", "capital", "yield", "basis", "listings", "tokenomics", "chwatch", "turbo", "own", "altport", "quality", "lsn", "appportfolio", "apphome", "apppush", "conveyor", "scorecard", "buynow", "okxsignal", "deskselect", "vipfeeds", "optmood", "golddesk", "whales20", "realwhy", "stockwhales", "smartmoney", "futowner"])
     ap.add_argument("sub", nargs="?", help="conveyor: run (default) | status | reinstate")
     ap.add_argument("target", nargs="?", help="conveyor reinstate: the desk key (e.g. bal)")
     ap.add_argument("--reason", help="conveyor reinstate: why the owner brings the desk back (stays private on the server)")
@@ -516,6 +516,15 @@ def main(argv: list[str] | None = None) -> int:
         st = d.get("stats") or {}
         print(f"gold_desk.json: rule={d['rule']['name']} inst={d.get('inst_used')} equity={d.get('equity_now')} trades={st.get('trades')} "
               f"open={len(d.get('open') or [])} pending={len(d.get('pending') or [])} {d.get('status_ru')} {d.get('note') or ''}")
+    elif args.cmd == "whales20":
+        # 13.11 (owner, backlog 160): «Киты-20» demo copy desk — paper only, the real account never reads it
+        from .execution import whale20
+        if not whale20.enabled():
+            print("whales20: off (CNQ_WHALES20)"); return 0
+        d = whale20.run(args.out)
+        dk = d.get("desk") or {}
+        print(f"whales20.json: following={len(d.get('following') or [])} open={len(dk.get('open') or [])} trades={dk.get('trades')} "
+              f"equity={dk.get('equity')} errors={len((dk.get('live') or {}).get('errors') or [])}")
     elif args.cmd == "vipfeeds":
         # 28.10 (owner's VIP spec): spot pipeline, strategies, other opportunities, system status — read-only, from the recorded data
         import os, sqlite3

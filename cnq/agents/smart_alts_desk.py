@@ -146,6 +146,9 @@ def step(st: dict | None, sm: dict, mk: dict, now: int) -> dict:
         vb, va = _bench_value(o["bench"], btc, alts)
         ob += (vb or o["bench"]["usd"]) - o["bench"]["usd"]
         oa += (va or o["bench"]["usd"]) - o["bench"]["usd"]
+        # 13.11: each open position also shows its own benchmark legs now (the owner card compares per position)
+        o["btc_same_time_usd"] = round((vb or o["bench"]["usd"]) - o["bench"]["usd"], 2) if vb is not None else None
+        o["alts_same_time_usd"] = round((va or o["bench"]["usd"]) - o["bench"]["usd"], 2) if va is not None else None
     d["bench_now"] = {"btc_usd": round(d["bench"]["btc_pnl"] + ob, 2), "alts_usd": round(d["bench"]["alts_pnl"] + oa, 2)}
     d["t"] = now
     return d

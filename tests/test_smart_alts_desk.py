@@ -66,3 +66,40 @@ def test_owner_only_paper_and_never_on_the_real_account(tmp_path):
 def test_backtest_replays_the_logged_snapshots():
     bt = S.backtest(os.path.join(ROOT, "data", "smart_money", "watchlist"))
     assert bt is None or (bt["days"] >= 1 and "note_ru" in bt)
+
+
+def test_open_positions_carry_their_own_benchmarks_and_the_owner_card_is_owner_only():
+    """13.11: the owner card compares every position (open too) with BTC and the top-20 alts on the same timing; it is shown only in
+    the owner session (vip tab owner: true, app card behind CNAuth.state.isOwner) and reads only the owner endpoint"""
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+    d = S.step(None, _sm(), MK, T0)
+    d["seen"] = {"z": "под наблюдением"}
+    d = S.step(d, _sm(_tok("z", "накопление")), MK, T0 + 1)
+    mk2 = {"top": [dict(r, price=r["price"] * 1.1) for r in MK["top"]]}
+    d = S.step(d, _sm(_tok("z", "накопление", px=1.05)), mk2, T0 + DAY)
+    o = d["open"][0]
+    assert abs(o["btc_same_time_usd"] - 100.0) < 0.01 and abs(o["alts_same_time_usd"] - 100.0) < 0.01 and o["upnl"] == 50.0
+    pub = S.public(d, T0 + DAY)
+    assert "bench" not in pub["open"][0] and pub["open"][0]["btc_same_time_usd"] == o["btc_same_time_usd"]
+    r = lambda *p: open(os.path.join(ROOT, *p), encoding="utf-8").read()
+    core, app, vip, js = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html"), r("web", "smart_alts.js")
+    assert "{ id: 'smart_alts', name: 'Альты от китов (тест)', short: 'Альты', icon: 'strategies', owner: true }" in core
+    assert "smart_alts: '/v2/owner/smart_alts'" in core and '<script src="vip/smart_alts.js"></script>' in vip
+    assert 'id="smartAltsCard" hidden' in app and "CNAuth.fetchOwner('/v2/owner/smart_alts')" in app
+    i = app.index("async function renderSmartAlts")
+    assert app.index("CNAuth.state.isOwner", i) < app.index("fetchOwner('/v2/owner/smart_alts')", i)
+    assert "smart_alts.json" not in app + js + r("web", "vip", "smart_alts.js") and not os.path.exists(os.path.join(ROOT, "web", "smart_alts.json"))
+    node = shutil.which("node")
+    if not node:
+        return
+    doc = {**pub, "backtest": {"days": 10, "from": "2026-11-04", "to": "2026-11-13", "trades_closed": 2, "open_now": 1, "pnl_usd": 12.0,
+                               "closed": [{"symbol": "AAA", "pnl_pct": 5.0, "why": "умные кошельки продают"}], "note_ru": "Короткая история — это не доказательство."}}
+    p = os.path.join(tempfile.mkdtemp(), "s.js")
+    open(p, "w", encoding="utf-8").write("global.window={};\n" + js + f"\nprocess.stdout.write(window.CNSmartAlts.html({{data:{json.dumps(doc, ensure_ascii=False)}}}));")
+    out = subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout
+    for must in ("ТЕСТ", "Правило.", "Оговорка:", "это не доказательство", "BTC на те же даты", "20 крупных альтов", "Z</b>", "eth", "Jump Trading",
+                 "BTC +$100,00", "альты +$100,00", "+$50,00"):
+        assert must in out, must

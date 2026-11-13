@@ -11,7 +11,7 @@
 
   /* ── owner-only data through CNAuth.fetchOwner(path) — the server decrypts for a signed-in owner (cnq/api/owner_data.py);
         the panel never asks for the old per-section passphrases ── */
-  V.OWNER_PATHS = { reversal: '/v2/owner/reversal', peter: '/v2/owner/peter', ivan: '/v2/owner/ivan', myspot: '/v2/owner/myspot', overview: '/v2/owner/overview' };
+  V.OWNER_PATHS = { smart_alts: '/v2/owner/smart_alts', reversal: '/v2/owner/reversal', peter: '/v2/owner/peter', ivan: '/v2/owner/ivan', myspot: '/v2/owner/myspot', overview: '/v2/owner/overview' };
 
   /* ── number format: ru, one style everywhere («$9 923,43», «−1,3%») ─── */
   const MINUS = '−';
@@ -302,6 +302,8 @@
     { id: 'peter', name: 'Golden Donut', short: 'Donut', icon: 'strategies', owner: true },
     // 11.11: «Разворот (тест)» — a paper test desk built on our copies: owner-only (vip/reversal.js, ../reversal.js)
     { id: 'reversal', name: 'Разворот (тест)', short: 'Разворот', icon: 'strategies', owner: true },
+    // 13.11: «Альты от китов (тест)» — paper desk on smart-money accumulation: owner-only (vip/smart_alts.js, ../smart_alts.js)
+    { id: 'smart_alts', name: 'Альты от китов (тест)', short: 'Альты', icon: 'strategies', owner: true },
     { id: 'opps', name: 'Другие возможности', short: 'Другое', icon: 'opps' },
     { id: 'demo', name: 'Live Demo', short: 'Live', icon: 'demo' },
     { id: 'system', name: 'Система', short: 'Система', icon: 'system' },

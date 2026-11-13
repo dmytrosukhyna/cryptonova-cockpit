@@ -557,7 +557,7 @@ details.pfirm{border:1px solid var(--line2);border-radius:14px;background:var(--
 .fdesk .fsw{flex-wrap:wrap!important;overflow:visible!important}.fsw.sub{margin-top:-2px;padding-left:14px;border-left:2px solid rgba(124,196,255,.35)}.fsw.sub button{font-size:11.5px}.fabout{font-size:11.5px;margin:2px 0 8px;line-height:1.45}
 .romanbox{border:1px dashed var(--line2);border-radius:12px;padding:14px;display:grid;gap:6px;font-size:12.5px}
 body.tab-futures:not(.fsys-nova) #sigCard,body.tab-futures:not(.fsys-ivan):not(.fut-own) #ivanCard,body.tab-futures:not(.fsys-whales) #wtopCard,body.tab-futures:not(.fsys-chan) #chwCard,body:not(.tab-futures) #chwCard,body.guest #chwCard{display:none!important}
-#peterCard,#reversalCard{display:none!important}body.tab-futures.fsys-tests:not(.guest) #peterCard:not([hidden]),body.tab-futures.fsys-tests:not(.guest) #reversalCard:not([hidden]){display:block!important;order:-1}
+#peterCard,#reversalCard,#smartAltsCard{display:none!important}body.tab-futures.fsys-tests:not(.guest) #peterCard:not([hidden]),body.tab-futures.fsys-tests:not(.guest) #reversalCard:not([hidden]),body.tab-futures.fsys-tests:not(.guest) #smartAltsCard:not([hidden]){display:block!important;order:-1}
 body.tab-futures #fdeskBox{order:-50!important}#fOwnCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard:not([hidden]){display:block!important;order:-60!important}
 @media (max-width:760px){.fsys{grid-template-columns:1fr 1fr 1fr;gap:6px}.fsys button{padding:7px 8px}.fsys button small{display:none}.fsys button b{font-size:12px}}
 /* compact cards: a fixed preview with «развернуть» instead of a scroll box inside the page */
@@ -984,6 +984,7 @@ body.ls-min .lspanel .lsb,body.ls-min .lspanel .lsmeta{display:none}
     <div class="card" id="ivanCard" hidden></div>
     <div class="card" id="peterCard" hidden></div>
     <div class="card" id="reversalCard" hidden></div>
+    <div class="card" id="smartAltsCard" hidden></div>
     <div class="card" id="sigCard" hidden></div>
     <div class="card" id="wtopCard" hidden></div>
     <div class="card" id="chwCard" hidden></div>
@@ -4820,6 +4821,18 @@ async function renderReversal(){ const el=document.getElementById('reversalCard'
   const sig=JSON.stringify([REVD&&REVD.asof, REVD_ERR]); if(el.__sig===sig) return; el.__sig=sig; el.hidden=false;
   el.innerHTML=CNReversal.html(REVD,{err:REVD_ERR}); }
 setTimeout(renderReversal,1800); setInterval(renderReversal,60000);
+</script>
+<script src="smart_alts.js?v=1"></script>
+<script>
+// 13.11: «Альты от китов (тест)» — paper test desk (GET /v2/owner/smart_alts, owner session only); never for guests or the public
+let SALT=null, SALT_T=0, SALT_ERR='';
+async function renderSmartAlts(){ const el=document.getElementById('smartAltsCard'); if(!el||!window.CNSmartAlts) return;
+  const own=(typeof ownerSigned==='function'&&ownerSigned())&&!!(window.CNAuth&&CNAuth.state&&CNAuth.state.isOwner)&&!document.body.classList.contains('guest');
+  if(!own){ el.hidden=true; el.innerHTML=''; return; }
+  if(Date.now()-SALT_T>5*60000){ SALT_T=Date.now(); try{ SALT=await CNAuth.fetchOwner('/v2/owner/smart_alts'); SALT_ERR=''; }catch(e){ SALT_ERR='Стол ещё не запускался на сервере или не загрузился.'; } }
+  const sig=JSON.stringify([SALT&&SALT.asof, SALT_ERR]); if(el.__sig===sig) return; el.__sig=sig; el.hidden=false;
+  el.innerHTML=CNSmartAlts.html(SALT,{err:SALT_ERR}); }
+setTimeout(renderSmartAlts,2000); setInterval(renderSmartAlts,60000);
 </script>
 </body>
 </html>

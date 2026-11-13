@@ -557,7 +557,7 @@ details.pfirm{border:1px solid var(--line2);border-radius:14px;background:var(--
 .fdesk .fsw{flex-wrap:wrap!important;overflow:visible!important}.fsw.sub{margin-top:-2px;padding-left:14px;border-left:2px solid rgba(124,196,255,.35)}.fsw.sub button{font-size:11.5px}.fabout{font-size:11.5px;margin:2px 0 8px;line-height:1.45}
 .romanbox{border:1px dashed var(--line2);border-radius:12px;padding:14px;display:grid;gap:6px;font-size:12.5px}
 body.tab-futures:not(.fsys-nova) #sigCard,body.tab-futures:not(.fsys-ivan):not(.fut-own) #ivanCard,body.tab-futures:not(.fsys-whales) #wtopCard,body.tab-futures:not(.fsys-chan) #chwCard,body:not(.tab-futures) #chwCard,body.guest #chwCard{display:none!important}
-#peterCard,#reversalCard,#smartAltsCard{display:none!important}body.tab-futures.fsys-tests:not(.guest) #peterCard:not([hidden]),body.tab-futures.fsys-tests:not(.guest) #reversalCard:not([hidden]),body.tab-futures.fsys-tests:not(.guest) #smartAltsCard:not([hidden]){display:block!important;order:-1}
+#peterCard,#reversalCard,#smartAltsCard,#ivanTestsCard{display:none!important}body.tab-futures.fsys-tests:not(.guest) #ivanTestsCard:not([hidden]){display:block!important;order:-1}body.tab-futures.fsys-tests:not(.guest) #peterCard:not([hidden]),body.tab-futures.fsys-tests:not(.guest) #reversalCard:not([hidden]),body.tab-futures.fsys-tests:not(.guest) #smartAltsCard:not([hidden]){display:block!important;order:-1}
 body.tab-futures #fdeskBox{order:-50!important}#fOwnCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard:not([hidden]){display:block!important;order:-60!important}
 @media (max-width:760px){.fsys{grid-template-columns:1fr 1fr 1fr;gap:6px}.fsys button{padding:7px 8px}.fsys button small{display:none}.fsys button b{font-size:12px}}
 /* compact cards: a fixed preview with «развернуть» instead of a scroll box inside the page */
@@ -985,6 +985,7 @@ body.ls-min .lspanel .lsb,body.ls-min .lspanel .lsmeta{display:none}
     <div class="card" id="peterCard" hidden></div>
     <div class="card" id="reversalCard" hidden></div>
     <div class="card" id="smartAltsCard" hidden></div>
+    <div class="card" id="ivanTestsCard" hidden></div>
     <div class="card" id="sigCard" hidden></div>
     <div class="card" id="wtopCard" hidden></div>
     <div class="card" id="chwCard" hidden></div>
@@ -4833,6 +4834,20 @@ async function renderSmartAlts(){ const el=document.getElementById('smartAltsCar
   const sig=JSON.stringify([SALT&&SALT.asof, SALT_ERR]); if(el.__sig===sig) return; el.__sig=sig; el.hidden=false;
   el.innerHTML=CNSmartAlts.html(SALT,{err:SALT_ERR}); }
 setTimeout(renderSmartAlts,2000); setInterval(renderSmartAlts,60000);
+</script>
+<script src="ivan_tests.js?v=1"></script>
+<script>
+// 13.11: «Иван · тест-стратегии» — Ivan's Bybit demo accounts (GET /v2/owner/ivan_tests, owner session only); never for guests or the public
+let IVT=null, IVT_T=0, IVT_ERR='';
+const ivtApi={add:b=>CNAuth.fetchOwner('/v2/owner/ivan_tests/add',{method:'POST',body:b}),check:id=>CNAuth.fetchOwner('/v2/owner/ivan_tests/check',{method:'POST',body:{id}}),remove:id=>CNAuth.fetchOwner('/v2/owner/ivan_tests/remove',{method:'POST',body:{id}})};
+function paintIvanTests(el){ el.innerHTML=CNIvanTests.html(IVT,{err:IVT_ERR}); CNIvanTests.mount(el,ivtApi,D=>{ IVT=D; el.__sig=null; paintIvanTests(el); }); }
+async function renderIvanTests(){ const el=document.getElementById('ivanTestsCard'); if(!el||!window.CNIvanTests) return;
+  const own=(typeof ownerSigned==='function'&&ownerSigned())&&!!(window.CNAuth&&CNAuth.state&&CNAuth.state.isOwner)&&!document.body.classList.contains('guest');
+  if(!own){ el.hidden=true; el.innerHTML=''; return; }
+  if(el.contains(document.activeElement)&&document.activeElement!==document.body) return;          // the owner is typing in the form
+  if(Date.now()-IVT_T>2*60000){ IVT_T=Date.now(); try{ IVT=await CNAuth.fetchOwner('/v2/owner/ivan_tests'); IVT_ERR=''; }catch(e){ IVT_ERR='Не загрузилось.'; } }
+  const sig=JSON.stringify([IVT&&IVT.asof, IVT_ERR]); if(el.__sig===sig) return; el.__sig=sig; el.hidden=false; paintIvanTests(el); }
+setTimeout(renderIvanTests,2200); setInterval(renderIvanTests,60000);
 </script>
 </body>
 </html>

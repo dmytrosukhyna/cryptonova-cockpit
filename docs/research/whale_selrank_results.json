@@ -1,0 +1,6585 @@
+{
+ "made": 1793810278130,
+ "decisions": 10384,
+ "traders": 103,
+ "reviews": 257,
+ "per_review": [
+  {
+   "T": "2024-09-23",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-09-26",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-09-29",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-02",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-05",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-08",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-11",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-14",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-17",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-20",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-23",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-26",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-10-29",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-01",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-04",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-07",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-10",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-13",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-16",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-19",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-22",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-25",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-11-28",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-01",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-04",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-07",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-10",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-13",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-16",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-19",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-22",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-25",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-28",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2024-12-31",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-03",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-06",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-09",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-12",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-15",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-18",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-21",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-24",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-27",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-01-30",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-02",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-05",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-08",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-11",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-14",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-17",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-20",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-23",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-02-26",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-01",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-04",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-07",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-10",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-13",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-16",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-19",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-22",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-25",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-28",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-03-31",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-03",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-06",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-09",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-12",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-15",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-18",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-21",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-24",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-27",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-04-30",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-03",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-06",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-09",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-12",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-15",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-18",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-21",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-24",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-27",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-05-30",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-02",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-05",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-08",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-11",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-14",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-17",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-20",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-23",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-26",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-06-29",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-02",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-05",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-08",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-11",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-14",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-17",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-20",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-23",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-26",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-07-29",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-01",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-04",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-07",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-10",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-13",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-16",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-19",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-22",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-25",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-28",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-08-31",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-03",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-06",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-09",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-12",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-15",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-18",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-21",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-24",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-27",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-09-30",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-03",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-06",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-09",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-12",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-15",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-18",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-21",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-24",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-27",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-10-30",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-02",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-05",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-08",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-11",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-14",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-17",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-20",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-23",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-26",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-11-29",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-02",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-05",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-08",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-11",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-14",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-17",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-20",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-23",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-26",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2025-12-29",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-01",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-04",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-07",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-10",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-13",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-16",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-19",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-22",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-25",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-28",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-01-31",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-03",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-06",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-09",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-12",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-15",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-18",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-21",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-24",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-02-27",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-03-02",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-03-05",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-03-08",
+   "sel": [
+    "0xe867fbda"
+   ],
+   "pool": 1,
+   "ra": [
+    "0xe867fbda"
+   ],
+   "rb": [
+    "0xe867fbda"
+   ],
+   "rc": [
+    "0xe867fbda"
+   ]
+  },
+  {
+   "T": "2026-03-11",
+   "sel": [],
+   "pool": 1,
+   "ra": [
+    "0xe867fbda"
+   ],
+   "rb": [
+    "0xe867fbda"
+   ],
+   "rc": [
+    "0xe867fbda"
+   ]
+  },
+  {
+   "T": "2026-03-14",
+   "sel": [],
+   "pool": 1,
+   "ra": [
+    "0xe867fbda"
+   ],
+   "rb": [
+    "0xe867fbda"
+   ],
+   "rc": []
+  },
+  {
+   "T": "2026-03-17",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-03-20",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-03-23",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-03-26",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-03-29",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-01",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-04",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-07",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-10",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-13",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-16",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-19",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-22",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-25",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-04-28",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-05-01",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-05-04",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-05-07",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-05-10",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-05-13",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-05-16",
+   "sel": [],
+   "pool": 0,
+   "ra": [],
+   "rb": [],
+   "rc": []
+  },
+  {
+   "T": "2026-05-19",
+   "sel": [],
+   "pool": 1,
+   "ra": [
+    "0x03b9a189"
+   ],
+   "rb": [
+    "0x03b9a189"
+   ],
+   "rc": []
+  },
+  {
+   "T": "2026-05-22",
+   "sel": [],
+   "pool": 1,
+   "ra": [
+    "0x03b9a189"
+   ],
+   "rb": [
+    "0x03b9a189"
+   ],
+   "rc": []
+  },
+  {
+   "T": "2026-05-25",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-05-28",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-05-31",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-03",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-06",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-09",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-12",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-15",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-18",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-21",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-24",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-27",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-06-30",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-07-03",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-07-06",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-07-09",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-07-12",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-07-15",
+   "sel": [],
+   "pool": 2,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382"
+   ],
+   "rc": [
+    "0xff4cd382"
+   ]
+  },
+  {
+   "T": "2026-07-18",
+   "sel": [],
+   "pool": 3,
+   "ra": [
+    "0x03b9a189",
+    "0xff4cd382",
+    "Fly-000"
+   ],
+   "rb": [
+    "0x03b9a189",
+    "0xff4cd382",
+    "Fly-000"
+   ],
+   "rc": [
+    "0xff4cd382",
+    "Fly-000"
+   ]
+  },
+  {
+   "T": "2026-07-21",
+   "sel": [
+    "Fly-000"
+   ],
+   "pool": 2,
+   "ra": [
+    "0xff4cd382",
+    "Fly-000"
+   ],
+   "rb": [
+    "0xff4cd382",
+    "Fly-000"
+   ],
+   "rc": [
+    "0xff4cd382",
+    "Fly-000"
+   ]
+  },
+  {
+   "T": "2026-07-24",
+   "sel": [],
+   "pool": 1,
+   "ra": [
+    "Fly-000"
+   ],
+   "rb": [
+    "Fly-000"
+   ],
+   "rc": [
+    "Fly-000"
+   ]
+  },
+  {
+   "T": "2026-07-27",
+   "sel": [
+    "Fly-000"
+   ],
+   "pool": 1,
+   "ra": [
+    "Fly-000"
+   ],
+   "rb": [
+    "Fly-000"
+   ],
+   "rc": [
+    "Fly-000"
+   ]
+  },
+  {
+   "T": "2026-07-30",
+   "sel": [],
+   "pool": 1,
+   "ra": [
+    "Fly-000"
+   ],
+   "rb": [
+    "Fly-000"
+   ],
+   "rc": [
+    "Fly-000"
+   ]
+  },
+  {
+   "T": "2026-08-02",
+   "sel": [],
+   "pool": 1,
+   "ra": [
+    "Fly-000"
+   ],
+   "rb": [
+    "Fly-000"
+   ],
+   "rc": []
+  },
+  {
+   "T": "2026-08-05",
+   "sel": [],
+   "pool": 1,
+   "ra": [
+    "Fly-000"
+   ],
+   "rb": [
+    "Fly-000"
+   ],
+   "rc": [
+    "Fly-000"
+   ]
+  },
+  {
+   "T": "2026-08-08",
+   "sel": [
+    "Ail.Wang"
+   ],
+   "pool": 4,
+   "ra": [
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "paboo"
+   ],
+   "rb": [
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "paboo"
+   ],
+   "rc": [
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K"
+   ]
+  },
+  {
+   "T": "2026-08-11",
+   "sel": [],
+   "pool": 6,
+   "ra": [
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "SharpMine",
+    "kcat",
+    "paboo"
+   ],
+   "rb": [
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "SharpMine",
+    "kcat",
+    "paboo"
+   ],
+   "rc": [
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "SharpMine",
+    "paboo"
+   ]
+  },
+  {
+   "T": "2026-08-14",
+   "sel": [
+    "1491",
+    "Ail.Wang",
+    "BestMax",
+    "JohnBread49",
+    "ZzzzQing_cc01"
+   ],
+   "pool": 12,
+   "ra": [
+    "01pp",
+    "1491",
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "JohnBread49",
+    "SharpMine",
+    "paboo"
+   ],
+   "rb": [
+    "01pp",
+    "1491",
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "JohnBread49",
+    "SharpMine",
+    "paboo"
+   ],
+   "rc": [
+    "01pp",
+    "1491",
+    "Ail.Wang",
+    "BestMax",
+    "Fly-000",
+    "IS.K",
+    "JohnBread49",
+    "ZzzzQing_cc01"
+   ]
+  },
+  {
+   "T": "2026-08-17",
+   "sel": [
+    "1491",
+    "Ail.Wang",
+    "BestMax",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "xiaojian888999"
+   ],
+   "pool": 15,
+   "ra": [
+    "1491",
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "paboo",
+    "xiaojian888999"
+   ],
+   "rb": [
+    "1491",
+    "Ail.Wang",
+    "Fly-000",
+    "IS.K",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "paboo",
+    "xiaojian888999"
+   ],
+   "rc": [
+    "1491",
+    "Ail.Wang",
+    "BestMax",
+    "ChinatownOG",
+    "Fly-000",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "xiaojian888999"
+   ]
+  },
+  {
+   "T": "2026-08-20",
+   "sel": [
+    "1491",
+    "BestMax",
+    "Fly-000",
+    "JohnBread49",
+    "xiaojian888999"
+   ],
+   "pool": 20,
+   "ra": [
+    "01pp",
+    "1491",
+    "Algo Box",
+    "Fly-000",
+    "HCSD",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "01pp",
+    "1491",
+    "Algo Box",
+    "Fly-000",
+    "HCSD",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rc": [
+    "1491",
+    "Algo Box",
+    "BestMax",
+    "Fly-000",
+    "HCSD",
+    "IS.K",
+    "JohnBread49",
+    "babaige"
+   ]
+  },
+  {
+   "T": "2026-08-23",
+   "sel": [
+    "010pp",
+    "1491",
+    "Fly-000",
+    "JohnBread49",
+    "paboo",
+    "xiaojian888999"
+   ],
+   "pool": 23,
+   "ra": [
+    "010pp",
+    "01pp",
+    "1491",
+    "Algo Box",
+    "Fly-000",
+    "HCSD",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "010pp",
+    "01pp",
+    "1491",
+    "Algo Box",
+    "Fly-000",
+    "HCSD",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rc": [
+    "1491",
+    "Algo Box",
+    "BestMax",
+    "Fly-000",
+    "HCSD",
+    "IS.K",
+    "babaige",
+    "xiaojian888999"
+   ]
+  },
+  {
+   "T": "2026-08-26",
+   "sel": [
+    "Fly-000",
+    "JohnBread49",
+    "xiaojian888999"
+   ],
+   "pool": 24,
+   "ra": [
+    "010pp",
+    "01pp",
+    "1491",
+    "Algo Box",
+    "Fly-000",
+    "HCSD",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "010pp",
+    "01pp",
+    "1491",
+    "Algo Box",
+    "Fly-000",
+    "HCSD",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rc": [
+    "Algo Box",
+    "BestMax",
+    "Fly-000",
+    "HCSD",
+    "IS.K",
+    "JohnBread49",
+    "babaige",
+    "xiaojian888999"
+   ]
+  },
+  {
+   "T": "2026-08-29",
+   "sel": [
+    "010pp",
+    "Fly-000",
+    "JohnBread49",
+    "xiaojian888999"
+   ],
+   "pool": 26,
+   "ra": [
+    "010pp",
+    "01pp",
+    "Algo Box",
+    "Busy-DID-Wombat",
+    "Fly-000",
+    "HCSD",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "010pp",
+    "01pp",
+    "Algo Box",
+    "Busy-DID-Wombat",
+    "Fly-000",
+    "HCSD",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rc": [
+    "010pp",
+    "01pp",
+    "Algo Box",
+    "BestMax",
+    "Fly-000",
+    "HCSD",
+    "JohnBread49",
+    "babaige"
+   ]
+  },
+  {
+   "T": "2026-09-01",
+   "sel": [
+    "010pp",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "xiaojian888999"
+   ],
+   "pool": 29,
+   "ra": [
+    "010pp",
+    "01pp",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "010pp",
+    "01pp",
+    "Algo Box",
+    "Busy-DID-Wombat",
+    "Fly-000",
+    "HCSD",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rc": [
+    "Algo Box",
+    "BestMax",
+    "CryptoPainter",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "JohnBread49",
+    "xiaojian888999"
+   ]
+  },
+  {
+   "T": "2026-09-04",
+   "sel": [
+    "010pp",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "chenyuan",
+    "xiaojian888999"
+   ],
+   "pool": 30,
+   "ra": [
+    "010pp",
+    "01pp",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "01pp",
+    "Algo Box",
+    "Busy-DID-Wombat",
+    "HCSD",
+    "IS.K",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rc": [
+    "Algo Box",
+    "BestMax",
+    "CryptoPainter",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "JohnBread49",
+    "chenyuan"
+   ]
+  },
+  {
+   "T": "2026-09-07",
+   "sel": [
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "chenyuan",
+    "paboo",
+    "xiaojian888999"
+   ],
+   "pool": 31,
+   "ra": [
+    "010pp",
+    "01pp",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "01pp",
+    "Algo Box",
+    "Busy-DID-Wombat",
+    "HCSD",
+    "Homely-18277",
+    "Shallow-Pair-Frog",
+    "paboo",
+    "xiaojian888999"
+   ],
+   "rc": [
+    "Algo Box",
+    "BestMax",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "JohnBread49",
+    "chenyuan",
+    "xiaojian888999"
+   ]
+  },
+  {
+   "T": "2026-09-10",
+   "sel": [
+    "Bare-Payee-Fox",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "chenyuan",
+    "xiaojian888999"
+   ],
+   "pool": 33,
+   "ra": [
+    "010pp",
+    "Fly-000",
+    "HCSD",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "babaige",
+    "paboo"
+   ],
+   "rb": [
+    "Busy-DID-Wombat",
+    "JohnBread49",
+    "Kelcrypto",
+    "Shallow-Pair-Frog",
+    "babaige",
+    "leaf-ye",
+    "paboo",
+    "xiaojian888999"
+   ],
+   "rc": [
+    "Algo Box",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "JohnBread49",
+    "chenyuan"
+   ]
+  },
+  {
+   "T": "2026-09-13",
+   "sel": [
+    "0xleek.eth",
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "chenyuan",
+    "xiaojian888999"
+   ],
+   "pool": 35,
+   "ra": [
+    "010pp",
+    "01pp",
+    "Busy-DID-Wombat",
+    "Fly-000",
+    "HCSD",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "0xleek.eth",
+    "Busy-DID-Wombat",
+    "HaveARestin",
+    "JohnBread49",
+    "Kelcrypto",
+    "Shallow-Pair-Frog",
+    "babaige",
+    "leaf-ye"
+   ],
+   "rc": [
+    "0xleek.eth",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "JohnBread49",
+    "chenyuan"
+   ]
+  },
+  {
+   "T": "2026-09-16",
+   "sel": [
+    "0xleek.eth",
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Fly-000",
+    "JohnBread49",
+    "Renoshi"
+   ],
+   "pool": 37,
+   "ra": [
+    "010pp",
+    "01pp",
+    "1491",
+    "Fly-000",
+    "HCSD",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "0xleek.eth",
+    "IS.K",
+    "JohnBread49",
+    "Kelcrypto",
+    "Renoshi",
+    "babaige",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rc": [
+    "0xleek.eth",
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Fly-000",
+    "FrontierQuantTrader",
+    "HCSD",
+    "JohnBread49",
+    "chenyuan"
+   ]
+  },
+  {
+   "T": "2026-09-19",
+   "sel": [
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "chenyuan",
+    "k001",
+    "paboo",
+    "ryry^",
+    "xiaojian888999"
+   ],
+   "pool": 37,
+   "ra": [
+    "010pp",
+    "01pp",
+    "Busy-DID-Wombat",
+    "Fly-000",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "IS.K",
+    "Shallow-Pair-Frog",
+    "k001",
+    "paboo",
+    "ryry^"
+   ],
+   "rc": [
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "chenyuan"
+   ]
+  },
+  {
+   "T": "2026-09-22",
+   "sel": [
+    "010pp",
+    "0xleek.eth",
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "chenyuan",
+    "k001",
+    "稳稳赚钱"
+   ],
+   "pool": 39,
+   "ra": [
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "babaige",
+    "paboo"
+   ],
+   "rb": [
+    "01pp",
+    "Algo Box",
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Shallow-Pair-Frog",
+    "稳稳赚钱"
+   ],
+   "rc": [
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "chenyuan",
+    "稳稳赚钱"
+   ]
+  },
+  {
+   "T": "2026-09-25",
+   "sel": [
+    "0xleek.eth",
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "chenyuan",
+    "k001",
+    "paboo",
+    "稳稳赚钱"
+   ],
+   "pool": 41,
+   "ra": [
+    "Algo Box",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "babaige",
+    "paboo"
+   ],
+   "rb": [
+    "Ail.Wang",
+    "Algo Box",
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Shallow-Pair-Frog",
+    "稳稳赚钱"
+   ],
+   "rc": [
+    "0xe867fbda",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "chenyuan",
+    "稳稳赚钱"
+   ]
+  },
+  {
+   "T": "2026-09-28",
+   "sel": [
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "chenyuan",
+    "ryry^",
+    "稳稳赚钱"
+   ],
+   "pool": 41,
+   "ra": [
+    "010pp",
+    "Algo Box",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "Algo Box",
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Shallow-Pair-Frog",
+    "k001",
+    "稳稳赚钱"
+   ],
+   "rc": [
+    "0xe867fbda",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "chenyuan",
+    "稳稳赚钱"
+   ]
+  },
+  {
+   "T": "2026-10-01",
+   "sel": [
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "JohnBread49",
+    "TP-Jason",
+    "chenyuan",
+    "稳稳赚钱"
+   ],
+   "pool": 42,
+   "ra": [
+    "010pp",
+    "01pp",
+    "Busy-DID-Wombat",
+    "Fly-000",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "01pp",
+    "Algo Box",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "leaf-ye"
+   ],
+   "rc": [
+    "0xe867fbda",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "chenyuan",
+    "稳稳赚钱"
+   ]
+  },
+  {
+   "T": "2026-10-04",
+   "sel": [
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Elegant-Layer-Violet",
+    "Homely-18277",
+    "JohnBread49",
+    "LanayaFrv",
+    "chenyuan",
+    "稳稳赚钱"
+   ],
+   "pool": 43,
+   "ra": [
+    "010pp",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "Ail.Wang",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "HCSD",
+    "JohnBread49",
+    "Kelcrypto",
+    "Shallow-Pair-Frog",
+    "leaf-ye"
+   ],
+   "rc": [
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "Homely-18277",
+    "LanayaFrv",
+    "chenyuan",
+    "稳稳赚钱"
+   ]
+  },
+  {
+   "T": "2026-10-07",
+   "sel": [
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Elegant-Layer-Violet",
+    "Homely-18277",
+    "JohnBread49",
+    "LanayaFrv",
+    "TP-Jason",
+    "chenyuan",
+    "稳稳赚钱"
+   ],
+   "pool": 44,
+   "ra": [
+    "010pp",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "HCSD",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "paboo"
+   ],
+   "rb": [
+    "1491",
+    "Ail.Wang",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "JohnBread49",
+    "Kelcrypto",
+    "Shallow-Pair-Frog",
+    "leaf-ye"
+   ],
+   "rc": [
+    "0xe867fbda",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Elegant-Layer-Violet",
+    "Fly-000",
+    "HCSD",
+    "Homely-18277",
+    "LanayaFrv"
+   ]
+  },
+  {
+   "T": "2026-10-10",
+   "sel": [
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Homely-18277",
+    "JohnBread49",
+    "Queenstown-Traders",
+    "TP-Jason",
+    "稳稳赚钱"
+   ],
+   "pool": 45,
+   "ra": [
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rb": [
+    "010pp",
+    "1491",
+    "Busy-DID-Wombat",
+    "HaveARestin",
+    "JohnBread49",
+    "Kelcrypto",
+    "Renoshi",
+    "leaf-ye"
+   ],
+   "rc": [
+    "0xe867fbda",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "Homely-18277",
+    "LanayaFrv",
+    "Queenstown-Traders"
+   ]
+  },
+  {
+   "T": "2026-10-13",
+   "sel": [
+    "Andyvillajr",
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "JohnBread49",
+    "Queenstown-Traders",
+    "TP-Jason",
+    "稳稳赚钱"
+   ],
+   "pool": 45,
+   "ra": [
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rb": [
+    "1491",
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "HaveARestin",
+    "JohnBread49",
+    "Renoshi",
+    "ZzzzQing_cc01",
+    "leaf-ye"
+   ],
+   "rc": [
+    "0xe867fbda",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "Homely-18277",
+    "SharpMine"
+   ]
+  },
+  {
+   "T": "2026-10-16",
+   "sel": [
+    "010pp",
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Homely-18277",
+    "JohnBread49",
+    "Queenstown-Traders",
+    "Renoshi",
+    "TP-Jason",
+    "稳稳赚钱"
+   ],
+   "pool": 47,
+   "ra": [
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "leaf-ye"
+   ],
+   "rb": [
+    "010pp",
+    "1491",
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "HaveARestin",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "leaf-ye"
+   ],
+   "rc": [
+    "0xe867fbda",
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Busy-DID-Wombat",
+    "CryptoPainter",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "Queenstown-Traders"
+   ]
+  },
+  {
+   "T": "2026-10-19",
+   "sel": [
+    "Bare-Payee-Fox",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "Hronos",
+    "JohnBread49",
+    "Kunpeng Plan",
+    "Queenstown-Traders",
+    "Renoshi",
+    "TP-Jason",
+    "稳稳赚钱"
+   ],
+   "pool": 46,
+   "ra": [
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "babaige",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rb": [
+    "1491",
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "HaveARestin",
+    "IS.K",
+    "JohnBread49",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rc": [
+    "Bare-Payee-Fox",
+    "BestMax",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "JohnBread49",
+    "Kunpeng Plan",
+    "Queenstown-Traders"
+   ]
+  },
+  {
+   "T": "2026-10-22",
+   "sel": [
+    "010pp",
+    "1491",
+    "AGD88888",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HaveARestin",
+    "Hronos",
+    "JohnBread49",
+    "Kunpeng Plan",
+    "Queenstown-Traders",
+    "Renoshi",
+    "TP-Jason",
+    "k001",
+    "稳稳赚钱"
+   ],
+   "pool": 44,
+   "ra": [
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "JohnBread49",
+    "Kunpeng Plan",
+    "Shallow-Pair-Frog",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rb": [
+    "1491",
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "JohnBread49",
+    "Kunpeng Plan",
+    "ZzzzQing_cc01",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rc": [
+    "AGD88888",
+    "BestMax",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HCSD",
+    "Kunpeng Plan",
+    "Renoshi",
+    "k001"
+   ]
+  },
+  {
+   "T": "2026-10-25",
+   "sel": [
+    "1491",
+    "AGD88888",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HaveARestin",
+    "Hronos",
+    "JohnBread49",
+    "Queenstown-Traders",
+    "Renoshi",
+    "TP-Jason",
+    "babaige"
+   ],
+   "pool": 43,
+   "ra": [
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "ZzzzQing_cc01",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rb": [
+    "1491",
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "IS.K",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rc": [
+    "AGD88888",
+    "BestMax",
+    "HCSD",
+    "JohnBread49",
+    "Queenstown-Traders",
+    "Renoshi",
+    "babaige",
+    "ryry^"
+   ]
+  },
+  {
+   "T": "2026-10-28",
+   "sel": [
+    "1491",
+    "AGD88888",
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "ChinatownOG",
+    "Elegant-Layer-Violet",
+    "HaveARestin",
+    "Hronos",
+    "JohnBread49",
+    "Queenstown-Traders",
+    "Renoshi",
+    "TP-Jason",
+    "chenyuan",
+    "k001",
+    "稳稳赚钱"
+   ],
+   "pool": 41,
+   "ra": [
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "HaveARestin",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rb": [
+    "AGD88888",
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "HaveARestin",
+    "JohnBread49",
+    "ZzzzQing_cc01",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rc": [
+    "AGD88888",
+    "ChinatownOG",
+    "Elegant-Layer-Violet",
+    "HaveARestin",
+    "LanayaFrv",
+    "Quaint-SegWit-Laurel",
+    "chenyuan",
+    "稳稳赚钱"
+   ]
+  },
+  {
+   "T": "2026-10-31",
+   "sel": [
+    "1491",
+    "AGD88888",
+    "Hronos",
+    "JohnBread49",
+    "Queenstown-Traders",
+    "Renoshi",
+    "TP-Jason",
+    "ryry^"
+   ],
+   "pool": 43,
+   "ra": [
+    "1491",
+    "Ail.Wang",
+    "Busy-DID-Wombat",
+    "Elegant-Layer-Violet",
+    "JohnBread49",
+    "Shallow-Pair-Frog",
+    "leaf-ye",
+    "paboo"
+   ],
+   "rb": [
+    "1491",
+    "AGD88888",
+    "Ail.Wang",
+    "JohnBread49",
+    "Kelcrypto",
+    "Renoshi",
+    "ZzzzQing_cc01",
+    "leaf-ye"
+   ],
+   "rc": [
+    "0xe867fbda",
+    "1491",
+    "AGD88888",
+    "BestMax",
+    "Hronos",
+    "JohnBread49",
+    "Renoshi",
+    "ryry^"
+   ]
+  }
+ ],
+ "dropout": {
+  "n": 1866,
+  "fails": 1081,
+  "checked": 1808
+ },
+ "from": "2024-07-25",
+ "to": "2026-11-04",
+ "active_reviews": [
+  "2026-08-11",
+  28
+ ],
+ "POOL_2": {
+  "all": {
+   "n": 7680,
+   "mean": 0.394,
+   "t": 5.22,
+   "pf": 1.24,
+   "win": 0.608
+  },
+  "traders": 51,
+  "by_trader": {
+   "n": 51,
+   "mean": 0.679,
+   "t": 2.56,
+   "pf": 3.25,
+   "win": 0.686
+  },
+  "half1": {
+   "n": 3174,
+   "mean": 0.744,
+   "t": 5.25,
+   "pf": 1.44,
+   "win": 0.59
+  },
+  "half2": {
+   "n": 4506,
+   "mean": 0.147,
+   "t": 1.81,
+   "pf": 1.09,
+   "win": 0.62
+  },
+  "months": {
+   "2026-03": {
+    "n": 1,
+    "mean": 0.04
+   },
+   "2026-05": {
+    "n": 350,
+    "mean": -0.062,
+    "t": -0.64,
+    "pf": 0.88,
+    "win": 0.449
+   },
+   "2026-07": {
+    "n": 6,
+    "mean": 20.482,
+    "t": 4.24,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 1206,
+    "mean": 1.333,
+    "t": 4.91,
+    "pf": 1.73,
+    "win": 0.617
+   },
+   "2026-09": {
+    "n": 2425,
+    "mean": 0.258,
+    "t": 1.83,
+    "pf": 1.14,
+    "win": 0.609
+   },
+   "2026-10": {
+    "n": 3517,
+    "mean": 0.185,
+    "t": 2.01,
+    "pf": 1.12,
+    "win": 0.618
+   },
+   "2026-11": {
+    "n": 175,
+    "mean": 0.232,
+    "t": 1.0,
+    "pf": 1.28,
+    "win": 0.634
+   }
+  },
+  "okx": {
+   "n": 7326,
+   "mean": 0.416,
+   "t": 5.26,
+   "pf": 1.25,
+   "win": 0.615
+  },
+  "hl": {
+   "n": 354,
+   "mean": -0.059,
+   "t": -0.61,
+   "pf": 0.89,
+   "win": 0.452
+  },
+  "per_trader": {
+   "leaf-ye": {
+    "n": 771,
+    "mean": 0.467,
+    "t": 2.21,
+    "pf": 1.29,
+    "win": 0.595
+   },
+   "Ail.Wang": {
+    "n": 667,
+    "mean": -1.305,
+    "t": -4.07,
+    "pf": 0.61,
+    "win": 0.643
+   },
+   "Busy-DID-Wombat": {
+    "n": 510,
+    "mean": 1.178,
+    "t": 4.0,
+    "pf": 1.86,
+    "win": 0.727
+   },
+   "JohnBread49": {
+    "n": 460,
+    "mean": 0.93,
+    "t": 3.73,
+    "pf": 1.78,
+    "win": 0.735
+   },
+   "ZzzzQing_cc01": {
+    "n": 424,
+    "mean": 1.0,
+    "t": 5.92,
+    "pf": 3.28,
+    "win": 0.757
+   },
+   "0x03b9a189": {
+    "n": 349,
+    "mean": -0.062,
+    "t": -0.64,
+    "pf": 0.89,
+    "win": 0.45
+   },
+   "HaveARestin": {
+    "n": 315,
+    "mean": 0.114,
+    "t": 0.29,
+    "pf": 1.05,
+    "win": 0.746
+   },
+   "BestMax": {
+    "n": 307,
+    "mean": -0.691,
+    "t": -4.34,
+    "pf": 0.38,
+    "win": 0.417
+   },
+   "01pp": {
+    "n": 252,
+    "mean": 0.605,
+    "t": 1.89,
+    "pf": 1.51,
+    "win": 0.615
+   },
+   "xiaojian888999": {
+    "n": 251,
+    "mean": 0.436,
+    "t": 1.83,
+    "pf": 1.6,
+    "win": 0.602
+   },
+   "Algo Box": {
+    "n": 231,
+    "mean": 0.26,
+    "t": 0.61,
+    "pf": 1.15,
+    "win": 0.377
+   },
+   "Kunpeng Plan": {
+    "n": 221,
+    "mean": -1.11,
+    "t": -2.54,
+    "pf": 0.65,
+    "win": 0.362
+   },
+   "paboo": {
+    "n": 209,
+    "mean": 2.084,
+    "t": 2.06,
+    "pf": 1.45,
+    "win": 0.589
+   },
+   "dai***@yinowealth.com": {
+    "n": 204,
+    "mean": -0.775,
+    "t": -2.52,
+    "pf": 0.61,
+    "win": 0.48
+   },
+   "IS.K": {
+    "n": 190,
+    "mean": 0.791,
+    "t": 1.91,
+    "pf": 1.66,
+    "win": 0.542
+   },
+   "1491": {
+    "n": 188,
+    "mean": 1.124,
+    "t": 3.77,
+    "pf": 2.05,
+    "win": 0.681
+   },
+   "010pp": {
+    "n": 177,
+    "mean": 0.659,
+    "t": 2.03,
+    "pf": 1.62,
+    "win": 0.672
+   },
+   "chenyuan": {
+    "n": 167,
+    "mean": -1.299,
+    "t": -3.46,
+    "pf": 0.22,
+    "win": 0.653
+   },
+   "ZCM5535": {
+    "n": 155,
+    "mean": 0.063,
+    "t": 0.3,
+    "pf": 1.07,
+    "win": 0.49
+   },
+   "kcat": {
+    "n": 135,
+    "mean": -0.15,
+    "t": -0.5,
+    "pf": 0.87,
+    "win": 0.511
+   },
+   "AGD88888": {
+    "n": 120,
+    "mean": 1.225,
+    "t": 7.9,
+    "pf": 12.09,
+    "win": 0.8
+   },
+   "Shallow-Pair-Frog": {
+    "n": 113,
+    "mean": 6.013,
+    "t": 3.12,
+    "pf": 3.16,
+    "win": 0.504
+   },
+   "Kelcrypto": {
+    "n": 107,
+    "mean": 1.41,
+    "t": 3.3,
+    "pf": 2.4,
+    "win": 0.589
+   },
+   "Andyvillajr": {
+    "n": 104,
+    "mean": -0.109,
+    "t": -0.86,
+    "pf": 0.76,
+    "win": 0.567
+   },
+   "k001": {
+    "n": 103,
+    "mean": 0.531,
+    "t": 1.41,
+    "pf": 1.47,
+    "win": 0.66
+   },
+   "ChinatownOG": {
+    "n": 102,
+    "mean": 0.968,
+    "t": 3.11,
+    "pf": 3.15,
+    "win": 0.794
+   },
+   "Renoshi": {
+    "n": 94,
+    "mean": 1.195,
+    "t": 3.34,
+    "pf": 2.5,
+    "win": 0.777
+   },
+   "Fly-000": {
+    "n": 91,
+    "mean": 1.605,
+    "t": 0.93,
+    "pf": 1.32,
+    "win": 0.484
+   },
+   "Hronos": {
+    "n": 90,
+    "mean": 0.105,
+    "t": 0.93,
+    "pf": 1.41,
+    "win": 0.756
+   },
+   "TP-Jason": {
+    "n": 84,
+    "mean": 0.176,
+    "t": 1.4,
+    "pf": 1.67,
+    "win": 0.702
+   },
+   "HCSD": {
+    "n": 73,
+    "mean": 1.351,
+    "t": 3.11,
+    "pf": 3.17,
+    "win": 0.644
+   },
+   "babaige": {
+    "n": 69,
+    "mean": -0.212,
+    "t": -0.28,
+    "pf": 0.91,
+    "win": 0.42
+   },
+   "ryry^": {
+    "n": 47,
+    "mean": 1.712,
+    "t": 1.33,
+    "pf": 1.77,
+    "win": 0.702
+   },
+   "CryptoPainter": {
+    "n": 45,
+    "mean": 1.42,
+    "t": 1.19,
+    "pf": 1.62,
+    "win": 0.422
+   },
+   "Elegant-Layer-Violet": {
+    "n": 43,
+    "mean": 1.637,
+    "t": 1.98,
+    "pf": 2.68,
+    "win": 0.558
+   },
+   "稳稳赚钱": {
+    "n": 42,
+    "mean": -0.792,
+    "t": -0.63,
+    "pf": 0.77,
+    "win": 0.643
+   },
+   "SharpMine": {
+    "n": 36,
+    "mean": -0.78,
+    "t": -0.44,
+    "pf": 0.78,
+    "win": 0.333
+   },
+   "Seventy-six": {
+    "n": 19,
+    "mean": 0.106,
+    "t": 0.38,
+    "pf": 1.25,
+    "win": 0.526
+   },
+   "FrontierQuantTrader": {
+    "n": 19,
+    "mean": -0.416,
+    "t": -1.35,
+    "pf": 0.34,
+    "win": 0.368
+   },
+   "mia***@yandex.ru": {
+    "n": 17,
+    "mean": 0.205,
+    "t": 1.3,
+    "pf": 2.83,
+    "win": 0.471
+   },
+   "0xleek.eth": {
+    "n": 15,
+    "mean": -1.203,
+    "t": -0.85,
+    "pf": 0.52,
+    "win": 0.4
+   },
+   "Linxixi": {
+    "n": 15,
+    "mean": 0.633,
+    "t": 1.37,
+    "pf": 3.43,
+    "win": 0.667
+   },
+   "Queenstown-Traders": {
+    "n": 10,
+    "mean": 2.602,
+    "t": 1.12,
+    "pf": 3.53,
+    "win": 0.7
+   },
+   "Homely-18277": {
+    "n": 9,
+    "mean": -2.341,
+    "t": -1.1,
+    "pf": 0.33,
+    "win": 0.333
+   },
+   "LanayaFrv": {
+    "n": 9,
+    "mean": -4.07,
+    "t": -1.5,
+    "pf": 0.24,
+    "win": 0.556
+   },
+   "Bare-Payee-Fox": {
+    "n": 7,
+    "mean": 7.738,
+    "t": 3.72,
+    "pf": null,
+    "win": 1.0
+   },
+   "Quaint-SegWit-Laurel": {
+    "n": 6,
+    "mean": 1.657,
+    "t": 2.68,
+    "pf": 134.02,
+    "win": 0.833
+   },
+   "0xe867fbda": {
+    "n": 4,
+    "mean": 0.265,
+    "t": 0.8,
+    "pf": 3.01,
+    "win": 0.75
+   },
+   "Mine13": {
+    "n": 2,
+    "mean": 5.806,
+    "t": 3.29,
+    "pf": null,
+    "win": 1.0
+   },
+   "0xff4cd382": {
+    "n": 1,
+    "mean": -0.074
+   },
+   "人生没有如果 只有后果和结果": {
+    "n": 1,
+    "mean": 1.967
+   }
+  }
+ },
+ "POOL_6": {
+  "all": {
+   "n": 7680,
+   "mean": 0.516,
+   "t": 6.83,
+   "pf": 1.33,
+   "win": 0.623
+  },
+  "traders": 51,
+  "by_trader": {
+   "n": 51,
+   "mean": 0.763,
+   "t": 2.84,
+   "pf": 3.78,
+   "win": 0.686
+  },
+  "half1": {
+   "n": 3174,
+   "mean": 0.848,
+   "t": 5.98,
+   "pf": 1.51,
+   "win": 0.604
+  },
+  "half2": {
+   "n": 4506,
+   "mean": 0.281,
+   "t": 3.47,
+   "pf": 1.19,
+   "win": 0.636
+  },
+  "months": {
+   "2026-03": {
+    "n": 1,
+    "mean": -0.005
+   },
+   "2026-05": {
+    "n": 350,
+    "mean": -0.062,
+    "t": -0.63,
+    "pf": 0.89,
+    "win": 0.44
+   },
+   "2026-07": {
+    "n": 6,
+    "mean": 20.51,
+    "t": 4.23,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 1206,
+    "mean": 1.449,
+    "t": 5.34,
+    "pf": 1.82,
+    "win": 0.634
+   },
+   "2026-09": {
+    "n": 2425,
+    "mean": 0.373,
+    "t": 2.64,
+    "pf": 1.21,
+    "win": 0.624
+   },
+   "2026-10": {
+    "n": 3517,
+    "mean": 0.327,
+    "t": 3.55,
+    "pf": 1.22,
+    "win": 0.633
+   },
+   "2026-11": {
+    "n": 175,
+    "mean": 0.321,
+    "t": 1.36,
+    "pf": 1.38,
+    "win": 0.669
+   }
+  },
+  "okx": {
+   "n": 7326,
+   "mean": 0.543,
+   "t": 6.87,
+   "pf": 1.34,
+   "win": 0.631
+  },
+  "hl": {
+   "n": 354,
+   "mean": -0.056,
+   "t": -0.57,
+   "pf": 0.9,
+   "win": 0.441
+  },
+  "per_trader": {
+   "leaf-ye": {
+    "n": 771,
+    "mean": 0.62,
+    "t": 2.95,
+    "pf": 1.4,
+    "win": 0.602
+   },
+   "Ail.Wang": {
+    "n": 667,
+    "mean": -0.937,
+    "t": -2.9,
+    "pf": 0.71,
+    "win": 0.673
+   },
+   "Busy-DID-Wombat": {
+    "n": 510,
+    "mean": 1.336,
+    "t": 4.51,
+    "pf": 1.99,
+    "win": 0.761
+   },
+   "JohnBread49": {
+    "n": 460,
+    "mean": 1.063,
+    "t": 4.2,
+    "pf": 1.9,
+    "win": 0.75
+   },
+   "ZzzzQing_cc01": {
+    "n": 424,
+    "mean": 1.078,
+    "t": 6.31,
+    "pf": 3.55,
+    "win": 0.776
+   },
+   "0x03b9a189": {
+    "n": 349,
+    "mean": -0.062,
+    "t": -0.62,
+    "pf": 0.89,
+    "win": 0.441
+   },
+   "HaveARestin": {
+    "n": 315,
+    "mean": 0.394,
+    "t": 1.01,
+    "pf": 1.18,
+    "win": 0.756
+   },
+   "BestMax": {
+    "n": 307,
+    "mean": -0.436,
+    "t": -2.72,
+    "pf": 0.55,
+    "win": 0.495
+   },
+   "01pp": {
+    "n": 252,
+    "mean": 0.523,
+    "t": 1.65,
+    "pf": 1.43,
+    "win": 0.595
+   },
+   "xiaojian888999": {
+    "n": 251,
+    "mean": 0.514,
+    "t": 2.15,
+    "pf": 1.73,
+    "win": 0.618
+   },
+   "Algo Box": {
+    "n": 231,
+    "mean": 0.246,
+    "t": 0.57,
+    "pf": 1.14,
+    "win": 0.372
+   },
+   "Kunpeng Plan": {
+    "n": 221,
+    "mean": -0.866,
+    "t": -1.95,
+    "pf": 0.72,
+    "win": 0.367
+   },
+   "paboo": {
+    "n": 209,
+    "mean": 2.439,
+    "t": 2.43,
+    "pf": 1.54,
+    "win": 0.598
+   },
+   "dai***@yinowealth.com": {
+    "n": 204,
+    "mean": -0.673,
+    "t": -2.21,
+    "pf": 0.65,
+    "win": 0.48
+   },
+   "IS.K": {
+    "n": 190,
+    "mean": 0.738,
+    "t": 1.78,
+    "pf": 1.61,
+    "win": 0.532
+   },
+   "1491": {
+    "n": 188,
+    "mean": 1.09,
+    "t": 3.62,
+    "pf": 1.99,
+    "win": 0.67
+   },
+   "010pp": {
+    "n": 177,
+    "mean": 0.59,
+    "t": 1.83,
+    "pf": 1.54,
+    "win": 0.661
+   },
+   "chenyuan": {
+    "n": 167,
+    "mean": -1.141,
+    "t": -3.09,
+    "pf": 0.28,
+    "win": 0.743
+   },
+   "ZCM5535": {
+    "n": 155,
+    "mean": 0.154,
+    "t": 0.73,
+    "pf": 1.18,
+    "win": 0.503
+   },
+   "kcat": {
+    "n": 135,
+    "mean": -0.078,
+    "t": -0.26,
+    "pf": 0.93,
+    "win": 0.511
+   },
+   "AGD88888": {
+    "n": 120,
+    "mean": 1.361,
+    "t": 8.5,
+    "pf": 14.64,
+    "win": 0.833
+   },
+   "Shallow-Pair-Frog": {
+    "n": 113,
+    "mean": 6.057,
+    "t": 3.13,
+    "pf": 3.19,
+    "win": 0.504
+   },
+   "Kelcrypto": {
+    "n": 107,
+    "mean": 1.422,
+    "t": 3.26,
+    "pf": 2.36,
+    "win": 0.598
+   },
+   "Andyvillajr": {
+    "n": 104,
+    "mean": -0.042,
+    "t": -0.33,
+    "pf": 0.9,
+    "win": 0.625
+   },
+   "k001": {
+    "n": 103,
+    "mean": 0.559,
+    "t": 1.48,
+    "pf": 1.5,
+    "win": 0.67
+   },
+   "ChinatownOG": {
+    "n": 102,
+    "mean": 0.957,
+    "t": 3.08,
+    "pf": 3.1,
+    "win": 0.784
+   },
+   "Renoshi": {
+    "n": 94,
+    "mean": 1.22,
+    "t": 3.4,
+    "pf": 2.53,
+    "win": 0.777
+   },
+   "Fly-000": {
+    "n": 91,
+    "mean": 1.747,
+    "t": 1.02,
+    "pf": 1.35,
+    "win": 0.495
+   },
+   "Hronos": {
+    "n": 90,
+    "mean": 0.154,
+    "t": 1.36,
+    "pf": 1.63,
+    "win": 0.778
+   },
+   "TP-Jason": {
+    "n": 84,
+    "mean": 0.271,
+    "t": 2.08,
+    "pf": 2.09,
+    "win": 0.714
+   },
+   "HCSD": {
+    "n": 73,
+    "mean": 1.231,
+    "t": 2.78,
+    "pf": 2.68,
+    "win": 0.658
+   },
+   "babaige": {
+    "n": 69,
+    "mean": -0.214,
+    "t": -0.29,
+    "pf": 0.91,
+    "win": 0.435
+   },
+   "ryry^": {
+    "n": 47,
+    "mean": 1.758,
+    "t": 1.36,
+    "pf": 1.79,
+    "win": 0.681
+   },
+   "CryptoPainter": {
+    "n": 45,
+    "mean": 1.405,
+    "t": 1.18,
+    "pf": 1.62,
+    "win": 0.422
+   },
+   "Elegant-Layer-Violet": {
+    "n": 43,
+    "mean": 1.791,
+    "t": 2.21,
+    "pf": 2.98,
+    "win": 0.605
+   },
+   "稳稳赚钱": {
+    "n": 42,
+    "mean": -0.763,
+    "t": -0.61,
+    "pf": 0.78,
+    "win": 0.643
+   },
+   "SharpMine": {
+    "n": 36,
+    "mean": -0.881,
+    "t": -0.5,
+    "pf": 0.76,
+    "win": 0.306
+   },
+   "Seventy-six": {
+    "n": 19,
+    "mean": 0.008,
+    "t": 0.03,
+    "pf": 1.02,
+    "win": 0.526
+   },
+   "FrontierQuantTrader": {
+    "n": 19,
+    "mean": -0.151,
+    "t": -0.54,
+    "pf": 0.68,
+    "win": 0.632
+   },
+   "mia***@yandex.ru": {
+    "n": 17,
+    "mean": 0.197,
+    "t": 1.11,
+    "pf": 2.46,
+    "win": 0.412
+   },
+   "0xleek.eth": {
+    "n": 15,
+    "mean": -1.31,
+    "t": -0.93,
+    "pf": 0.49,
+    "win": 0.4
+   },
+   "Linxixi": {
+    "n": 15,
+    "mean": 0.587,
+    "t": 1.28,
+    "pf": 3.03,
+    "win": 0.6
+   },
+   "Queenstown-Traders": {
+    "n": 10,
+    "mean": 2.579,
+    "t": 1.12,
+    "pf": 3.57,
+    "win": 0.6
+   },
+   "Homely-18277": {
+    "n": 9,
+    "mean": -2.325,
+    "t": -1.08,
+    "pf": 0.34,
+    "win": 0.333
+   },
+   "LanayaFrv": {
+    "n": 9,
+    "mean": -3.917,
+    "t": -1.42,
+    "pf": 0.27,
+    "win": 0.556
+   },
+   "Bare-Payee-Fox": {
+    "n": 7,
+    "mean": 8.08,
+    "t": 3.81,
+    "pf": null,
+    "win": 1.0
+   },
+   "Quaint-SegWit-Laurel": {
+    "n": 6,
+    "mean": 1.908,
+    "t": 3.32,
+    "pf": null,
+    "win": 1.0
+   },
+   "0xe867fbda": {
+    "n": 4,
+    "mean": 0.485,
+    "t": 1.24,
+    "pf": 6.32,
+    "win": 0.5
+   },
+   "Mine13": {
+    "n": 2,
+    "mean": 5.861,
+    "t": 3.21,
+    "pf": null,
+    "win": 1.0
+   },
+   "0xff4cd382": {
+    "n": 1,
+    "mean": -0.187
+   },
+   "人生没有如果 只有后果和结果": {
+    "n": 1,
+    "mean": 2.481
+   }
+  }
+ },
+ "RA_2": {
+  "all": {
+   "n": 2619,
+   "mean": 0.683,
+   "t": 4.69,
+   "pf": 1.4,
+   "win": 0.616
+  },
+  "traders": 24,
+  "by_trader": {
+   "n": 24,
+   "mean": 0.543,
+   "t": 1.32,
+   "pf": 2.05,
+   "win": 0.667
+  },
+  "half1": {
+   "n": 1255,
+   "mean": 1.246,
+   "t": 5.16,
+   "pf": 1.81,
+   "win": 0.587
+  },
+  "half2": {
+   "n": 1364,
+   "mean": 0.164,
+   "t": 0.98,
+   "pf": 1.09,
+   "win": 0.642
+  },
+  "months": {
+   "2026-03": {
+    "n": 1,
+    "mean": 0.04
+   },
+   "2026-05": {
+    "n": 350,
+    "mean": -0.062,
+    "t": -0.64,
+    "pf": 0.88,
+    "win": 0.449
+   },
+   "2026-07": {
+    "n": 6,
+    "mean": 20.482,
+    "t": 4.24,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 488,
+    "mean": 1.709,
+    "t": 3.56,
+    "pf": 1.77,
+    "win": 0.627
+   },
+   "2026-09": {
+    "n": 560,
+    "mean": 0.653,
+    "t": 1.83,
+    "pf": 1.34,
+    "win": 0.625
+   },
+   "2026-10": {
+    "n": 1155,
+    "mean": 0.437,
+    "t": 2.39,
+    "pf": 1.24,
+    "win": 0.656
+   },
+   "2026-11": {
+    "n": 59,
+    "mean": -0.296,
+    "t": -0.54,
+    "pf": 0.81,
+    "win": 0.593
+   }
+  },
+  "okx": {
+   "n": 2268,
+   "mean": 0.798,
+   "t": 4.77,
+   "pf": 1.42,
+   "win": 0.642
+  },
+  "hl": {
+   "n": 351,
+   "mean": -0.062,
+   "t": -0.64,
+   "pf": 0.89,
+   "win": 0.45
+  },
+  "per_trader": {
+   "0x03b9a189": {
+    "n": 349,
+    "mean": -0.062,
+    "t": -0.64,
+    "pf": 0.89,
+    "win": 0.45
+   },
+   "leaf-ye": {
+    "n": 339,
+    "mean": 0.447,
+    "t": 1.45,
+    "pf": 1.26,
+    "win": 0.614
+   },
+   "JohnBread49": {
+    "n": 314,
+    "mean": 0.777,
+    "t": 2.82,
+    "pf": 1.68,
+    "win": 0.723
+   },
+   "ZzzzQing_cc01": {
+    "n": 293,
+    "mean": 0.745,
+    "t": 4.38,
+    "pf": 2.68,
+    "win": 0.741
+   },
+   "Busy-DID-Wombat": {
+    "n": 290,
+    "mean": 1.976,
+    "t": 6.83,
+    "pf": 4.87,
+    "win": 0.793
+   },
+   "paboo": {
+    "n": 201,
+    "mean": 2.573,
+    "t": 2.51,
+    "pf": 1.59,
+    "win": 0.602
+   },
+   "01pp": {
+    "n": 135,
+    "mean": 0.456,
+    "t": 1.38,
+    "pf": 1.47,
+    "win": 0.644
+   },
+   "Ail.Wang": {
+    "n": 134,
+    "mean": -2.258,
+    "t": -2.39,
+    "pf": 0.55,
+    "win": 0.597
+   },
+   "010pp": {
+    "n": 105,
+    "mean": 1.112,
+    "t": 2.74,
+    "pf": 2.47,
+    "win": 0.733
+   },
+   "Shallow-Pair-Frog": {
+    "n": 88,
+    "mean": 2.317,
+    "t": 1.53,
+    "pf": 1.7,
+    "win": 0.455
+   },
+   "Fly-000": {
+    "n": 64,
+    "mean": 1.358,
+    "t": 0.57,
+    "pf": 1.21,
+    "win": 0.406
+   },
+   "Kunpeng Plan": {
+    "n": 51,
+    "mean": -2.44,
+    "t": -3.22,
+    "pf": 0.35,
+    "win": 0.333
+   },
+   "Algo Box": {
+    "n": 48,
+    "mean": -1.776,
+    "t": -2.38,
+    "pf": 0.32,
+    "win": 0.312
+   },
+   "HCSD": {
+    "n": 45,
+    "mean": 0.941,
+    "t": 1.43,
+    "pf": 1.97,
+    "win": 0.511
+   },
+   "1491": {
+    "n": 41,
+    "mean": -2.104,
+    "t": -2.66,
+    "pf": 0.35,
+    "win": 0.268
+   },
+   "Elegant-Layer-Violet": {
+    "n": 39,
+    "mean": 0.337,
+    "t": 0.68,
+    "pf": 1.31,
+    "win": 0.513
+   },
+   "HaveARestin": {
+    "n": 25,
+    "mean": 2.554,
+    "t": 4.54,
+    "pf": 13.62,
+    "win": 0.84
+   },
+   "IS.K": {
+    "n": 20,
+    "mean": 4.095,
+    "t": 1.73,
+    "pf": 10.25,
+    "win": 0.65
+   },
+   "SharpMine": {
+    "n": 12,
+    "mean": -2.1,
+    "t": -1.28,
+    "pf": 0.27,
+    "win": 0.417
+   },
+   "kcat": {
+    "n": 11,
+    "mean": 0.242,
+    "t": 0.1,
+    "pf": 1.08,
+    "win": 0.636
+   },
+   "xiaojian888999": {
+    "n": 11,
+    "mean": 5.467,
+    "t": 2.16,
+    "pf": 31.99,
+    "win": 0.818
+   },
+   "Homely-18277": {
+    "n": 2,
+    "mean": -1.601,
+    "t": -0.56,
+    "pf": 0.28,
+    "win": 0.5
+   },
+   "0xe867fbda": {
+    "n": 1,
+    "mean": 0.04
+   },
+   "0xff4cd382": {
+    "n": 1,
+    "mean": -0.074
+   }
+  }
+ },
+ "RA_6": {
+  "all": {
+   "n": 2619,
+   "mean": 0.808,
+   "t": 5.55,
+   "pf": 1.48,
+   "win": 0.627
+  },
+  "traders": 24,
+  "by_trader": {
+   "n": 24,
+   "mean": 0.611,
+   "t": 1.48,
+   "pf": 2.21,
+   "win": 0.625
+  },
+  "half1": {
+   "n": 1255,
+   "mean": 1.31,
+   "t": 5.41,
+   "pf": 1.86,
+   "win": 0.593
+  },
+  "half2": {
+   "n": 1364,
+   "mean": 0.346,
+   "t": 2.05,
+   "pf": 1.19,
+   "win": 0.658
+  },
+  "months": {
+   "2026-03": {
+    "n": 1,
+    "mean": -0.005
+   },
+   "2026-05": {
+    "n": 350,
+    "mean": -0.062,
+    "t": -0.63,
+    "pf": 0.89,
+    "win": 0.44
+   },
+   "2026-07": {
+    "n": 6,
+    "mean": 20.51,
+    "t": 4.23,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 488,
+    "mean": 1.813,
+    "t": 3.77,
+    "pf": 1.82,
+    "win": 0.639
+   },
+   "2026-09": {
+    "n": 560,
+    "mean": 0.712,
+    "t": 2.0,
+    "pf": 1.37,
+    "win": 0.641
+   },
+   "2026-10": {
+    "n": 1155,
+    "mean": 0.644,
+    "t": 3.53,
+    "pf": 1.38,
+    "win": 0.671
+   },
+   "2026-11": {
+    "n": 59,
+    "mean": -0.233,
+    "t": -0.42,
+    "pf": 0.85,
+    "win": 0.61
+   }
+  },
+  "okx": {
+   "n": 2268,
+   "mean": 0.942,
+   "t": 5.63,
+   "pf": 1.51,
+   "win": 0.656
+  },
+  "hl": {
+   "n": 351,
+   "mean": -0.062,
+   "t": -0.63,
+   "pf": 0.89,
+   "win": 0.439
+  },
+  "per_trader": {
+   "0x03b9a189": {
+    "n": 349,
+    "mean": -0.062,
+    "t": -0.62,
+    "pf": 0.89,
+    "win": 0.441
+   },
+   "leaf-ye": {
+    "n": 339,
+    "mean": 0.684,
+    "t": 2.22,
+    "pf": 1.43,
+    "win": 0.625
+   },
+   "JohnBread49": {
+    "n": 314,
+    "mean": 0.901,
+    "t": 3.23,
+    "pf": 1.79,
+    "win": 0.732
+   },
+   "ZzzzQing_cc01": {
+    "n": 293,
+    "mean": 0.812,
+    "t": 4.72,
+    "pf": 2.89,
+    "win": 0.771
+   },
+   "Busy-DID-Wombat": {
+    "n": 290,
+    "mean": 2.16,
+    "t": 7.33,
+    "pf": 5.42,
+    "win": 0.834
+   },
+   "paboo": {
+    "n": 201,
+    "mean": 2.941,
+    "t": 2.89,
+    "pf": 1.7,
+    "win": 0.612
+   },
+   "01pp": {
+    "n": 135,
+    "mean": 0.347,
+    "t": 1.06,
+    "pf": 1.33,
+    "win": 0.615
+   },
+   "Ail.Wang": {
+    "n": 134,
+    "mean": -1.88,
+    "t": -1.99,
+    "pf": 0.61,
+    "win": 0.627
+   },
+   "010pp": {
+    "n": 105,
+    "mean": 1.024,
+    "t": 2.56,
+    "pf": 2.34,
+    "win": 0.724
+   },
+   "Shallow-Pair-Frog": {
+    "n": 88,
+    "mean": 2.35,
+    "t": 1.55,
+    "pf": 1.71,
+    "win": 0.455
+   },
+   "Fly-000": {
+    "n": 64,
+    "mean": 1.474,
+    "t": 0.62,
+    "pf": 1.23,
+    "win": 0.422
+   },
+   "Kunpeng Plan": {
+    "n": 51,
+    "mean": -2.027,
+    "t": -2.52,
+    "pf": 0.44,
+    "win": 0.353
+   },
+   "Algo Box": {
+    "n": 48,
+    "mean": -1.773,
+    "t": -2.43,
+    "pf": 0.32,
+    "win": 0.312
+   },
+   "HCSD": {
+    "n": 45,
+    "mean": 0.748,
+    "t": 1.11,
+    "pf": 1.65,
+    "win": 0.511
+   },
+   "1491": {
+    "n": 41,
+    "mean": -2.135,
+    "t": -2.66,
+    "pf": 0.35,
+    "win": 0.268
+   },
+   "Elegant-Layer-Violet": {
+    "n": 39,
+    "mean": 0.561,
+    "t": 1.12,
+    "pf": 1.56,
+    "win": 0.564
+   },
+   "HaveARestin": {
+    "n": 25,
+    "mean": 2.813,
+    "t": 4.86,
+    "pf": 16.52,
+    "win": 0.88
+   },
+   "IS.K": {
+    "n": 20,
+    "mean": 3.985,
+    "t": 1.67,
+    "pf": 9.89,
+    "win": 0.6
+   },
+   "SharpMine": {
+    "n": 12,
+    "mean": -2.388,
+    "t": -1.37,
+    "pf": 0.25,
+    "win": 0.417
+   },
+   "kcat": {
+    "n": 11,
+    "mean": 0.402,
+    "t": 0.16,
+    "pf": 1.13,
+    "win": 0.636
+   },
+   "xiaojian888999": {
+    "n": 11,
+    "mean": 5.553,
+    "t": 2.21,
+    "pf": 32.02,
+    "win": 0.818
+   },
+   "Homely-18277": {
+    "n": 2,
+    "mean": -1.636,
+    "t": -0.57,
+    "pf": 0.27,
+    "win": 0.5
+   },
+   "0xe867fbda": {
+    "n": 1,
+    "mean": -0.005
+   },
+   "0xff4cd382": {
+    "n": 1,
+    "mean": -0.187
+   }
+  }
+ },
+ "RB_2": {
+  "all": {
+   "n": 3122,
+   "mean": 0.553,
+   "t": 4.28,
+   "pf": 1.32,
+   "win": 0.623
+  },
+  "traders": 31,
+  "by_trader": {
+   "n": 31,
+   "mean": 0.635,
+   "t": 2.05,
+   "pf": 3.03,
+   "win": 0.613
+  },
+  "half1": {
+   "n": 1366,
+   "mean": 0.932,
+   "t": 4.08,
+   "pf": 1.54,
+   "win": 0.574
+  },
+  "half2": {
+   "n": 1756,
+   "mean": 0.257,
+   "t": 1.77,
+   "pf": 1.15,
+   "win": 0.661
+  },
+  "months": {
+   "2026-03": {
+    "n": 1,
+    "mean": 0.04
+   },
+   "2026-05": {
+    "n": 350,
+    "mean": -0.062,
+    "t": -0.64,
+    "pf": 0.88,
+    "win": 0.449
+   },
+   "2026-07": {
+    "n": 6,
+    "mean": 20.482,
+    "t": 4.24,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 488,
+    "mean": 1.709,
+    "t": 3.56,
+    "pf": 1.77,
+    "win": 0.627
+   },
+   "2026-09": {
+    "n": 700,
+    "mean": 0.023,
+    "t": 0.07,
+    "pf": 1.01,
+    "win": 0.579
+   },
+   "2026-10": {
+    "n": 1487,
+    "mean": 0.506,
+    "t": 3.18,
+    "pf": 1.31,
+    "win": 0.676
+   },
+   "2026-11": {
+    "n": 90,
+    "mean": 0.238,
+    "t": 0.66,
+    "pf": 1.26,
+    "win": 0.711
+   }
+  },
+  "okx": {
+   "n": 2771,
+   "mean": 0.63,
+   "t": 4.35,
+   "pf": 1.33,
+   "win": 0.645
+  },
+  "hl": {
+   "n": 351,
+   "mean": -0.062,
+   "t": -0.64,
+   "pf": 0.89,
+   "win": 0.45
+  },
+  "per_trader": {
+   "leaf-ye": {
+    "n": 566,
+    "mean": 0.336,
+    "t": 1.27,
+    "pf": 1.19,
+    "win": 0.594
+   },
+   "0x03b9a189": {
+    "n": 349,
+    "mean": -0.062,
+    "t": -0.64,
+    "pf": 0.89,
+    "win": 0.45
+   },
+   "Busy-DID-Wombat": {
+    "n": 342,
+    "mean": 0.95,
+    "t": 2.61,
+    "pf": 1.59,
+    "win": 0.734
+   },
+   "JohnBread49": {
+    "n": 304,
+    "mean": 0.976,
+    "t": 3.69,
+    "pf": 2.0,
+    "win": 0.743
+   },
+   "Ail.Wang": {
+    "n": 273,
+    "mean": -1.623,
+    "t": -2.88,
+    "pf": 0.58,
+    "win": 0.612
+   },
+   "ZzzzQing_cc01": {
+    "n": 234,
+    "mean": 0.562,
+    "t": 2.61,
+    "pf": 1.88,
+    "win": 0.714
+   },
+   "paboo": {
+    "n": 140,
+    "mean": 3.955,
+    "t": 3.1,
+    "pf": 2.01,
+    "win": 0.621
+   },
+   "01pp": {
+    "n": 121,
+    "mean": -0.17,
+    "t": -0.59,
+    "pf": 0.85,
+    "win": 0.595
+   },
+   "HaveARestin": {
+    "n": 112,
+    "mean": 1.299,
+    "t": 2.65,
+    "pf": 2.18,
+    "win": 0.866
+   },
+   "1491": {
+    "n": 111,
+    "mean": 1.135,
+    "t": 2.59,
+    "pf": 1.92,
+    "win": 0.631
+   },
+   "Algo Box": {
+    "n": 84,
+    "mean": -1.475,
+    "t": -2.77,
+    "pf": 0.37,
+    "win": 0.357
+   },
+   "Shallow-Pair-Frog": {
+    "n": 60,
+    "mean": 4.462,
+    "t": 2.1,
+    "pf": 2.31,
+    "win": 0.55
+   },
+   "IS.K": {
+    "n": 54,
+    "mean": 2.111,
+    "t": 2.07,
+    "pf": 3.79,
+    "win": 0.667
+   },
+   "Kunpeng Plan": {
+    "n": 51,
+    "mean": -2.44,
+    "t": -3.22,
+    "pf": 0.35,
+    "win": 0.333
+   },
+   "010pp": {
+    "n": 48,
+    "mean": 0.689,
+    "t": 1.17,
+    "pf": 1.69,
+    "win": 0.75
+   },
+   "Fly-000": {
+    "n": 40,
+    "mean": 4.901,
+    "t": 1.4,
+    "pf": 1.77,
+    "win": 0.475
+   },
+   "xiaojian888999": {
+    "n": 38,
+    "mean": 1.192,
+    "t": 1.3,
+    "pf": 2.4,
+    "win": 0.553
+   },
+   "AGD88888": {
+    "n": 36,
+    "mean": 1.336,
+    "t": 5.57,
+    "pf": 18.49,
+    "win": 0.889
+   },
+   "Renoshi": {
+    "n": 32,
+    "mean": -0.254,
+    "t": -0.45,
+    "pf": 0.82,
+    "win": 0.688
+   },
+   "HCSD": {
+    "n": 23,
+    "mean": -0.224,
+    "t": -0.35,
+    "pf": 0.81,
+    "win": 0.391
+   },
+   "Kelcrypto": {
+    "n": 23,
+    "mean": 0.277,
+    "t": 0.28,
+    "pf": 1.18,
+    "win": 0.565
+   },
+   "Elegant-Layer-Violet": {
+    "n": 17,
+    "mean": 0.416,
+    "t": 0.47,
+    "pf": 1.33,
+    "win": 0.588
+   },
+   "k001": {
+    "n": 16,
+    "mean": -0.587,
+    "t": -0.57,
+    "pf": 0.64,
+    "win": 0.5
+   },
+   "稳稳赚钱": {
+    "n": 14,
+    "mean": -0.13,
+    "t": -0.06,
+    "pf": 0.95,
+    "win": 0.643
+   },
+   "SharpMine": {
+    "n": 12,
+    "mean": -2.1,
+    "t": -1.28,
+    "pf": 0.27,
+    "win": 0.417
+   },
+   "kcat": {
+    "n": 11,
+    "mean": 0.242,
+    "t": 0.1,
+    "pf": 1.08,
+    "win": 0.636
+   },
+   "ryry^": {
+    "n": 6,
+    "mean": 3.24,
+    "t": 2.11,
+    "pf": 8.69,
+    "win": 0.667
+   },
+   "0xleek.eth": {
+    "n": 2,
+    "mean": -0.571,
+    "t": -0.21,
+    "pf": 0.65,
+    "win": 0.5
+   },
+   "0xe867fbda": {
+    "n": 1,
+    "mean": 0.04
+   },
+   "0xff4cd382": {
+    "n": 1,
+    "mean": -0.074
+   },
+   "Homely-18277": {
+    "n": 1,
+    "mean": 1.272
+   }
+  }
+ },
+ "RB_6": {
+  "all": {
+   "n": 3122,
+   "mean": 0.676,
+   "t": 5.23,
+   "pf": 1.4,
+   "win": 0.63
+  },
+  "traders": 31,
+  "by_trader": {
+   "n": 31,
+   "mean": 0.692,
+   "t": 2.2,
+   "pf": 3.23,
+   "win": 0.581
+  },
+  "half1": {
+   "n": 1366,
+   "mean": 1.015,
+   "t": 4.44,
+   "pf": 1.59,
+   "win": 0.577
+  },
+  "half2": {
+   "n": 1756,
+   "mean": 0.412,
+   "t": 2.84,
+   "pf": 1.24,
+   "win": 0.671
+  },
+  "months": {
+   "2026-03": {
+    "n": 1,
+    "mean": -0.005
+   },
+   "2026-05": {
+    "n": 350,
+    "mean": -0.062,
+    "t": -0.63,
+    "pf": 0.89,
+    "win": 0.44
+   },
+   "2026-07": {
+    "n": 6,
+    "mean": 20.51,
+    "t": 4.23,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 488,
+    "mean": 1.813,
+    "t": 3.77,
+    "pf": 1.82,
+    "win": 0.639
+   },
+   "2026-09": {
+    "n": 700,
+    "mean": 0.128,
+    "t": 0.42,
+    "pf": 1.06,
+    "win": 0.587
+   },
+   "2026-10": {
+    "n": 1487,
+    "mean": 0.674,
+    "t": 4.24,
+    "pf": 1.42,
+    "win": 0.685
+   },
+   "2026-11": {
+    "n": 90,
+    "mean": 0.357,
+    "t": 0.98,
+    "pf": 1.39,
+    "win": 0.722
+   }
+  },
+  "okx": {
+   "n": 2771,
+   "mean": 0.769,
+   "t": 5.3,
+   "pf": 1.42,
+   "win": 0.654
+  },
+  "hl": {
+   "n": 351,
+   "mean": -0.062,
+   "t": -0.63,
+   "pf": 0.89,
+   "win": 0.439
+  },
+  "per_trader": {
+   "leaf-ye": {
+    "n": 566,
+    "mean": 0.51,
+    "t": 1.95,
+    "pf": 1.31,
+    "win": 0.599
+   },
+   "0x03b9a189": {
+    "n": 349,
+    "mean": -0.062,
+    "t": -0.62,
+    "pf": 0.89,
+    "win": 0.441
+   },
+   "Busy-DID-Wombat": {
+    "n": 342,
+    "mean": 1.134,
+    "t": 3.06,
+    "pf": 1.71,
+    "win": 0.763
+   },
+   "JohnBread49": {
+    "n": 304,
+    "mean": 1.097,
+    "t": 4.1,
+    "pf": 2.13,
+    "win": 0.753
+   },
+   "Ail.Wang": {
+    "n": 273,
+    "mean": -1.363,
+    "t": -2.41,
+    "pf": 0.64,
+    "win": 0.641
+   },
+   "ZzzzQing_cc01": {
+    "n": 234,
+    "mean": 0.644,
+    "t": 2.97,
+    "pf": 2.03,
+    "win": 0.726
+   },
+   "paboo": {
+    "n": 140,
+    "mean": 4.395,
+    "t": 3.48,
+    "pf": 2.2,
+    "win": 0.636
+   },
+   "01pp": {
+    "n": 121,
+    "mean": -0.273,
+    "t": -0.94,
+    "pf": 0.77,
+    "win": 0.579
+   },
+   "HaveARestin": {
+    "n": 112,
+    "mean": 1.538,
+    "t": 3.08,
+    "pf": 2.4,
+    "win": 0.866
+   },
+   "1491": {
+    "n": 111,
+    "mean": 1.106,
+    "t": 2.51,
+    "pf": 1.88,
+    "win": 0.613
+   },
+   "Algo Box": {
+    "n": 84,
+    "mean": -1.455,
+    "t": -2.77,
+    "pf": 0.37,
+    "win": 0.357
+   },
+   "Shallow-Pair-Frog": {
+    "n": 60,
+    "mean": 4.49,
+    "t": 2.12,
+    "pf": 2.32,
+    "win": 0.55
+   },
+   "IS.K": {
+    "n": 54,
+    "mean": 2.04,
+    "t": 2.0,
+    "pf": 3.71,
+    "win": 0.667
+   },
+   "Kunpeng Plan": {
+    "n": 51,
+    "mean": -2.027,
+    "t": -2.52,
+    "pf": 0.44,
+    "win": 0.353
+   },
+   "010pp": {
+    "n": 48,
+    "mean": 0.591,
+    "t": 1.0,
+    "pf": 1.57,
+    "win": 0.75
+   },
+   "Fly-000": {
+    "n": 40,
+    "mean": 4.896,
+    "t": 1.4,
+    "pf": 1.77,
+    "win": 0.475
+   },
+   "xiaojian888999": {
+    "n": 38,
+    "mean": 1.26,
+    "t": 1.38,
+    "pf": 2.56,
+    "win": 0.579
+   },
+   "AGD88888": {
+    "n": 36,
+    "mean": 1.55,
+    "t": 5.78,
+    "pf": 20.13,
+    "win": 0.889
+   },
+   "Renoshi": {
+    "n": 32,
+    "mean": -0.193,
+    "t": -0.34,
+    "pf": 0.86,
+    "win": 0.688
+   },
+   "HCSD": {
+    "n": 23,
+    "mean": -0.481,
+    "t": -0.71,
+    "pf": 0.66,
+    "win": 0.391
+   },
+   "Kelcrypto": {
+    "n": 23,
+    "mean": 0.245,
+    "t": 0.25,
+    "pf": 1.15,
+    "win": 0.565
+   },
+   "Elegant-Layer-Violet": {
+    "n": 17,
+    "mean": 0.64,
+    "t": 0.69,
+    "pf": 1.52,
+    "win": 0.588
+   },
+   "k001": {
+    "n": 16,
+    "mean": -0.665,
+    "t": -0.64,
+    "pf": 0.61,
+    "win": 0.5
+   },
+   "稳稳赚钱": {
+    "n": 14,
+    "mean": -0.007,
+    "t": -0.0,
+    "pf": 1.0,
+    "win": 0.643
+   },
+   "SharpMine": {
+    "n": 12,
+    "mean": -2.388,
+    "t": -1.37,
+    "pf": 0.25,
+    "win": 0.417
+   },
+   "kcat": {
+    "n": 11,
+    "mean": 0.402,
+    "t": 0.16,
+    "pf": 1.13,
+    "win": 0.636
+   },
+   "ryry^": {
+    "n": 6,
+    "mean": 3.294,
+    "t": 2.11,
+    "pf": 9.07,
+    "win": 0.667
+   },
+   "0xleek.eth": {
+    "n": 2,
+    "mean": -0.503,
+    "t": -0.18,
+    "pf": 0.69,
+    "win": 0.5
+   },
+   "0xe867fbda": {
+    "n": 1,
+    "mean": -0.005
+   },
+   "0xff4cd382": {
+    "n": 1,
+    "mean": -0.187
+   },
+   "Homely-18277": {
+    "n": 1,
+    "mean": 1.214
+   }
+  }
+ },
+ "RC_2": {
+  "all": {
+   "n": 1567,
+   "mean": 0.01,
+   "t": 0.06,
+   "pf": 1.01,
+   "win": 0.556
+  },
+  "traders": 37,
+  "by_trader": {
+   "n": 37,
+   "mean": 0.534,
+   "t": 0.7,
+   "pf": 1.62,
+   "win": 0.486
+  },
+  "half1": {
+   "n": 860,
+   "mean": 0.727,
+   "t": 2.75,
+   "pf": 1.44,
+   "win": 0.565
+  },
+  "half2": {
+   "n": 707,
+   "mean": -0.861,
+   "t": -4.03,
+   "pf": 0.61,
+   "win": 0.546
+  },
+  "months": {
+   "2026-03": {
+    "n": 1,
+    "mean": 0.04
+   },
+   "2026-05": {
+    "n": 1,
+    "mean": -0.074
+   },
+   "2026-07": {
+    "n": 6,
+    "mean": 20.482,
+    "t": 4.24,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 528,
+    "mean": 0.741,
+    "t": 1.98,
+    "pf": 1.38,
+    "win": 0.57
+   },
+   "2026-09": {
+    "n": 389,
+    "mean": -0.099,
+    "t": -0.33,
+    "pf": 0.94,
+    "win": 0.545
+   },
+   "2026-10": {
+    "n": 585,
+    "mean": -0.778,
+    "t": -3.35,
+    "pf": 0.64,
+    "win": 0.525
+   },
+   "2026-11": {
+    "n": 57,
+    "mean": -0.075,
+    "t": -0.16,
+    "pf": 0.93,
+    "win": 0.789
+   }
+  },
+  "okx": {
+   "n": 1562,
+   "mean": 0.01,
+   "t": 0.06,
+   "pf": 1.01,
+   "win": 0.556
+  },
+  "hl": {
+   "n": 5,
+   "mean": 0.197,
+   "t": 0.74,
+   "pf": 2.64,
+   "win": 0.6
+  },
+  "per_trader": {
+   "BestMax": {
+    "n": 275,
+    "mean": -0.705,
+    "t": -4.14,
+    "pf": 0.36,
+    "win": 0.422
+   },
+   "JohnBread49": {
+    "n": 180,
+    "mean": 0.258,
+    "t": 0.76,
+    "pf": 1.21,
+    "win": 0.733
+   },
+   "Kunpeng Plan": {
+    "n": 117,
+    "mean": -2.393,
+    "t": -3.65,
+    "pf": 0.43,
+    "win": 0.239
+   },
+   "Busy-DID-Wombat": {
+    "n": 87,
+    "mean": 2.651,
+    "t": 8.13,
+    "pf": 16.3,
+    "win": 0.862
+   },
+   "chenyuan": {
+    "n": 80,
+    "mean": -2.288,
+    "t": -3.27,
+    "pf": 0.15,
+    "win": 0.662
+   },
+   "AGD88888": {
+    "n": 78,
+    "mean": 0.69,
+    "t": 4.27,
+    "pf": 5.14,
+    "win": 0.718
+   },
+   "xiaojian888999": {
+    "n": 70,
+    "mean": 1.532,
+    "t": 2.3,
+    "pf": 3.19,
+    "win": 0.571
+   },
+   "babaige": {
+    "n": 69,
+    "mean": -0.212,
+    "t": -0.28,
+    "pf": 0.91,
+    "win": 0.42
+   },
+   "ZzzzQing_cc01": {
+    "n": 65,
+    "mean": 3.431,
+    "t": 5.14,
+    "pf": 27.53,
+    "win": 0.954
+   },
+   "Fly-000": {
+    "n": 64,
+    "mean": 1.358,
+    "t": 0.57,
+    "pf": 1.21,
+    "win": 0.406
+   },
+   "IS.K": {
+    "n": 59,
+    "mean": 0.389,
+    "t": 0.54,
+    "pf": 1.38,
+    "win": 0.407
+   },
+   "Ail.Wang": {
+    "n": 58,
+    "mean": -4.732,
+    "t": -3.17,
+    "pf": 0.33,
+    "win": 0.414
+   },
+   "Algo Box": {
+    "n": 57,
+    "mean": -0.103,
+    "t": -0.1,
+    "pf": 0.95,
+    "win": 0.456
+   },
+   "HCSD": {
+    "n": 56,
+    "mean": 0.934,
+    "t": 1.75,
+    "pf": 2.15,
+    "win": 0.554
+   },
+   "Elegant-Layer-Violet": {
+    "n": 37,
+    "mean": 0.319,
+    "t": 0.61,
+    "pf": 1.28,
+    "win": 0.514
+   },
+   "1491": {
+    "n": 33,
+    "mean": -1.849,
+    "t": -1.89,
+    "pf": 0.43,
+    "win": 0.333
+   },
+   "稳稳赚钱": {
+    "n": 26,
+    "mean": -0.799,
+    "t": -0.5,
+    "pf": 0.76,
+    "win": 0.654
+   },
+   "HaveARestin": {
+    "n": 25,
+    "mean": 2.554,
+    "t": 4.54,
+    "pf": 13.62,
+    "win": 0.84
+   },
+   "01pp": {
+    "n": 21,
+    "mean": -0.042,
+    "t": -0.05,
+    "pf": 0.97,
+    "win": 0.667
+   },
+   "Andyvillajr": {
+    "n": 17,
+    "mean": -0.328,
+    "t": -0.99,
+    "pf": 0.36,
+    "win": 0.471
+   },
+   "010pp": {
+    "n": 12,
+    "mean": -1.516,
+    "t": -0.89,
+    "pf": 0.37,
+    "win": 0.667
+   },
+   "SharpMine": {
+    "n": 11,
+    "mean": -2.629,
+    "t": -1.54,
+    "pf": 0.16,
+    "win": 0.364
+   },
+   "ChinatownOG": {
+    "n": 11,
+    "mean": -0.011,
+    "t": -0.0,
+    "pf": 1.0,
+    "win": 0.636
+   },
+   "paboo": {
+    "n": 8,
+    "mean": 23.656,
+    "t": 13.0,
+    "pf": null,
+    "win": 1.0
+   },
+   "Homely-18277": {
+    "n": 8,
+    "mean": -3.399,
+    "t": -1.62,
+    "pf": 0.14,
+    "win": 0.25
+   },
+   "Bare-Payee-Fox": {
+    "n": 7,
+    "mean": 7.738,
+    "t": 3.72,
+    "pf": null,
+    "win": 1.0
+   },
+   "Renoshi": {
+    "n": 7,
+    "mean": 1.225,
+    "t": 5.11,
+    "pf": null,
+    "win": 1.0
+   },
+   "k001": {
+    "n": 6,
+    "mean": -0.292,
+    "t": -0.48,
+    "pf": 0.63,
+    "win": 0.5
+   },
+   "0xe867fbda": {
+    "n": 4,
+    "mean": 0.265,
+    "t": 0.8,
+    "pf": 3.01,
+    "win": 0.75
+   },
+   "LanayaFrv": {
+    "n": 4,
+    "mean": -7.077,
+    "t": -1.33,
+    "pf": 0.13,
+    "win": 0.5
+   },
+   "Queenstown-Traders": {
+    "n": 4,
+    "mean": 2.075,
+    "t": 0.36,
+    "pf": 1.85,
+    "win": 0.5
+   },
+   "Hronos": {
+    "n": 4,
+    "mean": 0.434,
+    "t": 4.27,
+    "pf": null,
+    "win": 1.0
+   },
+   "0xleek.eth": {
+    "n": 2,
+    "mean": -0.571,
+    "t": -0.21,
+    "pf": 0.65,
+    "win": 0.5
+   },
+   "Quaint-SegWit-Laurel": {
+    "n": 2,
+    "mean": 0.774,
+    "t": 0.91,
+    "pf": 21.72,
+    "win": 0.5
+   },
+   "0xff4cd382": {
+    "n": 1,
+    "mean": -0.074
+   },
+   "CryptoPainter": {
+    "n": 1,
+    "mean": -2.799
+   },
+   "ryry^": {
+    "n": 1,
+    "mean": 1.295
+   }
+  }
+ },
+ "RC_6": {
+  "all": {
+   "n": 1567,
+   "mean": 0.15,
+   "t": 0.85,
+   "pf": 1.08,
+   "win": 0.583
+  },
+  "traders": 37,
+  "by_trader": {
+   "n": 37,
+   "mean": 0.624,
+   "t": 0.82,
+   "pf": 1.74,
+   "win": 0.486
+  },
+  "half1": {
+   "n": 860,
+   "mean": 0.819,
+   "t": 3.08,
+   "pf": 1.5,
+   "win": 0.591
+  },
+  "half2": {
+   "n": 707,
+   "mean": -0.665,
+   "t": -3.06,
+   "pf": 0.69,
+   "win": 0.574
+  },
+  "months": {
+   "2026-03": {
+    "n": 1,
+    "mean": -0.005
+   },
+   "2026-05": {
+    "n": 1,
+    "mean": -0.187
+   },
+   "2026-07": {
+    "n": 6,
+    "mean": 20.51,
+    "t": 4.23,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 528,
+    "mean": 0.826,
+    "t": 2.19,
+    "pf": 1.42,
+    "win": 0.587
+   },
+   "2026-09": {
+    "n": 389,
+    "mean": 0.006,
+    "t": 0.02,
+    "pf": 1.0,
+    "win": 0.586
+   },
+   "2026-10": {
+    "n": 585,
+    "mean": -0.561,
+    "t": -2.37,
+    "pf": 0.73,
+    "win": 0.554
+   },
+   "2026-11": {
+    "n": 57,
+    "mean": 0.017,
+    "t": 0.03,
+    "pf": 1.02,
+    "win": 0.807
+   }
+  },
+  "okx": {
+   "n": 1562,
+   "mean": 0.149,
+   "t": 0.84,
+   "pf": 1.08,
+   "win": 0.584
+  },
+  "hl": {
+   "n": 5,
+   "mean": 0.35,
+   "t": 1.06,
+   "pf": 4.18,
+   "win": 0.4
+  },
+  "per_trader": {
+   "BestMax": {
+    "n": 275,
+    "mean": -0.457,
+    "t": -2.67,
+    "pf": 0.53,
+    "win": 0.491
+   },
+   "JohnBread49": {
+    "n": 180,
+    "mean": 0.35,
+    "t": 1.02,
+    "pf": 1.29,
+    "win": 0.756
+   },
+   "Kunpeng Plan": {
+    "n": 117,
+    "mean": -2.14,
+    "t": -3.2,
+    "pf": 0.48,
+    "win": 0.248
+   },
+   "Busy-DID-Wombat": {
+    "n": 87,
+    "mean": 3.048,
+    "t": 8.36,
+    "pf": 23.31,
+    "win": 0.885
+   },
+   "chenyuan": {
+    "n": 80,
+    "mean": -2.199,
+    "t": -3.12,
+    "pf": 0.18,
+    "win": 0.7
+   },
+   "AGD88888": {
+    "n": 78,
+    "mean": 0.841,
+    "t": 4.87,
+    "pf": 6.61,
+    "win": 0.769
+   },
+   "xiaojian888999": {
+    "n": 70,
+    "mean": 1.521,
+    "t": 2.26,
+    "pf": 3.02,
+    "win": 0.6
+   },
+   "babaige": {
+    "n": 69,
+    "mean": -0.214,
+    "t": -0.29,
+    "pf": 0.91,
+    "win": 0.435
+   },
+   "ZzzzQing_cc01": {
+    "n": 65,
+    "mean": 3.605,
+    "t": 5.31,
+    "pf": 29.14,
+    "win": 0.954
+   },
+   "Fly-000": {
+    "n": 64,
+    "mean": 1.474,
+    "t": 0.62,
+    "pf": 1.23,
+    "win": 0.422
+   },
+   "IS.K": {
+    "n": 59,
+    "mean": 0.356,
+    "t": 0.49,
+    "pf": 1.34,
+    "win": 0.39
+   },
+   "Ail.Wang": {
+    "n": 58,
+    "mean": -4.261,
+    "t": -2.73,
+    "pf": 0.38,
+    "win": 0.466
+   },
+   "Algo Box": {
+    "n": 57,
+    "mean": -0.124,
+    "t": -0.12,
+    "pf": 0.94,
+    "win": 0.456
+   },
+   "HCSD": {
+    "n": 56,
+    "mean": 0.783,
+    "t": 1.43,
+    "pf": 1.82,
+    "win": 0.571
+   },
+   "Elegant-Layer-Violet": {
+    "n": 37,
+    "mean": 0.535,
+    "t": 1.01,
+    "pf": 1.51,
+    "win": 0.541
+   },
+   "1491": {
+    "n": 33,
+    "mean": -1.855,
+    "t": -1.88,
+    "pf": 0.44,
+    "win": 0.333
+   },
+   "稳稳赚钱": {
+    "n": 26,
+    "mean": -0.767,
+    "t": -0.48,
+    "pf": 0.77,
+    "win": 0.654
+   },
+   "HaveARestin": {
+    "n": 25,
+    "mean": 2.813,
+    "t": 4.86,
+    "pf": 16.52,
+    "win": 0.88
+   },
+   "01pp": {
+    "n": 21,
+    "mean": -0.09,
+    "t": -0.1,
+    "pf": 0.93,
+    "win": 0.667
+   },
+   "Andyvillajr": {
+    "n": 17,
+    "mean": -0.259,
+    "t": -0.79,
+    "pf": 0.44,
+    "win": 0.471
+   },
+   "010pp": {
+    "n": 12,
+    "mean": -1.559,
+    "t": -0.92,
+    "pf": 0.35,
+    "win": 0.667
+   },
+   "SharpMine": {
+    "n": 11,
+    "mean": -2.941,
+    "t": -1.62,
+    "pf": 0.15,
+    "win": 0.364
+   },
+   "ChinatownOG": {
+    "n": 11,
+    "mean": -0.064,
+    "t": -0.02,
+    "pf": 0.98,
+    "win": 0.636
+   },
+   "paboo": {
+    "n": 8,
+    "mean": 23.777,
+    "t": 12.88,
+    "pf": null,
+    "win": 1.0
+   },
+   "Homely-18277": {
+    "n": 8,
+    "mean": -3.432,
+    "t": -1.65,
+    "pf": 0.13,
+    "win": 0.25
+   },
+   "Bare-Payee-Fox": {
+    "n": 7,
+    "mean": 8.08,
+    "t": 3.81,
+    "pf": null,
+    "win": 1.0
+   },
+   "Renoshi": {
+    "n": 7,
+    "mean": 1.259,
+    "t": 5.34,
+    "pf": null,
+    "win": 1.0
+   },
+   "k001": {
+    "n": 6,
+    "mean": -0.334,
+    "t": -0.57,
+    "pf": 0.58,
+    "win": 0.5
+   },
+   "0xe867fbda": {
+    "n": 4,
+    "mean": 0.485,
+    "t": 1.24,
+    "pf": 6.32,
+    "win": 0.5
+   },
+   "LanayaFrv": {
+    "n": 4,
+    "mean": -6.834,
+    "t": -1.25,
+    "pf": 0.16,
+    "win": 0.5
+   },
+   "Queenstown-Traders": {
+    "n": 4,
+    "mean": 2.103,
+    "t": 0.37,
+    "pf": 1.88,
+    "win": 0.5
+   },
+   "Hronos": {
+    "n": 4,
+    "mean": 0.413,
+    "t": 4.34,
+    "pf": null,
+    "win": 1.0
+   },
+   "0xleek.eth": {
+    "n": 2,
+    "mean": -0.503,
+    "t": -0.18,
+    "pf": 0.69,
+    "win": 0.5
+   },
+   "Quaint-SegWit-Laurel": {
+    "n": 2,
+    "mean": 1.276,
+    "t": 2.12,
+    "pf": null,
+    "win": 1.0
+   },
+   "0xff4cd382": {
+    "n": 1,
+    "mean": -0.187
+   },
+   "CryptoPainter": {
+    "n": 1,
+    "mean": -2.824
+   },
+   "ryry^": {
+    "n": 1,
+    "mean": 1.414
+   }
+  }
+ },
+ "SEL_2": {
+  "all": {
+   "n": 1866,
+   "mean": 0.147,
+   "t": 1.06,
+   "pf": 1.09,
+   "win": 0.638
+  },
+  "traders": 29,
+  "by_trader": {
+   "n": 29,
+   "mean": -0.401,
+   "t": -0.54,
+   "pf": 0.71,
+   "win": 0.517
+  },
+  "half1": {
+   "n": 722,
+   "mean": 0.415,
+   "t": 1.74,
+   "pf": 1.27,
+   "win": 0.634
+  },
+  "half2": {
+   "n": 1144,
+   "mean": -0.023,
+   "t": -0.14,
+   "pf": 0.99,
+   "win": 0.64
+  },
+  "months": {
+   "2026-07": {
+    "n": 4,
+    "mean": 17.541,
+    "t": 2.58,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 320,
+    "mean": 0.03,
+    "t": 0.08,
+    "pf": 1.01,
+    "win": 0.644
+   },
+   "2026-09": {
+    "n": 599,
+    "mean": 0.195,
+    "t": 0.77,
+    "pf": 1.12,
+    "win": 0.619
+   },
+   "2026-10": {
+    "n": 889,
+    "mean": 0.089,
+    "t": 0.49,
+    "pf": 1.05,
+    "win": 0.636
+   },
+   "2026-11": {
+    "n": 54,
+    "mean": -0.035,
+    "t": -0.07,
+    "pf": 0.97,
+    "win": 0.815
+   }
+  },
+  "okx": {
+   "n": 1866,
+   "mean": 0.147,
+   "t": 1.06,
+   "pf": 1.09,
+   "win": 0.638
+  },
+  "hl": {
+   "n": 0,
+   "mean": null
+  },
+  "per_trader": {
+   "JohnBread49": {
+    "n": 460,
+    "mean": 0.93,
+    "t": 3.73,
+    "pf": 1.78,
+    "win": 0.735
+   },
+   "Busy-DID-Wombat": {
+    "n": 186,
+    "mean": 1.846,
+    "t": 5.38,
+    "pf": 4.92,
+    "win": 0.753
+   },
+   "xiaojian888999": {
+    "n": 151,
+    "mean": 0.376,
+    "t": 1.03,
+    "pf": 1.42,
+    "win": 0.536
+   },
+   "Kunpeng Plan": {
+    "n": 117,
+    "mean": -2.393,
+    "t": -3.65,
+    "pf": 0.43,
+    "win": 0.239
+   },
+   "ZzzzQing_cc01": {
+    "n": 107,
+    "mean": 2.666,
+    "t": 5.97,
+    "pf": 23.42,
+    "win": 0.879
+   },
+   "AGD88888": {
+    "n": 78,
+    "mean": 0.69,
+    "t": 4.27,
+    "pf": 5.14,
+    "win": 0.718
+   },
+   "chenyuan": {
+    "n": 77,
+    "mean": -2.973,
+    "t": -3.93,
+    "pf": 0.09,
+    "win": 0.61
+   },
+   "TP-Jason": {
+    "n": 73,
+    "mean": 0.19,
+    "t": 1.34,
+    "pf": 1.7,
+    "win": 0.685
+   },
+   "010pp": {
+    "n": 65,
+    "mean": -0.521,
+    "t": -0.95,
+    "pf": 0.7,
+    "win": 0.538
+   },
+   "Ail.Wang": {
+    "n": 64,
+    "mean": -4.297,
+    "t": -3.03,
+    "pf": 0.36,
+    "win": 0.469
+   },
+   "Andyvillajr": {
+    "n": 57,
+    "mean": -0.27,
+    "t": -1.49,
+    "pf": 0.47,
+    "win": 0.491
+   },
+   "HaveARestin": {
+    "n": 57,
+    "mean": 0.395,
+    "t": 0.6,
+    "pf": 1.28,
+    "win": 0.702
+   },
+   "1491": {
+    "n": 50,
+    "mean": -0.025,
+    "t": -0.03,
+    "pf": 0.99,
+    "win": 0.5
+   },
+   "Fly-000": {
+    "n": 42,
+    "mean": -3.975,
+    "t": -1.98,
+    "pf": 0.45,
+    "win": 0.357
+   },
+   "稳稳赚钱": {
+    "n": 40,
+    "mean": -0.822,
+    "t": -0.63,
+    "pf": 0.77,
+    "win": 0.65
+   },
+   "Elegant-Layer-Violet": {
+    "n": 39,
+    "mean": 0.337,
+    "t": 0.68,
+    "pf": 1.31,
+    "win": 0.513
+   },
+   "Renoshi": {
+    "n": 38,
+    "mean": -0.091,
+    "t": -0.19,
+    "pf": 0.92,
+    "win": 0.658
+   },
+   "k001": {
+    "n": 30,
+    "mean": 0.837,
+    "t": 1.42,
+    "pf": 2.11,
+    "win": 0.733
+   },
+   "Hronos": {
+    "n": 27,
+    "mean": 0.171,
+    "t": 1.21,
+    "pf": 2.05,
+    "win": 0.778
+   },
+   "BestMax": {
+    "n": 25,
+    "mean": -0.114,
+    "t": -0.55,
+    "pf": 0.75,
+    "win": 0.64
+   },
+   "paboo": {
+    "n": 24,
+    "mean": -1.395,
+    "t": -0.69,
+    "pf": 0.68,
+    "win": 0.625
+   },
+   "ryry^": {
+    "n": 14,
+    "mean": 2.313,
+    "t": 2.34,
+    "pf": 10.12,
+    "win": 0.714
+   },
+   "Shallow-Pair-Frog": {
+    "n": 13,
+    "mean": 4.344,
+    "t": 1.5,
+    "pf": 6.24,
+    "win": 0.692
+   },
+   "Queenstown-Traders": {
+    "n": 10,
+    "mean": 2.602,
+    "t": 1.12,
+    "pf": 3.53,
+    "win": 0.7
+   },
+   "Homely-18277": {
+    "n": 7,
+    "mean": -4.335,
+    "t": -2.01,
+    "pf": 0.04,
+    "win": 0.143
+   },
+   "Bare-Payee-Fox": {
+    "n": 7,
+    "mean": 7.738,
+    "t": 3.72,
+    "pf": null,
+    "win": 1.0
+   },
+   "0xleek.eth": {
+    "n": 4,
+    "mean": -2.756,
+    "t": -0.56,
+    "pf": 0.43,
+    "win": 0.5
+   },
+   "LanayaFrv": {
+    "n": 2,
+    "mean": -16.28,
+    "t": -686.65,
+    "pf": 0.0,
+    "win": 0.0
+   },
+   "ChinatownOG": {
+    "n": 2,
+    "mean": 3.167,
+    "t": 1.13,
+    "pf": null,
+    "win": 1.0
+   }
+  }
+ },
+ "SEL_6": {
+  "all": {
+   "n": 1866,
+   "mean": 0.284,
+   "t": 2.03,
+   "pf": 1.17,
+   "win": 0.658
+  },
+  "traders": 29,
+  "by_trader": {
+   "n": 29,
+   "mean": -0.305,
+   "t": -0.41,
+   "pf": 0.77,
+   "win": 0.586
+  },
+  "half1": {
+   "n": 722,
+   "mean": 0.513,
+   "t": 2.12,
+   "pf": 1.34,
+   "win": 0.659
+  },
+  "half2": {
+   "n": 1144,
+   "mean": 0.139,
+   "t": 0.82,
+   "pf": 1.08,
+   "win": 0.657
+  },
+  "months": {
+   "2026-07": {
+    "n": 4,
+    "mean": 17.561,
+    "t": 2.57,
+    "pf": null,
+    "win": 1.0
+   },
+   "2026-08": {
+    "n": 320,
+    "mean": 0.159,
+    "t": 0.41,
+    "pf": 1.08,
+    "win": 0.656
+   },
+   "2026-09": {
+    "n": 599,
+    "mean": 0.283,
+    "t": 1.1,
+    "pf": 1.18,
+    "win": 0.648
+   },
+   "2026-10": {
+    "n": 889,
+    "mean": 0.267,
+    "t": 1.46,
+    "pf": 1.17,
+    "win": 0.655
+   },
+   "2026-11": {
+    "n": 54,
+    "mean": 0.02,
+    "t": 0.04,
+    "pf": 1.02,
+    "win": 0.815
+   }
+  },
+  "okx": {
+   "n": 1866,
+   "mean": 0.284,
+   "t": 2.03,
+   "pf": 1.17,
+   "win": 0.658
+  },
+  "hl": {
+   "n": 0,
+   "mean": null
+  },
+  "per_trader": {
+   "JohnBread49": {
+    "n": 460,
+    "mean": 1.063,
+    "t": 4.2,
+    "pf": 1.9,
+    "win": 0.75
+   },
+   "Busy-DID-Wombat": {
+    "n": 186,
+    "mean": 2.09,
+    "t": 5.92,
+    "pf": 5.76,
+    "win": 0.796
+   },
+   "xiaojian888999": {
+    "n": 151,
+    "mean": 0.439,
+    "t": 1.2,
+    "pf": 1.51,
+    "win": 0.563
+   },
+   "Kunpeng Plan": {
+    "n": 117,
+    "mean": -2.14,
+    "t": -3.2,
+    "pf": 0.48,
+    "win": 0.248
+   },
+   "ZzzzQing_cc01": {
+    "n": 107,
+    "mean": 2.806,
+    "t": 6.18,
+    "pf": 26.51,
+    "win": 0.916
+   },
+   "AGD88888": {
+    "n": 78,
+    "mean": 0.841,
+    "t": 4.87,
+    "pf": 6.61,
+    "win": 0.769
+   },
+   "chenyuan": {
+    "n": 77,
+    "mean": -2.766,
+    "t": -3.72,
+    "pf": 0.11,
+    "win": 0.649
+   },
+   "TP-Jason": {
+    "n": 73,
+    "mean": 0.287,
+    "t": 1.94,
+    "pf": 2.1,
+    "win": 0.699
+   },
+   "010pp": {
+    "n": 65,
+    "mean": -0.61,
+    "t": -1.12,
+    "pf": 0.66,
+    "win": 0.523
+   },
+   "Ail.Wang": {
+    "n": 64,
+    "mean": -3.939,
+    "t": -2.69,
+    "pf": 0.4,
+    "win": 0.5
+   },
+   "Andyvillajr": {
+    "n": 57,
+    "mean": -0.191,
+    "t": -1.06,
+    "pf": 0.59,
+    "win": 0.544
+   },
+   "HaveARestin": {
+    "n": 57,
+    "mean": 0.629,
+    "t": 0.93,
+    "pf": 1.46,
+    "win": 0.737
+   },
+   "1491": {
+    "n": 50,
+    "mean": 0.046,
+    "t": 0.06,
+    "pf": 1.02,
+    "win": 0.5
+   },
+   "Fly-000": {
+    "n": 42,
+    "mean": -3.958,
+    "t": -1.97,
+    "pf": 0.46,
+    "win": 0.381
+   },
+   "稳稳赚钱": {
+    "n": 40,
+    "mean": -0.792,
+    "t": -0.6,
+    "pf": 0.78,
+    "win": 0.65
+   },
+   "Elegant-Layer-Violet": {
+    "n": 39,
+    "mean": 0.561,
+    "t": 1.12,
+    "pf": 1.56,
+    "win": 0.564
+   },
+   "Renoshi": {
+    "n": 38,
+    "mean": -0.085,
+    "t": -0.17,
+    "pf": 0.93,
+    "win": 0.658
+   },
+   "k001": {
+    "n": 30,
+    "mean": 0.903,
+    "t": 1.56,
+    "pf": 2.23,
+    "win": 0.733
+   },
+   "Hronos": {
+    "n": 27,
+    "mean": 0.237,
+    "t": 1.69,
+    "pf": 2.6,
+    "win": 0.815
+   },
+   "BestMax": {
+    "n": 25,
+    "mean": 0.053,
+    "t": 0.25,
+    "pf": 1.14,
+    "win": 0.6
+   },
+   "paboo": {
+    "n": 24,
+    "mean": -1.335,
+    "t": -0.66,
+    "pf": 0.7,
+    "win": 0.583
+   },
+   "ryry^": {
+    "n": 14,
+    "mean": 2.31,
+    "t": 2.28,
+    "pf": 9.64,
+    "win": 0.643
+   },
+   "Shallow-Pair-Frog": {
+    "n": 13,
+    "mean": 4.312,
+    "t": 1.49,
+    "pf": 6.36,
+    "win": 0.692
+   },
+   "Queenstown-Traders": {
+    "n": 10,
+    "mean": 2.579,
+    "t": 1.12,
+    "pf": 3.57,
+    "win": 0.6
+   },
+   "Homely-18277": {
+    "n": 7,
+    "mean": -4.352,
+    "t": -2.02,
+    "pf": 0.04,
+    "win": 0.143
+   },
+   "Bare-Payee-Fox": {
+    "n": 7,
+    "mean": 8.08,
+    "t": 3.81,
+    "pf": null,
+    "win": 1.0
+   },
+   "0xleek.eth": {
+    "n": 4,
+    "mean": -2.797,
+    "t": -0.58,
+    "pf": 0.42,
+    "win": 0.5
+   },
+   "LanayaFrv": {
+    "n": 2,
+    "mean": -16.28,
+    "t": -686.65,
+    "pf": 0.0,
+    "win": 0.0
+   },
+   "ChinatownOG": {
+    "n": 2,
+    "mean": 3.161,
+    "t": 1.1,
+    "pf": null,
+    "win": 1.0
+   }
+  }
+ },
+ "verdict": {
+  "RA": "работает вперёд",
+  "RB": "работает вперёд",
+  "RC": "не доказано"
+ }
+}

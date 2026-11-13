@@ -304,6 +304,8 @@
     { id: 'reversal', name: 'Разворот (тест)', short: 'Разворот', icon: 'strategies', owner: true },
     // 13.11: «Альты от китов (тест)» — paper desk on smart-money accumulation: owner-only (vip/smart_alts.js, ../smart_alts.js)
     { id: 'smart_alts', name: 'Альты от китов (тест)', short: 'Альты', icon: 'strategies', owner: true },
+    // 13.11: «Иван · тест-стратегии» — Ivan's Bybit demo accounts, read-only keys, paper copy: owner-only (vip/ivan_tests.js)
+    { id: 'ivan_tests', name: 'Иван · тест-стратегии', short: 'Иван ×3', icon: 'strategies', owner: true },
     { id: 'opps', name: 'Другие возможности', short: 'Другое', icon: 'opps' },
     { id: 'demo', name: 'Live Demo', short: 'Live', icon: 'demo' },
     { id: 'system', name: 'Система', short: 'Система', icon: 'system' },

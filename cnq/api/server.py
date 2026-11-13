@@ -54,7 +54,7 @@ from cnq.agents.llm import LLM, PROVIDERS
 
 from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, owner_auth, owner_data, pf_parse, \
     pf_review, spot_top, tts
-from . import peter as peter_desk, peter_cloud, reversal as reversal_api, listing_short as listing_short_api, smart_alts as smart_alts_api
+from . import ivan_tests as ivan_tests_api, peter as peter_desk, peter_cloud, reversal as reversal_api, listing_short as listing_short_api, smart_alts as smart_alts_api
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -138,6 +138,8 @@ class Api:
         # 12.11: the paper test desk «Шорт листингов» — owner-only, kept in <run>/data/listing_short (cnq/api/listing_short.py)
         self.listing_short = listing_short_api.ListingShort(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "listing_short"))
         # 13.11: the paper test desk «Альты от китов» — owner-only, kept in <run>/data/smart_alts (cnq/api/smart_alts.py)
+        # 13.11: «Иван · тест-стратегии» — Ivan's Bybit demo accounts, read-only keys, observation + paper copy (cnq/api/ivan_tests.py)
+        self.ivan_tests = ivan_tests_api.IvanTests(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "ivan_tests"))
         self.smart_alts = smart_alts_api.SmartAlts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "smart_alts"), web_dir)
         self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
         try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
@@ -499,6 +501,15 @@ class Api:
             return deny
         if method == "POST" and path == "/v2/owner/peter/token/rotate":     # 11.11: «Новый токен» for Peter's MT5 bridge
             return self.peter.token_view(rotate=True)
+        if method == "POST" and path in ("/v2/owner/ivan_tests/add", "/v2/owner/ivan_tests/check", "/v2/owner/ivan_tests/remove"):
+            try:                                                            # 13.11: «Иван · тест-стратегии» (owner session only)
+                form = json.loads((body or b"{}").decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                return 400, {"error": "bad_json"}
+            form = form if isinstance(form, dict) else {}
+            if path.endswith("/add"):
+                return self.ivan_tests.add(form)
+            return (self.ivan_tests.check if path.endswith("/check") else self.ivan_tests.remove)(str(form.get("id") or ""))
         if method == "POST" and path == "/v2/owner/peter/cloud":            # 11.11 option B: the form «Подключение через пароль инвестора»
             try:
                 form = json.loads((body or b"{}").decode("utf-8"))
@@ -536,6 +547,8 @@ class Api:
             return self.reversal.desk()
         if path == "/v2/owner/listing_short":                          # 12.11: «Шорт листингов (тест)», owner only
             return self.listing_short.desk()
+        if path == "/v2/owner/ivan_tests":                             # 13.11: secrets never returned — names, hosts, masked keys
+            return 200, self.ivan_tests.view()
         if path == "/v2/owner/smart_alts":                             # 13.11: «Альты от китов (тест)», owner only
             return self.smart_alts.desk()
         if path == "/v2/owner/peter":                                  # 11.11: «Питер» (MT5), owner only
@@ -901,6 +914,7 @@ def main() -> int:
     api.tts.attach_installer()
     api.reversal.start()                     # 11.11: «Разворот (тест)» — paper, every 10 minutes, owner-only output
     api.listing_short.start()                # 12.11: «Шорт листингов (тест)» — paper, every 10 minutes, owner-only output
+    api.ivan_tests.start()                   # 13.11: «Иван · тест-стратегии» — every 90 s while accounts are connected
     api.smart_alts.start()                   # 13.11: «Альты от китов (тест)» — paper, every 10 minutes, owner-only output
     api.peter_cloud.start()                  # 11.11: «Питер» through MetaApi — polls only while the owner has connected it
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))

@@ -6,6 +6,8 @@ config/owner_overrides.json (in the repo; the server gets it with the engine's g
                path, and the «Киты» paper desk closes its copy). New trades after «set» are not touched by «close».
   • no_short — no short in that coin is held or opened until «until» (a held one is closed the same way);
   • no_long  — the same for longs.
+  • day_stop_ok — trade ids («W-ARB-L-…») the owner explicitly approved to open while the futures day stop holds (14.11);
+               all other entry checks still apply; expires at «day_stop_ok_until» (or «until»).
 After «until» the file does nothing. A missing / broken file = no overrides (it can only REMOVE trades, never add one).
 Coins are matched by their base: HYPE, HYPE-USDT-SWAP, kPEPE, 1000PEPE, PEPE all compare as the base coin.
 Stdlib only."""
@@ -58,7 +60,16 @@ def active(ov: dict | None, now: int | None = None) -> dict:
     # 05.11: copies the owner closed by hand on OKX (trade ids «W-…»): the desk closes them too and never re-opens them (no expiry)
     return {"close": pick("close"), "no_short": pick("no_short"), "no_long": pick("no_long"), "set": _ms(ov.get("set")),
             "until": until, "note_ru": ov.get("note_ru") or "решение владельца",
-            "closed_ids": {str(x) for x in (ov.get("closed_ids") or []) if x}}
+            "closed_ids": {str(x) for x in (ov.get("closed_ids") or []) if x},
+            # 14.11 (owner, real money: «Давай ARB лонг Ивана поставим»): these trade ids may open through the futures day stop;
+            # every other check (follow list, join window, size, caps) stays. Own expiry «day_stop_ok_until», else «until».
+            "day_stop_ok": {str(x).split(":")[-1] for x in (ov.get("day_stop_ok") or []) if x}
+            if now < (_ms(ov.get("day_stop_ok_until")) or until) else set()}
+
+
+def day_stop_ok(a: dict, tid) -> bool:
+    """the owner explicitly let this trade open while the futures day stop holds (matched by «W-…» id, desk prefix ignored)"""
+    return str(tid or "").split(":")[-1] in (a.get("day_stop_ok") or set())
 
 
 def blocked(a: dict, sym, side: str, opened=None) -> str | None:

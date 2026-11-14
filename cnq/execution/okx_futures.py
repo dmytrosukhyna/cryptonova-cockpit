@@ -1120,8 +1120,13 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
         cap = {**cap, "risk": r_now}
         st["risk_now"] = r_now
         if st.get("day_stop") == day:
-            res["skipped"] += [{"id": tid, "why": "дневной стоп: убыток дня ≥ 3% бюджета фьючерсов — новых входов до завтра (UTC)"} for tid, _ in fresh]
-            fresh = []
+            # 14.11 (owner, explicit «да» for one trade): config/owner_overrides.json day_stop_ok lets a named trade through
+            ok = [(tid, w) for tid, w in fresh if ov.day_stop_ok(ova, tid)]
+            for tid, _ in ok:
+                log({"ev": "day_stop_owner_ok", "id": tid, "day_pnl": st.get("day_pnl")}, log_path)
+            res["skipped"] += [{"id": tid, "why": "дневной стоп: убыток дня ≥ 3% бюджета фьючерсов — новых входов до завтра (UTC)"}
+                               for tid, _ in fresh if not ov.day_stop_ok(ova, tid)]
+            fresh = ok
         pos = ctx.positions(fresh=True)
         avail = ctx.avail_usdt() if fresh else 0.0
         parts = desk_parts(ds, bud["usd"], st.get("sel"))

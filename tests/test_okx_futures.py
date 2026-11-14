@@ -241,6 +241,18 @@ def test_daily_loss_stop_blocks_new_entries_for_the_day():
     assert r["opened"] == 0 and not swap_orders(fk) and "дневной стоп" in r["skipped"][0]["why"]
     st = fu.load_state(e)
     assert st["day_stop"] == "2027-01-15" and fu.status(e)["day_stop"] is False or st["day_stop"] == "2027-01-15"
+    import json                                  # 14.11: a trade the owner named in day_stop_ok opens through the day stop
+    p = os.path.join(tempfile.mkdtemp(), "ov.json")
+    tid = F.trade()["id"]
+    with open(p, "w") as f:
+        json.dump({"set": NOW, "until": NOW + 86_400_000, "day_stop_ok": ["ivan:" + tid]}, f)
+    fk3 = F.FakeOkx(hist=[{"instId": "SOL-USDT-SWAP", "realizedPnl": str(-(budget * 0.03 + 1)), "uTime": str(NOW - 3600_000)}])
+    e3 = F.env(CNQ_OWNER_OVERRIDES=p)
+    assert run(fk3, e3, F.desks(F.trade(), F.trade("T9", "ETH", "LONG", 3000.0, 2900.0, 3300.0)))["opened"] == 1
+    assert {o["instId"] for o in swap_orders(fk3)} >= {"SOL-USDT-SWAP"} and "ETH-USDT-SWAP" not in fk3.pos
+    with open(p, "w") as f:
+        json.dump({"set": NOW, "until": NOW + 1000, "day_stop_ok": [tid]}, f)   # expired → the day stop holds again
+    assert run(F.FakeOkx(hist=fk3.hist), F.env(CNQ_OWNER_OVERRIDES=p), F.desks(F.trade()), NOW + 5000)["opened"] == 0
     fk2 = F.FakeOkx(hist=[{"instId": "SOL-USDT-SWAP", "realizedPnl": "-10", "uTime": str(NOW - 86_400_000 * 2)}])   # yesterday's loss
     assert run(fk2, F.env(), F.desks(F.trade()))["opened"] == 1
 

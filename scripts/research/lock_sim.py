@@ -31,7 +31,7 @@ LOCK_N, LOCK_LOSS, REVIEW = 7, 0.10, 3 * DAY
 
 
 def simulate(trades, mark, cost, mode, X=3.0, max_pos=15, pause=0):
-    """mode: 'live' | 'none' | 'pause'. Returns per-day P&L (% of the budget) and rule stats."""
+    """mode: 'live' | 'none' | 'pause' | 'hold' (backlog 165: as live, but the open copies are not closed at the threshold). Returns per-day P&L (% of the budget) and rule stats."""
     ev = sorted(trades, key=lambda x: x["t_in"])
     if not ev: return {"days": {}}
     T0 = ev[0]["t_in"] // DAY * DAY
@@ -75,8 +75,9 @@ def simulate(trades, mark, cost, mode, X=3.0, max_pos=15, pause=0):
             for p in mine:
                 r = Bk._cut(p, t, mark, cost)
                 if r is None or not math.isfinite(r): continue        # no price: the copy runs to its own exit
+                st_["cut_n"] += 1; st_["cut_ret"].append(r); st_["own_ret"].append(p["ret"]); st_.setdefault("cut_t", []).append(t)
+                if mode == "hold": continue                             # backlog 165: he leaves, but his open copies run to their own exit
                 openp.remove(p); book(t // DAY, r * NOTIONAL)
-                st_["cut_n"] += 1; st_["cut_ret"].append(r); st_["own_ret"].append(p["ret"])
             wait = pause if mode == "pause" else 0
             k = (t + wait - T0) // REVIEW + 1
             out[w] = T0 + k * REVIEW

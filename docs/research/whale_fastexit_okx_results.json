@@ -1,0 +1,240 @@
+{
+ "made": 1793810278130,
+ "whales": 30,
+ "top10": {
+  "n": 2648,
+  "days": 90,
+  "whales": 27,
+  "cut": {
+   "taken": 506,
+   "busy": 654,
+   "drops": 40,
+   "copies_at_threshold": 94,
+   "skipped_out_n": 312,
+   "skipped_out_mean": -0.153,
+   "all": {
+    "total": -10.32,
+    "n_days": 90.0,
+    "worst_day": -6.46,
+    "max_dd": -44.4,
+    "lose_streak": 7.0
+   },
+   "h1": {
+    "total": -21.37,
+    "n_days": 45.0,
+    "worst_day": -6.46,
+    "max_dd": -27.69,
+    "lose_streak": 7.0
+   },
+   "h2": {
+    "total": 11.05,
+    "n_days": 45.0,
+    "worst_day": -4.34,
+    "max_dd": -17.1,
+    "lose_streak": 6.0
+   }
+  },
+  "hold": {
+   "taken": 248,
+   "busy": 155,
+   "drops": 41,
+   "copies_at_threshold": 82,
+   "skipped_out_n": 260,
+   "skipped_out_mean": 0.06,
+   "all": {
+    "total": 5.7,
+    "n_days": 90.0,
+    "worst_day": -3.35,
+    "max_dd": -9.63,
+    "lose_streak": 3.0
+   },
+   "h1": {
+    "total": 2.19,
+    "n_days": 45.0,
+    "worst_day": -3.35,
+    "max_dd": -9.63,
+    "lose_streak": 3.0
+   },
+   "h2": {
+    "total": 3.51,
+    "n_days": 45.0,
+    "worst_day": -2.51,
+    "max_dd": -4.58,
+    "lose_streak": 3.0
+   }
+  },
+  "per_copy": {
+   "all": {
+    "n": 94,
+    "cut_mean": -4.181,
+    "own_mean": -3.183,
+    "hold_minus_cut": 0.999,
+    "t": 1.42,
+    "worst_cut": -14.27,
+    "worst_own": -18.86,
+    "own_better_share": 0.638,
+    "own_stopped": 15
+   },
+   "h1": {
+    "n": 54,
+    "cut_mean": -4.0,
+    "own_mean": -3.946,
+    "hold_minus_cut": 0.053,
+    "t": 0.06,
+    "worst_cut": -13.92,
+    "worst_own": -18.86,
+    "own_better_share": 0.593,
+    "own_stopped": 10
+   },
+   "h2": {
+    "n": 40,
+    "cut_mean": -4.427,
+    "own_mean": -2.152,
+    "hold_minus_cut": 2.275,
+    "t": 1.95,
+    "worst_cut": -14.27,
+    "worst_own": -16.19,
+    "own_better_share": 0.7,
+    "own_stopped": 5
+   }
+  },
+  "hold_minus_cut": {
+   "all": {
+    "d": 16.02,
+    "n": 78,
+    "t": 0.72
+   },
+   "h1": {
+    "d": 23.56,
+    "n": 38,
+    "t": 1.74
+   },
+   "h2": {
+    "d": -7.55,
+    "n": 40,
+    "t": -0.44
+   },
+   "risk_ok": true,
+   "worst_ok": false,
+   "pass_here": false
+  }
+ },
+ "all_bar": {
+  "n": 3316,
+  "days": 90,
+  "whales": 30,
+  "cut": {
+   "taken": 503,
+   "busy": 473,
+   "drops": 42,
+   "copies_at_threshold": 97,
+   "skipped_out_n": 345,
+   "skipped_out_mean": -0.337,
+   "all": {
+    "total": -27.44,
+    "n_days": 90.0,
+    "worst_day": -6.46,
+    "max_dd": -50.49,
+    "lose_streak": 7.0
+   },
+   "h1": {
+    "total": -27.04,
+    "n_days": 45.0,
+    "worst_day": -6.46,
+    "max_dd": -32.97,
+    "lose_streak": 7.0
+   },
+   "h2": {
+    "total": -0.4,
+    "n_days": 45.0,
+    "worst_day": -5.42,
+    "max_dd": -17.51,
+    "lose_streak": 3.0
+   }
+  },
+  "hold": {
+   "taken": 230,
+   "busy": 156,
+   "drops": 49,
+   "copies_at_threshold": 90,
+   "skipped_out_n": 339,
+   "skipped_out_mean": 0.287,
+   "all": {
+    "total": -8.91,
+    "n_days": 90.0,
+    "worst_day": -3.89,
+    "max_dd": -12.04,
+    "lose_streak": 4.0
+   },
+   "h1": {
+    "total": -0.93,
+    "n_days": 45.0,
+    "worst_day": -3.35,
+    "max_dd": -9.63,
+    "lose_streak": 3.0
+   },
+   "h2": {
+    "total": -7.98,
+    "n_days": 45.0,
+    "worst_day": -3.89,
+    "max_dd": -12.04,
+    "lose_streak": 4.0
+   }
+  },
+  "per_copy": {
+   "all": {
+    "n": 97,
+    "cut_mean": -4.082,
+    "own_mean": -3.626,
+    "hold_minus_cut": 0.456,
+    "t": 0.67,
+    "worst_cut": -13.92,
+    "worst_own": -18.86,
+    "own_better_share": 0.619,
+    "own_stopped": 16
+   },
+   "h1": {
+    "n": 58,
+    "cut_mean": -3.977,
+    "own_mean": -3.817,
+    "hold_minus_cut": 0.16,
+    "t": 0.19,
+    "worst_cut": -13.92,
+    "worst_own": -18.86,
+    "own_better_share": 0.603,
+    "own_stopped": 11
+   },
+   "h2": {
+    "n": 39,
+    "cut_mean": -4.238,
+    "own_mean": -3.34,
+    "hold_minus_cut": 0.897,
+    "t": 0.79,
+    "worst_cut": -13.54,
+    "worst_own": -16.08,
+    "own_better_share": 0.641,
+    "own_stopped": 5
+   }
+  },
+  "hold_minus_cut": {
+   "all": {
+    "d": 18.53,
+    "n": 79,
+    "t": 0.89
+   },
+   "h1": {
+    "d": 26.11,
+    "n": 38,
+    "t": 1.93
+   },
+   "h2": {
+    "d": -7.58,
+    "n": 41,
+    "t": -0.5
+   },
+   "risk_ok": true,
+   "worst_ok": false,
+   "pass_here": false
+  }
+ }
+}

@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "stops (bn_whale_stops.py), size (backlog 92), impulse (backlog 96), delay (backlog 88), daystop (backlog 90), join (backlog 103), regime (backlog 102), dispute (backlog 112), book (backlog 101), cohort (backlog 106), fresh (backlog 116), lockloss (backlog 117), norepeat (backlog 123), trail (backlog 130), same2 (backlog 131), side (backlog 132), agree (backlog 127), rotbar (backlog 139), hedge (backlog 129), exitanat (backlog 135) early (backlog 144), selag (backlog 146), selroll (backlog 149) sel21 (backlog 152) or joindepth (backlog 164)"
+        description: "stops (bn_whale_stops.py), size (backlog 92), impulse (backlog 96), delay (backlog 88), daystop (backlog 90), join (backlog 103), regime (backlog 102), dispute (backlog 112), book (backlog 101), cohort (backlog 106), fresh (backlog 116), lockloss (backlog 117), norepeat (backlog 123), trail (backlog 130), same2 (backlog 131), side (backlog 132), agree (backlog 127), rotbar (backlog 139), hedge (backlog 129), exitanat (backlog 135) early (backlog 144), selag (backlog 146), selroll (backlog 149) or sel21 (backlog 152)"
         type: choice
-        options: [stops, size, impulse, delay, daystop, join, regime, dispute, book, cohort, fresh, lockloss, norepeat, trail, same2, side, agree, rotbar, hedge, exitanat, early, selag, selroll, sel21, joindepth]
+        options: [stops, size, impulse, delay, daystop, join, regime, dispute, book, cohort, fresh, lockloss, norepeat, trail, same2, side, agree, rotbar, hedge, exitanat, early, selag, selroll, sel21]
         default: stops
 permissions:
   contents: read

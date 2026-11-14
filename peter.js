@@ -1,0 +1,131 @@
+/* CRYPTO NOVΛ — «Питер» (11.11.2026): an MT5 gold trader under observation, owner views only. One renderer for both panels
+   (app.html owner session and vip.html isOwner). Data: GET /v2/owner/peter (cnq/api/peter.py) — never a public file.
+   Observation only: no orders anywhere. */
+(function () {
+  'use strict';
+  if (window.CNPeter) return;
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = (v, d) => (v == null || !isFinite(v) ? '—' : (+v < 0 ? '−' : '') + Math.abs(+v).toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d }));
+  const usd = (v, d = 2) => (v == null || !isFinite(v) ? '—' : (+v < 0 ? '−' : '') + '$' + Math.abs(+v).toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d }));
+  const pct = (v, d = 2) => (v == null || !isFinite(v) ? '—' : (+v > 0 ? '+' : +v < 0 ? '−' : '') + Math.abs(+v).toLocaleString('ru-RU', { maximumFractionDigits: d }) + '%');
+  const cls = (v) => (+v > 0 ? 'pos' : +v < 0 ? 'neg' : '');
+  const dt = (t) => (t ? new Date(t).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
+  const hold = (m) => (m == null ? '—' : m < 60 ? m + ' мин' : m < 1440 ? (m / 60).toFixed(1).replace('.', ',') + ' ч' : (m / 1440).toFixed(1).replace('.', ',') + ' д');
+  const side = (s) => (s === 'LONG' ? '▲ лонг' : s === 'SHORT' ? '▼ шорт' : '—');
+  const CSS = `.pt-k{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:8px 0 12px}.pt-k>div{border:1px solid var(--line,rgba(127,127,127,.25));border-radius:10px;padding:8px 10px;display:grid;gap:2px}
+.pt-k small{color:var(--muted,#8a94a6);font-size:11px}.pt-k b{font-size:16px}.pt-t{width:100%;border-collapse:collapse;font-size:12.5px}.pt-t th,.pt-t td{padding:5px 6px;border-bottom:1px solid var(--line,rgba(127,127,127,.18));text-align:right;white-space:nowrap}
+.pt-t th:first-child,.pt-t td:first-child{text-align:left}.pt-w{overflow-x:auto}.pt-h{font-size:13px;margin:12px 0 4px}.pt-d{display:flex;gap:6px;flex-wrap:wrap;font-size:12px}.pt-d span{border:1px solid var(--line,rgba(127,127,127,.25));border-radius:8px;padding:3px 8px}
+.pt-c{width:100%;height:90px;display:block}.pt-m{color:var(--muted,#8a94a6);font-size:12px;line-height:1.5}.pt .pos{color:var(--pos,#22c55e)}.pt .neg{color:var(--neg,#ef4444)}
+@media (max-width:760px){.pt-k{grid-template-columns:1fr 1fr}.pt-t td,.pt-t th{white-space:normal}}`;
+
+  function curve(c) {
+    const pts = (c || []).filter((p) => Array.isArray(p) && isFinite(p[1]));
+    if (pts.length < 2) return '';
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const X = (x) => ((x - x0) / Math.max(1, x1 - x0)) * 300, Y = (y) => 86 - ((y - y0) / Math.max(1e-9, y1 - y0)) * 80;
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' ');
+    const up = ys[ys.length - 1] >= ys[0];
+    return `<svg class="pt-c" viewBox="0 0 300 90" preserveAspectRatio="none" aria-label="Условные $10 000"><path d="${d}" fill="none" stroke="${up ? 'var(--pos,#22c55e)' : 'var(--neg,#ef4444)'}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+
+  function ctxLine(c) {
+    if (!c) return '—';
+    const bits = [(c.sessions || []).join(' / '), c.weekday];
+    if (c.vs_sma200_D1_pct != null) bits.push('к SMA200 D1 ' + pct(c.vs_sma200_D1_pct));
+    if (c.atr14_D1_pct != null) bits.push('ATR D1 ' + num(c.atr14_D1_pct, 2) + '%');
+    return esc(bits.filter(Boolean).join(' · '));
+  }
+
+  function html(R, opts) {
+    opts = opts || {};
+    const head = `<h2>${opts.icon || ''} Golden Donut <span class="r muted">MT5 · золото · демо · тест · видно только тебе</span></h2>`;
+    if (!R) return `<style>${CSS}</style><div class="pt">${head}<p class="pt-m">${esc(opts.err || 'Загружаю…')}</p></div>`;
+    const L = R.data || R, s = L.stats || {};
+    const hb = L.last_hb, late = hb && Date.now() - hb > 30 * 60000;
+    const k = (lab, val, sub) => `<div><small>${lab}</small><b class="num">${val}</b>${sub ? `<span class="pt-m">${sub}</span>` : ''}</div>`;
+    const kp = `<div class="pt-k">${k('Условные $10 000', `<span class="${cls(L.pnl_notional)}">${usd(L.equity_notional, 0)}</span>`, pct(L.pnl_pct))}
+      ${k('В плюсе', s.winrate != null ? Math.round(s.winrate * 100) + '%' : '—', `${s.wins || 0} из ${s.trades || 0}`)}
+      ${k('Средняя сделка', `<span class="${cls(s.avg_pct)}">${pct(s.avg_pct, 3)}</span>`, s.avg_usd_notional != null ? usd(s.avg_usd_notional) + ' на $10 000' : '')}
+      ${k('Макс. просадка', s.max_dd_pct != null ? '−' + num(s.max_dd_pct, 1) + '%' : '—', 'по условной кривой')}
+      ${k('Сделок в неделю', num(s.trades_per_week, 1), s.hold_median_min != null ? 'держит ~' + hold(s.hold_median_min) : '')}</div>`;
+    const op = (L.open || []).map((o) => `<tr><td><b>${esc(o.symbol)}</b> ${side(o.side)}</td><td>${num(o.volume, 2)}</td><td>${num(o.in_px, 2)}</td><td>${num(o.price, 2)}</td>
+      <td>${num(o.sl, 2)} / ${num(o.tp, 2)}</td><td class="${cls(o.float_pct != null ? o.float_pct : o.float_usd)}">${o.float_pct != null ? pct(o.float_pct) : '—'}</td><td>${dt(o.open_t)}</td></tr>`).join('');
+    const cl = (L.closed || []).slice(0, 15).map((t) => `<tr><td><b>${esc(t.symbol)}</b> ${side(t.side)}</td><td>${dt(t.open_t)}</td><td>${num(t.in_px, 2)} → ${num(t.out_px, 2)}</td>
+      <td>${hold(t.hold_min)}</td><td class="${cls(t.pct)}">${pct(t.pct)}</td><td class="pt-m">${ctxLine(t.entry_ctx)}</td></tr>`).join('');
+    const dist = (s.hold_dist || []).filter((x) => x.n).map((x) => `<span>${esc(x.label)}: <b>${x.n}</b></span>`).join('');
+    const conn = `<details class="edet"><summary>Другой способ: советник в терминале на Windows</summary><p class="pt-m">Адрес для «Разрешить WebRequest»: <b>https://app.crypto-capital.app</b>.
+      Инструкция трейдеру — docs/peter-mt5-setup.md. Токен сервер создаёт сам; видно его только здесь, в сессии владельца — передай его трейдеру лично.</p>
+      <button class="ib sm" type="button" data-pt="token">Показать токен</button> <button class="ib sm" type="button" data-pt="rotate">Новый токен</button>
+      <code data-pt="tok" style="user-select:all;word-break:break-all"></code>
+      <p class="pt-m">«Новый токен» сразу отключает старый: трейдеру нужно будет вставить новый в InpToken.</p></details>`;
+    return `<style>${CSS}</style><div class="pt">${head}
+      ${!hb ? '<p class="pt-m">Счёт ещё не подключён — см. «Подключение» ниже.</p>' : late ? `<p class="pt-m">⚠ Нет связи с терминалом с ${dt(hb)} — сделки придут из очереди, когда он снова включится.</p>` : `<p class="pt-m">Связь с терминалом: ${dt(hb)}.</p>`}
+      ${kp}${curve(L.curve)}
+      <div class="pt-h"><b>Открытые позиции${(L.open || []).length ? ' · ' + L.open.length : ''}</b></div>
+      ${op ? `<div class="pt-w"><table class="pt-t"><tr><th>Позиция</th><th>Лот</th><th>Вход</th><th>Сейчас</th><th>Стоп / тейк</th><th>Сейчас, % счёта</th><th>Открыта</th></tr>${op}</table></div>` : '<p class="pt-m">Открытых позиций нет.</p>'}
+      <div class="pt-h"><b>Закрытые сделки</b> <span class="pt-m">· % от баланса на момент сделки</span></div>
+      ${cl ? `<div class="pt-w"><table class="pt-t"><tr><th>Сделка</th><th>Открыта</th><th>Цена</th><th>Держал</th><th>Итог</th><th>Момент входа</th></tr>${cl}</table></div>` : '<p class="pt-m">Закрытых сделок пока нет.</p>'}
+      ${dist ? `<div class="pt-h"><b>Сколько держит сделку</b></div><div class="pt-d">${dist}</div>` : ''}
+      ${cloudBox()}${conn}<p class="pt-m">${esc(L.about_ru || '')}</p></div>`;
+  }
+
+  // 11.11 option B: read the account with the INVESTOR password through MetaApi. The four values go straight to the server
+  // (owner session, HTTPS) and are never shown again — the card only knows «задано / не задано» and a masked login.
+  function cloudBox() {
+    return `<details class="edet" data-pt="cloud" open><summary>Подключение: логин, сервер, пароль инвестора</summary>
+      <p class="pt-m"><b>Только пароль ИНВЕСТОРА (read-only).</b> Основной (торговый) пароль вводить нельзя — сервер его отклонит.</p>
+      <div data-pt="cstate" class="pt-m"></div>
+      <form data-pt="cform" autocomplete="off" style="display:grid;gap:6px;max-width:420px;margin:8px 0">
+        <input name="login" inputmode="numeric" autocomplete="off" placeholder="Номер счёта MT5 (логин)" required>
+        <input name="server" autocomplete="off" placeholder="Сервер брокера — точно как в MT5" required>
+        <input name="password" type="password" autocomplete="new-password" placeholder="Пароль инвестора" required>
+        <input name="token" type="password" autocomplete="off" placeholder="Токен MetaApi" data-pt="ctok">
+        <span class="pt-m" data-pt="ctokh">Токен MetaApi — один раз: app.metaapi.cloud → API access → скопировать токен.</span>
+        <div><button class="ib sm" type="submit">Подключить</button></div>
+      </form><div data-pt="cmsg" class="pt-m"></div>
+      <div data-pt="cmore" hidden><button class="ib sm" type="button" data-pt="ccheck">Проверить подключение</button>
+        <button class="ib sm" type="button" data-pt="coff">Отключить</button></div></details>`;
+  }
+
+  function cloudMount(el, api) {
+    const box = el.querySelector('[data-pt="cloud"]');
+    if (!box || !api) return;
+    const st = box.querySelector('[data-pt="cstate"]'), msg = box.querySelector('[data-pt="cmsg"]'), form = box.querySelector('[data-pt="cform"]');
+    const tok = box.querySelector('[data-pt="ctok"]'), tokh = box.querySelector('[data-pt="ctokh"]'), more = box.querySelector('[data-pt="cmore"]');
+    const paint = (v) => { if (!v) return; const l = v.last || {};
+      tok.hidden = tokh.hidden = !!v.set;                 // the token is asked once; after that the form is 3 fields
+      form.hidden = !!v.provisioned; more.hidden = !v.set;
+      st.innerHTML = (v.provisioned ? `Подключён счёт <b>${esc(v.login)}</b> · сервер <b>${esc(v.server)}</b>.` : v.set ? 'Токен MetaApi сохранён — осталось ввести счёт.' : '')
+        + (l.t ? ` Последняя проверка ${dt(l.t)}: ${l.ok ? 'данные идут' : esc(l.msg || 'нет данных')}.` : '')
+        + (v.refused ? ' ⚠ Прошлое подключение отклонено: был введён основной пароль.' : ''); };
+    const run = async (fn, btn) => { if (btn) btn.disabled = true; msg.textContent = 'Подождите…';
+      try { const r = await fn(); msg.textContent = (r && r.message_ru) || ''; paint(r); } catch (e) { msg.textContent = 'Не получилось: ' + ((e && e.message) || e); }
+      if (btn) btn.disabled = false; };
+    let loaded = false;
+    const first = () => { if (box.open && !loaded) { loaded = true; api.get().then(paint).catch(() => { st.textContent = 'Состояние не загрузилось.'; }); } };
+    box.addEventListener('toggle', first); first();
+    form.addEventListener('submit', (e) => { e.preventDefault(); const f = new FormData(form), body = {};
+      ['token', 'login', 'server', 'password'].forEach((k) => { body[k] = String(f.get(k) || '').trim(); });
+      run(async () => { const r = await api.save(body); form.reset(); return r; }, form.querySelector('[type="submit"]')); });
+    box.querySelector('[data-pt="ccheck"]').addEventListener('click', (e) => run(api.check, e.target));
+    box.querySelector('[data-pt="coff"]').addEventListener('click', (e) => { if (window.confirm('Отключить счёт и удалить сохранённые данные?')) run(api.off, e.target); });
+  }
+
+  function mount(el, opts) {
+    opts = opts || {};
+    cloudMount(el, opts.cloud);
+    const b = el.querySelector('[data-pt="token"]'), rb = el.querySelector('[data-pt="rotate"]'), out = el.querySelector('[data-pt="tok"]');
+    const show = async (btn, fn) => {
+      btn.disabled = true;
+      try { const r = await fn(); out.textContent = r && r.token ? r.token : 'токен не получен'; }
+      catch (e) { out.textContent = 'не получилось: ' + (e && e.message || e); }
+      btn.disabled = false;
+    };
+    if (b && out && typeof opts.fetchToken === 'function') b.addEventListener('click', () => show(b, opts.fetchToken));
+    if (rb && out && typeof opts.rotateToken === 'function') rb.addEventListener('click', () => {
+      if (window.confirm('Создать новый токен? Старый перестанет работать сразу.')) show(rb, opts.rotateToken);
+    });
+  }
+  window.CNPeter = { html, mount };
+})();

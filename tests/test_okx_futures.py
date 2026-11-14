@@ -250,6 +250,10 @@ def test_daily_loss_stop_blocks_new_entries_for_the_day():
     e3 = F.env(CNQ_OWNER_OVERRIDES=p)
     assert run(fk3, e3, F.desks(F.trade(), F.trade("T9", "ETH", "LONG", 3000.0, 2900.0, 3300.0)))["opened"] == 1
     assert {o["instId"] for o in swap_orders(fk3)} >= {"SOL-USDT-SWAP"} and "ETH-USDT-SWAP" not in fk3.pos
+    with open(p, "w") as f:                      # «*» (owner 14.11: «копировать все»): every copy trade passes until expiry
+        json.dump({"set": NOW, "until": NOW + 86_400_000, "day_stop_ok": ["*"]}, f)
+    fk4 = F.FakeOkx(hist=fk3.hist)
+    assert run(fk4, F.env(CNQ_OWNER_OVERRIDES=p), F.desks(F.trade(), F.trade("T9", "ETH", "LONG", 3000.0, 2900.0, 3300.0)))["opened"] == 2
     with open(p, "w") as f:
         json.dump({"set": NOW, "until": NOW + 1000, "day_stop_ok": [tid]}, f)   # expired → the day stop holds again
     assert run(F.FakeOkx(hist=fk3.hist), F.env(CNQ_OWNER_OVERRIDES=p), F.desks(F.trade()), NOW + 5000)["opened"] == 0

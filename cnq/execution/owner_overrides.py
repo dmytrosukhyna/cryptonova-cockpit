@@ -6,7 +6,7 @@ config/owner_overrides.json (in the repo; the server gets it with the engine's g
                path, and the «Киты» paper desk closes its copy). New trades after «set» are not touched by «close».
   • no_short — no short in that coin is held or opened until «until» (a held one is closed the same way);
   • no_long  — the same for longs.
-  • day_stop_ok — trade ids («W-ARB-L-…») the owner explicitly approved to open while the futures day stop holds (14.11);
+  • day_stop_ok — trade ids («W-ARB-L-…», or «*» = every copy trade) the owner explicitly approved to open while the futures day stop holds (14.11);
                all other entry checks still apply; expires at «day_stop_ok_until» (or «until»).
 After «until» the file does nothing. A missing / broken file = no overrides (it can only REMOVE trades, never add one).
 Coins are matched by their base: HYPE, HYPE-USDT-SWAP, kPEPE, 1000PEPE, PEPE all compare as the base coin.
@@ -69,7 +69,8 @@ def active(ov: dict | None, now: int | None = None) -> dict:
 
 def day_stop_ok(a: dict, tid) -> bool:
     """the owner explicitly let this trade open while the futures day stop holds (matched by «W-…» id, desk prefix ignored)"""
-    return str(tid or "").split(":")[-1] in (a.get("day_stop_ok") or set())
+    ok = a.get("day_stop_ok") or set()
+    return "*" in ok or str(tid or "").split(":")[-1] in ok      # «*» (owner 14.11: «копировать все»): every copy trade until expiry
 
 
 def blocked(a: dict, sym, side: str, opened=None) -> str | None:

@@ -30,3 +30,12 @@ def test_rebase_replays_only_our_commit():
     assert '--onto origin/main "$base"' in step
     al = (WF.parent / "autolab.yml").read_text(encoding="utf-8")
     assert '--onto origin/main "$base"' in al and "base=$(git rev-parse HEAD)" in al
+
+
+def test_engine_sync_retry_replays_only_its_commit():
+    """14.11: the server engine's push retry («pull --rebase -X theirs») rolled a file pushed seconds earlier back (21a8413)."""
+    src = (WF.parents[2] / "cnq" / "engine.py").read_text(encoding="utf-8")
+    i = src.index("def sync(")
+    body = src[i:src.index("\ndef ", i + 10)]
+    assert '["rev-parse", "HEAD"]' in body and body.index('["rev-parse", "HEAD"]') < body.index('["commit"')
+    assert '"--onto", "origin/main", base.strip()' in body

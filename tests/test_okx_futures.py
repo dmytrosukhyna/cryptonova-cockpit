@@ -607,3 +607,33 @@ def test_the_real_sleeve_opens_only_copy_signals_and_logs_the_rejection():
     sk = {x["sig"]: x for x in st["copy_skips"]}
     assert "aggr:A1" in sk and "не сигнал копирования — отклонено" in sk["aggr:A1"]["why"]
     assert fu.copy_sig("ivan:x") and fu.copy_sig("whales:x") and not fu.copy_sig("aggr:x") and not fu.copy_sig("aggr:x", {})
+
+
+def test_day_pnl_counts_only_the_loss_made_today():
+    # 14.11 (owner, «1»): the day stop counts the loss made since 00:00 UTC, not the paper loss open copies carried into the day
+    start = fu.day_start(NOW)
+
+    class Ctx:
+        def __init__(self, hist, pos, px0):
+            self.hist, self.pos, self.px0 = hist, pos, px0
+
+        def get(self, path, params=None, signed=True):
+            if path == "/api/v5/market/candles":
+                v = self.px0.get(params["instId"])
+                return [] if v is None else [[str(start), str(v), "0", "0", "0"]]
+            return self.hist
+
+        def positions(self, fresh=False):
+            return self.pos
+
+    # a long from 100 opened yesterday, 95 at 00:00 UTC, 94 now: upl −60 in all, only −10 of it today
+    old = {"BTC-USDT-SWAP": {"upl": -60.0, "avgPx": 100.0, "markPx": 94.0, "cTime": start - 3_600_000}}
+    assert fu.day_pnl(Ctx([], old, {"BTC-USDT-SWAP": 95.0}), NOW) == -10.0
+    assert fu.day_pnl(Ctx([], old, {}), NOW) == -60.0                       # no price at 00:00 → counted whole (the stricter rule)
+    new = {"ETH-USDT-SWAP": {"upl": -25.0, "avgPx": 50.0, "markPx": 45.0, "cTime": start + 60_000}}
+    assert fu.day_pnl(Ctx([], new, {"ETH-USDT-SWAP": 52.0}), NOW) == -25.0  # opened today → all of it
+    # closed today: opened yesterday at 100, 95 at 00:00, closed at 90 → gross −50, −25 of it today, fees −1
+    h = [{"instId": "SOL-USDT-SWAP", "uTime": str(start + 7_200_000), "cTime": str(start - 86_400_000), "realizedPnl": "-51",
+          "pnl": "-50", "openAvgPx": "100", "closeAvgPx": "90"}]
+    assert fu.day_pnl(Ctx(h, {}, {"SOL-USDT-SWAP": 95.0}), NOW) == -26.0
+    assert fu.day_pnl(Ctx([{**h[0], "uTime": str(start - 1)}], {}, {}), NOW) == 0.0      # closed yesterday → not today's

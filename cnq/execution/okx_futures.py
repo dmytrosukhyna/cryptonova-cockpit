@@ -437,7 +437,8 @@ class Ctx:
                     continue
                 side = p.get("posSide") or "net"
                 out[p["instId"]] = {"long": (q > 0) if side == "net" else side == "long", "sz": abs(q), "upl": ms._f(p.get("upl")) or 0.0,
-                                    "notional": abs(ms._f(p.get("notionalUsd")) or 0.0), "avgPx": ms._f(p.get("avgPx"))}
+                                    "notional": abs(ms._f(p.get("notionalUsd")) or 0.0), "avgPx": ms._f(p.get("avgPx")),
+                                    "markPx": ms._f(p.get("markPx")), "cTime": int(p.get("cTime") or 0)}
             self._pos = out
         return self._pos
 
@@ -550,16 +551,59 @@ def risk_now(cap: dict, wk: float, bud: float) -> tuple[float, str | None]:
     return cap["risk"], None
 
 
+def day_open_px(ctx: Ctx, inst_id: str, start: int) -> float | None:
+    """the price at 00:00 UTC (the open of today's 1Dutc candle) or None"""
+    try:
+        rows = ctx.get("/api/v5/market/candles", {"instId": inst_id, "bar": "1Dutc", "limit": "1"}, signed=False)
+    except Exception:  # noqa: BLE001
+        return None
+    for r in rows or []:
+        if isinstance(r, (list, tuple)) and len(r) > 1 and int(r[0]) == start:
+            return ms._f(r[1])
+    return None
+
+
+def _today_part(pnl: float, px0, open_px, last_px) -> float:
+    """the part of a position's P/L made since 00:00 UTC: pnl × (last − px0)/(last − open); unknown prices → the whole pnl"""
+    if not px0 or not open_px or not last_px or abs(last_px - open_px) < 1e-12:
+        return pnl
+    return pnl * (last_px - px0) / (last_px - open_px)
+
+
 def day_pnl(ctx: Ctx, now: int) -> float:
-    """Realised P/L of the UTC day (fees and funding included, OKX positions history) + the open losses. The sub-account is the
-    autopilot's own: every SWAP position on it counts."""
+    """The futures result of the UTC day itself (owner 14.11, real money, «1»: the day stop counts only the loss made TODAY;
+    the paper loss open copies carried into the day does not block new entries). = realised P/L of positions closed today
+    (fees and funding included, OKX positions history) minus the part they had already made before 00:00 UTC + the change of
+    the open positions since 00:00 UTC (the whole open P/L for those opened today). Counted only when negative. A price that
+    does not read → that position counts whole (the old, stricter rule). The sub-account is the autopilot's own."""
     start = day_start(now)
     try:
         hist = ctx.get("/api/v5/account/positions-history", {"instType": "SWAP"})
     except ms.OkxError:
         hist = []
-    real = sum(ms._f(h.get("realizedPnl")) or 0.0 for h in hist if int(h.get("uTime") or 0) >= start)
-    upl = sum(p["upl"] for p in ctx.positions().values())
+    px0s: dict = {}
+
+    def px0(inst):
+        if inst not in px0s:
+            px0s[inst] = day_open_px(ctx, inst, start)
+        return px0s[inst]
+
+    real = 0.0
+    for h in hist:
+        if int(h.get("uTime") or 0) < start:
+            continue
+        r = ms._f(h.get("realizedPnl")) or 0.0
+        if int(h.get("cTime") or start) < start:                    # opened before today: drop the part made before 00:00 UTC
+            gross = ms._f(h.get("pnl"))
+            if gross is not None:
+                r -= gross - _today_part(gross, px0(h.get("instId")), ms._f(h.get("openAvgPx")), ms._f(h.get("closeAvgPx")))
+        real += r
+    upl = 0.0
+    for inst, p in ctx.positions().items():
+        u = p["upl"]
+        if p.get("cTime") and p["cTime"] < start:
+            u = _today_part(u, px0(inst), p.get("avgPx"), p.get("markPx"))
+        upl += u
     return round(real + min(0.0, upl), 2)
 
 

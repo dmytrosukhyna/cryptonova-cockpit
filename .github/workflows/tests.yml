@@ -21,7 +21,8 @@ jobs:
       - run: pip install -q numpy pillow pytest cryptography pyjwt
       - name: tests/run.py against the known failures
         run: |
-          python -u tests/run.py > tests.log 2>&1 || true
+          # 14.11: owner_health reads origin/main under GITHUB_ACTIONS; the tests that need it set it themselves
+          env -u GITHUB_ACTIONS python -u tests/run.py > tests.log 2>&1 || true
           tail -3 tests.log
           python - <<'PY'
           import re, sys

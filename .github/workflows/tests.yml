@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install -q numpy pillow pytest cryptography
+      - run: pip install -q numpy pillow pytest cryptography pyjwt
       - name: tests/run.py against the known failures
         run: |
           python -u tests/run.py > tests.log 2>&1 || true
@@ -30,6 +30,9 @@ jobs:
           known = {l.strip() for l in open("tests/known_failures.txt") if l.strip() and not l.startswith("#")}
           summary = (re.findall(r"^\d+ passed, \d+ failed.*$", log, re.M) or ["no summary line"])[-1]
           new = sorted(failed - known)
+          if summary == "no summary line":          # 14.11: tests/run.py died on «import jwt» before any test and the gate said green
+              print("::error title=tests: run.py crashed::" + " | ".join(log.strip().splitlines()[-4:])[:900])
+              sys.exit(1)
           if new:
               for name in new:                     # the traceback's last lines as an annotation: logs are not readable from sessions
                   m = re.search(r"^FAIL\s+" + re.escape(name) + r"\n(.*?)(?=^(?:PASS|FAIL)\s|^\d+ passed, |\Z)", log, re.M | re.S)

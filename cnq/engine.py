@@ -293,6 +293,10 @@ def sync(push: bool = True) -> dict:
     data_changed = copy_out_data()
     if data_changed:                                        # separate «git add»: a problem with these never blocks the desks' files
         sh(git + ["add"] + data_changed, REPO, 30)
+    # 14.11: a plain «pull --rebase -X theirs» after a rejected push replayed more than the engine's own commit and rolled a file
+    # pushed seconds earlier back (21a8413 reverted .github/workflows/research-bn-whales.yml from 77e1645) — the same mechanism as
+    # site.yml on 10.11. The retry replays ONLY our commit onto the fresh origin/main.
+    b_ok, _t, base = sh(git + ["rev-parse", "HEAD"], REPO, 30)
     ok_c, _t, out_c = sh(git + ["commit", "-q", "-m", f"engine: desks {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}"], REPO, 30)
     pushed = False
     if ok_c:
@@ -301,7 +305,13 @@ def sync(push: bool = True) -> dict:
             if p_ok:
                 pushed = True
                 break
-            sh(git + ["pull", "-q", "--rebase", "-X", "theirs"], REPO, 60)
+            f_ok, _t, _o = sh(git + ["fetch", "-q", "origin", "main"], REPO, 60)
+            if b_ok and base and f_ok:
+                r_ok, _t, _o = sh(git + ["rebase", "-q", "-X", "theirs", "--onto", "origin/main", base.strip()], REPO, 60)
+                if not r_ok:
+                    sh(git + ["rebase", "--abort"], REPO, 30)
+            else:
+                sh(git + ["pull", "-q", "--rebase", "-X", "theirs"], REPO, 60)
     return {"pulled": ok, "pushed": pushed, "committed": ok_c}
 
 

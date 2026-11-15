@@ -1,0 +1,206 @@
+{
+ "all": {
+  "n": 25227,
+  "traders": 101,
+  "all": [
+   25227,
+   1.217,
+   37.27
+  ],
+  "single": [
+   7556,
+   1.116,
+   20.63
+  ],
+  "rank1_2": [
+   5369,
+   1.148,
+   15.23
+  ],
+  "skipped_4plus": [
+   12302,
+   1.309,
+   27.32
+  ],
+  "sum_all": 30701.3,
+  "sum_kept": 14592.8,
+  "worst_trader_day_all": -1738.9,
+  "worst_trader_day_kept": -393.0,
+  "traders_with_skips": 65,
+  "trader_weighted_skip_minus_kept": [
+   65,
+   -0.151,
+   -0.53
+  ]
+ },
+ "h1": {
+  "n": 12613,
+  "traders": 77,
+  "all": [
+   12613,
+   1.473,
+   33.05
+  ],
+  "single": [
+   4100,
+   1.255,
+   16.65
+  ],
+  "rank1_2": [
+   2892,
+   1.281,
+   14.11
+  ],
+  "skipped_4plus": [
+   5621,
+   1.732,
+   25.04
+  ],
+  "sum_all": 18583.8,
+  "sum_kept": 8849.9,
+  "worst_trader_day_all": -806.7,
+  "worst_trader_day_kept": -118.6,
+  "traders_with_skips": 35,
+  "trader_weighted_skip_minus_kept": [
+   35,
+   0.015,
+   0.05
+  ]
+ },
+ "h2": {
+  "n": 12614,
+  "traders": 96,
+  "all": [
+   12614,
+   0.961,
+   20.18
+  ],
+  "single": [
+   3456,
+   0.95,
+   12.3
+  ],
+  "rank1_2": [
+   2477,
+   0.993,
+   7.99
+  ],
+  "skipped_4plus": [
+   6681,
+   0.954,
+   14.45
+  ],
+  "sum_all": 12117.5,
+  "sum_kept": 5742.9,
+  "worst_trader_day_all": -1738.9,
+  "worst_trader_day_kept": -393.0,
+  "traders_with_skips": 56,
+  "trader_weighted_skip_minus_kept": [
+   56,
+   0.083,
+   0.23
+  ]
+ },
+ "bn": {
+  "n": 3111,
+  "traders": 42,
+  "all": [
+   3111,
+   1.261,
+   13.27
+  ],
+  "single": [
+   2343,
+   1.173,
+   13.03
+  ],
+  "rank1_2": [
+   684,
+   1.593,
+   5.37
+  ],
+  "skipped_4plus": [
+   84,
+   0.997,
+   2.07
+  ],
+  "sum_all": 3921.6,
+  "sum_kept": 3837.8,
+  "worst_trader_day_all": -64.8,
+  "worst_trader_day_kept": -64.8,
+  "traders_with_skips": 18,
+  "trader_weighted_skip_minus_kept": [
+   18,
+   -0.36,
+   -0.55
+  ]
+ },
+ "okx": {
+  "n": 21446,
+  "traders": 51,
+  "all": [
+   21446,
+   1.227,
+   34.39
+  ],
+  "single": [
+   4764,
+   1.112,
+   15.42
+  ],
+  "rank1_2": [
+   4487,
+   1.116,
+   14.39
+  ],
+  "skipped_4plus": [
+   12195,
+   1.312,
+   27.21
+  ],
+  "sum_all": 26304.0,
+  "sum_kept": 10307.3,
+  "worst_trader_day_all": -1738.9,
+  "worst_trader_day_kept": -393.0,
+  "traders_with_skips": 43,
+  "trader_weighted_skip_minus_kept": [
+   43,
+   -0.242,
+   -0.76
+  ]
+ },
+ "hl": {
+  "n": 670,
+  "traders": 8,
+  "all": [
+   670,
+   0.71,
+   6.2
+  ],
+  "single": [
+   449,
+   0.853,
+   5.75
+  ],
+  "rank1_2": [
+   198,
+   0.328,
+   1.84
+  ],
+  "skipped_4plus": [
+   23,
+   1.22,
+   2.06
+  ],
+  "sum_all": 475.8,
+  "sum_kept": 447.7,
+  "worst_trader_day_all": -14.3,
+  "worst_trader_day_kept": -14.3,
+  "traders_with_skips": 4,
+  "trader_weighted_skip_minus_kept": [
+   4,
+   1.774,
+   1.81
+  ]
+ }
+}

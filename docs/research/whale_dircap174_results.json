@@ -1,0 +1,187 @@
+{
+ "made": "2026-11-15",
+ "A_desk": {
+  "base": {
+   "all": {
+    "n": 133,
+    "total": 1262.6,
+    "worst_day": -893.8,
+    "max_dd": -974.6,
+    "scaled_n": 0,
+    "avg_scale_alt": 1.0
+   },
+   "h1": {
+    "n": 66,
+    "total": 1865.6,
+    "worst_day": -167.3,
+    "max_dd": -640.2,
+    "scaled_n": 0,
+    "avg_scale_alt": 1.0
+   },
+   "h2": {
+    "n": 67,
+    "total": -603.0,
+    "worst_day": -893.8,
+    "max_dd": -974.6,
+    "scaled_n": 0,
+    "avg_scale_alt": 1.0
+   }
+  },
+  "N15": {
+   "all": {
+    "n": 133,
+    "total": 830.3,
+    "worst_day": -893.8,
+    "max_dd": -974.6,
+    "scaled_n": 34,
+    "avg_scale_alt": 0.78
+   },
+   "h1": {
+    "n": 66,
+    "total": 1439.4,
+    "worst_day": -715.3,
+    "max_dd": -727.7,
+    "scaled_n": 31,
+    "avg_scale_alt": 0.603
+   },
+   "h2": {
+    "n": 67,
+    "total": -609.1,
+    "worst_day": -893.8,
+    "max_dd": -974.6,
+    "scaled_n": 3,
+    "avg_scale_alt": 0.963
+   },
+   "pass": false
+  },
+  "N25": {
+   "all": {
+    "n": 133,
+    "total": 1077.6,
+    "worst_day": -893.8,
+    "max_dd": -974.6,
+    "scaled_n": 12,
+    "avg_scale_alt": 0.921
+   },
+   "h1": {
+    "n": 66,
+    "total": 1680.6,
+    "worst_day": -352.2,
+    "max_dd": -661.0,
+    "scaled_n": 12,
+    "avg_scale_alt": 0.845
+   },
+   "h2": {
+    "n": 67,
+    "total": -603.0,
+    "worst_day": -893.8,
+    "max_dd": -974.6,
+    "scaled_n": 0,
+    "avg_scale_alt": 1.0
+   },
+   "pass": false
+  }
+ },
+ "B_locked": {
+  "base": {
+   "all": {
+    "n": 1089,
+    "total": 47003.8,
+    "worst_day": -1020.7,
+    "max_dd": -3935.4,
+    "scaled_n": 0,
+    "avg_scale_alt": 1.0
+   },
+   "h1": {
+    "n": 544,
+    "total": 24275.7,
+    "worst_day": -777.1,
+    "max_dd": -3935.4,
+    "scaled_n": 0,
+    "avg_scale_alt": 1.0
+   },
+   "h2": {
+    "n": 545,
+    "total": 22728.2,
+    "worst_day": -1020.7,
+    "max_dd": -2020.5,
+    "scaled_n": 0,
+    "avg_scale_alt": 1.0
+   }
+  },
+  "N15": {
+   "all": {
+    "n": 1089,
+    "total": 16014.1,
+    "worst_day": -291.2,
+    "max_dd": -1055.4,
+    "scaled_n": 879,
+    "avg_scale_alt": 0.33
+   },
+   "h1": {
+    "n": 544,
+    "total": 9041.9,
+    "worst_day": -291.2,
+    "max_dd": -1055.4,
+    "scaled_n": 397,
+    "avg_scale_alt": 0.37
+   },
+   "h2": {
+    "n": 545,
+    "total": 6972.2,
+    "worst_day": -244.7,
+    "max_dd": -505.1,
+    "scaled_n": 482,
+    "avg_scale_alt": 0.294
+   },
+   "pass": false
+  },
+  "N25": {
+   "all": {
+    "n": 1089,
+    "total": 18291.5,
+    "worst_day": -622.3,
+    "max_dd": -1055.4,
+    "scaled_n": 800,
+    "avg_scale_alt": 0.389
+   },
+   "h1": {
+    "n": 544,
+    "total": 10875.5,
+    "worst_day": -622.3,
+    "max_dd": -1055.4,
+    "scaled_n": 364,
+    "avg_scale_alt": 0.415
+   },
+   "h2": {
+    "n": 545,
+    "total": 7416.0,
+    "worst_day": -271.2,
+    "max_dd": -708.8,
+    "scaled_n": 436,
+    "avg_scale_alt": 0.365
+   },
+   "pass": false
+  }
+ },
+ "B_names": [
+  "0xRubi",
+  "CchrisBbtc",
+  "leaf-ye",
+  "建斌论坛",
+  "慢就是快Mike8",
+  "金虎趋势论"
+ ],
+ "A_span": [
+  1792381733249,
+  1794743723157
+ ],
+ "B_by_trader": {
+  "0xRubi": 64,
+  "CchrisBbtc": 20,
+  "leaf-ye": 825,
+  "建斌论坛": 38,
+  "慢就是快Mike8": 47,
+  "金虎趋势论": 95
+ }
+}

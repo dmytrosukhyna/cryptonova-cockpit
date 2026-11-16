@@ -655,6 +655,50 @@ def test_ideas_weekly_review_on_monday_once():
     assert {a["symbol"] for a in st["actions"] if a["action"] == "SELL"} == {"A4"}
 
 
+def test_monday_review_never_sells_the_core_and_the_owner_restores_it_once():
+    """16.11 (owner, explicit yes): the Monday review («ждём» / another portfolio's stop and −10 %) no longer sells BTC / ETH / SOL;
+    config «core_restore» buys the core sold before back once, past the 14-day pause and «не добираем», from the cash above 10 %"""
+    rows, src = ideas_world()
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step(src, _ideas(rows, T0), T0)                                              # Wednesday
+    rows1, src1 = copy.deepcopy(rows), copy.deepcopy(src)
+    _set(rows1, "BTC", status="avoid", status_ru="не брать", why_ru=CROSS)
+    _set(rows1, "A3", status="avoid", status_ru="не брать", why_ru=CROSS)
+    src1["cg"]["BTC"] *= 0.85
+    src1["cg"]["A3"] *= 0.85
+    mon = T0 + 5 * DAY + 3_600_000
+    st = port.step(src1, _ideas(rows1, mon), mon)
+    sells = {a["symbol"] for a in st["actions"] if a["action"] == "SELL"}
+    assert "A3" in sells and "BTC" not in sells                                         # the alt goes, the core stays
+    assert {p["symbol"]: p for p in st["positions"]}["BTC"]["reco"]["t"] == "Не добирать"
+    # the old rule sold BTC: simulate it, then the owner's restore buys it back once although the table says «не добираем»
+    port.rp._act(mon, "BTC", "SELL", 0, src1["cg"]["BTC"], "Недельный пересмотр: тест")
+    t1 = mon + 3_600_000
+    parts = [mon, t1 + DAY, t1 + 2 * DAY]
+    cfg = {"id": "t-core", "coins": [], "core_restore": {"id": "cr1", "coins": ["BTC", "ETH"], "parts": parts, "until": mon + 5 * DAY}}
+    st = port.step(src1, _ideas(rows1, t1), t1, picks=cfg)
+    buys = [a for a in st["actions"] if a["action"] == "BUY" and a["symbol"] == "BTC"]
+    assert len(buys) == 1 and "Возврат ядра" in buys[0]["reason"] and "часть 1 из 3" in buys[0]["reason"]
+    w1 = port.rp._meta("cr_b:cr1:BTC") / 3 / (1 + sp.IDEAS["fee"])
+    btc = {p["symbol"]: p for p in st["positions"]}["BTC"]
+    assert btc["bucket"] == "core" and btc["levels"]["stop"] is None and abs(btc["cost_weight"] - w1) < 1e-6
+    assert not [a for a in st["actions"] if a["symbol"] == "ETH" and a["action"] in ("BUY", "ADD")]  # ETH never sold — held
+    st = port.step(src1, _ideas(rows1, t1 + 3_600_000), t1 + 3_600_000, picks=cfg)          # part 2 not before its time
+    assert not [a for a in st["actions"] if a["symbol"] == "BTC" and a["action"] in ("BUY", "ADD")]
+    st = port.step(src1, _ideas(rows1, t1 + DAY), t1 + DAY, picks=cfg)
+    adds = [a for a in st["actions"] if a["symbol"] == "BTC" and a["action"] == "ADD"]
+    assert len(adds) == 1 and "часть 2 из 3" in adds[0]["reason"]
+    assert port.rp.cash() >= 0.10 * port.value(src1["cg"]) - 1e-6                           # never below the cash floor
+    t2 = t1 + DAY + 3_600_000
+    port.rp._act(t2 - 1, "BTC", "SELL", 0, src1["cg"]["BTC"], "тест")                       # sold again → no part 3
+    st = port.step(src1, _ideas(rows1, t1 + 2 * DAY), t1 + 2 * DAY, picks=cfg)
+    assert not [a for a in st["actions"] if a["symbol"] == "BTC" and a["action"] in ("BUY", "ADD")]
+    cfg2 = {"id": "t-core", "coins": [], "core_restore": {"id": "cr2", "coins": ["BTC"], "until": t2 - 1}}
+    st = port.step(src1, _ideas(rows1, t2 + 60_000), t2 + 60_000, picks=cfg2)              # expired → nothing
+    assert not [a for a in st["actions"] if a["symbol"] == "BTC" and a["action"] == "BUY"]
+
+
 def test_ideas_stale_or_missing_table_no_buys_but_holdings_priced():
     rows, src = ideas_world()
     conn = sqlite3.connect(":memory:")

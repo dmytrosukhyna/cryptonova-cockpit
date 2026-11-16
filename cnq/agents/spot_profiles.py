@@ -363,7 +363,7 @@ IDEAS_ABOUT = ("Наш портфель CRYPTO NOVA AI: сам покупает 
                "SOL 5% (доливаем, если доля упала ниже ¾ плана; продаём лишнее, если выросла больше чем в 1.5 раза), остальные «можно брать» и «можно добрать» — по 7.5%, всего не больше 8 монет вместе с ядром; «можно на небольшую сумму» — по 2.5%, "
                "не больше 3; кэш не меньше 10%, комиссия 0.1% с каждой сделки. Продаём, если таблица поставила «не брать»; стоп −20% от "
                "входа (ядро BTC, ETH, SOL — без стопа); для небольшой суммы стоп −35%, на ×2 продаём половину, остаток — до отката 35% от "
-               "пика; по понедельникам продаём монеты со статусом «ждём» и минусом 10% и больше. Проданную монету 14 дней не берём. "
+               "пика; по понедельникам продаём монеты со статусом «ждём» и минусом 10% и больше (ядро BTC, ETH, SOL — нет, решение владельца 16.11). Проданную монету 14 дней не берём. "
                "С 28.10 (решение владельца): чужой стоп — «не добирать», а не продавать; кэш выше 10% три дня без подходящих монет — "
                "в ядро BTC / ETH / SOL. Результат не обещаем — может быть и минус.")
 IDEAS_RULES = [
@@ -616,7 +616,8 @@ def ideas_reco(kind: str, est: str, p: dict, px: float | None, row: dict | None,
         else "таблица устарела — работают только ценовые правила"
     if fresh and st == "avoid" and cross_stop(row):
         return {"k": "hold", "t": "Не добирать", "why": f"Таблица: {row.get('why_ru') or 'чужой стоп'} — это «не добирать», не продажа "
-                "(решение владельца 28.10); продаст только свой стоп, своя фиксация или понедельничный пересмотр."}
+                "(решение владельца 28.10); продаст только свой стоп, своя фиксация или понедельничный пересмотр"
+                + (" (ядро понедельничный пересмотр не продаёт — решение владельца 16.11)." if kind == "core" else ".")}
     if fresh and st == "avoid":
         return {"k": "sell", "t": "Продать — «не брать»", "why": f"Таблица: {row.get('why_ru') or 'не брать'}."}
     if est == "small":
@@ -632,11 +633,11 @@ def ideas_reco(kind: str, est: str, p: dict, px: float | None, row: dict | None,
             return {"k": "hold", "t": "Держим бонусом", "why": f"Тело забрано; остаток держим до отката 35% от пика; {tab}."}
     elif kind != "core" and ret <= P["stop_buy"] + 0.05:
         return {"k": "sell", "t": "У стопа −20%", "why": f"Сейчас {_pc(ret)} от входа; на −20% продаём."}
-    if fresh and st == "wait" and ret <= P["review_pnl"]:
+    if fresh and st == "wait" and ret <= P["review_pnl"] and kind != "core":
         return {"k": "sell", "t": "Продать в понедельник",
                 "why": f"В таблице «ждём» ({row.get('why_ru') or '—'}), позиция {_pc(ret)} — на недельном пересмотре продаём."}
     rule = ("Небольшая сумма: стоп −35%, на ×2 забираем тело" if est == "small"
-            else "Ядро без стопа: продаём, только если таблица скажет «не брать» или на пересмотре («ждём» и −10%)" if kind == "core"
+            else "Ядро без стопа: продаём, только если таблица сама скажет «не брать»; понедельничный пересмотр ядро не продаёт (владелец 16.11)" if kind == "core"
             else "Стоп −20% от входа, продаём и при «не брать»")
     if fresh and st == "add":
         rule += "; таблица пишет «можно добрать», но портфель не доливает — одна покупка на монету"
@@ -798,7 +799,10 @@ class IdeasPortfolio:
                            "— остаток продаём.", actions)
             elif est != "small" and kind != "core" and ret <= P["stop_buy"]:
                 self._sell(now, s, p, px, f"Стоп {_pc(P['stop_buy'])}: {s} {res}. Убыток режем; {P['cooldown_d']} дней монету не берём.", actions)
-            elif weekly and (st == "wait" or cross_stop(r)) and ret <= P["review_pnl"] and s not in P["trusted_small"] and est != "pick":
+            # 16.11 (owner, explicit yes, real money): the Monday review never sells the core BTC / ETH / SOL — 16.11 it sold $4 162 of
+            # BTC / ETH on another portfolio's stop at fear 10 (docs/research/core_monday180.md: the −10 % Monday sale is a coin flip)
+            elif (weekly and (st == "wait" or cross_stop(r)) and ret <= P["review_pnl"] and s not in P["trusted_small"] and est != "pick"
+                  and kind != "core"):
                 self._sell(now, s, p, px, f"Недельный пересмотр: в таблице «ждём» ({r.get('why_ru') or '—'}), позиция {res} — "
                            "освобождаем место.", actions)
         # --- 3. buys: table order, buy/add 10 % (≤ 8), small 2.5 % (≤ 4), cash ≥ 10 %, 14-day cooldown, a reliable live price
@@ -808,6 +812,8 @@ class IdeasPortfolio:
             eligible_seen = False                 # 28.10: a coin passed every rule of the portfolio this run (bought or cash-blocked)
             if picks:                             # 11.11 (owner): his picks first — tranche 1 now, 2–3 from support
                 actions += self._owner_picks(picks, now, price, live, psrc, src, smap, okx, support, not_bought)
+                if isinstance(picks.get("core_restore"), dict):   # 16.11 (owner): buy the sold core back once
+                    actions += self._core_restore(picks["core_restore"], now, price, live, psrc, src, smap, okx, blocked, not_bought)
             held = {p["symbol"]: p for p in rp.positions()}
             n_pick = sum(1 for p in held.values() if self._split(p["bucket"])[1] == "pick")      # picks take no table place
             n_buy = sum(1 for p in held.values() if self._split(p["bucket"])[1] not in ("small", "pick"))
@@ -1012,6 +1018,61 @@ class IdeasPortfolio:
             rp._set_meta(f"px:{c}", px)
             rp._set_meta(f"op_n:{c}", float(n + 1))
             rp._set_meta(f"op_t:{c}", now)
+            price[c], psrc[c] = px, k
+            live.add(c)
+        return out
+
+    def _core_restore(self, cfg: dict, now: int, price: dict, live: set, psrc: dict, src: dict, smap: dict, okx, blocked: dict,
+                      not_bought: list) -> list[dict]:
+        """16.11 (owner, explicit yes, real money): the core coins of config «core_restore» {"id", "coins", "parts": [t_ms…], "until"}
+        sold by the Monday review are bought back to their plan share (_core_t, fixed at part 1) in len(parts) equal parts, part i not
+        before parts[i] (16.11 owner: three steps — today, after the Nvidia report / Fed minutes, a week later) — past the 14-day pause
+        and the table's «не добираем» (another portfolio's stop), from the cash above the 10 % floor. The coin is an ordinary core
+        holding (no stop). A coin already held at part 1, or sold again between parts, gets no (more) parts. Not bought: owner
+        «не брать», no OKX pair, no reliable live price, no free cash (the reason is published; retried next run until `until`)."""
+        rp, P = self.rp, IDEAS
+        cid = str(cfg.get("id") or "")
+        coins = [str(c).upper() for c in cfg.get("coins") or []]
+        until = cfg.get("until")
+        parts = sorted(float(t) for t in (cfg.get("parts") or [0]))
+        if not cid or not coins or (isinstance(until, (int, float)) and now > until):
+            return []
+        out: list[dict] = []
+        for c in coins:
+            n = int(rp._meta(f"cr_n:{cid}:{c}") or 0)
+            if n >= len(parts) or now < parts[n]:
+                continue
+            held = {p["symbol"]: p for p in rp.positions()}
+            if (n == 0 and c in held) or (n >= 1 and c not in held):
+                rp._set_meta(f"cr_n:{cid}:{c}", float(len(parts)))   # held already at the start / sold again — no (more) parts
+                continue
+            px = k = why = None
+            if c in blocked:
+                why = f"владелец: не брать ({blocked[c]})"
+            elif okx is not None and c not in okx:
+                why = "на споте OKX нет пары"
+            else:
+                px, k, why = self._entry_price(c, {"price": (smap.get(c) or {}).get("price")}, src)
+            V = self.value(price)
+            b = rp._meta(f"cr_b:{cid}:{c}") or (self._core_t(c, price) * V)
+            cost = min(b / len(parts), max(0.0, rp.cash() - P["min_cash"] * V)) / (1 + P["fee"]) if V else 0.0
+            if px is not None and cost < 0.001:
+                px, why = None, f"свободного кэша сверх {P['min_cash'] * 100:.0f}% нет"
+            if px is None:
+                not_bought.append({"symbol": c, "status": "core", "why_ru": f"Возврат ядра (владелец 16.11), часть {n + 1} из {len(parts)}: {why}"})
+                continue
+            rp._set_meta(f"cr_b:{cid}:{c}", b)
+            head = (f"Возврат ядра (решение владельца 16.11), часть {n + 1} из {len(parts)}: {c} +{cost / V * 100:.1f}% счёта к доле ядра "
+                    "по плану. Монету продал понедельничный пересмотр из-за чужого стопа; пауза 14 дней и «не добираем» для этого возврата "
+                    "не действуют. Ядро — без стопа, понедельничный пересмотр его больше не продаёт.")
+            if c in held:
+                out.append(rp._act(now, c, "ADD", held[c]["weight"] + cost, px, head, held[c]["bucket"]))
+            else:
+                out.append(rp._act(now, c, "BUY", cost, px, head, "core:buy"))
+            rp._set_cash(rp.cash() - cost * P["fee"])
+            rp._set_meta(f"src:{c}", _SRC_CODE[k])
+            rp._set_meta(f"px:{c}", px)
+            rp._set_meta(f"cr_n:{cid}:{c}", float(n + 1))
             price[c], psrc[c] = px, k
             live.add(c)
         return out

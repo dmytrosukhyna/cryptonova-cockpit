@@ -2,3 +2,4 @@
 {"key":"eth:0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","symbol":"UNI","h":1,"t0":1794235295996,"t":1794325199652,"price0":6.89,"price":6.83,"ret":-0.87,"late":false}
 {"key":"hl:UZEC","symbol":"UZEC","h":1,"t0":1794382960547,"t":1794469580911,"price0":988.78,"price":983.1,"ret":-0.57,"late":false}
 {"key":"eth:0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9","symbol":"AAVE","h":7,"t0":1794134463404,"t":1794739549946,"price0":130.014,"price":107.11,"ret":-17.62,"late":false}
+{"key":"hl:UBTC","symbol":"UBTC","h":1,"t0":1794735251827,"t":1794823907768,"price0":65387.0,"price":64372.0,"ret":-1.55,"late":false}

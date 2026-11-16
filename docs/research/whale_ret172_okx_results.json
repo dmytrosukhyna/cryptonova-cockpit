@@ -1,0 +1,188 @@
+{
+ "made": 1793810278130,
+ "whales": 30,
+ "top10": {
+  "n": 2648,
+  "days": 90,
+  "whales": 27,
+  "now": {
+   "taken": 523,
+   "busy": 393,
+   "exits": 46,
+   "returns": 42,
+   "hours_out_median": 0.7,
+   "returns_within_24h": 28,
+   "skipped_out_n": 357,
+   "skipped_out_mean": 0.319,
+   "post72_n": 133,
+   "post72_mean": -1.113,
+   "post72_sum_budget": -27.75,
+   "all": {
+    "total": -49.98,
+    "n_days": 90.0,
+    "worst_day": -5.11,
+    "max_dd": -60.96,
+    "lose_streak": 9.0
+   },
+   "h1": {
+    "total": -36.54,
+    "n_days": 45.0,
+    "worst_day": -5.11,
+    "max_dd": -43.22,
+    "lose_streak": 9.0
+   },
+   "h2": {
+    "total": -13.44,
+    "n_days": 45.0,
+    "worst_day": -4.12,
+    "max_dd": -24.42,
+    "lose_streak": 5.0
+   }
+  },
+  "after": {
+   "taken": 475,
+   "busy": 418,
+   "exits": 30,
+   "returns": 25,
+   "hours_out_median": 153.0,
+   "returns_within_24h": 0,
+   "skipped_out_n": 723,
+   "skipped_out_mean": 0.447,
+   "post72_n": 70,
+   "post72_mean": 0.01,
+   "post72_sum_budget": 0.13,
+   "all": {
+    "total": -23.96,
+    "n_days": 90.0,
+    "worst_day": -6.93,
+    "max_dd": -32.3,
+    "lose_streak": 3.0
+   },
+   "h1": {
+    "total": -11.49,
+    "n_days": 45.0,
+    "worst_day": -6.93,
+    "max_dd": -14.38,
+    "lose_streak": 3.0
+   },
+   "h2": {
+    "total": -12.47,
+    "n_days": 45.0,
+    "worst_day": -5.01,
+    "max_dd": -19.99,
+    "lose_streak": 2.0
+   }
+  },
+  "after_minus_now": {
+   "all": {
+    "d": 26.02,
+    "n": 69,
+    "t": 1.28
+   },
+   "h1": {
+    "d": 25.05,
+    "n": 32,
+    "t": 1.39
+   },
+   "h2": {
+    "d": 0.97,
+    "n": 37,
+    "t": 0.11
+   },
+   "dd_better": true,
+   "pass_here": true
+  }
+ },
+ "all_bar": {
+  "n": 3316,
+  "days": 90,
+  "whales": 30,
+  "now": {
+   "taken": 483,
+   "busy": 387,
+   "exits": 49,
+   "returns": 46,
+   "hours_out_median": 0.8,
+   "returns_within_24h": 31,
+   "skipped_out_n": 424,
+   "skipped_out_mean": 0.58,
+   "post72_n": 122,
+   "post72_mean": -1.632,
+   "post72_sum_budget": -37.33,
+   "all": {
+    "total": -45.22,
+    "n_days": 90.0,
+    "worst_day": -5.11,
+    "max_dd": -55.79,
+    "lose_streak": 9.0
+   },
+   "h1": {
+    "total": -35.59,
+    "n_days": 45.0,
+    "worst_day": -5.11,
+    "max_dd": -43.22,
+    "lose_streak": 9.0
+   },
+   "h2": {
+    "total": -9.63,
+    "n_days": 45.0,
+    "worst_day": -4.7,
+    "max_dd": -20.2,
+    "lose_streak": 6.0
+   }
+  },
+  "after": {
+   "taken": 424,
+   "busy": 450,
+   "exits": 35,
+   "returns": 29,
+   "hours_out_median": 154.0,
+   "returns_within_24h": 0,
+   "skipped_out_n": 976,
+   "skipped_out_mean": 0.1,
+   "post72_n": 71,
+   "post72_mean": -0.652,
+   "post72_sum_budget": -8.68,
+   "all": {
+    "total": -33.8,
+    "n_days": 90.0,
+    "worst_day": -6.93,
+    "max_dd": -40.32,
+    "lose_streak": 3.0
+   },
+   "h1": {
+    "total": -16.74,
+    "n_days": 45.0,
+    "worst_day": -6.93,
+    "max_dd": -18.56,
+    "lose_streak": 3.0
+   },
+   "h2": {
+    "total": -17.06,
+    "n_days": 45.0,
+    "worst_day": -4.7,
+    "max_dd": -23.46,
+    "lose_streak": 3.0
+   }
+  },
+  "after_minus_now": {
+   "all": {
+    "d": 11.42,
+    "n": 72,
+    "t": 0.51
+   },
+   "h1": {
+    "d": 18.85,
+    "n": 32,
+    "t": 1.02
+   },
+   "h2": {
+    "d": -7.43,
+    "n": 40,
+    "t": -0.59
+   },
+   "dd_better": true,
+   "pass_here": false
+  }
+ }
+}

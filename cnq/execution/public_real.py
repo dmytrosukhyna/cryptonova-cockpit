@@ -442,7 +442,9 @@ def spot_stops(env=None) -> list:
         miss = st.get("spot_stop_missing") or {}
         out = [{"sym": c, "ok": True, "px": ms._f((v or {}).get("px")) or None, "since": None}
                for c, v in sorted((st.get("spot_stops") or {}).items()) if c not in miss]
-        out += [{"sym": c, "ok": False, "px": None, "since": int((v or {}).get("t") or 0) or None} for c, v in sorted(miss.items())]
+        # «code» — only the digits of OKX's own order code (sCode) from the reason, for diagnosis; the text stays owner-only
+        out += [{"sym": c, "ok": False, "px": None, "since": int((v or {}).get("t") or 0) or None,
+                 "code": (re.findall(r"sCode (\d{1,8})", str((v or {}).get("why") or "")) or [None])[0]} for c, v in sorted(miss.items())]
         return out
     except Exception:  # noqa: BLE001
         return []
@@ -501,7 +503,8 @@ def clean(doc: dict) -> dict:
     out["copy_skips"] = [{"t": int(x["t"]), "sig": x["sig"] if isinstance(x.get("sig"), str) and SIG_RE.match(x["sig"]) else None,
                           "inst": x["inst"] if INST_RE.match(str(x.get("inst") or "")) else None, "why": str(x.get("why") or "")[:200]}
                          for x in (doc.get("copy_skips") or [])[-COPY_SKIPS_MAX:] if isinstance(x, dict) and num(x.get("t"))]
-    out["spot_stops"] = [{"sym": x["sym"], "ok": bool(x.get("ok")), "px": num(x.get("px")), "since": int(x["since"]) if num(x.get("since")) else None}
+    out["spot_stops"] = [{"sym": x["sym"], "ok": bool(x.get("ok")), "px": num(x.get("px")), "since": int(x["since"]) if num(x.get("since")) else None,
+                          **({"code": str(x["code"])} if str(x.get("code") or "").isdigit() else {})}
                          for x in (doc.get("spot_stops") or [])[:40] if isinstance(x, dict) and SYM_RE.match(str(x.get("sym") or ""))]
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None

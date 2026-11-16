@@ -287,13 +287,22 @@ class FakeOkx:
             ids = {x["algoId"] for x in b}
             self.cancels += b
             self.algos = [a for a in self.algos if a["algoId"] not in ids]
+            for x in getattr(self, "lead_subs", []):             # 16.11: a spot lead sub-position's own stop
+                if x.get("sl_algo") in ids:
+                    x["sl"], x["sl_algo"] = "", ""
             return ok([{"sCode": "0"}])
         if path == "/api/v5/copytrading/current-subpositions" and q.get("instType") == "SPOT":
             return ok([{"subPosId": x["subPosId"], "instId": x["instId"], "instType": "SPOT", "subPos": str(x["subPos"]),
-                        "availSubPos": str(x["subPos"]), "openAvgPx": str(x["openAvgPx"]), "openOrdId": x.get("openOrdId", "")}
+                        "availSubPos": str(x["subPos"]), "openAvgPx": str(x["openAvgPx"]), "openOrdId": x.get("openOrdId", ""),
+                        "slTriggerPx": x.get("sl", ""), "algoId": x.get("sl_algo", "")}
                        for x in self.lead_subs if not q.get("instId") or x["instId"] == q["instId"]])
         if path == "/api/v5/copytrading/algo-order" and b.get("instType") == "SPOT":     # 11.11: a stop on a spot lead sub-position
+            x = next((x for x in self.lead_subs if x["subPosId"] == b["subPosId"]), None)
+            if x is not None and x.get("sl"):                    # 16.11: OKX refuses a second stop on a sub-position that has one
+                return {"code": "1", "msg": "", "data": [{"sCode": "59404", "sMsg": "made-up: the sub-position already has a stop"}]}
             self.lead_calls.append(("spot_stop", dict(b)))
+            if x is not None:
+                x["sl"], x["sl_algo"] = b["slTriggerPx"], "LS" + b["subPosId"]
             return ok([{"subPosId": b["subPosId"], "sCode": "0"}])
         if path == "/api/v5/copytrading/close-subposition" and b.get("instType") == "SPOT":
             self.lead_calls.append(("close", b))

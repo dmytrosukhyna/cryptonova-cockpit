@@ -58,6 +58,22 @@ def _fmt(x: float, step: str) -> str:
     return fmt(x, step)
 
 
+def lead_stops(cl) -> dict:
+    """{subPosId: {"slTriggerPx", "algoId"}} of the open spot lead sub-positions, as OKX has them now"""
+    out, after = {}, None
+    try:
+        for _ in range(10):
+            d = cl.call("GET", "/api/v5/copytrading/current-subpositions", {"instType": "SPOT", **({"after": after} if after else {})}) or []
+            for x in d:
+                out[str(x.get("subPosId") or "")] = {"slTriggerPx": x.get("slTriggerPx"), "algoId": x.get("algoId") or x.get("slAlgoId")}
+            after = str((d[-1] if d else {}).get("subPosId") or "")
+            if len(d) < 100 or not after:
+                break
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
 def last_of(rt: dict, cl, inst_id: str) -> float:
     return _f((rt.get("tk") or cl.ticker(inst_id) or {}).get("last"))
 
@@ -143,23 +159,47 @@ def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict
             # ordinary stop below.
             subs = [x for x in ((lead.get(c) or {}).get("subs") or []) if x and x[0]]
             if subs:
-                kl = dict((known.get(c) or {}).get("lead") or {})
-                done, lq = {}, 0.0
+                # 16.11 (LIT / MORPHO lost their stops after the 2nd tranche): every buy makes a NEW sub-position, and the averaged
+                # entry moves the stop. Re-sending the stop to a sub-position that already has one is refused by OKX, the error
+                # aborted the whole coin and it stayed «no stop». Now: what each sub-position really has is read from OKX
+                # (slTriggerPx / algoId); the right stop is kept; a different one is cancelled and set again; each sub-position
+                # is handled on its own; one that keeps an OLD stop is still protected (noted once), one with NO stop is a miss.
+                live = lead_stops(cl)
+                done, lq, bad, stale = {}, 0.0, [], []
                 for sid, s_inst, sq in subs:
+                    lq += _f(sq)
                     s_info = cl.instrument(s_inst) or info
                     s_k = via_rate(cl, memo) if s_inst.endswith("-USDC") and quote == "USDT" else 1.0
                     s_trig = _fmt(px / s_k, s_info["tickSz"])
-                    lq += _f(sq)
-                    if kl.get(sid) and abs(_f(kl[sid]) / float(s_trig) - 1) <= TOL_PX:
-                        done[sid] = kl[sid]
+                    cur = live.get(sid) or {}
+                    have_sl = _f(cur.get("slTriggerPx"))
+                    if have_sl and abs(have_sl / float(s_trig) - 1) <= TOL_PX:
+                        done[sid] = have_sl
                         continue
-                    cl.call("POST", LEAD_ALGO, body={"instType": "SPOT", "subPosId": sid, "slTriggerPx": s_trig, "slTriggerPxType": "last"})
-                    done[sid] = float(s_trig)
-                    res["set"].append({"ccy": c, "px": float(s_trig), "sz": _f(sq)})
-                    log({"ev": "spot_stop_set", "ccy": c, "px": float(s_trig), "sz": _f(sq), "usd": round(_f(sq) * (last_of(rt, cl, inst_id) or px), 2),
-                         "t": now, "why": f"стоп-лосс модели на лид-позиции {s_inst}: продать {_f(sq):g} {c} по рынку, если цена ≤ {s_trig}"})
-                known[c] = {**{k_: v for k_, v in (known.get(c) or {}).items() if k_ in ("algoId", "sz", "inst")},
-                            "lead": done, "px": next(iter(done.values()))}
+                    try:
+                        if have_sl and cur.get("algoId"):
+                            cl.call("POST", "/api/v5/trade/cancel-algos", body=[{"instId": s_inst, "algoId": cur["algoId"]}])
+                        cl.call("POST", LEAD_ALGO, body={"instType": "SPOT", "subPosId": sid, "slTriggerPx": s_trig, "slTriggerPxType": "last"})
+                        done[sid] = float(s_trig)
+                        res["set"].append({"ccy": c, "px": float(s_trig), "sz": _f(sq)})
+                        log({"ev": "spot_stop_set", "ccy": c, "px": float(s_trig), "sz": _f(sq),
+                             "usd": round(_f(sq) * (last_of(rt, cl, inst_id) or px), 2), "t": now,
+                             "why": f"стоп-лосс модели на лид-позиции {s_inst}: продать {_f(sq):g} {c} по рынку, если цена ≤ {s_trig}"})
+                    except Exception as e:  # noqa: BLE001 — one sub-position's failure never leaves the others without a stop
+                        log({"ev": "spot_stop_error", "ccy": c, "t": now, "sub": sid, "error": str(e)[:200]})
+                        if have_sl:
+                            done[sid] = have_sl
+                            stale.append(f"{_f(sq):g} {c} остаётся со старым стопом {have_sl:g} вместо {s_trig}: {str(e)[:120]}")
+                        else:
+                            bad.append(f"{_f(sq):g} {c} без стопа: {str(e)[:160]}")
+                if done:
+                    known[c] = {**{k_: v for k_, v in (known.get(c) or {}).items() if k_ in ("algoId", "sz", "inst")},
+                                "lead": done, "px": min(done.values())}
+                if bad:
+                    skip(c, "стоп не поставился на часть позиции: " + "; ".join(bad))
+                    continue
+                if stale and (miss_prev.get(c) or {}).get("why") != stale[0]:
+                    log({"ev": "spot_stop_skip", "ccy": c, "t": now, "why": stale[0]})
                 have_q = max(0.0, have_q - lq)
                 if floor_to(have_q, float(lot)) < mn:
                     continue                                            # everything is in lead positions — done

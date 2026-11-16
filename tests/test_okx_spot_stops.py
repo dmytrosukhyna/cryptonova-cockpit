@@ -106,6 +106,68 @@ def test_the_public_stop_summary_has_no_reason_text():
         out = PR.spot_stops()
     finally:
         AP.load_state = orig
-    assert out == [{"sym": "VVV", "ok": True, "px": 15.18, "since": None}, {"sym": "LIT", "ok": False, "px": None, "since": 5}]
+    assert out == [{"sym": "VVV", "ok": True, "px": 15.18, "since": None}, {"sym": "LIT", "ok": False, "px": None, "since": 5, "code": None}]
     import json
     assert "raw OKX" not in json.dumps(out) and "why" not in json.dumps(out)
+
+
+def _lead(fk):
+    out = {}
+    for x in fk.lead_subs:
+        a = out.setdefault(x["instId"].split("-")[0], {"qty": 0.0, "avail": 0.0, "insts": [x["instId"]], "subs": []})
+        a["qty"] += x["subPos"]; a["avail"] += x["subPos"]
+        a["subs"].append((x["subPosId"], x["instId"], x["subPos"]))
+    return out
+
+
+def test_lead_sub_positions_keep_their_stops_through_new_tranches_and_a_moved_stop():
+    """11.11: a coin held as spot LEAD sub-positions gets its stop on each of them. 16.11 (LIT / MORPHO lost their stops after the
+    2nd tranche): a new buy = a new sub-position and a moved stop; OKX refuses a second stop on a sub-position that has one — the
+    old one is cancelled and set again, each sub-position on its own, and the coin never ends up «no stop»"""
+    fk = F.FakeOkx(balances={"USDT": 1000.0, "AAA": 30.0}, lead_subs=[{"subPosId": "sp1", "instId": "AAA-USDT", "subPos": 30.0, "openAvgPx": 10.0}])
+    cl = ap.connect(F.env(), fk, {}, F.nosleep)
+    st, logs = {}, []
+    r = ss.sync(cl, pf(), st, NOW, logs.append, avail={"AAA": 30.0}, lead=_lead(fk))
+    assert [(b["subPosId"], b["instType"]) for k, b in fk.lead_calls if k == "spot_stop"] == [("sp1", "SPOT")]
+    assert not [b for b in fk.algo_posts if b["instId"].startswith("AAA")]           # no ordinary order on a balance that is not available
+    assert st["spot_stops"]["AAA"]["lead"] == {"sp1": 8.0} and "AAA" not in st["spot_stop_missing"]
+    n = len(fk.lead_calls)
+    ss.sync(cl, pf(), st, NOW + 1, logs.append, avail={"AAA": 30.0}, lead=_lead(fk))
+    assert len(fk.lead_calls) == n                                                   # in sync → nothing re-sent
+    # tranche 2: a new sub-position, and the averaged entry moves the model's stop 8.0 → 7.5
+    fk.lead_subs.append({"subPosId": "sp2", "instId": "AAA-USDT", "subPos": 20.0, "openAvgPx": 9.0})
+    ss.sync(cl, pf(stop_aaa=7.5), st, NOW + 2, logs.append, avail={"AAA": 50.0}, lead=_lead(fk))
+    assert {x["subPosId"]: float(x["sl"]) for x in fk.lead_subs} == {"sp1": 7.5, "sp2": 7.5}
+    assert any(c.get("algoId") == "LSsp1" for c in fk.cancels)                       # the old stop was cancelled first
+    assert st["spot_stops"]["AAA"]["lead"] == {"sp1": 7.5, "sp2": 7.5} and "AAA" not in st["spot_stop_missing"]
+    # a state that forgot everything (the old bug's situation): nothing is re-sent, the stops OKX has are recognised
+    n = len(fk.lead_calls)
+    st2 = {}
+    ss.sync(cl, pf(stop_aaa=7.5), st2, NOW + 3, logs.append, avail={"AAA": 50.0}, lead=_lead(fk))
+    assert len(fk.lead_calls) == n and st2["spot_stops"]["AAA"]["lead"] == {"sp1": 7.5, "sp2": 7.5} and "AAA" not in st2["spot_stop_missing"]
+    # the sub-positions and the coin are gone → the stop fired
+    fk.lead_subs.clear()
+    r = ss.sync(cl, pf(stop_aaa=7.5), st, NOW + 4, logs.append, avail={}, lead={})
+    assert r["fired"] == ["AAA"] and "AAA" in ss.held_off(st, NOW + 5)
+
+
+def test_a_sub_position_whose_stop_cannot_be_moved_keeps_the_old_one_and_one_without_a_stop_is_a_miss(monkeypatch):
+    fk = F.FakeOkx(balances={"USDT": 1000.0, "AAA": 50.0}, lead_subs=[{"subPosId": "sp1", "instId": "AAA-USDT", "subPos": 30.0, "openAvgPx": 10.0,
+                                                                     "sl": "8", "sl_algo": ""},       # has a stop, no algo id to cancel
+                                                                    {"subPosId": "sp2", "instId": "AAA-USDT", "subPos": 20.0, "openAvgPx": 9.0}])
+    cl = ap.connect(F.env(), fk, {}, F.nosleep)
+    st, logs = {}, []
+    ss.sync(cl, pf(stop_aaa=7.5), st, NOW, logs.append, avail={"AAA": 50.0}, lead=_lead(fk))
+    assert st["spot_stops"]["AAA"]["lead"] == {"sp1": 8.0, "sp2": 7.5} and "AAA" not in st["spot_stop_missing"]   # protected, old price noted
+    assert any(e["ev"] == "spot_stop_skip" and "старым стопом" in e["why"] for e in logs)
+    fk.lead_subs.append({"subPosId": "sp3", "instId": "AAA-USDT", "subPos": 5.0, "openAvgPx": 9.0})
+    orig = cl.call
+
+    def call(method, path, params=None, body=None, signed=True):
+        if path == ss.LEAD_ALGO and (body or {}).get("subPosId") == "sp3":
+            raise RuntimeError("OKX: 1 [sCode 59999] refused")
+        return orig(method, path, params, body, signed)
+    monkeypatch.setattr(cl, "call", call)
+    ss.sync(cl, pf(stop_aaa=7.5), st, NOW + 1, logs.append, avail={"AAA": 55.0}, lead=_lead(fk))
+    assert "без стопа" in st["spot_stop_missing"]["AAA"]["why"] and "59999" in st["spot_stop_missing"]["AAA"]["why"]
+    assert set(st["spot_stops"]["AAA"]["lead"]) == {"sp1", "sp2"}                    # the others keep theirs

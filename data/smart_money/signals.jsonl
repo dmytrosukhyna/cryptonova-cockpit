@@ -19,3 +19,4 @@
 {"day":"2026-11-15","t":1794735251827,"key":"hl:UBTC","src":"hl","chain":"hl","address":null,"symbol":"UBTC","n":2,"wallets":["0xfe7c…b7ae","0xecb6…2b00"],"price":65387.0,"liq":null,"fdv":null,"flags":0}
 {"day":"2026-11-16","t":1794801340681,"key":"eth:0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","src":"evm","chain":"eth","address":"0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","symbol":"UNI","n":2,"wallets":["0xba5d…a352","Jump Trading"],"price":5.17,"liq":665712.78,"fdv":4588041094.0,"flags":0}
 {"day":"2026-11-16","t":1794832367756,"key":"hl:HYPE","src":"hl","chain":"hl","address":null,"symbol":"HYPE","n":2,"wallets":["0xfe7c…b7ae","0xfc66…ca06"],"price":65.429,"liq":null,"fdv":null,"flags":0}
+{"day":"2026-11-16","t":1794862148847,"key":"hl:UBTC","src":"hl","chain":"hl","address":null,"symbol":"UBTC","n":2,"wallets":["0xfe7c…b7ae","0x6859…7e1e"],"price":64944.0,"liq":null,"fdv":null,"flags":0}

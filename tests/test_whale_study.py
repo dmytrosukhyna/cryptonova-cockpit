@@ -800,3 +800,26 @@ def test_rotation_five_losing_copies_in_a_row_move_to_b_and_owner_out_once():
     assert R["fast"] == [] and not R["rot"]["bench"]["bn:1"]["fast"]                  # slow exit: open copies run to his exit
     R2 = W.rotate(st, rot, ranked, prof, {"equity": 7000.0}, now, None, None, {"bn:6": "решение владельца: на досмотр"})
     assert "bn:6" not in [x["addr"] for x in R2["top"]] and R2["why"]["bn:6"] == ["решение владельца: на досмотр"]
+
+
+def test_an_opposite_side_signal_on_a_held_coin_is_recorded_with_its_counterfactuals_and_trades_nothing():
+    """16.11 (п. 181): record only — keep / switch / flat are computed later from the noted prices; the desk's trades do not change"""
+    now = 1_800_000_000_000
+    a, b = "0x" + "a" * 40, "0x" + "b" * 40
+    mids = {"ETH": 100.0}
+    d = W.desk_step(_deskd(now), [a, b], {a: [], b: []}, mids, now)
+    d = W.desk_step(d, [a, b], {a: [_pos("ETH", "LONG", 5000.0)], b: []}, mids, now + 30_000)
+    d = W.desk_step(d, [a, b], {a: [_pos("ETH", "LONG", 5000.0)], b: [_pos("ETH", "SHORT", 5000.0)]}, mids, now + 60_000)
+    assert len(d["conflicts"]) == 1 and d["conflicts"][0]["px0"] == 100.0 and [o["side"] for o in d["open"]] == ["LONG"]
+    d = W.desk_step(d, [a, b], {a: [_pos("ETH", "LONG", 5000.0)], b: [_pos("ETH", "SHORT", 5000.0)]}, mids, now + 90_000)
+    assert len(d["conflicts"]) == 1                                              # once per case
+    d = W.desk_step(d, [a, b], {a: [], b: [_pos("ETH", "SHORT", 5000.0)]}, {"ETH": 90.0}, now + 120_000)     # A exits at 90
+    d = W.desk_step(d, [a, b], {a: [], b: []}, {"ETH": 80.0}, now + 180_000)                                  # B exits at 80
+    v = W.conflict_view(d["conflicts"][0])
+    assert v["keep_pct"] == round((-0.10 - 0.0005) * 100, 2) and v["switch_pct"] == round((0.20 - 0.0015) * 100, 2)
+    assert v["flat_pct"] == round((-(80 / 90 - 1) - 0.0015) * 100, 2) and v["ivan"] is False
+    assert W.desk_public(d, {})["conflicts"][0]["coin"] == "ETH"
+    same = W.desk_step(_deskd(now), [a, b], {a: [], b: []}, mids, now)
+    same = W.desk_step(same, [a, b], {a: [_pos("ETH", "LONG", 5000.0)], b: []}, mids, now + 30_000)
+    same = W.desk_step(same, [a, b], {a: [_pos("ETH", "LONG", 5000.0)], b: [_pos("ETH", "LONG", 5000.0)]}, mids, now + 60_000)
+    assert not same.get("conflicts")                                             # the same side is not a conflict

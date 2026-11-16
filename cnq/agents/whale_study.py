@@ -1397,6 +1397,63 @@ def dominant_sides(pos: list[dict], prev: dict | None = None) -> tuple[dict, lis
     return out, both
 
 
+# 16.11 (backlog п. 181, owner: «в спорных случаях выбирать сторону по тренду рынка»): RECORD ONLY — every time a followed trader
+# takes the OPPOSITE side of a coin we already hold from another trader, the case is written down with the prices needed to compare
+# afterwards: keep the first (today's rule) / switch to the newer / stand aside / by regime / by source. Nothing here trades.
+CONFLICT_COST_KEEP, CONFLICT_COST_SWITCH = 0.0005, 0.0015
+
+
+def conflict_note(d: dict, held: dict, addr: str, side: str, px: float, now: int) -> None:
+    try:
+        if not px or held.get("side") == side or held.get("whale") == addr:
+            return
+        key = f"{held['whale']}|{held['coin']}|{held.get('opened_t')}|{addr}"
+        cs = d.setdefault("conflicts", [])
+        if any(c["key"] == key for c in cs):
+            return
+        cs.append({"key": key, "t": now, "coin": held["coin"], "px0": px, "a": held["whale"], "a_side": held["side"],
+                   "a_opened_t": held.get("opened_t"), "b": addr, "b_side": side, "pa": None, "ta": None, "pb": None, "tb": None})
+        d["conflicts"] = cs[-200:]
+    except Exception:  # noqa: BLE001 — a note never breaks the desk
+        pass
+
+
+def conflict_update(d: dict, states: dict, mids: dict, now: int) -> None:
+    """fill in the price at which OUR copy of A closed and the price when B left his position"""
+    try:
+        for c in d.get("conflicts") or []:
+            px = _f(mids.get(c["coin"]))
+            if c["pa"] is None and not any(o["whale"] == c["a"] and o["coin"] == c["coin"] and o.get("opened_t") == c["a_opened_t"]
+                                           for o in d.get("open") or []):
+                cl = next((x for x in reversed(d.get("closed") or []) if x.get("whale") == c["a"] and x.get("coin") == c["coin"]
+                           and x.get("opened_t") == c["a_opened_t"]), None)
+                if cl or px:
+                    c["pa"], c["ta"] = _f((cl or {}).get("exit")) or px, int(_f((cl or {}).get("closed_t")) or now)
+            pos = states.get(c["b"])
+            if c["pb"] is None and pos is not None and not hidden(pos) and px:
+                if not any(p_["coin"] == c["coin"] and p_["side"] == c["b_side"] for p_ in pos):
+                    c["pb"], c["tb"] = px, now
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def conflict_view(c: dict, mids: dict | None = None) -> dict:
+    """the counterfactuals of one recorded case (unlevered price move, costs in): keep / switch / flat; None while a leg is open"""
+    px0, sa = _f(c.get("px0")), (1 if c.get("a_side") == "LONG" else -1)
+    pa, pb = _f(c.get("pa")), _f(c.get("pb"))
+    out = {k: c.get(k) for k in ("t", "coin", "a", "a_side", "b", "b_side", "px0", "pa", "pb", "ta", "tb")}
+    out["keep_pct"] = round((sa * (pa / px0 - 1) - CONFLICT_COST_KEEP) * 100, 2) if px0 and pa else None
+    out["switch_pct"] = round((-sa * (pb / px0 - 1) - CONFLICT_COST_SWITCH) * 100, 2) if px0 and pb else None
+    if px0 and pa and pb:
+        first_a = int(_f(c.get("ta"))) <= int(_f(c.get("tb")))
+        leg = (-sa * (pb / pa - 1)) if first_a else (sa * (pa / pb - 1))
+        out["flat_pct"] = round((leg - CONFLICT_COST_SWITCH) * 100, 2)
+    else:
+        out["flat_pct"] = None
+    out["ivan"] = str(c.get("a", "")).startswith("ivan:") or str(c.get("b", "")).startswith("ivan:")
+    return out
+
+
 def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, now: int, owner: dict | None = None,
               quality: dict | None = None, close_unfollowed: bool = False, close_whales=None) -> dict:
     """One run of the paper copy desk. states = {addr: [positions]} for the whales fetched this run (missing addr = not
@@ -1581,6 +1638,7 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             if not any(o["coin"] == coin and o["whale"] == addr for o in d["open"]):
                 skip_once(key + "|held", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
                                           "why": "эта монета уже скопирована у другого трейдера — одна копия на монету"})
+                conflict_note(d, next(o for o in d["open"] if o["coin"] == coin), addr, p["side"], px, now)
             continue
         if len(d["open"]) >= DESK_MAX_OPEN:
             skip_once(key + "|max", {"t": now, "kind": "skip", "coin": coin, "side": p["side"], "whale": addr,
@@ -1656,6 +1714,7 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                             "px": px, "whale_entry": p.get("entry"), "gap_pct": gap_pct, "lev": lev, "lev_note": lev_note})
     d["join_wait"] = wait_now
     d["skip_seen"] = {**{k: v for k, v in skip_prev.items() if k.split("|", 1)[0] not in states}, **skip_now}
+    conflict_update(d, states, mids, now)
     d["events"] = d["events"][-200:]
     for o in d["open"]:                                        # copies opened before 04.11 get their protective stop now
         if not o.get("stop"):
@@ -1735,6 +1794,8 @@ def desk_public(d: dict, names: dict) -> dict:
             "by_whale": by_whale(d, names),
             # 04.11 17:37: every join of an already open whale position (and every one still waiting) with its gap to the whale's entry
             "joins": [{**e, "whale_ru": lab(e["whale"])} for e in (d.get("events") or []) if e.get("kind") in ("join", "join_wait")][-20:],
+            # 16.11 (п. 181): the recorded «opposite side on a held coin» cases with their counterfactuals — research only
+            "conflicts": [{**conflict_view(c), "a_ru": lab(c["a"]), "b_ru": lab(c["b"])} for c in (d.get("conflicts") or [])][-50:],
             # 04.11: the same copies in the shape of a web/paper.json desk — the real OKX sleeve follows this at the desk's stage share
             "paper": {"name": "Киты · копирование топ-5", "start_equity": d["start"], "equity": d.get("equity", d["start"]),
                       "since": d.get("started"), "open": [paper_trade(o) for o in d.get("open") or []],

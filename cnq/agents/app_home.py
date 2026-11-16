@@ -1308,6 +1308,45 @@ def _at(curve: list, x: int):
     return v
 
 
+HOUR_MS = 3_600_000
+PP_GRID_N = 720
+
+
+def _grid(curve: list, n: int = PP_GRID_N) -> list:
+    """owner 16.11 («график страшный: одно огромное падение и потом ровно»): the app (builds ≤ 57) draws a curve point by point,
+    evenly — and the history is kept at 3–4 points a day for the old days and ~60 a day for the last ones, so 22 days were squeezed
+    into the left third of the chart (a «vertical candle») and the last 3 filled the rest. The curve is put on an even clock
+    instead: one point per step (1 h, longer once the history outgrows n points), each = the last REAL value at or before that
+    time (a step — nothing is smoothed or invented between two real points), and the newest real point always closes it."""
+    if len(curve) < 3:
+        return list(curve)
+    t0, t1 = curve[0][0], curve[-1][0]
+    step = HOUR_MS * max(1, -(-(t1 - t0) // (HOUR_MS * n)))
+    out, i, v, g = [], 0, curve[0][1], t0
+    while g < t1:
+        while i < len(curve) and curve[i][0] <= g:
+            v = curve[i][1]
+            i += 1
+        out.append((g, v))
+        g += step
+    out.append(tuple(curve[-1]))
+    return out
+
+
+def _daily(curve: list, res_now, since: int, now: int) -> list:
+    """[[the day's 00:00 UTC, the change of the result over that day in $]] from the start to today — the same day borders as
+    periods.day, the last day ends on the result right now, so the bars add up to the whole result (to the cent rounding)"""
+    if not curve or res_now is None:
+        return []
+    out, prev, d = [], 0.0, since - since % DAY_MS
+    while d <= now:
+        v = float(res_now) if d + DAY_MS > now else _at(curve, d + DAY_MS)
+        v = prev if v is None else v
+        out.append([d, _r(v - prev)])
+        prev, d = v, d + DAY_MS
+    return out
+
+
 def _periods(curve: list, res_now, base, since: int, now: int, known_from: int | None = None, flows: list | None = None) -> dict:
     """{day, week, month, all}: the change of the result over the period and its % — 28.10 (owner): deposits / withdrawals are not
     a result. The curve is the result WITHOUT the flows (cnq/execution/public_real.py), so the change never jumps at a deposit;
@@ -1378,6 +1417,15 @@ def _pp_action(a: dict, lang: str, key: str | None = None) -> str:
     return t(lang, f"pp.a.{k}", sym=sym)
 
 
+def _spot_note(real: dict, lang: str) -> str:
+    """owner 16.11: the plain note behind «ⓘ» next to spot — no promise. The owner's draft said «у каждой монеты есть защитный стоп»;
+    that is not so (okx_spot_stops: the core BTC / ETH / SOL has no stop by design, and a stop can fail to be placed), so the note
+    says what is true and adds how many of the other coins have their stop on the exchange right now (public_real.spot_stops)."""
+    ss = [x for x in real.get("spot_stops") or [] if isinstance(x, dict) and x.get("sym")]
+    txt = t(lang, "pp.spot_note")
+    return txt + " " + t(lang, "pp.spot_note.stops", n=sum(1 for x in ss if x.get("ok")), m=len(ss)) if ss else txt
+
+
 def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAULT, whales: dict | None = None,
                     real_why: dict | None = None, trend: dict | None = None) -> dict | None:
     if not real or not real.get("since") or real.get("equity_usd") is None:
@@ -1436,7 +1484,8 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
         return {"share_pct": _r(share), "start_usd": _r(base), "pnl_usd": _r(res), "value_usd": _r(base + res) if res is not None else None,
                 "pct": _r(res / base * 100) if res is not None and base else None, "since": since,
                 "base_note": t(lang, f"pp.base.{key}", share=_dec(float(share), lang), usd=_usd_text(base, lang)),
-                "curve": [[t_, _r(base + v)] for t_, v in _sample_keep_last(crv, PUB_CURVE_N)] if crv else [],
+                "curve": [[t_, _r(base + v)] for t_, v in _grid(crv)] if crv else [],
+                "daily": _daily(crv, res, since, asof) if split_from is not None and split_from <= since else [],
                 "periods": _periods(crv, res, base, since, asof, split_from)}
     spot = part(spot_share, spnl, scurve, "spot")
     fut = part(fut_share, fpnl, fcurve, "fut")
@@ -1539,7 +1588,12 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             "split_note": t(lang, "pp.split_from", d=_date_text(split_from, lang)) if split_from and split_from > since else None,
             "copy_url": real.get("copy_url"), "copiers": real.get("copiers"),
             # the curve = start + the result without the flows (so a deposit is never a jump); value_usd = the money really there
-            "curve": [[t_, _r(s0 + v)] for t_, v in curve], "periods": _periods(curve, pnl, s0, since, asof, since, fl["events"]),
+            # 16.11: on an even clock (_grid), so a chart drawn point by point is true to time
+            "curve": [[t_, _r(s0 + v)] for t_, v in _grid(curve)], "periods": _periods(curve, pnl, s0, since, asof, since, fl["events"]),
+            # owner 16.11 — the block's new look (build 58 and the web): what opens first, the day bars, the always-visible
+            # «всего с начала» and the plain note about spot. Older builds ignore these keys.
+            "view": {"segment": "futures", "period": "day"}, "daily": _daily(curve, pnl, since, asof),
+            "total_label": t(lang, "pp.total"), "spot_note": _spot_note(real, lang),
             "flows": {**{k: fl[k] for k in ("in_usd", "out_usd", "net_usd", "n", "last_t")}, "checked_t": f.get("checked_t")},
             "capital_usd": _r(cap0),
             "flows_note": t(lang, "pp.flows", usd=("+" if fl["net_usd"] > 0 else "") + _usd_text(fl["net_usd"], lang)) if fl["n"] else None,

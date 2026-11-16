@@ -961,6 +961,7 @@ body.ls-min .lspanel .lsb,body.ls-min .lspanel .lsmeta{display:none}
   <div class="pnlb" id="pnlSpot"><small>Спот · <span id="pnlSpotName"></span></small><b class="num" id="pnlSpotV">$—</b><span id="pnlSpotP"></span><canvas class="spark" id="pnlSpotS"></canvas><em id="pnlSpotD"></em></div>
   <div class="pnlfoot muted" id="pnlFoot"></div>
 </section>
+<section class="card" id="realBlockCard" hidden aria-label="Реальный счёт CRYPTO NOVA AI на OKX"><h2>Реальный счёт <span class="r muted">OKX · публичные данные</span></h2><div id="realBlock"></div></section>
 <div class="kpi" id="kpi"></div>
 <section id="earn" class="earn"></section>
 
@@ -4822,6 +4823,18 @@ async function renderReversal(){ const el=document.getElementById('reversalCard'
   const sig=JSON.stringify([REVD&&REVD.asof, REVD_ERR]); if(el.__sig===sig) return; el.__sig=sig; el.hidden=false;
   el.innerHTML=CNReversal.html(REVD,{err:REVD_ERR}); }
 setTimeout(renderReversal,1800); setInterval(renderReversal,60000);
+</script>
+<script src="real_block.js?v=1"></script>
+<script>
+// owner 16.11: «Реальный счёт» — the public block (app_home.json → public_portfolio, the same numbers as the app): opens on
+// «Фьючерсы · за сутки», «Всего с начала: фьючерсы · спот» always on the screen, a true-to-time chart with a marked zero line.
+document.head.insertAdjacentHTML('beforeend','<style>#realBlockCard{margin-top:12px}body:not(.tab-overview) #realBlockCard{display:none!important}</style>');
+let RB_ST=null, RB_SIG='';
+async function renderRealBlock(){ const card=document.getElementById('realBlockCard'), el=document.getElementById('realBlock'); if(!card||!el||!window.CNRealBlock) return;
+  let pp=null; try{ const r=await fetch('./app_home.json?'+Math.floor(Date.now()/60000),{cache:'no-store'}); pp=r.ok?(await r.json()).public_portfolio:null; }catch(e){ pp=null; }
+  if(!pp||pp.kind!=='real'){ if(!RB_SIG) card.hidden=true; return; }
+  const sig=String(pp.asof)+'|'+pp.pnl_usd; if(sig===RB_SIG) return; RB_SIG=sig; card.hidden=false; RB_ST=CNRealBlock.mount(el,pp,RB_ST||undefined); }
+setTimeout(renderRealBlock,1200); setInterval(()=>{ if(!document.hidden) renderRealBlock(); },5*60000);
 </script>
 <script src="smart_alts.js?v=1"></script>
 <script>

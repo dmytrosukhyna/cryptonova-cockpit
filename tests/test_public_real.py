@@ -4,6 +4,7 @@ the sub-account only (never the personal account), exactly the agreed keys, no k
 Every coin, key and amount is made-up test data; OKX and GitHub are never called."""
 import json
 import os
+import pathlib
 import shutil
 import sqlite3
 import subprocess
@@ -315,9 +316,24 @@ def test_public_portfolio_is_the_real_account_only_since_its_start(tmp_path):
     # final QA 28.10: the futures part is back-filled from the start (base + the P/L of the trades closed by then, a point at each
     # close), spot = total − futures — so both parts have their own history from day one and no «separate history since» note
     assert pp["split_note"] is None
-    assert F["curve"][:5] == [[since, 2500.0], [since + 2 * H, 2500.5], [since + 3 * H, 2502.5], [since + 4 * H, 2496.5],
-                              [since + 24 * H, 2496.5]]
-    assert S["curve"][:2] == [[since, 7500.0], [since + 24 * H, 7500.0 - 40.0 + 3.5]]
+    # owner 16.11: the curves are on an even clock (one point an hour = the last real value at or before it, a step), so a chart
+    # drawn point by point is true to time; the newest real point closes each curve
+    assert F["curve"][:6] == [[since, 2500.0], [since + H, 2500.0], [since + 2 * H, 2500.5], [since + 3 * H, 2502.5],
+                              [since + 4 * H, 2496.5], [since + 5 * H, 2496.5]] and F["curve"][24] == [since + 24 * H, 2496.5]
+    assert S["curve"][:2] == [[since, 7500.0], [since + H, 7500.0]] and S["curve"][24] == [since + 24 * H, 7500.0 - 40.0 + 3.5]
+    for crv_ in (pp["curve"], S["curve"], F["curve"]):
+        ts_ = [p_[0] for p_ in crv_]
+        assert {b_ - a_ for a_, b_ in zip(ts_[:-2], ts_[1:-1])} == {H} and 0 < ts_[-1] - ts_[-2] <= H
+    # the day bars (00:00 UTC borders, as periods.day): they add up to the result, today's bar = the period «day»
+    for prt_ in (pp, S, F):
+        dy_ = prt_["daily"]
+        assert dy_[0][0] == since - since % (24 * H) and dy_[-1][0] == day0
+        assert [b_[0] - a_[0] for a_, b_ in zip(dy_, dy_[1:])] == [24 * H] * (len(dy_) - 1)
+        assert abs(sum(x_[1] for x_ in dy_) - prt_["pnl_usd"]) < 0.011 and dy_[-1][1] == prt_["periods"]["day"]["usd"]
+    # what opens first, the always-visible total and the plain note about spot (no promise; the core has no stop — said so)
+    assert pp["view"] == {"segment": "futures", "period": "day"} and pp["total_label"] == "Всего с начала"
+    assert "рост не гарантирован" in pp["spot_note"] and "BTC, ETH и SOL держатся без стопа" in pp["spot_note"]
+    assert not any(w in pp["spot_note"].lower() for w in ("бесплатн", "кит", "копи", "у каждой есть"))
     assert F["periods"]["week"]["available"] and F["periods"]["week"]["usd"] == -2.0 and S["periods"]["week"]["usd"] == -28.0
     assert abs(sum(c["share_spot"] for c in S["coins"]) + (S["cash_usd"] / S["holdings_usd"] * 100) - 100) < 0.1
     # 28.10 (build 46 QA): money moved between spot and futures is no one's result — each part's «now» is the money in it
@@ -504,3 +520,43 @@ def test_public_portfolio_periods_leave_the_flows_out(tmp_path):
     assert en["flows_note"] == "Deposits and withdrawals don't count as the result: +$1,000.00." and en["periods"] == P
     from cnq.api import nova
     assert "пополнения и выводы (+$1 000) не считаются результатом" in nova.Knowledge(os.path.join(ROOT, "data")).demo_block(doc)
+
+
+def test_real_curve_is_true_to_time_on_an_even_clock():
+    """owner 16.11 («одно огромное падение и потом ровно»): the history is kept thin for the old days (3–4 points a day) and dense for
+    the last ones (~60 a day), and the app draws a curve point by point — so 22 days took the left third of the chart and looked like
+    one vertical candle. On the even clock every hour is one point: a day takes the same width wherever it is, and every point is
+    a REAL value (the last one at or before that hour) — nothing between two real points is invented."""
+    H, D = 3_600_000, 86_400_000
+    t0 = 1_792_540_800_000
+    old = [(t0 + d * D + k * 8 * H, -60.0 * d - k) for d in range(22) for k in range(3)]                  # 3 a day, falling slowly
+    new = [(t0 + 22 * D + i * 24 * 60_000, -1320.0 - (i % 7)) for i in range(180)]                       # 60 a day, flat
+    crv = old + new
+    g = app_home._grid(crv)
+    ts = [p[0] for p in g]
+    assert {b - a for a, b in zip(ts[:-2], ts[1:-1])} == {H} and g[0] == crv[0] and g[-1] == crv[-1]
+    share_old = sum(1 for t_ in ts if t_ < t0 + 22 * D) / len(ts)
+    assert abs(share_old - 22 / 25) < 0.01                             # 22 of 25 days = 88 % of the chart (was 66 of 246 points = 27 %)
+    real = dict(crv)
+    for t_, v in g:                                                    # each point = the last real value at or before its time
+        assert v == [rv for rt, rv in crv if rt <= t_][-1] and (t_ in real or v in real.values())
+    assert max(abs(b[1] - a[1]) for a, b in zip(g, g[1:])) <= 60.0     # no step bigger than the real ones — no «vertical candle»
+    assert app_home._grid(crv[:2]) == crv[:2] and app_home._grid([]) == []
+    long = [(t0 + i * H, float(i)) for i in range(3000)]               # a long history: the step grows, the point count stays bounded
+    gl = app_home._grid(long)
+    assert len(gl) <= app_home.PP_GRID_N + 2 and gl[1][0] - gl[0][0] == 5 * H and gl[-1] == long[-1]
+
+
+def test_real_block_on_the_web_opens_on_futures_today_with_the_total_always_visible():
+    """owner 16.11: the web block reads the same public_portfolio as the app; «Всего с начала: фьючерсы · спот» is in the block's
+    own markup (not behind a tap), the spot note sits behind «i», the chart has a marked zero line and a time-proportional x axis"""
+    root = pathlib.Path(__file__).resolve().parents[1]
+    js = (root / "web" / "real_block.js").read_text(encoding="utf-8")
+    html = (root / "web" / "app.html").read_text(encoding="utf-8")
+    assert 'id="realBlockCard"' in html and 'src="real_block.js?v=1"' in html and "CNRealBlock.mount(el,pp" in html
+    assert "(await r.json()).public_portfolio" in html                                   # one source: the app's own feed
+    assert "'futures'" in js and "st.per = st.per || (PERS.some((x) => x[0] === v.period) ? v.period : 'day')" in js
+    assert "totalHtml(pp) + plot" in js and "data-rb-note hidden" in js                 # the total is always drawn, the note on «i»
+    assert "(t - S.from) / Math.max(1, S.to - S.from)" in js and "Y(0)" in js           # real time on x, the zero line
+    for bad in ("бесплатн", "кит", "копи", "гарантируем"):
+        assert bad not in js.lower()

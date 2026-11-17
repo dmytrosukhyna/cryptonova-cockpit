@@ -105,3 +105,67 @@ def test_routes_and_panels_are_owner_only():
     assert "Только ключ «Read-Only»" in js and 'type="password"' in js and "ivan_tests.json" not in js + app
     doc = r("docs", "ivan-bybit-readonly-key.md")
     assert "Read-Only" in doc and "Demo Trading" in doc and "never post" in doc.lower() and "общих чатах" in doc
+
+
+def test_the_real_copy_switch_is_the_owners_own_click_with_a_plain_confirm():
+    """17.11: the panel's switch «Копировать на реальный счёт» of one account — POST /v2/owner/ivan_tests/copy_real {id, on} from the
+    owner's session only, a confirm that says «реальные деньги» with the limits before ON, the server's refusal shown as it came;
+    the held loss and the drawdown stand next to the win rate; ids ivan2: / ivan3: / ivan4: read «копия: Иван · тест N»."""
+    import shutil
+    import subprocess
+    import tempfile
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rd = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()                                      # noqa: E731
+    js, vip, app = rd("web", "ivan_tests.js"), rd("web", "vip", "ivan_tests.js"), rd("web", "app.html")
+    for src in (vip, app):
+        assert "/copy_real" in src and "fetchOwner(" in src
+    assert "copyReal: (id, on) => call('/copy_real', { id, on })" in vip
+    assert "copyReal:(id,on)=>CNAuth.fetchOwner('/v2/owner/ivan_tests/copy_real',{method:'POST',body:{id,on}})" in app
+    j = app.index("async function renderIvanTests")
+    assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j)         # still owner-only
+    assert "window.confirm(on ? confirmOn(" in js and js.index("window.confirm(on ? confirmOn(") < js.index("api.copyReal(b.dataset.id, on)")
+    assert "err.data.message_ru" in js and "Иван Тест 2 / 3 / 4" in js
+    assert "copy_real" not in js.split("function mount")[1].split("data-it=\"copy\"")[0]                     # nothing switches by itself
+    node = shutil.which("node")
+    if not node:
+        return
+    acc = {"id": "a1", "name": "Иван Тест 3", "host": "demo", "key": "ab…yz", "copy_real": True, "slot": 3, "copy_id": "ivan3",
+           "copy_since": 1794900000000,
+           "real": {"open_n": 1, "open_pnl_usd": -4.2, "open": [], "closed_n": 2, "closed_pnl_usd": 3.1, "wins": 1, "total_pnl_usd": -1.1},
+           "study": {"since": 1, "closed_pnl_usd": 120, "open_pnl_usd": -340.5, "total_pnl_usd": -220.5, "worst_open_usd": -512,
+                     "max_dd_usd": 600, "max_dd_pct": 5.5, "open_n": 3, "open_averaged_n": 2, "open_max_steps": 4, "entries": 5, "adds": 7,
+                     "averagings": 6, "reduces": 1, "exits": 2, "winrate": 1, "closed_n": 2, "note_ru": "N",
+                     "ladders": [{"key": "ETH|LONG", "steps": 4, "adds": 3, "avg_downs": 3, "avg": 3000, "first_px": 3200, "worst_upnl": -300}],
+                     "last_events": [{"t": 1, "symbol": "ETH", "side": "LONG", "kind": "add", "averaging": True, "step": 4, "upnl": -280}]},
+           "data": {"account": {"equity": 10000, "positions": [], "closed": []}, "paper": {}, "summary": {}}}
+    doc = {"asof": 1, "label_ru": "ЯРЛЫК", "paper_rule_ru": "P", "copy_rule_ru": "ПРАВИЛО КОПИИ", "copy_real_any": True,
+           "accounts": [acc, {"id": "a2", "name": "Иван Тест 2", "host": "demo", "key": "k", "copy_real": False, "slot": None, "data": None}]}
+    a, b = app.index("// WHALE_LABEL_START"), app.index("// WHALE_LABEL_END")
+    script = f"""global.window={{}};require({json.dumps(os.path.join(root, "web", "ivan_tests.js"))});const C=window.CNIvanTests;
+{app[a:b]}
+const names={{}}, kindRu=g=>g, r=(sig,st,guest)=>realDeskOf(sig,st,guest,[],names,kindRu);
+process.stdout.write(JSON.stringify({{html:C.html({json.dumps(doc, ensure_ascii=False)},{{msg:'ОТВЕТ СЕРВЕРА'}}),on:C.confirmOn('Иван Тест 3',3),off:C.confirmOff('Иван Тест 3'),
+  labels:[r('ivan2:W-ETH-L-1',null,false),r('ivan3:W-ETH-L-1',null,false),r('ivan4:W-X-S-2',null,false),r('x:1','ivan4',false),r('ivan:W-ETH-L-1',null,false),
+          r('ivan5:W-ETH-L-1',null,false),r('ivan3:W-ETH-L-1',null,true),r('whales:W-1',null,false)]}}));"""
+    p = os.path.join(tempfile.mkdtemp(), "t.js")
+    open(p, "w", encoding="utf-8").write(script)
+    out = json.loads(subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout)
+    h = out["html"]
+    assert "ВКЛЮЧЕНО" in h and "«Иван · тест 3»" in h and "id ivan3:" in h and 'aria-checked="true"' in h and 'data-on="0"' in h
+    assert 'aria-checked="false"' in h and 'data-on="1"' in h and "Включить…" in h                    # the second account is off
+    assert "ЯРЛЫК" in h and "ПРАВИЛО КОПИИ" in h and "ОТВЕТ СЕРВЕРА" in h
+    for words in ("Открытый результат (не закрыт)", "Худший открытый убыток", "Макс. просадка", "В плюсе (только закрытые)",
+                  "Доливки / усреднения", "Открытые лесенки", "Наши реальные копии этого счёта", "усреднение"):
+        assert words in h, words
+    import re
+    for rx in (r"−\$340[.,]50", r"−\$512[.,]00", r"−\$600[.,]00", r"5[.,]50% от пика"):       # node may run without the ru locale
+        assert re.search(rx, h), rx
+    k = h.index('class="it-k"')                                    # the held loss and the drawdown come BEFORE the win rate, same tiles
+    assert h.index("Открытый результат", k) < h.index("Худший открытый убыток", k) < h.index("Макс. просадка", k) < h.index("В плюсе (только", k)
+    on, off = out["on"], out["off"]
+    for words in ("РЕАЛЬНЫЙ счёт", "реальные деньги", "не больше 50% бюджета фьючерсов", "стоп −16%", "дневной стоп", "не больше 15 копий",
+                  "только НОВЫЕ копии", "по нашему стопу", "не гарантирует"):
+        assert words in on, words
+    assert "Новых копий не будет" in off and "по нашему стопу" in off
+    assert out["labels"] == ["копия: Иван · тест 2", "копия: Иван · тест 3", "копия: Иван · тест 4", "копия: Иван · тест 4", "копия: Иван",
+                             "W", "сигнал системы CRYPTO NOVA AI", "копия трейдера"]      # ivan5: is not a copy id

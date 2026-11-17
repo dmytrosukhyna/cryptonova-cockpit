@@ -52,6 +52,11 @@ def _usd_ru(v) -> str:
     return ("−" if v < 0 else "+") + "$" + body
 
 
+def _ddmm(ms) -> str:
+    """dd.mm in Kyiv time (17.11: the first copy's date)"""
+    return dt.datetime.fromtimestamp(int(ms) / 1000, KYIV).strftime("%d.%m")
+
+
 def _pct_ru(v) -> str:
     return "—" if v is None else (("−" if v < 0 else "+") + f"{abs(float(v)):.1f}".replace(".", ",") + "%")
 
@@ -285,10 +290,25 @@ def build(out: str = "web", now: int | None = None) -> dict:
                       "net_pct": x.get("net_pct"), "trades": x.get("trades"), "real": bool(x.get("real_money"))})
     # Ivan
     iv = _load(out, "ivan_stats.json")
-    ivan = {"stats": iv or None, "copied_real": False,
-            "source_ru": "Bybit (демо-счёт платформы Ивана), ключ только для чтения; сервер читает счёт каждые 15 минут "
-                         "(таймер cnq-okx-monitors) и шифрует подробности в web/ivan.enc.json.",
-            "copy_ru": "Реальный счёт Ивана сейчас не копирует: в исполнителе фьючерсов нет источника «Иван»."}
+    # 17.11 20:10 (owner): the copy line is read from the current state, never fixed text. Ivan is copied on the real account as
+    # the source «ivan:» (whales_top following, fut_owner trades by «whale»). The account type (demo / main) is not in any published
+    # file (ivan_watch.public_stats leaves the host out on purpose), so the source line does not claim one.
+    iv_rows = [f for f in following + dropped if str(f.get("addr") or "").startswith("ivan:")]
+    iv_cp = [c for f in iv_rows for c in f.get("copies") or []]
+    iv_t = (iv_rows[0].get("totals") or {}) if iv_rows else {}
+    iv_on = any(f.get("status") == "following" for f in iv_rows)
+    first = min((int(c["opened"]) for c in iv_cp if c.get("opened")), default=None)
+    if iv_on or iv_cp:
+        copy_ru = ((f"Копируется на реальный счёт OKX как источник «Иван» (ivan:)" if iv_on else "Сейчас не в списке копирования; раньше копировался")
+                   + (f", первая копия {_ddmm(first)}" if first else "")
+                   + f": закрыто {int(iv_t.get('n') or 0)} ({_usd_ru(iv_t.get('sum_usd') or 0)}), открыто {int(iv_t.get('open_n') or 0)} "
+                   f"({_usd_ru(iv_t.get('open_usd') or 0)}). Наш размер и наш стоп — сумма несравнима с его счётом.")
+    else:
+        copy_ru = "На реальный счёт сейчас не копируется: «Иван» не в списке копирования и копий нет."
+    ivan = {"stats": iv or None, "copied_real": bool(iv_on),
+            "source_ru": "Bybit, ключ только для чтения; сервер читает счёт каждые 15 минут (таймер cnq-okx-monitors) и шифрует "
+                         "подробности в web/ivan.enc.json.",
+            "copy_ru": copy_ru}
     return {"asof": now, "since": since, "switch_t": SWITCH_T, "fix_t": FIX_T,
             "markers": [{"t": SWITCH_T, "ru": "04.11 · копирование китов"}, {"t": BUDGET_T, "ru": "05.11 · бюджет 15% → 25%"},
                         {"t": FIX_T, "ru": "06.11 12:41 · исправления"}],

@@ -143,7 +143,7 @@
       return `<div class="it-acc"><div class="it-h"><b>${esc(a.name)}</b> <span class="it-m">Bybit ${a.host === 'demo' ? 'демо' : 'реальный'} · ключ ${esc(a.key)}${l.t ? ` · ${dt(l.t)}: ${esc(l.msg || '')}` : ''}</span>
         <button class="ib sm" type="button" data-it="check" data-id="${esc(a.id)}">Проверить</button> <button class="ib sm" type="button" data-it="remove" data-id="${esc(a.id)}">Отключить</button></div>${copyBox(a)}</div>`; }).join('');
     const links = (opts.links || []).map((x) => `<a class="it-lnk" href="${esc(x[1])}">${esc(x[0])}</a>`).join('');
-    return `<style>${CSS}</style><div class="it it-conn"><h2>Подключить стратегии Ивана (Тест 2 / 3 / 4) <span class="r muted">видно только тебе</span></h2>
+    return `<style>${CSS}</style><div class="it it-conn"><h2>Подключить ключи Ивана (Тест 2/3/4) <span class="r muted">видно только тебе</span></h2>
       ${opts.msg ? `<div class="it-flash" role="status">${esc(opts.msg)}</div>` : ''}
       <p class="it-m">Сюда вставляется ключ «Read-Only» каждого тест-счёта Ивана на Bybit. После подключения у счёта появится переключатель «Копировать на реальный счёт» — он выключен, пока вы сами его не включите.</p>
       ${opts.err ? `<p class="it-m">${esc(opts.err)}</p>` : ''}${rows || (R ? '<p class="it-m">Счета ещё не подключены.</p>' : '')}${form(true)}

@@ -75,7 +75,7 @@ def seed(wtop: dict, now: int) -> dict:
 
 
 def src_of(addr: str) -> str:
-    if str(addr).startswith("ivan:"):
+    if W.ivan_key(addr):                     # «ivan:bybit» and, 17.11, the test accounts «ivan2:bybit» …
         return "ivan"
     return WS.src_of(addr) or ("okx" if str(addr).startswith("okx:") else "hl")
 
@@ -110,6 +110,49 @@ def ivan_reader(env, st: dict):
     return read
 
 
+# 17.11 (owner, real money): «Иван Тест 2 / 3 / 4» — Bybit sub-accounts the owner connected in the form «Иван · тест-стратегии»
+# (cnq/api/ivan_tests.py: READ-ONLY keys, <run>/data/ivan_tests/accounts.json, mode 600, the same server user). An account whose
+# owner switch «копировать на реальный счёт» is ON (copy_real, default off) and that has a slot 2 / 3 / 4 is one more followed
+# «whale» here: addr «ivan<slot>:bybit», read straight from Bybit every pass (GET /v5/position/list on the host the owner chose —
+# the key never goes to the other host). Switched off / removed → it leaves the follow list: no new copies; copies already held
+# run to his exit / our stop while the account is still connected (a removed account's copies are closed as «blind» after 1 h).
+TESTS_FILE = "/opt/cnq/run/data/ivan_tests/accounts.json"
+TEST_SLOTS = (2, 3, 4)
+
+
+def tests_path(env=None) -> str:
+    e = os.environ if env is None else env
+    return e.get("IVAN_TESTS_FILE") or TESTS_FILE
+
+
+def test_accounts(env=None) -> list[dict]:
+    """the connected test accounts that have a slot: [{addr, name, key, secret, host, on}] (on = the owner's real-copy switch)"""
+    try:
+        with open(tests_path(env), encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return []
+    out, used = [], set()
+    for a in d if isinstance(d, list) else []:
+        try:
+            slot = int(a.get("slot") or 0)
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if slot not in TEST_SLOTS or slot in used or a.get("host") not in ("demo", "main") or not a.get("key") or not a.get("secret"):
+            continue
+        used.add(slot)
+        out.append({"addr": f"ivan{slot}:bybit", "name": f"Иван · тест {slot}", "key": str(a["key"]), "secret": str(a["secret"]),
+                    "host": a["host"], "on": a.get("copy_real") is True})
+    return out
+
+
+def test_reader(acc: dict):
+    """() → Bybit position rows of one test account, on the host the owner chose only"""
+    from . import ivan_watch as IV
+    fetch, base = IV.make_fetch(acc["key"], acc["secret"]), IV.HOSTS[acc["host"]]
+    return lambda: IV.read_positions(fetch, base)
+
+
 def ivan_positions(rows: list) -> list[dict]:
     """Bybit /v5/position/list rows → [{coin, side, size, notional, entry, upnl, lev, sl, opened}] (coin without the USDT quote)"""
     out = []
@@ -131,9 +174,10 @@ def poll(addr: str, mids: dict, post, okx_get, src_get: dict) -> tuple[list[dict
     k = src_of(addr)
     opened: dict = {}
     if k == "ivan":
-        reader = src_get.get("ivan")
+        reader = src_get.get("ivan") if addr == IVAN_ADDR else src_get.get(addr)      # a test account only ever uses ITS key
         if reader is None:
-            raise RuntimeError("нет ключа IVAN_BYBIT_KEY / IVAN_BYBIT_SECRET — позиции Ивана не читаются")
+            raise RuntimeError("нет ключа IVAN_BYBIT_KEY / IVAN_BYBIT_SECRET — позиции Ивана не читаются" if addr == IVAN_ADDR
+                               else "тест-счёт Ивана не подключён (нет ключа) — позиции не читаются")
         pos = ivan_positions(reader())
         for x in pos:
             if x.get("opened"):
@@ -182,6 +226,10 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
         desk = seed(wtop, now)
     fresh = now - int(W._f(wtop.get("asof"))) <= FOLLOW_STALE_MS
     fol = [x for x in (wtop.get("following") or []) if isinstance(x, dict) and x.get("addr")] if fresh else []
+    # 17.11 (owner): the test accounts with the real-copy switch ON are followed like Ivan (owner picks, outside the selection)
+    tests = test_accounts(env)
+    if fresh:
+        fol += [{"addr": a["addr"], "name": a["name"], "owner_pick": True} for a in tests if a["on"] and a["addr"] not in {x["addr"] for x in fol}]
     follow = [x["addr"] for x in fol]
     quality = {x["addr"]: {k: x.get(k) for k in ("win", "pf", "per_day", "pnl_60d", "lev_med")} for x in fol}
     names = {**(st.get("names") or {}), **{x["addr"]: x.get("name") or x.get("short") or x["addr"] for x in fol}}
@@ -189,6 +237,9 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     if IVAN_ADDR in follow and "ivan" not in src_get:
         src_get = {**src_get, "ivan": ivan_reader(env, st)}
     watch = list(dict.fromkeys(follow + [o["whale"] for o in desk.get("open") or []]))
+    for a in tests:                          # a reader for every test account we follow or still hold a copy of
+        if a["addr"] in watch and a["addr"] not in src_get:
+            src_get = {**src_get, a["addr"]: test_reader(a)}
     states, opened, errors = {}, {}, []
     gone = dict(st.get("gone") or {})
     vanished = []

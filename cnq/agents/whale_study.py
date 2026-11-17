@@ -126,6 +126,20 @@ DESK_STOP = 0.16                      # protective stop, fraction of the entry p
 # signal frequency, at least 2), and one whale's copies hold at most WHALE_CAP (a soft cap, so an active whale may use more than 1/N
 # while the others are quiet). Every real trade keeps its own caps in okx_futures (2 % risk, 3 % day stop, 5×, margin ≤ budget).
 WHALE_CAP = 0.50
+# 17.11 (owner): Ivan's test strategies («Иван Тест 2 / 3 / 4», Bybit sub-accounts) are copied like «ivan:» under their own
+# ids «ivan2:» / «ivan3:» / «ivan4:». ALL Ivan accounts are ONE trader for the per-trader cap above (they share WHALE_CAP).
+IVAN_KEYS = ("ivan", "ivan2", "ivan3", "ivan4")
+
+
+def ivan_key(addr) -> str | None:
+    """«ivan:bybit» → «ivan», «ivan3:bybit» → «ivan3»; None for every other trader"""
+    k = str(addr or "").split(":", 1)[0] if ":" in str(addr or "") else ""
+    return k if k in IVAN_KEYS else None
+
+
+def trader_of(addr) -> str:
+    """the trader behind an address: every Ivan account is the same trader"""
+    return "ivan" if ivan_key(addr) else str(addr or "")
 MIN_SLOTS, MIN_COPY_MARGIN = 2, 0.02
 STOP_MIN, STOP_MAX = 0.002, 0.15      # the whale's own stop is used only when it sits 0.2–15 % away on the protective side
 UA = {"Content-Type": "application/json", "User-Agent": "cryptonova-whale-study/1.0"}
@@ -1450,7 +1464,7 @@ def conflict_view(c: dict, mids: dict | None = None) -> dict:
         out["flat_pct"] = round((leg - CONFLICT_COST_SWITCH) * 100, 2)
     else:
         out["flat_pct"] = None
-    out["ivan"] = str(c.get("a", "")).startswith("ivan:") or str(c.get("b", "")).startswith("ivan:")
+    out["ivan"] = bool(ivan_key(c.get("a")) or ivan_key(c.get("b")))
     return out
 
 
@@ -1609,7 +1623,7 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
         seen[addr] = {c: p["side"] for c, p in cur.items()}
         # 06.11 (owner, Ivan: «never copy his adds / averaging-down»): an owner pick's entry is FIXED at first sight — his later
         # averaging moves his avgPrice, not our join window (one copy per position, never added to)
-        if addr.startswith("ivan:"):
+        if ivan_key(addr):
             fe = d.setdefault("first_entry", {})
             keep = {f"{addr}|{c}|{p['side']}" for c, p in cur.items()}
             for k_ in [k_ for k_ in fe if k_.startswith(addr + "|") and k_ not in keep]:
@@ -1680,7 +1694,7 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
                 d["events"].append(ev)
             continue
         eq = d["cash"] + sum(mark(o) for o in d["open"])
-        used = sum(risk_margin(o, eq) for o in d["open"] if o["whale"] == addr)
+        used = sum(risk_margin(o, eq) for o in d["open"] if trader_of(o["whale"]) == trader_of(addr))   # 17.11: Ivan's accounts = one trader
         ucap, _rec = util_cap(d, now)
         free = ucap * eq - sum(risk_margin(o, eq) for o in d["open"])         # 05.11: up to the adaptive utilisation target
         # 04.11 22:38 (owner): free margin ÷ the copies still expected today, never past the soft per-whale cap
@@ -1755,8 +1769,8 @@ def paper_trade(o: dict, closed: bool = False) -> dict:
          "tps": [], "parts": [], "qty": qty, "qty_left": qty, "risk_usd": round(qty * abs(e - stp), 2), "opened": int(_f(o.get("opened_t"))),
          "copy_lev": min(DESK_LEV_CAP, max(1.0, _f(o.get("lev"), 1.0))), "whale": o.get("whale"), "notional": o.get("notional"),
          "whale_entry": o.get("whale_entry"), "join": bool(o.get("join")), "gap_pct": o.get("gap_pct")}
-    if str(o.get("whale") or "").startswith("ivan:"):              # 06.11: Ivan's copies — the panel attributes them by «sig» ivan:…
-        t["sig"] = f"ivan:{t['id']}"
+    if ivan_key(o.get("whale")):              # 06.11: Ivan's copies — the panel attributes them by «sig» ivan:… (17.11: ivan2:… etc.)
+        t["sig"] = f"{ivan_key(o.get('whale'))}:{t['id']}"
     if closed:
         t.update(closed=int(_f(o.get("closed_t"))), exit=o.get("exit"), net_usd=o.get("pnl"), exit_kind=o.get("why"))
     return t

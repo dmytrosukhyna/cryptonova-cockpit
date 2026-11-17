@@ -86,12 +86,18 @@ LIQ_ROOM = 0.8              # leverage ≤ 0.8 ÷ stop distance: the stop always
 WHALES = "whales"           # the copy desk's key (desk_select stages, the trade ids «whales:<id>»)
 IVAN = "ivan"               # 06.11 (owner): Ivan's copies come from the same whale desk, held as «ivan:<id>» (the panel's «sig»), same budget
 WHALES_STALE_MS = 3 * 3_600_000
-COPY_PREFIXES = (WHALES + ":", IVAN + ":")    # 10.11: the only signals the real sleeve may open
+# 17.11 (owner, real money): «Иван Тест 2 / 3 / 4» (Bybit sub-accounts the owner connected and switched on one by one) are copied like
+# «ivan:» under their own desk keys. ALL Ivan desks together are ONE trader: ≤ IVAN_CAP of the futures budget as margin.
+IVAN_KEYS = (IVAN, "ivan2", "ivan3", "ivan4")
+IVAN_CAP = 0.50
+IVAN_NAMES = {IVAN: "Иван · копия (выбор владельца)", "ivan2": "Иван · тест 2 · копия", "ivan3": "Иван · тест 3 · копия",
+              "ivan4": "Иван · тест 4 · копия"}
+COPY_PREFIXES = (WHALES + ":",) + tuple(k + ":" for k in IVAN_KEYS)    # 10.11: the only signals the real sleeve may open
 NOT_COPY = "не сигнал копирования — отклонено"
 
 
 def copy_sig(tid, env=None) -> bool:
-    """10.11: may the real sleeve open this desk trade? Only «whales:…» / «ivan:…». OKX_FUT_ALLOW_DESKS (TESTS ONLY — never set on the
+    """10.11: may the real sleeve open this desk trade? Only «whales:…» / «ivan:…» (17.11: + «ivan2:» / «ivan3:» / «ivan4:»). OKX_FUT_ALLOW_DESKS (TESTS ONLY — never set on the
     server) lists more desk keys, «*» = any; the mechanics tests of the other desks use it"""
     if str(tid).startswith(COPY_PREFIXES):
         return True
@@ -339,7 +345,7 @@ def fetch_desks(env=None, st: dict | None = None) -> list:
         st["sel"] = {"stages": {"alloc": staged_alloc(sel)}} if sel else None     # the ladder's shares for desk_parts() this pass
         st["ladder_risk_back"] = ((sel or {}).get("stages") or {}).get("whales_risk_back") if sel else None      # 06.11
     held = held_desks(st)
-    held_w = WHALES in held or IVAN in held
+    held_w = WHALES in held or any(k in held for k in IVAN_KEYS)
     if not forced and (staged_alloc(sel).get(WHALES, 0) > 0 or held_w):     # 04.11: the whales copy desk
         try:
             wtop = _get_json(whales_src(env))
@@ -363,18 +369,30 @@ def fetch_desks(env=None, st: dict | None = None) -> list:
 
 
 def split_ivan(ds: list, held=()) -> list:
-    """06.11: the whale desk's copies of Ivan (whale «ivan:…») become a desk of their own — key IVAN, the same budget part as WHALES"""
+    """06.11: the whale desk's copies of Ivan (whale «ivan:…») become a desk of their own — key IVAN, the same budget part as WHALES.
+    17.11: the same for each test account («ivan2:…» → desk «ivan2», …)"""
+    from ..agents.whale_study import ivan_key
     out = []
     for k, d in ds:
         if k != WHALES:
             out.append((k, d))
             continue
         opn = d.get("open") or []
-        iv = [t for t in opn if str(t.get("whale") or "").startswith("ivan:")]
-        out.append((k, {**d, "open": [t for t in opn if t not in iv]}))
-        if iv or IVAN in held:
-            out.append((IVAN, {**d, "name": "Иван · копия (выбор владельца)", "open": iv, "_share_of": WHALES}))
+        by = {key: [t for t in opn if ivan_key(t.get("whale")) == key] for key in IVAN_KEYS}
+        out.append((k, {**d, "open": [t for t in opn if not ivan_key(t.get("whale"))]}))
+        for key in IVAN_KEYS:
+            if by[key] or key in held:
+                out.append((key, {**d, "name": IVAN_NAMES[key], "open": by[key], "_share_of": WHALES}))
     return out
+
+
+def ivan_margin(trades: dict) -> float:
+    """17.11: the margin ($) the account holds in copies of ALL Ivan accounts (state «trades»: contracts × contract value × entry ÷ leverage)"""
+    tot = 0.0
+    for tid, m in (trades or {}).items():
+        if str((m or {}).get("desk") or str(tid).split(":")[0]) in IVAN_KEYS:
+            tot += (ms._f(m.get("c0")) or 0) * (ms._f(m.get("ct")) or 0) * (ms._f(m.get("entry")) or 0) / max(1.0, ms._f(m.get("lev")) or 1.0)
+    return tot
 
 
 # ── OKX: the swap calls (through the autopilot's signed client — no transfer, no withdrawal exists here) ──────────────────
@@ -1184,6 +1202,15 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
                     log({"ev": "skip", "id": tid, "inst": dcs["inst"], "why": dcs["skip"]}, log_path)
                 continue
             inst_id, inst, s, long = dcs["inst"], dcs["inst_info"], dcs["s"], dcs["long"]
+            # 17.11 (owner): every Ivan account is the same trader — their copies together hold ≤ IVAN_CAP of the futures budget
+            # as margin (this copy included; a single copy while nothing of his is held keeps its usual size); not final:
+            # re-checked every pass, the late-entry guard still applies
+            iv_held = ivan_margin(st["trades"]) if dk in IVAN_KEYS else 0.0      # nothing held → the first copy is sized as before
+            if iv_held > 0 and bud["usd"] > 0 and iv_held + (ms._f(s.get("margin")) or 0) > IVAN_CAP * bud["usd"]:
+                res["skipped"].append({"id": tid, "inst": inst_id,
+                                       "why": f"у Ивана (все его счета вместе) уже {ivan_margin(st['trades']) / bud['usd'] * 100:.0f}% "
+                                              f"бюджета фьючерсов — предел {IVAN_CAP * 100:.0f}% на одного трейдера"})
+                continue
             seq += 1
             if dcs.get("settle") == "USDC":
                 via_used = True

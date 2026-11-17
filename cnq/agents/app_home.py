@@ -1966,7 +1966,7 @@ def _polished(doc: dict, lang: str) -> dict:
     return d
 
 
-_SIG_INTERNAL = re.compile(r"^[a-z_]+:")
+_SIG_INTERNAL = re.compile(r"^[a-z_][a-z0-9_]*:")      # 17.11: «ivan2:…» must be neutralised too
 
 
 def public_sig(sig: str) -> str:

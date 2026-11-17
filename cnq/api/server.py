@@ -139,7 +139,7 @@ class Api:
         self.listing_short = listing_short_api.ListingShort(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "listing_short"))
         # 13.11: the paper test desk «Альты от китов» — owner-only, kept in <run>/data/smart_alts (cnq/api/smart_alts.py)
         # 13.11: «Иван · тест-стратегии» — Ivan's Bybit demo accounts, read-only keys, observation + paper copy (cnq/api/ivan_tests.py)
-        self.ivan_tests = ivan_tests_api.IvanTests(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "ivan_tests"))
+        self.ivan_tests = ivan_tests_api.IvanTests(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "ivan_tests"), web_dir=web_dir)
         self.smart_alts = smart_alts_api.SmartAlts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "smart_alts"), web_dir)
         self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
         try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
@@ -501,7 +501,8 @@ class Api:
             return deny
         if method == "POST" and path == "/v2/owner/peter/token/rotate":     # 11.11: «Новый токен» for Peter's MT5 bridge
             return self.peter.token_view(rotate=True)
-        if method == "POST" and path in ("/v2/owner/ivan_tests/add", "/v2/owner/ivan_tests/check", "/v2/owner/ivan_tests/remove"):
+        if method == "POST" and path in ("/v2/owner/ivan_tests/add", "/v2/owner/ivan_tests/check", "/v2/owner/ivan_tests/remove",
+                                         "/v2/owner/ivan_tests/copy_real"):
             try:                                                            # 13.11: «Иван · тест-стратегии» (owner session only)
                 form = json.loads((body or b"{}").decode("utf-8"))
             except (ValueError, UnicodeDecodeError):
@@ -509,6 +510,8 @@ class Api:
             form = form if isinstance(form, dict) else {}
             if path.endswith("/add"):
                 return self.ivan_tests.add(form)
+            if path.endswith("/copy_real"):                                 # 17.11: the per-account real-copy switch (default off)
+                return self.ivan_tests.set_copy(str(form.get("id") or ""), form.get("on"))
             return (self.ivan_tests.check if path.endswith("/check") else self.ivan_tests.remove)(str(form.get("id") or ""))
         if method == "POST" and path == "/v2/owner/peter/cloud":            # 11.11 option B: the form «Подключение через пароль инвестора»
             try:
@@ -924,7 +927,7 @@ def main() -> int:
         here = os.path.dirname(os.path.realpath(__file__))
         agents = os.path.join(os.path.dirname(here), "agents")            # what the API imports from the engine's package
         files = lambda: [os.path.join(here, f) for f in os.listdir(here) if f.endswith(".py")] + \
-            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py") if os.path.exists(os.path.join(agents, f))]
+            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py") if os.path.exists(os.path.join(agents, f))]
         stamp = lambda: max(os.path.getmtime(p) for p in files())
         first = stamp()
         while True:

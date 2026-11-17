@@ -91,6 +91,9 @@ def test_the_desk_is_owner_only_and_never_a_public_file(tmp_path):
     assert srv.count("reversal.desk()") == 1 and "api.reversal.start()" in srv           # no other route serves it
     core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
     assert "{ id: 'reversal', name: 'Разворот (тест)', short: 'Разворот', icon: 'strategies', owner: true, group: 'tests' }" in core
-    assert '"vip/reversal.js"' in vip and 'id="reversalCard" hidden' in app and "/v2/owner/reversal" in app
+    assert '"vip/reversal.js"' in vip
+    # 17.11 20:01 (owner): management tools live ONLY on cryptonova.vip (vip.html) — app.html shows results, none of these
+    assert not any(x in app for x in ("peterCard", "reversalCard", "smartAltsCard", "ivanTestsCard", "ownerToolsCard", "/v2/owner/peter",
+                                      "/v2/owner/reversal", "/v2/owner/smart_alts", "/v2/owner/ivan_tests", "CNIvanTests", "copy_real"))
     js = r("web", "reversal.js")
     assert "Оговорки" in js and "Правило" in js and "fetch('./reversal" not in js and "reversal_desk.json" not in app + js + r("web", "vip", "reversal.js")

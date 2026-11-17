@@ -1,4 +1,4 @@
-"""Backlog 189 (17.11.2026 18:34, owner hypothesis: «у хороших трейдеров чем глубже просадка по позиции, тем лучше для нас в неё
+"""Backlog 196 (17.11.2026 18:34, owner hypothesis: «у хороших трейдеров чем глубже просадка по позиции, тем лучше для нас в неё
 входить»). RESEARCH + PAPER ONLY — no real-account change whatever the result. Extends backlog 164 (whale_joindepth) past the live
 −3 % window. PRE-REGISTERED (this file is committed before any result is seen):
 

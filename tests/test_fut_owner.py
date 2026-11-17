@@ -65,6 +65,9 @@ def test_every_real_copy_finds_its_trader_and_the_totals_add_up():
     names = [x["name_ru"] for x in d["tests"][:2]]
     assert names == ["CRYPTO NOVA v1 (правила, до 04.11)", "CRYPTO NOVA v2 — копирование китов, с 04.11"]
     assert d["ivan"]["copied_real"] is False and d["ivan"]["stats"]["closed_n"] == 1
+    # 17.11 20:10 (owner): the copy line comes from the current state; the source line does not claim a demo account it cannot see
+    assert d["ivan"]["copy_ru"] == "На реальный счёт сейчас не копируется: «Иван» не в списке копирования и копий нет."
+    assert "демо" not in d["ivan"]["source_ru"] and "нет источника" not in open(F.__file__, encoding="utf-8").read()
     json.dumps(d)
 
 
@@ -73,7 +76,7 @@ def test_the_owner_card_is_owner_only_in_both_panels():
     assert 'id="fOwnCard"' in app and "#fOwnCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard" in app
     assert "if(I.guest||document.body.classList.contains('guest')){ el.hidden=true; el.innerHTML=''; return; }" in app
     fut = open("web/vip/futures.js", encoding="utf-8").read()
-    assert "if (V.auth.owner() && window.CNFutOwner)" in fut
+    assert "if (!V.auth.owner()) {" in fut and fut.index("if (!V.auth.owner()) {") < fut.index("window.CNFutOwner.html(")
     js = open("web/fut_owner.js", encoding="utf-8").read()
     assert "window.CNFutOwner = { html, mount }" in js
 
@@ -170,8 +173,8 @@ def test_owner_futures_is_one_compact_list_with_ivan_apart_and_the_connect_box()
     assert "ownerToolsCard" not in app and "connectHtml" not in app and "/v2/owner/ivan_tests" not in app
     for href in ("#/peter", "#/reversal", "#/smart_alts", "#/ivan_tests"):
         assert f"'{href}'" in vfut, href
-    assert "if (V.auth.owner() && window.CNFutOwner)" in vfut and vfut.index("if (V.auth.owner() && window.CNFutOwner)") < vfut.index("connectHtml(")
-    assert "function connectHtml(R, opts)" in it and "form(true)" in it and "Подключить стратегии Ивана (Тест 2 / 3 / 4)" in it
+    assert vfut.index("if (!V.auth.owner()) {") < vfut.index("connectHtml(")
+    assert "function connectHtml(R, opts)" in it and "form(true)" in it and "Подключить ключи Ивана (Тест 2/3/4)" in it
     # the phone menu and the cache
     assert "group: 'tests'" in core and "V.bottomNav = function (routes)" in core and "V.BNAV_MAX = 8" in core
     assert "Math.floor(Date.now() / 3600000)" in vip and "'?h=' + h" in vip
@@ -211,3 +214,68 @@ process.stdout.write(window.CNFutOwner.html({json.dumps(doc, ensure_ascii=False)
     assert re.search(r"его счёт <span[^>]*>−\u2060\$1\s616</span> · наши копии <span[^>]*>−\u2060\$39</span>", iv)
     body = iv[iv.index("</summary>"):]
     assert body.index("−\u2060$685") < body.index("Наши копии по нему") < body.index("−\u2060$39")    # his money first, ours apart
+
+
+def test_strategies_today_on_top_of_the_owners_futures():
+    """17.11 20:10 (owner): on vip.html «Фьючерсы» the owner first sees ONE list «Стратегии сегодня» — the real account's futures,
+    each followed trader, Ivan (his account, our copies apart), Ivan Test 2/3/4, the demo desk «Киты», Разворот, Альты от китов,
+    Golden Donut — each one row: today's $ and % and how many are open, details on tap; every «сегодня» says what it measures and
+    nothing is estimated. Below: everything folded; vip.html#/futures/ivan-keys opens the Ivan keys box and scrolls to it. app.html
+    has one owner-only link to the panel and no tools."""
+    import shutil
+    import subprocess
+    import tempfile
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rd = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()                                       # noqa: E731
+    vfut, vip, app = rd("web", "vip", "futures.js"), rd("web", "vip.html"), rd("web", "app.html")
+    assert '"strat_today.js", "vip/futures.js"' in vip
+    assert vfut.index("data-st-top") < vfut.index("fold('fut-owner'") < vfut.index("fold('ivan-keys'") < vfut.index("fold('fut-real'")
+    assert "arg === 'ivan-keys'" in vfut and "k.open = true" in vfut and "scrollIntoView" in vfut
+    assert "Подключить ключи Ивана (Тест 2/3/4)" in vfut
+    # app.html: the owner-only link, nothing else
+    assert 'id="ownerPanelLink" href="vip.html#/futures" hidden' in app and "CNAuth.state.isOwner===true" in app
+    assert "/v2/owner/ivan_tests" not in app and "connectHtml" not in app
+    node = shutil.which("node")
+    if not node:
+        return
+    H, D = 3_600_000, 86_400_000
+    now = 1794938000000
+    day0 = now - now % D
+    src = {
+        "home": {"public_portfolio": {"futures": {"periods": {"day": {"available": True, "usd": -36.35, "pct": -2.79}}}}},
+        "real": {"futures": [{"inst": "ETH-USDT-SWAP", "side": "long", "upnl_usd": -3.9}]},
+        "fo": {"following": [{"addr": "bn:1", "name": "0xRubi", "totals": {"total_usd": 11.8}}, {"addr": "okx:2", "name": "ТИХИЙ", "totals": {}},
+                             {"addr": "ivan:bybit", "name": "Иван", "totals": {}}],
+               "trades": [{"whale": "bn:1", "coin": "AAVE", "side": "SHORT", "closed": False, "pnl_usd": -10.65},
+                          {"whale": "bn:1", "coin": "SOL", "side": "LONG", "closed": True, "closed_t": day0 + H, "pnl_usd": 5.0},
+                          {"whale": "bn:1", "coin": "XRP", "side": "LONG", "closed": True, "closed_t": day0 - H, "pnl_usd": 99.0},
+                          {"whale": "ivan:bybit", "coin": "BTC", "side": "LONG", "closed": False, "pnl_usd": -0.85}],
+               "desk": {"pnl_pct": 11.0, "pnl_usd": 1100, "history": [[day0 + 5 * H, 11265.11], [now, 11148.81]]}},
+        "ivanStats": {"open_n": 9, "open_upnl_usd": -1003.67, "net_closed_usd": 246.38},
+        "ivanTests": {"accounts": [{"id": "a1", "name": "Иван Тест 2", "copy_real": True, "real": {"open_n": 1, "open_pnl_usd": -2},
+                                    "data": {"account": {"equity_hist": [[day0 - H, 10000], [day0 + H, 10100], [now, 9900]], "positions": [{}], "upnl": -40}}}]},
+        "reversal": {"data": {"pnl_usd": 12, "open": [{"coin": "ZEC", "side": "SHORT", "upnl": 3}],
+                              "closed": [{"closed_t": day0 + 2 * H, "pnl": -4}, {"closed_t": day0 - 2 * H, "pnl": 50}]}},
+        "smartAlts": None,
+        "peter": {"data": {"pnl_pct": 1.5, "equity_notional": 10150, "curve": [[day0 - D, 10000], [day0 + H, 10200]], "open": []}},
+    }
+    js = f"""global.window={{}};require({json.dumps(os.path.join(root, "web", "strat_today.js"))});const C=window.CNStratToday;
+const R=C.rows({json.dumps(src, ensure_ascii=False)},{now});process.stdout.write(JSON.stringify({{rows:R,html:C.html(R)}}));"""
+    p = os.path.join(tempfile.mkdtemp(), "s.js")
+    open(p, "w", encoding="utf-8").write(js)
+    out = json.loads(subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout)
+    R = {r["key"]: r for r in out["rows"]}
+    assert [r["key"] for r in out["rows"]] == ["real", "w:bn:1", "w:okx:2", "ivan", "it:a1", "desk", "reversal", "smart_alts", "peter"]
+    assert R["real"]["today"] == {"usd": -36.35, "pct": -2.79, "label": "с 00:00 UTC"} and R["real"]["open"]["n"] == 1
+    assert R["w:bn:1"]["today"]["usd"] == 5.0 and R["w:bn:1"]["today"]["pct"] is None and R["w:bn:1"]["open"] == {"n": 1, "usd": -10.65}
+    assert R["w:okx:2"]["today"] is None and "наших копий пока нет" in R["w:okx:2"]["note"]
+    assert R["w:bn:1"]["today"]["label"] == "закрыто сегодня · 1"
+    assert R["ivan"]["today"] is None and "его счёт" in R["ivan"]["note"] and "наши копии: открыто 1" in R["ivan"]["note"]
+    assert R["it:a1"]["today"] == {"usd": -100.0, "pct": -1.0, "label": "с 00:00 UTC"} and "ВКЛ" in R["it:a1"]["tag"]
+    assert R["desk"]["today"]["label"].startswith("с 05:00") and R["desk"]["today"]["usd"] == -116.3     # the curve starts later: said so
+    assert R["reversal"]["today"]["usd"] == -4 and R["reversal"]["today"]["label"] == "закрыто сегодня · 1"
+    assert R["smart_alts"]["today"] is None and R["smart_alts"]["note"] == "нет данных с сервера"
+    assert R["peter"]["today"]["usd"] == 150.0 and R["peter"]["today"]["label"] == "с 00:00 UTC"
+    h = out["html"]
+    assert "Стратегии сегодня" in h and h.count('<details class="st-r"') == 9 and " open" not in h.split("Стратегии сегодня")[1].split(">")[0]
+    assert "за сегодня нет данных" in h and "сегодня = с 00:00 UTC" in h

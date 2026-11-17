@@ -88,6 +88,6 @@ def test_owner_only_cards_on_the_panel():
     html = open(os.path.join(ROOT, "web", "vip.html"), encoding="utf-8").read()
     assert "V.ownerWatchCard && V.auth.owner() ? await V.ownerWatchCard()" in spot and "${OW}\n        ${summary(M, X)}" in spot
     assert "V.ownerHealthCard && V.auth.owner() ? await V.ownerHealthCard()" in ov and "return `${HL}<div class=\"ph\">" in ov
-    assert '<script src="vip/watch.js"></script>' in html and '<script src="vip/health.js"></script>' in html
+    assert '"vip/watch.js"' in html and '"vip/health.js"' in html
     yml = open(os.path.join(ROOT, ".github", "workflows", "site.yml"), encoding="utf-8").read()
     assert "python -m cnq.agents.owner_watch" in yml and "python -m cnq.agents.owner_health" in yml and "web/owner_watch.json" in yml

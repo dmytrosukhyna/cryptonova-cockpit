@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="vip/vip.css">
+<link rel="stylesheet" href="vip/vip.css?v=2">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -62,28 +62,19 @@
   <div class="sheet-b" id="sheetBody"></div>
 </section>
 
-<script src="vip/auth.js"></script>
-<script src="vip/core.js"></script>
-<script src="vip/chart.js"></script>
-<script src="vip/overview.js"></script>
-<script src="vip/spot.js"></script>
-<script src="vip/watch.js"></script>
-<script src="vip/health.js"></script>
-<script src="fut_owner.js?v=3"></script>
-<script src="vip/futures.js"></script>
-<script src="vip/strategies.js"></script>
-<script src="vip/whales.js"></script>
-<script src="peter.js?v=3"></script>
-<script src="vip/peter.js"></script>
-<script src="reversal.js?v=1"></script>
-<script src="vip/reversal.js"></script>
-<script src="smart_alts.js?v=1"></script>
-<script src="vip/smart_alts.js"></script>
-<script src="ivan_tests.js?v=1"></script>
-<script src="vip/ivan_tests.js"></script>
-<script src="vip/opps.js"></script>
-<script src="vip/system.js"></script>
-<script src="vip/demo.js"></script>
-<script>VIP.start();</script>
+<script>
+/* 17.11 (owner 18:31: new tabs did not appear without a manual refresh): every script is asked for with the current hour in its
+   address, so a browser never keeps an old panel for longer than an hour — and no one has to remember to bump a version by hand.
+   document.write keeps the order; VIP.start() runs after the last one. */
+(function () {
+  var h = Math.floor(Date.now() / 3600000);
+  ["vip/auth.js", "vip/core.js", "vip/chart.js", "vip/overview.js", "vip/spot.js",
+   "vip/watch.js", "vip/health.js", "fut_owner.js", "vip/futures.js", "vip/strategies.js",
+   "vip/whales.js", "peter.js", "vip/peter.js", "reversal.js", "vip/reversal.js",
+   "smart_alts.js", "vip/smart_alts.js", "ivan_tests.js", "vip/ivan_tests.js", "vip/opps.js",
+   "vip/system.js", "vip/demo.js"].forEach(function (s) { document.write('<script src="' + s + '?h=' + h + '"><\/script>'); });
+  document.write('<script>VIP.start();<\/script>');
+})();
+</script>
 </body>
 </html>

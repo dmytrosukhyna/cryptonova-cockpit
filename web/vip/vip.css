@@ -377,3 +377,8 @@ body.compact .tbl td{padding:5px 8px}body.compact .li{padding:6px 0}body.compact
 .ow-l{margin:4px 0 8px 18px;padding:0;line-height:1.5;font-size:13px}
 .hl-tbl td{vertical-align:top}
 .hl-dot{font-size:14px;white-space:nowrap}
+
+/* 17.11: the owner's test desks as a group in the side menu, and the lists the phone menu's «Тесты» / «Ещё» open */
+.nav-group{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 12px 4px}
+.nav-sheet{display:grid;gap:8px}.nav-sheet a{display:flex;align-items:center;gap:12px;min-height:48px;padding:10px 14px;border:1px solid var(--line2);border-radius:12px;color:inherit;text-decoration:none;font-weight:600}
+.nav-sheet a[aria-current="page"]{background:var(--accent-bg)}.nav-sheet a .ico{width:20px;height:20px}

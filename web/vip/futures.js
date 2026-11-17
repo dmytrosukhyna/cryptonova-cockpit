@@ -6,6 +6,7 @@
   const symOf = (inst) => String(inst || '').split('-')[0] || '—';
   const deskOf = (sig, names) => { if (!sig) return null; const k = String(sig).split(':')[0]; return names[k] || k; };
 
+  const DESKS = [['Golden Donut', '#/peter'], ['Разворот (тест)', '#/reversal'], ['Альты от китов (тест)', '#/smart_alts'], ['Иван · тест-стратегии', '#/ivan_tests']];
   V.views.futures = {
     async html() {
       const [M, names, DS, H] = await Promise.all([V.real(), V.deskNames(), V.feed('desk_select.json'), V.feed('app_home.json')]);
@@ -18,6 +19,14 @@
           let IV = null; try { IV = await V.ownerData('ivan'); } catch (e) { IV = null; }
           OWN = `<div class="card" style="margin-bottom:var(--gap)">${window.CNFutOwner.html(FO, { ivan: IV, ivanStats: IS })}</div>`;
         } catch (e) { OWN = ''; }
+        // 17.11 (owner 18:31): right under the owner's picture — the connect form of Ivan's test accounts with their real-copy
+        // switches (the same component as the tab «Иван · тест-стратегии») and links to the test desks
+        if (window.CNIvanTests && V.ivanTestsApi) {
+          let IT = null, err = '';
+          try { IT = await window.CNAuth.fetchOwner('/v2/owner/ivan_tests'); } catch (e) { err = 'Список счетов не загрузился — форма ниже работает.'; }
+          V.views.futures._it = IT;
+          OWN += `<div class="card" data-it="tools" style="margin-bottom:var(--gap)">${window.CNIvanTests.connectHtml(IT, { err, links: DESKS })}</div>`;
+        }
       }
       return `<div class="ph"><div><h2>Фьючерсы</h2><p>Реальные фьючерсные позиции счёта CRYPTO NOVA на OKX с ${V.PUBLIC_START_LABEL}. Тестовые сделки демо-столов здесь не показываются.</p></div></div>
         ${OWN}
@@ -27,6 +36,12 @@
     },
     mount(el) {
       if (window.CNFutOwner) window.CNFutOwner.mount(el);
+      const tools = el.querySelector('[data-it="tools"]');
+      if (tools && window.CNIvanTests && V.ivanTestsApi) {
+        let last = V.views.futures._it || null;
+        const re = (D, msg) => { if (D && D.accounts) last = D; tools.innerHTML = window.CNIvanTests.connectHtml(last, { msg, links: DESKS }); window.CNIvanTests.mount(tools, V.ivanTestsApi, re); };
+        window.CNIvanTests.mount(tools, V.ivanTestsApi, re);
+      }
       el.querySelectorAll('[data-fper]').forEach((b) => b.addEventListener('click', () => { if (!b.disabled) { ui.per = b.dataset.fper; V.render({ keepScroll: true }); } }));
       el.querySelectorAll('[data-ff]').forEach((i) => i.addEventListener('change', () => { ui[i.dataset.ff] = i.value; V.render({ keepScroll: true }); }));
       const r = el.querySelector('[data-freset]'); if (r) r.addEventListener('click', () => { Object.assign(ui, { from: '', to: '', sym: '', strat: '', res: '' }); V.render({ keepScroll: true }); });

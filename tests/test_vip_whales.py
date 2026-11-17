@@ -341,7 +341,7 @@ def test_pipeline_runs_and_commits_the_new_feeds():
 
 def test_panel_has_the_whales_route_and_the_spot_card():
     html = (ROOT / "web" / "vip.html").read_text(encoding="utf-8")
-    assert 'src="vip/whales.js"' in html and 'id="i-whales"' in html
+    assert '"vip/whales.js"' in html and 'id="i-whales"' in html
     core = (ROOT / "web" / "vip" / "core.js").read_text(encoding="utf-8")
     assert "id: 'whales'" in core
     js = (ROOT / "web" / "vip" / "whales.js").read_text(encoding="utf-8")
@@ -462,3 +462,25 @@ def test_panel_shows_the_token_watchlist_and_patterns():
     assert "Список токенов китов" in js and "Что срабатывало" in js and "data-wlst" in js and "мало данных" in js
     for s in SWT.STATUS_ORDER:
         assert s in js
+
+
+def test_vip_phone_menu_folds_the_test_desks_into_one_group_when_they_do_not_fit():
+    """17.11 (owner 18:31: «не могу найти вкладки»): the phone's bottom menu holds 8 places, an owner has 12 tabs — the owner's
+    test desks fold into «Тесты» (and opps / demo / system into «Ещё»), each opening a list; a guest's menu stays as it was"""
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if not node:
+        return
+    core = (ROOT / "web" / "vip" / "core.js").read_text(encoding="utf-8")
+    a, b = core.index("  V.ROUTES = ["), core.index("  V.parse = ")
+    c, d = core.index("  V.NAV_GROUPS"), core.index("  function paintNav(cur)")
+    js = "const V={};\n" + core[a:b] + core[c:d] + """
+const show=(own)=>V.bottomNav(V.ROUTES.filter(r=>!r.owner||own)).map(x=>x.route?x.route.id:'['+x.group+':'+x.routes.map(r=>r.id).join(',')+']');
+process.stdout.write(JSON.stringify([show(true),show(false)]));"""
+    p = pathlib.Path(tempfile.mkdtemp()) / "n.js"
+    p.write_text(js, encoding="utf-8")
+    own, guest = json.loads(subprocess.run([node, str(p)], capture_output=True, text=True, timeout=30).stdout)
+    assert own == ["overview", "spot", "futures", "strategies", "whales", "[tests:peter,reversal,smart_alts,ivan_tests]", "[more:opps,demo,system]"]
+    assert len(own) <= 8 and guest == ["overview", "spot", "futures", "strategies", "opps", "demo", "system"]

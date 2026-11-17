@@ -299,16 +299,18 @@
     // внутреннего понимания»): owner-only — hidden from the menu and refused by the router unless CNAuth.state.isOwner
     { id: 'whales', name: 'Киты', short: 'Киты', icon: 'whales', owner: true },
     // 11.11: «Питер» — MT5 gold trader under observation (vip/peter.js, ../peter.js), owner-only like «Киты»
-    { id: 'peter', name: 'Golden Donut', short: 'Donut', icon: 'strategies', owner: true },
+    // 17.11 (owner 18:31: «не могу найти вкладки»): the four test desks are one group «Тесты» — on a phone the bottom menu
+    // holds 8 places and an owner has 12 tabs, so the last ones fell out of sight; the group and «Ещё» open a list instead
+    { id: 'peter', name: 'Golden Donut', short: 'Donut', icon: 'strategies', owner: true, group: 'tests' },
     // 11.11: «Разворот (тест)» — a paper test desk built on our copies: owner-only (vip/reversal.js, ../reversal.js)
-    { id: 'reversal', name: 'Разворот (тест)', short: 'Разворот', icon: 'strategies', owner: true },
+    { id: 'reversal', name: 'Разворот (тест)', short: 'Разворот', icon: 'strategies', owner: true, group: 'tests' },
     // 13.11: «Альты от китов (тест)» — paper desk on smart-money accumulation: owner-only (vip/smart_alts.js, ../smart_alts.js)
-    { id: 'smart_alts', name: 'Альты от китов (тест)', short: 'Альты', icon: 'strategies', owner: true },
+    { id: 'smart_alts', name: 'Альты от китов (тест)', short: 'Альты', icon: 'strategies', owner: true, group: 'tests' },
     // 13.11: «Иван · тест-стратегии» — Ivan's Bybit demo accounts, read-only keys, paper copy: owner-only (vip/ivan_tests.js)
-    { id: 'ivan_tests', name: 'Иван · тест-стратегии', short: 'Иван ×3', icon: 'strategies', owner: true },
-    { id: 'opps', name: 'Другие возможности', short: 'Другое', icon: 'opps' },
-    { id: 'demo', name: 'Live Demo', short: 'Live', icon: 'demo' },
-    { id: 'system', name: 'Система', short: 'Система', icon: 'system' },
+    { id: 'ivan_tests', name: 'Иван · тест-стратегии', short: 'Иван ×3', icon: 'strategies', owner: true, group: 'tests' },
+    { id: 'opps', name: 'Другие возможности', short: 'Другое', icon: 'opps', group: 'more' },
+    { id: 'demo', name: 'Live Demo', short: 'Live', icon: 'demo', group: 'more' },
+    { id: 'system', name: 'Система', short: 'Система', icon: 'system', group: 'more' },
   ];
   V.parse = () => {
     const h = (location.hash || '').replace(/^#\/?/, '');
@@ -319,11 +321,34 @@
   };
   V.go = (id, arg) => { const h = '#/' + id + (arg ? '/' + encodeURIComponent(arg) : ''); if (location.hash === h) V.render(); else location.hash = h; };
 
+  V.NAV_GROUPS = { tests: ['Тесты', 'strategies'], more: ['Ещё', 'system'] };
+  V.BNAV_MAX = 8;                                                   // the places of the phone's bottom menu (vip.css .bnav)
+  /** the bottom menu's items: every tab while they fit; otherwise the groups fold into one button each («Тесты», «Ещё») */
+  V.bottomNav = function (routes) {
+    if (routes.length <= V.BNAV_MAX) return routes.map((r) => ({ route: r }));
+    const out = [], seen = {};
+    routes.forEach((r) => {
+      if (!r.group) out.push({ route: r });
+      else if (!seen[r.group]) { seen[r.group] = 1; out.push({ group: r.group, routes: routes.filter((x) => x.group === r.group) }); }
+    });
+    return out;
+  };
   function paintNav(cur) {
-    const html = (short) => V.ROUTES.filter((r) => !r.owner || V.auth.owner()).map((r) =>
-      `<a href="#/${r.id}" ${r.id === cur ? 'aria-current="page"' : ''}>${V.ico(r.icon)}<span>${esc(short ? r.short : r.name)}</span></a>`).join('');
-    document.getElementById('navSide').innerHTML = html(false);
-    document.getElementById('navBottom').innerHTML = html(true);
+    const routes = V.ROUTES.filter((r) => !r.owner || V.auth.owner());
+    const link = (r, short) => `<a href="#/${r.id}" ${r.id === cur ? 'aria-current="page"' : ''}>${V.ico(r.icon)}<span>${esc(short ? r.short : r.name)}</span></a>`;
+    // the side menu (desktop): the test desks under their own heading
+    let side = '', g0 = null;
+    routes.forEach((r) => { const g = r.group === 'tests' ? 'tests' : null; if (g && g !== g0) side += '<div class="nav-group">Тесты · только владельцу</div>'; g0 = g; side += link(r, false); });
+    document.getElementById('navSide').innerHTML = side;
+    const nb = document.getElementById('navBottom');
+    nb.innerHTML = V.bottomNav(routes).map((x) => x.route ? link(x.route, true)
+      : `<a href="#/${x.routes[0].id}" data-navgroup="${x.group}" ${x.routes.some((r) => r.id === cur) ? 'aria-current="page"' : ''}>${V.ico(V.NAV_GROUPS[x.group][1])}<span>${V.NAV_GROUPS[x.group][0]}</span></a>`).join('');
+    nb.querySelectorAll('[data-navgroup]').forEach((a) => a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const g = a.dataset.navgroup;
+      V.sheet(g === 'tests' ? 'Тесты · только владельцу' : 'Ещё', `<div class="nav-sheet">${routes.filter((r) => r.group === g).map((r) => link(r, false)).join('')}</div>`,
+        (b) => b.querySelectorAll('a').forEach((l) => l.addEventListener('click', () => { if (location.hash === l.getAttribute('href')) V.sheetClose(); })));
+    }));
     const r = V.ROUTES.find((x) => x.id === cur);
     document.getElementById('topTitle').textContent = r ? r.name : '';
     document.title = (r ? r.name + ' · ' : '') + 'CRYPTO NOVΛ VIP';

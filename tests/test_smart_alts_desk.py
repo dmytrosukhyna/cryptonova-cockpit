@@ -86,8 +86,8 @@ def test_open_positions_carry_their_own_benchmarks_and_the_owner_card_is_owner_o
     assert "bench" not in pub["open"][0] and pub["open"][0]["btc_same_time_usd"] == o["btc_same_time_usd"]
     r = lambda *p: open(os.path.join(ROOT, *p), encoding="utf-8").read()
     core, app, vip, js = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html"), r("web", "smart_alts.js")
-    assert "{ id: 'smart_alts', name: 'Альты от китов (тест)', short: 'Альты', icon: 'strategies', owner: true }" in core
-    assert "smart_alts: '/v2/owner/smart_alts'" in core and '<script src="vip/smart_alts.js"></script>' in vip
+    assert "{ id: 'smart_alts', name: 'Альты от китов (тест)', short: 'Альты', icon: 'strategies', owner: true, group: 'tests' }" in core
+    assert "smart_alts: '/v2/owner/smart_alts'" in core and '"vip/smart_alts.js"' in vip
     assert 'id="smartAltsCard" hidden' in app and "CNAuth.fetchOwner('/v2/owner/smart_alts')" in app
     i = app.index("async function renderSmartAlts")
     assert app.index("CNAuth.state.isOwner", i) < app.index("fetchOwner('/v2/owner/smart_alts')", i)

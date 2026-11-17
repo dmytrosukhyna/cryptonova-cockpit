@@ -90,7 +90,7 @@ def test_the_desk_is_owner_only_and_never_a_public_file(tmp_path):
     assert 'path == "/v2/owner/reversal"' in srv[i:] and srv.index("self.owner_auth.require(headers)", i) < srv.index('path == "/v2/owner/reversal"', i)
     assert srv.count("reversal.desk()") == 1 and "api.reversal.start()" in srv           # no other route serves it
     core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
-    assert "{ id: 'reversal', name: 'Разворот (тест)', short: 'Разворот', icon: 'strategies', owner: true }" in core
-    assert '<script src="vip/reversal.js"></script>' in vip and 'id="reversalCard" hidden' in app and "/v2/owner/reversal" in app
+    assert "{ id: 'reversal', name: 'Разворот (тест)', short: 'Разворот', icon: 'strategies', owner: true, group: 'tests' }" in core
+    assert '"vip/reversal.js"' in vip and 'id="reversalCard" hidden' in app and "/v2/owner/reversal" in app
     js = r("web", "reversal.js")
     assert "Оговорки" in js and "Правило" in js and "fetch('./reversal" not in js and "reversal_desk.json" not in app + js + r("web", "vip", "reversal.js")

@@ -97,8 +97,8 @@ def test_routes_and_panels_are_owner_only():
         assert route in srv[i:] and srv.index("self.owner_auth.require(headers)", i) < srv.index(route, i), route
         assert route not in srv[:i], route
     core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
-    assert "{ id: 'ivan_tests', name: 'Иван · тест-стратегии', short: 'Иван ×3', icon: 'strategies', owner: true }" in core
-    assert '<script src="vip/ivan_tests.js"></script>' in vip and 'id="ivanTestsCard" hidden' in app
+    assert "{ id: 'ivan_tests', name: 'Иван · тест-стратегии', short: 'Иван ×3', icon: 'strategies', owner: true, group: 'tests' }" in core
+    assert '"vip/ivan_tests.js"' in vip and 'id="ivanTestsCard" hidden' in app
     j = app.index("async function renderIvanTests")
     assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j)
     js = r("web", "ivan_tests.js")

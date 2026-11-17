@@ -1,6 +1,7 @@
 """06.11 (owner 17:30): the owner's Futures picture — web/fut_owner.json joins the real OKX futures with the whale each copy came from."""
 import json
 import os
+import re
 import tempfile
 
 from cnq.agents import fut_owner as F
@@ -69,7 +70,7 @@ def test_every_real_copy_finds_its_trader_and_the_totals_add_up():
 
 def test_the_owner_card_is_owner_only_in_both_panels():
     app = open("web/app.html", encoding="utf-8").read()
-    assert 'id="fOwnCard"' in app and "#fOwnCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard" in app
+    assert 'id="fOwnCard"' in app and "#fOwnCard,#ownerToolsCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard" in app
     assert "if(I.guest||document.body.classList.contains('guest')){ el.hidden=true; el.innerHTML=''; return; }" in app
     fut = open("web/vip/futures.js", encoding="utf-8").read()
     assert "if (V.auth.owner() && window.CNFutOwner)" in fut
@@ -151,3 +152,64 @@ def test_research_factors_without_data_read_no_data_not_weak():
     assert out[1][0].startswith("Оценка есть только по одному фактору: рынок (55). Нет данных: команда, сообщество")
     assert out[2][0] == "Нет данных: команда." and out[3] == ["", ""]
     assert out[4][0] == "Сильная сторона — экономика (70), слабая — рынок (30). Нет данных: команда." and "NaN" not in out[4][1]
+
+
+def test_owner_futures_is_one_compact_list_with_ivan_apart_and_the_connect_box():
+    """17.11 (owner 18:31: «куча табличек, неудобно»; «не могу найти, куда вставить ключи Ивана»): the owner's «Фьючерсы» is four
+    folded sections — the real account (open copies as one list), the traders (one row each, a trader with no trades greyed with a
+    one-line reason), Ivan (HIS account apart from OUR copies of him), the demo desk. Under it, owner-only: the connect form of
+    Ivan's test accounts and links to the test desks. The VIP phone menu folds the test desks into «Тесты» when they do not fit,
+    and vip.html asks for every script with the hour in its address (no stale panel after a release)."""
+    import shutil
+    import subprocess
+    import tempfile
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rd = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()                                       # noqa: E731
+    app, vip, core, vfut, it = rd("web", "app.html"), rd("web", "vip.html"), rd("web", "vip", "core.js"), rd("web", "vip", "futures.js"), rd("web", "ivan_tests.js")
+    # the connect box: owner-only on both panels, the same component as the tab
+    assert 'id="ownerToolsCard" hidden' in app and "body.tab-futures:not(.guest) #ownerToolsCard:not([hidden])" in app
+    j = app.index("async function renderOwnerTools")
+    assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j) and "CNIvanTests.connectHtml(" in app
+    for href in ("vip.html#/peter", "vip.html#/reversal", "vip.html#/smart_alts", "vip.html#/ivan_tests"):
+        assert href in app, href
+    assert "if (V.auth.owner() && window.CNFutOwner)" in vfut and vfut.index("if (V.auth.owner() && window.CNFutOwner)") < vfut.index("connectHtml(")
+    assert "function connectHtml(R, opts)" in it and "form(true)" in it and "Подключить стратегии Ивана (Тест 2 / 3 / 4)" in it
+    # the phone menu and the cache
+    assert "group: 'tests'" in core and "V.bottomNav = function (routes)" in core and "V.BNAV_MAX = 8" in core
+    assert "Math.floor(Date.now() / 3600000)" in vip and "'?h=' + h" in vip
+    assert '<script src="vip/' not in vip and '"vip/futures.js"' in vip and '"vip/ivan_tests.js"' in vip
+    node = shutil.which("node")
+    if not node:
+        return
+    doc = {"asof": 1794932533707, "kpi": {"pnl_all_usd": -253.35, "today_usd": -42.4, "margin_usd": 393, "budget_usd": 1250, "open_n": 2,
+                                         "open_usd": -28.4, "closed": {"n": 50, "win_pct": 60}},
+           "curve": [], "markers": [],
+           "trades": [{"coin": "AAVE", "side": "SHORT", "closed": False, "pnl_usd": -10.65, "whale_name": "0xRubi", "strategy": "whales"},
+                      {"coin": "ETH", "side": "LONG", "closed": False, "pnl_usd": -17.75, "whale_name": "Иван", "strategy": "ivan"},
+                      {"coin": "SOL", "side": "LONG", "closed": True, "pnl_usd": 5.0, "whale_name": "0xRubi"}],
+           "following": [{"addr": "bn:1", "name": "0xRubi", "status": "following", "copies": [], "totals": {"n": 13, "wins": 10, "open_n": 2, "total_usd": 11.82}},
+                         {"addr": "okx:2", "name": "ТИХИЙ", "status": "following", "copies": [], "totals": {"n": 0, "open_n": 0, "total_usd": 0}},
+                         {"addr": "ivan:bybit", "name": "Иван", "status": "following", "copies": [],
+                          "totals": {"n": 4, "wins": 3, "open_n": 6, "sum_usd": -14.61, "open_usd": -24.72, "total_usd": -39.33}}],
+           "dropped": [{"addr": "bn:3", "name": "БЕЗСДЕЛОК", "status": "dropped", "why_ru": "ниже других по PF", "copies": [], "totals": {"n": 0}}],
+           "bench": [{"name": "ЗАПАС", "win_pct": 70, "why_ru": "только наблюдение"}],
+           "desk": {"pnl_pct": 11.04, "switch_pct": 2.56, "real_switch_pct": -14.23}, "tests": [],
+           "ivan": {"stats": {"net_closed_usd": -685.0, "open_upnl_usd": -931.0, "closed_n": 7, "open_n": 9, "wins": 5, "max_dd_pct": 20.8}}}
+    script = f"""global.window={{}};global.document={{getElementById:()=>1}};require({json.dumps(os.path.join(root, "web", "fut_owner.js"))});
+process.stdout.write(window.CNFutOwner.html({json.dumps(doc, ensure_ascii=False)},{{}}));"""
+    p = os.path.join(tempfile.mkdtemp(), "f.js")
+    open(p, "w", encoding="utf-8").write(script)
+    h = subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout
+    secs = re.findall(r'<details class="fo-sec" data-fo-sec="([a-z]+)"( open)?>', h)
+    assert [k for k, _ in secs] == ["real", "traders", "ivan", "desk"] and not any(o for _, o in secs)          # all folded
+    real = h[h.index('data-fo-sec="real"'):h.index('data-fo-sec="traders"')]
+    assert real.count('class="fo-li"') == 2 and "AAVE" in real and "0xRubi" in real and "SOL" not in real.split("fo-sub")[1].split("<details")[0]
+    tr = h[h.index('data-fo-sec="traders"'):h.index('data-fo-sec="ivan"')]
+    assert "0xRubi" in tr and "Иван" not in tr                                       # Ivan is only in his own section
+    assert 'class="fo-tr zero"' in tr and "ТИХИЙ" in tr and "не открыл ни одной новой позиции" in tr
+    assert "Выбывшие без наших сделок · 1" in tr and "Скамейка · 1" in tr
+    iv = h[h.index('data-fo-sec="ivan"'):h.index('data-fo-sec="desk"')]
+    assert "Его счёт · деньги Ивана, не наши" in iv and "Наши копии по нему · реальный счёт OKX, наши деньги" in iv
+    assert re.search(r"его счёт <span[^>]*>−\u2060\$1\s616</span> · наши копии <span[^>]*>−\u2060\$39</span>", iv)
+    body = iv[iv.index("</summary>"):]
+    assert body.index("−\u2060$685") < body.index("Наши копии по нему") < body.index("−\u2060$39")    # his money first, ours apart

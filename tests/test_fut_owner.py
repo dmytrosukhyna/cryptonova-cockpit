@@ -70,7 +70,7 @@ def test_every_real_copy_finds_its_trader_and_the_totals_add_up():
 
 def test_the_owner_card_is_owner_only_in_both_panels():
     app = open("web/app.html", encoding="utf-8").read()
-    assert 'id="fOwnCard"' in app and "#fOwnCard,#ownerToolsCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard" in app
+    assert 'id="fOwnCard"' in app and "#fOwnCard{display:none!important}body.tab-futures:not(.guest) #fOwnCard" in app
     assert "if(I.guest||document.body.classList.contains('guest')){ el.hidden=true; el.innerHTML=''; return; }" in app
     fut = open("web/vip/futures.js", encoding="utf-8").read()
     assert "if (V.auth.owner() && window.CNFutOwner)" in fut
@@ -166,12 +166,10 @@ def test_owner_futures_is_one_compact_list_with_ivan_apart_and_the_connect_box()
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     rd = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()                                       # noqa: E731
     app, vip, core, vfut, it = rd("web", "app.html"), rd("web", "vip.html"), rd("web", "vip", "core.js"), rd("web", "vip", "futures.js"), rd("web", "ivan_tests.js")
-    # the connect box: owner-only on both panels, the same component as the tab
-    assert 'id="ownerToolsCard" hidden' in app and "body.tab-futures:not(.guest) #ownerToolsCard:not([hidden])" in app
-    j = app.index("async function renderOwnerTools")
-    assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j) and "CNIvanTests.connectHtml(" in app
-    for href in ("vip.html#/peter", "vip.html#/reversal", "vip.html#/smart_alts", "vip.html#/ivan_tests"):
-        assert href in app, href
+    # the connect box: owner-only, on vip.html ONLY (17.11 20:01 owner: management lives on cryptonova.vip; app.html shows results)
+    assert "ownerToolsCard" not in app and "connectHtml" not in app and "/v2/owner/ivan_tests" not in app
+    for href in ("#/peter", "#/reversal", "#/smart_alts", "#/ivan_tests"):
+        assert f"'{href}'" in vfut, href
     assert "if (V.auth.owner() && window.CNFutOwner)" in vfut and vfut.index("if (V.auth.owner() && window.CNFutOwner)") < vfut.index("connectHtml(")
     assert "function connectHtml(R, opts)" in it and "form(true)" in it and "Подключить стратегии Ивана (Тест 2 / 3 / 4)" in it
     # the phone menu and the cache

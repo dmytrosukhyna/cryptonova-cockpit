@@ -106,7 +106,9 @@ def test_panels_owner_only():
     core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
     assert "{ id: 'peter', name: 'Golden Donut', short: 'Donut', icon: 'strategies', owner: true, group: 'tests' }" in core and "peter: '/v2/owner/peter'" in core
     assert '"vip/peter.js"' in vip and '"peter.js"' in vip
-    assert 'id="peterCard" hidden' in app and "CNAuth.state.isOwner" in app and "/v2/owner/peter" in app
+    # 17.11 20:01 (owner): management tools live ONLY on cryptonova.vip (vip.html) — app.html shows results, none of these
+    assert not any(x in app for x in ("peterCard", "reversalCard", "smartAltsCard", "ivanTestsCard", "ownerToolsCard", "/v2/owner/peter",
+                                      "/v2/owner/reversal", "/v2/owner/smart_alts", "/v2/owner/ivan_tests", "CNIvanTests", "copy_real"))
     for f in os.listdir(os.path.join(root, "web")):         # the desk is never a public file
         assert not f.startswith("peter_live"), f
 

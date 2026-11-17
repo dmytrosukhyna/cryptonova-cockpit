@@ -98,9 +98,10 @@ def test_routes_and_panels_are_owner_only():
         assert route not in srv[:i], route
     core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
     assert "{ id: 'ivan_tests', name: 'Иван · тест-стратегии', short: 'Иван ×3', icon: 'strategies', owner: true, group: 'tests' }" in core
-    assert '"vip/ivan_tests.js"' in vip and 'id="ivanTestsCard" hidden' in app
-    j = app.index("async function renderIvanTests")
-    assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j)
+    assert '"vip/ivan_tests.js"' in vip and '"ivan_tests.js"' in vip
+    # 17.11 20:01 (owner): management tools live ONLY on cryptonova.vip (vip.html) — app.html shows results, none of these
+    assert not any(x in app for x in ("peterCard", "reversalCard", "smartAltsCard", "ivanTestsCard", "ownerToolsCard", "/v2/owner/peter",
+                                      "/v2/owner/reversal", "/v2/owner/smart_alts", "/v2/owner/ivan_tests", "CNIvanTests", "copy_real"))
     js = r("web", "ivan_tests.js")
     assert "Только ключ «Read-Only»" in js and 'type="password"' in js and "ivan_tests.json" not in js + app
     doc = r("docs", "ivan-bybit-readonly-key.md")
@@ -117,12 +118,8 @@ def test_the_real_copy_switch_is_the_owners_own_click_with_a_plain_confirm():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     rd = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()                                      # noqa: E731
     js, vip, app = rd("web", "ivan_tests.js"), rd("web", "vip", "ivan_tests.js"), rd("web", "app.html")
-    for src in (vip, app):
-        assert "/copy_real" in src and "fetchOwner(" in src
-    assert "copyReal: (id, on) => call('/copy_real', { id, on })" in vip
-    assert "copyReal:(id,on)=>CNAuth.fetchOwner('/v2/owner/ivan_tests/copy_real',{method:'POST',body:{id,on}})" in app
-    j = app.index("async function renderIvanTests")
-    assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j)         # still owner-only
+    assert "/copy_real" in vip and "fetchOwner(" in vip and "copyReal: (id, on) => call('/copy_real', { id, on })" in vip
+    assert "copy_real" not in app and "/v2/owner/ivan_tests" not in app                    # 17.11 20:01: the switch is on vip.html only
     assert "window.confirm(on ? confirmOn(" in js and js.index("window.confirm(on ? confirmOn(") < js.index("api.copyReal(b.dataset.id, on)")
     assert "err.data.message_ru" in js and "Иван Тест 2 / 3 / 4" in js
     assert "copy_real" not in js.split("function mount")[1].split("data-it=\"copy\"")[0]                     # nothing switches by itself

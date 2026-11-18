@@ -137,6 +137,46 @@ def build(out: str = "web", conn=None, now: int | None = None) -> dict:
     rows.append(_row("traders", "Опрос трейдеров",
                      "Каждые несколько минут смотрит, что делают отобранные трейдеры, — отсюда сигналы для фьючерсов.",
                      t_w, _by_age(t_w, now, 45, 120), "", ASK.format(x="опрос трейдеров"), now))
+    # 2b. 18.11 (owner): «Иван Тест 2 / 3 / 4: копирование» — from the server's own line in whales_live.json (no keys, masked names)
+    wl = _live(out, "whales_live.json")
+    lv = ((wl.get("desk") or {}).get("live") or {})
+    t_l = _ms(lv.get("t")) or _ms(wl.get("asof"))
+    srcs = [x for x in lv.get("sources") or [] if isinstance(x, dict)]
+    on = [x for x in srcs if x.get("copy_on")]
+    if "sources" not in lv:
+        rows.append(_row("ivan_tests", "Иван Тест 2/3/4: копирование", "Копии тест-счетов Ивана на реальный счёт — только счета, у которых "
+                         "владелец включил «Копировать на реальный счёт».", t_l, INFO, "автопилот ещё не публикует строку тест-счетов "
+                         "(старая версия кода на сервере)", None, now))
+    elif not on:
+        why = {"нет файла": "на сервере автопилот не видит подключённых тест-счетов (нет файла счетов)",
+               "нет доступа": "автопилот не может прочитать файл тест-счетов (нет доступа)",
+               "файл повреждён": "файл тест-счетов не читается (повреждён)"}.get(lv.get("tests_file"))
+        nos = int(lv.get("tests_on_no_slot") or 0)
+        bad = why if lv.get("tests_file") not in (None, "ok") and int(lv.get("tests_n") or 0) == 0 else None
+        rows.append(_row("ivan_tests", "Иван Тест 2/3/4: копирование", "Копии тест-счетов Ивана на реальный счёт — только счета, у которых "
+                         "владелец включил «Копировать на реальный счёт».", t_l, YELLOW if nos else INFO,
+                         (f"копирование включено у {nos} счёта, но номер счёта (2/3/4) не назначен" if nos else
+                          bad or "копирование ни у одного тест-счёта не включено"), None, now))
+    else:
+        parts, worst = [], GREEN
+        for x in on:
+            nm = str(x.get("name") or x.get("id"))
+            if x.get("read_ok") is False:
+                parts.append(f"{nm} — ошибка чтения ({x.get('err') or 'без кода'})"); worst = YELLOW if worst != RED else worst
+                if x.get("last_read_t") and now - int(x["last_read_t"]) > 60 * 60_000 or not x.get("last_read_t"):
+                    worst = RED
+            elif x.get("read_ok") is None:
+                parts.append(f"{nm} — ещё не опрошен"); worst = YELLOW if worst == GREEN else worst
+            elif not x.get("open_n"):
+                parts.append(f"{nm} — нет позиций")
+            else:
+                parts.append(f"{nm} — позиций {x['open_n']}, наших копий {x.get('copies_n') or 0}")
+        if not lv.get("follow_fresh", True):
+            worst, parts = YELLOW, parts + ["список отбора устарел — новых копий нет"]
+        st_ = worst if worst != GREEN else _by_age(t_l, now, 45, 120)
+        rows.append(_row("ivan_tests", "Иван Тест 2/3/4: копирование", "Копии тест-счетов Ивана на реальный счёт — только счета, у которых "
+                         "владелец включил «Копировать на реальный счёт».", t_l, st_, "; ".join(parts),
+                         ASK.format(x="копирование тест-счетов Ивана"), now))
     # 3. the GitHub data pipeline
     t_site = max(_ms(_load(out, "status.json").get("time")) or 0, _ms(_load(out, "version.json").get("time")) or 0) or None
     st, note, t = _gh(R, "site", now, 75, 180, t_site)

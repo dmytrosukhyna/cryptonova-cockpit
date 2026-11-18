@@ -322,3 +322,51 @@ def test_every_event_is_stored_raw_with_context_and_the_card_shows_open_loss_and
                          "closed_n": 2, "closed_pnl_usd": 9.0, "wins": 1, "total_pnl_usd": 4.5, "asof": NOW}
     assert KEY not in json.dumps(t.view(), ensure_ascii=False) and SEC not in json.dumps(t.view(), ensure_ascii=False)
     assert IT.real_copies(None, "ivan2") is None and IT.real_copies(tempfile.mkdtemp(), "ivan2") is None
+
+
+# ── 18.11: the server's own status line (whales_live.json desk.live.sources) and the owner_health row ─────────────────────────
+def test_the_published_status_tells_no_positions_from_a_read_error_without_secrets(tmp_path):
+    from cnq.agents import owner_health as OH
+    from cnq.execution import ivan_watch as IV
+    f = Feed()
+    rows2 = []
+    def bad():
+        raise IV.KeyRejected(10003, "API key is invalid. https://api-demo.bybit.com", "/v5/position/list")
+    env = {"OKX_WHALE_LIVE_STATE": str(tmp_path / "s.json"), "IVAN_TESTS_FILE": accounts(tmp_path, acc(2, True), acc(3, True), acc(4, False))}
+    kw = dict(env=env, post=f.post, okx_get=f.okx_get, sleep=lambda s: None, src_get={"ivan2:bybit": lambda: rows2, "ivan3:bybit": bad})
+    docs = []
+    d = WL.step(wtop(), now=NOW, put=lambda doc: docs.append(doc) or True, **kw)
+    src = {x["id"]: x for x in d["live"]["sources"]}
+    assert src["ivan2:bybit"] == {"id": "ivan2:bybit", "name": "Иван · тест 2", "copy_on": True, "host": "demo", "read_ok": True, "err": None,
+                                  "last_read_t": NOW, "open_n": 0, "copies_n": 0}
+    assert src["ivan3:bybit"]["read_ok"] is False and src["ivan3:bybit"]["err"] == "KeyRejected 10003" and src["ivan3:bybit"]["last_read_t"] is None
+    assert src["ivan4:bybit"]["copy_on"] is False and src["ivan4:bybit"]["read_ok"] is None
+    assert d["live"]["tests_file"] == "ok" and d["live"]["tests_n"] == 3 and d["live"]["follow_fresh"] is True
+    blob = json.dumps(docs[-1], ensure_ascii=False)
+    assert "K" * 14 not in blob and "s" * 30 not in blob and "Иван Тест 2" not in blob and "sources" in blob
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "whales_live.json").write_text(json.dumps(docs[-1], ensure_ascii=False), encoding="utf-8")
+    r = next(x for x in OH.build(str(web), now=NOW + MIN)["rows"] if x["key"] == "ivan_tests")
+    assert r["status"] == OH.RED and "Иван · тест 2 — нет позиций" in r["note"] and "Иван · тест 3 — ошибка чтения (KeyRejected 10003)" in r["note"]
+    rows2.append(dict(ROW))
+    d = WL.step(wtop(), now=NOW + MIN, put=lambda doc: True, **{**kw, "src_get": {"ivan2:bybit": lambda: rows2, "ivan3:bybit": lambda: []}})
+    (web / "whales_live.json").write_text(json.dumps({"asof": NOW + MIN, "desk": {"live": d["live"]}}), encoding="utf-8")
+    r = next(x for x in OH.build(str(web), now=NOW + 2 * MIN)["rows"] if x["key"] == "ivan_tests")
+    assert r["status"] == OH.GREEN and "Иван · тест 2 — позиций 1, наших копий 1" in r["note"] and "Иван · тест 3 — нет позиций" in r["note"]
+    # the autopilot cannot see the accounts file → said so; an old server version → «ждёт» (not counted)
+    d = WL.step(wtop(), now=NOW + 2 * MIN, put=lambda doc: True, **{**kw, "env": {**env, "IVAN_TESTS_FILE": str(tmp_path / "missing.json")}})
+    assert d["live"]["tests_file"] == "нет файла" and d["live"]["sources"] == []
+    (web / "whales_live.json").write_text(json.dumps({"asof": NOW, "desk": {"live": d["live"]}}), encoding="utf-8")
+    r = next(x for x in OH.build(str(web), now=NOW + 3 * MIN)["rows"] if x["key"] == "ivan_tests")
+    assert r["status"] == OH.INFO and "нет файла" in r["note"]
+    (web / "whales_live.json").write_text(json.dumps({"asof": NOW, "desk": {"live": {"t": NOW}}}), encoding="utf-8")
+    assert next(x for x in OH.build(str(web), now=NOW)["rows"] if x["key"] == "ivan_tests")["status"] == OH.INFO
+    try:
+        open(str(tmp_path / "noperm.json"), "w").write("[]")
+        os.chmod(str(tmp_path / "noperm.json"), 0)
+        stt = {}
+        WL.test_accounts({"IVAN_TESTS_FILE": str(tmp_path / "noperm.json")}, stt)
+        assert stt["file"] in ("нет доступа", "ok")                           # root in CI can still read it
+    finally:
+        os.chmod(str(tmp_path / "noperm.json"), 0o600)

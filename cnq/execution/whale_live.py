@@ -125,15 +125,31 @@ def tests_path(env=None) -> str:
     return e.get("IVAN_TESTS_FILE") or TESTS_FILE
 
 
-def test_accounts(env=None) -> list[dict]:
-    """the connected test accounts that have a slot: [{addr, name, key, secret, host, on}] (on = the owner's real-copy switch)"""
+TESTS_STATUS = {"ok": "ok"}
+
+
+def test_accounts(env=None, status: dict | None = None) -> list[dict]:
+    """the connected test accounts that have a slot: [{addr, name, key, secret, host, on}] (on = the owner's real-copy switch).
+    18.11: status (optional) gets «file» = ok / нет файла / нет доступа / файл повреждён — why nothing is followed, without secrets"""
+    st = status if status is not None else {}
     try:
         with open(tests_path(env), encoding="utf-8") as f:
             d = json.load(f)
+        st["file"] = "ok"
+    except FileNotFoundError:
+        st["file"] = "нет файла"
+        return []
+    except PermissionError:
+        st["file"] = "нет доступа"
+        return []
     except (OSError, ValueError):
+        st["file"] = "файл повреждён"
         return []
     out, used = [], set()
-    for a in d if isinstance(d, list) else []:
+    rows = d if isinstance(d, list) else []
+    st["accounts"] = len(rows)
+    st["copy_on_no_slot"] = sum(1 for a in rows if isinstance(a, dict) and a.get("copy_real") is True and a.get("slot") not in TEST_SLOTS)
+    for a in rows:
         try:
             slot = int(a.get("slot") or 0)
         except (AttributeError, TypeError, ValueError):
@@ -151,6 +167,14 @@ def test_reader(acc: dict):
     from . import ivan_watch as IV
     fetch, base = IV.make_fetch(acc["key"], acc["secret"]), IV.HOSTS[acc["host"]]
     return lambda: IV.read_positions(fetch, base)
+
+
+def err_code(e: Exception) -> str:
+    """a short, non-secret error label for the public status: the exception's type and the Bybit retCode digits, never its text"""
+    code = getattr(e, "code", None)
+    if code is None and getattr(e, "args", None) and isinstance(e.args[0], int):
+        code = e.args[0]
+    return type(e).__name__ + (f" {int(code)}" if isinstance(code, int) else "")
 
 
 def ivan_positions(rows: list) -> list[dict]:
@@ -227,7 +251,8 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
     fresh = now - int(W._f(wtop.get("asof"))) <= FOLLOW_STALE_MS
     fol = [x for x in (wtop.get("following") or []) if isinstance(x, dict) and x.get("addr")] if fresh else []
     # 17.11 (owner): the test accounts with the real-copy switch ON are followed like Ivan (owner picks, outside the selection)
-    tests = test_accounts(env)
+    t_stat: dict = {}
+    tests = test_accounts(env, t_stat)
     if fresh:
         fol += [{"addr": a["addr"], "name": a["name"], "owner_pick": True} for a in tests if a["on"] and a["addr"] not in {x["addr"] for x in fol}]
     follow = [x["addr"] for x in fol]
@@ -296,10 +321,27 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
                 src = str(e["whale"]).split(":")[0] if ":" in str(e["whale"]) else "hl"
                 by_src.setdefault(src, []).append(lags[-1])
     med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None  # noqa: E731
+    # 18.11 (owner: «Тест 2 / 3 включены, а копий нет — подхватил ли автопилот?»): one non-secret line per Ivan test account —
+    # switch, read result, positions seen — so the published file tells «нет позиций» from «не читается» (names masked, no keys)
+    reads = dict(st.get("src_read") or {})
+    for a in tests:
+        r_, e_ = results.get(a["addr"], (None, None))
+        if r_ is not None and e_ is None:
+            reads[a["addr"]] = now
+    srcs = []
+    for a in tests:
+        r_, e_ = results.get(a["addr"], (None, None))
+        srcs.append({"id": a["addr"], "name": a["name"], "copy_on": a["on"], "host": a["host"],
+                     "read_ok": None if a["addr"] not in results else e_ is None, "err": err_code(e_) if e_ is not None else None,
+                     "last_read_t": reads.get(a["addr"]), "open_n": len(r_[0]) if r_ is not None and e_ is None else None,
+                     "copies_n": sum(1 for o in desk.get("open") or [] if o.get("whale") == a["addr"])})
+    st["src_read"] = {k: v for k, v in reads.items() if k in {a["addr"] for a in tests}}
     desk["live"] = {"t": now, "whales": len(watch), "polled": len(states), "errors": errors[:5], "follow_asof": wtop.get("asof"), "poll_s": poll_s,
                     "lag_s_med": med(lags), "lag_s_last": lags[-1] if lags else None, "n_lags": len(lags),
                     # 05.11 (backlog 88a): which source is slow — {source: {med, n}}
-                    "lag_by_src": {k: {"med": med(v), "n": len(v)} for k, v in sorted(by_src.items()) if v}}
+                    "lag_by_src": {k: {"med": med(v), "n": len(v)} for k, v in sorted(by_src.items()) if v},
+                    "sources": srcs, "tests_file": t_stat.get("file"), "tests_n": t_stat.get("accounts"),
+                    "tests_on_no_slot": t_stat.get("copy_on_no_slot"), "follow_fresh": fresh}
     st.update(desk=desk, names=names, lags=lags, lags_src=by_src, t=now, gone=gone)
     pub = W.desk_public(desk, names)
     _publish(st, desk, now, env, put)
@@ -315,7 +357,8 @@ def step(wtop: dict | None, env=None, now: int | None = None, post=None, okx_get
 
 def _sig(desk: dict) -> str:
     return json.dumps([[o.get("whale"), o.get("coin"), o.get("side"), o.get("opened_t"), o.get("stop")] for o in desk.get("open") or []]
-                      + [len(desk.get("closed") or [])])
+                      + [len(desk.get("closed") or [])]
+                      + [[x.get("id"), x.get("copy_on"), x.get("read_ok"), x.get("open_n")] for x in (desk.get("live") or {}).get("sources") or []])
 
 
 def _publish(st: dict, desk: dict, now: int, env=None, put=None) -> bool:

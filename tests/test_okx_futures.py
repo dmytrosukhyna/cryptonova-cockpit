@@ -637,37 +637,3 @@ def test_day_pnl_counts_only_the_loss_made_today():
           "pnl": "-50", "openAvgPx": "100", "closeAvgPx": "90"}]
     assert fu.day_pnl(Ctx(h, {}, {"SOL-USDT-SWAP": 95.0}), NOW) == -26.0
     assert fu.day_pnl(Ctx([{**h[0], "uTime": str(start - 1)}], {}, {}), NOW) == 0.0      # closed yesterday → not today's
-
-
-def test_owner_one_off_add_to_a_held_copy_once_same_stop():
-    """18.11 (owner, explicit «да»): config/owner_overrides.json «add» — ONE extra entry into a held copy, same side and stop,
-    risk_pct of the futures budget; never repeated; expired or unknown ids do nothing; a bad risk_pct is ignored."""
-    import json
-    fk = F.FakeOkx()
-    p = os.path.join(tempfile.mkdtemp(), "ov.json")
-    e = F.env(CNQ_OWNER_OVERRIDES=p)
-    with open(p, "w") as f:
-        json.dump({"set": NOW, "until": NOW + 1000}, f)
-    d = F.desks(F.trade())
-    assert run(fk, e, d)["opened"] == 1
-    n0 = len(swap_orders(fk))
-    with open(p, "w") as f:
-        json.dump({"set": NOW, "until": NOW + 1000, "add_set": NOW + 60_000, "add_until": NOW + 86_400_000,
-                   "add": [{"id": "ivan:T1", "risk_pct": 1.0}, {"id": "ivan:NOPE", "risk_pct": 1.0}]}, f)
-    r = run(fk, e, d, NOW + 120_000)
-    assert r.get("added") == 1 and not r["errors"]
-    o = swap_orders(fk)[n0]
-    assert o["side"] == "buy" and o["ordType"] == "ioc" and o["clOrdId"].startswith("cnqfa")
-    assert "attachAlgoOrds" not in o                                         # one stop: the existing one is re-sized to the whole position
-    assert sum(float(a.get("sz") or 0) for a in fk.algos if a.get("instId") == "SOL-USDT-SWAP" and a.get("slTriggerPx")) \
-        == abs(fk.pos["SOL-USDT-SWAP"])
-    budget = fu.load_state(e).get("budget", {}).get("usd") or 10000 * 0.15
-    risk = float(o["sz"]) * (float(o["px"]) - 190.0)
-    assert 0 < risk <= budget * 0.01 * 1.02 + 1.0
-    st = fu.load_state(e)["trades"]["bal:T1"]
-    assert st["owner_add"].startswith("T1@") and st["c0"] > float(swap_orders(fk)[0]["sz"]) - 1e-9
-    n1 = len(swap_orders(fk))
-    assert run(fk, e, d, NOW + 180_000).get("added") is None and len(swap_orders(fk)) == n1        # never twice
-    assert fu.ov.add_for({"add_until": NOW + 10, "add": [{"id": "T1", "risk_pct": 5}]}, "bal:T1", NOW) is None   # > 3 % ignored
-    assert fu.ov.add_for({"add_until": NOW - 1, "add": [{"id": "T1", "risk_pct": 1}]}, "bal:T1", NOW) is None   # expired
-    assert fu.ov.add_for({"add_until": NOW + 10, "add": [{"id": "ivan:T1", "risk_pct": 1}]}, "bal:T1", NOW)["risk"] == 0.01

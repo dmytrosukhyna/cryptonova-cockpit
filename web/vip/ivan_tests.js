@@ -5,7 +5,6 @@
   const call = (p, body) => window.CNAuth.fetchOwner('/v2/owner/ivan_tests' + p, { method: 'POST', body });
   const api = { add: (b) => call('/add', b), check: (id) => call('/check', { id }), remove: (id) => call('/remove', { id }),
     copyReal: (id, on) => call('/copy_real', { id, on }) };          // 17.11: the owner's own switch, default off
-  V.ivanTestsApi = api;                                             // 17.11: the «Фьючерсы» page mounts the same form inline
   V.views.ivan_tests = {
     async html() {
       if (!V.auth.owner()) return `<div class="card">${V.nodata('раздел доступен только владельцу')}</div>`;

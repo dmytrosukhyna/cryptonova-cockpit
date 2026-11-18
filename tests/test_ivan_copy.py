@@ -62,8 +62,10 @@ def test_the_switch_is_off_by_default_owner_only_and_gives_the_slot_from_the_nam
     assert IT.slot_for("Иван Тест 7", set()) == 2 and IT.slot_for("x", {2, 3, 4}) is None
     srv = open(os.path.join(ROOT, "cnq", "api", "server.py"), encoding="utf-8").read()
     i = srv.index("def _owner(")
-    assert '"/v2/owner/ivan_tests/copy_real"' in srv[i:] and '"/v2/owner/ivan_tests/copy_real"' not in srv[:i]
-    assert srv.index("self.owner_auth.require(headers)", i) < srv.index('"/v2/owner/ivan_tests/copy_real"', i)
+    # 18.11: the switch is in the one handler _ivan_tests, reached only after an owner check (owner session or console.check)
+    k = srv.index("def _ivan_tests(")
+    assert '"/v2/owner/ivan_tests/copy_real"' in srv[:k] and "self.ivan_tests.set_copy(" in srv[k:i]
+    assert srv.index("self.owner_auth.require(headers)", i) < srv.index("self._ivan_tests(", i)
 
 
 # ── the live copy loop ───────────────────────────────────────────────────────────────────────────────────────────────────

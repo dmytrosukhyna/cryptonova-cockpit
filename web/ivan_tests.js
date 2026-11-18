@@ -109,7 +109,7 @@
 
   function form() {
     return `<details class="edet" data-it="formbox"><summary>Подключить счёт Ивана (ключ только для чтения)</summary>
-      <p class="it-m"><b>Только ключ «Read-Only».</b> Ключ с правом торговли или вывода сервер не сохранит. Ключ и секрет обратно не показываются.</p>
+      <p class="it-m"><b>Демо-счёт: подойдёт и ключ Read-Write</b> (платформа Ивана торгует им, CRYPTO NOVA только читает). Реальный счёт — только «Read-Only». Ключ с правом вывода или переводов сервер не сохранит. Ключ и секрет обратно не показываются.</p>
       <form data-it="form" autocomplete="off" style="display:grid;gap:6px;max-width:420px;margin:8px 0">
         <input name="name" placeholder="Имя: «Иван Тест 2», «Иван Тест 3» или «Иван Тест 4»" required>
         <span class="it-m">Назовите счёт «Иван Тест 2 / 3 / 4»: цифра в имени закрепляет за ним место для копии на реальный счёт (не больше трёх счетов).</span>

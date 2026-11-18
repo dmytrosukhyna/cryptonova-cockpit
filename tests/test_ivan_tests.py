@@ -13,12 +13,12 @@ NOW = 1794600000000
 KEY, SEC = "AbCdEfGh123456", "s" * 36
 
 
-def fake_bybit(read_only=1, wallet=(), log=None):
+def fake_bybit(read_only=1, wallet=(), log=None, host="demo"):
     def make(key, secret):
         def fetch(base, path, params):
             if log is not None:
                 log.append((base, path))
-            if base != iw.HOSTS["demo"]:
+            if base != iw.HOSTS[host]:
                 return {"retCode": 10003, "retMsg": "API key is invalid."}
             if path == "/v5/user/query-api":
                 return {"retCode": 0, "result": {"readOnly": read_only, "permissions": {"ContractTrade": ["Order", "Position"], "Wallet": list(wallet)}}}
@@ -67,14 +67,14 @@ def test_read_only_key_is_stored_secretly_and_read_on_the_chosen_host_only():
 
 def test_trading_or_withdraw_keys_are_refused_and_not_kept():
     d = tempfile.mkdtemp()
-    for ro, wallet in ((0, ()), (1, ("Withdraw",)), (1, ("AccountTransfer",))):
-        t = IT.IvanTests(d, make_fetch=fake_bybit(read_only=ro, wallet=wallet))
-        code, r = t.add({"name": "X", "key": KEY, "secret": SEC, "demo": True})
+    for ro, wallet, demo in ((1, ("Withdraw",), True), (1, ("AccountTransfer",), True), (0, ("Withdraw",), True), (0, (), False)):
+        t = IT.IvanTests(d, make_fetch=fake_bybit(read_only=ro, wallet=wallet, host="demo" if demo else "main"))
+        code, r = t.add({"name": "X", "key": KEY, "secret": SEC, "demo": demo})
         assert code == 200 and not r["ok"] and "не сохранён" in r["message_ru"] and t.view()["accounts"] == []
     t = IT.IvanTests(d, make_fetch=fake_bybit())
     t.add({"name": "Y", "key": KEY, "secret": SEC, "demo": True})
     aid = t.view()["accounts"][0]["id"]
-    t.make_fetch = fake_bybit(read_only=0)                                 # the key later gained trade rights → disconnected
+    t.make_fetch = fake_bybit(wallet=("Withdraw",))                        # the key later gained a withdraw right → disconnected
     assert not t.check(aid)[1]["ok"] and t.view()["accounts"] == []
     t2 = IT.IvanTests(tempfile.mkdtemp(), make_fetch=fake_bybit())
     assert not t2.add({"name": "Z", "key": KEY, "secret": SEC, "demo": False})[1]["ok"]   # a demo key on mainnet: rejected, not stored
@@ -105,7 +105,7 @@ def test_routes_and_panels_are_owner_only():
     j = app.index("async function renderIvanTests")
     assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j)
     js = r("web", "ivan_tests.js")
-    assert "Только ключ «Read-Only»" in js and 'type="password"' in js and "ivan_tests.json" not in js + app
+    assert "подойдёт и ключ Read-Write" in js and "Реальный счёт — только «Read-Only»" in js and 'type="password"' in js and "ivan_tests.json" not in js + app
     doc = r("docs", "ivan-bybit-readonly-key.md")
     assert "Read-Only" in doc and "Demo Trading" in doc and "never post" in doc.lower() and "общих чатах" in doc
 
@@ -197,3 +197,16 @@ def test_ivan_tests_in_upravlenie_need_the_owner_and_go_through_admin_html_api(t
     assert "Иван Тест (2 / 3 / 4) — ключи и копирование" in adm and '<script src="ivan_tests.js?v=2"></script>' in adm
     assert "const ivtCall=async(p,body)=>{ const r=await api('/v2/admin/ivan_tests'+p" in adm and "fetch(" not in adm.split("const ivtCall")[1].split("async function ivtLoad")[0]
     assert "copyReal:(id,on)=>ivtCall('/copy_real',{id,on})" in adm and "loaders.overview=async()=>{\n  ivtLoad();" in adm
+
+
+def test_demo_read_write_key_is_accepted_and_only_read():
+    """18.11 (owner): Ivan's platform trades the demo accounts, so the keys are Read-Write — accepted on the demo host only"""
+    log = []
+    d = tempfile.mkdtemp()
+    t = IT.IvanTests(d, make_fetch=fake_bybit(read_only=0, log=log))
+    code, r = t.add({"name": "Иван Тест 2", "key": KEY, "secret": SEC, "demo": True})
+    assert code == 200 and r["ok"] and "только читает" in r["message_ru"] and len(t.view()["accounts"]) == 1
+    aid = t.view()["accounts"][0]["id"]
+    assert t.check(aid)[1]["ok"] and len(t.view()["accounts"]) == 1      # the periodic re-check keeps it
+    assert t.set_copy(aid, True)[1]["ok"]
+    assert {b for b, _ in log} == {iw.HOSTS["demo"]}

@@ -55,7 +55,7 @@ def test_the_switch_is_off_by_default_owner_only_and_gives_the_slot_from_the_nam
     assert r["accounts"][0]["copy_real"] is False and r["accounts"][0]["slot"] == 3
     assert [x["on"] for x in WL.test_accounts({"IVAN_TESTS_FILE": os.path.join(d, "accounts.json")})] == [False]
     assert t.set_copy("nope", True)[0] == 404
-    t.make_fetch = fake_bybit(read_only=0)                                # the key gained trade rights → the switch refuses
+    t.make_fetch = fake_bybit(wallet=("Withdraw",))                       # the key gained a withdraw right → the switch refuses
     code, r = t.set_copy(a["id"], True)
     assert not r["ok"] and "не включено" in r["message_ru"] and r["accounts"][0]["copy_real"] is False
     assert IT.slot_for("Иван Тест 2", set()) == 2 and IT.slot_for("Иван Тест 2", {2}) == 3 and IT.slot_for("Демо", {2, 3}) == 4

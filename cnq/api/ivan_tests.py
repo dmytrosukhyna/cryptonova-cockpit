@@ -2,7 +2,8 @@
 them and show what a paper copy would give. Nothing here can place an order.
 
 Runs on the server inside the API for N named accounts. Each account: a READ-ONLY Bybit API key (checked with
-GET /v5/user/query-api: readOnly must be 1 and no Withdraw / transfer right — otherwise refused and not stored), on the demo host
+GET /v5/user/query-api: readOnly must be 1 and no Withdraw / transfer right — otherwise refused and not stored; 18.11 owner: on
+the DEMO host a Read-Write key is accepted too, still without withdraw / transfer, because Ivan's platform trades with it), on the demo host
 (https://api-demo.bybit.com, a key made in Demo Trading mode) or mainnet. The reading itself is cnq/execution/ivan_watch.collect
 (wallet, positions, closed P&L, spot fills) — the same code as «Иван тест» — every 90 s; the positions alone every 30 s.
 
@@ -64,10 +65,15 @@ def check_key(fetch, base: str) -> tuple[bool, str]:
         return False, f"не удалось проверить ключ ({type(e).__name__})"
     perms = r.get("permissions") or {}
     wallet = set(perms.get("Wallet") or [])
-    if str(r.get("readOnly")) != "1":
-        return False, "Ключ с правом торговли (Read-Write). Нужен ключ «Только чтение» (Read-Only) — ключ не сохранён."
     if wallet & BAD_WALLET:
         return False, "У ключа есть право вывода или переводов — нужен ключ только для чтения. Ключ не сохранён."
+    if str(r.get("readOnly")) != "1":
+        # 18.11 (owner): Ivan's platform trades these DEMO accounts, so their keys are Read-Write. On the demo host only (no real
+        # money behind the key, and still no withdraw / transfer right) such a key is accepted — this module and whale_live only
+        # ever send GET requests with it. A mainnet key must stay read-only.
+        if base == iw.HOSTS["demo"]:
+            return True, "ключ демо-счёта с правом торговли — CRYPTO NOVA его только читает"
+        return False, "Ключ с правом торговли (Read-Write). Нужен ключ «Только чтение» (Read-Only) — ключ не сохранён."
     return True, "ключ только для чтения"
 
 

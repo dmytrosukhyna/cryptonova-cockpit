@@ -8,7 +8,10 @@ config/owner_overrides.json (in the repo; the server gets it with the engine's g
   • no_long  — the same for longs.
   • day_stop_ok — trade ids («W-ARB-L-…», or «*» = every copy trade) the owner explicitly approved to open while the futures day stop holds (14.11);
                all other entry checks still apply; expires at «day_stop_ok_until» (or «until»).
-After «until» the file does nothing. A missing / broken file = no overrides (it can only REMOVE trades, never add one).
+  • add      — 18.11 (owner, explicit «да», one-off): [{"id": "ivan:W-ARB-L-…", "risk_pct": 1.0}] — ONE extra entry into a copy the
+               real account already holds (same side, same stop, risk_pct % of the futures budget, ≤ 3 %); at most once per trade
+               id; expires at «add_until». The only key that adds instead of removing.
+After «until» the file does nothing. A missing / broken file = no overrides (it can only REMOVE trades, except the owner's one-off «add»).
 Coins are matched by their base: HYPE, HYPE-USDT-SWAP, kPEPE, 1000PEPE, PEPE all compare as the base coin.
 Stdlib only."""
 from __future__ import annotations
@@ -82,4 +85,24 @@ def blocked(a: dict, sym, side: str, opened=None) -> str | None:
         return f"шорты {b} запрещены владельцем: {a['note_ru']}"
     if side == "LONG" and b in a["no_long"]:
         return f"лонги {b} запрещены владельцем: {a['note_ru']}"
+    return None
+
+
+def add_for(ov: dict | None, tid, now: int | None = None) -> dict | None:
+    """18.11 (owner, one-off «да»): {"key", "risk"} when the owner asked for ONE extra entry into this held copy, else None.
+    risk = a fraction of the futures budget, capped at 3 %; the key («id@set») makes it happen at most once per decision."""
+    ov = ov or {}
+    now = int(now if now is not None else time.time() * 1000)
+    if now >= _ms(ov.get("add_until")):
+        return None
+    me = str(tid or "").split(":")[-1]
+    for x in ov.get("add") or []:
+        if isinstance(x, dict) and me and str(x.get("id") or "").split(":")[-1] == me:
+            try:
+                pct = float(x.get("risk_pct") or 0)
+            except (TypeError, ValueError):
+                return None
+            if not 0 < pct <= 3.0:
+                return None
+            return {"key": f"{me}@{_ms(ov.get('add_set')) or _ms(ov.get('set'))}", "risk": pct / 100.0}
     return None

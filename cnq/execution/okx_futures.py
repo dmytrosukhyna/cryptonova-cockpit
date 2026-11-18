@@ -122,6 +122,7 @@ BUDGET_TTL = 15 * 60_000
 VERIFY_MS = 10 * 60_000     # every open position's stop is re-checked on OKX at least this often
 PX_TOL = 0.15               # OKX price vs the desk's entry (catches a wrong ticker mapping)
 MAX_TRIES = 3
+ADD_TRIES = 30            # 18.11: the owner's one-off add is retried while OKX refuses orders (e.g. ~5 min of re-verification)
 SRC = "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/paper.json"
 SEL_SRC = "https://raw.githubusercontent.com/dmytrosukhyna/cryptonova-cockpit/main/web/desk_select.json"
 DAY = 86_400_000
@@ -845,6 +846,45 @@ def close(ctx: Ctx, m: dict, sz: float | None, now: int, seq: int, sleep, why: s
     return f["filled"] > 0
 
 
+def owner_add(ctx: Ctx, m: dict, add: dict, bud_usd: float, slip: float, now: int, seq: int, sleep, log_path=None) -> float | None:
+    """18.11 (owner, one-off): ONE extra IOC entry into a held copy — same side, same stop (attached), size from the owner's risk
+    share of the futures budget at the current price. → contracts filled (0 = not filled), or None when nothing was sent (no price,
+    price beyond the stop, below the minimum size, not enough margin) — then a final note is logged and it is not retried."""
+    inst_id, long = m["inst"], m["side"] == "LONG"
+    inst = ctx.inst(inst_id)
+    tk = ctx.ticker(inst_id) or {}
+    bid, ask = ms._f(tk.get("bidPx")) or ms._f(tk.get("last")), ms._f(tk.get("askPx")) or ms._f(tk.get("last"))
+    px = ask if long else bid
+    stop = float(m["stop"])
+    why = None
+    if not inst or not px:
+        why = "нет цены или инструмента"
+    else:
+        dist = (px - stop) if long else (stop - px)
+        ct, lot = float(inst["ctVal"]), float(inst["lotSz"])
+        q = ap.floor_to(add["risk"] * bud_usd / (ct * dist), lot) if dist > 0 else 0.0
+        lev = max(1.0, float(m.get("lev") or 1))
+        if dist <= 0:
+            why = "цена уже за стопом"
+        elif q < float(inst["minSz"]):
+            why = "размер меньше минимального лота"
+        elif q * ct * px / lev > ctx.avail_usdt() * 0.95:
+            why = "не хватает свободной маржи"
+    if why:
+        log({"ev": "owner_add_skip", "inst": inst_id, "why": why}, log_path)
+        m["owner_add_tries"] = ADD_TRIES
+        return None
+    s = {"sz": ap.fmt(q, inst["lotSz"]), "stop": stop, "tp": m.get("tp")}
+    body = entry_body(ctx, inst_id, inst, long, s, slip, _cid("cnqfa", now, seq), _cid("cnqfas", now, seq), bid or px, ask or px)
+    if not ctx.lead:          # one stop for the whole position: step() re-sizes the existing one (ensure_stop) right after the fill —
+        body.pop("attachAlgoOrds", None)      # a second attached stop would make the stops bigger than the position
+    f = fill(ctx, body, sleep)
+    log({"ev": "owner_add", "inst": inst_id, "side": m["side"], "sz": f["filled"], "avg_px": f["avg_px"], "stop": stop,
+         "risk_usd": round(f["filled"] * ct * abs((f["avg_px"] or px) - stop), 2), "budget": bud_usd,
+         "why": "разовое решение владельца 18.11: добор к копии Ивана"}, log_path)
+    return f["filled"]
+
+
 def ensure_stop(ctx: Ctx, m: dict, size_now: float, log_path=None) -> str:
     """The position's stop on OKX equals the desk stop and covers the whole position: «ok», «amended» or «placed». Raises StopFailed."""
     inst_id, long, tick = m["inst"], m["side"] == "LONG", float(m["tick"])
@@ -1069,6 +1109,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             if w:
                 owner_why[tid] = w
     slip = ap.limits(env)["slip"]
+    ov_raw, bud_usd = ov.load(env=env), None
     seq = 0
     via_used = any(m.get("settle") == "USDC" for m in st["trades"].values())     # a USDC swap now or this pass → sweep at its end
     ctx.positions()
@@ -1129,6 +1170,27 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             if changed:
                 log({"ev": "desk_moved", "id": tid, "inst": m["inst"], "stop": ns, "tp": ntp, "old_stop": m["stop"]}, log_path)
                 m["stop"], m["tp"] = ns, (ntp if ntp is not None else m.get("tp"))
+            # 18.11 (owner, one-off «да»: «скопируем все максимально просаженные сделки Ивана … входим»): config/owner_overrides.json
+            # «add» — ONE extra entry into this held copy, same side and stop, the owner's risk share of the budget
+            add = ov.add_for(ov_raw, tid, now)
+            if add and m.get("owner_add") != add["key"] and int(m.get("owner_add_tries") or 0) < ADD_TRIES:
+                seq += 1
+                if bud_usd is None:
+                    bud_usd = budget(cl, st, env, now)["usd"]
+                try:
+                    got = owner_add(ctx, m, add, bud_usd, slip, now, seq, sleep, log_path)
+                except Exception as e:  # noqa: BLE001 — a refused order: nothing was bought, tried again next pass (≤ MAX_TRIES)
+                    got = None
+                    m["owner_add_tries"] = int(m.get("owner_add_tries") or 0) + 1
+                    log({"ev": "owner_add_error", "id": tid, "inst": m["inst"], "error": str(e)[:200]}, log_path)
+                if got is not None:
+                    m["owner_add"] = add["key"]          # an order went out (filled or not) → never again for this decision
+                    if got > 0:
+                        m["c0"] = float(m["c0"]) + got
+                        res["added"] = res.get("added", 0) + 1
+                        pos = ctx.positions(fresh=True)
+                        size_now = (pos.get(m["inst"]) or {}).get("sz") or size_now + got
+                        changed = True
             if changed or now - int(m.get("chk") or 0) >= VERIFY_MS:
                 try:
                     r = ensure_stop(ctx, m, size_now, log_path)

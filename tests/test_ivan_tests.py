@@ -92,16 +92,18 @@ def test_paper_copy_math():
 def test_routes_and_panels_are_owner_only():
     r = lambda *p: open(os.path.join(ROOT, *p), encoding="utf-8").read()
     srv = r("cnq", "api", "server.py")
+    # 18.11: one handler (_ivan_tests) reached only after an owner check — the owner session (_owner) or, for «Управление»
+    # (admin.html), the same check as every /v2/admin/* call (console.check)
     i = srv.index("def _owner(")
-    for route in ('"/v2/owner/ivan_tests"', '"/v2/owner/ivan_tests/add"', '"/v2/owner/ivan_tests/check"', '"/v2/owner/ivan_tests/remove"'):
-        assert route in srv[i:] and srv.index("self.owner_auth.require(headers)", i) < srv.index(route, i), route
-        assert route not in srv[:i], route
+    assert srv.count("self._ivan_tests(") == 2
+    assert srv.index("self.owner_auth.require(headers)", i) < srv.index("self._ivan_tests(", i)
+    j = srv.index('if path == "/v2/admin/ivan_tests" or path.startswith("/v2/admin/ivan_tests/"):')
+    assert srv.index("deny = self.console.check(headers)", j) < srv.index("self._ivan_tests(", j) < srv.index("def _ivan_tests(")
     core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
-    assert "{ id: 'ivan_tests', name: 'Иван · тест-стратегии', short: 'Иван ×3', icon: 'strategies', owner: true, group: 'tests' }" in core
-    assert '"vip/ivan_tests.js"' in vip and '"ivan_tests.js"' in vip
-    # 17.11 20:01 (owner): management tools live ONLY on cryptonova.vip (vip.html) — app.html shows results, none of these
-    assert not any(x in app for x in ("peterCard", "reversalCard", "smartAltsCard", "ivanTestsCard", "ownerToolsCard", "/v2/owner/peter",
-                                      "/v2/owner/reversal", "/v2/owner/smart_alts", "/v2/owner/ivan_tests", "CNIvanTests", "copy_real"))
+    assert "{ id: 'ivan_tests', name: 'Иван · тест-стратегии', short: 'Иван ×3', icon: 'strategies', owner: true }" in core
+    assert '<script src="vip/ivan_tests.js"></script>' in vip and 'id="ivanTestsCard" hidden' in app
+    j = app.index("async function renderIvanTests")
+    assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j)
     js = r("web", "ivan_tests.js")
     assert "Только ключ «Read-Only»" in js and 'type="password"' in js and "ivan_tests.json" not in js + app
     doc = r("docs", "ivan-bybit-readonly-key.md")
@@ -118,8 +120,12 @@ def test_the_real_copy_switch_is_the_owners_own_click_with_a_plain_confirm():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     rd = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()                                      # noqa: E731
     js, vip, app = rd("web", "ivan_tests.js"), rd("web", "vip", "ivan_tests.js"), rd("web", "app.html")
-    assert "/copy_real" in vip and "fetchOwner(" in vip and "copyReal: (id, on) => call('/copy_real', { id, on })" in vip
-    assert "copy_real" not in app and "/v2/owner/ivan_tests" not in app                    # 17.11 20:01: the switch is on vip.html only
+    for src in (vip, app):
+        assert "/copy_real" in src and "fetchOwner(" in src
+    assert "copyReal: (id, on) => call('/copy_real', { id, on })" in vip
+    assert "copyReal:(id,on)=>CNAuth.fetchOwner('/v2/owner/ivan_tests/copy_real',{method:'POST',body:{id,on}})" in app
+    j = app.index("async function renderIvanTests")
+    assert app.index("CNAuth.state.isOwner", j) < app.index("fetchOwner('/v2/owner/ivan_tests')", j)         # still owner-only
     assert "window.confirm(on ? confirmOn(" in js and js.index("window.confirm(on ? confirmOn(") < js.index("api.copyReal(b.dataset.id, on)")
     assert "err.data.message_ru" in js and "Иван Тест 2 / 3 / 4" in js
     assert "copy_real" not in js.split("function mount")[1].split("data-it=\"copy\"")[0]                     # nothing switches by itself
@@ -166,3 +172,28 @@ process.stdout.write(JSON.stringify({{html:C.html({json.dumps(doc, ensure_ascii=
     assert "Новых копий не будет" in off and "по нашему стопу" in off
     assert out["labels"] == ["копия: Иван · тест 2", "копия: Иван · тест 3", "копия: Иван · тест 4", "копия: Иван · тест 4", "копия: Иван",
                              "W", "сигнал системы CRYPTO NOVA AI", "копия трейдера"]      # ivan5: is not a copy id
+
+
+def test_ivan_tests_in_upravlenie_need_the_owner_and_go_through_admin_html_api(tmp_path, monkeypatch):
+    """18.11 (owner): «Иван Тест» is in «Управление» (admin.html?embed=1). Its calls (/v2/admin/ivan_tests*) need the same owner
+    credential as the rest of the admin panel — no token / a wrong token → refused; the owner's CNQ_ADMIN_TOKEN → the view."""
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import test_api as TA
+    monkeypatch.setenv("CNQ_ADMIN_TOKEN", "t" * 40)
+    api, _ = TA.make(tmp_path)
+    for tok in (None, "x" * 40):
+        code, _d = TA.call(api, "GET", "/v2/admin/ivan_tests", tok=tok)
+        assert code == 401
+        code, _d = TA.call(api, "POST", "/v2/admin/ivan_tests/copy_real", {"id": "a", "on": True}, tok=tok)
+        assert code == 401
+    code, d = TA.call(api, "GET", "/v2/admin/ivan_tests", tok="t" * 40)
+    assert code == 200 and d["accounts"] == [] and d["owner_only"] is True
+    code, d = TA.call(api, "POST", "/v2/admin/ivan_tests/copy_real", {"id": "nope", "on": True}, tok="t" * 40)
+    assert code == 404
+    code, d = TA.call(api, "GET", "/v2/owner/ivan_tests", tok="t" * 40)      # the owner area itself still wants the owner session
+    assert code == 401
+    adm = open(os.path.join(ROOT, "web", "admin.html"), encoding="utf-8").read()
+    assert "Иван Тест (2 / 3 / 4) — ключи и копирование" in adm and '<script src="ivan_tests.js?v=2"></script>' in adm
+    assert "const ivtCall=async(p,body)=>{ const r=await api('/v2/admin/ivan_tests'+p" in adm and "fetch(" not in adm.split("const ivtCall")[1].split("async function ivtLoad")[0]
+    assert "copyReal:(id,on)=>ivtCall('/copy_real',{id,on})" in adm and "loaders.overview=async()=>{\n  ivtLoad();" in adm

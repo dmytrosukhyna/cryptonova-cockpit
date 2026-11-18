@@ -21,9 +21,6 @@
 .it-copy{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}.it-copy.on{border-color:var(--amber,#f2c14e)}
 .it-sw{min-height:34px;padding:6px 14px;border-radius:999px;border:1px solid var(--line2,rgba(127,127,127,.5));background:none;color:var(--fg,#e8f0fa);font:600 12.5px inherit;cursor:pointer}
 .it-sw[aria-checked="true"]{border-color:var(--amber,#f2c14e);background:rgba(242,193,78,.14)}.it-flash{border:1px solid var(--line2,rgba(127,127,127,.5));border-radius:10px;padding:8px 10px;margin:8px 0;font-size:12.5px;line-height:1.5}
-.it-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line,rgba(127,127,127,.25));padding-top:10px;margin-top:12px}.it-links .it-m{flex-basis:100%}
-.it-lnk{display:inline-flex;align-items:center;min-height:38px;padding:6px 14px;border-radius:10px;border:1px solid var(--line2,rgba(127,127,127,.5));color:var(--fg,#e8f0fa);text-decoration:none;font-size:13px;font-weight:600}
-.it-conn input:not([type=checkbox]){min-height:38px;padding:6px 10px;border-radius:8px;border:1px solid var(--line2,rgba(127,127,127,.5));background:rgba(127,127,127,.08);color:inherit;font:inherit;width:100%;box-sizing:border-box}
 @media (max-width:760px){.it-k{grid-template-columns:1fr 1fr}}
 .it-c{width:100%;height:70px;display:block}.it-acc{border-top:1px solid var(--line,rgba(127,127,127,.25));padding-top:10px;margin-top:12px}`;
 
@@ -110,8 +107,8 @@
         в плюсе ${P.winrate != null ? Math.round(P.winrate * 100) + '%' : '—'}, просадка −${num(P.max_dd_pct, 1)}%.${spark(P.curve)}</div></div>`;
   }
 
-  function form(open) {
-    return `<details class="edet" data-it="formbox"${open ? ' open' : ''}><summary>Подключить счёт Ивана (ключ только для чтения)</summary>
+  function form() {
+    return `<details class="edet" data-it="formbox"><summary>Подключить счёт Ивана (ключ только для чтения)</summary>
       <p class="it-m"><b>Только ключ «Read-Only».</b> Ключ с правом торговли или вывода сервер не сохранит. Ключ и секрет обратно не показываются.</p>
       <form data-it="form" autocomplete="off" style="display:grid;gap:6px;max-width:420px;margin:8px 0">
         <input name="name" placeholder="Имя: «Иван Тест 2», «Иван Тест 3» или «Иван Тест 4»" required>
@@ -131,23 +128,6 @@
     return `<style>${CSS}</style><div class="it">${head}${flash}<p class="it-m">${R.copy_real_any ? '<b>' + esc(R.label_ru || '') + '</b>' : esc(R.label_ru || '')}</p>
       <div class="it-box">${esc(R.paper_rule_ru || '')}</div>${R.copy_rule_ru ? `<div class="it-box"><b>Копия на реальный счёт:</b> ${esc(R.copy_rule_ru)}</div>` : ''}
       ${accs.length ? compare(accs) + accs.map(account).join('') : '<p class="it-m">Счета ещё не подключены.</p>'}${form()}</div>`;
-  }
-
-  /** 17.11 (owner 18:31: «не могу найти, куда вставить ключи»): the SAME form and switches as the tab, as one box for the
-   *  «Фьючерсы» page — the form is open, every connected account shows its state and its «Копировать на реальный счёт» switch,
-   *  and a row of links leads to the test desks. opts.links = [[name, href]]. Owner views only. */
-  function connectHtml(R, opts) {
-    opts = opts || {};
-    const accs = (R && R.accounts) || [];
-    const rows = accs.map((a) => { const l = a.last || {};
-      return `<div class="it-acc"><div class="it-h"><b>${esc(a.name)}</b> <span class="it-m">Bybit ${a.host === 'demo' ? 'демо' : 'реальный'} · ключ ${esc(a.key)}${l.t ? ` · ${dt(l.t)}: ${esc(l.msg || '')}` : ''}</span>
-        <button class="ib sm" type="button" data-it="check" data-id="${esc(a.id)}">Проверить</button> <button class="ib sm" type="button" data-it="remove" data-id="${esc(a.id)}">Отключить</button></div>${copyBox(a)}</div>`; }).join('');
-    const links = (opts.links || []).map((x) => `<a class="it-lnk" href="${esc(x[1])}">${esc(x[0])}</a>`).join('');
-    return `<style>${CSS}</style><div class="it it-conn"><h2>Подключить ключи Ивана (Тест 2/3/4) <span class="r muted">видно только тебе</span></h2>
-      ${opts.msg ? `<div class="it-flash" role="status">${esc(opts.msg)}</div>` : ''}
-      <p class="it-m">Сюда вставляется ключ «Read-Only» каждого тест-счёта Ивана на Bybit. После подключения у счёта появится переключатель «Копировать на реальный счёт» — он выключен, пока вы сами его не включите.</p>
-      ${opts.err ? `<p class="it-m">${esc(opts.err)}</p>` : ''}${rows || (R ? '<p class="it-m">Счета ещё не подключены.</p>' : '')}${form(true)}
-      ${links ? `<div class="it-links"><span class="it-m">Тестовые столы (только для владельца):</span>${links}</div>` : ''}</div>`;
   }
 
   function mount(el, api, rerender) {
@@ -178,5 +158,5 @@
         if (rerender) rerender(null, m); else if (msg) msg.textContent = m; }
       b.disabled = false; }));
   }
-  window.CNIvanTests = { html, connectHtml, mount, confirmOn, confirmOff };
+  window.CNIvanTests = { html, mount, confirmOn, confirmOff };
 })();

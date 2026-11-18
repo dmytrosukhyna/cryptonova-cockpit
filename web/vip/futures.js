@@ -6,51 +6,27 @@
   const symOf = (inst) => String(inst || '').split('-')[0] || '—';
   const deskOf = (sig, names) => { if (!sig) return null; const k = String(sig).split(':')[0]; return names[k] || k; };
 
-  const DESKS = [['Golden Donut', '#/peter'], ['Разворот (тест)', '#/reversal'], ['Альты от китов (тест)', '#/smart_alts'], ['Иван · тест-стратегии', '#/ivan_tests']];
   V.views.futures = {
-    async html(arg) {
+    async html() {
       const [M, names, DS, H] = await Promise.all([V.real(), V.deskNames(), V.feed('desk_select.json'), V.feed('app_home.json')]);
       if (!M) return `<div class="ph"><div><h2>Фьючерсы</h2></div></div><div class="card">${V.nodata('public_real.json не загрузился')}</div>`;
-      const pub = `${summary(M)}
+      // 06.11 (owner 17:30): the owner's Futures picture on top (web/fut_owner.json, ../fut_owner.js) — owner views only
+      let OWN = '';
+      if (V.auth.owner() && window.CNFutOwner) {
+        try {
+          const [FO, IS] = await V.feeds(['fut_owner.json', 'ivan_stats.json']);
+          let IV = null; try { IV = await V.ownerData('ivan'); } catch (e) { IV = null; }
+          OWN = `<div class="card" style="margin-bottom:var(--gap)">${window.CNFutOwner.html(FO, { ivan: IV, ivanStats: IS })}</div>`;
+        } catch (e) { OWN = ''; }
+      }
+      return `<div class="ph"><div><h2>Фьючерсы</h2><p>Реальные фьючерсные позиции счёта CRYPTO NOVA на OKX с ${V.PUBLIC_START_LABEL}. Тестовые сделки демо-столов здесь не показываются.</p></div></div>
+        ${OWN}
+        ${summary(M)}
         <div class="grid g-main" style="margin-top:var(--gap)">${openCard(M, names)}${stateCard(M, names, DS, H)}</div>
         ${closedCard(M, names)}`;
-      if (!V.auth.owner()) {
-        return `<div class="ph"><div><h2>Фьючерсы</h2><p>Реальные фьючерсные позиции счёта CRYPTO NOVA на OKX с ${V.PUBLIC_START_LABEL}. Тестовые сделки демо-столов здесь не показываются.</p></div></div>${pub}`;
-      }
-      // 17.11 20:10 (owner: «на телефоне сверху ОДИН список „Стратегии сегодня“, остальное свёрнуто»): owner views only —
-      // the list on top (web/strat_today.js), then the owner's picture, the Ivan keys and the account's tables, each folded.
-      const own = (path) => window.CNAuth.fetchOwner(path).catch(() => null);
-      const [FO, IS] = await V.feeds(['fut_owner.json', 'ivan_stats.json']);
-      const [IT, RV, SA, PT] = await Promise.all(['/v2/owner/ivan_tests', '/v2/owner/reversal', '/v2/owner/smart_alts', '/v2/owner/peter'].map(own));
-      let IV = null; try { IV = await V.ownerData('ivan'); } catch (e) { IV = null; }
-      V.views.futures._it = IT;
-      const rows = window.CNStratToday ? window.CNStratToday.rows({ home: H, real: { futures: M.futures }, fo: FO, ivanStats: IS, ivanTests: IT,
-        reversal: RV, smartAlts: SA, peter: PT }, Date.now()) : [];
-      const fold = (id, title, sub, body, open) => `<details class="card fut-fold" id="${id}" style="margin-top:var(--gap)"${open ? ' open' : ''}>
-        <summary><b>${title}</b><span class="muted">${sub}</span></summary><div style="margin-top:10px">${body}</div></details>`;
-      const keys = arg === 'ivan-keys';
-      return `<style>.fut-fold>summary{display:flex;justify-content:space-between;align-items:baseline;gap:10px;cursor:pointer;list-style:none;min-height:40px}
-        .fut-fold>summary::-webkit-details-marker{display:none}.fut-fold>summary::after{content:'▾';color:var(--muted)}.fut-fold[open]>summary::after{content:'▴'}
-        .fut-fold>summary span{font-size:12px;text-align:right;flex:1}</style>
-        <div class="ph"><div><h2>Фьючерсы</h2><p>Видно только владельцу. Сверху — все стратегии одной строкой; остальное открывается по тапу.</p></div></div>
-        <section class="card" data-st-top>${window.CNStratToday ? window.CNStratToday.html(rows) : V.nodata('strat_today.js не загрузился')}</section>
-        ${window.CNFutOwner ? fold('fut-owner', 'Фьючерсы владельца подробно', 'счёт · трейдеры · Иван · демо-стол', window.CNFutOwner.html(FO, { ivan: IV, ivanStats: IS })) : ''}
-        ${window.CNIvanTests && V.ivanTestsApi ? fold('ivan-keys', 'Подключить ключи Ивана (Тест 2/3/4)', `${((IT || {}).accounts || []).length} подключено · ключи только Read-Only`,
-          `<div data-it="tools">${window.CNIvanTests.connectHtml(IT, { err: IT ? '' : 'Список счетов не загрузился — форма ниже работает.', links: DESKS })}</div>`, keys) : ''}
-        ${fold('fut-real', 'Реальный счёт: сводка, позиции, история', `открыто ${M.futures.length}`, pub)}`;
     },
-    mount(el, arg) {
+    mount(el) {
       if (window.CNFutOwner) window.CNFutOwner.mount(el);
-      if (arg === 'ivan-keys') {                                     // vip.html#/futures/ivan-keys: open the box and scroll to it
-        const k = el.querySelector('#ivan-keys');
-        if (k) { k.open = true; setTimeout(() => { try { k.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (e) { k.scrollIntoView(); } }, 60); }
-      }
-      const tools = el.querySelector('[data-it="tools"]');
-      if (tools && window.CNIvanTests && V.ivanTestsApi) {
-        let last = V.views.futures._it || null;
-        const re = (D, msg) => { if (D && D.accounts) last = D; tools.innerHTML = window.CNIvanTests.connectHtml(last, { msg, links: DESKS }); window.CNIvanTests.mount(tools, V.ivanTestsApi, re); };
-        window.CNIvanTests.mount(tools, V.ivanTestsApi, re);
-      }
       el.querySelectorAll('[data-fper]').forEach((b) => b.addEventListener('click', () => { if (!b.disabled) { ui.per = b.dataset.fper; V.render({ keepScroll: true }); } }));
       el.querySelectorAll('[data-ff]').forEach((i) => i.addEventListener('change', () => { ui[i.dataset.ff] = i.value; V.render({ keepScroll: true }); }));
       const r = el.querySelector('[data-freset]'); if (r) r.addEventListener('click', () => { Object.assign(ui, { from: '', to: '', sym: '', strat: '', res: '' }); V.render({ keepScroll: true }); });

@@ -104,11 +104,9 @@ def test_panels_owner_only():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     r = lambda *p: open(os.path.join(root, *p), encoding="utf-8").read()
     core, app, vip = r("web", "vip", "core.js"), r("web", "app.html"), r("web", "vip.html")
-    assert "{ id: 'peter', name: 'Golden Donut', short: 'Donut', icon: 'strategies', owner: true, group: 'tests' }" in core and "peter: '/v2/owner/peter'" in core
-    assert '"vip/peter.js"' in vip and '"peter.js"' in vip
-    # 17.11 20:01 (owner): management tools live ONLY on cryptonova.vip (vip.html) — app.html shows results, none of these
-    assert not any(x in app for x in ("peterCard", "reversalCard", "smartAltsCard", "ivanTestsCard", "ownerToolsCard", "/v2/owner/peter",
-                                      "/v2/owner/reversal", "/v2/owner/smart_alts", "/v2/owner/ivan_tests", "CNIvanTests", "copy_real"))
+    assert "{ id: 'peter', name: 'Golden Donut', short: 'Donut', icon: 'strategies', owner: true }" in core and "peter: '/v2/owner/peter'" in core
+    assert '<script src="vip/peter.js"></script>' in vip and '<script src="peter.js?v=3"></script>' in vip
+    assert 'id="peterCard" hidden' in app and "CNAuth.state.isOwner" in app and "/v2/owner/peter" in app
     for f in os.listdir(os.path.join(root, "web")):         # the desk is never a public file
         assert not f.startswith("peter_live"), f
 

@@ -423,6 +423,11 @@ class Api:
             return self.owner_auth.handle(method, path, headers, body)
         if path == "/v2/owner" or path.startswith("/v2/owner/"):          # 28.10: the owner's private sections, owner session only
             return self._owner(method, path, headers, body)
+        if path == "/v2/admin/ivan_tests" or path.startswith("/v2/admin/ivan_tests/"):
+            # 18.11 (owner): «Иван Тест» lives in «Управление» (admin.html), which signs in with the owner session OR the owner's
+            # CNQ_ADMIN_TOKEN — the same check as every other /v2/admin/* call (console.check: constant-time, rate-limited)
+            deny = self.console.check(headers)
+            return deny if deny else self._ivan_tests(method, path.replace("/v2/admin/", "/v2/owner/", 1), body)
         if path == "/v2/admin" or path.startswith("/v2/admin/"):          # the owner's admin panel: its own token, not Firebase
             return self.console.handle(method, path, url.query, headers, body)
         # ------------------------------------------------------------ signed-in user
@@ -493,6 +498,26 @@ class Api:
         return 404, {"error": "not_found"}
 
     # ---------------------------------------------------------------- 28.10: the owner's private sections
+    IVAN_TESTS_POST = ("/v2/owner/ivan_tests/add", "/v2/owner/ivan_tests/check", "/v2/owner/ivan_tests/remove", "/v2/owner/ivan_tests/copy_real")
+
+    def _ivan_tests(self, method: str, path: str, body: bytes = b"") -> tuple[int, dict]:
+        """«Иван Тест» — called ONLY after the caller was checked as the owner (_owner: the owner session; /v2/admin/ivan_tests*:
+        console.check). GET = the view (secrets never returned — names, hosts, masked keys); POST add / check / remove / copy_real."""
+        if method == "GET" and path == "/v2/owner/ivan_tests":
+            return 200, self.ivan_tests.view()
+        if method != "POST" or path not in self.IVAN_TESTS_POST:
+            return (405, {"error": "method"}) if path == "/v2/owner/ivan_tests" or path in self.IVAN_TESTS_POST else (404, {"error": "not_found"})
+        try:
+            form = json.loads((body or b"{}").decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return 400, {"error": "bad_json"}
+        form = form if isinstance(form, dict) else {}
+        if path.endswith("/add"):
+            return self.ivan_tests.add(form)
+        if path.endswith("/copy_real"):                                     # 17.11: the per-account real-copy switch (default off)
+            return self.ivan_tests.set_copy(str(form.get("id") or ""), form.get("on"))
+        return (self.ivan_tests.check if path.endswith("/check") else self.ivan_tests.remove)(str(form.get("id") or ""))
+
     def _owner(self, method: str, path: str, headers: dict, body: bytes = b"") -> tuple[int, dict]:
         """GET /v2/owner/overview · /v2/owner/myspot · /v2/owner/ivan — only with a valid owner session (checked here, on the
         server, on every call). Read-only: nothing here can change an account, a key or a trading setting."""
@@ -501,18 +526,8 @@ class Api:
             return deny
         if method == "POST" and path == "/v2/owner/peter/token/rotate":     # 11.11: «Новый токен» for Peter's MT5 bridge
             return self.peter.token_view(rotate=True)
-        if method == "POST" and path in ("/v2/owner/ivan_tests/add", "/v2/owner/ivan_tests/check", "/v2/owner/ivan_tests/remove",
-                                         "/v2/owner/ivan_tests/copy_real"):
-            try:                                                            # 13.11: «Иван · тест-стратегии» (owner session only)
-                form = json.loads((body or b"{}").decode("utf-8"))
-            except (ValueError, UnicodeDecodeError):
-                return 400, {"error": "bad_json"}
-            form = form if isinstance(form, dict) else {}
-            if path.endswith("/add"):
-                return self.ivan_tests.add(form)
-            if path.endswith("/copy_real"):                                 # 17.11: the per-account real-copy switch (default off)
-                return self.ivan_tests.set_copy(str(form.get("id") or ""), form.get("on"))
-            return (self.ivan_tests.check if path.endswith("/check") else self.ivan_tests.remove)(str(form.get("id") or ""))
+        if path == "/v2/owner/ivan_tests" or path.startswith("/v2/owner/ivan_tests/"):
+            return self._ivan_tests(method, path, body)                     # 13.11: «Иван · тест-стратегии» (owner session only)
         if method == "POST" and path == "/v2/owner/peter/cloud":            # 11.11 option B: the form «Подключение через пароль инвестора»
             try:
                 form = json.loads((body or b"{}").decode("utf-8"))
@@ -550,8 +565,6 @@ class Api:
             return self.reversal.desk()
         if path == "/v2/owner/listing_short":                          # 12.11: «Шорт листингов (тест)», owner only
             return self.listing_short.desk()
-        if path == "/v2/owner/ivan_tests":                             # 13.11: secrets never returned — names, hosts, masked keys
-            return 200, self.ivan_tests.view()
         if path == "/v2/owner/smart_alts":                             # 13.11: «Альты от китов (тест)», owner only
             return self.smart_alts.desk()
         if path == "/v2/owner/peter":                                  # 11.11: «Питер» (MT5), owner only

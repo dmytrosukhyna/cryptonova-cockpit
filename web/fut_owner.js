@@ -61,24 +61,7 @@
 @media (max-width:720px){.fo .fo-tiles,.fo .fo-vs{grid-template-columns:repeat(2,minmax(0,1fr))}.fo .fo-grid{grid-template-columns:1fr}
   .fo .fo-tile b{font-size:18px}.fo .fo-vs .fo-tile:last-child{grid-column:1/-1}}
 @media (max-width:720px){.fo td{white-space:normal;word-break:break-word}.fo td.r{white-space:nowrap}.fo table{font-size:11.5px}.fo td,.fo th{padding-right:4px}}
-@media (max-width:380px){.fo .fo-kv{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.fo .fo-strip{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;margin-top:10px;color:var(--fo-ink2)}.fo .fo-strip b{color:var(--fo-ink);font-weight:700}
-.fo details.fo-sec{margin-top:10px;padding:0}.fo details.fo-sec>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;min-height:48px;margin:0}
-.fo details.fo-sec>summary::-webkit-details-marker{display:none}.fo details.fo-sec>summary b{font-size:14.5px;color:var(--fo-ink)}
-.fo details.fo-sec>summary span{font-size:12.5px;color:var(--fo-ink2);text-align:right}.fo details.fo-sec>summary::after{content:'▾';color:var(--fo-mute);margin-left:4px}
-.fo details.fo-sec[open]>summary::after{content:'▴'}.fo details.fo-sec[open]>summary{border-bottom:1px solid var(--fo-line)}.fo .fo-in{padding:8px 14px 12px}
-.fo .fo-li{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.4fr) auto;gap:8px;align-items:baseline;padding:8px 0;border-bottom:1px solid rgba(160,190,230,.07);font-size:13px}
-.fo .fo-li:last-child{border-bottom:0}.fo .fo-li .w{color:var(--fo-ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fo .fo-li .v{font-weight:700;text-align:right;white-space:nowrap}
-.fo details.fo-tr{margin:0;border:0;border-bottom:1px solid rgba(160,190,230,.07);border-radius:0;padding:0}.fo details.fo-tr:last-of-type{border-bottom:0}
-.fo details.fo-tr>summary{list-style:none;display:grid;grid-template-columns:minmax(0,1.3fr) auto minmax(0,1fr) auto;gap:8px;align-items:baseline;padding:9px 0;margin:0;font-size:13px;min-height:40px}
-.fo details.fo-tr>summary::-webkit-details-marker{display:none}.fo details.fo-tr>summary b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fo-ink)}
-.fo details.fo-tr>summary .c{color:var(--fo-ink2);font-size:12px}.fo details.fo-tr>summary .v{font-weight:700;text-align:right;white-space:nowrap}
-.fo details.fo-tr.zero>summary b,.fo details.fo-tr.zero>summary .c,.fo details.fo-tr.zero>summary .v{color:var(--fo-faint);font-weight:500}
-.fo .fo-why{grid-column:1/-1;font-size:11.5px;color:var(--fo-faint);line-height:1.4;white-space:normal}.fo details.fo-tr .fo-card{margin:0 0 10px}
-.fo .fo-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fo .fo-two .fo-card h4{margin:0;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fo-mute);font-weight:600}
-.fo .fo-two .fo-card .big{font-size:21px;font-weight:700}.fo .fo-two .fo-card.his{border-style:dashed}.fo .fo-two .fo-card.ours{border-color:var(--fo-acc)}
-.fo .fo-sub{font-size:12px;color:var(--fo-mute);margin:12px 0 4px;letter-spacing:.06em;text-transform:uppercase}
-@media (max-width:720px){.fo .fo-two{grid-template-columns:1fr}.fo details.fo-tr>summary{grid-template-columns:minmax(0,1fr) auto auto}.fo details.fo-tr>summary .c{grid-column:1/-1;grid-row:2}}`;
+@media (max-width:380px){.fo .fo-kv{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
   function css() { if (document.getElementById('fo-css')) return; const s = document.createElement('style'); s.id = 'fo-css'; s.textContent = CSS; document.head.appendChild(s); }
 
   /* ── the chart: futures P&L since 22.10, one line, a zero line, the three marks; hover = crosshair + tooltip ── */
@@ -128,20 +111,9 @@
     return `<div class="fo-chart" data-fo-chart="${c.data}" data-fo-doc="${esc(JSON.stringify({ curve: doc.curve, markers: doc.markers }))}">${c.svg}<div class="fo-tip"></div></div>
       <div class="fo-legend"><span><i></i>итог фьючерсов реального счёта OKX, $ (с открытыми позициями)</span>${M.map((m, i) => `<span><b class="fo-num">${i + 1}</b>${esc(m.ru)}</span>`).join('')}</div>`;
   }
-  const OPEN = new Set();                        // 17.11: the sections the owner opened stay open over the minute's redraw
   function mount(el) {
-    (el || document).querySelectorAll('details[data-fo-sec]').forEach((d) => {
-      if (d.__foS) return; d.__foS = 1;
-      d.addEventListener('toggle', () => { if (d.open) OPEN.add(d.dataset.foSec); else OPEN.delete(d.dataset.foSec); });
-    });
     (el || document).querySelectorAll('[data-fo-chart]').forEach((box) => {
-      if (box.__fo) return;
-      if (!box.clientWidth) {                    // 17.11: inside a folded section — drawn at its real width when it is opened
-        const d = box.closest('details');
-        if (d && !d.__foT) { d.__foT = 1; d.addEventListener('toggle', () => { if (d.open) mount(el); }); }
-        return;
-      }
-      box.__fo = 1;
+      if (box.__fo) return; box.__fo = 1;
       // redraw at the box's own width: 1 unit = 1 px, so the axis text keeps its size on a phone
       try {
         const w = box.clientWidth;
@@ -201,6 +173,24 @@
       ${copiesTable(f.copies || [])}
       <div class="fo-tot"><span>Нам дал: закрыто ${esc(T.n || 0)}${T.n ? ` (в плюсе ${esc(T.wins)})` : ''}${T.open_n ? `, открыто ${esc(T.open_n)}` : ''}</span><b class="${tone(T.total_usd, 2)}">${esc(usd(T.total_usd, true))}</b></div></div>`;
   }
+  function strategy(doc) {
+    const F = doc.following || [], lockNext = (doc.lock || {}).next_t;
+    const all = F.concat(doc.dropped || []);
+    const sum = (k) => all.reduce((a, f) => a + (+((f.totals || {})[k]) || 0), 0);
+    const n = sum('n'), tot = sum('total_usd');
+    const summary = `<div class="fo-card"><div class="t"><b>Итого по стратегии</b><span class="fo-chip">реальный счёт с 04.11</span></div>
+      <div class="fo-kv"><div><span>копий закрыто</span><b>${esc(n)}</b></div><div><span>открыто</span><b>${esc(sum('open_n'))}</b></div><div><span>итог</span><b class="${tone(tot)}">${esc(usd(tot, true))}</b></div>
+        <div><span>от текущих</span><b>${esc(usd(F.reduce((a, f) => a + (+(f.totals || {}).total_usd || 0), 0), true))}</b></div><div><span>от выбывших</span><b>${esc(usd((doc.dropped || []).reduce((a, f) => a + (+(f.totals || {}).total_usd || 0), 0), true))}</b></div>
+        <div><span>без источника</span><b>${esc((doc.unattributed || {}).n || 0)} · ${esc(usd((doc.unattributed || {}).sum_usd, true))}</b></div></div>
+      <p class="fo-note">${esc((doc.lock || {}).ru || '')}</p></div>`;
+    const dropped = (doc.dropped || []).filter((f) => (f.copies || []).length);
+    const bench = doc.bench || [];
+    return `<h3>Стратегия «Копирование китов» <small>${esc(F.length)} трейдеров в списке · пересмотр ${esc(dd(lockNext))}</small></h3>
+      <div class="fo-grid">${F.map((f) => traderCard(f, lockNext)).join('')}${summary}</div>
+      <details><summary>Выбывшие трейдеры с нашими копиями · ${esc(dropped.length)}</summary><div class="fo-grid">${dropped.map((f) => traderCard(f, lockNext)).join('') || '<p class="fo-note">Нет.</p>'}</div></details>
+      <details><summary>Скамейка запасных · ${esc(bench.length)}</summary><div class="fo-tbl"><table><thead><tr><th>Трейдер</th><th class="r">в плюсе</th><th class="r">PF</th><th class="r">решений</th><th class="r">60 дн</th></tr></thead><tbody>${bench.map((b) =>
+        `<tr><td style="white-space:normal">${esc(b.name)}<br><span class="m">${esc(b.why_ru || '')}</span></td><td class="r">${esc(pct(b.win_pct, 0, false))}</td><td class="r">${esc(isN(b.pf) ? grp(b.pf, 1) : '—')}</td><td class="r">${esc(b.decisions != null ? b.decisions : '—')}</td><td class="r">${esc(usd(b.pnl_60d, true))}</td></tr>`).join('')}</tbody></table></div></details>`;
+  }
   function desk(doc) {
     const D = doc.desk || {};
     const t = (lab, val, sub, cls) => `<div class="fo-tile"><small>${lab}</small><b class="${cls || ''}">${val}</b><em>${sub}</em></div>`;
@@ -209,6 +199,19 @@
       ${t('С 04.11: реальный счёт vs стол', `${esc(pct(D.real_switch_pct, 1))} <span class="m">/</span> ${esc(pct(D.switch_pct, 1))}`, 'реальные фьючерсы к их бюджету против стола к его счёту')}
       ${t('Качество копии', esc(pct(D.avg_entry_gap_pct, 2)), `средняя разница нашего входа с входом трейдера по ${esc(D.gap_n || 0)} сделкам («+» — хуже трейдера)`)}
     </div>`;
+  }
+  function ivanCard(st, iv, info) {
+    const S = st || {};
+    const pos = (iv && iv.positions) || [], cl = (iv && iv.closed) || [];
+    const lastIn = Math.max(0, ...pos.map((p) => +p.seen || +p.created || 0), ...cl.map((c) => +c.open_time || 0));
+    const rows = pos.map((p) => `<tr><td>${esc(p.symbol)} ${sideRu(p.side)}</td><td>${esc(px(p.entry))}</td><td>${p.stop ? esc(px(p.stop)) : '<span class="m">нет</span>'}</td><td class="r ${tone(p.upnl, 2)}">${esc(usd(p.upnl, true))}</td></tr>`).join('')
+      + cl.slice(0, 8).map((c) => `<tr><td>${esc(c.symbol)} ${sideRu(c.side)}<br><span class="m">${esc(dd(c.close_time))}</span></td><td>${esc(px(c.entry))}</td><td>${esc(px(c.exit))}</td><td class="r ${tone(c.pnl, 2)}">${esc(usd(c.pnl, true))}</td></tr>`).join('');
+    return `<h3>Иван <small>демо-счёт Bybit, только чтение</small></h3><div class="fo-vs">
+      <div class="fo-tile"><small>С ${esc(dd(S.first_trade || S.since))}</small><b class="${tone((+S.net_closed_usd || 0) + (+S.open_upnl_usd || 0))}">${esc(usd((+S.net_closed_usd || 0) + (+S.open_upnl_usd || 0), true))}</b><em>закрыто ${esc(S.closed_n != null ? S.closed_n : '—')} (в плюсе ${esc(S.wins != null ? S.wins : '—')}) · просадка ${esc(pct(S.max_dd_pct, 1, false))}</em></div>
+      <div class="fo-tile"><small>Открыто сейчас</small><b>${esc(S.open_n != null ? S.open_n : '—')}</b><em>по ним ${esc(usd(S.open_upnl_usd, true))}</em></div>
+      <div class="fo-tile"><small>Последний вход</small><b>${iv ? esc(lastIn ? ddt(lastIn) : 'нет') : '—'}</b><em>${iv ? 'по данным счёта, точность ±15 мин' : 'подробности — после входа владельца (пароль «Иван тест»)'}</em></div></div>
+      ${rows ? `<div class="fo-tbl" style="margin-top:10px"><table><thead><tr><th>Сделка</th><th>Вход</th><th>Стоп / выход</th><th class="r">Итог</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}
+      <p class="fo-note">${esc((info || {}).source_ru || '')} ${esc((info || {}).copy_ru || '')}</p>`;
   }
   function tests(doc) {
     const T = doc.tests || [];
@@ -220,87 +223,12 @@
       ${rest.length ? `<details><summary>Все остальные тесты · ${esc(rest.length)}</summary><div class="fo-tbl"><table>${head}<tbody>${rest.map((x) => row(x, false)).join('')}</tbody></table></div></details>` : ''}`;
   }
 
-  /* 17.11 (owner 18:31: «куча табличек, неудобно»): ONE compact list. Four sections, all folded: (a) the real account — the open
-     copies as one list, (b) the traders — one row each, (c) Ivan — HIS account apart from OUR copies of it, (d) the demo desk.
-     Every detail of the old picture is still there, one tap deeper. */
-  const isIvan = (f) => /^ivan\d?:/.test(String((f || {}).addr || '')) || String((f || {}).name || '') === 'Иван';
-  const sec = (key, title, sum, body) => `<details class="fo-sec" data-fo-sec="${key}"${OPEN.has(key) ? ' open' : ''}><summary><b>${title}</b><span>${sum}</span></summary><div class="fo-in">${body}</div></details>`;
-
-  function realSec(doc) {
-    const K = doc.kpi || {}, open = (doc.trades || []).filter((t) => !t.closed);
-    const rows = open.map((t) => `<div class="fo-li"><span><b>${esc(t.coin)}</b> ${sideRu(t.side)}</span><span class="w">${esc(t.whale_name || (t.strategy === 'whales' ? 'трейдер не записан' : t.strategy || '—'))}</span><span class="v ${tone(t.pnl_usd, 2)}">${esc(usd(t.pnl_usd, true))}</span></div>`).join('');
-    const n = open.length || K.open_n || 0;
-    return sec('real', 'Реальный счёт', `открыто ${esc(n)} · сейчас <span class="${tone(K.open_usd)}">${esc(usd(K.open_usd, true))}</span>`,
-      `${rows ? `<div class="fo-sub">Открытые копии: монета · чья · результат сейчас</div>${rows}` : '<p class="fo-note">Открытых копий сейчас нет.</p>'}
-      <details><summary>График и цифры счёта</summary>${chart(doc)}${tiles(K)}</details>`);
-  }
-
-  function traderRow(f, kind, lockNext) {
-    const T = f.totals || {}, n = +T.n || 0, on = +T.open_n || 0, zero = !n && !on;
-    const st = kind === 'bench' ? 'скамейка' : kind === 'dropped' ? 'выбыл' : 'A · в списке';
-    const why = zero ? (f.why_ru || (kind === 'bench' ? 'в запасе: в список A не вошёл' : 'в списке, но пока не открыл ни одной новой позиции, которую можно было скопировать')) : '';
-    const body = kind === 'bench'
-      ? `<div class="fo-card"><div class="fo-kv"><div><span>в плюсе, 60 дн</span><b>${esc(pct(f.win_pct, 0, false))}</b></div><div><span>PF</span><b>${esc(isN(f.pf) ? (f.pf >= 99 ? '99+' : grp(f.pf, 1)) : '—')}</b></div><div><span>за 60 дн</span><b>${esc(usd(f.pnl_60d, true))}</b></div></div>${f.why_ru ? `<p class="fo-note">${esc(f.why_ru)}</p>` : ''}</div>`
-      : traderCard(f, lockNext);
-    return `<details class="fo-tr${zero ? ' zero' : ''}"><summary><b title="${esc(f.name)}">${esc(f.name)}</b><span class="fo-chip">${st}</span>
-      <span class="c">${zero ? 'сделок нет' : `открыто ${esc(on)} · закрыто ${esc(n)}`}</span><span class="v ${zero ? '' : tone(T.total_usd, 2)}">${zero ? '—' : esc(usd(T.total_usd, true))}</span>
-      ${why ? `<span class="fo-why">${esc(why)}</span>` : ''}</summary>${body}</details>`;
-  }
-  function tradersSec(doc) {
-    const F = (doc.following || []).filter((f) => !isIvan(f)), lockNext = (doc.lock || {}).next_t;
-    const D = (doc.dropped || []).filter((f) => !isIvan(f)), B = doc.bench || [];
-    const had = (f) => (+((f.totals || {}).n) || 0) + (+((f.totals || {}).open_n) || 0) > 0, D1 = D.filter(had), D0 = D.filter((f) => !had(f));
-    const tot = F.concat(D).reduce((a, f) => a + (+((f.totals || {}).total_usd) || 0), 0);
-    const U = doc.unattributed || {};
-    return sec('traders', 'Трейдеры', `в списке ${esc(F.length)} · наши копии <span class="${tone(tot)}">${esc(usd(tot, true))}</span>`,
-      `<div class="fo-sub">В списке A · результат НАШИХ копий</div>${F.map((f) => traderRow(f, 'following', lockNext)).join('') || '<p class="fo-note">Список пуст.</p>'}
-      ${D1.length ? `<div class="fo-sub">Выбывшие с нашими копиями · ${esc(D1.length)}</div>${D1.map((f) => traderRow(f, 'dropped', lockNext)).join('')}` : ''}
-      ${D0.length ? `<details><summary>Выбывшие без наших сделок · ${esc(D0.length)}</summary>${D0.map((f) => traderRow(f, 'dropped', lockNext)).join('')}</details>` : ''}
-      ${B.length ? `<details><summary>Скамейка · ${esc(B.length)}</summary>${B.map((f) => traderRow(f, 'bench', lockNext)).join('')}</details>` : ''}
-      <p class="fo-note">${esc((doc.lock || {}).ru || '')}${U.n ? ` Без источника: ${esc(U.n)} сделок, ${esc(usd(U.sum_usd, true))}.` : ''}</p>`);
-  }
-
-  function ivanSec(doc, st, iv) {
-    const S = st || {}, I = doc.ivan || {};
-    const ours = (doc.following || []).concat(doc.dropped || []).filter(isIvan);
-    const T = ours.reduce((a, f) => { const t = f.totals || {}; ['n', 'wins', 'open_n', 'sum_usd', 'open_usd', 'total_usd'].forEach((k) => { a[k] = (a[k] || 0) + (+t[k] || 0); }); return a; }, {});
-    const copies = ours.reduce((a, f) => a.concat(f.copies || []), []);
-    const hisTot = (+S.net_closed_usd || 0) + (+S.open_upnl_usd || 0), has = S.closed_n != null || S.open_n != null;
-    const pos = (iv && iv.positions) || [], cl = (iv && iv.closed) || [];
-    const rows = pos.map((p) => `<tr><td>${esc(p.symbol)} ${sideRu(p.side)}</td><td>${esc(px(p.entry))}</td><td>${p.stop ? esc(px(p.stop)) : '<span class="m">нет</span>'}</td><td class="r ${tone(p.upnl, 2)}">${esc(usd(p.upnl, true))}</td></tr>`).join('')
-      + cl.slice(0, 8).map((c) => `<tr><td>${esc(c.symbol)} ${sideRu(c.side)}<br><span class="m">${esc(dd(c.close_time))}</span></td><td>${esc(px(c.entry))}</td><td>${esc(px(c.exit))}</td><td class="r ${tone(c.pnl, 2)}">${esc(usd(c.pnl, true))}</td></tr>`).join('');
-    return sec('ivan', 'Иван', `его счёт ${has ? `<span class="${tone(hisTot)}">${esc(usd(hisTot, true))}</span>` : '—'} · наши копии <span class="${tone(T.total_usd, 2)}">${esc(usd(T.total_usd || 0, true))}</span>`,
-      `<div class="fo-two">
-        <div class="fo-card his"><h4>Его счёт · деньги Ивана, не наши</h4><span class="big ${tone(hisTot)}">${has ? esc(usd(hisTot, true)) : '—'}</span>
-          <div class="fo-kv"><div><span>закрыто (${esc(S.closed_n != null ? S.closed_n : '—')})</span><b class="${tone(S.net_closed_usd)}">${esc(usd(S.net_closed_usd, true))}</b></div>
-            <div><span>открыто (${esc(S.open_n != null ? S.open_n : '—')})</span><b class="${tone(S.open_upnl_usd)}">${esc(usd(S.open_upnl_usd, true))}</b></div>
-            <div><span>просадка</span><b>${esc(pct(S.max_dd_pct, 1, false))}</b></div></div>
-          <p class="fo-note">Демо-счёт Bybit, только чтение, с ${esc(dd(S.first_trade || S.since))}. В плюсе ${esc(S.wins != null ? S.wins : '—')} из ${esc(S.closed_n != null ? S.closed_n : '—')} закрытых — открытый минус в этот подсчёт не входит.</p></div>
-        <div class="fo-card ours"><h4>Наши копии по нему · реальный счёт OKX, наши деньги</h4><span class="big ${tone(T.total_usd, 2)}">${esc(usd(T.total_usd || 0, true))}</span>
-          <div class="fo-kv"><div><span>закрыто (${esc(T.n || 0)})</span><b class="${tone(T.sum_usd, 2)}">${esc(usd(T.sum_usd || 0, true))}</b></div>
-            <div><span>открыто (${esc(T.open_n || 0)})</span><b class="${tone(T.open_usd, 2)}">${esc(usd(T.open_usd || 0, true))}</b></div>
-            <div><span>в плюсе</span><b>${esc(T.wins || 0)} из ${esc(T.n || 0)}</b></div></div>
-          <p class="fo-note">${ours.length ? 'Наш размер и наш стоп — поэтому сумма несравнима с его счётом.' : esc(I.copy_ru || 'Копий Ивана на реальном счёте нет.')}</p></div></div>
-      ${copies.length ? `<details><summary>Наши копии по Ивану · ${esc(copies.length)}</summary>${copiesTable(copies)}</details>` : ''}
-      ${rows ? `<details><summary>Его сделки на его счёте</summary><div class="fo-tbl"><table><thead><tr><th>Сделка</th><th>Вход</th><th>Стоп / выход</th><th class="r">Итог</th></tr></thead><tbody>${rows}</tbody></table></div></details>` : ''}
-      <p class="fo-note">${esc(S.note_ru || '')} ${esc(I.source_ru || '')}</p>`);
-  }
-
-  function deskSec(doc) {
-    const D = doc.desk || {};
-    return sec('desk', 'Демо-стол для сравнения', `стол <span class="${tone(D.pnl_pct, 0.5)}">${esc(pct(D.pnl_pct, 1))}</span> · с 04.11: счёт ${esc(pct(D.real_switch_pct, 1))} / стол ${esc(pct(D.switch_pct, 1))}`,
-      desk(doc).replace(/<h3>[\s\S]*?<\/h3>/, '') + tests(doc));
-  }
-
   function html(doc, opt) {
     css();
     opt = opt || {};
     if (!doc || !doc.kpi) return '<div class="fo"><p class="fo-note">Сводка фьючерсов ещё не собрана (web/fut_owner.json).</p></div>';
-    const K = doc.kpi;
     return `<div class="fo"><div class="fo-head"><b>Фьючерсы · реальный счёт OKX с 22.10</b><span>видно только владельцу · данные ${esc(ddt(doc.asof))}</span></div>
-      <div class="fo-strip"><span>Итог с 22.10 <b class="${tone(K.pnl_all_usd)}">${esc(usd(K.pnl_all_usd, true))}</b></span><span>сегодня <b class="${tone(K.today_usd)}">${esc(usd(K.today_usd, true))}</b></span>
-        <span>в работе <b>${esc(usd(K.margin_usd))}</b> из ${esc(usd(K.budget_usd))}</span><span>закрыто ${esc((K.closed || {}).n != null ? K.closed.n : '—')}, в плюсе ${esc(pct((K.closed || {}).win_pct, 0, false))}</span></div>
-      ${realSec(doc)}${tradersSec(doc)}${ivanSec(doc, opt.ivanStats || (doc.ivan || {}).stats, opt.ivan)}${deskSec(doc)}</div>`;
+      ${chart(doc)}${tiles(doc.kpi)}${strategy(doc)}${desk(doc)}${ivanCard(opt.ivanStats || (doc.ivan || {}).stats, opt.ivan, doc.ivan)}${tests(doc)}</div>`;
   }
   window.CNFutOwner = { html, mount };
 })();

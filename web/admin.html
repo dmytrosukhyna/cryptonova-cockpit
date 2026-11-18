@@ -52,6 +52,9 @@ h1{font-size:22px;margin:22px 0 4px;letter-spacing:.01em}
 .kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .cols2{grid-template-columns:repeat(auto-fit,minmax(380px,1fr))}
 .cols3{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.ivt{margin:10px 0 16px}.ivt>summary{display:flex;justify-content:space-between;align-items:baseline;gap:10px;cursor:pointer;list-style:none;font-size:15px}
+.ivt>summary::-webkit-details-marker{display:none}.ivt .it>h2{display:none}.ivt>summary .sub{margin:0}.ivt h2 .r{font-weight:400;font-size:12px;color:var(--muted)}
+.ivt input:not([type=checkbox]){min-height:36px;padding:6px 10px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--fg);font:inherit}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;min-width:0}
 .card h3{margin:0 0 4px;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:700}
 .card .sub{color:var(--muted);font-size:12.5px;margin:0 0 12px}
@@ -269,6 +272,10 @@ textarea.in1{width:100%;min-height:84px;resize:vertical}
   <!-- overview -->
   <section id="v-overview" hidden>
     <h1>Обзор</h1>
+    <!-- 18.11 (owner): «Иван Тест» — the keys of Ivan's Bybit test accounts and the per-account real-copy switch, right here in
+         «Управление» (GET/POST /v2/admin/ivan_tests* — the same owner check as every admin call). Renderer: ivan_tests.js. -->
+    <details class="card ivt" id="ivanTestsBox" open><summary><b>Иван Тест (2 / 3 / 4) — ключи и копирование</b><span class="sub" id="ivtSub">загружаю…</span></summary>
+      <div id="ivanTests"></div></details>
     <p class="lead" id="ovLead">Приложение CRYPTO NOVA 2.0: люди, вовлечённость и путь к подтверждённому UID.</p>
     <div class="grid kpis" id="kpis"></div>
     <div class="sec"><h2>Воронка</h2>
@@ -412,6 +419,7 @@ textarea.in1{width:100%;min-height:84px;resize:vertical}
 <div class="toasts" id="toasts"></div>
 
 <script src="vip/auth.js"></script>
+<script src="ivan_tests.js?v=2"></script>
 <script>
 (function(){
 'use strict';
@@ -491,11 +499,26 @@ function show(v){ if(!VIEWS.includes(v)) v='overview'; CUR=v;
   try{ history.replaceState(null,'','#'+v); }catch(e){} load(v); }
 document.querySelectorAll('#tabs button').forEach(b=>b.addEventListener('click',()=>show(b.dataset.t)));
 const loaders={};
+/* 18.11 (owner): «Иван Тест» in «Управление». Every call goes through api() — the same credential as the rest of this page (the
+   owner session or CNQ_ADMIN_TOKEN); the switch to the real account asks for confirmation first (ivan_tests.js). */
+let IVT=null;
+const ivtCall=async(p,body)=>{ const r=await api('/v2/admin/ivan_tests'+p,body?{method:'POST',body}:{});
+  if(r.code>=400||r.code===0){ const e=new Error((r.d&&(r.d.message_ru||r.d.error))||('HTTP '+r.code)); e.data=r.d; throw e; } return r.d; };
+const ivtApi={add:b=>ivtCall('/add',b),check:id=>ivtCall('/check',{id}),remove:id=>ivtCall('/remove',{id}),copyReal:(id,on)=>ivtCall('/copy_real',{id,on})};
+function ivtPaint(msg){ const el=$('#ivanTests'); if(!el||!window.CNIvanTests) return;
+  const n=((IVT&&IVT.accounts)||[]).length, on=((IVT&&IVT.accounts)||[]).filter(a=>a.copy_real).length;
+  $('#ivtSub').textContent=IVT?(n?`подключено ${n} · на реальный счёт копируется ${on}`:'счета ещё не подключены'):'не загрузилось';
+  el.innerHTML=CNIvanTests.html(IVT,{msg,err:IVT?'':'Список счетов не загрузился — форма подключения ниже работает.'});
+  CNIvanTests.mount(el,ivtApi,(D,m)=>{ if(D&&D.accounts) IVT=D; ivtPaint(m); }); }
+async function ivtLoad(){ const el=$('#ivanTests'); if(!el) return;
+  if(el.contains(document.activeElement)&&/^(INPUT|BUTTON)$/.test(document.activeElement.tagName)) return;   // never under the owner's typing
+  try{ IVT=await ivtCall(''); }catch(e){ if(!IVT) IVT=null; } ivtPaint(); }
 function load(v){ (loaders[v]||(()=>{}))(); }
 
 /* ------------------------------------------------------------------ overview */
 let OV=null, LEADS=null, CONN=null;
 loaders.overview=async()=>{
+  ivtLoad();                                       // 18.11: «Иван Тест» on top of «Обзор»
   if(!OV) $('#kpis').innerHTML=Array(6).fill('<div class="card kpi"><div class="skel" style="width:60%"></div><div class="skel" style="width:40%;height:26px"></div></div>').join('');
   const [o,l]=await Promise.all([api('/v2/admin/overview'),api('/v2/admin/leads?size=1')]);
   if(o.code!==200) return; OV=o.d; LEADS=l.code===200?l.d:null; const d=OV, u=d.users;

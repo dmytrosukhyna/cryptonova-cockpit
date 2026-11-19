@@ -118,3 +118,8 @@ def test_the_panel_shows_open_closed_rates_and_the_system_next_to_dmytro():
               "По активам", "По срокам", "Удалённые до срока", "удалён", "ПРАВИЛО", 'data-mc="del"'):
         assert w in h, w
     assert "Изменить" not in h and "edit" not in h                     # no edit
+
+
+def test_the_rule_text_keeps_its_commas(tmp_path):
+    r = MC.MyCalls(str(tmp_path)).view()["rule_ru"]
+    assert "(OKX спот, если нет — BingX)" in r and "позиция $1 000 (для «вниз»" in r and "издержки 0.1% ($1)" in r

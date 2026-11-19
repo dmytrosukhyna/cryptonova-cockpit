@@ -146,6 +146,8 @@ class Api:
         self.my_calls = my_calls_api.MyCalls(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "my_calls"), web_dir)
         # 19.11: «Ручной стол (Дмитрий)» — the owner's semi-manual PAPER desk, <run>/data/manual_desk (cnq/api/manual_desk.py)
         self.manual = manual_desk_api.ManualDesk(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "manual_desk"), web_dir)
+        from . import manual_market
+        self.manual_market = manual_market.Market(self.manual, web_dir)
         self.smart_alts = smart_alts_api.SmartAlts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "smart_alts"), web_dir)
         self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
         try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
@@ -530,7 +532,7 @@ class Api:
             return self.ivan_tests.set_copy(str(form.get("id") or ""), form.get("on"))
         return (self.ivan_tests.check if path.endswith("/check") else self.ivan_tests.remove)(str(form.get("id") or ""))
 
-    MANUAL_POST = ("resolve", "preview", "open", "close", "stop", "settings")
+    MANUAL_POST = ("resolve", "preview", "open", "close", "stop", "settings", "candles", "flow", "side", "level")
 
     def _manual(self, method: str, path: str, body: bytes = b"") -> tuple[int, dict]:
         """«Ручной стол (Дмитрий)» — called ONLY after console.check (the owner). PAPER: no exchange order anywhere."""
@@ -554,6 +556,10 @@ class Api:
             return self.manual.close(str(form.get("id") or ""))
         if act == "stop":
             return self.manual.move_stop(str(form.get("id") or ""), form.get("px"))
+        if act in ("candles", "flow", "side"):                              # stage 2: OKX public data, cached on the server
+            return getattr(self.manual_market, act)(form)
+        if act == "level":
+            return self.manual.level(form)
         return self.manual.set_settings(form)
 
     def _my_calls(self, method: str, path: str, body: bytes = b"") -> tuple[int, dict]:

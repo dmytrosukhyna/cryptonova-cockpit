@@ -104,7 +104,8 @@ def run_variant(D, PP, v):
             res = None
             k = j
             while k < n:
-                res = LD.step_trade(tr, (o[k], h[k], l[k], c[k]) if k > j or sg["kind"] == "limit" else (entry, h[k], l[k], c[k]), P["atr"][k])
+                res = LD.step_trade(tr, (o[k], h[k], l[k], c[k]) if k > j or sg["kind"] == "limit" else (entry, h[k], l[k], c[k]), P["atr"][k],
+                                    fill_bar=(k == j and sg["kind"] == "limit"))     # 20.11 fix: no target on the limit's fill bar
                 if res:
                     break
                 k += 1
@@ -209,19 +210,76 @@ def asym(D):
 
 
 def portfolio(trs):
-    """$10 000, 1 % risk per trade, ≤ 5 at once, one per coin; trades in order of entry"""
-    eq, peak, dd, open_ = 10_000.0, 10_000.0, 0.0, []
+    """$10 000, 1 % risk per trade, ≤ 5 at once, one per coin, one position ≤ 20 % of the equity (the risk shrinks when the cap
+    binds); a trade's result is booked at its exit. 20.11: rewritten — the first version booked results at the entry and let one
+    trade take the whole equity (5 open = 5× leverage), so its numbers were invalid"""
+    eq, peak, dd, open_, capped = 10_000.0, 10_000.0, 0.0, [], 0
     for x in sorted(trs, key=lambda x: x["t"]):
-        open_ = [o for o in open_ if o["exit_t"] > x["t"]]
-        for o in [o for o in open_ if False]:
-            pass
+        for o in sorted([o for o in open_ if o["exit_t"] <= x["t"]], key=lambda o: o["exit_t"]):
+            eq += o["usd"]; open_.remove(o)
+            peak = max(peak, eq); dd = max(dd, (peak - eq) / peak)
         if len(open_) >= 5 or any(o["coin"] == x["coin"] for o in open_):
             continue
-        notional = min(0.01 * eq / x["risk_pct"], eq)
-        eq += notional * x["ret"] / 100
-        peak = max(peak, eq); dd = max(dd, (peak - eq) / peak)
-        open_.append(x)
-    return {"equity": round(eq, 2), "max_dd_pct": round(dd * 100, 2)}
+        want = 0.01 * eq / x["risk_pct"]
+        notional = min(want, 0.20 * eq)
+        capped += int(notional < want)
+        open_.append({**x, "usd": notional * x["ret"] / 100})
+    for o in sorted(open_, key=lambda o: o["exit_t"]):
+        eq += o["usd"]; peak = max(peak, eq); dd = max(dd, (peak - eq) / peak)
+    n = sum(1 for _ in trs)
+    return {"equity": round(eq, 2), "pnl_pct": round((eq / 10_000 - 1) * 100, 2), "max_dd_pct": round(dd * 100, 2),
+            "capped": capped, "candidates": n}
+
+
+def retest_rerun(npz, out_json):
+    """20.11: the 4 bo_retest variants again after the fill-bar fix (the target used to be counted on the bar the limit filled,
+    though that bar's low / high may have come before the fill — a look-ahead). Same pass rule, same null, same halves."""
+    D = load(npz)
+    PP = {}
+    for coin, K in D.items():
+        t, o, h, l, c, v = (list(x) for x in zip(*K))
+        P = LD.prep(t, o, h, l, c, v)
+        P["_L"] = [LD.levels_at(P, i) if i >= 200 else [] for i in range(len(c))]
+        PP[coin] = P
+    O = json.load(open(out_json))
+    for v in [x for x in LD.VARIANTS if x.startswith("bo_retest")]:
+        tr = run_variant(D, PP, v)
+        is_, oos = [x for x in tr if x["t"] < MID], [x for x in tr if x["t"] >= MID]
+        r = {"is": summ(is_), "oos": summ(oos), "all": summ(tr)}
+        r["null"] = null(D, PP, v, oos)
+        nl = r["null"] or {}
+        r["pass"] = bool(r["is"].get("mean", -1) > 0 and r["oos"].get("mean", -1) > 0 and (r["oos"].get("t_daily") or 0) >= Z
+                         and nl.get("max") is not None and r["oos"]["mean"] > nl["max"] and r["oos"]["n"] >= 100)
+        r["portfolio_is"], r["portfolio_oos"] = portfolio(is_), portfolio(oos)
+        r["before_fix"] = {k: O["variants"][v].get(k) for k in ("is", "oos", "pass")}
+        O["variants"][v] = r
+        print(v, "IS", r["is"].get("n"), r["is"].get("mean"), "OOS", r["oos"].get("n"), r["oos"].get("mean"), r["oos"].get("t_daily"),
+              "null", nl.get("max"), "pass", r["pass"], r["portfolio_is"], r["portfolio_oos"], flush=True)
+    elig = [(r["is"]["mean"], v) for v, r in O["variants"].items() if r["is"].get("n", 0) >= 100]
+    O["desk_variant_after_fix"] = max(elig)[1] if elig else None
+    O["passed"] = [v for v, r in O["variants"].items() if r.get("pass")]
+    json.dump(O, open(out_json, "w"), ensure_ascii=False, indent=1)
+
+
+def portfolio_only(npz, out_json):
+    """20.11: re-run only the trades and the corrected portfolio of every variant (the per-trade results and the verdict are
+    those of the pre-registered run and do not change) → writes portfolio_oos / portfolio_all into OUT"""
+    D = load(npz)
+    PP = {}
+    for coin, K in D.items():
+        t, o, h, l, c, v = (list(x) for x in zip(*K))
+        P = LD.prep(t, o, h, l, c, v)
+        P["_L"] = [LD.levels_at(P, i) if i >= 200 else [] for i in range(len(c))]
+        PP[coin] = P
+    O = json.load(open(out_json))
+    for v in LD.VARIANTS:
+        tr = run_variant(D, PP, v)
+        O["variants"][v]["portfolio_oos"] = portfolio([x for x in tr if x["t"] >= MID])
+        O["variants"][v]["portfolio_is"] = portfolio([x for x in tr if x["t"] < MID])
+        print(v, O["variants"][v]["portfolio_is"], O["variants"][v]["portfolio_oos"], flush=True)
+    O["portfolio_note_ru"] = ("20.11: портфель пересчитан — $10 000, риск 1%, одна позиция ≤ 20% счёта, ≤ 5 позиций, результат "
+                              "записывается при выходе. Прежние цифры портфеля были неверны.")
+    json.dump(O, open(out_json, "w"), ensure_ascii=False, indent=1)
 
 
 def main():
@@ -256,4 +314,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 3 and sys.argv[3] == "--retest-fix":
+        retest_rerun(sys.argv[1], sys.argv[2])
+    elif len(sys.argv) > 3 and sys.argv[3] == "--portfolio-only":
+        portfolio_only(sys.argv[1], sys.argv[2])
+    else:
+        main()

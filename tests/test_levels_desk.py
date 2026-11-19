@@ -69,7 +69,7 @@ def test_the_paper_desk_runs_owner_only_and_never_reaches_the_real_account():
     st = json.load(open(os.path.join(d, "state.json")))
     assert st["last_bar"]["AAA"] == NOW - H and len(st["open"]) <= LD.MAX_OPEN
     for tr in st["open"]:
-        assert tr["risk_usd"] == 100.0 and tr["ctx"]["levels_below"] is not None and "atr_pct" in tr["ctx"]   # 1 % risk, snapshot kept
+        assert tr["notional"] <= 2000.0 and tr["risk_usd"] <= 100.0 + 1e-6 and tr["ctx"]["levels_below"] is not None and "atr_pct" in tr["ctx"]
     code, r = lv.desk()
     assert code == 200 and r["name"] == "levels"
     again = lv.tick(now=NOW, candles=candles_factory(d), coins=["AAA", "BBB"])        # same bar again → nothing new
@@ -83,3 +83,16 @@ def test_the_paper_desk_runs_owner_only_and_never_reaches_the_real_account():
     assert srv.index("deny = self.console.check(headers)", j) < srv.index("self.levels.desk()", j)
     assert not os.path.exists(os.path.join(ROOT, "web", "levels_desk.json"))
     assert len(LD.VARIANTS) == 21 and LD.RISK == 0.01 and LD.MAX_OPEN == 5
+
+
+def test_one_position_is_capped_at_20_percent_and_the_risk_shrinks():
+    st = {"cash": 10_000.0, "open": []}
+    LD._open(st, "AAA", "S", "asym", {"stop": 100.5, "tgt": 99.0, "tgt2": 99.0}, 100.0, NOW, {})      # stop 0.5 % → 1 % risk wants $20 000
+    tr = st["open"][0]
+    assert tr["notional"] == 2000.0 and tr["risk_usd"] == 10.0 and tr["capped"] is True and tr["capped_ru"] == "размер урезан лимитом"
+    LD._open(st, "BBB", "S", "asym", {"stop": 110.0, "tgt": 90.0, "tgt2": 90.0}, 100.0, NOW, {})      # stop 10 % → $1 000, not capped
+    tr = st["open"][1]
+    assert tr["notional"] == 1000.0 and tr["risk_usd"] == 100.0 and tr["capped"] is False and "capped_ru" not in tr
+    for k in "CDEFG":
+        LD._open(st, k, "S", "asym", {"stop": 100.5, "tgt": 99.0, "tgt2": 99.0}, 100.0, NOW, {})
+    assert len(st["open"]) == 5 and sum(x["notional"] for x in st["open"]) <= 10_000.0

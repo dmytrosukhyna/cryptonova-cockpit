@@ -48,6 +48,8 @@ COST, FUND_8H = 0.001, 0.0001
 MODES = ("range", "bo_vol", "bo_retest", "fbo1", "fbo3")
 VARIANTS = [f"{m}|{s}|{x}" for m in MODES for s in ("L", "S") for x in ("sym", "asym")] + ["crash|S|asym"]
 START, RISK, MAX_OPEN = 10_000.0, 0.01, 5
+POS_CAP = 0.20               # 20.11 (owner): one position ≤ 20 % of the paper equity ($2 000 of $10 000) — all 5 together ≤ 1×
+CAPPED_RU = "размер урезан лимитом"
 CFG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "levels_desk.json")
 
 
@@ -263,21 +265,26 @@ def plan(sig, side, exit_, entry):
     return {"stop": sig["stop"], "tgt": tgt, "maxb": maxb, "trail": trail, "risk": risk}
 
 
-def step_trade(tr, bar, a):
-    """advance one open trade by one H1 bar (o, h, l, c) → None while open, else (exit price, why)"""
+def step_trade(tr, bar, a, fill_bar=False):
+    """advance one open trade by one H1 bar (o, h, l, c) → None while open, else (exit price, why).
+    20.11 fix: on the bar a retest LIMIT fills, the order of the bar's high and low is unknown — only the stop (beyond the fill) is
+    checked there, never the target (the bar's other extreme may have come before the fill)"""
     o, h, l, c = bar
     long = tr["side"] == "L"
     st, tg = tr["stop"], tr["tgt"]
     if long:
         if l <= st:
             return (min(o, st) if o < st else st), "стоп"
-        if h >= tg:
+        if h >= tg and not fill_bar:
             return (max(o, tg) if o > tg else tg), "цель"
     else:
         if h >= st:
             return (max(o, st) if o > st else st), "стоп"
-        if l <= tg:
+        if l <= tg and not fill_bar:
             return (min(o, tg) if o < tg else tg), "цель"
+    if fill_bar:
+        tr["bars"] += 1
+        return (c, "время") if tr["bars"] >= tr["maxb"] else None
     tr["bars"] += 1
     if tr.get("trail") and a:
         r = tr["risk"]
@@ -375,10 +382,12 @@ def step(st, now, v, candles=hourly, coins=COINS):
                 if (pd["side"] == "L" and l[i] <= pd["px"]) or (pd["side"] == "S" and h[i] >= pd["px"]):
                     st["pending"].remove(pd)
                     _open(st, coin, pd["side"], ex, pd["sig"], pd["px"], t[i], pd["ctx"])
+                    if st["open"] and st["open"][-1]["coin"] == coin:
+                        st["open"][-1]["fill_t"] = t[i]                # managed stop-only on this bar (step_trade fill_bar)
                 elif t[i] - pd["t"] > 6 * H:
                     st["pending"].remove(pd)
             for tr in [x for x in st["open"] if x["coin"] == coin]:   # 2. open positions
-                r = step_trade(tr, bar, P["atr"][i])
+                r = step_trade(tr, bar, P["atr"][i], fill_bar=tr.get("fill_t") == t[i])
                 if r:
                     px, why = r
                     pct = ret_pct(tr["side"], tr["entry"], px, tr["bars"])
@@ -411,11 +420,14 @@ def _open(st, coin, side, ex, sg, entry, t, ctx):
     if not p or len(st["open"]) >= MAX_OPEN:
         return
     eq = st["cash"]
-    risk_usd = RISK * eq
-    notional = min(risk_usd / (p["risk"] / entry), eq)            # 1 % of equity at risk, never more than the equity in one trade
+    want = RISK * eq / (p["risk"] / entry)                        # 1 % of equity at risk …
+    notional = min(want, POS_CAP * eq)                            # … but one position ≤ 20 % of the equity (20.11): the risk shrinks
+    capped = notional < want - 1e-9
+    risk_usd = notional * p["risk"] / entry
     st["open"].append({"coin": coin, "side": side, "entry": entry, "opened_t": t, "stop": p["stop"], "stop0": p["stop"], "tgt": p["tgt"],
                        "maxb": p["maxb"], "trail": p["trail"], "risk": p["risk"], "bars": 0, "notional": round(notional, 2),
-                       "risk_usd": round(risk_usd, 2), "level": sg.get("lvl"), "ctx": ctx})
+                       "risk_usd": round(risk_usd, 2), "capped": capped, **({"capped_ru": CAPPED_RU} if capped else {}),
+                       "level": sg.get("lvl"), "ctx": ctx})
 
 
 def public(st, v, now, bt=None):
@@ -429,4 +441,5 @@ def public(st, v, now, bt=None):
             "closed": list(reversed(cl[-50:])), "trades": len(cl), "wins": wins, "started": st.get("started"),
             "errors": st.get("errors") or [], "backtest": bt,
             "rule_ru": ("ТЕСТ, бумажные деньги $10 000. Уровни H1/H4/D1 (свинги, вчерашний день и неделя, круглые числа, узлы объёма); "
-                        "риск 1% счёта на сделку, не больше 5 позиций, одна на монету. На реальный счёт сделки не попадают.")}
+                        "риск 1% счёта на сделку, одна позиция — не больше 20% счёта (тогда риск меньше 1%), не больше 5 позиций, одна на монету. "
+                        "На реальный счёт сделки не попадают.")}

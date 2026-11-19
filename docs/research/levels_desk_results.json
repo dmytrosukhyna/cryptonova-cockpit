@@ -43,7 +43,21 @@
     "max": 0.04,
     "p95": -0.04
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 8535.6,
+    "pnl_pct": -14.64,
+    "max_dd_pct": 23.52,
+    "capped": 809,
+    "candidates": 852
+   },
+   "portfolio_oos": {
+    "equity": 7266.69,
+    "pnl_pct": -27.33,
+    "max_dd_pct": 37.68,
+    "capped": 818,
+    "candidates": 899
+   }
   },
   "range|L|asym": {
    "is": {
@@ -88,7 +102,21 @@
     "max": 0.068,
     "p95": -0.027
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 8040.82,
+    "pnl_pct": -19.59,
+    "max_dd_pct": 26.21,
+    "capped": 758,
+    "candidates": 811
+   },
+   "portfolio_oos": {
+    "equity": 6228.63,
+    "pnl_pct": -37.71,
+    "max_dd_pct": 43.38,
+    "capped": 760,
+    "candidates": 863
+   }
   },
   "range|S|sym": {
    "is": {
@@ -133,7 +161,21 @@
     "max": 0.186,
     "p95": 0.092
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 5875.28,
+    "pnl_pct": -41.25,
+    "max_dd_pct": 41.56,
+    "capped": 702,
+    "candidates": 730
+   },
+   "portfolio_oos": {
+    "equity": 7042.33,
+    "pnl_pct": -29.58,
+    "max_dd_pct": 38.93,
+    "capped": 770,
+    "candidates": 814
+   }
   },
   "range|S|asym": {
    "is": {
@@ -178,7 +220,21 @@
     "max": 0.131,
     "p95": 0.033
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 7130.88,
+    "pnl_pct": -28.69,
+    "max_dd_pct": 29.57,
+    "capped": 761,
+    "candidates": 787
+   },
+   "portfolio_oos": {
+    "equity": 8054.37,
+    "pnl_pct": -19.46,
+    "max_dd_pct": 29.38,
+    "capped": 859,
+    "candidates": 890
+   }
   },
   "bo_vol|L|sym": {
    "is": {
@@ -223,7 +279,21 @@
     "max": -0.108,
     "p95": -0.132
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 2013.95,
+    "pnl_pct": -79.86,
+    "max_dd_pct": 83.31,
+    "capped": 5887,
+    "candidates": 10047
+   },
+   "portfolio_oos": {
+    "equity": 3208.42,
+    "pnl_pct": -67.92,
+    "max_dd_pct": 72.57,
+    "capped": 5707,
+    "candidates": 10324
+   }
   },
   "bo_vol|L|asym": {
    "is": {
@@ -268,7 +338,21 @@
     "max": -0.139,
     "p95": -0.149
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 2734.66,
+    "pnl_pct": -72.65,
+    "max_dd_pct": 80.13,
+    "capped": 4740,
+    "candidates": 8876
+   },
+   "portfolio_oos": {
+    "equity": 5275.85,
+    "pnl_pct": -47.24,
+    "max_dd_pct": 59.13,
+    "capped": 4538,
+    "candidates": 9040
+   }
   },
   "bo_vol|S|sym": {
    "is": {
@@ -313,7 +397,21 @@
     "max": -0.018,
     "p95": -0.032
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 3101.11,
+    "pnl_pct": -68.99,
+    "max_dd_pct": 70.43,
+    "capped": 5606,
+    "candidates": 11097
+   },
+   "portfolio_oos": {
+    "equity": 3514.81,
+    "pnl_pct": -64.85,
+    "max_dd_pct": 67.3,
+    "capped": 5827,
+    "candidates": 11707
+   }
   },
   "bo_vol|S|asym": {
    "is": {
@@ -358,187 +456,365 @@
     "max": -0.012,
     "p95": -0.034
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 3234.78,
+    "pnl_pct": -67.65,
+    "max_dd_pct": 69.22,
+    "capped": 6189,
+    "candidates": 11815
+   },
+   "portfolio_oos": {
+    "equity": 3204.56,
+    "pnl_pct": -67.95,
+    "max_dd_pct": 70.61,
+    "capped": 6448,
+    "candidates": 12408
+   }
   },
   "bo_retest|L|sym": {
    "is": {
-    "n": 24583,
-    "mean": -0.063,
-    "median": -0.574,
-    "win": 0.262,
+    "n": 24486,
+    "mean": -0.075,
+    "median": -0.578,
+    "win": 0.255,
     "worst": -4.52,
-    "stopped": 0.738,
-    "t": -6.6,
-    "t_daily": -2.15,
+    "stopped": 0.745,
+    "t": -7.84,
+    "t_daily": -2.7,
     "days": 712,
-    "hold_h": 2
-   },
-   "oos": {
-    "n": 26092,
-    "mean": -0.071,
-    "median": -0.625,
-    "win": 0.26,
-    "worst": -6.07,
-    "stopped": 0.74,
-    "t": -7.46,
-    "t_daily": -2.01,
-    "days": 721,
     "hold_h": 2.0
    },
-   "all": {
-    "n": 50675,
-    "mean": -0.067,
-    "median": -0.599,
-    "win": 0.261,
+   "oos": {
+    "n": 25957,
+    "mean": -0.08,
+    "median": -0.629,
+    "win": 0.254,
     "worst": -6.07,
-    "stopped": 0.739,
-    "t": -9.96,
-    "t_daily": -2.94,
+    "stopped": 0.746,
+    "t": -8.39,
+    "t_daily": -2.34,
+    "days": 721,
+    "hold_h": 2
+   },
+   "all": {
+    "n": 50443,
+    "mean": -0.078,
+    "median": -0.603,
+    "win": 0.254,
+    "worst": -6.07,
+    "stopped": 0.746,
+    "t": -11.48,
+    "t_daily": -3.54,
     "days": 1432,
     "hold_h": 2
    },
    "null": {
     "reps": 200,
-    "mean": -0.132,
-    "max": -0.106,
-    "p95": -0.12
+    "mean": -0.133,
+    "max": -0.111,
+    "p95": -0.118
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 4396.3,
+    "pnl_pct": -56.04,
+    "max_dd_pct": 62.37,
+    "capped": 11163,
+    "candidates": 24486
+   },
+   "portfolio_oos": {
+    "equity": 7841.54,
+    "pnl_pct": -21.58,
+    "max_dd_pct": 54.48,
+    "capped": 11422,
+    "candidates": 25957
+   },
+   "before_fix": {
+    "is": {
+     "n": 24583,
+     "mean": -0.063,
+     "median": -0.574,
+     "win": 0.262,
+     "worst": -4.52,
+     "stopped": 0.738,
+     "t": -6.6,
+     "t_daily": -2.15,
+     "days": 712,
+     "hold_h": 2
+    },
+    "oos": {
+     "n": 26092,
+     "mean": -0.071,
+     "median": -0.625,
+     "win": 0.26,
+     "worst": -6.07,
+     "stopped": 0.74,
+     "t": -7.46,
+     "t_daily": -2.01,
+     "days": 721,
+     "hold_h": 2.0
+    },
+    "pass": false
+   }
   },
   "bo_retest|L|asym": {
    "is": {
-    "n": 21021,
-    "mean": -0.059,
-    "median": -0.63,
-    "win": 0.19,
+    "n": 21003,
+    "mean": -0.064,
+    "median": -0.631,
+    "win": 0.188,
     "worst": -4.52,
-    "stopped": 0.81,
-    "t": -4.59,
-    "t_daily": -0.1,
+    "stopped": 0.812,
+    "t": -5.02,
+    "t_daily": -0.26,
     "days": 712,
     "hold_h": 2
    },
    "oos": {
-    "n": 22508,
-    "mean": -0.084,
-    "median": -0.683,
+    "n": 22481,
+    "mean": -0.087,
+    "median": -0.684,
+    "win": 0.185,
+    "worst": -6.07,
+    "stopped": 0.815,
+    "t": -6.91,
+    "t_daily": -0.73,
+    "days": 720,
+    "hold_h": 2
+   },
+   "all": {
+    "n": 43484,
+    "mean": -0.076,
+    "median": -0.657,
     "win": 0.187,
     "worst": -6.07,
     "stopped": 0.813,
-    "t": -6.68,
-    "t_daily": -0.62,
-    "days": 720,
-    "hold_h": 2.0
-   },
-   "all": {
-    "n": 43529,
-    "mean": -0.072,
-    "median": -0.656,
-    "win": 0.189,
-    "worst": -6.07,
-    "stopped": 0.811,
-    "t": -8.0,
-    "t_daily": -0.56,
+    "t": -8.47,
+    "t_daily": -0.75,
     "days": 1431,
-    "hold_h": 2
+    "hold_h": 2.0
    },
    "null": {
     "reps": 200,
-    "mean": -0.139,
-    "max": -0.111,
-    "p95": -0.121
+    "mean": -0.14,
+    "max": -0.108,
+    "p95": -0.118
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 6325.88,
+    "pnl_pct": -36.74,
+    "max_dd_pct": 51.28,
+    "capped": 8608,
+    "candidates": 21003
+   },
+   "portfolio_oos": {
+    "equity": 10265.66,
+    "pnl_pct": 2.66,
+    "max_dd_pct": 46.29,
+    "capped": 8973,
+    "candidates": 22481
+   },
+   "before_fix": {
+    "is": {
+     "n": 21021,
+     "mean": -0.059,
+     "median": -0.63,
+     "win": 0.19,
+     "worst": -4.52,
+     "stopped": 0.81,
+     "t": -4.59,
+     "t_daily": -0.1,
+     "days": 712,
+     "hold_h": 2
+    },
+    "oos": {
+     "n": 22508,
+     "mean": -0.084,
+     "median": -0.683,
+     "win": 0.187,
+     "worst": -6.07,
+     "stopped": 0.813,
+     "t": -6.68,
+     "t_daily": -0.62,
+     "days": 720,
+     "hold_h": 2.0
+    },
+    "pass": false
+   }
   },
   "bo_retest|S|sym": {
    "is": {
-    "n": 24298,
-    "mean": -0.061,
-    "median": -0.563,
-    "win": 0.27,
+    "n": 24159,
+    "mean": -0.07,
+    "median": -0.567,
+    "win": 0.263,
     "worst": -5.51,
-    "stopped": 0.73,
-    "t": -6.67,
-    "t_daily": -4.16,
+    "stopped": 0.737,
+    "t": -7.6,
+    "t_daily": -4.42,
     "days": 712,
-    "hold_h": 2.0
+    "hold_h": 2
    },
    "oos": {
-    "n": 25452,
-    "mean": -0.031,
-    "median": -0.609,
-    "win": 0.272,
+    "n": 25335,
+    "mean": -0.046,
+    "median": -0.615,
+    "win": 0.265,
     "worst": -6.91,
-    "stopped": 0.728,
-    "t": -3.24,
-    "t_daily": -1.7,
+    "stopped": 0.735,
+    "t": -4.75,
+    "t_daily": -2.29,
     "days": 720,
-    "hold_h": 2.0
+    "hold_h": 2
    },
    "all": {
-    "n": 49750,
-    "mean": -0.046,
-    "median": -0.585,
-    "win": 0.271,
+    "n": 49494,
+    "mean": -0.058,
+    "median": -0.59,
+    "win": 0.264,
     "worst": -6.91,
-    "stopped": 0.729,
-    "t": -6.89,
-    "t_daily": -3.99,
+    "stopped": 0.736,
+    "t": -8.65,
+    "t_daily": -4.61,
     "days": 1431,
     "hold_h": 2.0
    },
    "null": {
     "reps": 200,
     "mean": -0.072,
-    "max": -0.044,
-    "p95": -0.058
+    "max": -0.047,
+    "p95": -0.057
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 8010.9,
+    "pnl_pct": -19.89,
+    "max_dd_pct": 36.42,
+    "capped": 11113,
+    "candidates": 24159
+   },
+   "portfolio_oos": {
+    "equity": 22147.99,
+    "pnl_pct": 121.48,
+    "max_dd_pct": 34.27,
+    "capped": 11172,
+    "candidates": 25335
+   },
+   "before_fix": {
+    "is": {
+     "n": 24298,
+     "mean": -0.061,
+     "median": -0.563,
+     "win": 0.27,
+     "worst": -5.51,
+     "stopped": 0.73,
+     "t": -6.67,
+     "t_daily": -4.16,
+     "days": 712,
+     "hold_h": 2.0
+    },
+    "oos": {
+     "n": 25452,
+     "mean": -0.031,
+     "median": -0.609,
+     "win": 0.272,
+     "worst": -6.91,
+     "stopped": 0.728,
+     "t": -3.24,
+     "t_daily": -1.7,
+     "days": 720,
+     "hold_h": 2.0
+    },
+    "pass": false
+   }
   },
   "bo_retest|S|asym": {
    "is": {
-    "n": 29696,
-    "mean": 0.028,
-    "median": -0.303,
-    "win": 0.462,
+    "n": 28541,
+    "mean": -0.075,
+    "median": -0.429,
+    "win": 0.394,
     "worst": -5.51,
-    "stopped": 0.539,
-    "t": 4.83,
-    "t_daily": 0.8,
+    "stopped": 0.606,
+    "t": -12.67,
+    "t_daily": -7.83,
     "days": 712,
-    "hold_h": 1.0
+    "hold_h": 1
    },
    "oos": {
-    "n": 31504,
-    "mean": 0.045,
-    "median": -0.285,
-    "win": 0.465,
+    "n": 30381,
+    "mean": -0.066,
+    "median": -0.45,
+    "win": 0.397,
     "worst": -6.91,
-    "stopped": 0.536,
-    "t": 7.74,
-    "t_daily": 2.75,
+    "stopped": 0.604,
+    "t": -11.07,
+    "t_daily": -6.09,
     "days": 720,
-    "hold_h": 1.0
+    "hold_h": 1
    },
    "all": {
-    "n": 61200,
-    "mean": 0.037,
-    "median": -0.294,
-    "win": 0.463,
+    "n": 58922,
+    "mean": -0.07,
+    "median": -0.439,
+    "win": 0.396,
     "worst": -6.91,
-    "stopped": 0.538,
-    "t": 8.96,
-    "t_daily": 2.82,
+    "stopped": 0.605,
+    "t": -16.74,
+    "t_daily": -9.73,
     "days": 1431,
     "hold_h": 1.0
    },
    "null": {
     "reps": 200,
     "mean": -0.098,
-    "max": -0.08,
-    "p95": -0.088
+    "max": -0.076,
+    "p95": -0.09
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 4204.98,
+    "pnl_pct": -57.95,
+    "max_dd_pct": 58.14,
+    "capped": 14898,
+    "candidates": 28541
+   },
+   "portfolio_oos": {
+    "equity": 8964.74,
+    "pnl_pct": -10.35,
+    "max_dd_pct": 38.31,
+    "capped": 15342,
+    "candidates": 30381
+   },
+   "before_fix": {
+    "is": {
+     "n": 29696,
+     "mean": 0.028,
+     "median": -0.303,
+     "win": 0.462,
+     "worst": -5.51,
+     "stopped": 0.539,
+     "t": 4.83,
+     "t_daily": 0.8,
+     "days": 712,
+     "hold_h": 1.0
+    },
+    "oos": {
+     "n": 31504,
+     "mean": 0.045,
+     "median": -0.285,
+     "win": 0.465,
+     "worst": -6.91,
+     "stopped": 0.536,
+     "t": 7.74,
+     "t_daily": 2.75,
+     "days": 720,
+     "hold_h": 1.0
+    },
+    "pass": false
+   }
   },
   "fbo1|L|sym": {
    "is": {
@@ -583,7 +859,21 @@
     "max": -0.124,
     "p95": -0.132
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 40.61,
+    "pnl_pct": -99.59,
+    "max_dd_pct": 99.62,
+    "capped": 18499,
+    "candidates": 28886
+   },
+   "portfolio_oos": {
+    "equity": 16.78,
+    "pnl_pct": -99.83,
+    "max_dd_pct": 99.83,
+    "capped": 18871,
+    "candidates": 29510
+   }
   },
   "fbo1|L|asym": {
    "is": {
@@ -628,7 +918,21 @@
     "max": -0.124,
     "p95": -0.132
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 40.3,
+    "pnl_pct": -99.6,
+    "max_dd_pct": 99.63,
+    "capped": 18422,
+    "candidates": 28820
+   },
+   "portfolio_oos": {
+    "equity": 16.39,
+    "pnl_pct": -99.84,
+    "max_dd_pct": 99.84,
+    "capped": 18779,
+    "candidates": 29452
+   }
   },
   "fbo1|S|sym": {
    "is": {
@@ -673,7 +977,21 @@
     "max": -0.094,
     "p95": -0.096
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 67.78,
+    "pnl_pct": -99.32,
+    "max_dd_pct": 99.33,
+    "capped": 18252,
+    "candidates": 26620
+   },
+   "portfolio_oos": {
+    "equity": 87.0,
+    "pnl_pct": -99.13,
+    "max_dd_pct": 99.17,
+    "capped": 19243,
+    "candidates": 28741
+   }
   },
   "fbo1|S|asym": {
    "is": {
@@ -718,7 +1036,21 @@
     "max": -0.091,
     "p95": -0.096
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 65.25,
+    "pnl_pct": -99.35,
+    "max_dd_pct": 99.35,
+    "capped": 19215,
+    "candidates": 27115
+   },
+   "portfolio_oos": {
+    "equity": 59.16,
+    "pnl_pct": -99.41,
+    "max_dd_pct": 99.44,
+    "capped": 20168,
+    "candidates": 29259
+   }
   },
   "fbo3|L|sym": {
    "is": {
@@ -763,7 +1095,21 @@
     "max": -0.13,
     "p95": -0.132
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 28.17,
+    "pnl_pct": -99.72,
+    "max_dd_pct": 99.74,
+    "capped": 19147,
+    "candidates": 37435
+   },
+   "portfolio_oos": {
+    "equity": 19.25,
+    "pnl_pct": -99.81,
+    "max_dd_pct": 99.81,
+    "capped": 19870,
+    "candidates": 38967
+   }
   },
   "fbo3|L|asym": {
    "is": {
@@ -808,7 +1154,21 @@
     "max": -0.125,
     "p95": -0.133
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 29.45,
+    "pnl_pct": -99.71,
+    "max_dd_pct": 99.73,
+    "capped": 18987,
+    "candidates": 37281
+   },
+   "portfolio_oos": {
+    "equity": 18.91,
+    "pnl_pct": -99.81,
+    "max_dd_pct": 99.82,
+    "capped": 19749,
+    "candidates": 38872
+   }
   },
   "fbo3|S|sym": {
    "is": {
@@ -853,7 +1213,21 @@
     "max": -0.086,
     "p95": -0.093
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 78.05,
+    "pnl_pct": -99.22,
+    "max_dd_pct": 99.22,
+    "capped": 19240,
+    "candidates": 35763
+   },
+   "portfolio_oos": {
+    "equity": 74.03,
+    "pnl_pct": -99.26,
+    "max_dd_pct": 99.29,
+    "capped": 20091,
+    "candidates": 38377
+   }
   },
   "fbo3|S|asym": {
    "is": {
@@ -898,7 +1272,21 @@
     "max": -0.087,
     "p95": -0.092
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 64.71,
+    "pnl_pct": -99.35,
+    "max_dd_pct": 99.36,
+    "capped": 20467,
+    "candidates": 36653
+   },
+   "portfolio_oos": {
+    "equity": 60.4,
+    "pnl_pct": -99.4,
+    "max_dd_pct": 99.44,
+    "capped": 21333,
+    "candidates": 39282
+   }
   },
   "crash|S|asym": {
    "is": {
@@ -943,7 +1331,21 @@
     "max": 0.004,
     "p95": -0.026
    },
-   "pass": false
+   "pass": false,
+   "portfolio_is": {
+    "equity": 5103.4,
+    "pnl_pct": -48.97,
+    "max_dd_pct": 51.73,
+    "capped": 4225,
+    "candidates": 7850
+   },
+   "portfolio_oos": {
+    "equity": 4376.28,
+    "pnl_pct": -56.24,
+    "max_dd_pct": 58.96,
+    "capped": 4313,
+    "candidates": 7885
+   }
   }
  },
  "asym": {
@@ -1448,6 +1850,10 @@
    }
   }
  },
- "desk_variant": "bo_retest|S|asym",
- "passed": []
+ "desk_variant": "range|L|sym",
+ "passed": [],
+ "portfolio_note_ru": "20.11: портфель пересчитан — $10 000, риск 1%, одна позиция ≤ 20% счёта, ≤ 5 позиций, результат записывается при выходе. Прежние цифры портфеля были неверны.",
+ "desk_variant_after_fix": "range|L|sym",
+ "desk_variant_prereg_run": "bo_retest|S|asym",
+ "fix_note_ru": "20.11: найдена ошибка заглядывания вперёд у лимитных входов «на откате» (bo_retest): цель засчитывалась в ту же часовую свечу, где исполнился лимит, хотя минимум/максимум свечи мог быть раньше исполнения. Исправлено (на свече исполнения проверяется только стоп), 4 варианта bo_retest пересчитаны (прежние цифры — в before_fix). Портфель пересчитан с лимитом 20% счёта на позицию; прежние цифры портфеля были неверны."
 }

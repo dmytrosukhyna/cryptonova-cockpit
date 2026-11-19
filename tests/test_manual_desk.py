@@ -123,7 +123,7 @@ def test_paper_only_owner_only_and_the_panel():
     j = srv.index('if path == "/v2/admin/manual" or path.startswith("/v2/admin/manual/"):')
     assert srv.index("deny = self.console.check(headers)", j) < srv.index("self._manual(", j) and srv.count("self._manual(") == 1
     adm = open(os.path.join(ROOT, "web", "admin.html"), encoding="utf-8").read()
-    assert "Ручной стол (Дмитрий)" in adm and '<script src="manual_desk.js?v=2"></script>' in adm and "mdCall('/open',{sym,side,confirm:true})" in adm
+    assert "Ручной стол (Дмитрий)" in adm and '<script src="manual_desk.js?v=3"></script>' in adm and "mdCall('/open',{sym,side,confirm:true})" in adm
     for f in ("app.html", "vip.html", "index.html"):
         assert "/v2/admin/manual" not in open(os.path.join(ROOT, "web", f), encoding="utf-8").read(), f
     node = shutil.which("node")
@@ -247,3 +247,102 @@ def test_the_screen_renders_three_columns_and_the_chart_is_local():
     for w in ("Покупатели против продавцов", "Стакан ±1%", "стакан OKX глубже не отдаёт", "Лонг / шорт", "Фандинг", "Открытый интерес", "Объём", "+50,0%",
               "Крупные ликвидации", "Новости ADA", "ADA news", "Календарь, 48 ч", "CPI", 'data-md="chart"', 'data-bar="4h"', "103,5000", 'data-md="lvdel"'):
         assert w in h, w
+
+
+# ---------------------------------------------------------------------------------------------- walls (owner 19.11 23:39)
+class Fake3(Fake2):
+    def __init__(self):
+        super().__init__()
+        self.wall_bid = 500           # contracts of 10 ADA at 98.0 (= $490 000)
+        self.trades = []
+
+    def __call__(self, path, **q):
+        if path.endswith("/books"):
+            bids = [["99.9", "10"], ["99.6", "10"], ["99.3", "10"], ["99.0", "10"], ["98.0", str(self.wall_bid)], ["97.5", "10"]]
+            asks = [["100.1", "10"], ["100.4", "10"], ["100.7", "10"], ["101.0", "10"], ["102.0", "300"], ["102.5", "10"]]
+            return [{"bids": bids, "asks": asks}]
+        if path.endswith("/books-full"):
+            return [{"bids": [["98.01", "1000"]], "asks": [["101.5", "10"]]}]                  # spot: +$98 010 near the perp wall
+        if path.endswith("/trades"):
+            return self.trades
+        return super().__call__(path, **q)
+
+
+def make3(tmp_path):
+    d, f, clk, m = make2(tmp_path)
+    f3 = Fake3()
+    d.get = f3
+    def ext(url):
+        if "binance" in url:
+            return {"bids": [["98.0", "2000"]], "asks": [["102.0", "100"]]}                  # +$196 000 on the bid wall
+        raise OSError("blocked")
+    w = MM.Walls(d, http_get=ext)
+    d.walls = w
+    return d, f3, clk, w
+
+
+def test_walls_merge_venues_track_age_and_spot_spoofing(tmp_path):
+    d, f, clk, w = make3(tmp_path)
+    f.trades = [{"tradeId": "1", "px": "100", "sz": "200", "side": "buy", "ts": str(T0)}, {"tradeId": "2", "px": "100", "sz": "1", "side": "sell", "ts": str(T0)}]
+    code, W = w.look({"sym": "ADA"})
+    assert code == 200 and W["sources"] == ["OKX фьючерсы", "OKX спот", "Binance фьючерсы"] and "Bybit фьючерсы: недоступен с нашего сервера" in W["errors"]
+    b = W["bids"][0]
+    assert abs(b["price"] - 98.0) < 0.01 and b["usd"] == round(490_000 + 98.01 * 1000 + 196_000) and set(b["by"]) == {"OKX фьючерсы", "OKX спот", "Binance фьючерсы"}
+    assert b["trend"] == "новая" and b["since"] == T0 and b["dist_pct"] == -2.0 and W["asks"][0]["price"] == 102.0
+    assert W["big_trade_usd"] == 10_000 and [x["id"] for x in W["trades"]] == ["1"] and W["trades"][0]["usd"] == 200_000                 # 200 contracts × 10 ADA × $100
+    # 30 s later the cache answers; a minute later: the wall grew, its age is kept
+    assert w.look({"sym": "ADA"})[1] is W
+    w.last.clear()
+    clk["t"] = T0 + 60_000
+    f.wall_bid = 900
+    W2 = w.look({"sym": "ADA"})[1]
+    assert W2["bids"][0]["since"] == T0 and W2["bids"][0]["trend"] == "выросла" and W2["trades"][0]["id"] == "1"
+    # the price comes within 1 % and the wall vanishes → the spoofing hint
+    w.last.clear()
+    clk["t"] = T0 + 120_000
+    f.wall_bid = 10
+    f.ext_mid = None
+    old_books = f.__call__
+    def near(path, **q):
+        if path.endswith("/books"):
+            return [{"bids": [["98.8", "10"], ["98.6", "10"], ["98.4", "10"], ["98.2", "10"]], "asks": [["99.0", "10"], ["99.3", "10"], ["99.6", "10"], ["102.0", "300"]]}]
+        if path.endswith("/books-full"):
+            return [{"bids": [["98.7", "1"]], "asks": [["99.1", "1"]]}]
+        return old_books(path, **q)
+    d.get = near
+    w.http = lambda url: (_ for _ in ()).throw(OSError("blocked"))
+    W3 = w.look({"sym": "ADA"})[1]
+    g = W3["gone"][0]
+    assert g["side"] == "bids" and abs(g["price"] - 98.0) < 0.01 and g["note_ru"] == "стенка исчезла при подходе цены" and g["lived_ms"] == 120_000
+
+
+def test_settings_for_walls_and_the_entry_keeps_the_walls(tmp_path):
+    d, f, clk, w = make3(tmp_path)
+    s = d.set_settings({"wall_range_pct": 30, "wall_top": 2, "wall_mult": 0.1, "big_trade_usd": 50_000})[1]["settings"]
+    assert s["wall_range_pct"] == 10.0 and s["wall_top"] == 2 and s["wall_mult"] == 1.0 and s["big_trade_usd"] == 50_000
+    w.last.clear()
+    code, v = d.open({"sym": "ADA", "side": "long", "confirm": True})
+    snap = v["open"][0]["walls"]
+    assert snap and snap["bids"] and len(snap["bids"]) <= 2 and snap["big_trade_usd"] == 50_000 and "OKX фьючерсы" in snap["sources"]
+    assert {"price", "usd", "dist_pct", "since", "trend"} <= set(snap["bids"][0])
+
+
+def test_the_walls_panel_and_chart_hooks():
+    node = shutil.which("node")
+    adm = open(os.path.join(ROOT, "web", "admin.html"), encoding="utf-8").read()
+    assert "walls:sym=>mdCall('/walls',{sym})" in adm and '<script src="manual_desk.js?v=3"></script>' in adm
+    js = open(os.path.join(ROOT, "web", "manual_desk.js"), encoding="utf-8").read()
+    assert "setInterval" in js and "30000" in js and "PL.push({ px: p.entry" in js and "fillRect(W - padR - len" in js
+    if not node:
+        return
+    W = {"sym": "ADA", "bids": [{"side": "bids", "price": 98, "usd": 784000, "dist_pct": -2, "since": T0, "trend": "выросла", "chg_pct": 60}],
+         "asks": [{"side": "asks", "price": 102, "usd": 306000, "dist_pct": 2, "since": T0, "trend": "стоит"}],
+         "gone": [{"side": "bids", "price": 97, "usd": 400000, "lived_ms": 600000, "note_ru": "стенка исчезла при подходе цены", "gone_t": T0}],
+         "trades": [{"t": T0, "px": 100, "usd": 20000, "side": "покупка"}], "big_trade_usd": 10000,
+         "settings": {"wall_band_pct": 0.25, "wall_range_pct": 5, "wall_top": 5, "wall_mult": 3}, "note_ru": "Источники: OKX фьючерсы."}
+    p = os.path.join(tempfile.mkdtemp(), "w.js")
+    open(p, "w", encoding="utf-8").write(f"global.window={{}};require({json.dumps(os.path.join(ROOT, 'web', 'manual_desk.js'))});"
+                                        f"process.stdout.write(window.CNManual.wallsHtml({json.dumps(W, ensure_ascii=False)}))")
+    h = subprocess.run([node, p], capture_output=True, text=True, timeout=30).stdout
+    for x in ("Крупные заявки", "покупка 98", "выросла +60%", "продажа 102", "стенка исчезла при подходе цены", "Крупные сделки (от $10", "Источники: OKX фьючерсы"):
+        assert x in h, x

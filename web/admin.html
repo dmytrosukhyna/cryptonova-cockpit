@@ -429,7 +429,7 @@ textarea.in1{width:100%;min-height:84px;resize:vertical}
 <script src="vip/auth.js"></script>
 <script src="ivan_tests.js?v=2"></script>
 <script src="my_calls.js?v=1"></script>
-<script src="manual_desk.js?v=2"></script>
+<script src="manual_desk.js?v=3"></script>
 <script>
 (function(){
 'use strict';
@@ -539,7 +539,7 @@ const mdCall=async(p,body)=>{ const r=await api('/v2/admin/manual'+p,body?{metho
   if(r.code>=400||r.code===0){ const e=new Error((r.d&&(r.d.message_ru||r.d.error))||('HTTP '+r.code)); e.data=r.d; throw e; } return r.d; };
 const mdApi={preview:(sym,side)=>mdCall('/preview',{sym,side}),open:(sym,side)=>mdCall('/open',{sym,side,confirm:true}),close:id=>mdCall('/close',{id}),
   stop:(id,px)=>mdCall('/stop',{id,px}),settings:f=>mdCall('/settings',f),
-  candles:(sym,bar)=>mdCall('/candles',{sym,bar}),flow:sym=>mdCall('/flow',{sym}),side:sym=>mdCall('/side',{sym}),level:f=>mdCall('/level',f)};
+  candles:(sym,bar)=>mdCall('/candles',{sym,bar}),flow:sym=>mdCall('/flow',{sym}),side:sym=>mdCall('/side',{sym}),level:f=>mdCall('/level',f),walls:sym=>mdCall('/walls',{sym})};
 function mdPaint(msg,o){ const el=$('#manualDesk'); if(!el||!window.CNManual) return; MD_O=o||{};
   const st=(MD&&MD.stats)||{};
   $('#mdSub').textContent=MD?`демо ${Math.round(MD.equity||0).toLocaleString('ru-RU')} $ · открыто ${(MD.open||[]).length} · сделок ${st.trades||0}`:'не загрузилось';

@@ -1,7 +1,9 @@
 /* CRYPTO NOVΛ — «Ручной стол (Дмитрий)», stage 1 (19.11.2026): the owner's semi-manual PAPER desk in «Управление» (admin.html).
    Data: GET/POST /v2/admin/manual* (cnq/api/manual_desk.py) — never a public file, never an exchange order.
    CNManual.html(D, {msg, preview, sym}) → HTML · CNManual.mount(el, api, rerender)
-   api = {resolve(q), preview(sym, side), open(sym, side), close(id), stop(id, px), settings(form), candles(sym, bar), flow(sym), side(sym), level(form)}
+   api = {resolve(q), preview(sym, side), open(sym, side), close(id), stop(id, px), settings(form), candles(sym, bar), flow(sym), side(sym), level(form), walls(sym)}
+   19.11 23:39: large limit orders («стенки») as bands on the chart and in «Крупные заявки» (age, grew / shrank, vanished — with the
+   spoofing hint), the large-trades tape, and the open positions' entry / stop / TP lines on the chart; walls refresh every 30 s.
    Stage 2 (owner 19.11 23:13): ONE trading screen — the chart in the centre (1h / 4h / 1d, auto levels dashed, the owner's levels
    solid: tap the chart to add one), «Покупатели против продавцов» on the left, volume / liquidations / facts / news / calendar on
    the right; on a phone the three stack. The chart is drawn here on a canvas (no external library: «Управление» allows scripts from
@@ -35,7 +37,20 @@
 @media (max-width:640px){.md .md-top{grid-template-columns:1fr 1fr}.md .md-top label{grid-column:1/-1}.md .md-k,.md .md-set{grid-template-columns:1fr 1fr}}`;
 
   // ------------------------------------------------------------------ stage 2: the trading screen
-  const SCR = { sym: '', bar: '1h', c: null, f: null, s: null, t: 0, err: '' };
+  const SCR = { sym: '', bar: '1h', c: null, f: null, s: null, w: null, pos: [], t: 0, err: '' };
+  // ages are counted on the server's clock (the walls' «asof»), so a phone with a wrong clock does not age them
+  const age = (t) => { const m = Math.max(0, Math.round((((SCR.w && SCR.w.asof) || Date.now()) - t) / 60000)); return m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; };
+  function wallsHtml(W) {
+    if (!W) return '';
+    const row = (w) => `<div class="md-row"><span class="${w.side === 'bids' ? 'pos' : 'neg'}">${w.side === 'bids' ? 'покупка' : 'продажа'} ${px(w.price)}<br><span class="md-m">${w.dist_pct > 0 ? '+' : ''}${grp(w.dist_pct, 2)}% · стоит ${age(w.since)} · ${esc(w.trend)}${isN(w.chg_pct) && w.trend !== 'стоит' ? ' ' + (w.chg_pct > 0 ? '+' : '') + grp(w.chg_pct, 0) + '%' : ''}</span></span><b>${usd0(w.usd)}</b></div>`;
+    const all = (W.asks || []).slice().reverse().concat(W.bids || []);
+    const gone = (W.gone || []).slice(0, 4).map((g) => `<div class="md-row"><span class="md-m">${g.side === 'bids' ? 'покупка' : 'продажа'} ${px(g.price)} · ${usd0(g.usd)} · стояла ${age(((SCR.w && SCR.w.asof) || Date.now()) - (g.lived_ms || 0))}</span><span class="${g.note_ru.indexOf('подходе') >= 0 ? 'neg' : 'md-m'}">${esc(g.note_ru)}</span></div>`).join('');
+    const tr = (W.trades || []).slice(0, 8).map((x) => `<div class="md-row"><span class="${x.side === 'покупка' ? 'pos' : 'neg'}">${esc(x.side)} ${px(x.px)}</span><span>${usd0(x.usd)} · ${new Date(x.t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}</span></div>`).join('');
+    return `<h5 style="margin-top:12px">Крупные заявки</h5>${all.length ? all.map(row).join('') : '<span class="md-m">заметных стенок нет</span>'}
+      ${gone ? `<div class="md-m" style="margin-top:6px">Исчезли (30 мин):</div>${gone}` : ''}
+      <h5 style="margin-top:12px">Крупные сделки (от ${usd0(W.big_trade_usd)})</h5>${tr || '<span class="md-m">за 2 ч не было</span>'}
+      <p class="md-m">${esc(W.note_ru || '')} Стенка — $ в полосе ${grp(W.settings.wall_band_pct, 2)}% в пределах ±${grp(W.settings.wall_range_pct, 0)}%, топ-${W.settings.wall_top} и не меньше ${grp(W.settings.wall_mult, 1)}× медианы. Обновление раз в 30 с.</p>`;
+  }
   let LAST_O = {};
   const usd0 = (v) => (!isN(v) ? '—' : '$' + grp(Math.abs(+v) >= 1e6 ? +v / 1e6 : +v >= 1e3 ? +v / 1e3 : +v, Math.abs(+v) >= 1e6 ? 2 : Math.abs(+v) >= 1e3 ? 1 : 0) + (Math.abs(+v) >= 1e6 ? ' млн' : Math.abs(+v) >= 1e3 ? ' тыс.' : ''));
   const imb = (x) => (!x ? '<span class="md-m">нет данных</span>' : `<div class="md-row"><span>покупки ${usd0(x.bid_usd)}</span><span>продажи ${usd0(x.ask_usd)}</span></div>
@@ -68,11 +83,11 @@
   function screenHtml() {
     if (!SCR.sym) return '<p class="md-m">Впишите монету — появится экран: график с уровнями, покупатели против продавцов, объём, новости и календарь.</p>';
     const C = SCR.c, own = (C && C.own) || [];
-    return `<div class="md-scr"><div class="md-pan md-pl">${flowHtml(SCR.f)}</div>
+    return `<div class="md-scr"><div class="md-pan md-pl">${flowHtml(SCR.f)}${wallsHtml(SCR.w)}</div>
       <div class="md-pan md-pc"><div class="md-tf"><b>${esc(SCR.sym)}</b>${['1h', '4h', '1d'].map((b) => `<button class="ib" type="button" data-md="bar" data-bar="${b}" aria-pressed="${SCR.bar === b}">${b}</button>`).join('')}
         <span class="md-m">${C && C.last ? 'цена ' + px(C.last) : ''} · тап по графику — свой уровень</span></div>
         <div class="md-cv"><canvas class="md-ch" data-md="chart" aria-label="График ${esc(SCR.sym)}"></canvas></div>
-        <div class="md-m">Пунктир — уровни системы (день, вчера, неделя, вершины и донья H1 / H4, круглые); сплошные жёлтые — ваши.</div>
+        <div class="md-m">Пунктир — уровни системы (день, вчера, неделя, вершины и донья H1 / H4, круглые); сплошные жёлтые — ваши; полосы — крупные заявки (зелёные — покупка, красные — продажа); белая — вход, красная — стоп, зелёные — тейки открытой позиции.</div>
         <div class="md-own">${own.map((l) => `<span>${px(l.px)}<button type="button" data-md="lvdel" data-id="${esc(l.id)}" aria-label="Убрать уровень">×</button></span>`).join('')}</div>
         ${SCR.err ? `<p class="md-m">${esc(SCR.err)}</p>` : ''}</div>
       <div class="md-pan md-pr">${sideHtml(SCR.s)}</div></div>`;
@@ -86,6 +101,10 @@
     const cs = C.candles.slice(-Math.max(40, Math.min(160, Math.floor(W / 5)))), padR = 64, padT = 8, padB = 18;
     let lo = Math.min(...cs.map((c) => c[3])), hi = Math.max(...cs.map((c) => c[2]));
     (C.own || []).forEach((l) => { if (C.last && Math.abs(l.px / C.last - 1) <= 0.15) { lo = Math.min(lo, l.px); hi = Math.max(hi, l.px); } });   // the owner's own levels stay in view
+    const PL = [];                                      // the open positions of this coin: entry / stop / take-profits
+    (SCR.pos || []).forEach((p) => { PL.push({ px: p.entry, c: '#e8f0fa', t: (p.side === 'long' ? 'LONG' : 'SHORT') + ' вход' }, { px: p.stop, c: '#ef7d6b', t: 'стоп' });
+      (p.tps || []).forEach((t, i) => { if (!t.done) PL.push({ px: t.px, c: '#6fcf97', t: 'TP' + (i + 1) }); }); });
+    PL.forEach((l) => { if (C.last && Math.abs(l.px / C.last - 1) <= 0.25) { lo = Math.min(lo, l.px); hi = Math.max(hi, l.px); } });
     const span0 = hi - lo; lo -= span0 * 0.04; hi += span0 * 0.04;
     const lv = (C.levels || []).filter((l) => l.px >= lo && l.px <= hi), own = (C.own || []).filter((l) => l.px >= lo && l.px <= hi);
     const Y = (p) => padT + (hi - p) / (hi - lo) * (Hh - padT - padB), cw = (W - padR) / cs.length;
@@ -94,11 +113,18 @@
     let lastY = -99;                                   // a label only where it does not overlap the previous one (the line is always drawn)
     lv.slice().sort((a, b) => b.px - a.px).forEach((l) => { g.strokeStyle = KC[l.kind] || '#7d93ad'; g.setLineDash([4, 4]); g.lineWidth = 1; g.beginPath(); g.moveTo(0, Y(l.px)); g.lineTo(W - padR, Y(l.px)); g.stroke();
       g.setLineDash([]); if (Y(l.px) - lastY >= 12) { g.fillStyle = KC[l.kind] || '#7d93ad'; g.fillText(l.label, 4, Y(l.px) - 6); lastY = Y(l.px); } });
+    const WB = SCR.w ? (SCR.w.bids || []).concat(SCR.w.asks || []) : [], wmax = Math.max(1, ...WB.map((w) => w.usd));
+    const bh = Math.max(3, (Hh - padT - padB) * ((SCR.w && SCR.w.settings.wall_band_pct) || 0.25) / 100 * (C.last || 1) / (hi - lo));
+    WB.filter((w) => w.price >= lo && w.price <= hi).forEach((w) => { const bid = w.side === 'bids', len = (W - padR) * (0.25 + 0.75 * w.usd / wmax);
+      g.fillStyle = bid ? 'rgba(111,207,151,.22)' : 'rgba(239,125,107,.22)'; g.fillRect(W - padR - len, Y(w.price) - bh / 2, len, bh);
+      g.fillStyle = bid ? '#6fcf97' : '#ef7d6b'; g.textAlign = 'right'; g.fillText(usd0(w.usd), W - padR - 4, Y(w.price)); g.textAlign = 'left'; });
     cs.forEach((c, i) => { const x = i * cw + cw / 2, up = c[4] >= c[1]; g.strokeStyle = g.fillStyle = up ? '#6fcf97' : '#ef7d6b';
       g.beginPath(); g.moveTo(x, Y(c[2])); g.lineTo(x, Y(c[3])); g.stroke();
       const y1 = Y(Math.max(c[1], c[4])), y2 = Y(Math.min(c[1], c[4])); g.fillRect(x - Math.max(1, cw * 0.35), y1, Math.max(2, cw * 0.7), Math.max(1, y2 - y1)); });
     own.forEach((l) => { g.strokeStyle = '#f2c14e'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, Y(l.px)); g.lineTo(W - padR, Y(l.px)); g.stroke();
       g.fillStyle = '#f2c14e'; g.fillText('свой ' + px(l.px), 4, Y(l.px) - 6); });
+    PL.forEach((l) => { g.strokeStyle = l.c; g.lineWidth = 1.5; g.setLineDash(l.t === 'стоп' ? [6, 3] : []); g.beginPath(); g.moveTo(0, Y(l.px)); g.lineTo(W - padR, Y(l.px)); g.stroke(); g.setLineDash([]);
+      g.fillStyle = l.c; g.fillText(l.t + ' ' + px(l.px), (W - padR) * 0.45, Y(l.px) - 6); });
     g.fillStyle = '#7d93ad'; for (let k = 0; k <= 4; k++) { const p = hi - (hi - lo) * k / 4; g.fillText(px(p), W - padR + 4, Y(p)); }
     if (C.last) { g.fillStyle = '#e8f0fa'; g.fillRect(W - padR, Y(C.last) - 7, padR, 14); g.fillStyle = '#06101e'; g.fillText(px(C.last), W - padR + 4, Y(C.last)); }
   }
@@ -106,9 +132,9 @@
     if (!api.candles || !sym || SCR.busy) return;
     SCR.busy = true;
     SCR.sym = sym; SCR.bar = bar || SCR.bar; SCR.err = '';
-    const [c, f, s] = await Promise.all([api.candles(sym, SCR.bar).catch((e) => { SCR.err = (e.data && e.data.message_ru) || 'График не загрузился.'; return null; }),
-      api.flow(sym).catch(() => null), api.side(sym).catch(() => null)]);
-    if (c) SCR.c = c; if (f) SCR.f = f; if (s) SCR.s = s;
+    const [c, f, s, w] = await Promise.all([api.candles(sym, SCR.bar).catch((e) => { SCR.err = (e.data && e.data.message_ru) || 'График не загрузился.'; return null; }),
+      api.flow(sym).catch(() => null), api.side(sym).catch(() => null), api.walls ? api.walls(sym).catch(() => null) : null]);
+    if (c) SCR.c = c; if (f) SCR.f = f; if (s) SCR.s = s; SCR.w = w || (SCR.w && SCR.w.sym === sym ? SCR.w : null);
     if (c && c.sym) SCR.sym = c.sym;
     SCR.t = Date.now();
     SCR.busy = false;
@@ -130,6 +156,7 @@
   function html(D, o) {
     o = o || {};
     LAST_O = o;
+    SCR.pos = ((D && D.open) || []).filter((p) => p.sym === SCR.sym);
     const S = (D && D.settings) || {}, st = (D && D.stats) || {};
     const top = `<div class="md-top"><label>Монета (OKX, бессрочный USDT)<input data-md="q" value="${esc(o.sym || '')}" placeholder="ADA или Cardano" maxlength="40" autocomplete="off"></label>
       <button class="md-b md-l" type="button" data-md="long">LONG</button><button class="md-b md-s" type="button" data-md="short">SHORT</button></div>`;
@@ -152,6 +179,10 @@
       <label>Тейки<select name="tp_rule"><option value="r"${S.tp_rule !== 'levels' ? ' selected' : ''}>по R-множителям</option><option value="levels"${S.tp_rule === 'levels' ? ' selected' : ''}>по уровням (R, где уровня нет)</option></select></label>
       <label>Тейки, R через запятую<input name="tp_r" value="${esc((S.tp_r || []).join(', '))}"></label>
       <label>Доли тейков, %<input name="tp_split" value="${esc((S.tp_split || []).join(', '))}"></label>
+      <label>Стенки: диапазон ±%<input name="wall_range_pct" type="number" step="0.5" min="1" max="10" value="${esc(S.wall_range_pct)}"></label>
+      <label>Стенки: полоса, %<input name="wall_band_pct" type="number" step="0.05" min="0.05" max="1" value="${esc(S.wall_band_pct)}"></label>
+      <label>Стенки: топ / ≥ × медианы<input name="wall_top_mult" value="${esc(S.wall_top)} / ${esc(S.wall_mult)}"></label>
+      <label>Крупная сделка от, $ (0 = авто)<input name="big_trade_usd" type="number" step="1000" min="0" value="${esc(S.big_trade_usd)}"></label>
       <label>Макс. плечо<input name="max_lev" type="number" step="0.5" min="1" max="5" value="${esc(S.max_lev)}"></label>
       <label>После TP1 / TP2<select name="mgmt"><option value="both"${S.be_after_tp1 && S.trail_after_tp2 ? ' selected' : ''}>безубыток + трейлинг</option><option value="be"${S.be_after_tp1 && !S.trail_after_tp2 ? ' selected' : ''}>только безубыток</option><option value="none"${!S.be_after_tp1 && !S.trail_after_tp2 ? ' selected' : ''}>ничего</option></select></label>
       <div><button class="ib" type="submit">Сохранить</button></div></form></details>`;
@@ -180,6 +211,10 @@
     el.querySelectorAll('[data-md="bar"]').forEach((b) => b.addEventListener('click', () => loadScreen(api, SCR.sym, b.dataset.bar, rerender)));
     if (q) { const go = () => { const v = (q.value || '').trim(); if (v && v.toUpperCase() !== SCR.sym) { LAST_O = { ...LAST_O, sym: v }; loadScreen(api, v, SCR.bar, rerender); } };
       q.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); }); q.addEventListener('change', go); }
+    TICK.api = api; TICK.rr = rerender;               // the walls refresh every 30 s while the screen is on the page
+    if (!TICK.id && api.walls) TICK.id = setInterval(async () => {
+      const cvs = document.querySelector('[data-md="chart"]'); if (!SCR.sym || !cvs || document.hidden || SCR.busy) return;
+      try { SCR.w = await TICK.api.walls(SCR.sym); TICK.rr(null, LAST_O.msg || '', LAST_O); } catch (e) { /* keep the last */ } }, 30000);
     if (want && api.candles && !SCR.busy && ((want !== SCR.sym && want !== SCR.tried) || Date.now() - SCR.t > 60000)) { SCR.tried = want; loadScreen(api, want, SCR.bar, rerender); }
     const err = (e) => (e && e.data && e.data.message_ru) || 'Не получилось: ' + ((e && e.message) || e);
     el.querySelectorAll('[data-md="long"],[data-md="short"]').forEach((b) => b.addEventListener('click', async () => {
@@ -207,8 +242,11 @@
       e.preventDefault(); const d = new FormData(f), num = (s) => String(s || '').split(/[,;\s]+/).filter(Boolean).map((v) => parseFloat(v.replace(',', '.')));
       const m = d.get('mgmt');
       try { const r = await api.settings({ risk_pct: +d.get('risk_pct'), stop_rule: d.get('stop_rule'), stop_pct: +d.get('stop_pct'), stop_max_pct: +d.get('stop_max_pct'),
-        tp_rule: d.get('tp_rule'), tp_r: num(d.get('tp_r')), tp_split: num(d.get('tp_split')), max_lev: +d.get('max_lev'), be_after_tp1: m !== 'none', trail_after_tp2: m === 'both' });
+        tp_rule: d.get('tp_rule'), wall_range_pct: +d.get('wall_range_pct'), wall_band_pct: +d.get('wall_band_pct'),
+        wall_top: num(d.get('wall_top_mult'))[0], wall_mult: num(String(d.get('wall_top_mult') || '').replace('/', ' '))[1], big_trade_usd: +d.get('big_trade_usd'),
+        tp_r: num(d.get('tp_r')), tp_split: num(d.get('tp_split')), max_lev: +d.get('max_lev'), be_after_tp1: m !== 'none', trail_after_tp2: m === 'both' });
         rerender(r, r.message_ru || ''); } catch (er) { rerender(null, err(er)); } });
   }
-  window.CNManual = { html, mount, _scr: SCR, flowHtml, sideHtml };
+  const TICK = { id: 0, api: null, rr: null };
+  window.CNManual = { html, mount, _scr: SCR, flowHtml, sideHtml, wallsHtml };
 })();

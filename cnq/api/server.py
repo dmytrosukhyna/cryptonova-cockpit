@@ -57,6 +57,7 @@ from . import access as access_codes, bingx, coin_verdict, console as admin_cons
 from . import my_calls as my_calls_api
 from . import manual_desk as manual_desk_api
 from . import ivan_tests as ivan_tests_api, peter as peter_desk, peter_cloud, reversal as reversal_api, listing_short as listing_short_api, smart_alts as smart_alts_api
+from . import levels as levels_api
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
 
@@ -151,6 +152,8 @@ class Api:
         self.manual_walls = manual_market.Walls(self.manual)
         self.manual.walls = self.manual_walls
         self.smart_alts = smart_alts_api.SmartAlts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "smart_alts"), web_dir)
+        # 19.11: the paper test desk «Торговля от уровней» — owner-only, kept in <run>/data/levels (cnq/api/levels.py)
+        self.levels = levels_api.Levels(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "levels"))
         self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
         try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
             self.peter.ensure_token()
@@ -444,6 +447,9 @@ class Api:
         if path == "/v2/admin/my_calls" or path.startswith("/v2/admin/my_calls/"):
             deny = self.console.check(headers)                           # 19.11: «Мои прогнозы» — the same owner check as «Управление»
             return deny if deny else self._my_calls(method, path, body)
+        if path == "/v2/admin/levels":                                   # 19.11: «Торговля от уровней (тест)» in «Управление»
+            deny = self.console.check(headers)
+            return deny if deny else ((405, {"error": "method"}) if method != "GET" else self.levels.desk())
         if path == "/v2/admin" or path.startswith("/v2/admin/"):          # the owner's admin panel: its own token, not Firebase
             return self.console.handle(method, path, url.query, headers, body)
         # ------------------------------------------------------------ signed-in user
@@ -630,6 +636,8 @@ class Api:
             return self.listing_short.desk()
         if path == "/v2/owner/smart_alts":                             # 13.11: «Альты от китов (тест)», owner only
             return self.smart_alts.desk()
+        if path == "/v2/owner/levels":                                 # 19.11: «Торговля от уровней (тест)», owner only
+            return self.levels.desk()
         if path == "/v2/owner/peter":                                  # 11.11: «Питер» (MT5), owner only
             return self.peter.desk()
         if path == "/v2/owner/peter/token":
@@ -997,6 +1005,7 @@ def main() -> int:
     api.my_calls.start()                     # 19.11: «Мои прогнозы» — scores calls at their horizon, every minute
     api.ivan_tests.start()                   # 13.11: «Иван · тест-стратегии» — every 90 s while accounts are connected
     api.smart_alts.start()                   # 13.11: «Альты от китов (тест)» — paper, every 10 minutes, owner-only output
+    api.levels.start()                       # 19.11: «Торговля от уровней (тест)» — paper, every 10 minutes, owner-only output
     api.peter_cloud.start()                  # 11.11: «Питер» through MetaApi — polls only while the owner has connected it
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))
     print(f"cnq-api {VERSION} on 127.0.0.1:{port}", flush=True)
@@ -1005,7 +1014,7 @@ def main() -> int:
         here = os.path.dirname(os.path.realpath(__file__))
         agents = os.path.join(os.path.dirname(here), "agents")            # what the API imports from the engine's package
         files = lambda: [os.path.join(here, f) for f in os.listdir(here) if f.endswith(".py")] + \
-            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py") if os.path.exists(os.path.join(agents, f))]
+            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py") if os.path.exists(os.path.join(agents, f))]
         stamp = lambda: max(os.path.getmtime(p) for p in files())
         first = stamp()
         while True:

@@ -371,7 +371,13 @@ def step(st, now, v, candles=hourly, coins=COINS):
         P = prep(t, o, h, l, c, vv)
         for i in new:
             bar = (o[i], h[i], l[i], c[i])
-            for tr in [x for x in st["open"] if x["coin"] == coin]:   # 1. open positions
+            for pd in [x for x in st["pending"] if x["coin"] == coin]:  # 1. retest limits (a fill is managed on its own bar too, as in the backtest)
+                if (pd["side"] == "L" and l[i] <= pd["px"]) or (pd["side"] == "S" and h[i] >= pd["px"]):
+                    st["pending"].remove(pd)
+                    _open(st, coin, pd["side"], ex, pd["sig"], pd["px"], t[i], pd["ctx"])
+                elif t[i] - pd["t"] > 6 * H:
+                    st["pending"].remove(pd)
+            for tr in [x for x in st["open"] if x["coin"] == coin]:   # 2. open positions
                 r = step_trade(tr, bar, P["atr"][i])
                 if r:
                     px, why = r
@@ -380,12 +386,6 @@ def step(st, now, v, candles=hourly, coins=COINS):
                     st["cash"] += usd
                     st["open"].remove(tr)
                     st["closed"].append({**tr, "exit": px, "closed_t": t[i] + H, "pct": round(pct, 3), "usd": usd, "why": why})
-            for pd in [x for x in st["pending"] if x["coin"] == coin]:  # 2. retest limits
-                if (pd["side"] == "L" and l[i] <= pd["px"]) or (pd["side"] == "S" and h[i] >= pd["px"]):
-                    st["pending"].remove(pd)
-                    _open(st, coin, pd["side"], ex, pd["sig"], pd["px"], t[i], pd["ctx"])
-                elif i - pd.get("i0", i) >= 6 or t[i] - pd["t"] >= 6 * H:
-                    st["pending"].remove(pd)
         st["last_bar"][coin] = t[new[-1]]
         i = new[-1]                                               # 3. new signals at the last closed bar
         if any(x["coin"] == coin for x in st["open"] + st["pending"]) or len(st["open"]) >= MAX_OPEN:

@@ -148,6 +148,8 @@ class Api:
         self.manual = manual_desk_api.ManualDesk(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "manual_desk"), web_dir)
         from . import manual_market
         self.manual_market = manual_market.Market(self.manual, web_dir)
+        self.manual_walls = manual_market.Walls(self.manual)
+        self.manual.walls = self.manual_walls
         self.smart_alts = smart_alts_api.SmartAlts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "smart_alts"), web_dir)
         self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
         try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
@@ -532,7 +534,7 @@ class Api:
             return self.ivan_tests.set_copy(str(form.get("id") or ""), form.get("on"))
         return (self.ivan_tests.check if path.endswith("/check") else self.ivan_tests.remove)(str(form.get("id") or ""))
 
-    MANUAL_POST = ("resolve", "preview", "open", "close", "stop", "settings", "candles", "flow", "side", "level")
+    MANUAL_POST = ("resolve", "preview", "open", "close", "stop", "settings", "candles", "flow", "side", "level", "walls")
 
     def _manual(self, method: str, path: str, body: bytes = b"") -> tuple[int, dict]:
         """«Ручной стол (Дмитрий)» — called ONLY after console.check (the owner). PAPER: no exchange order anywhere."""
@@ -560,6 +562,8 @@ class Api:
             return getattr(self.manual_market, act)(form)
         if act == "level":
             return self.manual.level(form)
+        if act == "walls":                                                  # 19.11 23:39: large limit orders and large trades
+            return self.manual_walls.look(form)
         return self.manual.set_settings(form)
 
     def _my_calls(self, method: str, path: str, body: bytes = b"") -> tuple[int, dict]:

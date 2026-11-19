@@ -29,11 +29,13 @@ import urllib.request
 from cnq.agents import ivan_study as IS
 
 from . import my_calls
+from .manual_market import WALL_DEF, wall_settings
 
 OKX = "https://www.okx.com"
 START = 10_000.0
 DEFAULTS = {"risk_pct": 3.0, "stop_rule": "swing_h1", "stop_pct": 3.0, "stop_max_pct": 16.0, "stop_min_pct": 0.3, "buffer_pct": 0.1,
-            "tp_r": [1.0, 2.0, 3.0], "tp_split": [40, 30, 30], "tp_rule": "r", "be_after_tp1": True, "trail_after_tp2": True, "max_lev": 5.0}
+            "tp_r": [1.0, 2.0, 3.0], "tp_split": [40, 30, 30], "tp_rule": "r", "be_after_tp1": True, "trail_after_tp2": True, "max_lev": 5.0,
+            **WALL_DEF}
 SLIP, FEE = 0.0005, 0.0005
 INST_TTL = 3600
 
@@ -77,6 +79,8 @@ def clean_settings(s: dict, base: dict | None = None) -> dict:
         out["tp_split"] = [round(float(x) / tot * 100, 1) for x in s["tp_split"]]
     elif len(out["tp_split"]) != len(out["tp_r"]):
         out["tp_split"] = [round(100 / len(out["tp_r"]), 1)] * len(out["tp_r"])
+    if any(k in s for k in WALL_DEF):                        # 19.11 23:39: the walls' settings live with the desk's
+        out.update(wall_settings({**{k: out.get(k) for k in WALL_DEF}, **{k: s[k] for k in WALL_DEF if k in s}}))
     for k in ("be_after_tp1", "trail_after_tp2"):
         if k in s:
             out[k] = bool(s[k])
@@ -125,6 +129,7 @@ class ManualDesk:
         self.lock = threading.Lock()
         self._inst = (0.0, set())
         self._ct: dict = {}
+        self.walls = None                      # 19.11 23:39: set by the API (manual_market.Walls) — the entry's walls snapshot
 
     # ------------------------------------------------------------------ state
     def _path(self) -> str:
@@ -273,6 +278,7 @@ class ManualDesk:
                "stop_why": p["stop_why"], "r_usd": p["risk_usd"], "tps": [{**x, "done": False} for x in p["tps"]], "best": p["entry"],
                "trail": False, "fees": round(fee, 4), "realised": 0.0, "fills": [{"t": now, "kind": "open", "px": p["entry"], "qty": p["qty"]}],
                "settings": p["settings"], "ctx": ctx, "system": my_calls.system_view(self.web, p["sym"]), "last_t": now, "mark": p["last"],
+               "walls": self._walls_snapshot(p["sym"]),
                "comment": str(form.get("comment") or "")[:300]}
         with self.lock:
             d = self._load()
@@ -280,6 +286,13 @@ class ManualDesk:
             d["open"].append(pos)
             self._save(d)
         return 200, {"ok": True, "message_ru": f"Открыто на бумаге: {p['sym']} {p['side'].upper()} на ${p['notional']:,.0f}, стоп {p['stop']:g}.".replace(",", " "), **self.view()}
+
+    def _walls_snapshot(self, sym: str):
+        """the order-book walls and large trades at the entry (for the research of whether walls hold); never blocks the trade"""
+        try:
+            return self.walls.snapshot(sym) if self.walls else None
+        except Exception:  # noqa: BLE001
+            return None
 
     # ------------------------------------------------------------------ manage
     def _fill(self, d: dict, pos: dict, px: float, qty: float, kind: str, t: int) -> None:

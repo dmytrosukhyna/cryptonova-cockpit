@@ -276,6 +276,10 @@ textarea.in1{width:100%;min-height:84px;resize:vertical}
          «Управление» (GET/POST /v2/admin/ivan_tests* — the same owner check as every admin call). Renderer: ivan_tests.js. -->
     <details class="card ivt" id="ivanTestsBox" open><summary><b>Иван Тест (2 / 3 / 4) — ключи и копирование</b><span class="sub" id="ivtSub">загружаю…</span></summary>
       <div id="ivanTests"></div></details>
+    <!-- 19.11 (owner): «Мои прогнозы (Дмитрий)» — the owner's paper calls next to the system's view (GET/POST /v2/admin/my_calls*,
+         the same owner check). Paper only: no order anywhere. Renderer: my_calls.js. -->
+    <details class="card ivt" id="myCallsBox" open><summary><b>Мои прогнозы (Дмитрий)</b><span class="sub" id="mcSub">загружаю…</span></summary>
+      <div id="myCalls"></div></details>
     <p class="lead" id="ovLead">Приложение CRYPTO NOVA 2.0: люди, вовлечённость и путь к подтверждённому UID.</p>
     <div class="grid kpis" id="kpis"></div>
     <div class="sec"><h2>Воронка</h2>
@@ -420,6 +424,7 @@ textarea.in1{width:100%;min-height:84px;resize:vertical}
 
 <script src="vip/auth.js"></script>
 <script src="ivan_tests.js?v=2"></script>
+<script src="my_calls.js?v=1"></script>
 <script>
 (function(){
 'use strict';
@@ -510,6 +515,19 @@ function ivtPaint(msg){ const el=$('#ivanTests'); if(!el||!window.CNIvanTests) r
   $('#ivtSub').textContent=IVT?(n?`подключено ${n} · на реальный счёт копируется ${on}`:'счета ещё не подключены'):'не загрузилось';
   el.innerHTML=CNIvanTests.html(IVT,{msg,err:IVT?'':'Список счетов не загрузился — форма подключения ниже работает.'});
   CNIvanTests.mount(el,ivtApi,(D,m)=>{ if(D&&D.accounts) IVT=D; ivtPaint(m); }); }
+/* 19.11 (owner): «Мои прогнозы (Дмитрий)» — through api() like everything here */
+let MC=null;
+const mcCall=async(p,body)=>{ const r=await api('/v2/admin/my_calls'+p,body?{method:'POST',body}:{});
+  if(r.code>=400||r.code===0){ const e=new Error((r.d&&(r.d.message_ru||r.d.error))||('HTTP '+r.code)); e.data=r.d; throw e; } return r.d; };
+const mcApi={add:f=>mcCall('/add',f),del:id=>mcCall('/delete',{id})};
+function mcPaint(msg){ const el=$('#myCalls'); if(!el||!window.CNMyCalls) return;
+  const A=(MC&&MC.stats&&MC.stats.all)||{};
+  $('#mcSub').textContent=MC?`открыто ${(MC.open||[]).length} · закрыто ${A.n||0}${A.n?` · попаданий ${A.hits}`:''}`:'не загрузилось';
+  el.innerHTML=CNMyCalls.html(MC,{msg,err:MC?'':'Прогнозы не загрузились — форма работает.'});
+  CNMyCalls.mount(el,mcApi,(D,m)=>{ if(D&&D.open) MC=D; mcPaint(m); }); }
+async function mcLoad(){ const el=$('#myCalls'); if(!el) return;
+  if(el.contains(document.activeElement)&&/^(INPUT|BUTTON|SELECT)$/.test(document.activeElement.tagName)) return;
+  try{ MC=await mcCall(''); }catch(e){} mcPaint(); }
 async function ivtLoad(){ const el=$('#ivanTests'); if(!el) return;
   if(el.contains(document.activeElement)&&/^(INPUT|BUTTON)$/.test(document.activeElement.tagName)) return;   // never under the owner's typing
   try{ IVT=await ivtCall(''); }catch(e){ if(!IVT) IVT=null; } ivtPaint(); }
@@ -519,6 +537,7 @@ function load(v){ (loaders[v]||(()=>{}))(); }
 let OV=null, LEADS=null, CONN=null;
 loaders.overview=async()=>{
   ivtLoad();                                       // 18.11: «Иван Тест» on top of «Обзор»
+  mcLoad();                                        // 19.11: «Мои прогнозы (Дмитрий)»
   if(!OV) $('#kpis').innerHTML=Array(6).fill('<div class="card kpi"><div class="skel" style="width:60%"></div><div class="skel" style="width:40%;height:26px"></div></div>').join('');
   const [o,l]=await Promise.all([api('/v2/admin/overview'),api('/v2/admin/leads?size=1')]);
   if(o.code!==200) return; OV=o.d; LEADS=l.code===200?l.d:null; const d=OV, u=d.users;

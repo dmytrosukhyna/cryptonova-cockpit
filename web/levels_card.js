@@ -16,18 +16,16 @@
   // the mode of the desk's variant — every trade of the desk is of that mode
   const MODE = { range: 'диапазон', bo_vol: 'пробой', bo_retest: 'пробой', crash: 'пробой', fbo1: 'ложный пробой', fbo3: 'ложный пробой' };
 
-  /** the variant in plain words, e.g. «шорт после пробоя поддержки на ретесте, короткое удержание» */
+  /** the variant in plain words, from the data («range|L|sym» → «лонг от поддержки внутри канала, цель — следующий уровень; обычные выходы») */
   function plain(mode, side, exit) {
-    const S = side === 'S', who = S ? 'шорт' : 'лонг';
-    const what = {
-      range: S ? 'от верхней границы диапазона' : 'от нижней границы диапазона',
-      bo_vol: S ? 'на пробое поддержки с объёмом' : 'на пробое сопротивления с объёмом',
-      bo_retest: S ? 'после пробоя поддержки на ретесте' : 'после пробоя сопротивления на ретесте',
-      crash: 'на резком пробое вниз с большим объёмом',
-      fbo1: S ? 'на ложном пробое сопротивления (возврат за 1 свечу)' : 'на ложном пробое поддержки (возврат за 1 свечу)',
-      fbo3: S ? 'на ложном пробое сопротивления (возврат за 3 свечи)' : 'на ложном пробое поддержки (возврат за 3 свечи)',
-    }[mode] || mode;
-    return `${who} ${what}, ${exit === 'asym' ? 'короткое удержание' : 'удержание до цели'}`;
+    const L = side === 'L', n = { fbo1: '1 свечу', fbo3: '3 свечи' }[mode];
+    const what = mode === 'range' ? (L ? 'лонг от поддержки внутри канала, цель — следующий уровень' : 'шорт от сопротивления внутри канала')
+      : mode === 'bo_retest' ? (L ? 'лонг после пробоя сопротивления на ретесте' : 'шорт после пробоя поддержки на ретесте')
+      : mode === 'bo_vol' ? (L ? 'пробой сопротивления с объёмом, лонг' : 'пробой поддержки с объёмом, шорт')
+      : mode === 'crash' ? 'пробой вниз на резком падении с большим объёмом, шорт'
+      : n ? (L ? `ложный пробой поддержки, лонг (возврат за ${n})` : `ложный пробой сопротивления, шорт (возврат за ${n})`)
+      : `${mode} · ${SIDE[side] || side}`;
+    return `${what}; ${exit === 'asym' ? 'короткие выходы' : exit === 'sym' ? 'обычные выходы' : exit}`;
   }
 
   function curve(closed) {
@@ -58,15 +56,15 @@
     const btn = (c, s) => `<button class="ib" type="button" data-lv="repeat" data-coin="${esc(c)}" data-side="${s === 'S' ? 'short' : 'long'}">Повторить вручную</button>`;
     const open = (D.open || []).map((t) => `<tr><td><b>${esc(t.coin)}</b> ${SIDE[t.side] || esc(t.side)}<br><span class="lv-m">${esc(mode)} · ${dt(t.opened_t)}</span></td>
       <td>${px(t.entry)}<br><span class="lv-m">уровень ${px(t.level)}</span></td><td>стоп ${px(t.stop)}<br>цель ${px(t.tgt)}</td>
-      <td class="r">$${grp(t.notional || 0, 0)}<br><span class="lv-m">риск $${grp(t.risk_usd || 0, 2)}</span></td><td class="r">${btn(t.coin, t.side)}</td></tr>`).join('');
+      <td class="r">$${grp(t.notional || 0, 0)}<br><span class="lv-m">риск $${grp(t.risk_usd || 0, 2)}</span>${t.capped ? `<br><span class="lv-m">${esc(t.capped_ru || 'размер урезан лимитом')}</span>` : ''}</td><td class="r">${btn(t.coin, t.side)}</td></tr>`).join('');
     const pend = (D.pending || []).map((p) => `<tr><td><b>${esc(p.coin)}</b> ${SIDE[p.side] || esc(p.side)}</td><td>лимит ${px(p.px)}</td><td class="lv-m">ждёт ретеста с ${dt(p.t)} (до 6 ч)</td><td class="r">${btn(p.coin, p.side)}</td></tr>`).join('');
     const closed = cl.slice(0, 30).map((t) => `<tr><td><b>${esc(t.coin)}</b> ${SIDE[t.side] || esc(t.side)}<br><span class="lv-m">${esc(mode)} · ${dt(t.opened_t)} → ${dt(t.closed_t)}</span></td>
-      <td>${px(t.entry)} → ${px(t.exit)}</td><td>${esc(t.why || '')}</td><td class="r ${cls(t.usd)}">${usd(t.usd)}<br><span class="lv-m">${pct(t.pct)}</span></td></tr>`).join('');
+      <td>${px(t.entry)} → ${px(t.exit)}${t.capped ? `<br><span class="lv-m">${esc(t.capped_ru || 'размер урезан лимитом')}</span>` : ''}</td><td>${esc(t.why || '')}</td><td class="r ${cls(t.usd)}">${usd(t.usd)}<br><span class="lv-m">${pct(t.pct)}</span></td></tr>`).join('');
     const oos = B.oos || {}, is_ = B.is || {};
     return `<style>${CSS}</style><div class="lv"><p class="lv-m"><b>ТЕСТ · бумажный стол системы CRYPTO NOVA AI, $${grp(D.start || 10000, 0)}. Сделок на бирже нет, на реальный счёт ничего не попадает.</b></p>
       <div class="lv-box"><b>Вариант:</b> ${esc(plain(D.mode, D.side, D.exit))} <span class="lv-m">(${esc(D.variant)}, режим — ${esc(mode)})</span><br>${esc(D.rule_ru || '')}</div>
       ${B.verdict_ru ? `<div class="lv-box lv-bad"><b>Проверка на истории: не прошёл — работает как наблюдение.</b> ${esc(B.verdict_ru)}.<br>
-        <span class="lv-m">Вторая половина: ${grp(oos.n || 0, 0)} сделок, в среднем ${pct(oos.mean)} на сделку, медиана ${pct(oos.median)}, в плюсе ${isN(oos.win) ? grp(oos.win * 100, 0) + '%' : '—'}, худшая ${pct(oos.worst)}. Первая половина: в среднем ${pct(is_.mean)}. ${esc(B.pass_rule_ru || '')}. Прошлое не гарантирует будущее.</span></div>` : ''}
+        <span class="lv-m">Вторая половина: ${grp(oos.n || 0, 0)} сделок, в среднем ${pct(oos.mean)} на сделку, медиана ${pct(oos.median)}, в плюсе ${isN(oos.win) ? grp(oos.win * 100, 0) + '%' : '—'}, худшая ${pct(oos.worst)}. Первая половина: ${grp(is_.n || 0, 0)} сделок, в среднем ${pct(is_.mean)}, в плюсе ${isN(is_.win) ? grp(is_.win * 100, 0) + '%' : '—'}.${B.portfolio_oos ? ` Портфель на второй половине (позиция ≤ 20% счёта): ${pct(B.portfolio_oos.pnl_pct)}, просадка −${grp(B.portfolio_oos.max_dd_pct || 0, 1)}%.` : ''} ${esc(B.pass_rule_ru || '')}. Прошлое не гарантирует будущее.</span></div>` : ''}
       <div class="lv-k"><div><small>Бумажный счёт</small><b>$${grp(D.equity || 0, 2)}</b><small class="${cls(D.pnl_usd)}">${usd(D.pnl_usd)}</small></div>
         <div><small>Сделок</small><b>${n}</b><small>с ${dt(D.started).slice(0, 5)}</small></div><div><small>В плюсе</small><b>${n ? grp(wins / n * 100, 0) + '%' : '—'}</b><small>${wins} из ${n}</small></div>
         <div><small>Открыто</small><b>${(D.open || []).length}</b><small>ждут ретеста: ${(D.pending || []).length}</small></div><div><small>Данные</small><b>${dt(D.asof).slice(0, 12)}</b><small>раз в 10 мин</small></div></div>

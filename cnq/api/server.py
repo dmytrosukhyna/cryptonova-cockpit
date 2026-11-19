@@ -54,6 +54,8 @@ from cnq.agents.llm import LLM, PROVIDERS
 
 from . import access as access_codes, bingx, coin_verdict, console as admin_console, home_news, nova, owner_auth, owner_data, pf_parse, \
     pf_review, spot_top, tts
+from . import my_calls as my_calls_api
+from . import manual_desk as manual_desk_api
 from . import ivan_tests as ivan_tests_api, peter as peter_desk, peter_cloud, reversal as reversal_api, listing_short as listing_short_api, smart_alts as smart_alts_api
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
@@ -140,6 +142,10 @@ class Api:
         # 13.11: the paper test desk «Альты от китов» — owner-only, kept in <run>/data/smart_alts (cnq/api/smart_alts.py)
         # 13.11: «Иван · тест-стратегии» — Ivan's Bybit demo accounts, read-only keys, observation + paper copy (cnq/api/ivan_tests.py)
         self.ivan_tests = ivan_tests_api.IvanTests(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "ivan_tests"), web_dir=web_dir)
+        # 19.11: «Мои прогнозы (Дмитрий)» — the owner's paper calls, owner-only, <run>/data/my_calls (cnq/api/my_calls.py)
+        self.my_calls = my_calls_api.MyCalls(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "my_calls"), web_dir)
+        # 19.11: «Ручной стол (Дмитрий)» — the owner's semi-manual PAPER desk, <run>/data/manual_desk (cnq/api/manual_desk.py)
+        self.manual = manual_desk_api.ManualDesk(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "manual_desk"), web_dir)
         self.smart_alts = smart_alts_api.SmartAlts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "smart_alts"), web_dir)
         self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
         try:                                     # 11.11: the owner has no shell — the server makes Peter's token itself (never logged)
@@ -428,6 +434,12 @@ class Api:
             # CNQ_ADMIN_TOKEN — the same check as every other /v2/admin/* call (console.check: constant-time, rate-limited)
             deny = self.console.check(headers)
             return deny if deny else self._ivan_tests(method, path.replace("/v2/admin/", "/v2/owner/", 1), body)
+        if path == "/v2/admin/manual" or path.startswith("/v2/admin/manual/"):
+            deny = self.console.check(headers)                           # 19.11: «Ручной стол» — the same owner check as «Управление»
+            return deny if deny else self._manual(method, path, body)
+        if path == "/v2/admin/my_calls" or path.startswith("/v2/admin/my_calls/"):
+            deny = self.console.check(headers)                           # 19.11: «Мои прогнозы» — the same owner check as «Управление»
+            return deny if deny else self._my_calls(method, path, body)
         if path == "/v2/admin" or path.startswith("/v2/admin/"):          # the owner's admin panel: its own token, not Firebase
             return self.console.handle(method, path, url.query, headers, body)
         # ------------------------------------------------------------ signed-in user
@@ -517,6 +529,47 @@ class Api:
         if path.endswith("/copy_real"):                                     # 17.11: the per-account real-copy switch (default off)
             return self.ivan_tests.set_copy(str(form.get("id") or ""), form.get("on"))
         return (self.ivan_tests.check if path.endswith("/check") else self.ivan_tests.remove)(str(form.get("id") or ""))
+
+    MANUAL_POST = ("resolve", "preview", "open", "close", "stop", "settings")
+
+    def _manual(self, method: str, path: str, body: bytes = b"") -> tuple[int, dict]:
+        """«Ручной стол (Дмитрий)» — called ONLY after console.check (the owner). PAPER: no exchange order anywhere."""
+        if method == "GET" and path == "/v2/admin/manual":
+            return 200, self.manual.view()
+        act = path.rsplit("/", 1)[-1]
+        if method != "POST" or path != f"/v2/admin/manual/{act}" or act not in self.MANUAL_POST:
+            return 404, {"error": "not_found"}
+        try:
+            form = json.loads((body or b"{}").decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return 400, {"error": "bad_json"}
+        form = form if isinstance(form, dict) else {}
+        if act == "resolve":
+            return self.manual.resolve(str(form.get("q") or ""))
+        if act == "preview":
+            return self.manual.preview(form)
+        if act == "open":
+            return self.manual.open(form)
+        if act == "close":
+            return self.manual.close(str(form.get("id") or ""))
+        if act == "stop":
+            return self.manual.move_stop(str(form.get("id") or ""), form.get("px"))
+        return self.manual.set_settings(form)
+
+    def _my_calls(self, method: str, path: str, body: bytes = b"") -> tuple[int, dict]:
+        """«Мои прогнозы (Дмитрий)» — called ONLY after console.check (the owner). GET = the desk (open calls are scored first);
+        POST add {asset, dir, horizon, comment} · delete {id} (before the horizon only). Paper: no order anywhere."""
+        if method == "GET" and path == "/v2/admin/my_calls":
+            self.my_calls.settle()
+            return 200, self.my_calls.view()
+        if method != "POST" or path not in ("/v2/admin/my_calls/add", "/v2/admin/my_calls/delete"):
+            return (405, {"error": "method"}) if path in ("/v2/admin/my_calls", "/v2/admin/my_calls/add", "/v2/admin/my_calls/delete") else (404, {"error": "not_found"})
+        try:
+            form = json.loads((body or b"{}").decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return 400, {"error": "bad_json"}
+        form = form if isinstance(form, dict) else {}
+        return self.my_calls.add(form) if path.endswith("/add") else self.my_calls.delete(str(form.get("id") or ""))
 
     def _owner(self, method: str, path: str, headers: dict, body: bytes = b"") -> tuple[int, dict]:
         """GET /v2/owner/overview · /v2/owner/myspot · /v2/owner/ivan — only with a valid owner session (checked here, on the
@@ -930,6 +983,8 @@ def main() -> int:
     api.tts.attach_installer()
     api.reversal.start()                     # 11.11: «Разворот (тест)» — paper, every 10 minutes, owner-only output
     api.listing_short.start()                # 12.11: «Шорт листингов (тест)» — paper, every 10 minutes, owner-only output
+    api.manual.start()                       # 19.11: «Ручной стол» — stops / take-profits every minute (paper)
+    api.my_calls.start()                     # 19.11: «Мои прогнозы» — scores calls at their horizon, every minute
     api.ivan_tests.start()                   # 13.11: «Иван · тест-стратегии» — every 90 s while accounts are connected
     api.smart_alts.start()                   # 13.11: «Альты от китов (тест)» — paper, every 10 minutes, owner-only output
     api.peter_cloud.start()                  # 11.11: «Питер» through MetaApi — polls only while the owner has connected it

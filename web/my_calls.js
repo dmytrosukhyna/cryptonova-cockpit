@@ -6,7 +6,7 @@
   if (window.CNMyCalls) return;
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const isN = (v) => v != null && v !== '' && isFinite(+v);
-  const grp = (n, d) => (+n).toFixed(d).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const grp = (n, d) => { const [i, f] = (+n).toFixed(d).split('.'); return i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (f ? ',' + f : ''); };   // groups the integer part only
   const usd = (v) => (!isN(v) ? '—' : (+v < 0 ? '−' : +v > 0 ? '+' : '') + '$' + grp(Math.abs(+v), 2));
   const pct = (v, d = 2) => (!isN(v) ? '—' : (+v < 0 ? '−' : +v > 0 ? '+' : '') + grp(Math.abs(+v), d) + '%');
   const px = (v) => (!isN(v) ? '—' : +v >= 1000 ? grp(v, 0) : +v >= 1 ? grp(v, 3) : (+v).toPrecision(4).replace('.', ','));

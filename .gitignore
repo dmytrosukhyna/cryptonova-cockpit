@@ -15,3 +15,4 @@ data/*
 !data/whale_trades/
 !data/smart_money/
 web/*.bak
+!data/market_view/

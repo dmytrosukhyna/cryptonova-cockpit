@@ -33,7 +33,7 @@ from . import my_calls
 OKX = "https://www.okx.com"
 START = 10_000.0
 DEFAULTS = {"risk_pct": 3.0, "stop_rule": "swing_h1", "stop_pct": 3.0, "stop_max_pct": 16.0, "stop_min_pct": 0.3, "buffer_pct": 0.1,
-            "tp_r": [1.0, 2.0, 3.0], "tp_split": [40, 30, 30], "be_after_tp1": True, "trail_after_tp2": True, "max_lev": 5.0}
+            "tp_r": [1.0, 2.0, 3.0], "tp_split": [40, 30, 30], "tp_rule": "r", "be_after_tp1": True, "trail_after_tp2": True, "max_lev": 5.0}
 SLIP, FEE = 0.0005, 0.0005
 INST_TTL = 3600
 
@@ -66,6 +66,8 @@ def clean_settings(s: dict, base: dict | None = None) -> dict:
     for k, lo, hi in (("risk_pct", 0.1, 10.0), ("stop_pct", 0.3, 16.0), ("stop_max_pct", 1.0, 16.0), ("max_lev", 1.0, 5.0)):
         if k in s and _f(s[k]) is not None:
             out[k] = min(hi, max(lo, float(s[k])))
+    if s.get("tp_rule") in ("r", "levels"):                # 19.11 stage 2: take-profits at R-multiples or at the nearest levels
+        out["tp_rule"] = s["tp_rule"]
     if s.get("stop_rule") in ("swing_h1", "swing_h4", "pct"):
         out["stop_rule"] = s["stop_rule"]
     if isinstance(s.get("tp_r"), list) and 1 <= len(s["tp_r"]) <= 3 and all(_f(x) and 0.2 <= float(x) <= 20 for x in s["tp_r"]):
@@ -122,6 +124,7 @@ class ManualDesk:
         self.now = clock or (lambda: int(time.time() * 1000))
         self.lock = threading.Lock()
         self._inst = (0.0, set())
+        self._ct: dict = {}
 
     # ------------------------------------------------------------------ state
     def _path(self) -> str:
@@ -154,6 +157,7 @@ class ManualDesk:
             return s
         rows = self.get("/api/v5/public/instruments", instType="SWAP")
         s = {r["instId"] for r in rows if str(r.get("instId", "")).endswith("-USDT-SWAP") and r.get("state", "live") == "live"}
+        self._ct = {r["instId"]: _f(r.get("ctVal")) for r in rows if _f(r.get("ctVal"))}
         self._inst = (time.time(), s)
         return s
 
@@ -178,6 +182,39 @@ class ManualDesk:
                 return 200, {"ok": True, "sym": c, "inst": f"{c}-USDT-SWAP"}
         return 404, {"error": "not_found", "message_ru": "нет такой монеты на OKX"}
 
+    def ct_val(self, inst: str) -> float | None:
+        """the contract's size in the coin (OKX ctVal) — books / liquidations count contracts"""
+        if inst not in self._ct:
+            try:
+                self._inst = (0.0, set())
+                self._instruments()
+            except Exception:  # noqa: BLE001
+                return None
+        return self._ct.get(inst)
+
+    # ------------------------------------------------------------------ the owner's own levels (per coin)
+    def own_levels(self, sym: str) -> list:
+        return list((self._load().get("levels") or {}).get(sym) or [])
+
+    def level(self, form: dict) -> tuple[int, dict]:
+        code, r = self.resolve(str(form.get("sym") or ""))
+        if code != 200:
+            return code, r
+        with self.lock:
+            d = self._load()
+            lv = d.setdefault("levels", {}).setdefault(r["sym"], [])
+            if form.get("remove"):
+                lv[:] = [x for x in lv if x["id"] != str(form["remove"])]
+            else:
+                px = _f(form.get("px"))
+                if not px or px <= 0:
+                    return 400, {"error": "bad_px", "message_ru": "Нужна цена уровня."}
+                if len(lv) >= 30:
+                    return 409, {"error": "too_many", "message_ru": "Не больше 30 своих уровней на монету."}
+                lv.append({"id": secrets.token_hex(4), "px": px, "t": self.now(), "note": str(form.get("note") or "")[:80]})
+            self._save(d)
+        return 200, {"ok": True, "sym": r["sym"], "own": lv}
+
     def _last(self, inst: str) -> float | None:
         rows = self.get("/api/v5/market/ticker", instId=inst)
         return _f((rows or [{}])[0].get("last"))
@@ -195,6 +232,7 @@ class ManualDesk:
         try:
             last = self._last(r["inst"])
             h1, h4 = candles(self.get, r["inst"], "1H", 300), candles(self.get, r["inst"], "4H", 300)
+            d1 = candles(self.get, r["inst"], "1D", 200) if st.get("tp_rule") == "levels" else []
         except Exception:  # noqa: BLE001
             return 502, {"error": "okx", "message_ru": "OKX не ответил — попробуйте ещё раз."}
         if not last:
@@ -204,7 +242,13 @@ class ManualDesk:
         eq = self.equity(d)
         sz = size_for(eq, entry, stop, st)
         r1 = abs(entry - stop)
-        tps = [{"r": x, "px": entry + x * r1 if side == "long" else entry - x * r1, "pct": sp} for x, sp in zip(st["tp_r"], st["tp_split"])]
+        if st.get("tp_rule") == "levels":                     # stage 2: at the nearest levels (auto + the owner's), R where none
+            from .manual_market import auto_levels, tps_by_levels
+            lv = auto_levels(h1, h4, d1, last, self.now()) + [{"px": x["px"], "label": "свой уровень"} for x in self.own_levels(r["sym"])]
+            got = tps_by_levels(side, entry, stop, lv, len(st["tp_r"]), st["tp_r"])
+            tps = [{"r": round(abs(p - entry) / r1, 2), "px": p, "pct": sp, "why": why} for (p, why), sp in zip(got, st["tp_split"])]
+        else:
+            tps = [{"r": x, "px": entry + x * r1 if side == "long" else entry - x * r1, "pct": sp} for x, sp in zip(st["tp_r"], st["tp_split"])]
         return 200, {"ok": True, "sym": r["sym"], "inst": r["inst"], "side": side, "last": last, "entry": entry, "stop": stop, "stop_why": why,
                      "tps": tps, **sz, "equity": round(eq, 2), "settings": st,
                      "fees_est": round(sz["notional"] * FEE * 2, 2),
@@ -368,8 +412,8 @@ class ManualDesk:
                 "stats": {"trades": len(cl), "wins": len(wins), "win_pct": round(100 * len(wins) / len(cl), 1) if cl else None,
                           "avg_r": round(sum(rs) / len(rs), 2) if rs else None, "pnl_usd": round(sum(c["pnl_usd"] for c in cl), 2),
                           "max_dd_pct": round(dd, 2)}, "curve": curve,
-                "stage_ru": "Этап 1: тикер, LONG / SHORT, стоп и тейки, позиции. Этап 2 (график с уровнями, «покупатели против продавцов», "
-                            "объёмы, новости, календарь) — следующий."}
+                "stage_ru": "Данные экрана — публичные данные OKX через наш сервер (кэш 30–60 с); новости — новостной стол системы, "
+                            "календарь — web/calendar.json. Сделки только на бумаге."}
 
     def start(self) -> None:
         def loop():

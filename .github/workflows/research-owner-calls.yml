@@ -12,7 +12,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: python scripts/research/owner_calls_prices.py owner_calls_prices.json
+      - run: python scripts/research/owner_calls_prices.py owner_calls_prices.json | sed 's/^::notice title=/coin /'
+      - run: python scripts/research/owner_calls_dump.py owner_calls_prices.json 0 9
+      - run: python scripts/research/owner_calls_dump.py owner_calls_prices.json 9 18
+      - run: python scripts/research/owner_calls_dump.py owner_calls_prices.json 18 27
+      - run: python -c "import json;d=json.load(open('owner_calls_prices.json'));print('::notice title=missing::'+','.join(c for c in ['BTC','ETH','SOL','ZEC','VVV','MORPHO','GRASS','LIT','ADA','UNI','PEPE','AAVE','ENA','ONDO','OP','ARB','EIGEN','AVAX','QNT','PUMP','XTEN','HYPE'] if c not in d['k1h']))"
       - uses: actions/upload-artifact@v4
         with:
           name: owner-calls-prices

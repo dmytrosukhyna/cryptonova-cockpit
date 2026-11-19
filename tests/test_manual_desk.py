@@ -123,7 +123,7 @@ def test_paper_only_owner_only_and_the_panel():
     j = srv.index('if path == "/v2/admin/manual" or path.startswith("/v2/admin/manual/"):')
     assert srv.index("deny = self.console.check(headers)", j) < srv.index("self._manual(", j) and srv.count("self._manual(") == 1
     adm = open(os.path.join(ROOT, "web", "admin.html"), encoding="utf-8").read()
-    assert "Ручной стол (Дмитрий)" in adm and '<script src="manual_desk.js?v=3"></script>' in adm and "mdCall('/open',{sym,side,confirm:true})" in adm
+    assert "Ручной стол (Дмитрий)" in adm and '<script src="manual_desk.js?v=4"></script>' in adm and "mdCall('/open',{sym,side,confirm:true})" in adm
     for f in ("app.html", "vip.html", "index.html"):
         assert "/v2/admin/manual" not in open(os.path.join(ROOT, "web", f), encoding="utf-8").read(), f
     node = shutil.which("node")
@@ -330,7 +330,7 @@ def test_settings_for_walls_and_the_entry_keeps_the_walls(tmp_path):
 def test_the_walls_panel_and_chart_hooks():
     node = shutil.which("node")
     adm = open(os.path.join(ROOT, "web", "admin.html"), encoding="utf-8").read()
-    assert "walls:sym=>mdCall('/walls',{sym})" in adm and '<script src="manual_desk.js?v=3"></script>' in adm
+    assert "walls:sym=>mdCall('/walls',{sym})" in adm and '<script src="manual_desk.js?v=4"></script>' in adm
     js = open(os.path.join(ROOT, "web", "manual_desk.js"), encoding="utf-8").read()
     assert "setInterval" in js and "30000" in js and "PL.push({ px: p.entry" in js and "fillRect(W - padR - len" in js
     if not node:

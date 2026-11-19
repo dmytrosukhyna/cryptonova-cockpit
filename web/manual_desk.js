@@ -37,7 +37,7 @@
 @media (max-width:640px){.md .md-top{grid-template-columns:1fr 1fr}.md .md-top label{grid-column:1/-1}.md .md-k,.md .md-set{grid-template-columns:1fr 1fr}}`;
 
   // ------------------------------------------------------------------ stage 2: the trading screen
-  const SCR = { sym: '', bar: '1h', c: null, f: null, s: null, w: null, pos: [], t: 0, err: '' };
+  const SCR = { sym: '', bar: '1h', c: null, f: null, s: null, w: null, pos: [], extra: [], t: 0, err: '' };
   // ages are counted on the server's clock (the walls' «asof»), so a phone with a wrong clock does not age them
   const age = (t) => { const m = Math.max(0, Math.round((((SCR.w && SCR.w.asof) || Date.now()) - t) / 60000)); return m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; };
   function wallsHtml(W) {
@@ -87,7 +87,7 @@
       <div class="md-pan md-pc"><div class="md-tf"><b>${esc(SCR.sym)}</b>${['1h', '4h', '1d'].map((b) => `<button class="ib" type="button" data-md="bar" data-bar="${b}" aria-pressed="${SCR.bar === b}">${b}</button>`).join('')}
         <span class="md-m">${C && C.last ? 'цена ' + px(C.last) : ''} · тап по графику — свой уровень</span></div>
         <div class="md-cv"><canvas class="md-ch" data-md="chart" aria-label="График ${esc(SCR.sym)}"></canvas></div>
-        <div class="md-m">Пунктир — уровни системы (день, вчера, неделя, вершины и донья H1 / H4, круглые); сплошные жёлтые — ваши; полосы — крупные заявки (зелёные — покупка, красные — продажа); белая — вход, красная — стоп, зелёные — тейки открытой позиции.</div>
+        <div class="md-m">Пунктир — уровни системы (день, вчера, неделя, вершины и донья H1 / H4, круглые); сплошные жёлтые — ваши; полосы — крупные заявки (зелёные — покупка, красные — продажа); белая — вход, красная — стоп, зелёные — тейки открытой позиции; фиолетовые — сделка стола «Торговля от уровней».</div>
         <div class="md-own">${own.map((l) => `<span>${px(l.px)}<button type="button" data-md="lvdel" data-id="${esc(l.id)}" aria-label="Убрать уровень">×</button></span>`).join('')}</div>
         ${SCR.err ? `<p class="md-m">${esc(SCR.err)}</p>` : ''}</div>
       <div class="md-pan md-pr">${sideHtml(SCR.s)}</div></div>`;
@@ -104,6 +104,7 @@
     const PL = [];                                      // the open positions of this coin: entry / stop / take-profits
     (SCR.pos || []).forEach((p) => { PL.push({ px: p.entry, c: '#e8f0fa', t: (p.side === 'long' ? 'LONG' : 'SHORT') + ' вход' }, { px: p.stop, c: '#ef7d6b', t: 'стоп' });
       (p.tps || []).forEach((t, i) => { if (!t.done) PL.push({ px: t.px, c: '#6fcf97', t: 'TP' + (i + 1) }); }); });
+    (SCR.extra || []).filter((l) => l.sym === SCR.sym).forEach((l) => PL.push(l));   // 20.11: other desks' positions (CNLevels.lines)
     PL.forEach((l) => { if (C.last && Math.abs(l.px / C.last - 1) <= 0.25) { lo = Math.min(lo, l.px); hi = Math.max(hi, l.px); } });
     const span0 = hi - lo; lo -= span0 * 0.04; hi += span0 * 0.04;
     const lv = (C.levels || []).filter((l) => l.px >= lo && l.px <= hi), own = (C.own || []).filter((l) => l.px >= lo && l.px <= hi);
@@ -123,8 +124,9 @@
       const y1 = Y(Math.max(c[1], c[4])), y2 = Y(Math.min(c[1], c[4])); g.fillRect(x - Math.max(1, cw * 0.35), y1, Math.max(2, cw * 0.7), Math.max(1, y2 - y1)); });
     own.forEach((l) => { g.strokeStyle = '#f2c14e'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, Y(l.px)); g.lineTo(W - padR, Y(l.px)); g.stroke();
       g.fillStyle = '#f2c14e'; g.fillText('свой ' + px(l.px), 4, Y(l.px) - 6); });
-    PL.forEach((l) => { g.strokeStyle = l.c; g.lineWidth = 1.5; g.setLineDash(l.t === 'стоп' ? [6, 3] : []); g.beginPath(); g.moveTo(0, Y(l.px)); g.lineTo(W - padR, Y(l.px)); g.stroke(); g.setLineDash([]);
-      g.fillStyle = l.c; g.fillText(l.t + ' ' + px(l.px), (W - padR) * 0.45, Y(l.px) - 6); });
+    let plY = -99;                                     // labels of position lines never overlap (the lines are always drawn)
+    PL.slice().sort((a, b) => b.px - a.px).forEach((l) => { g.strokeStyle = l.c; g.lineWidth = 1.5; g.setLineDash(l.t === 'стоп' || l.dash ? [6, 3] : []); g.beginPath(); g.moveTo(0, Y(l.px)); g.lineTo(W - padR, Y(l.px)); g.stroke(); g.setLineDash([]);
+      if (Y(l.px) - plY >= 12) { g.fillStyle = l.c; g.fillText(l.t + ' ' + px(l.px), (W - padR) * 0.45, Y(l.px) - 6); plY = Y(l.px); } });
     g.fillStyle = '#7d93ad'; for (let k = 0; k <= 4; k++) { const p = hi - (hi - lo) * k / 4; g.fillText(px(p), W - padR + 4, Y(p)); }
     if (C.last) { g.fillStyle = '#e8f0fa'; g.fillRect(W - padR, Y(C.last) - 7, padR, 14); g.fillStyle = '#06101e'; g.fillText(px(C.last), W - padR + 4, Y(C.last)); }
   }
@@ -248,5 +250,7 @@
         rerender(r, r.message_ru || ''); } catch (er) { rerender(null, err(er)); } });
   }
   const TICK = { id: 0, api: null, rr: null };
-  window.CNManual = { html, mount, _scr: SCR, flowHtml, sideHtml, wallsHtml };
+  /** 20.11: lines of another desk to draw on this chart when its coin is selected ([{sym, px, c, t, dash}]) */
+  const setExtra = (ls) => { SCR.extra = Array.isArray(ls) ? ls : []; };
+  window.CNManual = { html, mount, setExtra, _scr: SCR, flowHtml, sideHtml, wallsHtml };
 })();

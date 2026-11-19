@@ -1,0 +1,19 @@
+name: research-owner-calls
+# 19.11: hourly candles of the coins in the owner's market views (scripts/research/owner_calls_prices.py). Public data, read-only.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/research/owner_calls_prices.py owner_calls_prices.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: owner-calls-prices
+          path: owner_calls_prices.json

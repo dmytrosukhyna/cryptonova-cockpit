@@ -280,6 +280,10 @@ textarea.in1{width:100%;min-height:84px;resize:vertical}
          same owner check). No exchange order anywhere. Renderer: manual_desk.js. Stage 2 (chart, side panels) comes next. -->
     <details class="card ivt" id="manualBox" open><summary><b>Ручной стол (Дмитрий)</b><span class="sub" id="mdSub">загружаю…</span></summary>
       <div id="manualDesk"></div></details>
+    <!-- 20.11 (owner): «Торговля от уровней · CRYPTO NOVA AI (тест)» — the system's automatic PAPER desk (GET /v2/admin/levels, the same
+         owner check); its positions are drawn on the chart of «Ручной стол». Renderer: levels_card.js. -->
+    <details class="card ivt" id="levelsBox" open><summary><b>Торговля от уровней · CRYPTO NOVA AI (тест)</b><span class="sub" id="lvSub">загружаю…</span></summary>
+      <div id="levelsCard"></div></details>
     <!-- 19.11 (owner): «Мои прогнозы (Дмитрий)» — the owner's paper calls next to the system's view (GET/POST /v2/admin/my_calls*,
          the same owner check). Paper only: no order anywhere. Renderer: my_calls.js. -->
     <details class="card ivt" id="myCallsBox" open><summary><b>Мои прогнозы (Дмитрий)</b><span class="sub" id="mcSub">загружаю…</span></summary>
@@ -429,7 +433,8 @@ textarea.in1{width:100%;min-height:84px;resize:vertical}
 <script src="vip/auth.js"></script>
 <script src="ivan_tests.js?v=2"></script>
 <script src="my_calls.js?v=1"></script>
-<script src="manual_desk.js?v=3"></script>
+<script src="manual_desk.js?v=4"></script>
+<script src="levels_card.js?v=1"></script>
 <script>
 (function(){
 'use strict';
@@ -549,6 +554,16 @@ function mdPaint(msg,o){ const el=$('#manualDesk'); if(!el||!window.CNManual) re
 async function mdLoad(){ const el=$('#manualDesk'); if(!el) return;
   if(MD_O.preview||el.contains(document.activeElement)&&/^(INPUT|BUTTON|SELECT)$/.test(document.activeElement.tagName)) return;
   try{ MD=await mdCall(''); }catch(e){} mdPaint('',{sym:MD_O.sym}); }
+/* 20.11 (owner): «Торговля от уровней (тест)» — through api() like everything here; 503 = the desk has not run yet */
+let LV=null, LV_START=false;
+async function lvLoad(){ const el=$('#levelsCard'); if(!el||!window.CNLevels) return;
+  const r=await api('/v2/admin/levels'); LV_START=r.code===503; LV=r.code===200?((r.d&&r.d.data)||null):(LV_START?null:LV);
+  const D=LV; $('#lvSub').textContent=D?`счёт $${Math.round(D.equity||0).toLocaleString('ru-RU')} · открыто ${(D.open||[]).length} · сделок ${D.trades||0} · не прошёл проверку`:(LV_START?'стол запускается':'не загрузилось');
+  el.innerHTML=CNLevels.html(D,{starting:LV_START,err:'Стол не загрузился.'});
+  CNLevels.mount(el,{repeat:async(coin,side)=>{ const box=$('#manualBox'); if(box){ box.open=true; box.scrollIntoView({block:'start'}); }
+    try{ const P=await mdApi.preview(coin,side); mdPaint('«Повторить вручную»: проверьте параметры по своим правилам и подтвердите сами.',{preview:P,sym:P.sym}); }
+    catch(e){ mdPaint((e&&e.data&&e.data.message_ru)||'Не получилось подготовить сделку.',{sym:coin}); } }});
+  if(window.CNManual&&CNManual.setExtra){ CNManual.setExtra(CNLevels.lines(D)); } }
 async function ivtLoad(){ const el=$('#ivanTests'); if(!el) return;
   if(el.contains(document.activeElement)&&/^(INPUT|BUTTON)$/.test(document.activeElement.tagName)) return;   // never under the owner's typing
   try{ IVT=await ivtCall(''); }catch(e){ if(!IVT) IVT=null; } ivtPaint(); }
@@ -560,6 +575,7 @@ loaders.overview=async()=>{
   ivtLoad();                                       // 18.11: «Иван Тест» on top of «Обзор»
   mcLoad();                                        // 19.11: «Мои прогнозы (Дмитрий)»
   mdLoad();                                        // 19.11: «Ручной стол (Дмитрий)»
+  lvLoad();                                        // 20.11: «Торговля от уровней (тест)»
   if(!OV) $('#kpis').innerHTML=Array(6).fill('<div class="card kpi"><div class="skel" style="width:60%"></div><div class="skel" style="width:40%;height:26px"></div></div>').join('');
   const [o,l]=await Promise.all([api('/v2/admin/overview'),api('/v2/admin/leads?size=1')]);
   if(o.code!==200) return; OV=o.d; LEADS=l.code===200?l.d:null; const d=OV, u=d.users;

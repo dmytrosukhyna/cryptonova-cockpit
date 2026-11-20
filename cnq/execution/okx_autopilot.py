@@ -589,6 +589,10 @@ def build(cl: Okx, env=None, model=None) -> dict:
     if lctx.get("fresh") and lctx["held"]:
         raw["trading"] = ld.merge(raw.get("trading") or [], lctx["held"])
     act = _active_held(env)                            # coins of the active-spot sleeve: never counted or sold here
+    # 20.11 (owner's ladder): core coins bought by the ladder's limit orders are never counted, sold or trimmed by the rebalancer
+    from . import okx_ladder
+    for c, q in okx_ladder.held(load_state(env)).items():
+        act = {**act, c: act.get(c, 0.0) + q}
     act_lead = _active_held(env, True) if lctx["held"] else {}     # … of them held as lead positions (okx_active, spot lead)
     for c, q in act_lead.items():
         if c in lctx["held"]:
@@ -1013,6 +1017,30 @@ def spot_stops(env=None, opener=None, model=None, now: int | None = None, sleep=
     return ("Стопы спота на OKX: " + ", ".join(parts)) if parts else None
 
 
+def ladder(env=None, opener=None, now: int | None = None, sleep=time.sleep) -> str | None:
+    """20.11: one cycle of the owner's ladder (okx_ladder) — only for an armed, not stopped, live-gated autopilot holding the lease"""
+    from . import okx_ladder, owner_overrides as ov
+    if not (enabled(env) and creds(env) and live(env)):
+        return None
+    st = load_state(env)
+    if not st.get("armed") or stopped(env):
+        return None
+    o = ov.load(env=env)
+    if not okx_ladder.cfg(o) and not (st.get("ladder") or {}).get("status") == "open":
+        return None
+    now = int(now or time.time() * 1000)
+    g = lease.gate(env, now)
+    if not g["ok"]:
+        return None
+    cl = connect(env, opener, st, sleep)
+    cl.lease_deadline = lease.deadline(g, now)
+    r = okx_ladder.step(cl, st, o, now, log, pick_quote(cl, env) or "USDT")
+    save_state(st, env)
+    parts = ([f"выставлено ордеров {r['placed']}"] if r["placed"] else []) + ([f"исполнено {r['filled']}"] if r["filled"] else []) + \
+        ([f"отменено (срок) {r['cancelled']}"] if r["cancelled"] else []) + ([f"ошибки: {'; '.join(r['errors'][:3])}"] if r["errors"] else [])
+    return ("Лестница BTC (решение владельца): " + ", ".join(parts)) if parts else None
+
+
 def due(st: dict, pf: dict, now: int, env=None) -> str | None:
     """Why a spot rebalance is due now (None = not due): the public portfolio changed. Only for an armed, not stopped autopilot."""
     if not st.get("armed") or not enabled(env) or stopped(env):
@@ -1100,6 +1128,9 @@ def stop(env=None, opener=None) -> str:
     if creds(env):
         try:
             cl = connect(env, opener, st)
+            from . import okx_ladder                 # 20.11: the owner's ladder's resting orders are cancelled too
+            n += okx_ladder.cancel_all(cl, st, log)
+            save_state(st, env)
             for o in cl.pending():
                 if str(o.get("clOrdId") or "").startswith("cnqap"):
                     try:
@@ -1444,6 +1475,12 @@ def _main(argv=None) -> int:
                             print(time.strftime("%H:%M ") + msg, flush=True)
                     except Exception as e:  # noqa: BLE001
                         print(time.strftime("%H:%M ") + describe_error(e), flush=True)
+                    try:                                   # 20.11 (owner): the core ladder of resting limit buys
+                        msg = ladder()
+                        if msg:
+                            print(time.strftime("%H:%M ") + msg, flush=True)
+                    except Exception as e:  # noqa: BLE001
+                        print(time.strftime("%H:%M ") + "Лестница: " + describe_error(e).replace("Автопилот OKX: ", ""), flush=True)
                     try:                                   # 09.11 (owner): the model's spot stops sit on OKX as conditional sells
                         msg = spot_stops()
                         if msg:

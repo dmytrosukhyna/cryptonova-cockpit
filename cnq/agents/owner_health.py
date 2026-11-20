@@ -314,3 +314,22 @@ def with_stop_reasons(doc: dict, state: dict | None) -> dict:
                                                          for c, v in sorted(miss.items()))}
         rows.append(r)
     return {**doc, "rows": rows}
+
+
+def with_ladder(doc: dict, state: dict | None) -> dict:
+    """20.11 (owner-only): the server adds the owner's BTC ladder (levels, open / filled orders) from its autopilot state when it
+    serves the sealed health file — the levels never go to a public file"""
+    from cnq.execution import okx_ladder
+    sm = okx_ladder.summary(state)
+    if not isinstance(doc, dict) or not sm:
+        return doc
+    bad = sm["failed"] > 0
+    st_ = YELLOW if bad else (GREEN if sm["status"] in ("open", "done") else INFO)
+    lv = sorted({o["level"] for o in sm["orders"]}, reverse=True)
+    note = (f"лестница {sm['status']}: ордеров открыто {sm['open']}, с исполнением {sm['filled_n']} на ${sm['filled_usd']:.2f} из "
+            f"${sm['planned_usd']:.2f}; уровни BTC {', '.join(f'{x:,.0f}'.replace(',', ' ') for x in lv)}"
+            + (f"; не выставлено: {sm['failed']}" + "".join(f" ({o['ccy']} {o['px']}: {o['why']})" for o in sm["orders"] if o["state"] == "failed")[:300] if bad else ""))
+    row = _row("ladder", "Лестница BTC (решение владельца 20.11)", "Лимитные покупки ядра BTC / ETH / SOL у июльского минимума BTC; без стопов, "
+               "срок 14 дней.", sm.get("placed_t"), st_, note, ASK.format(x="лестницу BTC"), int(time.time() * 1000))
+    row["ladder"] = sm
+    return {**doc, "rows": [r for r in doc.get("rows") or [] if r.get("key") != "ladder"] + [row]}

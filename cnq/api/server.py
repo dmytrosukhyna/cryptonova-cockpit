@@ -633,6 +633,8 @@ class Api:
                     from cnq.agents.owner_health import with_stop_reasons
                     from cnq.execution import okx_autopilot
                     d = with_stop_reasons(d, okx_autopilot.load_state())
+                    from cnq.agents.owner_health import with_ladder      # 20.11: the owner's BTC ladder (owner-only)
+                    d = with_ladder(d, okx_autopilot.load_state())
                 except Exception:  # noqa: BLE001
                     pass
             return 200, {"name": m.group(1), "asof": d.get("asof"), "data": d}

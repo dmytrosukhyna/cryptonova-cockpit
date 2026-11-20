@@ -640,7 +640,7 @@ def budget(cl: ap.Okx, st: dict, env=None, now: int | None = None, fresh: bool =
     now = int(now or time.time() * 1000)
     b = st.get("budget") or {}
     if not fresh and b.get("usd") and b.get("how") and now - int(b.get("t") or 0) < BUDGET_TTL:
-        return b
+        return ladder_hold(b, env)
     share = al.shares(env)["futures"]
     total = account_total(cl)
     own = own_capital(cl.fetch, cl.host, env)
@@ -653,7 +653,26 @@ def budget(cl: ap.Okx, st: dict, env=None, now: int | None = None, fresh: bool =
              "share": share, "total": total, "how": "own", "capital": own["capital"], "realized": own.get("realized"),
              "upl": own["upl"], "margin": own["margin"], "since": own["since"]}
     st["budget"] = b
-    return b
+    return ladder_hold(b, env)
+
+
+LADDER_MIN = 600.0
+
+
+def ladder_hold(b: dict, env=None) -> dict:
+    """20.11 (owner's ladder): while its limit buys rest on OKX, fut_usd ($500) of the futures budget is lent to the spot core ladder —
+    never below LADDER_MIN ($600) for the futures. Risk %, stops and caps are unchanged (they scale with the budget as always)."""
+    try:
+        from . import okx_ladder, owner_overrides as ov
+        o = ov.load(env=env)
+        hold = okx_ladder.fut_hold(ap.load_state(env), o)
+        mn = float((okx_ladder.cfg(o) or {}).get("fut_min") or LADDER_MIN)
+    except Exception:  # noqa: BLE001
+        return b
+    if not hold or not b.get("usd"):
+        return b
+    take = round(min(hold, max(0.0, float(b["usd"]) - mn)), 2)
+    return {**b, "usd": round(float(b["usd"]) - take, 2), "ladder_usd": take} if take > 0 else b
 
 
 def budget_text(b: dict) -> str:

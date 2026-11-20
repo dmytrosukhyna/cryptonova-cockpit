@@ -16,7 +16,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - uses: actions/cache@v4
-        with: { path: /tmp/mvcache, key: mvhist-${{ github.run_id }}, restore-keys: mvhist- }
+        with:
+          path: /tmp/mvcache
+          key: mvhist-${{ github.run_id }}
+          restore-keys: mvhist-
       - name: Study
         run: python scripts/research/market_view_history.py docs/research/market_view_history.md docs/research/market_view_history.json
       - name: Commit

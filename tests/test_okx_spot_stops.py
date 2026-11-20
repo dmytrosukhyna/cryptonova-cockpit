@@ -171,3 +171,19 @@ def test_a_sub_position_whose_stop_cannot_be_moved_keeps_the_old_one_and_one_wit
     ss.sync(cl, pf(stop_aaa=7.5), st, NOW + 1, logs.append, avail={"AAA": 55.0}, lead=_lead(fk))
     assert "без стопа" in st["spot_stop_missing"]["AAA"]["why"] and "59999" in st["spot_stop_missing"]["AAA"]["why"]
     assert set(st["spot_stops"]["AAA"]["lead"]) == {"sp1", "sp2"}                    # the others keep theirs
+
+
+def test_no_buy_back_at_the_model_stop_morpho_2011():
+    """20.11 (MORPHO): the lead stop fired, the drift pass bought the coin back right above its stop, the stop fired again — twice.
+    A non-core coin at (or within 1 % above) the model's stop is never bought; far from it, it is."""
+    import copy
+    e = F.env()
+    p = copy.deepcopy(F.portfolio())
+    for x in p["portfolios"]["ideas"]["positions"]:
+        if x["symbol"] == "AAA":
+            x["levels"]["stop"] = 9.95                       # price 10.0 → 0.5 % above the stop
+    b = ap.build(ap.connect(e, F.FakeOkx(), {}, F.nosleep), e, p)
+    assert "AAA" not in {o["ccy"] for o in b["buys"]} and any("AAA" in d and "у стопа модели" in d for d in b["diffs"])
+    assert "BTC" in {o["ccy"] for o in b["buys"]}             # the core is untouched by the guard
+    b = ap.build(ap.connect(e, F.FakeOkx(), {}, F.nosleep), e, F.portfolio())   # stop 8.0, 20 % below → bought
+    assert "AAA" in {o["ccy"] for o in b["buys"]}

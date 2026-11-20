@@ -567,6 +567,9 @@ def _active_held(env=None, lead: bool | None = None) -> dict:
         return {}
 
 
+STOP_NEAR = 0.01                       # 20.11: no buy of a non-core coin within 1 % above the model's stop (okx_spot_stops)
+
+
 def build(cl: Okx, env=None, model=None) -> dict:
     """Read the account and turn «Наш портфель CRYPTO NOVA» (× the spot share) into exact orders. Places nothing.
     model = web/portfolio.json (default: fetched). A spot lead trader (okx_lead.py): lead positions are counted like ordinary coins,
@@ -694,6 +697,13 @@ def build(cl: Okx, env=None, model=None) -> dict:
             ask = ms._f((tk or {}).get("askPx")) or ms._f((tk or {}).get("last"))
             if not inst or not ask:
                 diffs.append(f"{c}: на OKX нет пары {rt['none']} — доля остаётся в {quote}.")
+                continue
+            # 20.11 (MORPHO 11:40–11:46 UTC: the lead stop fired, the drift pass bought it back at 1.5979 under a 1.5957 stop — it fired
+            # again, bought again, fired again): a non-core coin is never bought at (or within STOP_NEAR above) the model's own stop —
+            # the exchange stop would sell it at once. The model sells it on its next run; the coin waits for that.
+            stp = (ms._f((mapped.get(c) or {}).get("stop")) or 0.0) / max(ms._f((mapped.get(c) or {}).get("mult")) or 1.0, 1e-12)
+            if c not in al.CORE and stp > 0 and ask * k <= stp * (1 + STOP_NEAR):
+                diffs.append(f"{c}: цена {ask * k:.6g} у стопа модели {stp:.6g} — не покупаю (стоп на OKX сразу продал бы монету)")
                 continue
             lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
             qty = floor_to(gap / (ask * k), lot)

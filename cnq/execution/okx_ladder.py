@@ -240,7 +240,12 @@ def step_core(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT") -> dic
                 if sz >= float(o["min"]):
                     try:
                         oid = cl.order(o["inst"], "buy", fmt(px, o["tick"]), fmt(sz, o["lot"]), f"cnqcbt{B['id']}{o['ccy']}"[:32]).get("ordId")
-                        s2 = cl.order_state(o["inst"], ord_id=oid) or {}
+                        s2 = {}
+                        for _ in range(6):                      # an IOC ends at once, but OKX may need a moment to report it
+                            s2 = cl.order_state(o["inst"], ord_id=oid) or {}
+                            if s2.get("state") not in LIVE + (None,):
+                                break
+                            time.sleep(0.4)
                         f2, p2 = ms._f(s2.get("accFillSz")) or 0.0, ms._f(s2.get("avgPx")) or 0.0
                         if f2 > 0:
                             log({"ev": "order", "src": "core_buy", "ccy": o["ccy"], "inst": o["inst"], "side": "buy", "filled": round(f2, 10),
@@ -251,7 +256,12 @@ def step_core(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT") -> dic
                         o["avg_px"] = tot / o["filled"] if o["filled"] else None
                         o["phase"] = "taker"
                     except Exception as e:  # noqa: BLE001
+                        o["why"] = f"OKX IOC: {getattr(e, 'code', '') or type(e).__name__}"          # 21.11: kept (diagnosis)
                         res["errors"].append(f"{o['ccy']} рынок: {getattr(e, 'code', '') or type(e).__name__}")
+                else:
+                    o["why"] = f"IOC не выставлен: размер {sz} < минимума {o['min']}"
+            else:
+                o["why"] = "IOC не выставлен: " + ("нет цены" if not ask else f"остаток ${rest_usd:.2f} < ${MIN_USD:g}")
             o["state"] = "filled" if o["filled"] > 0 else "canceled"
     if all(o["state"] not in LIVE + ("new",) or o["tries"] >= MAX_TRIES for o in B["orders"]):
         B["status"] = "done"

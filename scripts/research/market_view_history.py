@@ -121,7 +121,8 @@ def load(sym, book=True):
         try:
             oi = float(rr[-1]["sum_open_interest"])
             ls = [float(r["count_long_short_ratio"]) for r in rr if r.get("count_long_short_ratio")]
-            D.setdefault(d, {})["oi"] = oi
+            if oi > 0:
+                D.setdefault(d, {})["oi"] = oi
             if ls:
                 D[d]["ls"] = sum(ls) / len(ls)
         except (KeyError, ValueError):
@@ -146,20 +147,30 @@ def load(sym, book=True):
 
 
 def spx():
-    out = {}
-    for url in ("https://stooq.com/q/d/l/?s=%5Espx&i=d",):
+    """S&P 500 daily % change by session date: FRED SP500 first, stooq as a fallback"""
+    srcs = (("https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500", None), ("https://stooq.com/q/d/l/?s=%5Espx&i=d", "Close"))
+    for url, col in srcs:
+        out = {}
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=30) as r:
                 txt = r.read().decode()
+            rd = csv.reader(io.StringIO(txt))
+            hdr = next(rd)
+            ci = hdr.index(col) if col else 1
             prev = None
-            for row in csv.DictReader(io.StringIO(txt)):
-                c = float(row["Close"])
+            for row in rd:
+                try:
+                    c = float(row[ci])
+                except (ValueError, IndexError):
+                    continue
                 if prev:
-                    out[date.fromisoformat(row["Date"])] = (c / prev - 1) * 100
+                    out[date.fromisoformat(row[0])] = (c / prev - 1) * 100
                 prev = c
         except Exception as e:  # noqa: BLE001
-            print("spx failed", e)
-    return out
+            print("spx failed", url, repr(e)[:120])
+        if len(out) > 500:
+            return out
+    return {}
 
 
 def pct_rank(hist, x):
@@ -179,7 +190,7 @@ def signals(D, SPX):
             q = pct_rank(f_hist, x["fund"])
             v["R1"] = -1 if q >= 0.9 else 1 if q <= 0.1 else 0
         dp = (x["close"] / y["close"] - 1) * 100
-        if "oi" in x and "oi" in y:
+        if x.get("oi") and y.get("oi"):
             do = (x["oi"] / y["oi"] - 1) * 100
             v["R2"] = -1 if do >= 3 and dp <= -2 else 0
             v["R3"] = 1 if dp <= -5 and do <= -5 else -1 if dp >= 5 and do <= -5 else 0

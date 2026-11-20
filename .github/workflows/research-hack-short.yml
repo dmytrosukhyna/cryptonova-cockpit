@@ -1,0 +1,26 @@
+name: research-hack-short
+# 20.11 (owner): hacks → short? Event study on DefiLlama /hacks with perp prices (scripts/research/hack_short_study.py). Public data
+# only, research only. Numbers come back as annotations (scripts/research/notice_dump.py).
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/research/hack_short_study.py hack_short.json | tail -40
+      - run: python -c "import json;d=json.load(open('hack_short.json'));d.pop('events');json.dump(d,open('summary.json','w'))"
+      - run: python -c "import json;d=json.load(open('hack_short.json'));json.dump(d['events'],open('events.json','w'))"
+      - run: python scripts/research/notice_dump.py summary.json 0 10 summary
+      - run: python scripts/research/notice_dump.py summary.json 10 20 summary
+      - run: python scripts/research/notice_dump.py summary.json 20 30 summary
+      - run: python scripts/research/notice_dump.py events.json 0 10 events
+      - run: python scripts/research/notice_dump.py events.json 10 20 events
+      - run: python scripts/research/notice_dump.py events.json 20 30 events
+      - run: python scripts/research/notice_dump.py events.json 30 40 events
+      - run: python scripts/research/notice_dump.py events.json 40 50 events

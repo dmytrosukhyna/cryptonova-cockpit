@@ -43,3 +43,5 @@ def test_stats_report_shadow_next_to_live():
     conn.commit()
     s = c.stats()["shadow"]["forward"]
     assert s["n"] == 3 and s["hit_rate"] == round(2 / 3, 3) and s["live_hit_rate"] == round(1 / 3, 3) and s["brier"] < s["live_brier"]
+    h1, h2 = s["halves"]                        # backlog 26: halves by time for the forward test
+    assert h1["n"] == 1 and h2["n"] == 2 and s["split_t"] == cal.SHADOW_SINCE + 1

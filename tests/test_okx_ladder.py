@@ -164,8 +164,9 @@ def test_public_real_shows_only_a_neutral_count_of_resting_orders():
 
 
 def test_the_owners_core_buy_maker_first_then_ioc_within_0_3_percent_and_the_coins_are_core():
-    c = L.core_cfg(CFG)
-    assert c["usd"] == 400 and c["fut_cut_usd"] == 400 and c["fut_free_min"] == 300 and c["fallback_min"] == 15 and c["max_slip"] == 0.003
+    c = L.core_cfg(CFG_LIVE)
+    assert c["usd"] == 400 and c["fut_cut_usd"] == 400 and c["fut_free_min"] == 300 and c["max_slip"] == 0.003
+    cfg = {**CFG, "core_buy": {k: v for k, v in c.items() if k != "replaces"} | {"id": "core400t", "fallback_min": 15}}
 
     class F2(Fake):
         def __init__(self):
@@ -190,15 +191,15 @@ def test_the_owners_core_buy_maker_first_then_ioc_within_0_3_percent_and_the_coi
             self.orders[oid] = body
             return [{"ordId": oid, "sCode": "0"}]
     cl, st, logs = F2(), {}, []
-    r = L.step_core(cl, st, CFG, NOW, logs.append)
+    r = L.step_core(cl, st, cfg, NOW, logs.append)
     o = st["core_buy"]["orders"]
     assert r["placed"] == 3 and {x["ccy"]: round(x["usd"]) for x in o} == {"BTC": 240, "ETH": 100, "SOL": 60}
     assert all(float(x["px"]) < cl.px[x["inst"]] for x in o)                                         # post-only, under the price
     btc = next(k for k, b in cl.orders.items() if b["instId"] == "BTC-USDT")
     cl.fills[btc] = float(cl.orders[btc]["sz"])                                                       # BTC fills as maker
-    L.step_core(cl, st, CFG, NOW + 300_000, logs.append)
+    L.step_core(cl, st, cfg, NOW + 300_000, logs.append)
     assert L.held(st)["BTC"] > 0 and not cl.ioc
-    L.step_core(cl, st, CFG, NOW + 15 * 60_000, logs.append)                                         # 15 min: the rest → IOC
+    L.step_core(cl, st, cfg, NOW + 15 * 60_000, logs.append)                                         # 15 min: the rest → IOC
     assert sorted(i for i, _, _ in cl.ioc) == ["ETH-USDT", "SOL-USDT"] and st["core_buy"]["status"] == "done"
     assert {e["ccy"] for e in logs if e.get("ev") == "order"} == {"BTC", "ETH", "SOL"} and set(L.held(st)) == {"BTC", "ETH", "SOL"}
     assert all(abs(x["filled"] * x["avg_px"] - x["usd"]) < 1.0 for x in st["core_buy"]["orders"])

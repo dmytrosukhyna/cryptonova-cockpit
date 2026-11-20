@@ -1,0 +1,17 @@
+name: research-hack-marked
+# 20.11 (owner): hand-marked largest hacks with their earliest public time → short at +5/15/60 min (scripts/research/hack_marked.py).
+# Public data only, research only. Numbers come back as annotations.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/research/hack_marked.py marked.json | tail -30
+      - run: python scripts/research/notice_dump.py marked.json 0 10 marked

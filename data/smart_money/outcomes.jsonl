@@ -6,3 +6,4 @@
 {"key":"eth:0x1f9840a85d5af5bf1d1762f925bdaddc4201f984","symbol":"UNI","h":7,"t0":1794235295996,"t":1794840279673,"price0":6.89,"price":5.21,"ret":-24.38,"late":false}
 {"key":"hl:HYPE","symbol":"HYPE","h":1,"t0":1794832367756,"t":1794920277390,"price0":65.429,"price":69.545,"ret":6.29,"late":false}
 {"key":"hl:UZEC","symbol":"UZEC","h":7,"t0":1794382960547,"t":1794988013968,"price0":988.78,"price":954.13,"ret":-3.5,"late":false}
+{"key":"hl:UETH","symbol":"UETH","h":1,"t0":1795080982750,"t":1795168126359,"price0":1805.3,"price":1746.6,"ret":-3.25,"late":false}

@@ -130,3 +130,18 @@ def test_owner_health_shows_the_ladder_only_on_the_owners_server_copy():
     assert OH.with_ladder({"rows": []}, {}) == {"rows": []}
     srv = open(os.path.join(ROOT, "cnq", "api", "server.py"), encoding="utf-8").read()
     assert "with_ladder(d, okx_autopilot.load_state())" in srv
+
+
+def test_public_real_shows_only_a_neutral_count_of_resting_orders():
+    import cnq.execution.okx_autopilot as ap
+    from cnq.execution import public_real as pr
+    cl, st = Fake(), {}
+    L.step(cl, st, CFG, NOW, lambda e: None)
+    d = tempfile.mkdtemp()
+    env = {"OKX_AUTOPILOT_STATE": os.path.join(d, "s.json")}
+    ap.save_state(st, env)
+    so = pr.spot_orders(env)
+    assert so == {"open": 18, "filled": 0, "since": NOW}
+    out = pr.clean({**{k: None for k in pr.KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, "copy_skips": [],
+                    "spot_stops": [], "spot_orders": so})
+    assert out["spot_orders"] == so and "58200" not in json.dumps(out) and "58 200" not in json.dumps(out)

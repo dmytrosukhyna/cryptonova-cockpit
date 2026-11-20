@@ -64,7 +64,7 @@ from . import myspot_watch as ms
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
         "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve",
-        "actions", "flows", "copy_skips", "spot_stops")
+        "actions", "flows", "copy_skips", "spot_stops", "spot_orders")
 # 06.11 (owner: «счёт не копирует новые позиции китов»): why the futures sleeve did NOT open a desk trade — the latest reason per
 # trade, last COPY_SKIPS_MAX, from okx_futures state «copy_skips» (desk trade id = «sig», OKX instrument, plain Russian reason)
 COPY_SKIPS_MAX = 30
@@ -430,7 +430,20 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
             "stale": not running(s.get("lease")), "flows": fl,
             "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url"),
             "closed": list(closed_rows or [])[:CLOSED_MAX], "fut_curve": [[int(t), _r(v)] for t, v in fcurve],
-            "actions": list(acts or [])[:ACTIONS_MAX], "copy_skips": copy_skips(), "spot_stops": spot_stops()}
+            "actions": list(acts or [])[:ACTIONS_MAX], "copy_skips": copy_skips(), "spot_stops": spot_stops(), "spot_orders": spot_orders()}
+
+
+def spot_orders(env=None) -> dict | None:
+    """20.11: a neutral PUBLIC count of the resting spot limit buys (the owner's core ladder) — {open, filled, since}; no prices or
+    levels (those are owner-only, owner_health.with_ladder)"""
+    try:
+        from . import okx_autopilot, okx_ladder
+        sm = okx_ladder.summary(okx_autopilot.load_state(env))
+    except Exception:  # noqa: BLE001
+        return None
+    if not sm:
+        return None
+    return {"open": int(sm["open"]), "filled": int(sm["filled_n"]), "since": int(sm["placed_t"]) if sm.get("placed_t") else None}
 
 
 def spot_stops(env=None) -> list:
@@ -506,6 +519,9 @@ def clean(doc: dict) -> dict:
     out["spot_stops"] = [{"sym": x["sym"], "ok": bool(x.get("ok")), "px": num(x.get("px")), "since": int(x["since"]) if num(x.get("since")) else None,
                           **({"code": str(x["code"])} if str(x.get("code") or "").isdigit() else {})}
                          for x in (doc.get("spot_stops") or [])[:40] if isinstance(x, dict) and SYM_RE.match(str(x.get("sym") or ""))]
+    so = doc.get("spot_orders") if isinstance(doc.get("spot_orders"), dict) else None
+    out["spot_orders"] = ({"open": int(num(so.get("open")) or 0), "filled": int(num(so.get("filled")) or 0),
+                           "since": int(num(so.get("since"))) if num(so.get("since")) else None} if so else None)
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None
     return out
@@ -554,7 +570,7 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
     elif state.get("last"):
         # the last real numbers, their own asof — never invented ones (a «last» from before 28.10 gets the new keys empty)
         doc = clean({**{k: None for k in KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, "copy_skips": copy_skips(env), "spot_stops": spot_stops(env),
-                     **state["last"], "stale": True})
+                     "spot_orders": spot_orders(env), **state["last"], "stale": True})
     else:
         return None
     if put is None:

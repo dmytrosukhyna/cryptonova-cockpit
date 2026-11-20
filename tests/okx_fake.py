@@ -342,7 +342,10 @@ def env(tmp=None, **kw):
          "OKX_LEASE_FILE": os.path.join(tmp, "lease.json"),     # the lease (okx_lease.py) in a local file, never GitHub
          # 05.11: the defaults are now futures 25 % / active 0 — these tests keep the 28.10 split they were written for
          "OKX_FUT_SHARE": "0.15", "OKX_ACT_SHARE": "0.10",
-         "OKX_FUT_ALLOW_DESKS": "*"}     # 10.11: the mechanics tests use rule desks too; the real gate is tested with "" 
+         "OKX_FUT_ALLOW_DESKS": "*",     # 10.11: the mechanics tests use rule desks too; the real gate is tested with "" 
+         # 20.11: the repository's live owner overrides (the ladder / core buy take part of the futures budget) stay out of the
+         # mechanics tests; tests of the overrides pass their own file
+         "CNQ_OWNER_OVERRIDES": os.path.join(tmp, "owner_overrides.json")}
     e.update(kw)
     return e
 

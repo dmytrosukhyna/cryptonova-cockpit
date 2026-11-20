@@ -76,7 +76,7 @@ def test_plan_prices_sizes_and_small_parts_go_to_btc():
 def test_place_fill_log_hold_futures_and_expire():
     cl, st, logs = Fake(), {}, []
     r = L.step(cl, st, CFG, NOW, logs.append)
-    assert r["placed"] == len(st["ladder"]["orders"]) == 18 and L.resting(st) and L.fut_hold(st, CFG) == 500
+    assert r["placed"] == len(st["ladder"]["orders"]) == 18 and L.resting(st) and L.fut_hold(st, CFG) == 900
     oid = next(k for k, b in cl.orders.items() if b["instId"] == "BTC-USDT" and b["px"] == "58200.0")
     cl.fills[oid] = float(cl.orders[oid]["sz"])
     L.step(cl, st, CFG, NOW + 300_000, logs.append)
@@ -88,13 +88,14 @@ def test_place_fill_log_hold_futures_and_expire():
     d = tempfile.mkdtemp()
     env = {"OKX_AUTOPILOT_STATE": os.path.join(d, "s.json")}
     ap.save_state(st, env)
-    assert fu.ladder_hold({"usd": 1500.0}, env) == {"usd": 1000.0, "ladder_usd": 500.0}
-    assert fu.ladder_hold({"usd": 900.0}, env) == {"usd": 600.0, "ladder_usd": 300.0}
-    assert fu.ladder_hold({"usd": 550.0}, env) == {"usd": 550.0}
+    # 20.11 23:43: + $400 for good; the futures keep their open margin + $300
+    assert fu.ladder_hold({"usd": 1500.0, "margin": 100.0}, env) == {"usd": 600.0, "margin": 100.0, "ladder_usd": 900.0}
+    assert fu.ladder_hold({"usd": 1189.81, "margin": 87.94}, env) == {"usd": 387.94, "margin": 87.94, "ladder_usd": 801.87}
+    assert fu.ladder_hold({"usd": 350.0, "margin": 100.0}, env) == {"usd": 350.0, "margin": 100.0}
     sm = L.summary(st)
     assert sm["filled_n"] == 1 and sm["open"] == 17 and sm["status"] == "open"
     r = L.step(cl, st, CFG, NOW + 14 * L.DAY + 1, logs.append)                                       # 14 days → the rest is cancelled
-    assert r["cancelled"] == 17 and st["ladder"]["status"] == "expired" and not L.resting(st) and L.fut_hold(st, CFG) == 0
+    assert r["cancelled"] == 17 and st["ladder"]["status"] == "expired" and not L.resting(st) and L.fut_hold(st, CFG) == 400   # the $400 stays
     assert L.held(st)["BTC"] > 0                                                                       # the filled BTC stays core
     assert L.step(cl, st, CFG, NOW + 15 * L.DAY, logs.append)["placed"] == 0                         # the same id is never re-placed
 
@@ -117,7 +118,9 @@ def test_no_free_cash_or_a_refusal_is_retried_then_reported_and_the_kill_switch_
     i = src.index("def stop(")
     assert src.index("okx_ladder.cancel_all", i) < src.index("def resume(", i)                     # the kill switch includes the ladder
     j = src.index("def build(")
-    assert src.index("okx_ladder.held(load_state(env))", j) < src.index("avail = trading_avail(raw)", j)   # never counted or sold
+    assert src.index("okx_ladder.held_live(cl, load_state(env))", j) < src.index("avail = trading_avail(raw)", j)   # never counted or sold
+    k = src.index("if time.time() - last_spot >= SPOT_EVERY_S:")
+    assert src.index("msg = ladder()", k) < src.index("msg = tick()", k)         # fills recorded before the rebalance reads the account
 
 
 def test_owner_health_shows_the_ladder_only_on_the_owners_server_copy():
@@ -145,3 +148,45 @@ def test_public_real_shows_only_a_neutral_count_of_resting_orders():
     out = pr.clean({**{k: None for k in pr.KEYS}, "closed": [], "fut_curve": [], "actions": [], "flows": {}, "copy_skips": [],
                     "spot_stops": [], "spot_orders": so})
     assert out["spot_orders"] == so and "58200" not in json.dumps(out) and "58 200" not in json.dumps(out)
+
+
+
+def test_the_owners_core_buy_maker_first_then_ioc_within_0_3_percent_and_the_coins_are_core():
+    c = L.core_cfg(CFG)
+    assert c["usd"] == 400 and c["fut_cut_usd"] == 400 and c["fut_free_min"] == 300 and c["fallback_min"] == 15 and c["max_slip"] == 0.003
+
+    class F2(Fake):
+        def __init__(self):
+            super().__init__()
+            self.ioc = []
+
+        def ticker(self, iid):
+            p = self.px[iid]
+            return {"last": str(p), "bidPx": str(p * 0.9999), "askPx": str(p * 1.0001)}
+
+        def order(self, inst_id, side, px, sz, cl_id, td="cash"):
+            assert side == "buy" and cl_id.startswith("cnqcbt") and float(px) <= self.px[inst_id] * 1.0001 * 1.003 + 1
+            oid = f"ioc{len(self.ioc)}"
+            self.ioc.append((inst_id, px, sz))
+            self.orders[oid] = {"px": px, "sz": sz, "instId": inst_id}
+            self.fills[oid] = float(sz)
+            return {"ordId": oid}
+
+        def call(self, method, path, q=None, body=None):
+            assert body["clOrdId"].startswith("cnqcb")
+            oid = str(len(self.orders) + 1)
+            self.orders[oid] = body
+            return [{"ordId": oid, "sCode": "0"}]
+    cl, st, logs = F2(), {}, []
+    r = L.step_core(cl, st, CFG, NOW, logs.append)
+    o = st["core_buy"]["orders"]
+    assert r["placed"] == 3 and {x["ccy"]: round(x["usd"]) for x in o} == {"BTC": 240, "ETH": 100, "SOL": 60}
+    assert all(float(x["px"]) < cl.px[x["inst"]] for x in o)                                         # post-only, under the price
+    btc = next(k for k, b in cl.orders.items() if b["instId"] == "BTC-USDT")
+    cl.fills[btc] = float(cl.orders[btc]["sz"])                                                       # BTC fills as maker
+    L.step_core(cl, st, CFG, NOW + 300_000, logs.append)
+    assert L.held(st)["BTC"] > 0 and not cl.ioc
+    L.step_core(cl, st, CFG, NOW + 15 * 60_000, logs.append)                                         # 15 min: the rest → IOC
+    assert sorted(i for i, _, _ in cl.ioc) == ["ETH-USDT", "SOL-USDT"] and st["core_buy"]["status"] == "done"
+    assert {e["ccy"] for e in logs if e.get("ev") == "order"} == {"BTC", "ETH", "SOL"} and set(L.held(st)) == {"BTC", "ETH", "SOL"}
+    assert all(abs(x["filled"] * x["avg_px"] - x["usd"]) < 1.0 for x in st["core_buy"]["orders"])

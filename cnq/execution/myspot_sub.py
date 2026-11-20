@@ -290,6 +290,12 @@ def read(env=None, fetch=None, now: int | None = None, log_path: str | None = No
             fb = al.fut_budget(al.shares(env)["futures"], own["capital"], own["realized"], own["upl"], own["margin"])
     except Exception:  # noqa: BLE001 — the card never fails because of it: the autopilot's last budget stays
         pass
+    try:                                          # 20.11: the owner's ladder / core buy take part of the futures budget (as the sizing does)
+        if fb:
+            fb = okx_futures.ladder_hold({"usd": fb, "margin": sum(float(p.get("margin") or 0.0) + float(p.get("upl") or 0.0)
+                                                                     for p in futures)}, env).get("usd", fb)
+    except Exception:  # noqa: BLE001
+        pass
     out["alloc"] = allocate(total, out["cash"]["usd"], out["spot"]["usd"], out["active"]["usd"], futures, out["split"] or {},
                             ms._f(st.get("pf_cash")), fb, sum(targets.values()))
     return out

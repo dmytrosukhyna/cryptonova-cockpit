@@ -660,13 +660,14 @@ LADDER_MIN = 600.0
 
 
 def ladder_hold(b: dict, env=None) -> dict:
-    """20.11 (owner's ladder): while its limit buys rest on OKX, fut_usd ($500) of the futures budget is lent to the spot core ladder —
-    never below LADDER_MIN ($600) for the futures. Risk %, stops and caps are unchanged (they scale with the budget as always)."""
+    """20.11 (owner's ladder): while its limit buys rest on OKX, fut_usd ($500) of the futures budget is lent to the spot core ladder;
+    20.11 23:43 (owner): + fut_cut_usd ($400) spent on the spot core for good. The futures keep at least their open margin + $300
+    (fut_free_min; before it: LADDER_MIN $600). Risk %, stops and caps are unchanged (they scale with the budget as always)."""
     try:
         from . import okx_ladder, owner_overrides as ov
         o = ov.load(env=env)
         hold = okx_ladder.fut_hold(ap.load_state(env), o)
-        mn = float((okx_ladder.cfg(o) or {}).get("fut_min") or LADDER_MIN)
+        mn = okx_ladder.fut_floor(o, b.get("margin")) if (b.get("margin") is not None or okx_ladder.core_cfg(o)) else LADDER_MIN
     except Exception:  # noqa: BLE001
         return b
     if not hold or not b.get("usd"):

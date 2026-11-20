@@ -73,7 +73,8 @@ def fmt(x: float, step: str) -> str:
 
 
 def _orders(st: dict | None) -> list:
-    return [o for k in ("ladder", "core_buy") for o in (((st or {}).get(k) or {}).get("orders") or [])]
+    hist = [o for L in ((st or {}).get("ladder_hist") or []) for o in (L.get("orders") or [])]
+    return [o for k in ("ladder", "core_buy") for o in (((st or {}).get(k) or {}).get("orders") or [])] + hist
 
 
 def held(st: dict | None) -> dict:
@@ -257,6 +258,32 @@ def step(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT") -> dict:
     res = {"placed": 0, "filled": 0, "cancelled": 0, "errors": []}
     c = cfg(ov)
     L = st.get("ladder") or {}
+    budget, expires = None, None
+    if c and L.get("id") != c["id"] and c.get("replaces") and L.get("id") == c["replaces"]:
+        # 20.11 23:51 (owner: re-plan «грамотно» from data): the old ladder's resting orders are cancelled, their fills kept (core,
+        # in ladder_hist), and ONLY the unfilled money is laid out on the new levels; the old expiry stays
+        left = 0.0
+        for o in L.get("orders") or []:
+            if o.get("state") in LIVE and o.get("ord_id"):
+                try:
+                    cl.cancel(o["inst"], o["ord_id"])
+                except Exception as e:  # noqa: BLE001
+                    res["errors"].append(f"отмена {o['ccy']} {o['px']}: {type(e).__name__}")
+                    return res                                  # never lay out money that may still be bought — next cycle
+                s_ = cl.order_state(o["inst"], ord_id=o["ord_id"]) or {}
+                fsz, apx = ms._f(s_.get("accFillSz")) or 0.0, ms._f(s_.get("avgPx")) or 0.0
+                new = fsz - (o.get("filled") or 0.0)
+                if new > 0:
+                    log({"ev": "order", "src": "ladder", "ccy": o["ccy"], "inst": o["inst"], "side": "buy", "filled": round(new, 10),
+                         "avg_px": apx, "usd": round(new * apx, 2), "id": None})
+                o.update(filled=fsz, avg_px=apx or o.get("avg_px"), state="canceled")
+            if o.get("state") in ("canceled", "new", "failed", "expired"):
+                left += max(0.0, float(o["usd"]) - (o.get("filled") or 0.0) * float(o.get("avg_px") or o["px"]))
+        L["status"] = "replaced"
+        st.setdefault("ladder_hist", []).append(L)
+        log({"ev": "ladder_replaced", "id": L["id"], "by": c["id"], "left_usd": round(left, 2)})
+        budget, expires = round(left, 2), L.get("expires")
+        L = {}
     if c and L.get("id") != c["id"]:
         coins = ("BTC", "ETH", "SOL")
         px, inst = {}, {}
@@ -270,8 +297,14 @@ def step(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT") -> dict:
             res["errors"].append("нет цены BTC — лестница не выставлена")
             return res
         days = int(c.get("days") or 14)
-        L = {"id": c["id"], "cfg": c, "placed_t": now, "expires": now + days * DAY, "btc_at_place": px["BTC"], "px_at_place": px,
-             "status": "open", "orders": plan(c, px, inst)}
+        cc = c
+        if c.get("budget") == "remaining":                       # weights × the money left by the replaced ladder
+            if budget is None:
+                res["errors"].append("новая лестница ждёт отмены старой — нечего раскладывать")
+                return res
+            cc = {**c, "levels": [[lv, round(budget * float(w), 2)] for lv, w in c["levels"]]}
+        L = {"id": c["id"], "cfg": cc, "placed_t": now, "expires": expires or now + days * DAY, "btc_at_place": px["BTC"], "px_at_place": px,
+             "status": "open", "orders": plan(cc, px, inst), "budget": budget}
         st["ladder"] = L
         log({"ev": "ladder_plan", "id": c["id"], "btc": px["BTC"], "orders": len(L["orders"]), "usd": round(sum(o["usd"] for o in L["orders"]), 2)})
     if not L:

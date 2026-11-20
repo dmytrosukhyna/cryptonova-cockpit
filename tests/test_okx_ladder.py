@@ -9,7 +9,10 @@ from cnq.execution import okx_futures as fu
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NOW = 1_795_200_000_000
-CFG = json.load(open(os.path.join(ROOT, "config", "owner_overrides.json"), encoding="utf-8"))
+CFG_LIVE = json.load(open(os.path.join(ROOT, "config", "owner_overrides.json"), encoding="utf-8"))
+FIRST = {"id": "btc58k1120", "set": 1795191420000, "days": 14, "levels": [[58200, 150], [57500, 200], [56800, 200], [56000, 200], [55000, 150], [53500, 151]],
+         "split": {"BTC": 0.6, "ETH": 0.25, "SOL": 0.15}, "fut_usd": 500, "fut_min": 600}
+CFG = {**CFG_LIVE, "ladder": FIRST}                     # the first ladder of 20.11 18:17 (the live config now holds its re-plan)
 INST = {"BTC-USDT": {"lotSz": "0.00000001", "minSz": "0.00001", "tickSz": "0.1"},
         "ETH-USDT": {"lotSz": "0.000001", "minSz": "0.0001", "tickSz": "0.01"},
         "SOL-USDT": {"lotSz": "0.000001", "minSz": "0.001", "tickSz": "0.001"}}
@@ -47,9 +50,13 @@ class Fake:
 
     def cancel(self, iid, ord_id):
         self.cancelled.append(ord_id)
+        b = self.orders.get(ord_id) or {}
+        if b.get("px"):
+            self.free += float(b["px"]) * (float(b["sz"]) - self.fills.get(ord_id, 0.0))     # OKX frees the rest
 
 
 def test_the_owners_ladder_is_in_the_config_as_decided():
+    assert CFG_LIVE["ladder"]["previous"]["levels"] == FIRST["levels"] and CFG_LIVE["ladder"]["replaces"] == FIRST["id"]
     c = L.cfg(CFG)
     assert c and c["levels"] == [[58200, 150], [57500, 200], [56800, 200], [56000, 200], [55000, 150], [53500, 151]]
     assert sum(u for _, u in c["levels"]) == 1051 and c["split"] == {"BTC": 0.6, "ETH": 0.25, "SOL": 0.15}
@@ -190,3 +197,26 @@ def test_the_owners_core_buy_maker_first_then_ioc_within_0_3_percent_and_the_coi
     assert sorted(i for i, _, _ in cl.ioc) == ["ETH-USDT", "SOL-USDT"] and st["core_buy"]["status"] == "done"
     assert {e["ccy"] for e in logs if e.get("ev") == "order"} == {"BTC", "ETH", "SOL"} and set(L.held(st)) == {"BTC", "ETH", "SOL"}
     assert all(abs(x["filled"] * x["avg_px"] - x["usd"]) < 1.0 for x in st["core_buy"]["orders"])
+
+
+
+def test_the_replan_cancels_the_rest_keeps_the_fills_and_lays_out_only_the_unfilled_money():
+    cl, st, logs = Fake(), {}, []
+    L.step(cl, st, CFG, NOW, logs.append)
+    old = st["ladder"]["orders"]
+    oid = next(k for k, b in cl.orders.items() if b["instId"] == "BTC-USDT" and b["px"] == "58200.0")
+    cl.fills[oid] = float(cl.orders[oid]["sz"])
+    L.step(cl, st, CFG, NOW + 300_000, logs.append)
+    held0 = L.held(st)["BTC"]
+    left = sum(o["usd"] for o in old) - 90.0
+    r = L.step(cl, st, CFG_LIVE, NOW + 600_000, logs.append)
+    new = st["ladder"]
+    assert new["id"] == "btc58kr2" and abs(new["budget"] - left) < 0.05 and new["expires"] == NOW + 14 * L.DAY
+    assert len(cl.cancelled) == 17 and st["ladder_hist"][-1]["status"] == "replaced" and abs(L.held(st)["BTC"] - held0) < 1e-12
+    assert sorted({o["level"] for o in new["orders"]}) == [56500.0, 57300.0, 57900.0, 58500.0] and r["placed"] == len(new["orders"])
+    assert abs(sum(o["usd"] for o in new["orders"]) - left) < 1.0
+    lv = {o["level"]: 0.0 for o in new["orders"]}
+    for o in new["orders"]:
+        lv[o["level"]] += o["usd"]
+    assert abs(lv[57900.0] / left - 0.30) < 0.01 and abs(lv[56500.0] / left - 0.20) < 0.01
+    assert L.step(cl, st, CFG_LIVE, NOW + 900_000, logs.append)["placed"] == 0                     # once only

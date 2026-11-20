@@ -60,9 +60,68 @@
 - Сопоставление «взлом → токен» идёт по символу протокола в DefiLlama. Отдельные записи сомнительны, например «Binance CEX, $6,36 млрд → BNB». Вручную не чистились.
 - Нет Hyperliquid, а значит и самого случая XMR1: Wagyu XMR1 торговался только на HL.
 
+## Ручная разметка: 23 крупных взлома с самым ранним найденным временем (20.11, по решению владельца)
+- **Что сделано.** Взяли крупные случаи 2022–2026 с перпетуалом токена. Для каждого нашли **самое раннее публичное время, которое смогли подтвердить**: время публикации первой статьи (The Block, по метаданным статьи) или метку времени в адресе статьи FXStreet.
+  - Это **позже** первой тревоги в X: посты X без платного API не прочитать. Реальная задержка нашей системы может быть меньше.
+  - Для 4 случаев статья называет время начала взлома в блокчейне.
+- **Сделка.** Шорт через +5 / +15 / +60 мин по 5-минутным свечам, издержки 0,10% + фандинг 0,01%/8 ч. Скрипт `scripts/research/hack_marked.py`, прогон 44768553839. Ссылки по каждому случаю — в списке CASES скрипта.
+- **Выборка 23 случая — только ориентир, без правила прохождения.**
+
+| Случай | Найденное время (UTC) | Источник | За 6 ч до статьи | Шорт с +15 мин: 1 ч / 24 ч / 7 дн. |
+|---|---|---|---|---|
+| Curve (Vyper), CRV | 30.07.2023 17:09 | [The Block](https://www.theblock.co/news/ecosystems/2023-07-30-curve-finance-factory-pools-targeted-due-to-reentrancy-vulnerability-242066) | −4,2% | −1,0 / +12,4 / +10,8% |
+| KyberSwap Elastic, KNC | 22.11.2023 23:19 | [FXStreet](https://fxstreet.com/amp/cryptocurrencies/news/breaking-kyber-network-exploited-across-multiple-chains-for-over-20-million-202311222319) | −2,7% | −5,7 / −2,5 / +6,0% |
+| Radiant, RDNT | 16.10.2024 18:39 (начало 17:09) | [The Block](https://theblock.co/post/321606/radiant-capital-appears-to-suffer-51-million-exploit-on-its-bnb-chain-and-arbitrum-instances) | −8,4% | −1,5 / +6,1 / +13,5% |
+| Cetus, CETUS | 22.05.2025 11:58 | [The Block](https://www.theblock.co/news/regulation/2025-05-22-sui-based-token-prices-cetus-protocol-355372) | −27,9% | +8,5 / +3,2 / +3,0% |
+| Balancer V2, BAL | 03.11.2025 08:36 | [The Block](https://www.theblock.co/news/defi/2025-11-03-defi-protocol-balancer-potentially-exploited-as-onchain-data-shows-millions-in-outflows-377223) | 0,0% | цена заморожена в данных — не в счёт |
+| GMX V1, GMX | 09.07.2025 14:24 | [The Block](https://www.theblock.co/post/361806/hacker-drains-42-million-from-decentralized-perpetual-exchange-gmx) | −16,0% | +12,1 / +5,8 / −5,8% |
+| Kelp rsETH, KERNEL | 18.04.2026 19:17 (начало 17:35) | [The Block](https://www.theblock.co/post/397988/kelp-dao-293-million-defi-hack-lazarus-layerzero) | −7,2% | −2,5 / +6,9 / +11,8% |
+| Humanity, H | 09.06.2026 01:15 | [The Block](https://www.theblock.co/post/404053/humanity-protocol-exploit) | −81,6% | +8,5 / −3,5 / −220,6% |
+| Resolv USR, RESOLV | 22.03.2026 15:39 (начало 02:21) | [The Block](https://www.theblock.co/post/394582) | +8,3% | +1,6 / +3,0 / +29,8% |
+| Drift, DRIFT | 01.04.2026 18:34 | [The Block](https://www.theblock.co/post/396107/solana-trading-platform-drift-exploited-at-least-200-million) | −32,0% | +3,5 / +7,7 / +42,2% |
+| UXLINK | 23.09.2025 06:00 | [The Block](https://www.theblock.co/post/371783/uxlink-multisig-hack) | −25,4% | +9,9 / −7,8 / +18,2% |
+| WOO X, WOO | 24.07.2025 17:23 | [The Block](https://www.theblock.co/post/364188/centralized-exchange-woo-x-investigates-contained-incident-resulting-in-estimated-14-million-loss) | +0,5% | +0,4 / +5,2 / +8,5% |
+| Abracadabra (GM), SPELL | 25.03.2025 16:00 | [The Block](https://www.theblock.co/post/348059/hacker-steals-13-million-in-abracadabras-magic-internet-money-seemingly-using-a-flash-loan-attack) | −3,1% | −0,5 / +0,6 / +9,5% |
+| Yearn yETH, YFI | 30.11.2025 22:50 | [The Block](https://www.theblock.co/post/380822/3-million-in-eth-sent-to-tornado-cash-following-apparent-attack-on-yearns-yeth) | −0,6% | −0,1 / +6,6 / +11,5% |
+| THORChain, RUNE | 15.05.2026 10:21 | [The Block](https://theblock.co/post/401462/thorchain-pauses-trading-as-security-researchers-flag-suspected-10m-multi-chain-exploit) | −12,8% | −5,4 / +15,0 / +15,3% |
+| Trust Wallet, TWT | 26.12.2025 02:01 | [The Block](https://www.theblock.co/post/383735/trust-wallet-extension-incident) | −2,9% | −1,1 / −6,1 / −11,6% |
+| WOOFi, WOO | 06.03.2024 08:06 (начало 05.03 15:49) | [The Block](https://www.theblock.co/news/ecosystems/2024-03-06-woofi-offers-bounty-after-8-75-million-exploit-on-arbitrum-280759) | +8,0% | +1,3 / −17,5 / −9,0% |
+| Bittensor, TAO | 03.07.2024 02:47 | [The Block](https://www.theblock.co/post/303235/bittensor-halts-network-after-reported-security-attack-on-wallets-zachxbt) | −5,8% | −0,0 / −3,6 / −11,2% |
+| Yearn yUSDT, YFI | 13.04.2023 08:12 | [FXStreet](https://www.fxstreet.com/cryptocurrencies/news/yearn-finance-victim-of-a-flash-loan-exploit-blockchain-security-firm-alerts-defi-protocol-202304130812) | −3,3% | −1,8 / −3,0 / +6,9% |
+| SagaEVM, SAGA | 22.01.2026 04:41 | [The Block](https://www.theblock.co/post/386638/sagaevm-suffers-exploit) | −2,3% | +0,5 / +2,9 / +13,2% |
+| Taiko bridge, TAIKO | 22.06.2026 05:01 | [The Block](https://www.theblock.co/post/405486) | −7,9% | +6,3 / +12,6 / +23,4% |
+| Abracadabra (MIM), SPELL | 30.01.2024 12:35 | [FXStreet](https://fxstreet.com/amp/cryptocurrencies/news/abracadabra-finance-loses-nearly-65-million-to-an-exploit-202401301235) | −2,4% | +0,5 / +3,5 / +5,8% |
+| dYdX v3 (YFI), DYDX | 18.11.2023 19:13 | [The Block](https://www.theblock.co/post/263632/dydxs-insurance-fund-lost-9-million-as-a-result-of-targeted-attack) | +0,8% | +1,8 / +0,7 / −7,9% |
+
+**Итог по 23 случаям (шорт с +15 мин после статьи):**
+- 1 ч: среднее +1,5%, медиана +0,4%, в плюсе 52%.
+- 24 ч: +2,1% / +3,0%, в плюсе 65%, t 1,4.
+- 7 дней: медиана **+8,5%**, в плюсе 70%. Но среднее −1,6%: Humanity после обвала на −82% вырос примерно втрое, и шорт без стопа потерял 221%.
+- Без Humanity и Balancer (замороженные цены; исключение после просмотра, только для ориентира): 24 ч +2,5% / медиана +3,2%, в плюсе 71%; 7 дней +8,8% / +9,5%, в плюсе 76%.
+- Задержка +5 и +60 минут дают похожую картину (таблица в прогоне).
+
+**Что видно:**
+- **До статьи цена в среднем уже упала на 3,3% (медиана за 6 ч).** В крупных случаях — намного больше: Humanity −82%, Drift −32%, Cetus −28%, UXLINK −25%, GMX −16%. Эта часть хода к моменту новости уже ушла.
+- **После новости токен чаще продолжает падать днями.** Медиана за 7 дней +8–9% для шорта, в плюсе 70%. Но разброс огромный, и без стопа хвост убивает всё: Humanity.
+- **Если бы мы видели само начало взлома в блокчейне** (3 случая, где оно известно, вход +15 мин): Radiant +11%, Kelp +19%, WOOFi +0,4% за 24 ч. Раннее обнаружение стоит больше, чем любая настройка выхода.
+- **Значимости нет:** t ≤ 1,6 на любом горизонте, n = 23. Это ориентир, а не правило.
+
+## Запись вперёд: стол «Взломы → шорт (тест)» (запущен 20.11)
+- **Источники.** Сервер раз в 5 минут опрашивает бесплатные источники и записывает, когда **мы** впервые увидели каждый случай:
+  - DefiLlama /hacks — новая запись;
+  - rekt.news RSS;
+  - публичные превью Telegram-каналов t.me/s/PeckShieldAlert, t.me/s/CyversAlerts, t.me/s/CertiK_Alert;
+  - наши новостные RSS — только сообщения со словами о взломе.
+  - Первый опрос каждого источника — точка отсчёта, без сделок.
+- **Токен.** Символ протокола из DefiLlama или $TICKER в тексте. Крупные монеты и стейблкоины не шортим никогда.
+- **Сделка.** Если у токена есть своп OKX — два бумажных шорта по $1 000 на счёте $10 000: держим 24 ч и 7 дней, стоп +15%, издержки 0,10%. Фандинг пока не учитывается.
+- **Что сохраняется:** время поста у источника (если есть), наше время, задержка, протокол, токен, ссылка.
+- **Где и кому.** Код: `cnq/agents/hack_desk.py`, `cnq/api/hacks.py`. Состояние в `<run>/data/hacks`, только владельцу: `GET /v2/owner/hacks`, `GET /v2/admin/hacks`. На реальный счёт ничего не попадает.
+- **Чего не проверить отсюда:** что сервер достаёт до t.me и rekt.news (с моего рабочего места эти сайты закрыты). Ошибки по источникам видны в поле `sources` стола.
+
 ## Что осталось
-1. Нужен источник точного времени тревог. В DefiLlama его нет (проверено). Варианты: архив постов PeckShield, Cyvers или CertiK с временем (X API платный; можно собирать вперёд из их публичных лент) или ручная разметка крупных случаев.
+1. Точное время тревог в DefiLlama отсутствует (проверено). Сделано вместо этого: ручная разметка 23 случаев (выше) и запись вперёд (стол выше). Через 1–3 месяца по столу будет живая задержка и результат.
 2. Оценить, сколько хода уходит до тревоги и за 5/15/60 минут после неё (раздел «feasibility» в скрипте — на наборе T).
-3. Стол «Взломы → шорт (тест)» — только если что-то пройдёт по правилу выше. Сейчас не прошло ничего.
+3. Стол «Взломы → шорт (тест)» запущен по решению владельца как запись вперёд, на бумаге. По истории ничего не прошло.
 
 Скрипты: `scripts/research/hack_short_study.py`, `scripts/research/notice_dump.py`, workflow `research-hack-short`.

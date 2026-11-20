@@ -453,3 +453,18 @@ def summary(st: dict | None) -> dict | None:
             "btc_at_place": L.get("btc_at_place"), "orders": rows, "open": sum(1 for o in rows if o["state"] in LIVE),
             "filled_n": sum(1 for o in rows if (o.get("filled") or 0) > 0), "filled_usd": filled_usd,
             "planned_usd": round(sum(o["usd"] for o in rows), 2), "failed": sum(1 for o in rows if o["state"] == "failed")}
+
+
+def core_summary(st: dict | None) -> dict | None:
+    """the owner's core buy: per coin — state, $ planned, $ bought, the OKX code of a refusal (digits only)"""
+    B = (st or {}).get("core_buy")
+    if not B:
+        return None
+    import re
+    rows = []
+    for o in B.get("orders") or []:
+        m = re.search(r"(\d{5})", str(o.get("why") or ""))
+        rows.append({"ccy": o["ccy"], "state": o.get("state"), "usd": o.get("usd"), "phase": o.get("phase"),
+                     "bought_usd": round((o.get("filled") or 0) * (o.get("avg_px") or 0), 2), "tries": o.get("tries"),
+                     **({"code": m.group(1)} if m else {}), **({"cash_short": True} if "мало свободных" in str(o.get("why") or "") else {})})
+    return {"id": B.get("id"), "status": B.get("status"), "placed_t": B.get("placed_t"), "orders": rows}

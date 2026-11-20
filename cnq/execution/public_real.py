@@ -443,7 +443,15 @@ def spot_orders(env=None) -> dict | None:
         return None
     if not sm:
         return None
-    return {"open": int(sm["open"]), "filled": int(sm["filled_n"]), "since": int(sm["placed_t"]) if sm.get("placed_t") else None}
+    out = {"open": int(sm["open"]), "filled": int(sm["filled_n"]), "since": int(sm["placed_t"]) if sm.get("placed_t") else None}
+    try:                                         # 21.11: the owner's core buy — per coin state / $ / refusal code (digits), no prices
+        cs = okx_ladder.core_summary(okx_autopilot.load_state(env))
+        if cs:
+            out["core"] = {"status": cs["status"], "orders": [{k: x.get(k) for k in ("ccy", "state", "usd", "bought_usd", "tries", "code", "cash_short")}
+                                                               for x in cs["orders"]]}
+    except Exception:  # noqa: BLE001
+        pass
+    return out
 
 
 def spot_stops(env=None) -> list:
@@ -522,6 +530,14 @@ def clean(doc: dict) -> dict:
     so = doc.get("spot_orders") if isinstance(doc.get("spot_orders"), dict) else None
     out["spot_orders"] = ({"open": int(num(so.get("open")) or 0), "filled": int(num(so.get("filled")) or 0),
                            "since": int(num(so.get("since"))) if num(so.get("since")) else None} if so else None)
+    co = (so or {}).get("core") if isinstance((so or {}).get("core"), dict) else None
+    if out["spot_orders"] is not None and co:
+        out["spot_orders"]["core"] = {"status": str(co.get("status") or "")[:12],
+                                      "orders": [{"ccy": x["ccy"], "state": str(x.get("state") or "")[:20], "usd": num(x.get("usd")),
+                                                  "bought_usd": num(x.get("bought_usd")), "tries": int(num(x.get("tries")) or 0),
+                                                  **({"code": str(x["code"])} if str(x.get("code") or "").isdigit() else {}),
+                                                  **({"cash_short": True} if x.get("cash_short") else {})}
+                                                 for x in (co.get("orders") or [])[:6] if isinstance(x, dict) and SYM_RE.match(str(x.get("ccy") or ""))]}
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None
     return out

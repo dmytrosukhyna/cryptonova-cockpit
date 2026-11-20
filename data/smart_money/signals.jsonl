@@ -27,4 +27,4 @@
 {"day":"2026-11-19","t":1795046564130,"key":"hl:HYPE","src":"hl","chain":"hl","address":null,"symbol":"HYPE","n":3,"wallets":["0xfe7c…b7ae","0x3dc9…54b0","0xba5d…a352"],"price":66.803,"liq":null,"fdv":null,"flags":0}
 {"day":"2026-11-19","t":1795046564130,"key":"hl:UBTC","src":"hl","chain":"hl","address":null,"symbol":"UBTC","n":2,"wallets":["x.com/SilkBtc","0xfe7c…b7ae"],"price":62852.0,"liq":null,"fdv":null,"flags":0}
 {"day":"2026-11-19","t":1795080982750,"key":"hl:UETH","src":"hl","chain":"hl","address":null,"symbol":"UETH","n":2,"wallets":["x.com/SilkBtc","0xecb6…2b00"],"price":1805.3,"liq":null,"fdv":null,"flags":0}
-{"day":"2026-11-20","t":1795134233720,"key":"hl:UBTC","src":"hl","chain":"hl","address":null,"symbol":"UBTC","n":2,"wallets":["0xfe7c…b7ae","x.com/SilkBtc"],"price":62120.0,"liq":null,"fdv":null,"flags":0}
+{"day":"2026-11-20","t":1795134667065,"key":"hl:UBTC","src":"hl","chain":"hl","address":null,"symbol":"UBTC","n":2,"wallets":["0xfe7c…b7ae","x.com/SilkBtc"],"price":61935.0,"liq":null,"fdv":null,"flags":0}

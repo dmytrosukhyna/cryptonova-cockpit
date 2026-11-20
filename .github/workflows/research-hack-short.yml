@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: python scripts/research/hack_short_study.py hack_short.json | tail -40
+      - run: python scripts/research/hack_short_study.py hack_short.json | grep -v "^ \|alert=" | head -60
       - run: python -c "import json;d=json.load(open('hack_short.json'));d.pop('events');json.dump(d,open('summary.json','w'))"
       - run: python -c "import json;d=json.load(open('hack_short.json'));json.dump(d['events'],open('events.json','w'))"
       - run: python scripts/research/notice_dump.py summary.json 0 10 summary

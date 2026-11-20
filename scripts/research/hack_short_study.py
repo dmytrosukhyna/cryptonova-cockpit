@@ -64,6 +64,7 @@ def snowflake(url):
 
 # ── prices ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 CACHE = {}
+FIELDS, LINKS = {}, {}
 
 
 def bn_live(sym, itv, t0, t1):
@@ -206,10 +207,23 @@ def main():
         if not sym or sym == "-":
             continue
         tech = f"{x.get('technique') or ''} {x.get('classification') or ''} {x.get('targetType') or ''}".lower()
-        ev.append({"name": x.get("name"), "sym": str(sym).upper(), "t_day": t, "t_alert": snowflake(x.get("source")), "loss": float(x.get("amount") or 0),
+        # 20.11 fix (first run: 0 X posts found in «source»): the alert link may sit in any string field of the record
+        t_alert = None
+        for k_, v_ in x.items():
+            for u in (v_ if isinstance(v_, list) else [v_]):
+                ts_ = snowflake(u) if isinstance(u, str) else None
+                if ts_ and (t_alert is None or ts_ < t_alert):
+                    t_alert = ts_
+        for k_, v_ in x.items():
+            FIELDS[k_] = FIELDS.get(k_, 0) + 1
+            if isinstance(v_, str) and ("twitter.com" in v_ or "x.com/" in v_ or "http" in v_):
+                LINKS[k_ + ":" + v_.split("/")[2] if v_.count("/") >= 2 else k_] = LINKS.get(k_ + ":" + (v_.split("/")[2] if v_.count("/") >= 2 else ""), 0) + 1
+        ev.append({"name": x.get("name"), "sym": str(sym).upper(), "t_day": t, "t_alert": t_alert, "loss": float(x.get("amount") or 0),
                    "kind": "key/bridge" if x.get("bridgeHack") or any(w in tech for w in KEY_WORDS) else "contract",
                    "token": "token" if any(w in tech for w in TOKEN_WORDS) or str(x.get("classification") or "").lower() == "token" else "funds",
                    "tech": (x.get("technique") or "")[:60]})
+    print("::notice title=fields::" + json.dumps(FIELDS) + " LINKS " + json.dumps(dict(sorted(LINKS.items(), key=lambda kv: -kv[1])[:25])), flush=True)
+    print(f"::notice title=sample::{json.dumps(hacks[-1])[:1500]}", flush=True)
     print(f"hacks since 2022: {prec['n']}, at 00:00 UTC: {prec['midnight']}; with a token symbol: {len(ev)}; with an X post: "
           f"{sum(1 for e in ev if e['t_alert'])}", flush=True)
     rows = []

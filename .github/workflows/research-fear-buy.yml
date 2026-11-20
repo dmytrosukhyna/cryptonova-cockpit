@@ -1,0 +1,17 @@
+name: research-fear-buy
+# 20.11 (п. 221, owner): buy at extreme fear / «пятница-сливатница» / swing longs after (scripts/research/fear_buy.py). Public data, read-only.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/research/fear_buy.py | tee fear_buy.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: fear-buy, path: fear_buy.txt }

@@ -170,6 +170,20 @@ def spx():
             print("spx failed", url, repr(e)[:120])
         if len(out) > 500:
             return out
+    try:  # Yahoo chart API as the last fallback
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=10y&interval=1d"
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=30) as r:
+            j = json.loads(r.read())["chart"]["result"][0]
+        out, prev = {}, None
+        for t, c in zip(j["timestamp"], j["indicators"]["quote"][0]["close"]):
+            if c is None:
+                continue
+            if prev:
+                out[datetime.fromtimestamp(t, timezone.utc).date()] = (c / prev - 1) * 100
+            prev = c
+        return out
+    except Exception as e:  # noqa: BLE001
+        print("spx failed yahoo", repr(e)[:120])
     return {}
 
 

@@ -1,5 +1,5 @@
 name: research-fear-buy
-# 20.11 (п. 221, owner): buy at extreme fear / «пятница-сливатница» / swing longs after (scripts/research/fear_buy.py). Public data, read-only.
+# 20.11 (п. 223, owner): buy at extreme fear / «пятница-сливатница» / swing longs after (scripts/research/fear_buy.py). Public data, read-only.
 on:
   workflow_dispatch:
 permissions:

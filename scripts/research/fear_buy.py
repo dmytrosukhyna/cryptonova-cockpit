@@ -1,4 +1,4 @@
-"""П. 221 (owner 20.11.2026): «на дне, в панике, альты и ядро надо набирать, а не продавать; пятница-сливатница — потом свинговые лонги».
+"""П. 223 (owner 20.11.2026): «на дне, в панике, альты и ядро надо набирать, а не продавать; пятница-сливатница — потом свинговые лонги».
 
 Hypotheses fixed before looking (N = 6 variants, all reported):
   H1  buy at extreme fear — Fear & Greed ≤ 10 / ≤ 15 / ≤ 20, an EPISODE = the first such day after ≥ 14 days without one

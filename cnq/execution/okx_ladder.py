@@ -140,6 +140,27 @@ def step_core(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT") -> dic
     if c and B.get("id") != c["id"]:
         split = c.get("split") or {"BTC": 0.60, "ETH": 0.25, "SOL": 0.15}
         parts = {k: float(c["usd"]) * float(v) for k, v in split.items()}
+        done = []
+        if c.get("replaces"):                                   # 21.11: what the earlier id really bought (OKX, by client ids) is not bought twice
+            for coin in list(parts):
+                for cid in (f"cnqcb{c['replaces']}{coin}"[:32], f"cnqcbt{c['replaces']}{coin}"[:32]):
+                    try:
+                        s_ = cl.order_state(f"{coin}-{quote}", cl_id=cid)
+                    except Exception:  # noqa: BLE001
+                        res["errors"].append("не удалось проверить прежнюю покупку на OKX — покупка отложена")
+                        return res
+                    if s_ and s_.get("state") in LIVE:
+                        try:
+                            cl.cancel(f"{coin}-{quote}", s_["ordId"])
+                        except Exception:  # noqa: BLE001
+                            res["errors"].append(f"не снят прежний ордер {coin} — покупка отложена")
+                            return res
+                        s_ = cl.order_state(f"{coin}-{quote}", cl_id=cid) or s_
+                    f_, p_ = ms._f((s_ or {}).get("accFillSz")) or 0.0, ms._f((s_ or {}).get("avgPx")) or 0.0
+                    if f_ > 0:
+                        parts[coin] = max(0.0, parts[coin] - f_ * p_)
+                        done.append({"ccy": coin, "inst": f"{coin}-{quote}", "px": str(p_), "sz": str(f_), "usd": round(f_ * p_, 2), "cl_id": cid,
+                                     "ord_id": s_.get("ordId"), "state": "filled", "phase": "earlier", "filled": f_, "avg_px": p_, "tries": 0})
         info = {}
         for coin in list(parts):
             iid = f"{coin}-{quote}"
@@ -161,7 +182,7 @@ def step_core(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT") -> dic
                 orders.append({"ccy": coin, "inst": iid, "px": fmt(px, i["tickSz"]), "sz": fmt(sz, i["lotSz"]), "usd": round(u, 2),
                                "lot": i["lotSz"], "tick": i["tickSz"], "min": i["minSz"], "cl_id": f"cnqcb{c['id']}{coin}"[:32],
                                "state": "new", "phase": "maker", "filled": 0.0, "avg_px": None, "tries": 0})
-        B = {"id": c["id"], "cfg": c, "placed_t": now, "status": "open", "orders": orders}
+        B = {"id": c["id"], "cfg": c, "placed_t": now, "status": "open", "orders": done + orders}
         st["core_buy"] = B
         log({"ev": "core_buy_plan", "id": c["id"], "usd": c["usd"], "orders": len(orders)})
     if not B or B.get("status") != "open":
@@ -259,6 +280,17 @@ def step(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT") -> dict:
     c = cfg(ov)
     L = st.get("ladder") or {}
     budget, expires = None, None
+    if c and c.get("replaces") and L.get("id") == c["id"] and not L.get("orders") and not L.get("recovered"):
+        # 21.11 recovery: at 22:04 UTC 20.11 the OLD code (still in memory) read the NEW config and replaced the old ladder's state
+        # with an empty one — its 14 orders kept resting on OKX untracked and its fills lost their protection. The old ladder is
+        # rebuilt from OKX by its client order ids, then the normal re-plan below runs.
+        old = rebuild(cl, c, quote)
+        if old is None:
+            res["errors"].append("не удалось восстановить старую лестницу с OKX — перестройка отложена")
+            return res
+        log({"ev": "ladder_recovered", "id": old["id"], "orders": len(old["orders"]),
+             "filled_usd": round(sum((o["filled"] or 0) * (o["avg_px"] or 0) for o in old["orders"]), 2)})
+        st["ladder"] = L = old
     if c and L.get("id") != c["id"] and c.get("replaces") and L.get("id") == c["replaces"]:
         # 20.11 23:51 (owner: re-plan «грамотно» from data): the old ladder's resting orders are cancelled, their fills kept (core,
         # in ladder_hist), and ONLY the unfilled money is laid out on the new levels; the old expiry stays
@@ -362,6 +394,33 @@ def step(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT") -> dict:
             log({"ev": "ladder_done", "id": L["id"]})
     L["t"] = now
     return res
+
+
+def rebuild(cl, c: dict, quote: str = "USDT") -> dict | None:
+    """the replaced ladder's orders read back from OKX by their client order ids (levels from c["previous"])"""
+    prev = c.get("previous") or {}
+    if not prev.get("levels"):
+        return None
+    split = c.get("split") or {"BTC": 0.60, "ETH": 0.25, "SOL": 0.15}
+    orders = []
+    for k, (level, _usd) in enumerate(prev["levels"]):
+        for coin in split:
+            cid = f"{PREFIX}{c['replaces']}{k}{coin}"[:32]
+            try:
+                s_ = cl.order_state(f"{coin}-{quote}", cl_id=cid)
+            except Exception:  # noqa: BLE001
+                return None
+            if not s_ or not s_.get("ordId"):
+                continue
+            px, sz = ms._f(s_.get("px")) or 0.0, ms._f(s_.get("sz")) or 0.0
+            orders.append({"lvl": k, "level": float(level), "ccy": coin, "inst": f"{coin}-{quote}", "px": str(s_.get("px")), "sz": str(s_.get("sz")),
+                           "usd": round(px * sz, 2), "cl_id": cid, "ord_id": s_.get("ordId"), "state": s_.get("state") or "live",
+                           "filled": ms._f(s_.get("accFillSz")) or 0.0, "avg_px": ms._f(s_.get("avgPx")) or None, "tries": 0})
+    if not orders:
+        return None
+    t0 = int(prev.get("set") or 0)
+    return {"id": c["replaces"], "cfg": prev, "placed_t": t0, "expires": t0 + int(c.get("days") or 14) * DAY, "status": "open",
+            "orders": orders, "recovered": True}
 
 
 def cancel_all(cl, st: dict, log) -> int:

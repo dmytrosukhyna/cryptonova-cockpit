@@ -44,9 +44,14 @@ class Fake:
         return [{"ordId": oid, "sCode": "0"}]
 
     def order_state(self, iid, ord_id=None, cl_id=None):
+        if ord_id is None:
+            ord_id = next((k for k, b in self.orders.items() if b.get("clOrdId") == cl_id), None)
+            if ord_id is None:
+                return None
         f = self.fills.get(ord_id, 0.0)
         b = self.orders[ord_id]
-        return {"state": "filled" if f >= float(b["sz"]) else ("partially_filled" if f else "live"), "accFillSz": str(f), "avgPx": b["px"]}
+        st = "canceled" if ord_id in self.cancelled else ("filled" if f >= float(b["sz"]) else ("partially_filled" if f else "live"))
+        return {"state": st, "accFillSz": str(f), "avgPx": b["px"] if f else "", "px": b["px"], "sz": b["sz"], "ordId": ord_id}
 
     def cancel(self, iid, ord_id):
         self.cancelled.append(ord_id)
@@ -220,3 +225,20 @@ def test_the_replan_cancels_the_rest_keeps_the_fills_and_lays_out_only_the_unfil
         lv[o["level"]] += o["usd"]
     assert abs(lv[57900.0] / left - 0.30) < 0.01 and abs(lv[56500.0] / left - 0.20) < 0.01
     assert L.step(cl, st, CFG_LIVE, NOW + 900_000, logs.append)["placed"] == 0                     # once only
+
+
+
+def test_recovery_after_the_old_code_wiped_the_ladder_state():
+    """21.11: 20.11 22:04 UTC the old code read the new config and left an empty ladder — the old orders kept resting untracked"""
+    cl, st, logs = Fake(), {}, []
+    L.step(cl, st, CFG, NOW, logs.append)
+    oid = next(k for k, b in cl.orders.items() if b["instId"] == "ETH-USDT" and b["clOrdId"].endswith("1ETH"))
+    cl.fills[oid] = float(cl.orders[oid]["sz"])
+    st["ladder"] = {"id": "btc58kr2", "cfg": CFG_LIVE["ladder"], "placed_t": NOW + 1, "status": "open", "orders": []}   # the wipe
+    assert "ETH" not in L.held(st)
+    r = L.step(cl, st, CFG_LIVE, NOW + 600_000, logs.append)
+    assert any(e.get("ev") == "ladder_recovered" and e["orders"] == 18 for e in logs)
+    assert st["ladder"]["id"] == "btc58kr2" and st["ladder"]["orders"] and r["placed"] == len(st["ladder"]["orders"])
+    assert len(cl.cancelled) == 17 and L.held(st)["ETH"] > 0                                         # the old fill is core again
+    left = sum(o["usd"] for o in st["ladder_hist"][-1]["orders"] if o["state"] == "canceled")
+    assert abs(st["ladder"]["budget"] - left) < 0.05 and st["ladder"]["expires"] == FIRST["set"] + 14 * L.DAY

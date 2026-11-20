@@ -172,19 +172,28 @@ class Calibration:
         base_up = sum(1 for _, _, o, _ in rows if o == "UP") / n
         shadow = {}
         for name, cond in (("study", "time < ?"), ("forward", "time >= ?")):
-            sr = self.conn.execute(f"SELECT p_up, price, up_target, dn_target, components, outcome FROM forecasts WHERE outcome IS NOT NULL AND {cond}",
-                                   (SHADOW_SINCE,)).fetchall()
+            sr = self.conn.execute(f"SELECT p_up, price, up_target, dn_target, components, outcome, time FROM forecasts "
+                                   f"WHERE outcome IS NOT NULL AND {cond} ORDER BY time", (SHADOW_SINCE,)).fetchall()
             if sr:
-                ps = [(shadow_p(pr, u, d, json.loads(cm or "{}")), p, 1.0 if o == "UP" else 0.0) for p, pr, u, d, cm, o in sr]
-                shadow[name] = {"n": len(ps), "hit_rate": round(sum((s >= .5) == (y == 1) for s, _, y in ps) / len(ps), 3),
-                                "brier": round(sum((s - y) ** 2 for s, _, y in ps) / len(ps), 4),
-                                "live_hit_rate": round(sum((p >= .5) == (y == 1) for _, p, y in ps) / len(ps), 3),
-                                "live_brier": round(sum((p - y) ** 2 for _, p, y in ps) / len(ps), 4)}
+                ps = [(shadow_p(pr, u, d, json.loads(cm or "{}")), p, 1.0 if o == "UP" else 0.0) for p, pr, u, d, cm, o, _ in sr]
+                shadow[name] = _shadow_block(ps)
+                if name == "forward" and len(ps) >= 2:   # backlog 26: the shadow must beat the live forecast in BOTH halves
+                    h = len(ps) // 2
+                    shadow[name]["halves"] = [_shadow_block(ps[:h]), _shadow_block(ps[h:])]
+                    shadow[name]["split_t"] = sr[h][6]
         return {"shadow": shadow, "shadow_since": SHADOW_SINCE,"n": n, "pending": self.conn.execute("SELECT count(*) FROM forecasts WHERE outcome IS NULL").fetchone()[0],
                 "hit_rate": round(hits / n, 3), "confident_n": len(conf), "confident_hit_rate": round(conf_hits / len(conf), 3) if conf else None,
                 "brier": round(brier, 4), "brier_coin_flip": 0.25, "base_rate_up": round(base_up, 3), "bins": bins,
                 "per_coin": {k: {"n": v["n"], "hit_rate": round(v["hits"] / v["n"], 2)} for k, v in sorted(per.items())},
                 "since": min(t for *_, t in rows)}
+
+
+def _shadow_block(ps: list) -> dict:
+    """ps: [(shadow p, live p, outcome 0/1)] → hit rate and Brier of the shadow and of the live forecast."""
+    return {"n": len(ps), "hit_rate": round(sum((s >= .5) == (y == 1) for s, _, y in ps) / len(ps), 3),
+            "brier": round(sum((s - y) ** 2 for s, _, y in ps) / len(ps), 4),
+            "live_hit_rate": round(sum((p >= .5) == (y == 1) for _, p, y in ps) / len(ps), 3),
+            "live_brier": round(sum((p - y) ** 2 for _, p, y in ps) / len(ps), 4)}
 
 
 def run(conn: sqlite3.Connection, report: dict, news: list[dict] | None = None, now: int | None = None) -> dict:

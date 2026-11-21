@@ -730,8 +730,13 @@ def build(cl: Okx, env=None, model=None) -> dict:
     # 21.11 07:46 (owner «аккуратно», all his money): while BTC is not in its bull regime the spot rebalance keeps a USDT buffer ≥
     # usdt_min_pct of the WHOLE account — a buy that would take the USDT under it waits (nothing is sold to reach it)
     bmin = okx_restart.usdt_min(env)
+    if bmin:                               # 21.11 07:06 UTC (BTC $88 sold while the buys it would fund waited): in this careful
+        from . import okx_futures as _fu   # regime the core BTC / ETH / SOL is never trimmed — owner: never sell core to fund buys
+        if _fu.btc_bull() is not True:
+            for o in [o for o in sells if o["ccy"] in al.CORE and o.get("act") == "trim"]:
+                sells.remove(o)
+                diffs.append(f"{o['ccy']}: ядро не урезаю ({usd(o['usd'])}) — пока BTC не в росте, ядро не продаём ради других покупок (решение владельца 21.11)")
     if bmin and buys:
-        from . import okx_futures as _fu
         if _fu.btc_bull() is not True:
             tot_all = sum(r["usd"] for r in rows_all)
             free = sum(r["usd"] for r in rows_all if r["cash"]) + sum(o["usd"] for o in sells) - bmin * tot_all

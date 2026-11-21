@@ -202,17 +202,17 @@ def step(cl, st: dict, ov: dict, now: int, log, quote: str = "USDT", usdt: float
     legs = S.setdefault("legs", {})
     if c:
         free = above_floor(usdt, equity, c, st, other_resting)
-        nw = c.get("now") or {}
-        if nw.get("id") and nw["id"] not in legs:
-            want = {k.upper(): float(v) for k, v in (nw.get("usd") or {}).items() if float(v) > 0}
-            cap = float(nw.get("max_share") or 0.5) * free
-            k = min(1.0, cap / sum(want.values())) if want else 0.0
-            parts = {s: u * k for s, u in want.items()}
-            legs[nw["id"]] = L = _leg(cl, parts, nw["id"], now, quote, f"покупка сейчас: ≤ {nw.get('max_share', 0.5):g} денег выше пола USDT ({free:.2f})")
-            L["free"], L["scale"] = round(free, 2), round(k, 4)
-            log({"ev": "spot_plan_leg", "id": nw["id"], "free": round(free, 2), "usd": round(sum(parts.values()), 2), "orders": len(L["orders"])})
-            res["new_legs"].append(nw["id"])
-            free = above_floor(usdt, equity, c, st, other_resting) - sum(o["usd"] for o in L["orders"])
+        for nw in [c.get("now") or {}] + [x for x in (c.get("extra") or []) if isinstance(x, dict)]:   # 21.11: + one-off legs (BTC buy-back)
+            if nw.get("id") and nw["id"] not in legs:
+                want = {k.upper(): float(v) for k, v in (nw.get("usd") or {}).items() if float(v) > 0}
+                cap = float(nw.get("max_share") or 0.5) * free
+                k = min(1.0, cap / sum(want.values())) if want else 0.0
+                parts = {s: u * k for s, u in want.items()}
+                legs[nw["id"]] = L = _leg(cl, parts, nw["id"], now, quote, f"покупка сейчас: ≤ {nw.get('max_share', 0.5):g} денег выше пола USDT ({free:.2f})")
+                L["free"], L["scale"] = round(free, 2), round(k, 4)
+                log({"ev": "spot_plan_leg", "id": nw["id"], "free": round(free, 2), "usd": round(sum(parts.values()), 2), "orders": len(L["orders"])})
+                res["new_legs"].append(nw["id"])
+                free = above_floor(usdt, equity, c, st, other_resting) - sum(o["usd"] for o in L["orders"])
         bk = c.get("breakout") or {}
         bid_ = bk.get("id")
         if bid_ and (not bk.get("until") or now < _until(bk["until"])) and (f"{bid_}:t1" not in legs or f"{bid_}:t2" not in legs):

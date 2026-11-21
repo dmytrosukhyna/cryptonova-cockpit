@@ -1262,22 +1262,11 @@ class IdeasPortfolio:
                 c["why_ru"], c["ok"] = ["нет данных о поддержках — без проверки «не догонять» мем не покупаем"], False
                 continue
             cost = MEME["w"] * V / (1 + P["fee"])
-            need = cost - max(0.0, rp.cash() - P["min_cash"] * V)
-            if need > 0:
-                need -= self._idle_release(now, need, price, live, out, s)
-            if need > 1e-9:
-                cw = {x: IDEAS["core_w"][x] for x in self.IDLE_CORE if x in held and x in live and held[x].get("entry")}
-                tot = sum(cw.values())
-                if not tot:
-                    c["why_ru"], c["ok"] = ["нет свободных денег на покупку"], False
-                    continue
-                for x, f in cw.items():
-                    q = need * f / tot
-                    p = held[x]
-                    neww = max(0.0, p["weight"] - q * p["entry"] / price[x])
-                    out.append(rp._act(now, x, "TRIM", neww, price[x], f"Ядро → мемы: продаём {x} −{q / V * 100:.1f}% счёта, чтобы купить {s}.", None))
-                    rp._set_cash(rp.cash() - q * P["fee"])
-                    held[x] = {**p, "weight": neww}
+            # 21.11 (owner: never sell core to fund other buys — 07:06 UTC the account sold BTC $88 for PEPE / SHIB): a meme is paid
+            # ONLY from the cash above the floor; no idle-core release, no core trim
+            if cost > max(0.0, rp.cash() - P["min_cash"] * V) + 1e-9:
+                c["why_ru"], c["ok"] = ["нет свободного кэша выше 10% — ядро ради мемов не продаём"], False
+                continue
             out.append(rp._act(now, s, "BUY", cost, px, f"Мемы (решение владельца 21.11, не больше 5%): {s} — "
                                f"проверки исследования мемов пройдены, просадка от максимума за 30 дней, оборот ${(c.get('vol24') or 0) / 1e6:.0f}M. "
                                f"{MEME['w'] * 100:g}% счёта, стоп {_pc(MEME['stop'])}, на ×{MEME['body_x']:.0f} — половину, не дольше {MEME['days']} дней."

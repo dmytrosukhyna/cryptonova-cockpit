@@ -252,3 +252,44 @@ def test_closed_total_after_the_restart_counts_only_swaps_closed_since_the_start
     assert stt["pct_base_usd"] == fb and abs(fb - 0.15 * 10276.07) < 1.0              # the futures part's base, not the account
     assert stt["realized_pct_start"] == round(-2.09 / fb * 100, 2) == -0.14
     shutil.rmtree(str(tmp_path), ignore_errors=True)
+
+
+def test_core_is_never_sold_for_memes_and_meme_stops_follow_the_model():
+    """21.11 07:06 UTC: the model paid PEPE / SHIB by trimming its core, the account sold BTC $88 while the meme buys waited behind
+    the USDT buffer. Now (1) the meme sleeve is paid only from cash above the floor, (2) the rebalancer never trims the core in the
+    careful regime, (3) a held meme-sleeve coin gets its −30 % exchange stop from the model's levels."""
+    from cnq.execution import okx_autopilot as ap
+    from cnq.execution import okx_futures as fu
+    from cnq.execution import okx_spot_stops as ss
+    import test_okx_autopilot as TA
+    memes = {"PEPE": {"symbol": "PEPE", "status": "small", "score": 82, "vol24": 3.2e8, "mcap": 1.4e9, "price": 3.2e-6}}
+    rows = [{"symbol": "BTC", "name": "Bitcoin", "kind": "core", "status": "buy", "status_ru": "можно брать", "why_ru": "ядро", "price": 80000}]
+    src = {"cg": {"BTC": 80000}, "meme": {"PEPE": 3.2e-6}, "hl": {}}
+    sup = {"sma200": {}, "walls": {}, "btc": {"price": 80000, "ll20": 70000, "mid": "LONG"}}
+    ideas = {"asof": T0, "available": True, "rows": rows}
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    port.step(src, ideas, T0, tradeable={"BTC", "PEPE"}, support=sup, memes=memes, meme_on=False)
+    mv = port.value({"BTC": 80000}) - port.rp.cash()
+    port.rp._set_cash(0.10 / 0.90 * mv + 0.001)                             # cash just above the 10 % floor: no room for a 2.5 % meme
+    st = port.step(src, ideas, T0 + 60_000, tradeable={"BTC", "PEPE"}, support=sup, memes=memes, meme_on=True)
+    assert not [p for p in st["positions"] if p["bucket"] == "msleeve"]
+    assert not [a for a in st["actions"] if a["action"] == "TRIM" and "мем" in a["reason"].lower()]
+    assert "ядро ради мемов не продаём" in " ".join(st["meme_sleeve"]["candidates"][0]["why_ru"])
+    # (2) the rebalancer: BTC over its target → a trim normally; in the careful regime the core stays
+    e = F.env()
+    fk = TA.live_fake(demo_key=True)
+    fk.bal["BTC"] = 0.2
+    trims = lambda b: [o for o in b["sells"] if o["ccy"] == "BTC" and o["act"] == "trim"]    # noqa: E731
+    assert trims(ap.build(ap.connect(e, fk, {}, F.nosleep), e, F.portfolio()))
+    _ov(e, {"restart_21_11": {"armed": False, "usdt_min_pct": 0.15}})
+    old = fu.btc_bull
+    try:
+        fu.btc_bull = lambda path=None: False
+        b = ap.build(ap.connect(e, fk, {}, F.nosleep), e, F.portfolio())
+        assert not trims(b) and any("ядро не урезаю" in d for d in b["diffs"])
+    finally:
+        fu.btc_bull = old
+    # (3) the meme sleeve's stop goes to the exchange like every non-core coin
+    pf = {"portfolios": {"ideas": {"positions": [{"symbol": "PEPE", "bucket": "msleeve", "levels": {"stop": 2.33e-06}},
+                                                 {"symbol": "BTC", "bucket": "core", "levels": {"stop": None}}]}}}
+    assert ss.wanted(pf) == {"PEPE": 2.33e-06}

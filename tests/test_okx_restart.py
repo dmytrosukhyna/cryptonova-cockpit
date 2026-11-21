@@ -247,5 +247,8 @@ def test_closed_total_after_the_restart_counts_only_swaps_closed_since_the_start
     _pp(str(tmp_path), {**real, "asof": since + 2_000_000})
     out = app_home.run(sqlite3.connect(":memory:"), str(tmp_path), now=since + 2_100_000)
     stt = out["public_portfolio"]["futures"]["stats"]
-    assert stt["n"] == 1 and stt["realized_usd"] == -2.09 and stt["losses"] == 1 and stt["realized_pct_start"] < 0
+    fb = out["public_portfolio"]["futures"]["start_usd"]
+    assert stt["n"] == 1 and stt["realized_usd"] == -2.09 and stt["losses"] == 1
+    assert stt["pct_base_usd"] == fb and abs(fb - 0.15 * 10276.07) < 1.0              # the futures part's base, not the account
+    assert stt["realized_pct_start"] == round(-2.09 / fb * 100, 2) == -0.14
     shutil.rmtree(str(tmp_path), ignore_errors=True)

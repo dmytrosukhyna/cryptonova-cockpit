@@ -1565,7 +1565,10 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
     stats = {"n": n, "listed": len(closed), "complete": len(closed) + len(part_open) >= n, "wins": wins, "losses": losses,
              "win_rate": _r(wins / len(closed) * 100, 1) if closed else None, "realized_usd": realized,
              "avg_usd": _r(realized / n) if realized is not None and n else None,
-             "realized_pct_start": _r(realized / s0 * 100) if realized is not None and s0 else None, "since": since}
+             # 21.11 (fix): the % is over the futures part's own base (its share of the capital) — the base the app labels
+             # «от базы фьючерсной части»; the whole account's start only when there is no futures part
+             "realized_pct_start": (_r(realized / fb_ * 100) if realized is not None and (fb_ := float((fut or {}).get("start_usd") or s0 or 0)) else None),
+             "pct_base_usd": _r(float((fut or {}).get("start_usd") or s0 or 0)) if (fut or s0) else None, "since": since}
     if fut is not None:
         fut.update({"open": open_rows, "open_n": len(open_rows), "open_pnl_usd": _r(upl), "closed": closed, "stats": stats,
                     "running": not real.get("stale")})

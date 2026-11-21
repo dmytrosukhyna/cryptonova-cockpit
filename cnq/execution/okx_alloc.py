@@ -216,7 +216,18 @@ def resolve(sym: str, ref_px: float | None, lookup) -> dict:
 def targets(w: dict, pos: dict) -> dict:
     """{ticker: share of the WHOLE account} = spot share × the coin's weight in the public portfolio (the extra core is added by
     okx_autopilot.build from core_extra — per OKX coin, after the ticker is mapped)."""
-    return {s: w["spot"] * t["w"] for s, t in pos.items()}
+    out = {s: w["spot"] * t["w"] for s, t in pos.items()}
+    # 21.11 (owner: memes «не больше 5%» of the account): the model's meme sleeve is ≤ 5 % of the model already; this is the hard
+    # cap on the account side, whatever the spot share is
+    mm = [s for s, t in pos.items() if str(t.get("bucket") or "") in ("meme", "msleeve")]
+    tot = sum(out[s] for s in mm)
+    if tot > MEME_ACCOUNT_MAX:
+        for s in mm:
+            out[s] *= MEME_ACCOUNT_MAX / tot
+    return out
+
+
+MEME_ACCOUNT_MAX = 0.05
 
 
 def signature(portfolio: dict, w: dict) -> str:

@@ -575,6 +575,9 @@ def build(cl: Okx, env=None, model=None) -> dict:
     model = web/portfolio.json (default: fetched). A spot lead trader (okx_lead.py): lead positions are counted like ordinary coins,
     sales may take them (lead first), and the orders are marked lead / ordinary with the instruments the next sync would set."""
     keep = keep_set(env)
+    from . import okx_restart              # 21.11 (owner's deposit): transferred coins on hold / kept with stops are never traded here
+    keep |= okx_restart.hold_coins(env)
+    slow = okx_restart.sell_slow(env)      # … and the junk among them is sold slowly: ≤ step $ per pass, limit orders
     quote = pick_quote(cl, env)
     if not quote:
         raise RuntimeError("на этом OKX нет пары BTC в нужной валюте (USDC / EUR" + ("" if is_eea(cl) else " / USDT") + ") — укажи OKX_QUOTE")
@@ -683,6 +686,9 @@ def build(cl: Okx, env=None, model=None) -> dict:
             lot, mn, tick = float(inst["lotSz"]), float(inst["minSz"]), float(inst["tickSz"])
             have = avail.get(c, 0.0) + (((lctx["held"].get(c) or {}).get("avail") or 0.0) if lctx["active"] and not via else 0.0)
             qty = floor_to(have if tgt == 0 else min(have, -gap / (bid * k)), lot)
+            if c in slow and qty * bid * k > slow[c]:
+                qty = floor_to(max(slow[c], MIN_ORDER * 1.2) / (bid * k), lot)
+                notes.append(f"{c}: монета из пополнения владельца — продаю частями ≤ {usd(slow[c])} за проход, лимитом.")
             if qty < mn or qty * bid * k < (1.0 if tgt == 0 else MIN_ORDER):
                 if tgt == 0 and have * bid * k >= MIN_ORDER:
                     diffs.append(f"{c}: остаток меньше минимального ордера OKX — остаётся.")
@@ -721,6 +727,22 @@ def build(cl: Okx, env=None, model=None) -> dict:
                                  "lot": inst["lotSz"], "min": mn, "ask": ask * k, "via": via, "pxq": inst_id.split("-")[1], "act": "buy",
                                  "target_pct": round(t_pct, 2), "now_pct": round(now_pct, 2), "why": why, "core": c in al.CORE})
     buys.sort(key=lambda o: (not o["core"], -o["usd"]))           # the core first, then the bigger gaps
+    # 21.11 07:46 (owner «аккуратно», all his money): while BTC is not in its bull regime the spot rebalance keeps a USDT buffer ≥
+    # usdt_min_pct of the WHOLE account — a buy that would take the USDT under it waits (nothing is sold to reach it)
+    bmin = okx_restart.usdt_min(env)
+    if bmin and buys:
+        from . import okx_futures as _fu
+        if _fu.btc_bull() is not True:
+            tot_all = sum(r["usd"] for r in rows_all)
+            free = sum(r["usd"] for r in rows_all if r["cash"]) + sum(o["usd"] for o in sells) - bmin * tot_all
+            kept = []
+            for o in buys:
+                if o["usd"] <= free:
+                    kept.append(o)
+                    free -= o["usd"]
+                else:
+                    diffs.append(f"{o['ccy']}: покупка {usd(o['usd'])} ждёт — USDT держим ≥ {bmin * 100:g}% счёта, пока BTC не в росте (решение владельца 21.11)")
+            buys = kept
     fee = taker_fee(cl, env)
     turnover = sum(o["usd"] for o in sells) + sum(o["usd"] for o in buys)
     spot_now = sum(r["usd"] for r in rows if not r["cash"])
@@ -1011,7 +1033,8 @@ def spot_stops(env=None, opener=None, model=None, now: int | None = None, sleep=
         lead_held = lctx.get("held") or {}
     except Exception:  # noqa: BLE001
         lead_held = {}
-    r = ss.sync(cl, pf, st, now, log, pick_quote(cl, env) or "USDT", ss.totals(raw), lead_held)
+    from . import okx_restart              # 21.11: the owner's transferred coins we keep get exchange stops too
+    r = ss.sync(cl, pf, st, now, log, pick_quote(cl, env) or "USDT", ss.totals(raw), lead_held, extra=okx_restart.keep_stops(env))
     save_state(st, env)
     parts = [f"поставлен {x['ccy']} ≤ {x['px']:g}" for x in r["set"]] + [f"снят {c}" for c in r["cancelled"]] + [f"сработал {c}" for c in r["fired"]]
     return ("Стопы спота на OKX: " + ", ".join(parts)) if parts else None

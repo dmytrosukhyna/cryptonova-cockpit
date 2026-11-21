@@ -79,6 +79,13 @@ def first_live_in_log(path: str | None = None, limit: int = 200_000) -> dict | N
 def start(env=None, st: dict | None = None, log_path: str | None = None, fut_st: dict | None = None) -> dict:
     """{"usd", "t", "src"} — where «результат с начала» counts from."""
     e = _env(env)
+    try:                                   # 21.11 (owner): the public track record restarts after his deposit (okx_restart)
+        from . import okx_restart
+        rs = okx_restart.public_start(env)
+    except Exception:  # noqa: BLE001
+        rs = None
+    if rs:
+        return rs
     st = ap.load_state(env) if st is None else st
     cands = []
     fl = st.get("first_live") or {}

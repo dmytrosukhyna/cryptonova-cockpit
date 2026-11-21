@@ -89,7 +89,8 @@ def pending(cl) -> list:
 LEAD_ALGO = "/api/v5/copytrading/algo-order"
 
 
-def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict | None = None, lead: dict | None = None) -> dict:
+def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict | None = None, lead: dict | None = None,
+         extra: dict | None = None) -> dict:
     """one pass → {"set": [...], "cancelled": [...], "fired": [...], "skipped": [...]}; st (autopilot state) keeps «spot_stops»
     {coin: {algoId, px, sz}} and «spot_hold» {coin: until ms}"""
     from .okx_autopilot import floor_to, route, via_rate
@@ -107,7 +108,7 @@ def sync(cl, pf: dict, st: dict, now: int, log, quote: str = "USDT", avail: dict
         if prev.get("why") != why:
             log({"ev": "spot_stop_skip", "ccy": c, "t": now, "why": why})
     memo: dict = {}
-    want = wanted(pf)
+    want = {**{c: float(p) for c, p in (extra or {}).items() if c not in CORE and float(p or 0) > 0}, **wanted(pf)}   # 21.11: kept deposit coins
     mine = {str(a.get("instId") or "").split("-")[0]: a for a in pending(cl)}
     known = st.setdefault("spot_stops", {})
     hold = {c: t for c, t in (st.get("spot_hold") or {}).items() if int(t) > now}

@@ -151,6 +151,52 @@ def _num(e, k, d):
 def caps(env=None) -> dict:
     """The hard caps. Env may only make them stricter."""
     e = _env(env)
+    c = _caps(e)
+    k = careful(env)                       # 21.11 (owner «аккуратно»): an owner override may only make it stricter
+    if k.get("risk"):
+        c["risk"] = min(c["risk"], float(k["risk"]))
+    return c
+
+
+def careful(env=None) -> dict:
+    """21.11 07:46 (owner: «внимательно, аккуратно», all his money; careful with longs while the market falls) — config/owner_overrides.json
+    «careful_21_11» {"risk": 0.02 (risk per copy, was 3 %), "long_cap_x": 1.0 (net LONG notional ≤ 1× the futures budget while BTC is
+    not in its bull regime)}; only ever stricter (risk ≤ RISK_CAP, cap > 0). Missing / broken → {}."""
+    try:
+        from . import owner_overrides
+        k = owner_overrides.load(env=env).get("careful_21_11") or {}
+        out = {}
+        if 0 < float(k.get("risk") or 0) <= RISK_CAP:
+            out["risk"] = float(k["risk"])
+        if float(k.get("long_cap_x") or 0) > 0:
+            out["long_cap_x"] = float(k["long_cap_x"])
+        return out
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def btc_bull(path: str | None = None):
+    """True / False / None — the BTC regime of the spot model (web/portfolio.json «btc_bull», the same file the spot step writes)"""
+    try:
+        p = path or os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "web", "portfolio.json")
+        with open(p, encoding="utf-8") as f:
+            v = json.load(f).get("btc_bull")
+        return v if isinstance(v, bool) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def long_room(env, bud: float, pos: dict, bull=None) -> float | None:
+    """21.11: the $ of new LONG notional allowed now (None = no cap): long_cap_x × budget − (open long − open short notional),
+    only while BTC is not in its bull regime (unknown counts as not bull)"""
+    k = careful(env)
+    if not k.get("long_cap_x") or bull is True:
+        return None
+    net = sum((p.get("notional") or 0.0) * (1 if p.get("long") else -1) for p in (pos or {}).values())
+    return k["long_cap_x"] * float(bud or 0.0) - net
+
+
+def _caps(e) -> dict:
     return {"lev": max(1, min(MAX_LEV, int(_num(e, "OKX_FUT_MAX_LEV", DEF_LEV)))),
             "copy_lev": max(1, min(COPY_MAX_LEV, int(_num(e, "OKX_FUT_COPY_MAX_LEV", COPY_MAX_LEV)))),
             "risk": min(RISK_CAP, _num(e, "OKX_FUT_RISK", RISK_CAP)),
@@ -1024,6 +1070,12 @@ def decide(ctx: Ctx, t: dict, desk_eq: float, part: float, bud: float, cap: dict
     if why:
         return {**base, "skip": why, "final": False, "late": True}
     sz = size(t, desk_eq, part, bud, cap, inst, px, mult, sum(p["notional"] for p in pos.values()), avail, slip)
+    if long and not sz.get("skip"):          # 21.11 (owner «аккуратно»): net LONG notional ≤ 1× the budget while BTC is not bull
+        room = long_room(ctx.env, bud, pos, btc_bull())
+        if room is not None and sz["notional"] > room:
+            return {**base, "skip": f"лимит лонгов: чистый лонг не больше {careful(ctx.env)['long_cap_x']:g}× бюджета, пока BTC не в росте "
+                                    f"(свободно {ap.usd(max(0.0, room))}, нужно {ap.usd(sz['notional'])}) — решение владельца 21.11 «аккуратно»",
+                    "final": False}
     if sz.get("skip"):
         # 06.11 bug fix (owner: «счёт не копирует новые позиции»): every size skip was FINAL — a trade skipped once for «доля 0%»
         # (the ladder rolled «Киты» back at 00:31 UTC), «меньше минимума», «мало USDT» or the leverage room was never tried again,

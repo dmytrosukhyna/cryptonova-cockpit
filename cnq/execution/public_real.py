@@ -64,7 +64,7 @@ from . import myspot_watch as ms
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
         "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve",
-        "actions", "flows", "copy_skips", "spot_stops", "spot_orders")
+        "actions", "flows", "copy_skips", "spot_stops", "spot_orders", "label_ru", "start_label_ru")
 # 06.11 (owner: «счёт не копирует новые позиции китов»): why the futures sleeve did NOT open a desk trade — the latest reason per
 # trade, last COPY_SKIPS_MAX, from okx_futures state «copy_skips» (desk trade id = «sig», OKX instrument, plain Russian reason)
 COPY_SKIPS_MAX = 30
@@ -384,6 +384,9 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
     raw = eq - s0                                  # the state's curve keeps equity − start; the flows come off at publishing
     pnl = raw - _f_at(ev, now)
     fpnl = None if fut_realized is None else fut_realized + sum(float(p.get("upl") or 0.0) for p in (s.get("futures") or {}).get("positions") or [])
+    rs = start.get("src") == "restart"            # 21.11: positions open at the restart — their P/L before it is not counted
+    if fpnl is not None and rs:
+        fpnl -= float(start.get("upl0") or 0.0)
     curve = [p for p in st.get("curve") or [] if isinstance(p, list) and len(p) == 2 and p[0] >= since]
     fcurve = [p for p in st.get("fut_curve") or [] if isinstance(p, list) and len(p) == 2 and p[0] >= since]
     if not curve:
@@ -430,7 +433,10 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
             "stale": not running(s.get("lease")), "flows": fl,
             "copiers": (s.get("lead") or {}).get("copiers"), "copy_url": (s.get("lead") or {}).get("url"),
             "closed": list(closed_rows or [])[:CLOSED_MAX], "fut_curve": [[int(t), _r(v)] for t, v in fcurve],
-            "actions": list(acts or [])[:ACTIONS_MAX], "copy_skips": copy_skips(), "spot_stops": spot_stops(), "spot_orders": spot_orders()}
+            "actions": list(acts or [])[:ACTIONS_MAX], "copy_skips": copy_skips(), "spot_stops": spot_stops(), "spot_orders": spot_orders(),
+            "label_ru": (start.get("label_ru") or None) if rs else None,
+            # 21.11 07:47 (owner): shown rounded «стартовый капитал ≈ $10 000»; every result uses the exact start_usd
+            "start_label_ru": ("стартовый капитал ≈ $" + f"{round(s0, -3):,.0f}".replace(",", " ")) if rs else None}
 
 
 def spot_orders(env=None) -> dict | None:
@@ -538,6 +544,10 @@ def clean(doc: dict) -> dict:
                                                   **({"code": str(x["code"])} if str(x.get("code") or "").isdigit() else {}),
                                                   **({"cash_short": True} if x.get("cash_short") else {})}
                                                  for x in (co.get("orders") or [])[:6] if isinstance(x, dict) and SYM_RE.match(str(x.get("ccy") or ""))]}
+    lb = doc.get("label_ru")                           # 21.11: «Реальный счёт CRYPTO NOVA AI · с 21.11.2026» after the restart
+    out["label_ru"] = lb if isinstance(lb, str) and 0 < len(lb) <= 80 and "\n" not in lb else None
+    sl = doc.get("start_label_ru")
+    out["start_label_ru"] = sl if isinstance(sl, str) and 0 < len(sl) <= 60 and "\n" not in sl else None
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None
     return out
@@ -566,6 +576,14 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
     if s and s.get("ok"):
         if fetch is None:
             fetch = ms.make_fetch(*sub.creds(env))
+        host = "https://" + s["host"]
+        try:                                       # 21.11 (owner): the restart of the public history, once, after his deposit
+            from . import okx_restart
+            old_t = int(s["start"].get("t") or now)
+            if okx_restart.maybe_activate(s, state, now, env, closed_old=lambda: closed_history(fetch, host, old_t)[2]):
+                s = {**s, "start": sub.start(env)}
+        except Exception:  # noqa: BLE001 — never blocks the summary; the next pass tries again
+            pass
         since = int(s["start"].get("t") or now)
         try:
             acts = actions(since)
@@ -580,7 +598,10 @@ def run(env=None, fetch=None, now: int | None = None, put=None, state: dict | No
             if not own_state:
                 raise LookupError
             from cnq.execution import auto_alloc
-            auto_alloc.update(doc.get("closed") or [], float(doc.get("start_usd") or 0.0), now, env=env)
+            closed_aa = doc.get("closed") or []
+            if s["start"].get("src") == "restart":    # 21.11: the weekly review keeps its own 30 days of swaps, not the public window
+                closed_aa = closed_history(fetch, host, auto_alloc.WHALE_ERA_MS)[2] or closed_aa
+            auto_alloc.update(closed_aa, float(doc.get("start_usd") or 0.0), now, env=env)
         except Exception:  # noqa: BLE001 — the summary never fails because of the auto share
             pass
     elif state.get("last"):

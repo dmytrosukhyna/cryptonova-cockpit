@@ -441,6 +441,54 @@ SMART_RULE_RU = ("Рукав «смарт-мани» — до 10% портфел
                  "Пока подходящих нет, эти 10% лежат в ядре BTC / ETH / SOL.")
 
 
+# 21.11 (owner, explicit: «не больше 5%»): the MEME sleeve of the CRYPTO NOVA AI portfolio — on only while config/owner_overrides.json
+# «restart_21_11» is armed (the restart of the real account's public record after the owner's deposit). Candidates = the spot meme
+# research rows (web/memes.json spot_memes, cnq/agents/meme_spot.py) with status «small» — every safety check passed (no red flag,
+# quality ≥ 50, volume ≥ $5M, a CEX / pool listing) AND ≥ 30 % below the 30-day high (the only entry our meme research supported,
+# docs/research/memes.md) — that are LIQUID (24 h volume ≥ vol_min, market cap ≥ mcap_min) and have an OKX spot pair (the real account
+# repeats the model). Entry by the «no chase» rule (entry_support: BTC not breaking down; near a support when we have one). 2.5 % per
+# meme, at most 2 → the sleeve ≤ 5 % of the model (and okx_alloc caps memes at 5 % of the account). Exits: stop −30 % (an exchange
+# stop like every non-core coin — okx_spot_stops), at ×2 half is sold and the rest trails 35 % below its peak, 30 days at most, sold at
+# once on a red flag («не брать» with «красный флаг»), sold when OKX drops the pair. Paid from the cash above the floor, then the idle
+# core top-up, then the core.
+MEME = {"max": 0.05, "w": 0.025, "n": 2, "stop": -0.30, "body_x": 2.0, "trail": 0.35, "days": 30, "vol_min": 20e6, "mcap_min": 100e6}
+MEME_RULE_RU = ("Рукав мемов — не больше 5% портфеля (решение владельца 21.11): только ликвидные мемы со спот-парой на OKX "
+                "(оборот ≥ $20M в сутки, капитализация ≥ $100M), прошедшие проверки нашего исследования мемов, и только после "
+                "просадки ≥ 30% от максимума за 30 дней; вход — без погони за ценой, у поддержки. 2,5% на мем (до 2), стоп −30% "
+                "на бирже, на ×2 продаём половину, остаток — с трейлингом 35% от пика, держим не дольше 30 дней.")
+
+
+def meme_sleeve_on(env=None) -> bool:
+    """21.11: the meme sleeve trades only while the owner's restart switch is armed"""
+    try:
+        from cnq.execution import okx_restart
+        return okx_restart.armed(env)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def meme_candidates(rows: dict | None, okx: set | None = None) -> list[dict]:
+    """spot meme rows {SYM: row} judged for the sleeve: [{symbol, ok, why_ru, score, vol24, mcap, price, status}], passing first"""
+    out = []
+    for sym, r in (rows or {}).items():
+        sym = str(sym or "").upper()
+        if not sym or not sym.isascii() or not sym.isalnum() or not isinstance(r, dict):
+            continue
+        why = []
+        if r.get("status") != "small":
+            why.append(str(r.get("why_ru") or "проверки мемов не пройдены или просадки ещё нет"))
+        if (r.get("vol24") or 0) < MEME["vol_min"]:
+            why.append(f"оборот ${(r.get('vol24') or 0) / 1e6:.0f}M < ${MEME['vol_min'] / 1e6:.0f}M")
+        if (r.get("mcap") or 0) < MEME["mcap_min"]:
+            why.append(f"капитализация ${(r.get('mcap') or 0) / 1e6:.0f}M < ${MEME['mcap_min'] / 1e6:.0f}M")
+        if okx is None or sym not in okx:
+            why.append("нет спот-пары на OKX" if okx is not None else "список пар OKX не загрузился")
+        out.append({"symbol": sym, "ok": not why, "why_ru": why, "score": r.get("score"), "vol24": r.get("vol24"),
+                    "mcap": r.get("mcap"), "price": r.get("price"), "status": r.get("status"), "red_flag": str(r.get("why_ru") or "").startswith("красный флаг")})
+    out.sort(key=lambda x: (not x["ok"], -(x["score"] or 0), -(x["vol24"] or 0)))
+    return out
+
+
 def smart_check(t: dict, okx: set | None = None) -> tuple[bool, list[str]]:
     """one watch-list token (web/smart_money.json watch.tokens) → (passes the balanced check, reasons it fails / notes)"""
     why = []
@@ -534,7 +582,7 @@ _SRC_CODE = {"cg": 1.0, "meme": 2.0, "hl": 3.0}      # meta `src:SYM` (REAL colu
 IDEAS_ROLE_RU = {"pick": "выбор владельца",
                  "buy": "из таблицы: можно брать", "add": "из таблицы: можно добрать", "small": "на небольшую сумму",
                  "smart": "смарт-мани: набирают умные кошельки"}
-KIND_RU = {"core": "ядро", "mid": "крупный альт", "high": "высокий риск", "meme": "мем", "smart": "смарт-мани"}
+KIND_RU = {"core": "ядро", "mid": "крупный альт", "high": "высокий риск", "meme": "мем", "smart": "смарт-мани", "msleeve": "мем"}
 
 
 def _pc(x: float) -> str:
@@ -713,7 +761,8 @@ class IdeasPortfolio:
         self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
 
     def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None,
-             tradeable: set | None = None, smart: dict | None = None, support: dict | None = None, picks: dict | None = None) -> dict:
+             tradeable: set | None = None, smart: dict | None = None, support: dict | None = None, picks: dict | None = None,
+             memes: dict | None = None, meme_on: bool | None = None) -> dict:
         """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
         "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas()); `sma200` (20.10) —
         {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map). `tradeable` (22.10, owner) — coins with an
@@ -738,6 +787,10 @@ class IdeasPortfolio:
         actions: list[dict] = []
         self._smart = smart_candidates(smart, okx)
         smart_by = {c["symbol"]: c for c in self._smart}
+        # 21.11 (owner): the meme sleeve — `memes` = web/memes.json spot_memes {SYM: row}; buys only while restart_21_11 is armed
+        self._meme_on = meme_sleeve_on() if meme_on is None else bool(meme_on)
+        self._memes = meme_candidates(memes, okx) if memes else []
+        meme_by = {c["symbol"]: c for c in self._memes}
         # --- 1. price the holdings (own source → another agreeing source → the table's price → last seen)
         price, live, psrc = {}, set(), {}
         for p in rp.positions():
@@ -774,6 +827,23 @@ class IdeasPortfolio:
                     self._sell(now, s, p, px, f"Смарт-мани: {SMART['days']} дней прошло — выходим по времени, {s} {res}.", actions)
                 elif c is not None and smart_exit(c):
                     self._sell(now, s, p, px, f"Смарт-мани: кошельки {c.get('status')} {s} — выходим вместе с ними, {res}.", actions)
+                continue
+            if kind == "msleeve":                                 # 21.11: the meme sleeve has its own exits
+                c = meme_by.get(s)
+                held_d = (now - (p.get("entry_time") or now)) / DAY
+                if ret <= MEME["stop"]:
+                    self._sell(now, s, p, px, f"Мемы: стоп {_pc(MEME['stop'])} — {s} {res}.", actions)
+                elif okx is not None and s not in okx:
+                    self._sell(now, s, p, px, f"Мемы: у {s} больше нет спот-пары на OKX — продаём, {res}.", actions)
+                elif c is not None and c.get("red_flag"):
+                    self._sell(now, s, p, px, f"Мемы: красный флаг у {s} — продаём сразу, {res}.", actions)
+                elif held_d >= MEME["days"]:
+                    self._sell(now, s, p, px, f"Мемы: {MEME['days']} дней прошло — выходим по времени, {s} {res}.", actions)
+                elif not fixes and px >= p["entry"] * MEME["body_x"]:
+                    self._trim_half(now, s, p, px, f"Мемы: ×{MEME['body_x']:.0f} от входа ({res}) — продаём половину, остаток держим "
+                                    f"до отката {MEME['trail'] * 100:.0f}% от пика.", actions)
+                elif fixes and px <= high * (1 - MEME["trail"]):
+                    self._sell(now, s, p, px, f"Мемы: {s} на {(1 - px / high) * 100:.0f}% ниже пика {_fp(high)} — остаток продаём ({res}).", actions)
                 continue
             if okx is not None and s not in okx and kind != "core":
                 rp._set_meta("okx_swap", (rp._meta("okx_swap") or 0.0) + self._mv(p, px))
@@ -816,8 +886,9 @@ class IdeasPortfolio:
                     actions += self._core_restore(picks["core_restore"], now, price, live, psrc, src, smap, okx, blocked, not_bought)
             held = {p["symbol"]: p for p in rp.positions()}
             n_pick = sum(1 for p in held.values() if self._split(p["bucket"])[1] == "pick")      # picks take no table place
-            n_buy = sum(1 for p in held.values() if self._split(p["bucket"])[1] not in ("small", "pick"))
-            n_small = len(held) - n_buy - n_pick
+            n_meme = sum(1 for p in held.values() if self._split(p["bucket"])[0] == "msleeve")  # 21.11: nor does the meme sleeve
+            n_buy = sum(1 for p in held.values() if self._split(p["bucket"])[1] not in ("small", "pick", "meme"))
+            n_small = len(held) - n_buy - n_pick - n_meme
             V = self.value(price)
             cool = rp.sold_recently(now, P["cooldown_d"])
             for r in rows:
@@ -881,6 +952,8 @@ class IdeasPortfolio:
                 held[s] = {"symbol": s}
                 n_small, n_buy = (n_small + 1, n_buy) if small else (n_small, n_buy + 1)
             actions += self._smart_buys(now, price, live, psrc, src, actions)
+            if self._meme_on:
+                actions += self._meme_buys(now, price, live, psrc, src)
             # 19.10 (owner: «сделки почти все в минус … нужна понятная модель»): the portfolio had drifted ALT-heavy — 5 alts bought at
             # 10 % each before the 7.5 % plan, BTC 13 % of its 30 % plan, no free cash to top it up. At the Monday review (and once on
             # the first run of this rule) a non-core «можно брать» coin above 1.2× its plan is trimmed back to the plan; the cash goes
@@ -892,7 +965,7 @@ class IdeasPortfolio:
                 for p in rp.positions():
                     s = p["symbol"]
                     kind, est = self._split(p["bucket"])
-                    if kind == "core" or est == "small" or s not in price or not V or not p["entry"]:
+                    if kind in ("core", "msleeve") or est == "small" or s not in price or not V or not p["entry"]:
                         continue
                     mw = p["weight"] * price[s] / p["entry"] / V
                     if mw > P["buy_w"] * 1.2:
@@ -1152,6 +1225,72 @@ class IdeasPortfolio:
             n += 1
         return out
 
+    def _meme_w(self, price: dict) -> float:
+        """the meme sleeve's share of the model now"""
+        V = self.value(price) or 1.0
+        return sum(self._mv(p, price.get(p["symbol"])) for p in self.rp.positions() if self._split(p["bucket"])[0] in ("meme", "msleeve")) / V
+
+    def _meme_buys(self, now: int, price: dict, live: set, psrc: dict, src: dict) -> list[dict]:
+        """21.11: buy the memes that pass meme_candidates — 2.5 % each, at most 2, the sleeve ≤ 5 %; «no chase»; paid from the cash
+        above the floor, then the idle core top-up, then the core itself (BTC / ETH / SOL in plan proportions)"""
+        rp, P = self.rp, IDEAS
+        out: list[dict] = []
+        held = {p["symbol"]: p for p in rp.positions()}
+        n = sum(1 for p in held.values() if self._split(p["bucket"])[0] == "msleeve")
+        for c in [x for x in self._memes if x["ok"]]:
+            s = c["symbol"]
+            V = self.value(price)
+            if s in held or n >= MEME["n"] or self._meme_w(price) + MEME["w"] > MEME["max"] + 1e-9 or not V:
+                continue
+            if s in rp.sold_recently(now, P["cooldown_d"]):
+                c["why_ru"] = [f"продан меньше {P['cooldown_d']} дней назад"]
+                continue
+            px, k, why_not = self._entry_price(s, {"price": c.get("price")}, src)
+            if px is None:
+                c["why_ru"], c["ok"] = [f"цена не сверилась: {why_not}"], False
+                continue
+            sup = getattr(self, "_support", None)
+            entry_ru = ""
+            if sup is not None:                      # «no chase»: BTC not breaking down; the support level too when we have one
+                known = s in (sup.get("sma200") or {}) or bool((sup.get("walls") or {}).get(s))
+                ok_in, entry_ru = _es.check(s, px, sup) if known else (not _es.btc_breaking(sup), _es.btc_breaking(sup) or "")
+                if not ok_in:
+                    c["why_ru"], c["ok"] = [entry_ru], False
+                    continue
+                entry_ru = entry_ru if known else ""
+            else:
+                c["why_ru"], c["ok"] = ["нет данных о поддержках — без проверки «не догонять» мем не покупаем"], False
+                continue
+            cost = MEME["w"] * V / (1 + P["fee"])
+            need = cost - max(0.0, rp.cash() - P["min_cash"] * V)
+            if need > 0:
+                need -= self._idle_release(now, need, price, live, out, s)
+            if need > 1e-9:
+                cw = {x: IDEAS["core_w"][x] for x in self.IDLE_CORE if x in held and x in live and held[x].get("entry")}
+                tot = sum(cw.values())
+                if not tot:
+                    c["why_ru"], c["ok"] = ["нет свободных денег на покупку"], False
+                    continue
+                for x, f in cw.items():
+                    q = need * f / tot
+                    p = held[x]
+                    neww = max(0.0, p["weight"] - q * p["entry"] / price[x])
+                    out.append(rp._act(now, x, "TRIM", neww, price[x], f"Ядро → мемы: продаём {x} −{q / V * 100:.1f}% счёта, чтобы купить {s}.", None))
+                    rp._set_cash(rp.cash() - q * P["fee"])
+                    held[x] = {**p, "weight": neww}
+            out.append(rp._act(now, s, "BUY", cost, px, f"Мемы (решение владельца 21.11, не больше 5%): {s} — "
+                               f"проверки исследования мемов пройдены, просадка от максимума за 30 дней, оборот ${(c.get('vol24') or 0) / 1e6:.0f}M. "
+                               f"{MEME['w'] * 100:g}% счёта, стоп {_pc(MEME['stop'])}, на ×{MEME['body_x']:.0f} — половину, не дольше {MEME['days']} дней."
+                               + (f" {entry_ru[:1].upper() + entry_ru[1:]}." if entry_ru else ""), "msleeve:meme"))
+            rp._set_cash(rp.cash() - cost * P["fee"])
+            rp._set_meta(f"src:{s}", _SRC_CODE[k])
+            rp._set_meta(f"px:{s}", px)
+            price[s], psrc[s] = px, k
+            live.add(s)
+            held[s] = {"symbol": s}
+            n += 1
+        return out
+
     def _okx_swap(self, now: int, price: dict, okx: set | None, src: dict | None = None) -> list[dict]:
         """22.10 (owner: «если монеты нет на бирже — заменить тем, что приносит деньги»): the money of a coin sold because OKX has no
         spot pair for it does not wait in cash — it goes to the core BTC / ETH / SOL in the plan's proportion (30 / 10 / 5), above the
@@ -1376,7 +1515,7 @@ class IdeasPortfolio:
             ret = px / p["entry"] - 1 if px and p["entry"] else None
             h = horizon_of(kind, est)
             held = (now - p["entry_time"]) / DAY if p.get("entry_time") else None
-            if kind == "smart":
+            if kind in ("smart", "msleeve"):
                 h = "short"
             hz = {"horizon": h, "horizon_ru": f"{HORIZONS[h]['name_ru']} · {HORIZONS[h]['period_ru']}", "horizon_days": list(HORIZONS[h]["days"]),
                   "held_days": round(held, 1) if held is not None else None,
@@ -1387,9 +1526,13 @@ class IdeasPortfolio:
                                       if h != "long" and p.get("entry") else None),
                              "take_third": round(p["entry"] * (1 + self._tp(s, est)), 8) if h == "mid" and p.get("entry") and not p.get("fixes") else None,
                              "take_half": round(p["entry"] * P["body_x"], 8) if h == "short" and p.get("entry") and not p.get("fixes") else None}}
+            if kind == "msleeve" and p.get("entry"):         # 21.11: the meme sleeve's own levels (the exchange stop follows «stop»)
+                hz["levels"] = {"stop": round((p.get("high") or p["entry"]) * (1 - MEME["trail"]), 8) if p.get("fixes")
+                                else round(p["entry"] * (1 + MEME["stop"]), 8),
+                                "take_third": None, "take_half": None if p.get("fixes") else round(p["entry"] * MEME["body_x"], 8)}
             out.append({**p, **hz, "bucket": kind, "kind_ru": KIND_RU.get(kind, kind), "role": est, "role_ru": IDEAS_ROLE_RU.get(est, est),
                         "name": names.get(s) or s, "weight": round(mv / V, 4), "cost_weight": round(p["weight"], 6),
-                        "target_weight": (SMART["w"] if kind == "smart" else P["small_w"] if est == "small" else round(self._core_t(s, price), 4)
+                        "target_weight": (SMART["w"] if kind == "smart" else MEME["w"] if kind == "msleeve" else P["small_w"] if est == "small" else round(self._core_t(s, price), 4)
                                           if kind == "core" else P["buy_w"]),
                         "price": px, "price_live": s in live, "price_src": psrc.get(s),
                         "pnl_pct": round(ret * 100, 2) if ret is not None else None,
@@ -1422,6 +1565,9 @@ class IdeasPortfolio:
                           "in_core_pct": round(max(0.0, SMART["max"] - self._smart_w(price)) * 100, 2),
                           "first_buy": int(rp._meta("smart_first")) if rp._meta("smart_first") else None,
                           "candidates": getattr(self, "_smart", [])[:20]},
+                # 21.11 (owner): the meme sleeve — the rule, on / off, its share now and the candidates with the verdict
+                "meme_sleeve": {"rule_ru": MEME_RULE_RU, "on": bool(getattr(self, "_meme_on", False)), "max_pct": MEME["max"] * 100,
+                                "now_pct": round(self._meme_w(price) * 100, 2), "candidates": getattr(self, "_memes", [])[:12]},
                 "idle_cash": self._idle_info(price, V, now),
                 "started": int(started) if started else None, "last_weekly": int(last_weekly) if last_weekly else None}
 

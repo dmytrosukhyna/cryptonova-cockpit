@@ -178,7 +178,7 @@ def test_deposit_coins_kept_with_stops_sold_slowly_or_held():
     assert R.keep_stops(e) == {"DOGE": 0.08} and R.hold_coins(e) == {"DOGE", "XYZ"}
     from cnq.execution import okx_spot_stops as ss
     import inspect
-    assert "extra" in inspect.signature(ss.sync).parameters and "extra=okx_restart.keep_stops(env)" in inspect.getsource(ap.spot_stops)
+    assert "extra" in inspect.signature(ss.sync).parameters and "okx_restart.keep_stops(env)" in inspect.getsource(ap.spot_stops) and "extra=xs" in inspect.getsource(ap.spot_stops)
 
 
 def test_usdt_buffer_holds_buys_while_btc_is_not_bull():

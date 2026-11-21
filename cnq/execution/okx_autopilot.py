@@ -1034,7 +1034,9 @@ def spot_stops(env=None, opener=None, model=None, now: int | None = None, sleep=
     except Exception:  # noqa: BLE001
         lead_held = {}
     from . import okx_restart              # 21.11: the owner's transferred coins we keep get exchange stops too
-    r = ss.sync(cl, pf, st, now, log, pick_quote(cl, env) or "USDT", ss.totals(raw), lead_held, extra=okx_restart.keep_stops(env))
+    from . import okx_spot_plan, owner_overrides as _ov        # 21.11 08:57: the plan's non-core coins get exchange stops too
+    xs = {**okx_spot_plan.stops(st, _ov.load(env=env)), **okx_restart.keep_stops(env)}
+    r = ss.sync(cl, pf, st, now, log, pick_quote(cl, env) or "USDT", ss.totals(raw), lead_held, extra=xs)
     save_state(st, env)
     parts = [f"поставлен {x['ccy']} ≤ {x['px']:g}" for x in r["set"]] + [f"снят {c}" for c in r["cancelled"]] + [f"сработал {c}" for c in r["fired"]]
     return ("Стопы спота на OKX: " + ", ".join(parts)) if parts else None
@@ -1049,8 +1051,10 @@ def ladder(env=None, opener=None, now: int | None = None, sleep=time.sleep) -> s
     if not st.get("armed") or stopped(env):
         return None
     o = ov.load(env=env)
+    from . import okx_spot_plan
+    plan_open = any(L.get("status") == "open" for L in ((st.get("spot_plan") or {}).get("legs") or {}).values())
     if not okx_ladder.cfg(o) and not okx_ladder.core_cfg(o) and (st.get("ladder") or {}).get("status") != "open" \
-            and (st.get("core_buy") or {}).get("status") != "open":
+            and (st.get("core_buy") or {}).get("status") != "open" and not okx_spot_plan.cfg(o) and not plan_open:
         return None
     now = int(now or time.time() * 1000)
     g = lease.gate(env, now)
@@ -1063,7 +1067,19 @@ def ladder(env=None, opener=None, now: int | None = None, sleep=time.sleep) -> s
     save_state(st, env)
     rc = okx_ladder.step_core(cl, st, o, now, log, q)          # 20.11 23:43: the owner's $400 core buy (post-only, then IOC ≤ 0.3 %)
     save_state(st, env)
-    r = {"placed": r["placed"] + rc["placed"], "filled": r["filled"] + rc["filled"], "cancelled": r["cancelled"], "errors": r["errors"] + rc["errors"]}
+    rp = {"placed": 0, "filled": 0, "errors": []}
+    if okx_spot_plan.cfg(o) or plan_open:            # 21.11 08:57: the owner's delegated spot plan (now + breakout 60k), above the USDT floor
+        try:
+            rows = ms.assets(ms.read_raw(cl.fetch, cl.host))
+            eq_, usdt_ = sum(x["usd"] for x in rows), sum(x["usd"] for x in rows if x.get("cash"))
+            lad = sum(max(0.0, float(x.get("usd") or 0) - (x.get("filled") or 0) * float(x.get("avg_px") or x.get("px") or 0))
+                      for x in ((st.get("ladder") or {}).get("orders") or []) if x.get("state") in okx_ladder.LIVE)
+            rp = okx_spot_plan.step(cl, st, o, now, log, q, usdt_, eq_, lad)
+        except Exception as e:  # noqa: BLE001 — the ladder and the core buy never fail because of the plan
+            rp = {"placed": 0, "filled": 0, "errors": [f"план: {type(e).__name__}"]}
+        save_state(st, env)
+    r = {"placed": r["placed"] + rc["placed"] + rp["placed"], "filled": r["filled"] + rc["filled"] + rp["filled"], "cancelled": r["cancelled"],
+         "errors": r["errors"] + rc["errors"] + rp["errors"]}
     parts = ([f"выставлено ордеров {r['placed']}"] if r["placed"] else []) + ([f"исполнено {r['filled']}"] if r["filled"] else []) + \
         ([f"отменено (срок) {r['cancelled']}"] if r["cancelled"] else []) + ([f"ошибки: {'; '.join(r['errors'][:3])}"] if r["errors"] else [])
     return ("Лестница BTC (решение владельца): " + ", ".join(parts)) if parts else None

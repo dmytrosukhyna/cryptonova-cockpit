@@ -74,7 +74,9 @@ def fmt(x: float, step: str) -> str:
 
 def _orders(st: dict | None) -> list:
     hist = [o for L in ((st or {}).get("ladder_hist") or []) for o in (L.get("orders") or [])]
-    return [o for k in ("ladder", "core_buy") for o in (((st or {}).get(k) or {}).get("orders") or [])] + hist
+    # 21.11 (owner's spot plan, okx_spot_plan): its buys are protected from the rebalancer the same way
+    plan = [o for L in (((st or {}).get("spot_plan") or {}).get("legs") or {}).values() for o in (L.get("orders") or [])]
+    return [o for k in ("ladder", "core_buy") for o in (((st or {}).get(k) or {}).get("orders") or [])] + hist + plan
 
 
 def held(st: dict | None) -> dict:

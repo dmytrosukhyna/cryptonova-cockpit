@@ -7,7 +7,21 @@
   V.ui = V.ui || {};          // per-view UI state that survives re-renders (filters, chart period …)
 
   /* ── public portfolio start (owner spec §6) ─────────────────────────── */
-  V.PUBLIC_START_LABEL = '22.10.2026';
+  // 21.11 (owner): the real account was restarted — its start comes from web/public_real.json (set by V.real(), vip/overview.js);
+  // until the file is read the texts say «начала счёта», never an old date. The public start sum is «≈ $10 000», never exact.
+  V.PUBLIC_START_LABEL = 'начала счёта';
+  V.PUBLIC_START_SHORT = 'начала счёта';
+  V.PUBLIC_START_WORDS = 'начала счёта';
+  V.approxUsd = (v) => { const r = Math.round((+v || 0) / 1000) * 1000; return r > 0 ? '≈ $' + r.toLocaleString('ru-RU') : '—'; };
+  V.setStart = (since) => {
+    if (!since) return;
+    const d = new Date(+since), dd = String(d.getUTCDate()).padStart(2, '0'), mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const M = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    V.PUBLIC_START_LABEL = `${dd}.${mm}.${d.getUTCFullYear()}`; V.PUBLIC_START_SHORT = `${dd}.${mm}`;
+    V.PUBLIC_START_WORDS = `${d.getUTCDate()} ${M[d.getUTCMonth()]} ${d.getUTCFullYear()} года`;
+  };
+  /** fills {since} «21.11», {since_full} «21.11.2026», {since_words} «21 ноября 2026 года» in fixed texts (vip/demo.js) */
+  V.sinceTxt = (s) => String(s == null ? '' : s).replace(/\{since_full\}/g, V.PUBLIC_START_LABEL).replace(/\{since_words\}/g, V.PUBLIC_START_WORDS).replace(/\{since\}/g, V.PUBLIC_START_SHORT);
 
   /* ── owner-only data through CNAuth.fetchOwner(path) — the server decrypts for a signed-in owner (cnq/api/owner_data.py);
         the panel never asks for the old per-section passphrases ── */

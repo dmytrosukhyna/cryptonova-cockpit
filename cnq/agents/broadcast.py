@@ -575,8 +575,11 @@ def s_whales(ctx: dict, now_ms: int) -> dict | None:
     opn, cl = c["open"], c["closed"]
     wk = sum(x["pnl"] for x in cl)
     B, S = [], ["Как работает реальный счёт: фьючерсы и спот ведёт система CRYPTO NOVA AI, у каждой сделки стоп на бирже."]
-    B.append(f"Реальный счёт OKX: {usd(real['equity_usd'], sign=False)}, с 22.10 {usd(real.get('pnl_usd') or 0)} ({pct((real.get('pnl_pct') or 0) / 100)})")
-    S.append(f"Реальный счёт на OKX — {say_usd(real['equity_usd'], sign=False)}; с 22 октября {say_usd(real.get('pnl_usd') or 0)}.")
+    from . import real_since as RS                           # 21.11: the start comes from public_real.json (the account was restarted)
+    si = RS.info(real)
+    B.append(f"Реальный счёт OKX: {usd(real['equity_usd'], sign=False)}, {RS.since_ru(si)} {usd(real.get('pnl_usd') or 0)} ({pct((real.get('pnl_pct') or 0) / 100)})")
+    S.append(f"Реальный счёт на OKX — {say_usd(real['equity_usd'], sign=False)}; "
+             + (f"с {si['words_ru'].rsplit(' ', 2)[0]}" if si["known"] else "с начала счёта") + f" {say_usd(real.get('pnl_usd') or 0)}.")
     B.append("Позиции: " + (", ".join(f"{o['coin']} {'лонг' if o['side'] == 'long' else 'шорт'}" for o in opn[:5]) if opn else "открытых нет"))
     B.append(f"За неделю закрыто сделок: {len(cl)}, итог {usd(wk)}")
     S.append(f"Сейчас открыто {len(opn)} {plural(len(opn), 'позиция', 'позиции', 'позиций')}, у каждой стоп на бирже; за неделю закрыто "

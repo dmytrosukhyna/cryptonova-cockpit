@@ -28,6 +28,7 @@ import sqlite3
 import time
 
 from . import panel_header as ph
+from . import real_since                            # 21.11: «≈ $10 000» for the public start
 from .i18n import DEFAULT, LANGS, T, file_name, plural, t
 
 START = 10000.0
@@ -1583,7 +1584,8 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
     return {"kind": "real", "exchange": real.get("exchange") or "OKX", "title": t(lang, "pp.title"), "since": since,
             "start_usd": _r(s0), "value_usd": _r(eq), "pnl_usd": _r(pnl), "pnl_pct": real.get("pnl_pct"),
             "today_usd": real.get("today_usd"), "today_pct": real.get("today_pct"), "asof": asof, "stale": bool(real.get("stale")),
-            "note": t(lang, "pp.note", d=_date_text(since, lang), usd=_usd_text(s0, lang)),
+            # 21.11 (owner): the start in public is «≈ $10 000» (rounded to the thousand); the exact start_usd stays for the math
+            "note": t(lang, "pp.note", d=_date_text(since, lang), usd=real_since.approx_start(s0) or _usd_text(s0, lang)),
             "stale_note": t(lang, "pp.stale") if real.get("stale") else None,
             "split_note": t(lang, "pp.split_from", d=_date_text(split_from, lang)) if split_from and split_from > since else None,
             "copy_url": real.get("copy_url"), "copiers": real.get("copiers"),

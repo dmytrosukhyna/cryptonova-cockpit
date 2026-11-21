@@ -16,6 +16,14 @@ WEEK_MS = 7 * 86400000
 RU_DAYS = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
 
 
+
+
+def _since_cap(real: dict) -> str:
+    """«С 21.11.2026» — the real account's start from public_real.json (21.11: the account was restarted; never a fixed date)"""
+    from . import real_since as RS
+    t = RS.since_ru(RS.info({"since": (real or {}).get("since_ms")}), True)
+    return t[:1].upper() + t[1:]
+
 def _fmt(p: float) -> str:
     return f"{p:,.0f}".replace(",", " ") if p >= 1000 else (f"{p:.2f}" if p >= 1 else f"{p:.4f}")
 
@@ -166,7 +174,7 @@ def real_week(real: dict, now_ms: int) -> dict | None:
     return {"equity": real["equity_usd"], "week_usd": tot, "fut_usd": fut, "spot_usd": (tot - fut) if (tot is not None and fut is not None) else None,
             "spot_top": spot_top,
             "n": len(closed), "wins": sum(1 for t in closed if (t.get("pnl_usd") or 0) > 0), "open": len(real.get("futures") or []),
-            "since_usd": real.get("pnl_usd"), "since_pct": real.get("pnl_pct")}
+            "since_usd": real.get("pnl_usd"), "since_pct": real.get("pnl_pct"), "since_ms": real.get("since")}
 
 
 def _usd(v: float) -> str:
@@ -206,7 +214,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
         L.append(f"- Счёт {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
                  + (f" (фьючерсы {_usd(real['fut_usd'])}, спот {_usd(real['spot_usd'])})" if real.get("fut_usd") is not None and real.get("spot_usd") is not None else "") + ".")
         if real.get("since_usd") is not None:
-            L.append(f"- С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%). Пополнения и выводы в результат не входят.".replace("(-", "(−"))
+            L.append(f"- {_since_cap(real)}: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%). Пополнения и выводы в результат не входят.".replace("(-", "(−"))
         L.append(f"- Фьючерсных сделок закрыто за неделю: {real['n']}, в плюсе {real['wins']}; в работе {real['open']}, у каждой стоп на бирже.")
         L.append("")
     if whales:
@@ -245,7 +253,7 @@ def compose(week: dict, market: dict, paper: dict, spot: dict, nxt: list, last: 
         P.append(f"Реальный счёт CRYPTO NOVA AI на OKX: {_fmt(real['equity'])} $" + (f", за неделю {_usd(real['week_usd'])}" if real.get("week_usd") is not None else "")
                  + (f" (фьючерсы {_usd(real['fut_usd'])}, спот {_usd(real['spot_usd'])})" if real.get("fut_usd") is not None and real.get("spot_usd") is not None else ""))
         if real.get("since_usd") is not None:
-            P.append(f"С 22.10.2026: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%)".replace("(-", "(−"))
+            P.append(f"{_since_cap(real)}: {_usd(real['since_usd'])} ({real.get('since_pct', 0):+.2f}%)".replace("(-", "(−"))
     if whales:
         P.append("")
         P.append("Система CRYPTO NOVA AI")

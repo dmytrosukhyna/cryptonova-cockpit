@@ -132,7 +132,7 @@ def test_weekly_post_speaks_about_the_real_account_and_the_whales():
             lv["kind"] = "support" if lv["hi"] <= c["price"] else "resistance"
     doc = weekly.run(sqlite3.connect(":memory:"), rep, os.path.join(tmp, "weekly.json"), now_ms)
     post, text = doc["post"], doc["text"]
-    assert post.startswith("📊") and "Реальный счёт CRYPTO NOVA AI на OKX: 9 650 $" in post and "С 22.10.2026: −$374.40 (−3.73%)" in post
+    assert post.startswith("📊") and "Реальный счёт CRYPTO NOVA AI на OKX: 9 650 $" in post and re.search(r"С \d\d\.\d\d\.20\d\d: −\$374\.40 \(−3\.73%\)", post) and "22.10" not in post   # 21.11: the file's own start
     assert "Система CRYPTO NOVA AI\n— За неделю закрыто сделок: 2" in post and not METHOD.search(post) and not METHOD.search(text)
     assert "Спот — ядро: BTC 36%, ETH 13%, SOL 7% счёта" in post and "<b>" not in post
     for s in (post, text):

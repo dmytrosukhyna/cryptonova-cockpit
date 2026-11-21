@@ -95,7 +95,7 @@
     }).join('');
     const last = pts[pts.length - 1];
     const data = esc(JSON.stringify({ pts, t0, t1, lo, hi, W, H, L, R, T, B }));
-    return { data, svg: `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Итог фьючерсов реального счёта с 22.10: ${esc(usd(last[1], true))}">
+    return { data, svg: `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Итог фьючерсов реального счёта с ${esc(dd(doc.since))}: ${esc(usd(last[1], true))}">
         ${grid}${xt}
         <path d="${area}" fill="rgba(124,196,255,.08)"/>
         <path d="${line}" fill="none" stroke="#7cc4ff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
@@ -141,12 +141,12 @@
     });
   }
 
-  function tiles(K) {
+  function tiles(K, since) {
     const c = K.closed || {}, used = isN(K.used_pct) ? Math.max(0, Math.min(100, +K.used_pct)) : 0;
     const t = (lab, val, sub, cls) => `<div class="fo-tile"><small>${lab}</small><b class="${cls || ''}">${val}</b><em>${sub}</em></div>`;
     return `<div class="fo-tiles">
       ${t('Вложено в фьючерсы', esc(usd(K.budget_usd)), `${esc(pct(K.budget_pct, 0, false))} счёта; было ${esc(pct(K.budget_start_pct, 0, false))} (${esc(usd(K.budget_start_usd))}) до ${esc(dd(K.budget_changed_t))}`)}
-      ${t('Итог с 22.10', esc(usd(K.pnl_all_usd, true)), `с 04.11: <span class="${tone(K.pnl_switch_usd)}">${esc(usd(K.pnl_switch_usd, true))}</span>`, tone(K.pnl_all_usd))}
+      ${t('Итог с ' + esc(dd(since)), esc(usd(K.pnl_all_usd, true)), `с 04.11: <span class="${tone(K.pnl_switch_usd)}">${esc(usd(K.pnl_switch_usd, true))}</span>`, tone(K.pnl_all_usd))}
       <div class="fo-tile"><small>В работе / свободно</small><b>${esc(usd(K.margin_usd))}</b><div class="fo-bar"><i style="width:${used.toFixed(1)}%"></i></div><em>маржа ${esc(pct(K.used_pct, 1, false))} · свободно ${esc(usd(K.reserve_usd))}</em></div>
       ${t('Открыто позиций', esc(K.open_n != null ? K.open_n : '—'), `сейчас по ним <span class="${tone(K.open_usd)}">${esc(usd(K.open_usd, true))}</span>`)}
       ${t('Закрытые сделки', esc(c.n != null ? c.n : '—'), `в плюсе ${esc(pct(c.win_pct, 0, false))} · PF ${esc(isN(c.pf) ? grp(c.pf, 2) : '—')} · в среднем ${esc(usd(c.avg_usd, true))}<br>лучшая ${c.best ? esc(c.best.coin + ' ' + usd(c.best.pnl_usd, true)) : '—'} · худшая ${c.worst ? esc(c.worst.coin + ' ' + usd(c.worst.pnl_usd, true)) : '—'}`)}
@@ -227,8 +227,8 @@
     css();
     opt = opt || {};
     if (!doc || !doc.kpi) return '<div class="fo"><p class="fo-note">Сводка фьючерсов ещё не собрана (web/fut_owner.json).</p></div>';
-    return `<div class="fo"><div class="fo-head"><b>Фьючерсы · реальный счёт OKX с 22.10</b><span>видно только владельцу · данные ${esc(ddt(doc.asof))}</span></div>
-      ${chart(doc)}${tiles(doc.kpi)}${strategy(doc)}${desk(doc)}${ivanCard(opt.ivanStats || (doc.ivan || {}).stats, opt.ivan, doc.ivan)}${tests(doc)}</div>`;
+    return `<div class="fo"><div class="fo-head"><b>Фьючерсы · реальный счёт OKX с ${esc(dd(doc.since))}</b><span>видно только владельцу · данные ${esc(ddt(doc.asof))}</span></div>
+      ${chart(doc)}${tiles(doc.kpi, doc.since)}${strategy(doc)}${desk(doc)}${ivanCard(opt.ivanStats || (doc.ivan || {}).stats, opt.ivan, doc.ivan)}${tests(doc)}</div>`;
   }
   window.CNFutOwner = { html, mount };
 })();

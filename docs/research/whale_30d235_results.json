@@ -1,0 +1,264 @@
+{
+ "points": [
+  {
+   "T": 1792022400000,
+   "traders": {
+    "yes": 22,
+    "no": 1
+   },
+   "yes": {
+    "dec": 222,
+    "mean_dec": 0.010989232535853061,
+    "mean_trader": 0.01650448014309025,
+    "tr_active": 21
+   },
+   "no": {
+    "dec": 0,
+    "mean_dec": null,
+    "mean_trader": null,
+    "tr_active": 0
+   }
+  },
+  {
+   "T": 1792281600000,
+   "traders": {
+    "yes": 25,
+    "no": 2
+   },
+   "yes": {
+    "dec": 275,
+    "mean_dec": 0.013203408061770243,
+    "mean_trader": 0.015775706557678397,
+    "tr_active": 22
+   },
+   "no": {
+    "dec": 12,
+    "mean_dec": 0.003528063796207708,
+    "mean_trader": 0.003528063796207708,
+    "tr_active": 1
+   }
+  },
+  {
+   "T": 1792540800000,
+   "traders": {
+    "yes": 27,
+    "no": 2
+   },
+   "yes": {
+    "dec": 401,
+    "mean_dec": 0.00911403710788439,
+    "mean_trader": 0.008465279497306872,
+    "tr_active": 23
+   },
+   "no": {
+    "dec": 3,
+    "mean_dec": 0.0033712276968959377,
+    "mean_trader": 0.0033712276968959377,
+    "tr_active": 1
+   }
+  },
+  {
+   "T": 1792800000000,
+   "traders": {
+    "yes": 29,
+    "no": 3
+   },
+   "yes": {
+    "dec": 346,
+    "mean_dec": 0.02226829099643277,
+    "mean_trader": 0.03684984520320318,
+    "tr_active": 23
+   },
+   "no": {
+    "dec": 2,
+    "mean_dec": -0.016391686569890717,
+    "mean_trader": -0.016391686569890717,
+    "tr_active": 1
+   }
+  },
+  {
+   "T": 1793059200000,
+   "traders": {
+    "yes": 28,
+    "no": 2
+   },
+   "yes": {
+    "dec": 385,
+    "mean_dec": 0.012764070767897345,
+    "mean_trader": 0.014082092800478882,
+    "tr_active": 24
+   },
+   "no": {
+    "dec": 2,
+    "mean_dec": 0.017193297575736833,
+    "mean_trader": 0.017193297575736833,
+    "tr_active": 1
+   }
+  },
+  {
+   "T": 1793318400000,
+   "traders": {
+    "yes": 34,
+    "no": 2
+   },
+   "yes": {
+    "dec": 331,
+    "mean_dec": 0.011502780797070416,
+    "mean_trader": 0.013415699707619298,
+    "tr_active": 30
+   },
+   "no": {
+    "dec": 1,
+    "mean_dec": 0.07752027902468556,
+    "mean_trader": 0.07752027902468556,
+    "tr_active": 1
+   }
+  },
+  {
+   "T": 1793577600000,
+   "traders": {
+    "yes": 34,
+    "no": 5
+   },
+   "yes": {
+    "dec": 444,
+    "mean_dec": 0.009340633384578788,
+    "mean_trader": 0.014965325554108844,
+    "tr_active": 26
+   },
+   "no": {
+    "dec": 9,
+    "mean_dec": 0.025999487821131546,
+    "mean_trader": 0.024490547058516027,
+    "tr_active": 4
+   }
+  },
+  {
+   "T": 1793836800000,
+   "traders": {
+    "yes": 37,
+    "no": 4
+   },
+   "yes": {
+    "dec": 261,
+    "mean_dec": 0.008822997311152384,
+    "mean_trader": 0.0077773633499390385,
+    "tr_active": 19
+   },
+   "no": {
+    "dec": 9,
+    "mean_dec": -0.0038016383642849056,
+    "mean_trader": -0.003801638364284905,
+    "tr_active": 3
+   }
+  },
+  {
+   "T": 1794096000000,
+   "traders": {
+    "yes": 45,
+    "no": 2
+   },
+   "yes": {
+    "dec": 231,
+    "mean_dec": 0.010943558552912002,
+    "mean_trader": 0.0011792793478027194,
+    "tr_active": 22
+   },
+   "no": {
+    "dec": 0,
+    "mean_dec": null,
+    "mean_trader": null,
+    "tr_active": 0
+   }
+  },
+  {
+   "T": 1794355200000,
+   "traders": {
+    "yes": 42,
+    "no": 3
+   },
+   "yes": {
+    "dec": 150,
+    "mean_dec": 0.007856627821416579,
+    "mean_trader": 0.008602337970191321,
+    "tr_active": 18
+   },
+   "no": {
+    "dec": 0,
+    "mean_dec": null,
+    "mean_trader": null,
+    "tr_active": 0
+   }
+  },
+  {
+   "T": 1794614400000,
+   "traders": {
+    "yes": 43,
+    "no": 5
+   },
+   "yes": {
+    "dec": 117,
+    "mean_dec": 0.009928866428915446,
+    "mean_trader": 0.009613251722429914,
+    "tr_active": 13
+   },
+   "no": {
+    "dec": 0,
+    "mean_dec": null,
+    "mean_trader": null,
+    "tr_active": 0
+   }
+  },
+  {
+   "T": 1794873600000,
+   "traders": {
+    "yes": 38,
+    "no": 6
+   },
+   "yes": {
+    "dec": 91,
+    "mean_dec": 0.010734296955664241,
+    "mean_trader": 0.016190542451762307,
+    "tr_active": 6
+   },
+   "no": {
+    "dec": 0,
+    "mean_dec": null,
+    "mean_trader": null,
+    "tr_active": 0
+   }
+  }
+ ],
+ "summary": {
+  "h1": {
+   "yes": {
+    "points": 6,
+    "dec": 1960,
+    "mean_trader_avg": 0.01751551731822948
+   },
+   "no": {
+    "points": 5,
+    "dec": 20,
+    "mean_trader_avg": 0.017044236304727064
+   },
+   "diff_mean": 0.0006734884485302635,
+   "diff_t": 0.03567622255765311,
+   "diff_pos": "3/5"
+  },
+  "h2": {
+   "yes": {
+    "points": 6,
+    "dec": 1294,
+    "mean_trader_avg": 0.009721350066039023
+   },
+   "no": {
+    "points": 2,
+    "dec": 18,
+    "mean_trader_avg": 0.010344454347115561
+   },
+   "diff_mean": 0.0010268901049083805,
+   "diff_t": null,
+   "diff_pos": "1/2"
+  }
+ }
+}

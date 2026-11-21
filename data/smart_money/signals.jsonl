@@ -32,3 +32,4 @@
 {"day":"2026-11-20","t":1795186262854,"key":"hl:UZEC","src":"hl","chain":"hl","address":null,"symbol":"UZEC","n":2,"wallets":["0xfe7c…b7ae","Auros"],"price":803.86,"liq":null,"fdv":null,"flags":0}
 {"day":"2026-11-21","t":1795222687432,"key":"hl:UBTC","src":"hl","chain":"hl","address":null,"symbol":"UBTC","n":2,"wallets":["0xfe7c…b7ae","x.com/SilkBtc"],"price":58925.0,"liq":null,"fdv":null,"flags":0}
 {"day":"2026-11-21","t":1795237312094,"key":"hl:HYPE","src":"hl","chain":"hl","address":null,"symbol":"HYPE","n":2,"wallets":["0x3dc9…54b0","0x6859…7e1e"],"price":56.421,"liq":null,"fdv":null,"flags":0}
+{"day":"2026-11-21","t":1795253750399,"key":"hl:UETH","src":"hl","chain":"hl","address":null,"symbol":"UETH","n":2,"wallets":["Auros","0x6859…7e1e"],"price":1634.6,"liq":null,"fdv":null,"flags":0}

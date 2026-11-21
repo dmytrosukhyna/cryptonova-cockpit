@@ -30,6 +30,15 @@ def approx_start(v) -> str:
     return "≈ $" + f"{r:,}".replace(",", " ") if r > 0 else ""
 
 
+def approx_base(v) -> str:
+    """«≈ $8 700» — a part's base (its share of the start) rounded to $100, for public texts"""
+    try:
+        r = int(round(float(v) / 100.0)) * 100
+    except (TypeError, ValueError):
+        return ""
+    return "≈ $" + f"{r:,}".replace(",", " ") if r > 0 else ""
+
+
 def info(real: dict) -> dict:
     """{since, short «21.11», full «21.11.2026», words_ru «21 ноября 2026 года», short_en «21 Nov», label_ru, start_label_ru,
     start_approx «≈ $10 000», known} — with no date known every text falls back to «с начала счёта»"""

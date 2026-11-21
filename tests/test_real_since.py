@@ -33,6 +33,10 @@ def test_morning_and_app_note_read_the_start():
     real = json.load(open(os.path.join(ROOT, "web", "public_real.json"), encoding="utf-8"))
     note = A._real_portfolio({**real, "since": SINCE, "start_usd": 10276.07}, {}, SINCE + 3_600_000, "ru")["note"]
     assert "21.11.2026" in note and "≈ $10 000" in note and "10 276" not in note
+    pp = A._real_portfolio({**real, "since": SINCE, "start_usd": 10276.07}, {}, SINCE + 3_600_000, "ru")
+    if pp.get("spot") and pp.get("futures"):                        # the part bases: «≈ $8 700» / «≈ $1 500», never «$8 734,66»
+        assert "(≈ $" in pp["spot"]["base_note"] and "(≈ $" in pp["futures"]["base_note"] and "8 734" not in pp["spot"]["base_note"]
+    assert RS.approx_base(8734.66) == "≈ $8 700" and RS.approx_base(1541.41) == "≈ $1 500"
 
 
 def test_no_public_page_or_text_keeps_the_old_start():

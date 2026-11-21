@@ -61,7 +61,7 @@
     return `<section class="card lead" data-demo="spot-summary">
       <div class="card-h"><span class="eyebrow">Сводка спота</span>${V.chip('реальный счёт OKX', 'real')}${V.realStartWarn(M)}<span class="sp"></span>${V.stamp(M.asof, 60)}</div>
       <div class="kpis">
-        ${V.kpi('Стоимость спот-части', V.money(value), V.isNum(S.start_usd) ? `старт ${V.money(S.start_usd)} · ${esc(V.date(S.since || M.since))}` : `с ${V.PUBLIC_START_LABEL}`, '', 'big')}
+        ${V.kpi('Стоимость спот-части', V.money(value), V.isNum(S.start_usd) ? `старт ≈ $${(Math.round((+S.start_usd || 0) / 100) * 100).toLocaleString('ru-RU')} · ${esc(V.date(S.since || M.since))}` : `с ${V.PUBLIC_START_LABEL}`, '', 'big')}
         ${V.kpi('Результат спота', `<span class="${V.cls(pnl)}">${V.smoney(pnl)}</span>`, V.isNum(S.pct) ? `<span class="${V.cls(S.pct)}">${V.pct(S.pct)}</span>` : '')}
         ${V.kpi('Свободно (кэш спота)', V.money(cash), cashPct != null ? `${V.share(cashPct)} спот-портфеля` : '')}
         ${V.kpi('В монетах', V.money(coins), sleeve ? `${V.share((coins / sleeve) * 100)} спот-портфеля` : '')}

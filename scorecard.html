@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CRYPTO NOVΛ — Табло прогнозов · Prediction scorecard</title>
+<meta name="description" content="Все прогнозы и сигналы CRYPTO NOVA AI: записаны в момент публикации, проверены по ценам, без отбора. Every forecast and signal, recorded when published and scored against real prices.">
+<meta name="theme-color" content="#0A0F1C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0A0F1C;--card:#121A2B;--line:#1C2740;--text:#EAF0FA;--soft:#C9D3E6;--muted:#94A3BD;--accent:#6CB4FF;--warn:#FFB547;--up:#3DDC97;--down:#FF6B6B}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 Manrope,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:28px 16px 64px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.brand{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:1px;color:var(--text);text-decoration:none}
+.lang{display:flex;gap:6px}
+.lang a{padding:6px 12px;border-radius:999px;background:var(--card);color:var(--soft);text-decoration:none;font-size:14px;font-weight:600}
+.lang a:hover{color:var(--text)}
+h1{font-family:'Space Grotesk',sans-serif;font-size:30px;line-height:1.2;margin:8px 0 6px}
+h2{font-family:'Space Grotesk',sans-serif;font-size:20px;margin:30px 0 8px}
+h3{font-size:16px;margin:16px 0 6px}
+p,li{color:var(--soft)}
+ul{padding-left:20px}
+li{margin:4px 0}
+a{color:var(--accent)}
+.meta{color:var(--muted);font-size:14px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin:16px 0}
+.box.warn{background:#1E1A10;border-color:#3A2F16}
+.box p{margin:4px 0}
+table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+th,td{text-align:left;vertical-align:top;padding:9px 8px;border-top:1px solid var(--line)}
+th{color:var(--muted);font-weight:700;font-size:12px;letter-spacing:.5px;text-transform:uppercase}
+td{color:var(--soft)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+hr{border:0;border-top:1px solid var(--line);margin:48px 0}
+footer{color:var(--muted);font-size:13px;margin-top:40px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.tile b{display:block;font-family:'Space Grotesk',sans-serif;font-size:26px;color:var(--text);font-variant-numeric:tabular-nums}
+.tile span{color:var(--muted);font-size:13px}
+.bad{color:var(--down)}
+.good{color:var(--up)}
+.warnc{color:var(--warn)}
+.verdict{font-weight:700}
+.list{list-style:none;padding:0;margin:8px 0}
+.list li{padding:7px 0;border-top:1px solid var(--line);font-size:14px;display:flex;gap:10px}
+.list li .mark{flex:0 0 18px;font-weight:700}
+.list li .when{color:var(--muted);flex:0 0 auto;white-space:nowrap;font-size:13px}
+.list li .what{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+code,.hash{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;overflow-wrap:anywhere;word-break:break-all;color:var(--text)}
+pre{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;overflow-x:auto;font-size:13px;white-space:pre-wrap;word-break:break-all}
+details{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 14px;margin:10px 0}
+details summary{cursor:pointer;font-weight:700;color:var(--text)}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--line);color:var(--muted);margin-left:6px;font-weight:600}
+</style>
+</head>
+<body><div class="wrap">
+<header><a class="brand" href="index.html">CRYPTO NOVΛ</a><div class="lang"><a href="#ru">RU</a><a href="#en">EN</a></div></header>
+
+<section id="ru">
+<h1>Табло прогнозов CRYPTO NOVA AI</h1>
+<p class="meta">Все прогнозы и сигналы, которые публикует система: записаны в момент публикации, проверены по настоящим ценам, без отбора — удачные и неудачные вместе. <span data-asof="ru"></span></p>
+<div class="box warn"><p><b>Честно:</b> здесь видны и провалы. Если прогноз хуже подбрасывания монеты — так и написано. Это обучение и демо, не финансовый совет.</p></div>
+<div data-out="ru"><p class="meta">Загружаем данные…</p></div>
+<h2>Как проверить, что мы ничего не меняли задним числом</h2>
+<div data-chain="ru"></div>
+<h2>Как считаем</h2>
+<p data-method="ru"></p>
+<ul>
+<li><b>Brier</b> — средний квадрат ошибки вероятности. 0 — идеально, 0.25 — как подбрасывать монету, больше 0.25 — хуже монеты.</li>
+<li><b>Простая частота</b> — если бы мы всегда называли одну и ту же среднюю вероятность. Чтобы прогноз был полезен, он должен её обыгрывать.</li>
+<li><b>Калибровка</b> — когда мы говорим «60%», событие должно случаться примерно в 6 случаях из 10.</li>
+<li><b>Сигналы</b> — результат в % цены после комиссий (без плеча) и в R (1R = расстояние до стопа). Сравниваем с простой покупкой той же монеты на то же время.</li>
+</ul>
+<h3>Что пока не входит</h3>
+<ul data-notcovered="ru"></ul>
+<p class="meta">Это обучение и демо, не финансовый совет. Торговля криптовалютой — высокий риск. <a href="terms.html">Условия</a> · <a href="privacy.html">Конфиденциальность</a> · <a href="support.html">Поддержка</a></p>
+</section>
+
+<hr>
+
+<section id="en">
+<h1>CRYPTO NOVA AI prediction scorecard</h1>
+<p class="meta">Every forecast and signal the system publishes: recorded when published, checked against real prices, no cherry-picking — hits and misses together. <span data-asof="en"></span></p>
+<div class="box warn"><p><b>Honestly:</b> failures are shown here too. If a forecast is worse than a coin flip, it says so. Education and demo, not financial advice.</p></div>
+<div data-out="en"><p class="meta">Loading…</p></div>
+<h2>How to check that nothing was changed afterwards</h2>
+<div data-chain="en"></div>
+<h2>How we score</h2>
+<p data-method="en"></p>
+<ul>
+<li><b>Brier</b> — the mean squared error of the probability. 0 is perfect, 0.25 is a coin flip, above 0.25 is worse than a coin.</li>
+<li><b>Base rate</b> — always stating the same average probability. A useful forecast has to beat it.</li>
+<li><b>Calibration</b> — when we say “60%”, the event should happen about 6 times out of 10.</li>
+<li><b>Signals</b> — result in % of price after fees (no leverage) and in R (1R = distance to the stop), compared with simply buying the same coin for the same time.</li>
+</ul>
+<h3>Not covered yet</h3>
+<ul data-notcovered="en"></ul>
+<p class="meta">Education and demo, not financial advice. Crypto trading is high risk. <a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · <a href="support.html">Support</a></p>
+</section>
+<footer>CRYPTO NOVΛ · scorecard.json · <a href="https://github.com/dmytrosukhyna/cryptonova-cockpit/tree/main/data">data/</a></footer>
+</div>
+<script>
+(function () {
+  var T = {
+    ru: {recorded: "записано прогнозов и сигналов", checked: "проверено", pending: "ждут срока", void: "не удалось проверить",
+         losing: "источников хуже монетки или в минусе", src: "Источник", n: "Проверено", hm: "Сбылось / нет", key: "Главная цифра", verdict: "Вердикт",
+         hz: "Срок", hit: "Попадания", brier: "Brier", clim: "Простая частота", calib: "Калибровка: что говорили → что случилось",
+         range: "Вероятность", said: "Говорили", happened: "Случилось", live: "Только записанные вживую (без старых журналов)",
+         ref: "Собственный журнал источника", misses: "Самые большие промахи", recent: "Последние 50 проверенных",
+         nomiss: "Промахов пока нет.", none: "Пока ничего не проверено.", bf: "из старых журналов", pendingw: "ждут срока",
+         lines: "строк", head: "последний хеш", cmd: "Проверка (нужен только Python 3):", ok: "цепочка цела", broken: "ЦЕПОЧКА НАРУШЕНА",
+         win: "в плюсе", avg: "в среднем", base: "простая покупка", r: "R", lag: "запись после публикации, медиана",
+         min: "мин", nodata: "Данных пока нет — табло обновляется сервером раз в минуту.", since: "с", asof: "Обновлено:",
+         prob: "вероятность", sig: "сделки", pub: "опубликовано как новые", ledger: "Прогнозы", outcomes: "Итоги", seg: "закрытых частей",
+         late: "записано позже 2 ч"},
+    en: {recorded: "forecasts and signals recorded", checked: "checked", pending: "waiting for their horizon", void: "could not be checked",
+         losing: "sources worse than a coin or losing", src: "Source", n: "Checked", hm: "Hit / miss", key: "Key number", verdict: "Verdict",
+         hz: "Horizon", hit: "Hit rate", brier: "Brier", clim: "Base rate", calib: "Calibration: what we said → what happened",
+         range: "Probability", said: "Said", happened: "Happened", live: "Recorded live only (no older ledgers)",
+         ref: "The source's own ledger", misses: "Biggest misses", recent: "Latest 50 checked",
+         nomiss: "No misses yet.", none: "Nothing checked yet.", bf: "from older ledgers", pendingw: "waiting",
+         lines: "lines", head: "latest hash", cmd: "Check (only Python 3 needed):", ok: "chain intact", broken: "CHAIN BROKEN",
+         win: "profitable", avg: "average", base: "plain buy", r: "R", lag: "recorded after publication, median",
+         min: "min", nodata: "No data yet — the server updates the scorecard every minute.", since: "since", asof: "Updated:",
+         prob: "probability", sig: "trades", pub: "published as new", ledger: "Predictions", outcomes: "Outcomes", seg: "closed segments",
+         late: "recorded > 2 h late"}
+  };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]; }); }
+  function pct(x, d) { return x == null ? "—" : (100 * x).toFixed(d == null ? 0 : d) + "%"; }
+  function num(x, d) { return x == null ? "—" : Number(x).toFixed(d); }
+  function sgn(x, d) { return x == null ? "—" : (x > 0 ? "+" : "") + Number(x).toFixed(d) ; }
+  function day(ms, lang) {
+    if (!ms) return "";
+    var d = new Date(ms), p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return p(d.getUTCDate()) + "." + p(d.getUTCMonth() + 1) + " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()) + " UTC";
+  }
+  function cls(code) { return /worse|loss|narrow|wide|no_edge|no_skill/.test(code) ? "bad" : code === "few" ? "warnc" : "good"; }
+  function keyNum(s, t) {
+    var st = s.stats || {};
+    if (!st.n) return "—";
+    if (s.kind === "prob") {
+      if (s.key === "band") return pct(st.base_rate) + " " + (t === T.ru ? "внутри" : "inside");
+      return "Brier " + num(st.brier, 4) + " · " + t.hit.toLowerCase() + " " + pct(st.hit_rate);
+    }
+    return sgn(st.avg_pct, 2) + "% · " + (st.avg_r == null ? "" : sgn(st.avg_r, 2) + "R · ") + t.win + " " + pct(st.win_rate);
+  }
+  function hm(s) {
+    var st = s.stats || {};
+    if (!st.n) return "—";
+    return s.kind === "prob" ? '<span class="good">' + st.hits + '</span> / <span class="bad">' + st.misses + "</span>"
+                             : '<span class="good">' + st.wins + '</span> / <span class="bad">' + st.losses + "</span>";
+  }
+  function detail(s, lang, t) {
+    var st = s.stats || {}, h = "";
+    h += '<details><summary>' + esc(s["name_" + lang]) + '<span class="tag">' + (s.kind === "prob" ? t.prob : t.sig) + "</span></summary>";
+    h += "<p>" + esc(s["what_" + lang]) + ". " + t.recorded + ": " + s.recorded + ", " + t.checked + ": " + s.checked + ", " + t.pendingw + ": " + s.pending +
+         (s["void"] ? ", " + t["void"] + ": " + s["void"] : "") + (s.backfilled ? ", " + t.bf + ": " + s.backfilled : "") +
+         (s.late ? ", " + t.late + ": " + s.late : "") +
+         (s.published != null ? ", " + t.pub + ": " + s.published : "") +
+         (s.lag_median_min != null ? "; " + t.lag + ": " + num(s.lag_median_min, 0) + " " + t.min : "") + ".</p>";
+    h += '<p class="verdict ' + cls(s.verdict) + '">' + esc(s["verdict_" + lang]) + "</p>";
+    if (s.kind === "prob" && st.n) {
+      h += '<div class="tablewrap"><table><tr><th>' + t.hz + '</th><th class="num">n</th><th class="num">' + t.hit + '</th><th class="num">' + t.brier +
+           '</th><th class="num">' + t.clim + '</th></tr>';
+      (s.horizons || []).forEach(function (x) {
+        h += "<tr><td>" + esc(x["label_" + lang]) + '</td><td class="num">' + x.n + '</td><td class="num">' + pct(x.hit_rate) + '</td><td class="num ' +
+             (x.brier > 0.25 ? "bad" : "") + '">' + num(x.brier, 4) + '</td><td class="num">' + num(x.brier_clim, 4) + "</td></tr>";
+      });
+      h += "</table></div>";
+      if ((s.calibration || []).length) {
+        h += "<h3>" + t.calib + '</h3><div class="tablewrap"><table><tr><th>' + t.range + '</th><th class="num">n</th><th class="num">' + t.said +
+             '</th><th class="num">' + t.happened + "</th></tr>";
+        s.calibration.forEach(function (c) {
+          h += "<tr><td>" + esc(c.range) + '</td><td class="num">' + c.n + '</td><td class="num">' + pct(c.p_mean) + '</td><td class="num ' +
+               (Math.abs(c.gap) > 0.1 ? "bad" : "") + '">' + pct(c.freq) + "</td></tr>";
+        });
+        h += "</table></div>";
+      }
+    }
+    if (s.kind === "signal" && st.n) {
+      h += "<p>" + t.avg + " " + sgn(st.avg_pct, 2) + "%" + (st.avg_r != null ? " (" + sgn(st.avg_r, 2) + "R)" : "") + ", " + t.win + " " + pct(st.win_rate) +
+           ", Σ " + sgn(st.sum_pct, 1) + "%, best " + sgn(st.best_pct, 2) + "%, worst " + sgn(st.worst_pct, 2) + "%" +
+           (st.base_n ? "; " + t.base + ": " + sgn(st.base_avg_pct, 2) + "% (n = " + st.base_n + ", " + (lang === "ru" ? "разница" : "difference") + " " + sgn(st.edge_pct, 2) + "%)" : "") + ".</p>";
+    }
+    var lv = s.live || {};
+    if (lv.n) {
+      h += '<p class="meta">' + t.live + ": n = " + lv.n + ", " + (s.kind === "prob" ? "Brier " + num(lv.brier, 4) + ", " + t.hit.toLowerCase() + " " + pct(lv.hit_rate)
+                                                                            : t.avg + " " + sgn(lv.avg_pct, 2) + "%, " + t.win + " " + pct(lv.win_rate)) + ".</p>";
+    }
+    if (s.ref) {
+      h += '<p class="meta">' + t.ref + " (" + esc(s.ref.file) + "): n = " + esc(s.ref.n) + (s.ref.brier != null ? ", Brier " + esc(s.ref.brier) : "") +
+           (s.ref.hit_rate != null ? ", " + t.hit.toLowerCase() + " " + pct(s.ref.hit_rate) : "") + (s.ref.avg_pct != null ? ", " + t.avg + " " + sgn(s.ref.avg_pct, 2) + "%" : "") + ".</p>";
+    }
+    return h + "</details>";
+  }
+  function list(rows, lang, t, empty) {
+    if (!rows || !rows.length) return '<p class="meta">' + empty + "</p>";
+    var h = '<ul class="list">';
+    rows.forEach(function (r) {
+      var m = r.ok === true ? '<span class="mark good">✓</span>' : r.ok === false ? '<span class="mark bad">✗</span>' : '<span class="mark warnc">?</span>';
+      if (r.ok === undefined) m = '<span class="mark bad">✗</span>';
+      h += "<li>" + m + '<span class="what">' + esc(r[lang]) + (r.bf ? ' <span class="tag">' + t.bf + "</span>" : "") + '</span><span class="when">' + day(r.t, lang) + "</span></li>";
+    });
+    return h + "</ul>";
+  }
+  function chain(c, lang, t) {
+    if (!c) return "";
+    var h = '<div class="box">';
+    [["ledger", t.ledger], ["outcomes", t.outcomes]].forEach(function (k) {
+      var x = c[k[0]] || {};
+      h += "<p><b>" + k[1] + "</b> — <code>" + esc(x.file) + "</code>" + (x.segments ? " + " + x.segments + " " + t.seg + " (<code>" + esc(x.segments_dir) + "</code>)" : "") +
+           ": " + x.lines + " " + t.lines + ", " + '<span class="' + (x.ok ? "good" : "bad") + '">' + (x.ok ? t.ok : t.broken + (x.bad_line ? " (" + x.bad_line + ")" : "")) +
+           "</span><br>" + t.head + ': <span class="hash">' + esc(x.head) + "</span></p>";
+    });
+    h += "</div><p>" + esc(c["how_" + lang]) + "</p><p>" + t.cmd + "</p><pre>" + esc(c.verify_cmd) + "</pre>";
+    return h;
+  }
+  function render(d, lang) {
+    var t = T[lang], out = document.querySelector('[data-out="' + lang + '"]');
+    document.querySelector('[data-asof="' + lang + '"]').textContent = d.asof ? t.asof + " " + day(d.asof, lang) + "." : "";
+    var hd = d.headline || {}, h = "";
+    h += '<div class="tiles"><div class="tile"><b>' + (hd.recorded || 0) + "</b><span>" + t.recorded + '</span></div><div class="tile"><b>' + (hd.checked || 0) +
+         "</b><span>" + t.checked + '</span></div><div class="tile"><b>' + (hd.pending || 0) + "</b><span>" + t.pending + '</span></div><div class="tile"><b class="' +
+         ((hd.sources_losing || []).length ? "bad" : "") + '">' + (hd.sources_losing || []).length + " / " + (hd.sources || 0) + "</b><span>" + t.losing + "</span></div></div>";
+    h += '<div class="tablewrap"><table><tr><th>' + t.src + '</th><th class="num">' + t.n + '</th><th class="num">' + t.hm + "</th><th>" + t.key + "</th><th>" + t.verdict + "</th></tr>";
+    (d.sources || []).forEach(function (s) {
+      h += "<tr><td>" + esc(s["name_" + lang]) + '</td><td class="num">' + s.checked + (s.pending ? ' <span class="meta">+' + s.pending + "</span>" : "") + '</td><td class="num">' + hm(s) +
+           "</td><td>" + esc(keyNum(s, t)) + '</td><td class="verdict ' + cls(s.verdict) + '">' + esc(s["verdict_" + lang]) + "</td></tr>";
+    });
+    h += "</table></div>";
+    (d.sources || []).forEach(function (s) { h += detail(s, lang, t); });
+    h += "<h2>" + t.misses + "</h2>" + list(d.misses, lang, t, t.nomiss);
+    h += "<h2>" + t.recent + "</h2>" + list(d.recent, lang, t, t.none);
+    if ((d.errors || []).length) h += '<p class="meta">' + esc(d.errors.slice(0, 5).join(" · ")) + "</p>";
+    out.innerHTML = h;
+    document.querySelector('[data-chain="' + lang + '"]').innerHTML = chain(d.chain, lang, t);
+    document.querySelector('[data-method="' + lang + '"]').textContent = d["method_" + lang] || "";
+    document.querySelector('[data-notcovered="' + lang + '"]').innerHTML = (d["not_covered_" + lang] || []).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("");
+  }
+  fetch("scorecard.json", {cache: "no-store"}).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
+    render(d, "ru"); render(d, "en");
+  }).catch(function () {
+    ["ru", "en"].forEach(function (l) { document.querySelector('[data-out="' + l + '"]').innerHTML = '<p class="meta">' + T[l].nodata + "</p>"; });
+  });
+})();
+</script>
+</body>
+</html>

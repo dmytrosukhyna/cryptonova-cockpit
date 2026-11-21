@@ -1485,7 +1485,8 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
         base = cap0 * float(share) / 100            # the part's share of the capital: the start + the net flows (28.10)
         return {"share_pct": _r(share), "start_usd": _r(base), "pnl_usd": _r(res), "value_usd": _r(base + res) if res is not None else None,
                 "pct": _r(res / base * 100) if res is not None and base else None, "since": since,
-                "base_note": t(lang, f"pp.base.{key}", share=_dec(float(share), lang), usd=_usd_text(base, lang)),
+                # 21.11 (owner): never the exact base in public — «≈ $8 700» (rounded to $100); the math keeps start_usd exact
+                "base_note": t(lang, f"pp.base.{key}", share=_dec(float(share), lang), usd=real_since.approx_base(base) or _usd_text(base, lang)),
                 "curve": [[t_, _r(base + v)] for t_, v in _grid(crv)] if crv else [],
                 "daily": _daily(crv, res, since, asof) if split_from is not None and split_from <= since else [],
                 "periods": _periods(crv, res, base, since, asof, split_from)}

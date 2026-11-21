@@ -77,8 +77,9 @@ def main():
             ret, kind = walk(S, c["side"], c["opened_t"], t_out, stop, ts)
             r[name] = round(ret, 2) if ret is not None else None
             r[name + "_kind"] = kind
-        if c["open_now"]:
-            # candles end yesterday: a copy that has not hit the variant's stop by then is marked at the desk's current price
+        r["short_candles"] = bool(t_out and B.bar_at(S, t_out) is None)
+        if c["open_now"] or r["short_candles"]:
+            # candles end yesterday (or before the trader's exit): a copy that has not hit the variant's stop by then is marked at the desk's current price
             for name in V:
                 if r.get(name + "_kind") == "as trader":
                     r[name] = round(r["desk_pct"], 2)
@@ -101,8 +102,11 @@ def main():
     print(f"::notice title=ivan233 n::{len(res)} copies, with candles {len(ok)}")
     for name, s_ in summ.items():
         print(f"::notice title=ivan233 {name}::" + json.dumps(s_, ensure_ascii=False))
-    for r in res:
-        print("::notice title=ivan233 copy::" + json.dumps({k: r.get(k) for k in ("coin", "open_now", "desk_pct", "mae_pct", "A16", "A16_kind", "B8", "B8_kind", "i12", "iT72", "iT72_kind", "err")}, ensure_ascii=False))
+    # one line for all copies (annotations per step are capped at 10)
+    print("::notice title=ivan233 copies::" + " ; ".join(
+        f"{r['coin']}{'*' if r['open_now'] else ''}{'~' if r.get('short_candles') else ''} desk {r['desk_pct']} mae {r.get('mae_pct')} "
+        f"A {r.get('A16')}/{r.get('A16_kind')} B8 {r.get('B8')}/{r.get('B8_kind')} i10 {r.get('i10')} i12 {r.get('i12')} T72 {r.get('iT72')}/{r.get('iT72_kind')}"
+        for r in res))
 
 
 if __name__ == "__main__":

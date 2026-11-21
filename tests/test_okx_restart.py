@@ -219,3 +219,33 @@ def test_careful_override_lowers_risk_and_caps_net_long():
     assert "лимит лонгов" in inspect.getsource(fu.decide)
     cfgd = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "owner_overrides.json")))
     assert cfgd["careful_21_11"]["risk"] <= 0.02 and cfgd["careful_21_11"]["long_cap_x"] <= 1.0
+
+
+def test_closed_total_after_the_restart_counts_only_swaps_closed_since_the_start(tmp_path):
+    """21.11 fix: the feed showed 1 closed swap (SOL −$2.09) but «итог закрытых +$63.36 / +4.11 %» — fut_pnl_usd − open P/L also
+    held the restart's own correction (upl0) of the positions opened before it. The closed total is now OKX's realized P/L of the
+    swaps closed since «since» only (public_real fut_realized_usd), in public_real and app_home."""
+    import shutil
+    import test_public_real as TP
+    from cnq.agents import app_home
+    since = 1795240455789
+    s = {"total_usd": 10300.0, "start": {"usd": 10276.07, "t": since, "src": "restart", "label_ru": R.LABEL_RU, "upl0": -65.45},
+         "futures": {"positions": [{"side": "LONG", "upl": -50.0, "mark": 1.0, "entry": 1.1}]}, "spot": {}, "cash": {"usd": 1000.0}}
+    st = {}
+    rows = [{"inst": "SOL-USDT-SWAP", "side": "long", "pnl_usd": -2.09, "opened": since - 8 * 3_600_000, "closed": since + 1_600_000}]
+    d = PR.build(s, st, since + 2_000_000, 1, -2.09, rows, [])
+    assert d["fut_realized_usd"] == -2.09 and abs(d["fut_pnl_usd"] - (-2.09 - 50.0 + 65.45)) < 0.011
+    doc = PR.clean(d)
+    assert doc["fut_realized_usd"] == -2.09
+    real = json.loads(json.dumps(doc))
+    real["closed"] = [{**r, "open_px": 68.88, "close_px": 65.91, "move_pct": -4.31, "lev": 4.0, "partial": False} for r in rows]
+    real["alloc"] = {**real["alloc"], "spot_coins_usd": 9000.0, "spot_cash_usd": 100.0, "fut_budget_usd": 1100.0, "fut_margin_usd": 90.0,
+                     "fut_reserve_usd": 1010.0, "active_coins_usd": 0.0, "active_wait_usd": 0.0, "other_usd": 0.0, "spot_pct": 75.0,
+                     "fut_pct": 15.0, "active_pct": 0.0}
+    real["spot"] = [{"sym": "BTC", "share": 87.4, "usd": 9000.0}]
+    _pp = TP._pp_files
+    _pp(str(tmp_path), {**real, "asof": since + 2_000_000})
+    out = app_home.run(sqlite3.connect(":memory:"), str(tmp_path), now=since + 2_100_000)
+    stt = out["public_portfolio"]["futures"]["stats"]
+    assert stt["n"] == 1 and stt["realized_usd"] == -2.09 and stt["losses"] == 1 and stt["realized_pct_start"] < 0
+    shutil.rmtree(str(tmp_path), ignore_errors=True)

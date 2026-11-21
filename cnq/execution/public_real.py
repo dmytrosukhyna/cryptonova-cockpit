@@ -64,7 +64,7 @@ from . import myspot_watch as ms
 PATH = "web/public_real.json"
 KEYS = ("exchange", "since", "start_usd", "equity_usd", "pnl_usd", "pnl_pct", "today_usd", "today_pct", "spot", "usdt_pct", "usdt_usd",
         "alloc", "futures", "closed_n", "curve", "asof", "stale", "copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd", "closed", "fut_curve",
-        "actions", "flows", "copy_skips", "spot_stops", "spot_orders", "label_ru", "start_label_ru")
+        "actions", "flows", "copy_skips", "spot_stops", "spot_orders", "label_ru", "start_label_ru", "fut_realized_usd")
 # 06.11 (owner: «счёт не копирует новые позиции китов»): why the futures sleeve did NOT open a desk trade — the latest reason per
 # trade, last COPY_SKIPS_MAX, from okx_futures state «copy_skips» (desk trade id = «sig», OKX instrument, plain Russian reason)
 COPY_SKIPS_MAX = 30
@@ -436,6 +436,9 @@ def build(s: dict, st: dict, now: int, closed_n: int | None = None, fut_realized
             "actions": list(acts or [])[:ACTIONS_MAX], "copy_skips": copy_skips(), "spot_stops": spot_stops(), "spot_orders": spot_orders(),
             "label_ru": (start.get("label_ru") or None) if rs else None,
             # 21.11 07:47 (owner): shown rounded «стартовый капитал ≈ $10 000»; every result uses the exact start_usd
+            # 21.11 (fix): OKX's realized P/L of the swaps CLOSED since «since» only — the closed-trade total; fut_pnl_usd also holds
+            # the open positions' P/L after the restart (their P/L before it, upl0, is taken off) and is not a closed total
+            "fut_realized_usd": _r(fut_realized),
             "start_label_ru": ("стартовый капитал ≈ $" + f"{round(s0, -3):,.0f}".replace(",", " ")) if rs else None}
 
 
@@ -548,6 +551,8 @@ def clean(doc: dict) -> dict:
     out["label_ru"] = lb if isinstance(lb, str) and 0 < len(lb) <= 80 and "\n" not in lb else None
     sl = doc.get("start_label_ru")
     out["start_label_ru"] = sl if isinstance(sl, str) and 0 < len(sl) <= 60 and "\n" not in sl else None
+    fr = doc.get("fut_realized_usd")
+    out["fut_realized_usd"] = fr if isinstance(fr, (int, float)) and not isinstance(fr, bool) else None
     out["copiers"] = int(doc["copiers"]) if isinstance(doc.get("copiers"), (int, float)) else None
     out["copy_url"] = doc["copy_url"] if isinstance(doc.get("copy_url"), str) and doc["copy_url"].startswith(sub.ld.PROFILE) else None
     return out

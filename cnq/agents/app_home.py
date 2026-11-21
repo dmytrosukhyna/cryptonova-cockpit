@@ -1237,7 +1237,8 @@ REAL_ALLOC = ("spot_coins_usd", "spot_cash_usd", "fut_budget_usd", "fut_margin_u
               "active_wait_usd", "other_usd", "spot_pct", "fut_pct", "active_pct", "core_pct")      # core_pct: 28.10
 REAL_STALE_MS = 2 * 3_600_000
 REAL_OPT = ("copiers", "copy_url", "spot_pnl_usd", "fut_pnl_usd",      # 22.10 (build 45): null in a file from before
-            "closed", "fut_curve", "actions", "flows")                # 28.10 (build 46)
+            "closed", "fut_curve", "actions", "flows",                # 28.10 (build 46)
+            "fut_realized_usd")                                       # 21.11: the closed total since «since» only
 REAL_FUT = ("inst", "side", "entry", "stop", "target", "upnl_pct", "upnl_usd", "copy", "copy_reason", "mark", "lev", "opened", "sig")
 
 
@@ -1554,7 +1555,10 @@ def _real_portfolio(real: dict | None, paper: dict, now: int, lang: str = DEFAUL
             r_["closed_part_usd"] = _r(part_open[r_["inst"]])
     upl = sum(float(x.get("upnl_usd") or 0) for x in real.get("futures") or [])
     n = int(real.get("closed_n") or 0)
-    realized = _r(fpnl - upl) if fpnl is not None else None
+    # 21.11 (fix after the restart): the closed total = OKX's realized P/L of the swaps closed since «since» (public_real
+    # fut_realized_usd); fut_pnl_usd − open P/L is not it once positions from before the restart are open (their pre-restart P/L)
+    fr_ = real.get("fut_realized_usd")
+    realized = _r(float(fr_)) if isinstance(fr_, (int, float)) and not isinstance(fr_, bool) else (_r(fpnl - upl) if fpnl is not None else None)
     wins = sum(1 for c in closed if (c["pnl_usd"] or 0) > 0)
     losses = sum(1 for c in closed if (c["pnl_usd"] or 0) < 0)
     stats = {"n": n, "listed": len(closed), "complete": len(closed) + len(part_open) >= n, "wins": wins, "losses": losses,

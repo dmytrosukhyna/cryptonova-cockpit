@@ -20,6 +20,8 @@ import re
 import sqlite3
 import time
 
+from . import real_since as RS                           # 21.11: the real account's start date and «≈ $10 000» (public_real.json)
+
 try:
     from zoneinfo import ZoneInfo
     KYIV = ZoneInfo("Europe/Kyiv")
@@ -652,7 +654,8 @@ class Channel:
         if st.get("trades"):
             w = round((st.get("winrate") or 0) * st["trades"])
             parts.append(f"<b>С начала счёта:</b> {self._deals(st['trades'])}, в плюсе {w}, итог <b>{self._usd(bal.get('pnl_usd') or 0)}</b>.")
-        parts.append("Реальный счёт CRYPTO NOVA AI на OKX с 22.10.2026, время киевское. Прошлые результаты не гарантируют будущих, это не инвестиционный совет.")
+        parts.append(f"Реальный счёт CRYPTO NOVA AI на OKX {RS.since_ru(RS.load(self.out), True)}, время киевское. "
+                     "Прошлые результаты не гарантируют будущих, это не инвестиционный совет.")
         return "\n\n".join(parts)
 
     def trade_posts(self, send_fn, photo_fn=None, now: dt.datetime | None = None) -> list[tuple[str, str]]:
@@ -977,7 +980,8 @@ class Channel:
         the market and how the system works; anyone can connect. No method, no Google Play (the Android account is under appeal)."""
         return ("<b>CRYPTO NOVA AI — система, которая работает с реальным счётом</b>\n\n"
                 "Система CRYPTO NOVA AI круглые сутки ведёт реальный счёт на OKX: фьючерсы и спот, сама балансирует доли между ними. "
-                "У каждой сделки стоп на бирже, результат публикуем честно — и плюсы, и минусы (статистика с 22.10.2026).\n\n"
+                "У каждой сделки стоп на бирже, результат публикуем честно — и плюсы, и минусы (статистика "
+                + RS.since_ru(RS.load(self.out), True) + ").\n\n"
                 "В приложении CRYPTO NOVA AI видно всё: что происходит на рынке, какие позиции открыты и почему, как работает система "
                 "и какой у неё результат.\n"
                 "Подключиться может каждый: скачайте приложение и следуйте шагам в разделе «Подключить».\n"

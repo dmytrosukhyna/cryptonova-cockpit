@@ -2,7 +2,7 @@
 market in a line, the account, and one line for the day only when there is something new. Warm, honest, no promises; public
 wording «система CRYPTO NOVA AI» (never the method).
 
-Numbers: web/public_real.json (the real account: 24 h futures / spot / total from its curves, value, result since 22.10) and
+Numbers: web/public_real.json (the real account: 24 h futures / spot / total from its curves, value, result since its start) and
 web/markets.json (BTC, fear & greed); the day line from the macro calendar (cnq/agents/macro_calendar.py, events of today).
 Variety: every part has several phrasings; the ones used on the last days are remembered (agents.sqlite morning_hist) and not
 repeated; the day line is skipped when it is the same as yesterday's or empty.
@@ -46,10 +46,10 @@ MARKET = ["Биткоин {btc} ({chg}), настроение рынка — {fn
           "Рынок: биткоин {btc}, за сутки {chg}; индекс страха и жадности {fng} — {fng_ru}.",
           "Биткоин стоит {btc} ({chg} за сутки), на рынке {fng_ru}.",
           "BTC {btc}, {chg} за сутки. Настроение — {fng_ru}, {fng} из 100."]
-ACCOUNT = ["Счёт {eq}, с 22.10 {since}.", "Реальный счёт — {eq} ({since} с 22.10).", "На счёте {eq}; результат с 22.10 — {since}.",
+ACCOUNT = ["Счёт {eq}, {from} {since}.", "Реальный счёт — {eq} ({since} {from}).", "На счёте {eq}; результат {from} — {since}.",
            "Реальный счёт CRYPTO NOVA AI: {eq}, с начала {since}."]
-ACCOUNT_OWNER = ["Твой счёт {eq}, с 22.10 {since}; позиций открыто: {open}.", "На твоём счёте {eq} ({since} с 22.10), открыто позиций: {open}.",
-                 "Счёт {eq}, с 22.10 {since}. В работе позиций: {open}."]
+ACCOUNT_OWNER = ["Твой счёт {eq}, {from} {since}; позиций открыто: {open}.", "На твоём счёте {eq} ({since} {from}), открыто позиций: {open}.",
+                 "Счёт {eq}, {from} {since}. В работе позиций: {open}."]
 DAY = ["Сегодня: {ev}.", "Что важно сегодня: {ev}.", "На сегодня в календаре: {ev}."]
 
 
@@ -110,7 +110,7 @@ def facts(out: str, now: int) -> dict | None:
     except Exception:  # noqa: BLE001
         ev = []
     return {"total": tot, "futures": fut, "spot": (tot - fut) if fut is not None else None, "equity": float(r["equity_usd"]),
-            "since_usd": float(r.get("pnl_usd") or 0), "since_pct": float(r.get("pnl_pct") or 0),
+            "since_usd": float(r.get("pnl_usd") or 0), "since_pct": float(r.get("pnl_pct") or 0), "since_ms": r.get("since"),
             "open": len([o for o in r.get("futures") or [] if isinstance(o, dict)]),
             "btc": btc.get("price"), "btc_chg": btc.get("chg24"), "fng": f.get("value"),
             "fng_ru": FNG_RU.get(str(f.get("label") or "").lower(), f.get("label") or ""), "fng_label": _fng_en(f.get("label")), "event": ev[0] if ev else None}
@@ -147,10 +147,10 @@ L = {"ru": {"titles": TITLES, "up": UP, "down": DOWN, "flat": FLAT, "market": MA
                      "No big moves on the account overnight: {tot}."],
             "market": ["Bitcoin {btc} ({chg}), market mood — {fng_ru} ({fng}).", "Market: bitcoin {btc}, {chg} in 24 h; fear & greed {fng} — {fng_ru}.",
                        "Bitcoin is at {btc} ({chg} in 24 h), the market shows {fng_ru}.", "BTC {btc}, {chg} in 24 h. Mood — {fng_ru}, {fng} of 100."],
-            "account": ["Account {eq}, {since} since 22 Oct.", "Real account — {eq} ({since} since 22 Oct).", "Account at {eq}; result since 22 Oct — {since}.",
+            "account": ["Account {eq}, {since} {from}.", "Real account — {eq} ({since} {from}).", "Account at {eq}; result {from} — {since}.",
                         "CRYPTO NOVA AI real account: {eq}, {since} since the start."],
-            "owner": ["Your account {eq}, {since} since 22 Oct; open positions: {open}.", "Your account is at {eq} ({since} since 22 Oct), open positions: {open}.",
-                      "Account {eq}, {since} since 22 Oct. Positions open: {open}."],
+            "owner": ["Your account {eq}, {since} {from}; open positions: {open}.", "Your account is at {eq} ({since} {from}), open positions: {open}.",
+                      "Account {eq}, {since} {from}. Positions open: {open}."],
             "day": ["Today: {ev}.", "What matters today: {ev}.", "On today's calendar: {ev}."], "flat0": "Over 24 hours: {tot}.", "nofng": "no reading",
             "close": "This is not a promise of income: the system keeps its rules and its stops. Have a good day!",
             "fng": {"extreme fear": "extreme fear", "fear": "fear", "neutral": "neutral", "greed": "greed", "extreme greed": "extreme greed"}},
@@ -166,10 +166,10 @@ L = {"ru": {"titles": TITLES, "up": UP, "down": DOWN, "flat": FLAT, "market": MA
                      "Ніч без великих рухів по рахунку: {tot}."],
             "market": ["Біткоїн {btc} ({chg}), настрій ринку — {fng_ru} ({fng}).", "Ринок: біткоїн {btc}, за добу {chg}; індекс страху й жадібності {fng} — {fng_ru}.",
                        "Біткоїн коштує {btc} ({chg} за добу), на ринку {fng_ru}.", "BTC {btc}, {chg} за добу. Настрій — {fng_ru}, {fng} зі 100."],
-            "account": ["Рахунок {eq}, з 22.10 {since}.", "Реальний рахунок — {eq} ({since} з 22.10).", "На рахунку {eq}; результат з 22.10 — {since}.",
+            "account": ["Рахунок {eq}, {from} {since}.", "Реальний рахунок — {eq} ({since} {from}).", "На рахунку {eq}; результат {from} — {since}.",
                         "Реальний рахунок CRYPTO NOVA AI: {eq}, від початку {since}."],
-            "owner": ["Твій рахунок {eq}, з 22.10 {since}; відкритих позицій: {open}.", "На твоєму рахунку {eq} ({since} з 22.10), відкритих позицій: {open}.",
-                      "Рахунок {eq}, з 22.10 {since}. У роботі позицій: {open}."],
+            "owner": ["Твій рахунок {eq}, {from} {since}; відкритих позицій: {open}.", "На твоєму рахунку {eq} ({since} {from}), відкритих позицій: {open}.",
+                      "Рахунок {eq}, {from} {since}. У роботі позицій: {open}."],
             "day": ["Сьогодні: {ev}.", "Що важливо сьогодні: {ev}.", "На сьогодні в календарі: {ev}."], "flat0": "За добу {tot}.", "nofng": "без оцінки",
             "close": "Це не обіцянка доходу: система тримається своїх правил і стопів. Гарного дня!",
             "fng": {"extreme fear": "крайній страх", "fear": "страх", "neutral": "нейтрально", "greed": "жадібність", "extreme greed": "крайня жадібність"}},
@@ -185,10 +185,10 @@ L = {"ru": {"titles": TITLES, "up": UP, "down": DOWN, "flat": FLAT, "market": MA
                      "Χωρίς μεγάλες κινήσεις στον λογαριασμό τη νύχτα: {tot}."],
             "market": ["Bitcoin {btc} ({chg}), διάθεση αγοράς — {fng_ru} ({fng}).", "Αγορά: bitcoin {btc}, {chg} σε 24 ώρες· δείκτης φόβου και απληστίας {fng} — {fng_ru}.",
                        "Το bitcoin είναι στα {btc} ({chg} σε 24 ώρες), στην αγορά επικρατεί {fng_ru}.", "BTC {btc}, {chg} σε 24 ώρες. Διάθεση — {fng_ru}, {fng} στα 100."],
-            "account": ["Λογαριασμός {eq}, από 22.10 {since}.", "Πραγματικός λογαριασμός — {eq} ({since} από 22.10).", "Στον λογαριασμό {eq}· αποτέλεσμα από 22.10 — {since}.",
+            "account": ["Λογαριασμός {eq}, {from} {since}.", "Πραγματικός λογαριασμός — {eq} ({since} {from}).", "Στον λογαριασμό {eq}· αποτέλεσμα {from} — {since}.",
                         "Πραγματικός λογαριασμός CRYPTO NOVA AI: {eq}, από την αρχή {since}."],
-            "owner": ["Ο λογαριασμός σου {eq}, από 22.10 {since}· ανοιχτές θέσεις: {open}.", "Στον λογαριασμό σου {eq} ({since} από 22.10), ανοιχτές θέσεις: {open}.",
-                      "Λογαριασμός {eq}, από 22.10 {since}. Ανοιχτές θέσεις: {open}."],
+            "owner": ["Ο λογαριασμός σου {eq}, {from} {since}· ανοιχτές θέσεις: {open}.", "Στον λογαριασμό σου {eq} ({since} {from}), ανοιχτές θέσεις: {open}.",
+                      "Λογαριασμός {eq}, {from} {since}. Ανοιχτές θέσεις: {open}."],
             "day": ["Σήμερα: {ev}.", "Τι μετράει σήμερα: {ev}.", "Στο σημερινό ημερολόγιο: {ev}."], "flat0": "Σε 24 ώρες: {tot}.", "nofng": "χωρίς ένδειξη",
             "close": "Δεν είναι υπόσχεση κέρδους: το σύστημα τηρεί τους κανόνες και τα stop του. Καλή σου μέρα!",
             "fng": {"extreme fear": "ακραίος φόβος", "fear": "φόβος", "neutral": "ουδέτερη", "greed": "απληστία", "extreme greed": "ακραία απληστία"}},
@@ -204,10 +204,10 @@ L = {"ru": {"titles": TITLES, "up": UP, "down": DOWN, "flat": FLAT, "market": MA
                      "Sin grandes movimientos en la cuenta durante la noche: {tot}."],
             "market": ["Bitcoin {btc} ({chg}), ánimo del mercado — {fng_ru} ({fng}).", "Mercado: bitcoin {btc}, {chg} en 24 h; índice de miedo y codicia {fng} — {fng_ru}.",
                        "Bitcoin está en {btc} ({chg} en 24 h), en el mercado hay {fng_ru}.", "BTC {btc}, {chg} en 24 h. Ánimo — {fng_ru}, {fng} de 100."],
-            "account": ["Cuenta {eq}, {since} desde el 22.10.", "Cuenta real — {eq} ({since} desde el 22.10).", "En la cuenta {eq}; resultado desde el 22.10 — {since}.",
+            "account": ["Cuenta {eq}, {since} {from}.", "Cuenta real — {eq} ({since} {from}).", "En la cuenta {eq}; resultado {from} — {since}.",
                         "Cuenta real de CRYPTO NOVA AI: {eq}, {since} desde el inicio."],
-            "owner": ["Tu cuenta {eq}, {since} desde el 22.10; posiciones abiertas: {open}.", "Tu cuenta está en {eq} ({since} desde el 22.10), posiciones abiertas: {open}.",
-                      "Cuenta {eq}, {since} desde el 22.10. Posiciones abiertas: {open}."],
+            "owner": ["Tu cuenta {eq}, {since} {from}; posiciones abiertas: {open}.", "Tu cuenta está en {eq} ({since} {from}), posiciones abiertas: {open}.",
+                      "Cuenta {eq}, {since} {from}. Posiciones abiertas: {open}."],
             "day": ["Hoy: {ev}.", "Lo importante hoy: {ev}.", "En el calendario de hoy: {ev}."], "flat0": "En 24 horas: {tot}.", "nofng": "sin lectura",
             "close": "No es una promesa de ganancias: el sistema mantiene sus reglas y sus stops. ¡Que tengas un buen día!",
             "fng": {"extreme fear": "miedo extremo", "fear": "miedo", "neutral": "neutral", "greed": "codicia", "extreme greed": "codicia extrema"}}}
@@ -227,6 +227,18 @@ def _usd_l(v: float, lang: str, sign: bool = True) -> str:
 
 def _pct_l(v: float, lang: str) -> str:
     return ("−" if v < 0 else "+") + _num(v, 1, lang) + "%"
+
+
+FROM = {"ru": ("с {d}", "с начала счёта"), "en": ("since {d}", "since the start"), "uk": ("з {d}", "з початку рахунку"),
+        "el": ("από {d}", "από την αρχή"), "es": ("desde el {d}", "desde el inicio")}
+
+
+def _from(F: dict, lang: str) -> str:
+    """21.11 (owner): «с 21.11» in the report's language — the real account's start from public_real.json, never a fixed date"""
+    from . import real_since as RS
+    i = RS.info({"since": F.get("since_ms")})
+    fmt, none = FROM.get(lang, FROM["ru"])
+    return fmt.format(d=i["short_en"] if lang == "en" else i["short"]) if i["known"] else none
 
 
 def plan(F: dict, day: str, hist: list[dict]) -> dict:
@@ -259,8 +271,9 @@ def render(F: dict, picks: dict, lang: str = "ru") -> dict:
         lab = P["fng"].get(str(F.get("fng_label") or "").lower()) or (F.get("fng_ru") if lang == "ru" else None) or P["nofng"]
         mk = P["market"][picks["m"]].format(btc="$" + _num(F["btc"], 0, lang), chg=_pct_l(F.get("btc_chg") or 0, lang),
                                             fng=F.get("fng") if F.get("fng") is not None else "—", fng_ru=lab)
-    acc = P["account"][picks["a"]].format(eq=_usd_l(F["equity"], lang, False), since=_pct_l(F["since_pct"], lang))
-    acc_o = P["owner"][picks["a"] % len(P["owner"])].format(eq=_usd_l(F["equity"], lang, False), since=_usd_l(F["since_usd"], lang), open=F["open"])
+    fr = _from(F, lang)
+    acc = P["account"][picks["a"]].format(eq=_usd_l(F["equity"], lang, False), since=_pct_l(F["since_pct"], lang), **{"from": fr})
+    acc_o = P["owner"][picks["a"] % len(P["owner"])].format(eq=_usd_l(F["equity"], lang, False), since=_usd_l(F["since_usd"], lang), open=F["open"], **{"from": fr})
     day_line = P["day"][picks["d"]].format(ev=picks["ev"]) if "d" in picks and lang == "ru" else ""   # the calendar's names are Russian
     body = " ".join(x for x in (res, mk, acc) if x)
     owner = " ".join(x for x in (res, mk, acc_o) if x)

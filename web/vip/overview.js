@@ -24,7 +24,8 @@
     const realizedFut = R && V.isNum(R.fut_realized_usd) ? +R.fut_realized_usd : closed.length ? sum(closed.map((c) => c.pnl_usd)) : 0;
     const openUpnl = sum(futures.map((f) => f.upnl_usd));
     const age = V.ageMin(asof);
-    const startOk = since ? V.date(since) === V.PUBLIC_START_LABEL : false;
+    if (since) V.setStart(since);                          // 21.11: the public start is the file's own date (the account was restarted)
+    const startOk = !!since;
     return {
       R, PP, since, asof, startOk,
       stale: !!g('stale') || (age != null && age > 60),
@@ -147,7 +148,7 @@
       <div class="card-h"><h3>Главный график</h3>
         <div class="seg" role="group" aria-label="Что показать">
           <button type="button" data-ovsrc="btc" aria-pressed="${ui.src === 'btc'}">Bitcoin</button>
-          <button type="button" data-ovsrc="pf" aria-pressed="${ui.src === 'pf'}">Портфель с 22.10</button></div>
+          <button type="button" data-ovsrc="pf" aria-pressed="${ui.src === 'pf'}">Портфель с ${V.PUBLIC_START_SHORT}</button></div>
         <span class="sp"></span>
         <div class="seg" role="group" aria-label="Период" id="ovPer"></div></div>
       <div id="ovChart"><div class="chart-empty">Загрузка…</div></div>
@@ -229,7 +230,7 @@
     return `<section class="card a-fin" data-demo="ov-finance">
       <div class="card-h"><span class="eyebrow">Публичный портфель CRYPTO NOVA</span>${V.chip('реальный счёт OKX', 'real')}${V.realStartWarn(M)}<span class="sp"></span>${V.stamp(M.asof, 60)}</div>
       <div class="kpis">
-        ${V.kpi('Стоимость сейчас', V.money(eq), `старт ${V.money(M.start)} · ${esc(V.date(M.since))}`, '', 'big')}
+        ${V.kpi('Стоимость сейчас', V.money(eq), `старт ${V.approxUsd(M.start)} · ${esc(V.date(M.since))}`, '', 'big')}
         ${V.kpi('Результат с начала', `<span class="${V.cls(M.pnl)}">${V.smoney(M.pnl)}</span>`, `<span class="${V.cls(M.pnlPct)}">${V.pct(M.pnlPct)}</span>`)}
         ${V.kpi('Сегодня', `<span class="${V.cls(M.today)}">${V.smoney(M.today)}</span>`, `<span class="${V.cls(M.todayPct)}">${V.pct(M.todayPct)}</span> · с 00:00 UTC`)}
         ${V.kpi('Спот · результат', `<span class="${V.cls(M.spotPnl)}">${V.smoney(M.spotPnl)}</span>`, 'монеты, кэш и активный спот')}

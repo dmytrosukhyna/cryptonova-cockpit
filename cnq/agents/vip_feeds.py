@@ -30,6 +30,7 @@ import re
 import time
 import urllib.error
 import urllib.request
+from . import real_since as RS                      # 21.11: the real account's start (public_real.json)
 
 DAY = 86_400_000
 H = 3_600_000
@@ -597,7 +598,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
     if capital:
         st0 = _num(capital.get("start_usd"), 10_000.0) or 10_000.0
         out.append(_st("capital", capital.get("name") or "CRYPTO NOVA AI Портфолио", "other", "Testing",
-                       "демо-распределитель $10 000; публичный портфель — реальный счёт с 22.10, не эта модель",
+                       "демо-распределитель $10 000; публичный портфель — реальный счёт " + RS.since_ru(RS.info(real or {})) + ", не эта модель",
                        since=_ms(capital.get("started")), net_usd=_r(capital.get("pnl_usd"), 2), net_pct=_r(capital.get("pnl_pct"), 2),
                        updated=_ms(capital.get("asof")), about_ru=capital.get("why_ru"), source="capital.json",
                        metrics_basis_ru="Демо-счёт $10 000, распределённый между направлениями; в файле только последние точки истории — просадку не показываем."))
@@ -630,7 +631,7 @@ def strategies(paper: dict, conv: dict, sel: dict, pf: dict, app_sig: dict, whal
                   # final QA 28.10: + the extra core 10 % (spot 65 + core 10 + futures 15 + «Импульс BTC» 10)
                   "split_pct": {**{k: _num(al.get(f"{k}_pct")) for k in ("spot", "fut", "active")},
                                 "core": _num(al.get("core_pct"), round(SHARES.get("core", 0.10) * 100, 1))},
-                  "note_ru": "Реальный счёт CRYPTO NOVA AI на OKX с 22.10.2026 — отдельно от демо-результатов стратегий ниже."} if real else None
+                  "note_ru": f"Реальный счёт CRYPTO NOVA AI на OKX {RS.since_ru(RS.info(real), True)} — отдельно от демо-результатов стратегий ниже."} if real else None
     return {"asof": now, "statuses": [{"key": k, "name_ru": v, "category": CATEGORY[k]} for k, v in STATUS_RU.items()],
             "status_rules_ru": STATUS_RULES_RU, "categories": [{"key": k, "name_ru": v} for k, v in CATEGORY_RU.items()],
             "sort_ru": "Категория → статус → тип (фьючерсы, спот, другое) → недавно обновлённые → название.",

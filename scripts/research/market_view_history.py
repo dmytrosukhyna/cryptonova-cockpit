@@ -14,10 +14,13 @@ RULES — fixed in this file BEFORE the first run (20.11.2026 07:40 UTC), no tun
   R6 regime   : close < SMA50 < SMA200 → short; close > SMA50 > SMA200 → long
   R7 spx      : S&P 500 fell 2%+ in the US session that closed on day d → short
   R8 combo    : sum of votes R1..R7 ≥ +2 → long, ≤ −2 → short  («сильный склон»)
+  R9 wick     : (added 21.11 07:40 UTC, before this run, after seeing the 21.11 night wick 58.6k→55.1k→58.1k — so treat as post-hoc idea,
+                tested once) intraday low ≤ prev close −5% and close recovered ≥ 60% of that drop → long; mirror (high ≥ +5%, gives back ≥ 60%)
+                → short. Not part of R8.
 Costs: 0.10% round trip (2×0.05% taker) + actual funding paid/received over the hold (8h prints).
 Independence: consecutive signal days of the same rule/side closer than the horizon are one EPISODE; only its first day counts.
-Halves: A = 2023-01-01..2024-12-31, B = 2025-01-01..end.  Tests: 8 rules × 2 horizons = 16 (Bonferroni).
-PASS (BTC): ≥ 30 episodes, ≥ 12 in each half; net mean > 0 in BOTH halves; one-sided t-test p·16 < 0.05; ETH net mean > 0 full period.
+Halves: A = 2023-01-01..2024-12-31, B = 2025-01-01..end.  Tests: 9 rules × 2 horizons = 18 (Bonferroni; was 16 before R9 on 21.11).
+PASS (BTC): ≥ 30 episodes, ≥ 12 in each half; net mean > 0 in BOTH halves; one-sided t-test p·18 < 0.05; ETH net mean > 0 full period.
 Also reported (not a pass criterion): lift of «strong move» (72h ≤ −5% for short / ≥ +5% for long) vs the base rate.
 Side filter for copies: desk copies (web/whales_live.json) and followed traders' closed trips (data/whale_trades) — what if
 LONG copies were skipped when R8 = short (and, separately, when R6 = short)? Unlevered return = pnl / notional.
@@ -31,7 +34,7 @@ from datetime import date, datetime, timedelta, timezone
 BASE = "https://data.binance.vision/data/futures/um"
 START, EVAL0, SPLIT = date(2022, 1, 1), date(2023, 1, 1), date(2025, 1, 1)
 END = (datetime.now(timezone.utc) - timedelta(days=2)).date()
-COST, NTESTS = 0.10, 16
+COST, NTESTS = 0.10, 18
 CACHE = os.environ.get("MV_CACHE", "/tmp/mvcache")
 DAY = 86400000
 
@@ -103,6 +106,7 @@ def load(sym, book=True):
             r = list(r.values()) if isinstance(r, dict) else r
             d = dkey(r[0])
             D.setdefault(d, {})["close"] = float(r[4])
+            D[d]["high"], D[d]["low"] = float(r[2]), float(r[3])
     # funding (monthly files; 8h prints)
     fund = {}
     for p in pool([f"{BASE}/monthly/fundingRate/{sym}/{sym}-fundingRate-{y}-{m:02d}.zip" for y, m in months(START, END)]):
@@ -223,6 +227,10 @@ def signals(D, SPX):
             v["R7"] = -1 if SPX.get(d, 0) <= -2 else 0
         tot = sum(v.values())
         v["R8"] = 1 if tot >= 2 else -1 if tot <= -2 else 0
+        if "low" in x:
+            pc, lo, hi, cl = y["close"], x["low"], x["high"], x["close"]
+            v["R9"] = (1 if lo <= pc * 0.95 and cl - lo >= 0.6 * (pc - lo) else
+                       -1 if hi >= pc * 1.05 and hi - cl >= 0.6 * (hi - pc) else 0)
         S[d] = v
     return S
 
@@ -337,7 +345,7 @@ def main(md, js):
     data = {"BTC": load("BTCUSDT", True), "ETH": load("ETHUSDT", False)}
     sigs = {k: signals(v, SPX) for k, v in data.items()}
     res = {}
-    for rule in ("R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"):
+    for rule in ("R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9"):
         for h in (1, 3):
             sb = summarize(evaluate(data["BTC"], sigs["BTC"], rule, h), data["BTC"], h)
             se = summarize(evaluate(data["ETH"], sigs["ETH"], rule, h), data["ETH"], h)
@@ -351,9 +359,9 @@ def main(md, js):
     json.dump(out, open(js, "w"), ensure_ascii=False, indent=1, default=str)
     L = [f"# Направление рынка — проверка на истории (п. 217), {out['generated'][:16]} UTC", "",
          "Скрипт: `scripts/research/market_view_history.py` (правила записаны в нём до прогона). Данные: data.binance.vision BTCUSDT/ETHUSDT, S&P 500 (stooq).",
-         f"Период оценки {EVAL0}..{END}; половины A = 2023–2024, B = 2025–2026. Издержки 0.10% + фандинг. Эпизоды (без перекрытий). Тестов 16 (Бонферрони).",
+         f"Период оценки {EVAL0}..{END}; половины A = 2023–2024, B = 2025–2026. Издержки 0.10% + фандинг. Эпизоды (без перекрытий). Тестов 18 (Бонферрони; R9 «выкупленный пролив» добавлен 21.11 — идея после просмотра ночи 21.11, проверка однократная).",
          f"Покрытие BTC: {cov['BTC']}; ETH: {cov['ETH']}; дней S&P: {len(SPX)}.", "",
-         "| Правило | Срок | BTC эпизодов (A/B) | BTC нетто, % (A / B) | p·16 | ETH нетто, % | Сильный ход: при сигнале / база (шорт; лонг) | Прошло |",
+         "| Правило | Срок | BTC эпизодов (A/B) | BTC нетто, % (A / B) | p·18 | ETH нетто, % | Сильный ход: при сигнале / база (шорт; лонг) | Прошло |",
          "|---|---|---|---|---|---|---|---|"]
     for k, v in res.items():
         b, e = v["BTC"], v["ETH"]

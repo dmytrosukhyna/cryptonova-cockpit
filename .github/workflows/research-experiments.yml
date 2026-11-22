@@ -10,7 +10,7 @@ on:
       mode:
         description: "variants | families | btcevents | hlbtc | postmortem | global"
         type: choice
-        options: [variants, families, btcevents, hlbtc, postmortem, global]
+        options: [variants, families, btcevents, hlbtc, postmortem, global, samples]
         default: variants
 permissions:
   contents: read
@@ -39,6 +39,8 @@ jobs:
         run: python scripts/research/exp_families.py data/agents.sqlite exp_families.json
       - if: inputs.mode == 'postmortem'
         run: python scripts/research/postmortem_whales.py data/agents.sqlite postmortem.json
+      - if: inputs.mode == 'samples'
+        run: python scripts/research/probe_samples.py
       - if: inputs.mode == 'global'
         run: python scripts/research/global_traders.py global_traders.json
       - if: inputs.mode == 'btcevents'

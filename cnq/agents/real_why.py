@@ -163,6 +163,46 @@ def why_for(sig: str, side: str, entry: float | None, stop: float | None, inst: 
     return w
 
 
+WIN = 10 * 60_000
+LEDGER_MAX = 2000
+BACKFILL = os.path.join(os.path.dirname(__file__), "real_attrib_backfill.json")
+
+
+def backfill() -> list[dict]:
+    """the 04.11–05.11 opens no public record kept: [{"sym", "t", "sig", "src": "backfill"}]"""
+    try:
+        with open(BACKFILL, encoding="utf-8") as f:
+            rows = json.load(f).get("trades") or []
+    except Exception:  # noqa: BLE001
+        return []
+    return [{"sym": r["sym"], "t": int(r["opened"]), "sig": r["sig"], "src": "backfill"} for r in rows if r.get("sig") and r.get("opened")]
+
+
+def _ledger(prev, actions) -> list[dict]:
+    """every fut_open with a sig ever seen (+ the backfill), oldest first, one row per sig"""
+    rows = {r["sig"]: r for r in (prev or []) if isinstance(r, dict) and r.get("sig")}
+    for r in backfill():
+        rows.setdefault(r["sig"], r)
+    for a in actions or []:
+        if a.get("kind") == "fut_open" and a.get("sig") and a["sig"] not in rows:
+            rows[a["sig"]] = {"sym": ov.base(a.get("sym")), "t": int(a.get("t") or 0), "sig": a["sig"], "src": "action"}
+    return sorted(rows.values(), key=lambda r: r["t"])[-LEDGER_MAX:]
+
+
+def attribute(c: dict, closes: list, ledger: list) -> tuple[str | None, str | None]:
+    """a closed OKX row → (sig, how it was found: "close" | "action" | "backfill") or (None, None)"""
+    b, o, x = ov.base(c.get("inst")), int(c.get("opened") or 0), int(c.get("closed") or 0)
+    if x:
+        near = [a for a in closes if ov.base(a.get("sym")) == b and abs(int(a.get("t") or 0) - x) <= WIN]
+        if near:
+            return min(near, key=lambda a: abs(int(a["t"]) - x))["sig"], "close"
+    near = [r for r in ledger if ov.base(r.get("sym")) == b and abs(int(r.get("t") or 0) - o) <= WIN]
+    if near:
+        r = min(near, key=lambda r: abs(int(r["t"]) - o))
+        return r["sig"], r.get("src") or "action"
+    return None, None
+
+
 def build(pub: dict, wtop: dict, prev: dict | None, post, now: int | None = None, ova: dict | None = None) -> dict:
     now = int(now or time.time() * 1000)
     ova = ova if ova is not None else ov.active(ov.load(), now)
@@ -170,7 +210,6 @@ def build(pub: dict, wtop: dict, prev: dict | None, post, now: int | None = None
     keep = dict(prev.get("by_sig") or {})
     idx = _copy_index(wtop or {})
     by_sig = {}
-    acts = {a.get("sig"): a for a in (pub.get("actions") or []) if a.get("kind") == "fut_open" and a.get("sig")}
     for f in pub.get("futures") or []:
         sig = f.get("sig")
         if not sig:
@@ -181,24 +220,25 @@ def build(pub: dict, wtop: dict, prev: dict | None, post, now: int | None = None
             mk = market_at(hl_coin(f.get("inst")), int(f.get("opened") or now), post)
         by_sig[sig] = why_for(sig, f.get("side"), _f(f.get("entry")), _f(f.get("stop")), f.get("inst"), wtop or {}, idx, ova, mk,
                               f.get("opened"))
-    # closed: OKX's own history rows; their sig comes from the matching fut_open action (inst + time)
+    # closed: OKX's own history rows; their sig comes from (22.11, post-mortem: 27 closes without a desk-trade id) 1) the fut_close /
+    # fut_gone action of that instrument at the close time (public_real carries the open's sig on it), 2) the LEDGER of every
+    # fut_open ever seen (kept here — public_real lists only the 30 newest actions since the start, so an older open drops out),
+    # 3) the backfill of 04.11–05.11 (real_attrib_backfill.json). Both times ± 10 min.
+    ledger = _ledger(prev.get("ledger"), pub.get("actions"))
+    closes = [a for a in (pub.get("actions") or []) if a.get("kind") in ("fut_close", "fut_gone") and a.get("sig")]
     closed = []
     hist = {**keep, **by_sig}
     for c in (pub.get("closed") or [])[:30]:
+        sig, src = attribute(c, closes, ledger)
         o = int(c.get("opened") or 0)
-        sig = None
-        for s, a in acts.items():
-            if ov.base(a.get("sym")) == ov.base(c.get("inst")) and abs(int(a.get("t") or 0) - o) <= 10 * 60_000:
-                sig = s
-                break
         w = hist.get(sig) if sig else None
         if w is None and sig:
             w = why_for(sig, c.get("side"), _f(c.get("open_px")), None, c.get("inst"), wtop or {}, idx, ova, None, o)
-        closed.append({"inst": c.get("inst"), "opened": c.get("opened"), "closed": c.get("closed"), "sig": sig, "why": w})
+        closed.append({"inst": c.get("inst"), "opened": c.get("opened"), "closed": c.get("closed"), "sig": sig, "src": src, "why": w})
     # remember every open why (closed ones look it up by sig later)
     mem = {**{k: v for k, v in keep.items() if k not in by_sig}, **by_sig}
     mem = dict(list(mem.items())[-200:])
-    return {"asof": now, "by_sig": by_sig, "closed": closed, "memory": mem,
+    return {"asof": now, "by_sig": by_sig, "closed": closed, "memory": mem, "ledger": ledger,
             "about_ru": "Почему открыта каждая реальная сделка фьючерсов: какой стол или кит её дал, его вход, плечо и размер, его итог "
                         "за 30 дней, наш стоп и плечо, рынок на момент входа (Hyperliquid). Цель у копий — выход вместе с китом; "
                         "ориентир 2R показан только для понимания."}

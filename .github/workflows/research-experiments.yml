@@ -7,7 +7,7 @@ on:
       mode:
         description: "variants (exp_variants.py) or hlbtc (hl_big_btc.py)"
         type: choice
-        options: [variants, hlbtc]
+        options: [variants, hlbtc, families, btcevents]
         default: variants
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: Restore the state cache (read only)
-        if: inputs.mode == 'variants'
+        if: inputs.mode == 'variants' || inputs.mode == 'families'
         uses: actions/cache/restore@v4
         with:
           path: |

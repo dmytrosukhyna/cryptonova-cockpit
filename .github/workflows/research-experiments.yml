@@ -1,20 +1,23 @@
 name: research-experiments
-# 22.11 (owner 16:18): the experiment program — variants of the whale copy stream on stored history (scripts/research/exp_variants.py)
-# and big Hyperliquid BTC positions for the watch list (scripts/research/hl_big_btc.py). Read-only: restores the state cache, never saves.
+# 22.11 (owner 16:18 / 16:48): the experiment program — variants of the whale copy stream (exp_variants.py), the groups /
+# confirmation / contrarian families (exp_families.py), BTC events (exp_btc_events.py) and big Hyperliquid BTC positions for the
+# watch list (hl_big_btc.py, weekly). Read-only: restores the state cache, never saves it.
 on:
+  schedule:
+    - cron: "17 5 * * 1"          # weekly (Monday): the big Hyperliquid BTC positions
   workflow_dispatch:
     inputs:
       mode:
-        description: "variants (exp_variants.py) or hlbtc (hl_big_btc.py)"
+        description: "variants | families | btcevents | hlbtc"
         type: choice
-        options: [variants, hlbtc, families, btcevents]
+        options: [variants, families, btcevents, hlbtc]
         default: variants
 permissions:
   contents: read
 jobs:
   study:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,10 +35,14 @@ jobs:
             cnq-state-
       - if: inputs.mode == 'variants'
         run: python scripts/research/exp_variants.py data/agents.sqlite exp_variants.json
-      - if: inputs.mode == 'hlbtc'
+      - if: inputs.mode == 'families'
+        run: python scripts/research/exp_families.py data/agents.sqlite exp_families.json
+      - if: inputs.mode == 'btcevents'
+        run: python scripts/research/exp_btc_events.py exp_btc_events.json
+      - if: inputs.mode == 'hlbtc' || github.event_name == 'schedule'
         run: python scripts/research/hl_big_btc.py hl_big_btc.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: exp-${{ inputs.mode }}
+          name: exp-${{ inputs.mode || 'hlbtc' }}
           path: "*.json"

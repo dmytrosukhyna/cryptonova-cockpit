@@ -108,6 +108,10 @@ def main():
                 b0 = sorted(t for t in btc if t >= c["t"] - DAY)
                 if bt and b0:
                     r[f"btc{w}"] = round((btc[bt[-1]][3] / btc[b0[0]][0] - 1) * 100, 2)
+        for hh in (1, 4, 24):                           # 22.11 (owner): the P3 day-trading posts need an intraday window
+            ht = [t for t in sorted(hr) if t >= nxt[0] + hh * H]
+            if ht:
+                r[f"h{hh}"] = round(s * (hr[ht[0]][0] / a - 1) * 100 - 0.2, 2)
         r["r_now"] = round(s * (D[days[-1]][3] / a - 1) * 100 - 0.2, 2)
         lows = [D[t][2] for t in days if t <= c["t"] + 90 * DAY]
         highs = [D[t][1] for t in days]
@@ -148,17 +152,21 @@ def main():
     def sub(sel):
         keep = [r for r in res if sel(r)]
         out = {}
-        for w in ("r7", "r30", "r90"):
+        for w in ("h1", "h4", "h24", "r7", "r30", "r90"):
             xs = [r[w] for r in keep if r.get(w) is not None]
-            bs = [r[w] - r["btc" + w[1:]] for r in keep if r.get(w) is not None and r.get("btc" + w[1:]) is not None]
+            bs = [r[w] - r["btc" + w[1:]] for r in keep if w.startswith("r") and r.get(w) is not None and r.get("btc" + w[1:]) is not None]
             out[w] = {"n": len(xs), "mean": round(st.mean(xs), 2) if xs else None, "win": round(sum(x > 0 for x in xs) / len(xs), 3) if xs else None,
                       "vs_btc": round(st.mean(bs), 2) if bs else None}
         return out
     splits = {"long": sub(lambda r: r["side"] == "LONG"), "short": sub(lambda r: r["side"] == "SHORT"),
               "p3": sub(lambda r: r["p3"]), "not_p3": sub(lambda r: not r["p3"]),
-              "majors": sub(lambda r: r["coin"] in ("BTC", "ETH", "SOL")), "alts": sub(lambda r: r["coin"] not in ("BTC", "ETH", "SOL"))}
+              "majors": sub(lambda r: r["coin"] in ("BTC", "ETH", "SOL")), "alts": sub(lambda r: r["coin"] not in ("BTC", "ETH", "SOL")),
+              "p3_long": sub(lambda r: r["p3"] and r["side"] == "LONG"), "p3_short": sub(lambda r: r["p3"] and r["side"] == "SHORT"),
+              "spot_longs_not_p3": sub(lambda r: not r["p3"] and r["side"] == "LONG")}
     own = {handle.lower()[i:i + 5] for i in range(max(1, len(handle) - 4))}
     snips = [("C " + c["coin"] + " " + c["side"][0] + ": " + c["snip"]) for c in calls[-12:]] + [("R " + c["coin"] + ": " + c["snip"]) for c in recaps[-8:]]
+    tg_posts = [p for p in posts if re.search(r"(цел[ьи]|тейк|тп\d|tp\d|\d\s?[xх×]\b|[xх×]\s?\d\b|ожидаю|жду)", p["text"] or "", re.I)]
+    snips += ["T: " + (p["text"] or "")[:110].replace("\n", " ") for p in tg_posts[-10:]]
     snips = ["<скрыто>" if any(x in t.lower() for x in own) else t for t in snips]
     O = {"posts": len(posts), "span": span, "calls": len(calls), "scored": len(res), "recaps": len(recaps), "recaps_without_prior_call": unmatched,
          "short_calls": sum(1 for c in calls if c["side"] == "SHORT"),

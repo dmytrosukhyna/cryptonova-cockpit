@@ -17,7 +17,8 @@ BUY = re.compile(r"(покупа|купил|куплю|набира|набрал
 SELL = re.compile(r"(шорт|short\b|продаю|продал|фиксирую|зафиксировал|закрыл|выхожу|вышел)", re.I)
 RECAP = re.compile(r"(сейчас\s*[~≈]?\s*\$?\d|уже\s*[~≈]?\s*\$?\d|от входа|от точки|дал[аио]?\s|отработ|как и писал|напомина|"
                    r"\+\s?\d{2,4}\s?%|\d+(?:[.,]\d+)?\s?[xхXХ]\b|[xхXХ]\s?\d\b|иксы|результат)", re.I)
-TARGET = re.compile(r"(?:цел[ьи]|таргет|target|tp)\s*[:\-–]?\s*\$?(\d+(?:[.,]\d+)?)|(?:\b|^)(\d(?:[.,]\d)?)\s?[xхXХ]\b|[xхXХ]\s?(\d(?:[.,]\d)?)\b", re.I)
+TARGET = re.compile(r"(?:цел[ьи]|таргет|target|тейк\w*|тп\d?|tp\d?|take\s?profit|фиксаци\w*\s+на|ожидаю|жду|до)\s*[:\-–—]?\s*\$?(\d+(?:[.,]\d+)?)(?!\d)(?!\s?[%xхXХ×])"
+                    r"|(?:\b|^)(\d(?:[.,]\d)?)\s?[xхXХ×]\b|[xхXХ×]\s?(\d(?:[.,]\d)?)\b", re.I)
 STOP = re.compile(r"стоп\s*[:\-–]?\s*\$?(\d+(?:[.,]\d+)?)", re.I)
 PRICE = re.compile(r"(?:по|at|@|вход\w*|цен\w*)\s*\$?(\d+(?:[.,]\d+)?)", re.I)
 HORIZON = re.compile(r"(долгосрок|среднесрок|краткосрок|на год|на месяц|на неделю|до конца года|в цикл|холд|hold)", re.I)
@@ -84,6 +85,8 @@ def classify(post: dict, coins: set) -> list:
             v = _num(m.group(2) or m.group(3))
             if v and 1.1 <= v <= 20:
                 tx.append(v)
+    for m in re.finditer(r"цел[ьи]\s*[:\-–—]?\s*((?:\$?\d+(?:[.,]\d+)?\s*[/;,]\s*)+\$?\d+(?:[.,]\d+)?)", text, re.I):   # «цели: 120 / 150»
+        tp += [v for v in (_num(x) for x in re.split(r"\s*[/;,]\s*", m.group(1).replace("$", ""))) if v]
     st = STOP.search(text)
     pr = PRICE.search(text)
     hz = HORIZON.search(text)

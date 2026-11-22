@@ -265,3 +265,19 @@ def test_forwarded_instagram_calls_feed_the_same_paper_desk():
                           {"t": 1, "coin": "OLD"}, {"coin": "bad coin!"}], "A", 1795000000000)
     assert [e["coin"] for e in ev] == ["VVV"] and ev[0]["targets_x"] == [2.0] and ev[0]["source"] == "instagram"
     assert os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "influencer_calls_A.jsonl"))
+
+
+def test_channels_come_from_the_sealed_file_first(tmp_path):
+    from cnq import sealed
+    from cnq.api import experiments as E
+    web, data = tmp_path / "web", tmp_path / "data"
+    (web / "sealed").mkdir(parents=True); data.mkdir()
+    pub = sealed.public_key(str(data))
+    json.dump(sealed.seal(pub, json.dumps({"B": {"handle": "chan_b"}}).encode()), open(web / "sealed" / "influencers.json", "w"))
+    ex = E.Experiments(str(data), str(web), env={})
+    assert ex.channels() == [{"key": "B", "handle": "chan_b"}]
+    (web / "sealed" / "influencers.json").unlink()
+    ex.set_channel("A", "chan_a")
+    assert ex.channels() == [{"key": "A", "handle": "chan_a"}]
+    blob = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "sealed", "influencers.json")))
+    assert set(blob) >= {"epk", "nonce", "ct"} and "Trader" not in json.dumps(blob)          # the repo copy is ciphertext only

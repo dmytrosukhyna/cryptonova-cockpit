@@ -127,7 +127,7 @@ class Experiments:
         if st.get("specs"):
             F.ensure_specs(st, F.POSTMORTEM_SPECS, now, "postmortem")
         # 22.11 22:36: a trader's public Telegram calls — the handle lives ONLY in <run>/data/influencers/channels.json (owner-only)
-        ch = (self._load(os.path.join(self.root, "influencers", "channels.json")) or {}).get("channels") or []
+        ch = self.channels()
         if ch and st.get("specs"):
             from cnq.agents import influencer as I
             F.ensure_specs(st, F.TG_SPECS, now, "telegram")
@@ -184,6 +184,23 @@ class Experiments:
         import urllib.request
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (cnq-factory)"}), timeout=15) as r:
             return r.read().decode("utf-8", "replace")
+
+    def channels(self) -> list:
+        """watched channels: the sealed web/sealed/influencers.json (encrypted to this server's key — the handle is never in plain text in
+        the public repo), else <run>/data/influencers/channels.json. Both shapes: {"channels": [{key, handle}]} or {key: {handle}}"""
+        d = None
+        try:
+            from cnq import sealed
+            d = sealed.load(self.web, self.root, "influencers")
+        except Exception:  # noqa: BLE001
+            d = None
+        if not d:
+            d = self._load(os.path.join(self.root, "influencers", "channels.json")) or {}
+        if isinstance(d.get("channels"), list):
+            out = d["channels"]
+        else:
+            out = [{"key": k, "handle": v.get("handle")} for k, v in d.items() if isinstance(v, dict)]
+        return [c for c in out if isinstance(c, dict) and c.get("key") and c.get("handle")]
 
     def set_channel(self, key: str, handle: str) -> tuple[int, dict]:
         """owner-only: add / replace a watched Telegram channel (kept in <run>/data/influencers/channels.json, never in git)"""

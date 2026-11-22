@@ -606,7 +606,7 @@ def manual_events(lines: list, key: str, born: int) -> list:
 
 
 TG_SPECS = [
-    {"src": "tgc", "family": "телеграм", "stop": 30, "tp_own": True, "hold": 2160},
+    {"src": "tgc", "family": "телеграм·основной (спот-лонги)", "stop": 30, "tp_own": True, "hold": 2160},   # 22.11: the main paper spec
     {"src": "tgc", "family": "телеграм", "stop": 99, "tp_own": True, "hold": 2160},
     {"src": "tgc", "family": "телеграм", "stop": 30, "tp_own": True, "hold": 2160, "filt": ["liquid", "reg1d200"]},
     {"src": "tgc", "family": "телеграм", "stop": 30, "hold": 720},

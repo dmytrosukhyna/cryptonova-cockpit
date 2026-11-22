@@ -47,7 +47,8 @@ def _get(url):
 def sid(s: dict) -> str:
     f = "+".join(sorted(s.get("filt") or [])) or "-"
     return (f"{s['src']}|{s.get('side', 'follow')}|{f}|{s.get('entry', 'now')}|s{s.get('stop')}|tp{s.get('tp') or '-'}|"
-            f"h{s.get('hold') or '-'}|{s.get('size', 'fixed')}" + (f"|{s['sub']}" if s.get("sub") else ""))
+            f"h{s.get('hold') or '-'}|{s.get('size', 'fixed')}" + (f"|ds{s['daystop']}" if s.get("daystop") else "")
+            + (f"|{s['sub']}" if s.get("sub") else ""))
 
 
 def seed_specs() -> list:
@@ -244,6 +245,13 @@ def _open(st, spec, ev, side, px, now, atrp):
         size = BASE_USD * min(3.0, max(0.25, 2.0 / atrp))
     elif spec.get("size") == "conv":
         size = BASE_USD * min(3, max(1, ev.get("agree", 1)))
+    elif spec.get("size") == "ladder":                             # 22.11 18:07: the real risk ladder 1 → 1.5 → 2 % on this spec's own closes
+        from cnq.execution import risk_ladder as RL
+        S = st.setdefault("ladders", {}).setdefault(spec["id"], {})
+        RL.decide(S, [(c["closed_t"], c["usd"]) for c in st["closed"] if c["spec"] == spec["id"]], 0.0, float(st.get("fut_budget") or 1000.0), now)
+        size = RL.level(S) * float(st.get("fut_budget") or 1000.0) / (stop / 100)
+    elif str(spec.get("size", "")).startswith("risk"):            # 22.11 18:05: the real sizing — risk % of the futures budget / stop
+        size = float(spec["size"][4:]) / 100 * float(st.get("fut_budget") or 1000.0) / (stop / 100)
     st["open"].append({"spec": spec["id"], "key": ev["key"], "coin": ev["coin"], "side": side, "entry": px, "t": now, "best": px,
                        "stop_pct": round(stop, 3), "usd": round(size, 2), "src_entry": ev.get("entry")})
 
@@ -292,6 +300,16 @@ def step(st: dict, now: int, ctx: dict, sources: dict, marks: dict, trend_of=Non
                 continue
             if any(p["spec"] == s["id"] and p["coin"] == ev["coin"] for p in st["open"]):
                 continue
+            if s.get("daystop"):                                   # the real day stop: today's closed $ of this spec ≤ −x % of budget
+                d0 = now - now % DAY
+                today = sum(c["usd"] for c in st["closed"] if c["spec"] == s["id"] and c["closed_t"] >= d0)
+                if s["daystop"] == "ladder":
+                    from cnq.execution import risk_ladder as RL
+                    lim = RL.day_loss(RL.level((st.get("ladders") or {}).get(s["id"])))
+                else:
+                    lim = float(s["daystop"])
+                if today <= -lim * float(st.get("fut_budget") or 1000.0):
+                    continue
             if atrp is None and (s["stop"] == "atr2" or s.get("size") == "vol") and atr_of:
                 try:
                     atrp = atr_of(ev["coin"])
@@ -521,6 +539,10 @@ POSTMORTEM_SPECS = [
     {"src": "whales", "family": "иван", "filt": ["ivan"]},
     {"src": "whales", "family": "иван", "filt": ["ivan", "reg4h20"]},
     {"src": "whales", "family": "иван", "filt": ["ivan", "cap2side"]},
+    # 22.11 18:05 (owner): the real rules at 2 % risk + 3 % day stop vs 1 % + 2 % (the $ and the drawdown differ, the % per trade not)
+    {"src": "whales", "family": "реальные правила", "size": "risk2", "daystop": 0.03},
+    {"src": "whales", "family": "реальные правила", "size": "risk1", "daystop": 0.02},
+    {"src": "whales", "family": "реальные правила", "size": "ladder", "daystop": "ladder"},
 ]
 
 

@@ -126,6 +126,9 @@ class Experiments:
             st["hl_book"], sources["hlw"] = F.hl_book(st.get("hl_book"), wallets, pos_of, now, marks)
         if st.get("specs"):
             F.ensure_specs(st, F.POSTMORTEM_SPECS, now, "postmortem")
+        fo = (self._load(os.path.join(self.web, "fut_owner.json")) or {}).get("kpi") or {}
+        if fo.get("budget_usd"):
+            st["fut_budget"] = float(fo["budget_usd"])             # the real futures budget for the «real rules» specs
         r = F.step(st, now, ctx, sources, marks,
                    trend_of=lambda c: F.trend_state(F.candles(f"{c}-USDT-SWAP", "1H", 60, g), 50),
                    atr_of=lambda c: F.atr_pct(F.candles(f"{c}-USDT-SWAP", "1H", 30, g)))

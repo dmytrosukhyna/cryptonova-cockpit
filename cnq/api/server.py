@@ -641,6 +641,8 @@ class Api:
                     from cnq.agents.owner_health import with_probation   # 22.11: Ivan on probation (owner-only)
                     from cnq.execution import okx_futures
                     d = with_probation(d, okx_futures.load_state())
+                    from cnq.agents.owner_health import with_risk_level  # 22.11 18:07: «Риск: X%» (owner-only)
+                    d = with_risk_level(d, okx_futures.load_state())
                 except Exception:  # noqa: BLE001
                     pass
             return 200, {"name": m.group(1), "asof": d.get("asof"), "data": d}

@@ -148,14 +148,72 @@ def _num(e, k, d):
         return d
 
 
-def caps(env=None) -> dict:
+def caps(env=None, ladder: bool = True) -> dict:
     """The hard caps. Env may only make them stricter."""
     e = _env(env)
     c = _caps(e)
     k = careful(env)                       # 21.11 (owner «аккуратно»): an owner override may only make it stricter
     if k.get("risk"):
         c["risk"] = min(c["risk"], float(k["risk"]))
+    h = halfrisk(env)                      # 22.11 18:05 (owner): half the risk until the system is proven
+    if h.get("ladder"):                    # 22.11 18:07: … then the risk ladder 1 → 1.5 → 2 % (its saved level; ≤ the caps above)
+        if ladder:
+            from . import risk_ladder as RL
+            lvl = RL.level(load_state(env).get("risk_ladder"))
+            c["risk"], c["day_loss"] = min(c["risk"], lvl), min(c["day_loss"], RL.day_loss(lvl))
+        return c
+    if h.get("risk"):
+        c["risk"] = min(c["risk"], h["risk"])
+    if h.get("day_loss"):
+        c["day_loss"] = min(c["day_loss"], h["day_loss"])
     return c
+
+
+def with_risk_ladder(cap: dict, st: dict, env, budget_usd: float, now: int, log=None) -> dict:
+    """22.11 18:07 (owner, part of «halfrisk_1122»): the risk per NEW copy follows the ladder 1.0 → 1.5 → 2.0 % (risk_ladder.py) on
+    the real copies closed since the override was set; the day stop follows the level (2 % / 3 %). Never above the caps already in
+    force (RISK_CAP, «careful_21_11»), never above 2 %. Without «ladder» in the override: the fixed halfrisk caps."""
+    try:
+        from . import owner_overrides, risk_ladder as RL
+        from . import ivan_probation as IP
+        h = owner_overrides.load(env=env).get("halfrisk_1122") or {}
+        if not h.get("ladder"):
+            return cap
+        web = _env(env).get("CNQ_WEB_DIR") or os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "web")
+        pr = IP._load(os.path.join(web, "public_real.json")) or {}
+        since = owner_overrides._ms(h.get("set"))
+        closes = sorted((int(x["closed"]), float(x.get("pnl_usd") or 0)) for x in pr.get("closed") or []
+                        if isinstance(x, dict) and x.get("closed") and int(x["closed"]) >= since)
+        upl = sum(float(x.get("upnl_usd") or 0) for x in pr.get("futures") or [] if int(x.get("opened") or 0) >= since)
+        S = st.setdefault("risk_ladder", {})
+        _S, why = RL.decide(S, closes, upl, budget_usd, now, h.get("ladder") if isinstance(h.get("ladder"), dict) else None)
+        lvl = RL.level(S)
+        if why and log:
+            last = (S.get("log") or [{}])[-1]
+            log({"ev": "risk_level", "from": last.get("from"), "to": last.get("to"), "why": why, "t": now})
+        base = caps(env, ladder=False)                                  # the caps without the ladder (careful 2 %, RISK_CAP)
+        return {**cap, "risk": min(base["risk"], lvl, RISK_CAP), "day_loss": min(base["day_loss"], DAY_LOSS, RL.day_loss(lvl))}
+    except Exception:  # noqa: BLE001 — a broken ladder keeps the fixed (stricter) caps
+        return cap
+
+
+def halfrisk(env=None) -> dict:
+    """22.11 18:05 (owner's yes: «стабильный плавный рост лучше, чем резкая просадка») — config/owner_overrides.json «halfrisk_1122»
+    {"risk": 0.01 (per new copy, of the futures budget; was 2 %), "day_loss": 0.02 (day stop; was 3 %)}. Only ever stricter
+    (risk ≤ RISK_CAP, day_loss ≤ DAY_LOSS); open positions keep their size and stops; removing the key restores the previous caps."""
+    try:
+        from . import owner_overrides
+        k = owner_overrides.load(env=env).get("halfrisk_1122") or {}
+        out = {}
+        if 0 < float(k.get("risk") or 0) <= RISK_CAP:
+            out["risk"] = float(k["risk"])
+        if 0 < float(k.get("day_loss") or 0) <= DAY_LOSS:
+            out["day_loss"] = float(k["day_loss"])
+        if k.get("ladder"):
+            out["ladder"] = k["ladder"]
+        return out
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 def careful(env=None) -> dict:
@@ -1235,6 +1293,7 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
         cap = caps(env)
         day = time.strftime("%Y-%m-%d", time.gmtime(now / 1000))
         bud = budget(cl, st, env, now)
+        cap = with_risk_ladder(cap, st, env, bud["usd"], now, lambda e: log(e, log_path))     # 22.11 18:07: 1 → 1.5 → 2 %
         if st.get("day_stop") != day:
             dp = day_pnl(ctx, now)
             st["day_pnl"], st["day"] = dp, day

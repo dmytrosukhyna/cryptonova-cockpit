@@ -349,3 +349,20 @@ def with_probation(doc: dict, fut_state: dict | None, ov: dict | None = None) ->
                P.get("t"), RED if paused else GREEN, note, ASK.format(x="проверку Ивана"), int(time.time() * 1000))
     row["probation"] = P
     return {**doc, "rows": [r for r in doc.get("rows") or [] if r.get("key") != "ivan_probation"] + [row]}
+
+
+def with_risk_level(doc: dict, fut_state: dict | None, ov: dict | None = None) -> dict:
+    """22.11 18:07 (owner-only): «Риск: X%» — the real risk per new copy now (the ladder of «halfrisk_1122») and its last change"""
+    from cnq.execution import owner_overrides, risk_ladder as RL
+    h = (ov if ov is not None else owner_overrides.load()).get("halfrisk_1122") or {}
+    if not isinstance(doc, dict) or not h:
+        return doc
+    S = (fut_state or {}).get("risk_ladder") or {}
+    lvl = RL.level(S) if h.get("ladder") else float(h.get("risk") or 0.01)
+    last = (S.get("log") or [None])[-1]
+    note = (f"риск на новую копию {lvl * 100:g}% бюджета фьючерсов, дневной стоп {RL.day_loss(lvl) * 100:g}%"
+            + (f"; последняя смена {last['from'] * 100:g}% → {last['to'] * 100:g}%: {last['why']}" if last else "; смен ещё не было"))
+    row = _row("risk_level", f"Риск: {lvl * 100:g}%", "Лестница риска 1% → 1,5% → 2% (решение владельца 22.11): вверх только после серии "
+               "побед, вниз — сразу при ошибках.", (last or {}).get("t"), GREEN, note, ASK.format(x="лестницу риска"), int(time.time() * 1000))
+    row["risk_ladder"] = {"level": lvl, "log": (S.get("log") or [])[-10:]}
+    return {**doc, "rows": [r for r in doc.get("rows") or [] if r.get("key") != "risk_level"] + [row]}

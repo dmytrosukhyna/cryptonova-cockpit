@@ -250,7 +250,7 @@ def test_check_card_and_public_line_show_the_role_the_copiers_and_the_profile_li
     out = tempfile.mkdtemp()
     with open(os.path.join(out, "public_real.json"), "w", encoding="utf-8") as f:
         json.dump(doc, f)
-    assert app_home._config(out)["okx_copy_url"] == "https://www.okx.com/copy-trading/account/TESTLEAD01"
+    assert app_home._config(out)["okx_copy_url"] == "https://www.okx.com/copy-trading/account/TESTLEAD01?tab=swap"
     with open(os.path.join(out, "app_config.json"), "w", encoding="utf-8") as f:
         json.dump({"okx_copy_url": "https://www.okx.com/copy-trading/account/OWNERSET"}, f)
     assert app_home._config(out)["okx_copy_url"].endswith("/OWNERSET")

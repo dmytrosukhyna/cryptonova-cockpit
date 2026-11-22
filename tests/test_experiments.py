@@ -222,3 +222,38 @@ def test_postmortem_specs_and_the_watch_list_config():
     assert F.passes(cap, "ETH", "LONG", {}, ev["ETH"]) and not F.passes(cap, "ARB", "LONG", {}, ev["ARB"])     # the 3rd long is skipped
     w = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "exp_watch_traders.json")))
     assert 1 <= len(w["hl"]) <= 30 and all(x["addr"].startswith("0x") and len(x["addr"]) == 42 for x in w["hl"])
+
+
+def test_telegram_calls_become_paper_buys_with_his_target_and_recaps_do_not(tmp_path):
+    from cnq.agents import exp_factory as F, influencer as I
+    page = ('<div data-post="c/10"><div class="tgme_widget_message_text js-message_text" dir="auto">SUI добавил по 0.75, сейчас 1.03, жду 2x</div>'
+            '<time datetime="2026-11-23T09:00:00+00:00"></time></div>'
+            '<div data-post="c/11"><div class="tgme_widget_message_text js-message_text" dir="auto">Набираю $VVV по 3.2, цель 6</div>'
+            '<time datetime="2026-11-23T10:00:00+00:00"></time></div>')
+    posts = I.parse_page(page)
+    born = posts[0]["t"] - 1
+    ev = F.tg_events(posts, {"SUI", "VVV"}, "A", born)
+    assert [o["coin"] for o in ev["open"]] == ["VVV"]                                    # the SUI recap is not a call
+    st = {"born": born, "specs": []}
+    F.step(st, born, {}, {}, {"BTC": 60000.0})
+    F.ensure_specs(st, F.TG_SPECS, born, "tg")
+    now = posts[1]["t"] + 60_000
+    F.step(st, now, {"vol24": {"VVV": 1e6}}, {"tgc": ev}, {"VVV": 3.0, "BTC": 60000.0})
+    mine = [p for p in st["open"] if p["spec"].startswith("tgc|")]
+    assert len(mine) == 3 and all(p["entry"] == 3.0 for p in mine)                     # the liquidity filter skips one ($1M a day)
+    assert {p["tp_px"] for p in mine} == {6.0, None}
+    F.step(st, now + 3_600_000, {}, {"tgc": ev}, {"VVV": 6.1, "BTC": 60000.0})
+    hit = [c for c in st["closed"] if c["spec"].startswith("tgc|") and c["why"] == "его цель"]
+    assert len(hit) == 2 and all(abs(c["pct"] - (100 - 0.11)) < 0.01 for c in hit)       # 3.0 → his target 6.0 = +100 %
+
+
+def test_owner_sets_the_channel_only_in_the_server_data_dir(tmp_path):
+    from cnq.api import experiments as E
+    ex = E.Experiments(str(tmp_path), str(tmp_path), env={})
+    assert ex.set_channel("A", "bad handle!")[0] == 400
+    code, d = ex.set_channel("A", "some_channel")
+    assert code == 200 and d["channels"] == ["A"]
+    assert json.load(open(tmp_path / "influencers" / "channels.json"))["channels"][0]["handle"] == "some_channel"
+    import inspect
+    from cnq.api import server
+    assert '"/v2/owner/influencers"' in inspect.getsource(server)

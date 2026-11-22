@@ -126,6 +126,40 @@ class Experiments:
             st["hl_book"], sources["hlw"] = F.hl_book(st.get("hl_book"), wallets, pos_of, now, marks)
         if st.get("specs"):
             F.ensure_specs(st, F.POSTMORTEM_SPECS, now, "postmortem")
+        # 22.11 22:36: a trader's public Telegram calls — the handle lives ONLY in <run>/data/influencers/channels.json (owner-only)
+        ch = (self._load(os.path.join(self.root, "influencers", "channels.json")) or {}).get("channels") or []
+        if ch and st.get("specs"):
+            from cnq.agents import influencer as I
+            F.ensure_specs(st, F.TG_SPECS, now, "telegram")
+            if now - int(st.get("tg_t") or 0) >= 30 * 60_000:
+                st["tg_t"] = now
+                spot = cached("spot", 6 * 3_600_000, lambda: [x["instId"].split("-")[0] for x in
+                                                              (g(f"{F.OKX}/public/instruments?instType=SPOT").get("data") or [])
+                                                              if x.get("instId", "").endswith("-USDT")]) or []
+                st["tg_coins"] = sorted(set(spot))
+                for c in ch[:3]:
+                    try:
+                        page = self._tg_get(f"https://t.me/s/{c['handle']}")
+                        new = I.parse_page(page)
+                        book = st.setdefault("tg_posts", {}).setdefault(c["key"], {})
+                        for p_ in new:
+                            book[str(p_["id"])] = p_
+                        d_ = os.path.join(self.root, "influencers", c["key"])
+                        os.makedirs(d_, exist_ok=True)
+                        self._save(os.path.join(d_, "posts.json"), sorted(book.values(), key=lambda x: x["id"]))
+                    except Exception:  # noqa: BLE001
+                        pass
+            evs = {"open": [], "closed": []}
+            for c in ch[:3]:
+                e_ = F.tg_events(list((st.get("tg_posts") or {}).get(c["key"], {}).values()), set(st.get("tg_coins") or []), c["key"], int(st["born"]))
+                evs["open"] += e_["open"]
+            sources["tgc"] = evs
+            stk = cached("spot_tk", 5 * 60_000, lambda: g(f"{F.OKX}/market/tickers?instType=SPOT").get("data") or []) or []
+            for x in stk:
+                b_ = str(x.get("instId", ""))
+                if b_.endswith("-USDT") and x.get("last"):
+                    marks.setdefault(b_[:-5], float(x["last"]))
+                    ctx.setdefault("vol24", {})[b_[:-5]] = float(x.get("volCcy24h") or 0)
         fo = (self._load(os.path.join(self.web, "fut_owner.json")) or {}).get("kpi") or {}
         if fo.get("budget_usd"):
             st["fut_budget"] = float(fo["budget_usd"])             # the real futures budget for the «real rules» specs
@@ -134,6 +168,24 @@ class Experiments:
                    atr_of=lambda c: F.atr_pct(F.candles(f"{c}-USDT-SWAP", "1H", 30, g)))
         self._save(sp, st)
         return r
+
+    @staticmethod
+    def _tg_get(url: str) -> str:
+        import urllib.request
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (cnq-factory)"}), timeout=15) as r:
+            return r.read().decode("utf-8", "replace")
+
+    def set_channel(self, key: str, handle: str) -> tuple[int, dict]:
+        """owner-only: add / replace a watched Telegram channel (kept in <run>/data/influencers/channels.json, never in git)"""
+        import re as _re
+        if not _re.fullmatch(r"[A-Za-z0-9_]{3,40}", str(handle or "")) or not _re.fullmatch(r"[A-Za-z0-9_]{1,12}", str(key or "")):
+            return 400, {"error": "bad_input"}
+        p = os.path.join(self.root, "influencers", "channels.json")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        d = self._load(p) or {"channels": []}
+        d["channels"] = [c for c in d.get("channels") or [] if c.get("key") != key] + [{"key": key, "handle": handle}]
+        self._save(p, d)
+        return 200, {"ok": True, "channels": [c["key"] for c in d["channels"]]}
 
     @staticmethod
     def _hl(body: dict):

@@ -612,6 +612,13 @@ class Api:
             except (ValueError, UnicodeDecodeError):
                 return 400, {"error": "bad_json"}
             return self.peter_cloud.connect(form if isinstance(form, dict) else {})
+        if method == "POST" and path == "/v2/owner/influencers":            # 22.11 22:36: a watched Telegram channel (paper, owner-only)
+            try:
+                form = json.loads((body or b"{}").decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                return 400, {"error": "bad_json"}
+            form = form if isinstance(form, dict) else {}
+            return self.experiments.set_channel(str(form.get("key") or ""), str(form.get("handle") or ""))
         if method == "POST" and path == "/v2/owner/peter/cloud/check":
             return self.peter_cloud.check()
         if method == "POST" and path == "/v2/owner/peter/cloud/disconnect":
@@ -1040,7 +1047,7 @@ def main() -> int:
         here = os.path.dirname(os.path.realpath(__file__))
         agents = os.path.join(os.path.dirname(here), "agents")            # what the API imports from the engine's package
         files = lambda: [os.path.join(here, f) for f in os.listdir(here) if f.endswith(".py")] + \
-            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py", "hack_desk.py", "exp_desks.py", "strategy_board.py", "exp_factory.py") if os.path.exists(os.path.join(agents, f))]
+            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py", "hack_desk.py", "exp_desks.py", "strategy_board.py", "exp_factory.py", "influencer.py") if os.path.exists(os.path.join(agents, f))]
         stamp = lambda: max(os.path.getmtime(p) for p in files())
         first = stamp()
         while True:

@@ -48,6 +48,7 @@ def sid(s: dict) -> str:
     f = "+".join(sorted(s.get("filt") or [])) or "-"
     return (f"{s['src']}|{s.get('side', 'follow')}|{f}|{s.get('entry', 'now')}|s{s.get('stop')}|tp{s.get('tp') or '-'}|"
             f"h{s.get('hold') or '-'}|{s.get('size', 'fixed')}" + (f"|ds{s['daystop']}" if s.get("daystop") else "")
+            + ("|tpown" if s.get("tp_own") else "")
             + (f"|{s['sub']}" if s.get("sub") else ""))
 
 
@@ -140,6 +141,8 @@ def passes(spec: dict, coin: str, side: str, ctx: dict, ev: dict) -> bool:
             return False
         if f == "agree2" and ev.get("agree", 1) < 2:
             return False
+        if f == "liquid" and (ctx.get("vol24") or {}).get(coin, 0) < 5e6:       # 22.11 22:36: ≥ $5M a day on OKX
+            return False
         if f == "ivan" and not str(ev.get("whale") or "").startswith("ivan"):   # 22.11 17:55: Ivan's copies only
             return False
         if f == "cap2side" and ev.get("side_open", 0) >= 2:         # 22.11 post-mortem: no 3rd copy on the same side (baskets)
@@ -171,7 +174,7 @@ def passes(spec: dict, coin: str, side: str, ctx: dict, ev: dict) -> bool:
 
 # ── events from the sources ──────────────────────────────────────────────────────────────────────────────────────────────
 def desk_events(desk: dict, src: str) -> list:
-    opens = [o for o in desk.get("open") or [] if isinstance(o, dict) and (o.get("coin") or o.get("symbol")) and o.get("entry")]
+    opens = [o for o in desk.get("open") or [] if isinstance(o, dict) and (o.get("coin") or o.get("symbol")) and (o.get("entry") or src == "tgc")]
     out = []
     for o in opens:
         coin = str(o.get("coin") or o.get("symbol")).upper().replace("-USDT-SWAP", "").replace("USDT", "")
@@ -182,7 +185,8 @@ def desk_events(desk: dict, src: str) -> list:
                         and int(x.get("opened_t") or x.get("opened") or 0) <= int(o.get("opened_t") or o.get("opened") or 0))
         t = int(o.get("opened_t") or o.get("opened") or 0)
         out.append({"key": f"{src}|{o.get('whale') or o.get('id')}|{coin}|{t}", "src": src, "coin": coin, "side": side, "t": t,
-                    "entry": float(o["entry"]), "agree": agree, "side_open": side_open, "whale": str(o.get("whale") or ""),
+                    "entry": float(o.get("entry") or 0) or None, "agree": agree, "side_open": side_open, "whale": str(o.get("whale") or ""),
+                    "targets_x": o.get("targets_x") or [], "targets_px": o.get("targets_px") or [],
                     **({"sub": str(o.get("whale"))} if src == "hlw" else {})})
     return out
 
@@ -252,8 +256,12 @@ def _open(st, spec, ev, side, px, now, atrp):
         size = RL.level(S) * float(st.get("fut_budget") or 1000.0) / (stop / 100)
     elif str(spec.get("size", "")).startswith("risk"):            # 22.11 18:05: the real sizing — risk % of the futures budget / stop
         size = float(spec["size"][4:]) / 100 * float(st.get("fut_budget") or 1000.0) / (stop / 100)
+    tpx = None
+    if spec.get("tp_own") and (ev.get("targets_x") or ev.get("targets_px")):        # 22.11 22:36: his own first target
+        c_ = [px * x for x in ev.get("targets_x") or []] + [x for x in ev.get("targets_px") or [] if x > px * 1.02]
+        tpx = min(c_) if c_ else None
     st["open"].append({"spec": spec["id"], "key": ev["key"], "coin": ev["coin"], "side": side, "entry": px, "t": now, "best": px,
-                       "stop_pct": round(stop, 3), "usd": round(size, 2), "src_entry": ev.get("entry")})
+                       "stop_pct": round(stop, 3), "usd": round(size, 2), "src_entry": ev.get("entry"), "tp_px": tpx})
 
 
 def step(st: dict, now: int, ctx: dict, sources: dict, marks: dict, trend_of=None, atr_of=None) -> dict:
@@ -354,6 +362,8 @@ def step(st: dict, now: int, ctx: dict, sources: dict, marks: dict, trend_of=Non
         why = None
         if r <= -p["stop_pct"]:
             why, r = "стоп", -p["stop_pct"]
+        elif p.get("tp_px") and ((sgn > 0 and px >= p["tp_px"]) or (sgn < 0 and px <= p["tp_px"])):
+            why, r = "его цель", _ret(p["side"], p["entry"], p["tp_px"])
         elif s.get("tp") and r >= s["tp"] * p["stop_pct"]:
             why, r = f"цель {s['tp']}R", s["tp"] * p["stop_pct"]
         elif s.get("hold") and now - p["t"] >= s["hold"] * H:
@@ -560,3 +570,26 @@ def ensure_specs(st: dict, specs: list, now: int, tag: str) -> list:
     if new:
         st.setdefault("generations", []).append({"t": now, "gen": tag, "spawned": [s["id"] for s in new], "killed": []})
     return [s["id"] for s in new]
+
+
+# ── 22.11 22:36 (owner): a trader's public Telegram calls (cnq/agents/influencer.py) — PAPER spot buys, owner-only ──────────────
+def tg_events(posts: list, coins: set, key: str, born: int) -> dict:
+    """the channel's NEW calls since the factory's birth as a desk-like {open: […]} (recaps are not calls)"""
+    from . import influencer as I
+    opens = []
+    for p in posts or []:
+        if not p.get("t") or p["t"] < born:
+            continue
+        for c in I.classify(p, coins):
+            if c["kind"] == "call" and c["side"] == "LONG":
+                opens.append({"whale": key, "coin": c["coin"], "side": "LONG", "entry": c.get("entry") or 0.0, "opened_t": p["t"],
+                              "targets_x": c["targets_x"], "targets_px": c["targets_px"], "id": p["id"]})
+    return {"open": opens, "closed": []}
+
+
+TG_SPECS = [
+    {"src": "tgc", "family": "телеграм", "stop": 30, "tp_own": True, "hold": 2160},
+    {"src": "tgc", "family": "телеграм", "stop": 99, "tp_own": True, "hold": 2160},
+    {"src": "tgc", "family": "телеграм", "stop": 30, "tp_own": True, "hold": 2160, "filt": ["liquid", "reg1d200"]},
+    {"src": "tgc", "family": "телеграм", "stop": 30, "hold": 720},
+]

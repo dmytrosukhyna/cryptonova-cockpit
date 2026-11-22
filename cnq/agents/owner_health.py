@@ -333,3 +333,19 @@ def with_ladder(doc: dict, state: dict | None) -> dict:
                "срок 14 дней.", sm.get("placed_t"), st_, note, ASK.format(x="лестницу BTC"), int(time.time() * 1000))
     row["ladder"] = sm
     return {**doc, "rows": [r for r in doc.get("rows") or [] if r.get("key") != "ladder"] + [row]}
+
+
+def with_probation(doc: dict, fut_state: dict | None, ov: dict | None = None) -> dict:
+    """22.11 (owner 17:55, owner-only): Ivan on probation — the guard's state from the futures sleeve (paused or watching)"""
+    from cnq.execution import ivan_probation as IP, owner_overrides
+    c = IP.cfg(ov if ov is not None else owner_overrides.load())
+    if not isinstance(doc, dict) or not c:
+        return doc
+    P = (fut_state or {}).get("ivan_probation") or {}
+    paused = bool(P.get("paused"))
+    note = (f"НОВЫЕ КОПИИ ИВАНА НА ПАУЗЕ: {P.get('why')} — открытые доживают со своими стопами; вернуть — только «да» владельца"
+            if paused else "наблюдение: 3 убыточных закрытия подряд, PF 10 последних < 0,8 или просадка копий > 4% бюджета → пауза новых копий")
+    row = _row("ivan_probation", "Иван на проверке (решение владельца 22.11)", "Только уменьшает риск: ставит на паузу новые копии Ивана.",
+               P.get("t"), RED if paused else GREEN, note, ASK.format(x="проверку Ивана"), int(time.time() * 1000))
+    row["probation"] = P
+    return {**doc, "rows": [r for r in doc.get("rows") or [] if r.get("key") != "ivan_probation"] + [row]}

@@ -1277,6 +1277,16 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
             # 17.11 (owner): every Ivan account is the same trader — their copies together hold ≤ IVAN_CAP of the futures budget
             # as margin (this copy included; a single copy while nothing of his is held keeps its usual size); not final:
             # re-checked every pass, the late-entry guard still applies
+            if dk in IVAN_KEYS:                # 22.11 (owner 17:55): Ivan on probation — a pause of NEW copies only (risk-reducing)
+                try:
+                    from . import ivan_probation as IP
+                    web_ = _env(env).get("CNQ_WEB_DIR") or os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "web")
+                    pw = IP.gate(st, ov.load(env=env), web_, bud["usd"], now, lambda e: log(e, log_path))
+                except Exception:  # noqa: BLE001 — the guard never blocks the step; a broken guard pauses nothing
+                    pw = None
+                if pw:
+                    res["skipped"].append({"id": tid, "inst": inst_id, "why": f"источник на проверке владельца: {pw} — новые копии на паузе до его решения"})
+                    continue
             iv_held = ivan_margin(st["trades"]) if dk in IVAN_KEYS else 0.0      # nothing held → the first copy is sized as before
             if iv_held > 0 and bud["usd"] > 0 and iv_held + (ms._f(s.get("margin")) or 0) > IVAN_CAP * bud["usd"]:
                 res["skipped"].append({"id": tid, "inst": inst_id,

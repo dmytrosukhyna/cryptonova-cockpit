@@ -215,7 +215,7 @@ def test_postmortem_specs_and_the_watch_list_config():
     st = {}
     F.step(st, T0, {}, {}, {"BTC": 60000.0})
     new = F.ensure_specs(st, F.POSTMORTEM_SPECS, T0, "postmortem")
-    assert len(new) == 5 and not F.ensure_specs(st, F.POSTMORTEM_SPECS, T0, "postmortem")
+    assert len(new) == len(F.POSTMORTEM_SPECS) and not F.ensure_specs(st, F.POSTMORTEM_SPECS, T0, "postmortem")
     opens = [_o("ETH", "LONG", 3000.0, T0 + 1), _o("SOL", "LONG", 70.0, T0 + 2, whale="bn:2"), _o("ARB", "LONG", 0.1, T0 + 3, whale="bn:3")]
     ev = {e["coin"]: e for e in F.desk_events({"open": opens}, "whales")}
     cap = next(s for s in st["specs"] if s["filt"] == ["cap2side"])

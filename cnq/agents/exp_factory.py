@@ -139,6 +139,8 @@ def passes(spec: dict, coin: str, side: str, ctx: dict, ev: dict) -> bool:
             return False
         if f == "agree2" and ev.get("agree", 1) < 2:
             return False
+        if f == "ivan" and not str(ev.get("whale") or "").startswith("ivan"):   # 22.11 17:55: Ivan's copies only
+            return False
         if f == "cap2side" and ev.get("side_open", 0) >= 2:         # 22.11 post-mortem: no 3rd copy on the same side (baskets)
             return False
         if f == "sess_eu_late":                                      # 22.11 post-mortem: US / Asia entries lost (exploratory)
@@ -179,7 +181,7 @@ def desk_events(desk: dict, src: str) -> list:
                         and int(x.get("opened_t") or x.get("opened") or 0) <= int(o.get("opened_t") or o.get("opened") or 0))
         t = int(o.get("opened_t") or o.get("opened") or 0)
         out.append({"key": f"{src}|{o.get('whale') or o.get('id')}|{coin}|{t}", "src": src, "coin": coin, "side": side, "t": t,
-                    "entry": float(o["entry"]), "agree": agree, "side_open": side_open,
+                    "entry": float(o["entry"]), "agree": agree, "side_open": side_open, "whale": str(o.get("whale") or ""),
                     **({"sub": str(o.get("whale"))} if src == "hlw" else {})})
     return out
 
@@ -515,6 +517,10 @@ POSTMORTEM_SPECS = [
     {"src": "whales", "family": "постмортем", "filt": ["reg4h20"], "entry": "retest"},
     {"src": "whales", "family": "постмортем", "filt": ["sess_eu_late"]},
     {"src": "whales", "family": "постмортем", "filt": ["cap2side", "reg4h20", "agree2"]},
+    # 22.11 17:55 (owner): Ivan on probation — as is vs + BTC regime vs + no 3rd copy on a side
+    {"src": "whales", "family": "иван", "filt": ["ivan"]},
+    {"src": "whales", "family": "иван", "filt": ["ivan", "reg4h20"]},
+    {"src": "whales", "family": "иван", "filt": ["ivan", "cap2side"]},
 ]
 
 

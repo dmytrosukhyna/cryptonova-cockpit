@@ -43,3 +43,31 @@ def test_whale_copy_gets_whale_record_stop_target_market_and_owner_note():
     # kept: the market context is not fetched again for a known trade
     d2 = R.build(pub, wtop, {"by_sig": d["memory"]}, lambda b: (_ for _ in ()).throw(AssertionError("refetch")), T + 3, a)
     assert d2["by_sig"][f"whales:W-HYPE-S-{T - 10 * H}"]["market"] == w["market"]
+
+
+def test_closed_trades_keep_their_desk_id_after_the_open_leaves_the_action_list():
+    """22.11 (post-mortem: 27 closes without a desk-trade id): the closed row finds its sig by the close action, by the ledger of every
+    open ever seen (public_real lists only the 30 newest actions) and by the 04.11–05.11 backfill."""
+    sig = f"whales:W-SOL-S-{T - 5 * H}"
+    pub1 = {"futures": [], "closed": [], "actions": [{"t": T - 4 * H, "kind": "fut_open", "sym": "SOL", "side": "short", "sig": sig}]}
+    d1 = R.build(pub1, {}, None, fake_post, T, {})
+    assert any(r["sig"] == sig and r["src"] == "action" for r in d1["ledger"])
+    # later: the open is no longer among the actions (restart / the 30 newest); the closed row still gets its sig from the ledger
+    row = {"inst": "SOL-USDT-SWAP", "side": "short", "open_px": 100.0, "opened": T - 4 * H + 3 * 60_000, "closed": T}
+    d2 = R.build({"futures": [], "closed": [row], "actions": []}, {}, {"by_sig": d1["memory"], "ledger": d1["ledger"]}, fake_post, T + 1, {})
+    assert d2["closed"][0]["sig"] == sig and d2["closed"][0]["src"] == "action" and d2["closed"][0]["why"]["desk"] == "whales"
+    # the close action carries the sig (public_real pairs it with the open) — it wins even with no ledger
+    sig2 = "ivan2:X-SOL-1"
+    d3 = R.build({"futures": [], "closed": [row], "actions": [{"t": T + 60_000, "kind": "fut_close", "sym": "SOL", "sig": sig2}]},
+                 {}, None, fake_post, T + 2, {})
+    assert d3["closed"][0]["sig"] == sig2 and d3["closed"][0]["src"] == "close"
+    # the backfill: a 05.11 copy no public record kept
+    bf = R.backfill()
+    assert len(bf) == 30 and all(b["sig"].startswith("whales:BF-") for b in bf)
+    fil = next(b for b in bf if b["sym"] == "FIL")
+    old = {"inst": "FIL-USDT-SWAP", "side": "long", "open_px": 0.86, "opened": fil["t"] + 40_000, "closed": fil["t"] + 2 * H}
+    d4 = R.build({"futures": [], "closed": [old], "actions": []}, {}, None, fake_post, T + 3, {})
+    assert d4["closed"][0]["sig"] == fil["sig"] and d4["closed"][0]["src"] == "backfill"
+    # nothing within ± 10 min → no guess
+    far = {**row, "opened": T - 9 * H, "closed": T - 8 * H}
+    assert R.build({"futures": [], "closed": [far], "actions": []}, {}, None, fake_post, T + 4, {})["closed"][0]["sig"] is None

@@ -217,15 +217,24 @@ def actions(since: int, logs: dict | None = None) -> list[dict]:
         if ev.get("ev") in ("buy", "sell", "park", "unpark") and (ms._f(ev.get("filled")) or 0) > 0:
             add(ev, "active_" + {"buy": "buy", "sell": "sell", "park": "park", "unpark": "unpark"}[ev["ev"]], ev.get("ccy") or ev.get("inst"),
                 usd=ms._f(ev.get("usd")), px=ev.get("avg_px"))
+    # 22.11 (post-mortem: closed trades without a desk-trade id): the futures log's close / reduce lines carry no «id» — they get the
+    # sig of the open position on that instrument (the log is in time order); a close ends it. Every fut_* action carries the sig.
+    held: dict = {}
     for ev in _tail(logs["fut"]):
         e_ = ev.get("ev")
         side = {"LONG": "long", "SHORT": "short"}.get(str(ev.get("side") or ""))
+        inst = str(ev.get("inst") or "")
+        sig = ev.get("id") or held.get(inst)
         if e_ == "open" and (ms._f(ev.get("sz")) or 0) > 0:
+            if ev.get("id"):
+                held[inst] = ev["id"]
             add(ev, "fut_open", ev.get("inst"), side, px=ev.get("avg_px"))
         elif e_ in ("close", "reduce") and ((ms._f(ev.get("filled")) or 0) > 0 or ev.get("lead")):
-            add(ev, "fut_" + e_, ev.get("inst"), px=ev.get("avg_px"))
+            add({**ev, "id": sig}, "fut_" + e_, ev.get("inst"), px=ev.get("avg_px"))
         elif e_ == "gone":
-            add(ev, "fut_gone", ev.get("inst"))
+            add({**ev, "id": sig}, "fut_gone", ev.get("inst"))
+        if e_ in ("close", "gone"):
+            held.pop(inst, None)
     out.sort(key=lambda a: -a["t"])
     return out[:ACTIONS_MAX]
 

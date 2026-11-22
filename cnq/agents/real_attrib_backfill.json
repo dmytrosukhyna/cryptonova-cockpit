@@ -1,0 +1,275 @@
+{
+ "about": "22.11 backfill: the real account's futures trades opened 04.11–05.11 2026 (UTC, minute precision) whose open was never in a public record (the public action list keeps the 30 newest; the repo history of public_real.json starts 08.11). Desk and whale from docs/journal/2026-11-05.md and 2026-11-06.md (all were copies of the «Киты» desk; whale unknown for the 04.11 day batch). OKX clOrdId («cnqf…») says only that the autopilot placed the order, not the desk.",
+ "trades": [
+  {
+   "sym": "HYPE",
+   "opened": 1793775180000,
+   "side": "short",
+   "desk": "whales",
+   "whale": null,
+   "sig": "whales:BF-HYPE-1793775180000",
+   "src": "journal 2026-11-05/06"
+  },
+  {
+   "sym": "ZRO",
+   "opened": 1793775180000,
+   "side": "short",
+   "desk": "whales",
+   "whale": null,
+   "sig": "whales:BF-ZRO-1793775180000",
+   "src": "journal 2026-11-05/06"
+  },
+  {
+   "sym": "PEPE",
+   "opened": 1793775180000,
+   "side": null,
+   "desk": "whales",
+   "whale": null,
+   "sig": "whales:BF-PEPE-1793775180000",
+   "src": "journal 2026-11-05/06"
+  },
+  {
+   "sym": "BTC",
+   "opened": 1793775180000,
+   "side": "long",
+   "desk": "whales",
+   "whale": null,
+   "sig": "whales:BF-BTC-1793775180000",
+   "src": "journal 2026-11-05/06"
+  },
+  {
+   "sym": "ETH",
+   "opened": 1793805540000,
+   "side": null,
+   "desk": "whales",
+   "whale": null,
+   "sig": "whales:BF-ETH-1793805540000",
+   "src": "journal 2026-11-05/06"
+  },
+  {
+   "sym": "SOL",
+   "opened": 1793806020000,
+   "side": null,
+   "desk": "whales",
+   "whale": null,
+   "sig": "whales:BF-SOL-1793806020000",
+   "src": "journal 2026-11-05/06"
+  },
+  {
+   "sym": "PEPE",
+   "opened": 1793826000000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "x.com/SilkBtc (HL)",
+   "sig": "whales:BF-PEPE-1793826000000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "HYPE",
+   "opened": 1793826000000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "BTC_Onlyone (bn)",
+   "sig": "whales:BF-HYPE-1793826000000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "BNB",
+   "opened": 1793828880000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "荣耀学员 (bn)",
+   "sig": "whales:BF-BNB-1793828880000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ZEC",
+   "opened": 1793828880000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "领航财经 (bn)",
+   "sig": "whales:BF-ZEC-1793828880000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "DOGE",
+   "opened": 1793828880000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "荣耀学员 (bn)",
+   "sig": "whales:BF-DOGE-1793828880000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "SOL",
+   "opened": 1793866860000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "x.com/SilkBtc (HL)",
+   "sig": "whales:BF-SOL-1793866860000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ETH",
+   "opened": 1793881260000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "邢小鸿 (bn)",
+   "sig": "whales:BF-ETH-1793881260000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "XRP",
+   "opened": 1793881260000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-XRP-1793881260000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ADA",
+   "opened": 1793881260000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-ADA-1793881260000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "LINK",
+   "opened": 1793881260000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-LINK-1793881260000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "BCH",
+   "opened": 1793881920000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "法兰西基金 (bn)",
+   "sig": "whales:BF-BCH-1793881920000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "FIL",
+   "opened": 1793883960000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-FIL-1793883960000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ETH",
+   "opened": 1793889720000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "邢小鸿 (bn)",
+   "sig": "whales:BF-ETH-1793889720000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "DOT",
+   "opened": 1793890080000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-DOT-1793890080000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ARB",
+   "opened": 1793890200000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-ARB-1793890200000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "BNB",
+   "opened": 1793890500000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "荣耀学员 (bn)",
+   "sig": "whales:BF-BNB-1793890500000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ARB",
+   "opened": 1793890560000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-ARB-1793890560000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "XRP",
+   "opened": 1793890560000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-XRP-1793890560000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "BTC",
+   "opened": 1793890620000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Luckyboytt (okx)",
+   "sig": "whales:BF-BTC-1793890620000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "LTC",
+   "opened": 1793890860000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "法兰西基金 (bn)",
+   "sig": "whales:BF-LTC-1793890860000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ARB",
+   "opened": 1793890920000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-ARB-1793890920000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ADA",
+   "opened": 1793891220000,
+   "side": "short",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-ADA-1793891220000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ARB",
+   "opened": 1793891220000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-ARB-1793891220000",
+   "src": "journal 2026-11-06"
+  },
+  {
+   "sym": "ADA",
+   "opened": 1793891400000,
+   "side": "long",
+   "desk": "whales",
+   "whale": "Michael123456789 (okx)",
+   "sig": "whales:BF-ADA-1793891400000",
+   "src": "journal 2026-11-06"
+  }
+ ]
+}

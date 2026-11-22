@@ -236,16 +236,22 @@ def test_actions_are_the_autopilots_own_filled_orders_without_ids():
     ap.log({"ev": "order", "ccy": "QQQ", "side": "sell", "sz": "1", "px": "0.1", "filled": 0.0, "usd": 0.0, "ordId": "X1"}, ap.LOG)
     ap.log({"ev": "buy", "id": "i9", "inst": "XRP-USDT", "filled": 50.0, "avg_px": 2.5, "usd": 125.0, "ordId": "X2"}, ac.LOG)
     fu.log({"ev": "gone", "id": "bal:T0", "inst": "ETH-USDT-SWAP", "note": "закрыта на OKX (стоп или цель)"}, fu.LOG)
+    # 22.11: a close line has no «id» in the futures log — the action gets the sig of the open position on that instrument
+    fu.log({"ev": "open", "id": "whales:W-AVAX-L-1", "inst": "AVAX-USDT-SWAP", "side": "LONG", "sz": "3", "avg_px": 20.0}, fu.LOG)
+    fu.log({"ev": "close", "inst": "AVAX-USDT-SWAP", "sz": "3", "filled": 3.0, "avg_px": 21.0, "why": "кит закрыл"}, fu.LOG)
+    fu.log({"ev": "close", "inst": "AVAX-USDT-SWAP", "sz": "3", "filled": 3.0, "avg_px": 21.0, "why": "повтор"}, fu.LOG)
     doc, (pub,) = _run(e, fk, NOW + 60_000, {})
     A = pub["actions"]
     kinds = {a["kind"] for a in A}
     assert {"spot_buy", "spot_sell", "fut_open", "active_buy", "fut_gone"} <= kinds and "QQQ" not in {a["sym"] for a in A}   # unfilled: not there
     assert all(list(a) == list(PR.ACTION_KEYS) for a in A) and [a["t"] for a in A] == sorted((a["t"] for a in A), reverse=True)
-    op = next(a for a in A if a["kind"] == "fut_open")
+    op = next(a for a in A if a["kind"] == "fut_open" and a["sym"] == "SOL")
     assert op["sym"] == "SOL" and op["side"] == "long" and op["sig"] and op["sig"].endswith("T1")
     xrp = next(a for a in A if a["kind"] == "active_buy")
     assert xrp["sym"] == "XRP" and xrp["usd"] == 125.0 and xrp["sig"] is None
     assert next(a for a in A if a["kind"] == "fut_gone")["sym"] == "ETH"
+    cl = [a for a in A if a["kind"] == "fut_close" and a["sym"] == "AVAX"]
+    assert len(cl) == 2 and sorted(a["sig"] or "" for a in cl) == ["", "whales:W-AVAX-L-1"]   # after a close nothing is held
     text = json.dumps(A)
     assert "ordId" not in text and "X2" not in text and "X1" not in text
     assert PR.actions(NOW + 10 ** 9) == []                                        # nothing before the start counts

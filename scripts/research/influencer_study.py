@@ -67,7 +67,7 @@ def main():
         if not p["t"]:
             continue
         for c in I.classify(p, coins):
-            c = {**c, "t": p["t"]}
+            c = {**c, "t": p["t"], "p3": "p3" in (p["text"] or "").lower(), "snip": (p["text"] or "")[:90].replace("\n", " ")}
             if c["kind"] == "recap":
                 recaps.append(c)
             elif c["kind"] == "call":
@@ -86,8 +86,10 @@ def main():
     btc = series("BTC")
     res = []
     for c in calls:
-        hr = candles(f"{c['coin']}-USDT", "1H", c["t"] - 2 * H)
-        nxt = sorted(t for t in hr if t >= c["t"])
+        hd = get(f"{OKX}/market/history-candles?instId={c['coin']}-USDT&bar=1H&limit=100&after={c['t'] + 48 * H}")   # the hours around the post
+        hr = {int(k[0]): (float(k[1]), float(k[2]), float(k[3]), float(k[4])) for k in ((hd or {}).get("data") or [])}
+        time.sleep(0.12)
+        nxt = sorted(t for t in hr if c["t"] <= t <= c["t"] + 2 * H)
         if not nxt:
             continue
         a = hr[nxt[0]][0]
@@ -96,7 +98,7 @@ def main():
         if not days:
             continue
         s = 1 if c["side"] == "LONG" else -1
-        r = {"coin": c["coin"], "side": c["side"], "t": c["t"], "entry": a, "claimed_entry": c.get("entry"), "targets_x": c["targets_x"],
+        r = {"coin": c["coin"], "side": c["side"], "t": c["t"], "entry": a, "p3": c["p3"], "claimed_entry": c.get("entry"), "targets_x": c["targets_x"],
              "targets_px": c["targets_px"], "horizon": c.get("horizon")}
         for w in (7, 30, 90):
             tt = [t for t in days if t <= c["t"] + w * DAY]
@@ -142,20 +144,38 @@ def main():
             o["beat_btc"] = round(sum(x > 0 for x in bs) / len(bs), 3) if bs else None
         return o
     th = [r for r in res if r.get("targets_n")]
+
+    def sub(sel):
+        keep = [r for r in res if sel(r)]
+        out = {}
+        for w in ("r7", "r30", "r90"):
+            xs = [r[w] for r in keep if r.get(w) is not None]
+            bs = [r[w] - r["btc" + w[1:]] for r in keep if r.get(w) is not None and r.get("btc" + w[1:]) is not None]
+            out[w] = {"n": len(xs), "mean": round(st.mean(xs), 2) if xs else None, "win": round(sum(x > 0 for x in xs) / len(xs), 3) if xs else None,
+                      "vs_btc": round(st.mean(bs), 2) if bs else None}
+        return out
+    splits = {"long": sub(lambda r: r["side"] == "LONG"), "short": sub(lambda r: r["side"] == "SHORT"),
+              "p3": sub(lambda r: r["p3"]), "not_p3": sub(lambda r: not r["p3"]),
+              "majors": sub(lambda r: r["coin"] in ("BTC", "ETH", "SOL")), "alts": sub(lambda r: r["coin"] not in ("BTC", "ETH", "SOL"))}
+    own = {handle.lower()[i:i + 5] for i in range(max(1, len(handle) - 4))}
+    snips = [("C " + c["coin"] + " " + c["side"][0] + ": " + c["snip"]) for c in calls[-12:]] + [("R " + c["coin"] + ": " + c["snip"]) for c in recaps[-8:]]
+    snips = ["<скрыто>" if any(x in t.lower() for x in own) else t for t in snips]
     O = {"posts": len(posts), "span": span, "calls": len(calls), "scored": len(res), "recaps": len(recaps), "recaps_without_prior_call": unmatched,
          "short_calls": sum(1 for c in calls if c["side"] == "SHORT"),
          "r7": agg("r7", "btc7"), "r30": agg("r30", "btc30"), "r90": agg("r90", "btc90"), "r_now": agg("r_now"),
          "mdd90_median": round(st.median([r["mdd90"] for r in res if r.get("mdd90") is not None]), 1) if any(r.get("mdd90") is not None for r in res) else None,
          "targets": {"calls_with_targets": len(th), "targets": sum(r["targets_n"] for r in th),
                      "hit": sum(r["targets_hit"] or 0 for r in th)},
-         "tools": tools, "domains": dict(doms.most_common(15)), "calls_list": res}
+         "tools": tools, "domains": dict(doms.most_common(15)), "splits": splits, "calls_list": res}
     json.dump(O, open(outp, "w"), ensure_ascii=False, indent=1)
     print("::notice title=inf summary::" + json.dumps({k: v for k, v in O.items() if k not in ("calls_list", "tools", "domains")}, ensure_ascii=False))
     print("::notice title=inf method::" + json.dumps({"tools": tools, "domains": O["domains"]}, ensure_ascii=False)[:4000])
+    print("::notice title=inf splits::" + json.dumps(splits, ensure_ascii=False)[:4000])
+    print("::notice title=inf sample::" + json.dumps(snips, ensure_ascii=False)[:4000])
     rows = [[time.strftime("%y-%m-%d", time.gmtime(r["t"] / 1000)), r["coin"], r["side"][0], round(r["entry"], 6), r.get("r7"), r.get("r30"),
              r.get("r90"), r.get("r_now"), r.get("btc30"), r.get("mdd90"), r.get("targets_n"), r.get("targets_hit")] for r in res]
-    for i in range(0, min(len(rows), 280), 35):
-        print(f"::notice title=inf calls {i // 35 + 1}::" + json.dumps(rows[i:i + 35], ensure_ascii=False)[:4000])
+    for i in range(0, min(len(rows), 240), 40):
+        print(f"::notice title=inf calls {i // 40 + 1}::" + json.dumps(rows[i:i + 35], ensure_ascii=False)[:4000])
 
 
 if __name__ == "__main__":

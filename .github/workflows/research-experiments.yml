@@ -1,0 +1,41 @@
+name: research-experiments
+# 22.11 (owner 16:18): the experiment program — variants of the whale copy stream on stored history (scripts/research/exp_variants.py)
+# and big Hyperliquid BTC positions for the watch list (scripts/research/hl_big_btc.py). Read-only: restores the state cache, never saves.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "variants (exp_variants.py) or hlbtc (hl_big_btc.py)"
+        type: choice
+        options: [variants, hlbtc]
+        default: variants
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Restore the state cache (read only)
+        if: inputs.mode == 'variants'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/cnq.sqlite
+            data/agents.sqlite
+            data/whales_ext.sqlite
+          key: cnq-state-none
+          restore-keys: |
+            cnq-state-
+      - if: inputs.mode == 'variants'
+        run: python scripts/research/exp_variants.py data/agents.sqlite exp_variants.json
+      - if: inputs.mode == 'hlbtc'
+        run: python scripts/research/hl_big_btc.py hl_big_btc.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exp-${{ inputs.mode }}
+          path: "*.json"

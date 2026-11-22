@@ -175,8 +175,50 @@ def test_factory_tick_through_the_api_with_a_fake_okx(tmp_path):
             return {"data": [[str(T0), "1.2"]]}
         return {"data": []}
     ex = E.Experiments(str(data), str(web), env={})
+    hl = []
+    ex._hl_post = lambda body: hl.append(body) or {"assetPositions": []}           # the watched wallets: a fake Hyperliquid
     r = ex.factory_tick(T0 + 60_000, get, json.load(open(web / "whales_live.json"))["desk"])
+    assert hl and all(b["type"] == "clearinghouseState" for b in hl)
     assert r["opened"] > 5 and r["live_specs"] >= 50
     assert sum("tickers" in u for u in calls) == 1                           # one marks call per pass
     code, doc = ex.factory()
     assert code == 200 and doc["live"] >= 50 and doc["rows"] and doc["cycle_ms"] is not None
+
+
+def test_watched_hl_wallets_are_paper_sources_with_group_specs():
+    from cnq.agents import exp_factory as F
+    st = {}
+    now = T0 + 10 * H
+    F.step(st, now, {}, {}, {"BTC": 60000.0})                                     # seeds the specs
+    w = ["0xaaa", "0xbbb"]
+    new = F.ensure_watch_specs(st, w, now)
+    assert len(new) == 5 and not F.ensure_watch_specs(st, w, now)                 # 2 wallets + 3 group specs, once
+    pos = {"0xaaa": [{"coin": "BTC", "side": "LONG", "entry": 59000.0}], "0xbbb": []}
+    book, d = F.hl_book(None, w, lambda a: pos[a], now, {"BTC": 60000.0})
+    assert d["open"][0]["opened_t"] == 0                                          # already open at the first read: not an event
+    pos["0xbbb"] = [{"coin": "BTC", "side": "LONG", "entry": 60000.0}]
+    pos["0xaaa"] = [{"coin": "ETH", "side": "SHORT", "entry": 3000.0}, {"coin": "BTC", "side": "LONG", "entry": 59000.0}]
+    book, d = F.hl_book(book, w, lambda a: pos[a], now + 300_000, {"BTC": 60000.0, "ETH": 3000.0})
+    F.step(st, now + 300_000, {}, {"hlw": d}, {"BTC": 60000.0, "ETH": 3000.0})
+    mine = [p for p in st["open"] if p["spec"].startswith("hlw|")]
+    assert {(p["coin"], p["spec"].split("|")[-1]) for p in mine if "agree2" not in p["spec"]} >= {("ETH", "0xaaa"), ("BTC", "0xbbb")}
+    assert not any(p["coin"] == "BTC" and p["spec"].endswith("0xaaa") for p in mine)   # his old BTC long was not taken
+    pos["0xaaa"] = [{"coin": "BTC", "side": "LONG", "entry": 59000.0}]                 # he closed ETH
+    book, d = F.hl_book(book, w, lambda a: pos[a], now + 600_000, {"BTC": 60000.0, "ETH": 2900.0})
+    assert d["closed"] and d["closed"][0]["coin"] == "ETH" and d["closed"][0]["exit"] == 2900.0
+    F.step(st, now + 600_000, {}, {"hlw": d}, {"BTC": 60000.0, "ETH": 2900.0})
+    assert any(c["spec"].endswith("0xaaa") and c["coin"] == "ETH" and c["why"] == "источник вышел" and c["pct"] > 3 for c in st["closed"])
+
+
+def test_postmortem_specs_and_the_watch_list_config():
+    from cnq.agents import exp_factory as F
+    st = {}
+    F.step(st, T0, {}, {}, {"BTC": 60000.0})
+    new = F.ensure_specs(st, F.POSTMORTEM_SPECS, T0, "postmortem")
+    assert len(new) == 5 and not F.ensure_specs(st, F.POSTMORTEM_SPECS, T0, "postmortem")
+    opens = [_o("ETH", "LONG", 3000.0, T0 + 1), _o("SOL", "LONG", 70.0, T0 + 2, whale="bn:2"), _o("ARB", "LONG", 0.1, T0 + 3, whale="bn:3")]
+    ev = {e["coin"]: e for e in F.desk_events({"open": opens}, "whales")}
+    cap = next(s for s in st["specs"] if s["filt"] == ["cap2side"])
+    assert F.passes(cap, "ETH", "LONG", {}, ev["ETH"]) and not F.passes(cap, "ARB", "LONG", {}, ev["ARB"])     # the 3rd long is skipped
+    w = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "exp_watch_traders.json")))
+    assert 1 <= len(w["hl"]) <= 30 and all(x["addr"].startswith("0x") and len(x["addr"]) == 42 for x in w["hl"])

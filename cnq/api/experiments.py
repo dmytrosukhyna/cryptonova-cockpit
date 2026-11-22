@@ -105,11 +105,40 @@ class Experiments:
         sources = {"whales": desk or {}, "own": pp.get("own") or {}, "aggr": pp.get("aggr") or {}}
         sp = os.path.join(d, "state.json")
         st = self._load(sp) or {}
+        # 22.11 17:19: watched Hyperliquid wallets (config/exp_watch_traders.json, from scripts/research/global_traders.py) — paper
+        wl = self._load(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config",
+                                     "exp_watch_traders.json")) or {}
+        wallets = [str(w["addr"]).lower() for w in wl.get("hl") or [] if isinstance(w, dict) and str(w.get("addr", "")).startswith("0x")][:30]
+        if wallets:
+            hp = getattr(self, "_hl_post", None) or self._hl
+
+            def pos_of(a):
+                ch = hp({"type": "clearinghouseState", "user": a}) or {}
+                out = []
+                for p_ in ch.get("assetPositions") or []:
+                    q = p_.get("position") or {}
+                    sz = float(q.get("szi") or 0)
+                    if sz and q.get("coin") and q.get("entryPx"):
+                        out.append({"coin": str(q["coin"]).upper(), "side": "LONG" if sz > 0 else "SHORT", "entry": float(q["entryPx"])})
+                return out
+            if st.get("specs"):
+                F.ensure_watch_specs(st, wallets, now)
+            st["hl_book"], sources["hlw"] = F.hl_book(st.get("hl_book"), wallets, pos_of, now, marks)
+        if st.get("specs"):
+            F.ensure_specs(st, F.POSTMORTEM_SPECS, now, "postmortem")
         r = F.step(st, now, ctx, sources, marks,
                    trend_of=lambda c: F.trend_state(F.candles(f"{c}-USDT-SWAP", "1H", 60, g), 50),
                    atr_of=lambda c: F.atr_pct(F.candles(f"{c}-USDT-SWAP", "1H", 30, g)))
         self._save(sp, st)
         return r
+
+    @staticmethod
+    def _hl(body: dict):
+        import urllib.request
+        req = urllib.request.Request("https://api.hyperliquid.xyz/info", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json", "User-Agent": "cnq-factory"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return json.loads(r.read())
 
     def factory(self) -> tuple[int, dict]:
         from cnq.agents import exp_factory as F

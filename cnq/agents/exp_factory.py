@@ -139,6 +139,12 @@ def passes(spec: dict, coin: str, side: str, ctx: dict, ev: dict) -> bool:
             return False
         if f == "agree2" and ev.get("agree", 1) < 2:
             return False
+        if f == "cap2side" and ev.get("side_open", 0) >= 2:         # 22.11 post-mortem: no 3rd copy on the same side (baskets)
+            return False
+        if f == "sess_eu_late":                                      # 22.11 post-mortem: US / Asia entries lost (exploratory)
+            h = time.gmtime(int(ev.get("t") or 0) / 1000).tm_hour
+            if h < 8 or 13 <= h < 21:
+                return False
         if f == "smart":
             fl = (ctx.get("smart") or {}).get(coin)
             if (side == "SHORT" and fl == "acc") or (side == "LONG" and fl == "dist"):
@@ -169,9 +175,12 @@ def desk_events(desk: dict, src: str) -> list:
         side = str(o.get("side") or "").upper()
         agree = sum(1 for x in opens if str(x.get("coin") or x.get("symbol")).upper().replace("USDT", "") == coin
                     and str(x.get("side")).upper() == side)
+        side_open = sum(1 for x in opens if x is not o and str(x.get("side")).upper() == side
+                        and int(x.get("opened_t") or x.get("opened") or 0) <= int(o.get("opened_t") or o.get("opened") or 0))
         t = int(o.get("opened_t") or o.get("opened") or 0)
         out.append({"key": f"{src}|{o.get('whale') or o.get('id')}|{coin}|{t}", "src": src, "coin": coin, "side": side, "t": t,
-                    "entry": float(o["entry"]), "agree": agree})
+                    "entry": float(o["entry"]), "agree": agree, "side_open": side_open,
+                    **({"sub": str(o.get("whale"))} if src == "hlw" else {})})
     return out
 
 
@@ -448,3 +457,78 @@ def summary(st: dict, src: dict | None = None) -> dict:
             "closed": len(st.get("closed") or []), "rows": rows, "generations": (st.get("generations") or [])[-10:],
             "rule_ru": "Кандидат: ≥ 30 сделок вперёд, t ≥ 3 (поправка на десятки спецификаций), плюс в обеих половинах, PF и просадка лучше "
                        "текущего источника. На реальный счёт — только после «да» владельца."}
+
+
+# ── 22.11 17:19 (owner): watched traders found outside our exchanges — Hyperliquid wallets, PAPER only ─────────────────────────
+def hl_book(prev: dict | None, wallets: list, positions_of, now: int, marks: dict) -> tuple[dict, dict]:
+    """positions_of(addr) → [{coin, side, entry}]; returns (new book {addr: {coin: {side, entry, t}}}, desk-like {open, closed})"""
+    book, opens, closed = {}, [], []
+    prev = prev or {}
+    for a in wallets:
+        try:
+            cur = {p["coin"]: p for p in positions_of(a) or []}
+        except Exception:  # noqa: BLE001 — a failed read keeps the last book of that wallet
+            book[a] = prev.get(a) or {}
+            for coin, p in book[a].items():
+                opens.append({"whale": a, "coin": coin, "side": p["side"], "entry": p["entry"], "opened_t": p["t"]})
+            continue
+        old = prev.get(a) or {}
+        book[a] = {}
+        for coin, p in cur.items():
+            o = old.get(coin)
+            # a position already open when we first read the wallet is not a new event (t = 0 → before the factory's birth)
+            t = o["t"] if o and o["side"] == p["side"] else (now if a in prev else 0)
+            book[a][coin] = {"side": p["side"], "entry": float(p["entry"]), "t": t}
+            opens.append({"whale": a, "coin": coin, "side": p["side"], "entry": float(p["entry"]), "opened_t": t})
+        for coin, o in old.items():
+            if coin not in cur or cur[coin]["side"] != o["side"]:
+                closed.append({"whale": a, "coin": coin, "side": o["side"], "entry": o["entry"], "opened_t": o["t"], "exit": marks.get(coin)})
+    return book, {"open": opens, "closed": closed}
+
+
+def ensure_watch_specs(st: dict, wallets: list, now: int) -> list:
+    """one follow spec per watched wallet + the group specs (≥ 2 watched wallets on the same coin and side); returns the new ids"""
+    have = {s["id"] for s in st.get("specs") or []}
+    new = []
+    base = {"side": "follow", "filt": [], "entry": "now", "stop": 16, "tp": None, "hold": None, "size": "fixed"}
+    for a in wallets:
+        s = {**base, "src": "hlw", "family": "global", "sub": a}
+        s["id"] = sid(s)
+        if s["id"] not in have:
+            new.append(s)
+    for g in ({"filt": ["agree2"]}, {"filt": ["agree2"], "entry": "retest"}, {"filt": ["agree2", "major"]}):
+        s = {**base, **g, "src": "hlw", "family": "global·группа"}
+        s["id"] = sid(s)
+        if s["id"] not in have:
+            new.append(s)
+    for s in new:
+        st.setdefault("specs", []).append({**s, "gen": 0, "born": now, "alive": True})
+    if new:
+        st.setdefault("generations", []).append({"t": now, "gen": "watch", "spawned": [s["id"] for s in new], "killed": []})
+    return [s["id"] for s in new]
+
+
+# ── 22.11 17:19 (owner): the post-mortem's fixes as specs (added to a running factory once) ─────────────────────────────────
+POSTMORTEM_SPECS = [
+    {"src": "whales", "family": "постмортем", "filt": ["cap2side"]},
+    {"src": "whales", "family": "постмортем", "filt": ["cap2side", "reg4h20"]},
+    {"src": "whales", "family": "постмортем", "filt": ["reg4h20"], "entry": "retest"},
+    {"src": "whales", "family": "постмортем", "filt": ["sess_eu_late"]},
+    {"src": "whales", "family": "постмортем", "filt": ["cap2side", "reg4h20", "agree2"]},
+]
+
+
+def ensure_specs(st: dict, specs: list, now: int, tag: str) -> list:
+    have = {s["id"] for s in st.get("specs") or []}
+    base = {"side": "follow", "filt": [], "entry": "now", "stop": 16, "tp": None, "hold": None, "size": "fixed"}
+    new = []
+    for x in specs:
+        s = {**base, **x}
+        s["id"] = sid(s)
+        if s["id"] not in have:
+            have.add(s["id"])
+            new.append(s)
+            st.setdefault("specs", []).append({**s, "gen": 0, "born": now, "alive": True})
+    if new:
+        st.setdefault("generations", []).append({"t": now, "gen": tag, "spawned": [s["id"] for s in new], "killed": []})
+    return [s["id"] for s in new]

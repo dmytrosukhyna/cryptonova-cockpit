@@ -587,6 +587,24 @@ def tg_events(posts: list, coins: set, key: str, born: int) -> dict:
     return {"open": opens, "closed": []}
 
 
+def manual_events(lines: list, key: str, born: int) -> list:
+    """22.11 (owner): calls he forwards from the trader's Instagram — jsonl rows {t (ms or ISO), coin, entry?, targets_x?, targets_px?,
+    source}; only those after the factory's birth, as desk-like opens of the same source"""
+    from cnq.execution.owner_overrides import _ms
+    out = []
+    for r in lines or []:
+        try:
+            t = _ms(r.get("t"))
+            coin = str(r.get("coin") or "").upper()
+        except Exception:  # noqa: BLE001
+            continue
+        if t and t >= born and coin.isalnum():
+            out.append({"whale": key, "coin": coin, "side": "LONG", "entry": float(r.get("entry") or 0), "opened_t": t,
+                        "targets_x": [float(x) for x in r.get("targets_x") or []], "targets_px": [float(x) for x in r.get("targets_px") or []],
+                        "id": f"m{t}{coin}", "source": str(r.get("source") or "manual")[:20]})
+    return out
+
+
 TG_SPECS = [
     {"src": "tgc", "family": "телеграм", "stop": 30, "tp_own": True, "hold": 2160},
     {"src": "tgc", "family": "телеграм", "stop": 99, "tp_own": True, "hold": 2160},

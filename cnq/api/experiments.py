@@ -153,6 +153,16 @@ class Experiments:
             for c in ch[:3]:
                 e_ = F.tg_events(list((st.get("tg_posts") or {}).get(c["key"], {}).values()), set(st.get("tg_coins") or []), c["key"], int(st["born"]))
                 evs["open"] += e_["open"]
+                lines = []                     # calls forwarded by the owner (Instagram): repo file (anonymous key) + the owner-only data dir
+                for fp in (os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config",
+                                        f"influencer_calls_{c['key']}.jsonl"),
+                           os.path.join(self.root, "influencers", c["key"], "manual_calls.jsonl")):
+                    try:
+                        with open(fp, encoding="utf-8") as f:
+                            lines += [json.loads(x) for x in f if x.strip()]
+                    except (OSError, ValueError):
+                        pass
+                evs["open"] += F.manual_events(lines, c["key"], int(st["born"]))
             sources["tgc"] = evs
             stk = cached("spot_tk", 5 * 60_000, lambda: g(f"{F.OKX}/market/tickers?instType=SPOT").get("data") or []) or []
             for x in stk:

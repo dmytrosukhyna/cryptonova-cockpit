@@ -257,3 +257,11 @@ def test_owner_sets_the_channel_only_in_the_server_data_dir(tmp_path):
     import inspect
     from cnq.api import server
     assert '"/v2/owner/influencers"' in inspect.getsource(server)
+
+
+def test_forwarded_instagram_calls_feed_the_same_paper_desk():
+    from cnq.agents import exp_factory as F
+    ev = F.manual_events([{"t": "2026-11-23T12:00:00+00:00", "coin": "vvv", "entry": 3.1, "targets_x": [2], "source": "instagram"},
+                          {"t": 1, "coin": "OLD"}, {"coin": "bad coin!"}], "A", 1795000000000)
+    assert [e["coin"] for e in ev] == ["VVV"] and ev[0]["targets_x"] == [2.0] and ev[0]["source"] == "instagram"
+    assert os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "influencer_calls_A.jsonl"))

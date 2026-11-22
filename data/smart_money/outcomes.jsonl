@@ -7,3 +7,4 @@
 {"key":"hl:HYPE","symbol":"HYPE","h":1,"t0":1794832367756,"t":1794920277390,"price0":65.429,"price":69.545,"ret":6.29,"late":false}
 {"key":"hl:UZEC","symbol":"UZEC","h":7,"t0":1794382960547,"t":1794988013968,"price0":988.78,"price":954.13,"ret":-3.5,"late":false}
 {"key":"hl:UETH","symbol":"UETH","h":1,"t0":1795080982750,"t":1795168126359,"price0":1805.3,"price":1746.6,"ret":-3.25,"late":false}
+{"key":"hl:UBTC","symbol":"UBTC","h":7,"t0":1794735251827,"t":1795341607610,"price0":65387.0,"price":60776.0,"ret":-7.05,"late":false}

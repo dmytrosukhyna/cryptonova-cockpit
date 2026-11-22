@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "variants | families | btcevents | hlbtc"
+        description: "variants | families | btcevents | hlbtc | postmortem | global"
         type: choice
-        options: [variants, families, btcevents, hlbtc]
+        options: [variants, families, btcevents, hlbtc, postmortem, global]
         default: variants
 permissions:
   contents: read
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: Restore the state cache (read only)
-        if: inputs.mode == 'variants' || inputs.mode == 'families'
+        if: inputs.mode == 'variants' || inputs.mode == 'families' || inputs.mode == 'postmortem'
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -37,6 +37,10 @@ jobs:
         run: python scripts/research/exp_variants.py data/agents.sqlite exp_variants.json
       - if: inputs.mode == 'families'
         run: python scripts/research/exp_families.py data/agents.sqlite exp_families.json
+      - if: inputs.mode == 'postmortem'
+        run: python scripts/research/postmortem_whales.py data/agents.sqlite postmortem.json
+      - if: inputs.mode == 'global'
+        run: python scripts/research/global_traders.py global_traders.json
       - if: inputs.mode == 'btcevents'
         run: python scripts/research/exp_btc_events.py exp_btc_events.json
       - if: inputs.mode == 'hlbtc' || github.event_name == 'schedule'

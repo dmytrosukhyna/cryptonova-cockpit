@@ -58,6 +58,7 @@ from . import my_calls as my_calls_api
 from . import manual_desk as manual_desk_api
 from . import ivan_tests as ivan_tests_api, peter as peter_desk, peter_cloud, reversal as reversal_api, listing_short as listing_short_api, smart_alts as smart_alts_api
 from . import levels as levels_api
+from . import experiments as experiments_api
 from . import hacks as hacks_api
 from .auth import AuthError, FirebaseVerifier
 from .store import Store
@@ -155,6 +156,8 @@ class Api:
         self.smart_alts = smart_alts_api.SmartAlts(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "smart_alts"), web_dir)
         # 19.11: the paper test desk «Торговля от уровней» — owner-only, kept in <run>/data/levels (cnq/api/levels.py)
         self.levels = levels_api.Levels(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "levels"))
+        # 22.11 (owner 16:18): the experiment program — paper variants of the whale stream + the daily strategy board, owner-only
+        self.experiments = experiments_api.Experiments(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data"), web_dir)
         # 20.11: the paper test desk «Взломы → шорт» — owner-only, kept in <run>/data/hacks (cnq/api/hacks.py)
         self.hacks = hacks_api.Hacks(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "hacks"))
         self.peter_cloud = peter_cloud.Cloud(self.peter)     # 11.11 option B: read through MetaApi with the investor password
@@ -646,6 +649,10 @@ class Api:
             return self.smart_alts.desk()
         if path == "/v2/owner/levels":                                 # 19.11: «Торговля от уровней (тест)», owner only
             return self.levels.desk()
+        if path == "/v2/owner/exp_desks":                              # 22.11: experiment desks (paper), owner only
+            return self.experiments.desks()
+        if path == "/v2/owner/strategy_board":                         # 22.11: the daily strategy board, owner only
+            return self.experiments.board()
         if path == "/v2/owner/hacks":                                  # 20.11: «Взломы → шорт (тест)», owner only
             return self.hacks.desk()
         if path == "/v2/owner/peter":                                  # 11.11: «Питер» (MT5), owner only
@@ -1015,6 +1022,7 @@ def main() -> int:
     api.my_calls.start()                     # 19.11: «Мои прогнозы» — scores calls at their horizon, every minute
     api.ivan_tests.start()                   # 13.11: «Иван · тест-стратегии» — every 90 s while accounts are connected
     api.smart_alts.start()                   # 13.11: «Альты от китов (тест)» — paper, every 10 minutes, owner-only output
+    api.experiments.start()                  # 22.11: experiment desks (paper, every 5 min) + the strategy board (hourly), owner-only
     api.levels.start()                       # 19.11: «Торговля от уровней (тест)» — paper, every 10 minutes, owner-only output
     api.hacks.start()                        # 20.11: «Взломы → шорт (тест)» — paper, every 5 minutes, owner-only output
     api.peter_cloud.start()                  # 11.11: «Питер» through MetaApi — polls only while the owner has connected it
@@ -1025,7 +1033,7 @@ def main() -> int:
         here = os.path.dirname(os.path.realpath(__file__))
         agents = os.path.join(os.path.dirname(here), "agents")            # what the API imports from the engine's package
         files = lambda: [os.path.join(here, f) for f in os.listdir(here) if f.endswith(".py")] + \
-            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py", "hack_desk.py") if os.path.exists(os.path.join(agents, f))]
+            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py", "hack_desk.py", "exp_desks.py", "strategy_board.py") if os.path.exists(os.path.join(agents, f))]
         stamp = lambda: max(os.path.getmtime(p) for p in files())
         first = stamp()
         while True:

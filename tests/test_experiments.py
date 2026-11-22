@@ -92,3 +92,91 @@ def test_server_routes_are_owner_only_and_the_thread_starts():
     src = inspect.getsource(server)
     assert '"/v2/owner/exp_desks"' in src and '"/v2/owner/strategy_board"' in src and "api.experiments.start()" in src
     assert "/v2/exp_desks" not in src.replace("/v2/owner/exp_desks", "")
+
+
+def test_factory_seeds_50_plus_specs_runs_them_and_evolves():
+    from cnq.agents import exp_factory as F
+    seeds = F.seed_specs()
+    assert len(seeds) >= 50 and len({s["id"] for s in seeds}) == len(seeds)
+    fams = {s["family"] for s in seeds}
+    assert {"baseline", "filter", "confirm", "stop", "tp", "hold", "size", "contrarian", "calendar", "panic", "breakout", "crowd"} <= fams
+    st = {}
+    now = T0 + 3 * H                                                     # a Tuesday? not needed: market events checked below
+    desk = {"open": [{"whale": "bn:1", "coin": "UNI", "side": "SHORT", "entry": 5.0, "opened_t": now}], "closed": []}
+    r = F.step(st, now, {}, {"whales": desk}, {"UNI": 5.0, "BTC": 60000.0})
+    assert r["live_specs"] == len(seeds) and r["opened"] > 10 and "cycle_ms" in st
+    byspec = {p["spec"]: p for p in st["open"]}
+    base = next(s["id"] for s in st["specs"] if s["src"] == "whales" and s["family"] == "baseline")
+    inv = next(s["id"] for s in st["specs"] if s["src"] == "whales" and s["family"] == "contrarian" and not s.get("tp"))
+    assert byspec[base]["side"] == "SHORT" and byspec[inv]["side"] == "LONG"
+    assert not any(st_["spec"].startswith("whales|follow|major") for st_ in st["open"])           # UNI is not a major
+    assert any(q["spec"].startswith("whales|follow|-|conf1") for q in st["pending"])
+    # +1 % our way (short: price down) → the confirmation opens; −4.2 % against → the −4 % stop closes
+    F.step(st, now + 300_000, {}, {"whales": desk}, {"UNI": 4.94, "BTC": 60000.0})
+    assert any(p["spec"].startswith("whales|follow|-|conf1") for p in st["open"])
+    F.step(st, now + 600_000, {}, {"whales": desk}, {"UNI": 5.23, "BTC": 60000.0})
+    s4 = next(s["id"] for s in st["specs"] if s["src"] == "whales" and s["stop"] == 4)
+    c = next(c for c in st["closed"] if c["spec"] == s4)
+    assert c["why"] == "стоп" and abs(c["pct"] - (-4.11)) < 1e-6
+    # the whale exits → base closes with the source
+    desk2 = {"open": [], "closed": [{"whale": "bn:1", "coin": "UNI", "side": "SHORT", "entry": 5.0, "opened_t": now, "exit": 4.5}]}
+    F.step(st, now + 900_000, {}, {"whales": desk2}, {"UNI": 4.5, "BTC": 60000.0})
+    cb = next(c for c in st["closed"] if c["spec"] == base)
+    assert cb["why"] == "источник вышел" and cb["pct"] > 9
+
+
+DAY_MS = 86_400_000
+
+
+def test_factory_calendar_evolution_and_candidate_guard():
+    from cnq.agents import exp_factory as F
+    import calendar as _cal
+    mon = _cal.timegm((2026, 11, 23, 0, 5, 0)) * 1000                       # Monday 23.11.2026 00:05 UTC
+    st = {}
+    F.step(st, mon, {"fng": 9}, {}, {"BTC": 60000.0})
+    subs = {p["spec"] for p in st["open"]}
+    assert any("|mon" in x for x in subs) and any(x.startswith("fear|") for x in subs)
+    assert not any("|fri" in x for x in subs)
+    # evolution: a spec with 40 losing trades dies; a winner with ≥ 15 trades spawns a mutation the next day
+    loser = next(s for s in st["specs"] if s["src"] == "brk")
+    winner = next(s for s in st["specs"] if s["src"] == "lsr")
+    st["closed"] += [{"spec": loser["id"], "pct": -1.0, "closed_t": mon + i} for i in range(40)]
+    st["closed"] += [{"spec": winner["id"], "pct": 2.0 if i % 4 else -1.0, "closed_t": mon + i} for i in range(20)]
+    n0 = len(st["specs"])
+    F.step(st, mon + DAY_MS, {}, {}, {"BTC": 60000.0})
+    assert not next(s for s in st["specs"] if s["id"] == loser["id"])["alive"]
+    kids = [s for s in st["specs"] if s.get("parent") == winner["id"]]
+    assert len(st["specs"]) > n0 and kids and kids[0]["gen"] >= 1
+    g = st["generations"][-1]
+    assert loser["id"] in g["killed"] and kids[0]["id"] in g["spawned"]
+    # candidate guard: ≥ 30 trades, t ≥ 3, both halves positive, better than the source
+    good = F.score([1.5 if i % 5 else -0.5 for i in range(40)])
+    assert F.candidate(good, {"pf": 0.66, "max_dd": 50}) and not F.candidate(good, {"pf": 99, "max_dd": 50})
+    assert not F.candidate(F.score([1.0, -0.9] * 15), {"pf": 0.5, "max_dd": 50})
+
+
+def test_factory_tick_through_the_api_with_a_fake_okx(tmp_path):
+    from cnq.api import experiments as E
+    web, data = tmp_path / "web", tmp_path / "data"
+    web.mkdir(); data.mkdir()
+    json.dump({"desk": {"open": [_o("ETH", "LONG", 3000.0, T0)], "closed": []}}, open(web / "whales_live.json", "w"))
+    json.dump({"fng": {"value": 30}}, open(web / "markets.json", "w"))
+    calls = []
+
+    def get(url):
+        calls.append(url)
+        if "tickers" in url:
+            return {"data": [{"instId": "ETH-USDT-SWAP", "last": "3000"}, {"instId": "BTC-USDT-SWAP", "last": "60000"}]}
+        if "candles" in url:
+            return {"data": [[str(T0 - i * H), "1", "2", "0.5", str(60000 - i), "0", "0", "0", "1"] for i in range(300)]}
+        if "funding-rate" in url:
+            return {"data": [{"fundingRate": "0.0001"}]}
+        if "long-short" in url:
+            return {"data": [[str(T0), "1.2"]]}
+        return {"data": []}
+    ex = E.Experiments(str(data), str(web), env={})
+    r = ex.factory_tick(T0 + 60_000, get, json.load(open(web / "whales_live.json"))["desk"])
+    assert r["opened"] > 5 and r["live_specs"] >= 50
+    assert sum("tickers" in u for u in calls) == 1                           # one marks call per pass
+    code, doc = ex.factory()
+    assert code == 200 and doc["live"] >= 50 and doc["rows"] and doc["cycle_ms"] is not None

@@ -57,6 +57,10 @@ class Experiments:
                 st = self._load(sp) or {}
                 X.step(st, desk, now, ctx, atr_of)
                 self._save(sp, st)
+                try:                                     # 22.11 16:48: the experiment factory (50+ specs, same marks)
+                    self.factory_tick(now, get, desk)
+                except Exception as e:  # noqa: BLE001
+                    self.last_err = f"factory {type(e).__name__}"
                 b = self._load(os.path.join(self.root, "strategy_board.json"))
                 if not b or now - int(b.get("asof") or 0) >= BOARD_EVERY_MS:
                     b = SB.write(self.web, self.root, now)
@@ -66,6 +70,56 @@ class Experiments:
             except Exception as e:  # noqa: BLE001
                 self.last_err = type(e).__name__
                 return None
+
+    def factory_tick(self, now: int, get=None, desk: dict | None = None) -> dict:
+        from cnq.agents import exp_desks as X, exp_factory as F
+        g = get or F._get
+        d = os.path.join(self.root, "exp_factory")
+        os.makedirs(d, exist_ok=True)
+        cache = getattr(self, "_fc", {})
+        tk = g(f"{F.OKX}/market/tickers?instType=SWAP").get("data") or []
+        marks = {x["instId"][:-len("-USDT-SWAP")]: float(x["last"]) for x in tk if str(x.get("instId", "")).endswith("-USDT-SWAP") and x.get("last")}
+
+        def cached(key, ttl, fn):
+            t, v = cache.get(key, (0, None))
+            if now - t >= ttl:
+                try:
+                    v = fn()
+                except Exception:  # noqa: BLE001
+                    pass
+                cache[key] = (now, v)
+            return v
+        c4 = cached("c4", 15 * 60_000, lambda: F.candles("BTC-USDT-SWAP", "4H", 60, g)) or []
+        c1 = cached("c1", 15 * 60_000, lambda: F.candles("BTC-USDT-SWAP", "1H", 80, g)) or []
+        cd = cached("cd", 3 * 3_600_000, lambda: F.candles("BTC-USDT-SWAP", "1D", 300, g)) or []
+        fund = cached("fund", 3_600_000, lambda: {c: float((g(f"{F.OKX}/public/funding-rate?instId={c}-USDT-SWAP").get("data") or [{}])[0]
+                                                         .get("fundingRate") or 0) for c in ("BTC", "ETH", "SOL")})
+        lsr = cached("lsr", 3_600_000, lambda: float((g(f"{F.OKX}/rubik/stat/contracts/long-short-account-ratio?ccy=BTC&period=1H")
+                                                      .get("data") or [[0, None]])[0][1]))
+        self._fc = cache
+        mk = self._load(os.path.join(self.web, "markets.json")) or {}
+        pp = (self._load(os.path.join(self.web, "paper.json")) or {}).get("profiles") or {}
+        ctx = {"c4": c4, "reg4h20": F.trend_state(c4, 20), "reg1h50": F.trend_state(c1, 50), "reg1d200": F.trend_state(cd, 200),
+               "fng": (mk.get("fng") or {}).get("value"), "funding": fund or {}, "lsr": lsr,
+               "smart": X.smart_flags(self._load(os.path.join(self.web, "smart_money.json")))}
+        sources = {"whales": desk or {}, "own": pp.get("own") or {}, "aggr": pp.get("aggr") or {}}
+        sp = os.path.join(d, "state.json")
+        st = self._load(sp) or {}
+        r = F.step(st, now, ctx, sources, marks,
+                   trend_of=lambda c: F.trend_state(F.candles(f"{c}-USDT-SWAP", "1H", 60, g), 50),
+                   atr_of=lambda c: F.atr_pct(F.candles(f"{c}-USDT-SWAP", "1H", 30, g)))
+        self._save(sp, st)
+        return r
+
+    def factory(self) -> tuple[int, dict]:
+        from cnq.agents import exp_factory as F
+        st = self._load(os.path.join(self.root, "exp_factory", "state.json"))
+        if st is None:
+            return 503, {"error": "no_data", "last_error": self.last_err}
+        b = self._load(os.path.join(self.root, "strategy_board.json")) or {}
+        src = next((r["d30"] for r in b.get("rows") or [] if r.get("key") == "whales"), {})
+        return 200, {"asof": int(time.time() * 1000), **F.summary(st, {"pf": src.get("pf"), "max_dd": src.get("max_dd_pct")}),
+                     "open": st.get("open") or []}
 
     def _publish(self, b: dict, now: int) -> None:
         """docs/research/strategy_board.md once a UTC day after 18:30 — the evening report reads it"""

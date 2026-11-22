@@ -653,6 +653,8 @@ class Api:
             return self.experiments.desks()
         if path == "/v2/owner/strategy_board":                         # 22.11: the daily strategy board, owner only
             return self.experiments.board()
+        if path == "/v2/owner/exp_factory":                            # 22.11 16:48: the experiment factory (paper), owner only
+            return self.experiments.factory()
         if path == "/v2/owner/hacks":                                  # 20.11: «Взломы → шорт (тест)», owner only
             return self.hacks.desk()
         if path == "/v2/owner/peter":                                  # 11.11: «Питер» (MT5), owner only
@@ -1033,7 +1035,7 @@ def main() -> int:
         here = os.path.dirname(os.path.realpath(__file__))
         agents = os.path.join(os.path.dirname(here), "agents")            # what the API imports from the engine's package
         files = lambda: [os.path.join(here, f) for f in os.listdir(here) if f.endswith(".py")] + \
-            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py", "hack_desk.py", "exp_desks.py", "strategy_board.py") if os.path.exists(os.path.join(agents, f))]
+            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py", "hack_desk.py", "exp_desks.py", "strategy_board.py", "exp_factory.py") if os.path.exists(os.path.join(agents, f))]
         stamp = lambda: max(os.path.getmtime(p) for p in files())
         first = stamp()
         while True:

@@ -154,12 +154,37 @@ def markdown(b: dict) -> str:
     flagged = [r["name"] for r in b["rows"] if r["beats_source"]]
     L += ["", b["rule_ru"], "", ("Лучше источника: " + ", ".join(flagged) + " — предложить владельцу с цифрами.") if flagged
           else "Ни один стол пока не прошёл планку «лучше источника»."]
+    f = b.get("factory")
+    if f:
+        L += ["", f"## Фабрика экспериментов — живых спецификаций {f['live']} из {f['specs']}, закрытых сделок {f['closed']}, "
+              f"цикл {f.get('cycle_ms')} мс", "",
+              "| # | Спецификация | Семейство | Сделок | Win % | PF | Среднее % | t | Просадка | Кандидат |", "|---|---|---|---|---|---|---|---|---|---|"]
+        for i, r in enumerate(f["top"], 1):
+            L.append(f"| {i} | `{r['id']}` | {r.get('family')} | {r.get('n', 0)} | {_c(r, 'win')} | {_c(r, 'pf')} | {_c(r, 'mean')} | {_c(r, 't')} | "
+                     f"{_c(r, 'max_dd')} | {'**да**' if r.get('candidate') else '—'} |")
+        L += ["", "Закрыто за сутки (мертвые): " + (", ".join(f"`{k}`" for k in f["killed"]) or "нет"),
+              "Новые за сутки (мутации лидеров): " + (", ".join(f"`{k}`" for k in f["spawned"]) or "нет")]
     return "\n".join(L) + "\n"
+
+
+def factory_part(data: str, now: int, src: dict | None) -> dict | None:
+    """22.11 16:48: the experiment factory's top 10 and today's killed / spawned specs"""
+    st = _load(os.path.join(data, "exp_factory", "state.json"))
+    if not st:
+        return None
+    from . import exp_factory as F
+    sm = F.summary(st, {"pf": (src or {}).get("pf"), "max_dd": (src or {}).get("max_dd_pct")})
+    day = [g for g in st.get("generations") or [] if now - int(g.get("t") or 0) <= DAY]
+    return {"live": sm["live"], "specs": sm["specs"], "cycle_ms": sm["cycle_ms"], "closed": sm["closed"],
+            "top": [r for r in sm["rows"] if r.get("n", 0) >= 1][:10], "candidates": [r["id"] for r in sm["rows"] if r["candidate"]],
+            "killed": [k for g in day for k in g.get("killed") or []], "spawned": [k for g in day for k in g.get("spawned") or []]}
 
 
 def write(web: str, data: str, now: int | None = None) -> dict:
     now = int(now or time.time() * 1000)
     b = board(collect(web, data), now)
+    src = next((r["d30"] for r in b["rows"] if r["key"] == "whales"), {})
+    b["factory"] = factory_part(data, now, src)
     os.makedirs(data, exist_ok=True)
     with open(os.path.join(data, "strategy_board.json"), "w", encoding="utf-8") as f:
         json.dump(b, f, ensure_ascii=False)

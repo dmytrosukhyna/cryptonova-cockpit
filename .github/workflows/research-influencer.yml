@@ -1,0 +1,24 @@
+name: research-influencer
+# 22.11 (owner 22:36): a trader's public Telegram channel — calls parsed and backtested (scripts/research/influencer_study.py).
+# The channel comes as a base64 run input and is never written to a file or a log; annotations are anonymous («канал A»).
+on:
+  workflow_dispatch:
+    inputs:
+      src:
+        description: "channel handle, base64"
+        required: true
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Mask the input
+        run: echo "::add-mask::$(echo '${{ inputs.src }}' | base64 -d)"
+      - run: python scripts/research/influencer_study.py influencer.json
+        env:
+          INF_HANDLE_B64: ${{ inputs.src }}

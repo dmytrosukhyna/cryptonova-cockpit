@@ -914,7 +914,9 @@ def _copy_url(out: str) -> str | None:
     """web/public_real.json → copy_url (cnq/execution/public_real.py), only an OKX copy-trading profile link."""
     u = _https(_load(out, "public_real.json").get("copy_url"))
     tail = (u or "").removeprefix("https://www.okx.com/copy-trading/account/")
-    return u if u and tail != u and tail.isalnum() else None
+    # 22.11 (owner: the plain link showed «not found» on his phone): the plain profile link now lands on OKX's «trade» tab; the
+    # futures tab is named explicitly (the profile and lead trading are live: OKX's public copy-trading API answers for this code)
+    return u + "?tab=swap" if u and tail != u and tail.isalnum() else None
 
 
 def _https(v) -> str | None:

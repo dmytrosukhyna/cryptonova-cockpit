@@ -2,8 +2,6 @@ name: research-experiments
 # 22.11 (owner 16:18): the experiment program — variants of the whale copy stream on stored history (scripts/research/exp_variants.py)
 # and big Hyperliquid BTC positions for the watch list (scripts/research/hl_big_btc.py). Read-only: restores the state cache, never saves.
 on:
-  schedule:
-    - cron: "17 5 * * 1"          # weekly (Monday): the big Hyperliquid BTC positions for the watch list
   workflow_dispatch:
     inputs:
       mode:
@@ -34,10 +32,10 @@ jobs:
             cnq-state-
       - if: inputs.mode == 'variants'
         run: python scripts/research/exp_variants.py data/agents.sqlite exp_variants.json
-      - if: inputs.mode == 'hlbtc' || github.event_name == 'schedule'
+      - if: inputs.mode == 'hlbtc'
         run: python scripts/research/hl_big_btc.py hl_big_btc.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: exp-${{ inputs.mode || 'hlbtc' }}
+          name: exp-${{ inputs.mode }}
           path: "*.json"

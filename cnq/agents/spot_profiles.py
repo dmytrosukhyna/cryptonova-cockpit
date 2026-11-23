@@ -764,7 +764,7 @@ class IdeasPortfolio:
 
     def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None,
              tradeable: set | None = None, smart: dict | None = None, support: dict | None = None, picks: dict | None = None,
-             memes: dict | None = None, meme_on: bool | None = None, nosell: dict | None = None) -> dict:
+             memes: dict | None = None, meme_on: bool | None = None, nosell: dict | None = None, trend_of=None) -> dict:
         """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
         "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas()); `sma200` (20.10) —
         {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map). `tradeable` (22.10, owner) — coins with an
@@ -781,6 +781,7 @@ class IdeasPortfolio:
         now = now or int(time.time() * 1000)
         P, rp = IDEAS, self.rp
         self._nosell_guard(now, nosell)
+        self._trend_of = trend_of
         src = {k: {str(s).upper(): float(v) for s, v in ((sources or {}).get(k) or {}).items() if _posnum(v)} for k in IDEAS_SRC}
         fresh, note = ideas_freshness(ideas, now)
         smap = ideas_statuses(ideas) if fresh else {}
@@ -955,6 +956,8 @@ class IdeasPortfolio:
                 held[s] = {"symbol": s}
                 n_small, n_buy = (n_small + 1, n_buy) if small else (n_small, n_buy + 1)
             actions += self._smart_buys(now, price, live, psrc, src, actions)
+            if getattr(self, "_nosell", None):           # 23.11 (owner): the only allowed sale — a sound swap into a better coin
+                actions += self._swaps(now, price, live, psrc, src, rows, okx, (ideas or {}).get("btc_bull"))
             if self._meme_on:
                 actions += self._meme_buys(now, price, live, psrc, src)
             # 19.10 (owner: «сделки почти все в минус … нужна понятная модель»): the portfolio had drifted ALT-heavy — 5 alts bought at
@@ -1269,6 +1272,66 @@ class IdeasPortfolio:
                         "reason": "Продажа заблокирована владельцем (23.11): " + str(reason)[:300]}
             return self._act0(now_, sym, action, weight, price, reason, *a, **k)
         rp._act = act
+
+    def _swaps(self, now: int, price: dict, live: set, psrc: dict, src: dict, rows: list, okx, btc_bull) -> list[dict]:
+        """23.11 (owner, «nospotsell_1123»): sell a holding ONLY to buy a different coin with the proceeds, in the same run, when that
+        coin's rating (the table's research rating) is ≥ rating_gap higher, it is a table «можно брать / добрать» coin with an OKX pair
+        and a live price, it is not falling (BTC in its bull regime, or its daily close above the 20-day EMA — trend_of), and the swaps
+        of the UTC day stay ≤ day_cap_pct of the model. The same rules as the real account's guard (cnq/execution/spot_sell_guard.py),
+        so the account repeats the swap. Core coins are not sold here. Logged «замена: X → Y, причина»."""
+        c, rp, P = self._nosell, self.rp, IDEAS
+        gap, cap = float(c.get("rating_gap") or 15), float(c.get("day_cap_pct") or 0.03)
+        V = self.value(price) or 1.0
+        day = now // 86_400_000
+        used = float(rp._meta(f"swap_day:{day}") or 0.0)
+        rate = {str(r.get("symbol") or "").upper(): float(r["rating"]) for r in rows or [] if r.get("rating") is not None}
+        held = {p["symbol"]: p for p in rp.positions()}
+        out = []
+        targets = [r for r in rows or [] if r.get("status") in ("buy", "add") and str(r.get("symbol") or "").upper() not in held
+                   and (okx is None or str(r.get("symbol") or "").upper() in okx)]
+        for x, p in sorted(held.items(), key=lambda kv: rate.get(kv[0], 1e9)):
+            kind, _est = self._split(p["bucket"])
+            if kind == "core" or x not in rate or x not in price or not p.get("entry"):
+                continue
+            room = cap * V - used
+            if room < 0.002 * V:
+                break
+            for r in sorted(targets, key=lambda r: -float(r.get("rating") or 0)):
+                y = str(r["symbol"]).upper()
+                if y in held or rate.get(y, 0) - rate[x] < gap:
+                    continue
+                trend = btc_bull is True
+                if not trend and self._trend_of:
+                    try:
+                        trend = bool(self._trend_of(y))
+                    except Exception:  # noqa: BLE001
+                        trend = False
+                if not trend:
+                    continue
+                py, k, why_not = self._entry_price(y, r, src)
+                if py is None:
+                    continue
+                mv = self._mv(p, price[x])
+                amt = min(mv, room, P["buy_w"] * V)
+                why = (f"рейтинг {rate[y]:.0f} против {rate[x]:.0f}, " + ("BTC в росте" if btc_bull is True else "цена выше 20-дневной EMA"))
+                note = f"Замена: {x} → {y}, {why} (решение владельца 23.11: продаём только ради лучшей монеты)."
+                if amt >= mv - 1e-9:
+                    out.append(self._act0(now, x, "SELL", 0, price[x], note))
+                else:
+                    out.append(self._act0(now, x, "TRIM", p["weight"] * (1 - amt / mv), price[x], note, None))
+                rp._set_cash(rp.cash() - amt * P["fee"])
+                cost = amt / (1 + P["fee"])
+                out.append(self._act0(now, y, "BUY", cost, py, note, f"{r.get('kind') or 'mid'}:{r.get('status')}"))
+                rp._set_cash(rp.cash() - cost * P["fee"])
+                rp._set_meta(f"src:{y}", _SRC_CODE[k])
+                rp._set_meta(f"px:{y}", py)
+                price[y], psrc[y] = py, k
+                live.add(y)
+                held[y] = {"symbol": y}
+                used += amt
+                rp._set_meta(f"swap_day:{day}", used)
+                break
+        return out
 
     def _meme_w(self, price: dict) -> float:
         """the meme sleeve's share of the model now"""

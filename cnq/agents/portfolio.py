@@ -1338,7 +1338,7 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
         profiles["ideas"] = IdeasPortfolio(conn).step({"cg": price, "meme": meme_px, "hl": hl_px}, load_ideas(), now, sma200=sma,
                                                       tradeable=okx_spot_list(conn, now), smart=smart, support=_support("web"),
                                                       picks=owner_picks_cfg(), memes=spot_memes,   # 21.11: the meme sleeve (≤ 5 %)
-                                                      nosell=_nosell_cfg())                      # 23.11: no model sells (owner)
+                                                      nosell=_nosell_cfg(), trend_of=_above_ema20)  # 23.11: no model sells (owner)
     except Exception as e:  # noqa: BLE001
         profiles["ideas"] = {"key": "ideas", "name": IDEAS["name"], "about": IDEAS_ABOUT, "experiment": True, "error": str(e), **empty}
     return {"asof": now, "available": True, "btc_bull": btc_bull, "universe": len(rows), "hyperliquid": hl.get("available", False),
@@ -1347,6 +1347,13 @@ def run(conn: sqlite3.Connection, btc_bull: bool | None = None, llm=None, now: i
             "hl_spot_top": [{"symbol": k, "vol24": v["vol24"], "price": v["price"], "chg24": v["chg24"],
                              "score": next((r["score"] for r in rows if r["symbol"] == k), None)} for k, v in hl_spot_list],
             "sources": ["CoinGecko /coins/markets", "Hyperliquid info API"]}
+
+
+def _above_ema20(coin: str) -> bool:
+    """23.11: the coin's last daily close (OKX spot, confirmed candles) above its 20-day EMA — the swap rule's «not falling»"""
+    d = _get(f"https://www.okx.com/api/v5/market/candles?instId={coin}-USDT&bar=1D&limit=40") or {}
+    from cnq.execution.spot_sell_guard import ema_ok
+    return ema_ok([float(k[4]) for k in sorted(d.get("data") or [], key=lambda k: int(k[0])) if len(k) < 9 or str(k[8]) == "1"])
 
 
 def _nosell_cfg() -> dict | None:

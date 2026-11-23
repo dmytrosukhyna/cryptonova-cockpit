@@ -65,3 +65,28 @@ def test_model_keeps_coins_and_mirrors_only_the_exchange_stop(tmp_path):
         assert "AAA" not in {p["symbol"] for p in port.rp.positions()}                   # the exchange stop fired → the model sells too
     finally:
         os.chdir(cwd)
+
+
+def test_model_swaps_only_into_a_better_rising_coin_within_the_day_cap():
+    import sqlite3
+    from cnq.agents import spot_profiles as sp
+    T0 = 1_790_000_000_000
+    base = [{"symbol": "BTC", "name": "Bitcoin", "kind": "core", "status": "buy", "status_ru": "", "why_ru": "", "price": 80000, "rating": 78},
+            {"symbol": "LOW", "name": "Low", "kind": "mid", "status": "buy", "status_ru": "", "why_ru": "", "price": 10.0, "rating": 40}]
+    sup = {"sma200": {"LOW": 9.9, "TOP": 4.9}, "walls": {}, "btc": {"price": 80000, "ll20": 70000, "mid": "LONG"}}
+    port = sp.IdeasPortfolio(sqlite3.connect(":memory:"))
+    port.step({"cg": {"BTC": 80000, "LOW": 10.0}, "meme": {}, "hl": {}}, {"asof": T0, "available": True, "rows": base}, T0, support=sup)
+    rows = [dict(base[0]), {**base[1], "status": "wait"},
+            {"symbol": "TOP", "name": "Top", "kind": "mid", "status": "buy", "status_ru": "", "why_ru": "", "price": 5.0, "rating": 70}]
+    src = {"cg": {"BTC": 80000, "LOW": 10.0, "TOP": 5.0}, "meme": {}, "hl": {}}
+    mv = port.value({"BTC": 80000, "LOW": 10.0}) - port.rp.cash()
+    port.rp._set_cash(0.10 / 0.90 * mv)                                            # cash at the floor: no ordinary buy is possible
+    st = port.step(src, {"asof": T0 + 3_600_000, "available": True, "rows": rows, "btc_bull": False}, T0 + 3_600_000, support=sup,
+                   tradeable={"BTC", "LOW", "TOP"}, nosell={**C, "day_cap_pct": 0.5}, trend_of=lambda c: False)
+    assert "TOP" not in {p["symbol"] for p in port.rp.positions()}                 # falling and BTC not bull → no swap
+    st = port.step(src, {"asof": T0 + 7_200_000, "available": True, "rows": rows, "btc_bull": False}, T0 + 7_200_000, support=sup,
+                   tradeable={"BTC", "LOW", "TOP"}, nosell={**C, "day_cap_pct": 0.5}, trend_of=lambda c: True)
+    held = {p["symbol"] for p in port.rp.positions()}
+    assert "TOP" in held                                                            # sold LOW (≤ the plan size of TOP) for TOP
+    assert any(a["action"] in ("SELL", "TRIM") and a["symbol"] == "LOW" and a["reason"].startswith("Замена: LOW → TOP") for a in st["actions"])
+    assert any(a["action"] == "BUY" and a["symbol"] == "TOP" for a in st["actions"])

@@ -105,6 +105,11 @@ class Experiments:
         sources = {"whales": desk or {}, "own": pp.get("own") or {}, "aggr": pp.get("aggr") or {}}
         sp = os.path.join(d, "state.json")
         st = self._load(sp) or {}
+        try:                                   # 23.11: macro bias state for the «макро-перекос» spec
+            evs = cached("macro_ev", 6 * 3_600_000, lambda: self._macro_events()) or []
+            st["macro_bias"] = F.macro_bias(evs, c4, now)
+        except Exception:  # noqa: BLE001
+            st["macro_bias"] = {"active": False}
         # 22.11 17:19: watched Hyperliquid wallets (config/exp_watch_traders.json, from scripts/research/global_traders.py) — paper
         wl = self._load(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config",
                                      "exp_watch_traders.json")) or {}
@@ -178,6 +183,20 @@ class Experiments:
                    atr_of=lambda c: F.atr_pct(F.candles(f"{c}-USDT-SWAP", "1H", 30, g)))
         self._save(sp, st)
         return r
+
+    @staticmethod
+    def _macro_events() -> list:
+        from datetime import datetime, timezone
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        out = []
+        for fn in ("macro_events.json", "macro_events_ext.json"):
+            try:
+                for e in json.load(open(os.path.join(root, "scripts", fn), encoding="utf-8"))["events"]:
+                    if e.get("type") in ("CPI", "PCE", "FOMC") and e.get("utc"):
+                        out.append((int(datetime.strptime(e["utc"], "%Y-%m-%dT%H:%MZ").replace(tzinfo=timezone.utc).timestamp() * 1000), e["type"]))
+            except Exception:  # noqa: BLE001
+                pass
+        return out
 
     @staticmethod
     def _tg_get(url: str) -> str:

@@ -249,6 +249,12 @@ def _open(st, spec, ev, side, px, now, atrp):
         size = BASE_USD * min(3.0, max(0.25, 2.0 / atrp))
     elif spec.get("size") == "conv":
         size = BASE_USD * min(3, max(1, ev.get("agree", 1)))
+    elif spec.get("size") == "macrobias":                         # 23.11: before / after CPI-PCE-FOMC with a BTC 4h flip down
+        mb = (st.get("macro_bias") or {})
+        k = 1.0
+        if mb.get("active"):
+            k = 1.5 if ev.get("side") == "SHORT" or side == "SHORT" else 0.5
+        size = BASE_USD * k
     elif spec.get("size") == "ladder":                             # 22.11 18:07: the real risk ladder 1 → 1.5 → 2 % on this spec's own closes
         from cnq.execution import risk_ladder as RL
         S = st.setdefault("ladders", {}).setdefault(spec["id"], {})
@@ -553,7 +559,24 @@ POSTMORTEM_SPECS = [
     {"src": "whales", "family": "реальные правила", "size": "risk2", "daystop": 0.03},
     {"src": "whales", "family": "реальные правила", "size": "risk1", "daystop": 0.02},
     {"src": "whales", "family": "реальные правила", "size": "ladder", "daystop": "ladder"},
+    # 23.11 11:44 (owner): around inflation / Fed data with a BTC 4h flip down — shorts ×1.5, longs ×0.5 (vs the baseline ×1)
+    {"src": "whales", "family": "макро-перекос", "size": "macrobias"},
 ]
+
+
+def macro_bias(events: list, c4: list, now: int) -> dict:
+    """{"active", "event"}: active from the first 4h flip down (close < EMA20(4h) and a lower high) inside the 24 h before a CPI / PCE /
+    FOMC release until 24 h after it. events = [(t, type)]; c4 = completed BTC 4h candles [(t, o, h, l, c)] oldest first"""
+    ev = next(((t, ty) for t, ty in sorted(events) if t - 24 * H <= now <= t + 24 * H), None)
+    if not ev or len(c4) < 22:
+        return {"active": False, "event": ev}
+    e, E = None, {}
+    for k in c4:
+        e = k[4] if e is None else e + (k[4] - e) * 2 / 21
+        E[k[0]] = e
+    flip = any(c4[i][4] < E[c4[i][0]] and c4[i][2] < c4[i - 1][2] for i in range(1, len(c4))
+               if ev[0] - 24 * H <= c4[i][0] + 4 * H <= min(ev[0], now))
+    return {"active": bool(flip), "event": ev}
 
 
 def ensure_specs(st: dict, specs: list, now: int, tag: str) -> list:

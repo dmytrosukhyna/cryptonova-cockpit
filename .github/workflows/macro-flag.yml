@@ -1,0 +1,28 @@
+name: macro-flag
+# 23.11 (owner 11:44): hourly — before PCE / CPI / FOMC, flag a BTC 4h flip down with a long crowd (scripts/macro_flag.py →
+# web/macro_flag.json, public market data) for the 24/7 watch. Information only; no trading rule.
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: { group: macro-flag, cancel-in-progress: false }
+jobs:
+  flag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python scripts/macro_flag.py web/macro_flag.json
+      - name: commit if changed
+        run: |
+          git config user.name "cnq-bot"; git config user.email "cnq-bot@users.noreply.github.com"
+          git add web/macro_flag.json
+          git diff --cached --quiet && exit 0
+          git commit -m "macro flag: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          base=$(git rev-parse HEAD~1)
+          for i in 1 2 3; do git fetch origin main && git rebase --onto origin/main "$base" && git push origin HEAD:main && break || { git rebase --abort || true; sleep 10; }; done

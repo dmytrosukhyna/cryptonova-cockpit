@@ -281,3 +281,19 @@ def test_channels_come_from_the_sealed_file_first(tmp_path):
     assert ex.channels() == [{"key": "A", "handle": "chan_a"}]
     blob = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "sealed", "influencers.json")))
     assert set(blob) >= {"epk", "nonce", "ct"} and "Trader" not in json.dumps(blob)          # the repo copy is ciphertext only
+
+
+def test_macro_bias_spec_sizes_shorts_up_longs_down_only_around_a_release_with_a_flip():
+    from cnq.agents import exp_factory as F
+    t_ev = 1_795_000_000_000
+    c4 = [(t_ev - (30 - i) * 4 * H, 100.0, 110.0 - (i if i > 25 else 0), 90.0, 100.0 + (0 if i < 26 else -5 * (i - 25))) for i in range(30)]
+    mb = F.macro_bias([(t_ev, "PCE")], c4, t_ev - 2 * H)
+    assert mb["active"] and mb["event"][1] == "PCE"
+    assert not F.macro_bias([(t_ev, "PCE")], c4, t_ev - 30 * H)["active"]               # outside the ±24 h window
+    st = {"macro_bias": mb, "open": []}
+    spec = {"id": "x", "stop": 16, "size": "macrobias"}
+    F._open(st, spec, {"key": "k", "coin": "ETH", "side": "SHORT"}, "SHORT", 100.0, t_ev, None)
+    F._open(st, spec, {"key": "k2", "coin": "ETH", "side": "LONG"}, "LONG", 100.0, t_ev, None)
+    assert [p["usd"] for p in st["open"]] == [1500.0, 500.0]
+    assert any(x.get("size") == "macrobias" for x in F.POSTMORTEM_SPECS)
+    assert os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "macro_flag.py"))

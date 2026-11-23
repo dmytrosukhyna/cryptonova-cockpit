@@ -38,3 +38,30 @@ def test_live_config_and_hooks():
     c = json.load(open(os.path.join(root, "config", "owner_overrides.json")))[SG.KEY]
     assert c["on"] and c["tp_off"] and c["stops_keep"] and c["rating_gap"] == 15 and c["day_cap_pct"] == 0.03
     assert "SG.apply(" in inspect.getsource(ap.build) and "SG.cfg(" in inspect.getsource(ap.spot_stops)
+
+
+def test_model_keeps_coins_and_mirrors_only_the_exchange_stop(tmp_path):
+    import sqlite3
+    from cnq.agents import spot_profiles as sp
+    T0 = 1_790_000_000_000
+    rows = [{"symbol": "BTC", "name": "Bitcoin", "kind": "core", "status": "buy", "status_ru": "можно брать", "why_ru": "ядро", "price": 80000},
+            {"symbol": "AAA", "name": "A", "kind": "mid", "status": "buy", "status_ru": "можно брать", "why_ru": "ок", "price": 10.0}]
+    ideas = lambda t: {"asof": t, "available": True, "rows": rows}                                   # noqa: E731
+    sup = {"sma200": {"AAA": 9.9}, "walls": {}, "btc": {"price": 80000, "ll20": 70000, "mid": "LONG"}}
+    conn = sqlite3.connect(":memory:")
+    port = sp.IdeasPortfolio(conn)
+    port.step({"cg": {"BTC": 80000, "AAA": 10.0}, "meme": {}, "hl": {}}, ideas(T0), T0, support=sup, nosell={"on": False})
+    assert "AAA" in {p["symbol"] for p in port.rp.positions()}
+    cwd = os.getcwd()
+    os.makedirs(tmp_path / "web")
+    json.dump({"actions": []}, open(tmp_path / "web" / "public_real.json", "w"))
+    os.chdir(tmp_path)
+    try:
+        st = port.step({"cg": {"BTC": 80000, "AAA": 7.5}, "meme": {}, "hl": {}}, ideas(T0 + 3_600_000), T0 + 3_600_000, support=sup, nosell=C)
+        assert "AAA" in {p["symbol"] for p in port.rp.positions()}                       # −25 %: the model would have sold — blocked
+        assert any(a["symbol"] == "AAA" and a["action"] == "SKIP" and "заблокирована владельцем" in a["reason"] for a in st["actions"])
+        json.dump({"actions": [{"kind": "spot_stop_fired", "sym": "AAA", "t": T0 + 7_000_000}]}, open(tmp_path / "web" / "public_real.json", "w"))
+        port.step({"cg": {"BTC": 80000, "AAA": 7.4}, "meme": {}, "hl": {}}, ideas(T0 + 7_200_000), T0 + 7_200_000, support=sup, nosell=C)
+        assert "AAA" not in {p["symbol"] for p in port.rp.positions()}                   # the exchange stop fired → the model sells too
+    finally:
+        os.chdir(cwd)

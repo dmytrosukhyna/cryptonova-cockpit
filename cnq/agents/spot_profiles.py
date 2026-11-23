@@ -753,16 +753,18 @@ class IdeasPortfolio:
     def _sell(self, now: int, s: str, p: dict, px: float, reason: str, actions: list):
         mv = self._mv(p, px)
         actions.append(self.rp._act(now, s, "SELL", 0, px, reason))
-        self.rp._set_cash(self.rp.cash() - mv * IDEAS["fee"])
+        if not getattr(self, "_nosell", None):
+            self.rp._set_cash(self.rp.cash() - mv * IDEAS["fee"])
 
     def _trim_half(self, now: int, s: str, p: dict, px: float, reason: str, actions: list):
         half = p["weight"] / 2
         actions.append(self.rp._act(now, s, "TRIM", half, px, reason, fixes=(p["fixes"] or 0) + 1, last_fix=px))
-        self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
+        if not getattr(self, "_nosell", None):
+            self.rp._set_cash(self.rp.cash() - half * px / p["entry"] * IDEAS["fee"])
 
     def step(self, sources: dict, ideas: dict | None, now: int | None = None, sma200: dict | None = None,
              tradeable: set | None = None, smart: dict | None = None, support: dict | None = None, picks: dict | None = None,
-             memes: dict | None = None, meme_on: bool | None = None) -> dict:
+             memes: dict | None = None, meme_on: bool | None = None, nosell: dict | None = None) -> dict:
         """`sources` — this run's live prices {"cg": {SYM: px} (CoinGecko top), "meme": {…} (CoinGecko meme list + spot meme rows),
         "hl": {…} (Hyperliquid spot)}; `ideas` — web/ideas.json of the previous run (load_ideas()); `sma200` (20.10) —
         {BTC/ETH/SOL: 200-day average} for the D10 core top-up (portfolio.sma200_map). `tradeable` (22.10, owner) — coins with an
@@ -778,6 +780,7 @@ class IdeasPortfolio:
                          for c in (picks or {}).get("coins") or []}
         now = now or int(time.time() * 1000)
         P, rp = IDEAS, self.rp
+        self._nosell_guard(now, nosell)
         src = {k: {str(s).upper(): float(v) for s, v in ((sources or {}).get(k) or {}).items() if _posnum(v)} for k in IDEAS_SRC}
         fresh, note = ideas_freshness(ideas, now)
         smap = ideas_statuses(ideas) if fresh else {}
@@ -1195,6 +1198,9 @@ class IdeasPortfolio:
             need = cost - max(0.0, rp.cash() - P["min_cash"] * V)   # 11.11: cash under the floor (owner picks) is not refilled from the core
             if need > 0:
                 need -= self._idle_release(now, need, price, live, out, s)
+            if need > 1e-9 and getattr(self, "_nosell", None):    # 23.11: no core sale to fund it — wait for free cash
+                c["why_ru"] = ["нет свободного кэша — ядро не продаём (решение владельца 23.11)"]
+                continue
             if need > 1e-9:                                       # the rest from the core itself, in plan proportions
                 cw = {x: IDEAS["core_w"][x] for x in self.IDLE_CORE if x in held and x in live and held[x].get("entry")}
                 tot = sum(cw.values())
@@ -1224,6 +1230,45 @@ class IdeasPortfolio:
             held[s] = {"symbol": s}
             n += 1
         return out
+
+    def _nosell_guard(self, now: int, nosell: dict | None) -> None:
+        """23.11 08:56 (owner «вообще не продаём ничего по споту», config «nospotsell_1123»): the model records NO sell or trim (weekly
+        review, stops of the model, take-profits, core → cash, sleeve exits); each becomes a «SKIP» «продажа заблокирована владельцем»,
+        so the model keeps what the real account keeps. The one exception: a coin whose EXCHANGE stop fired on the real account
+        (web/public_real.json actions «spot_stop_fired» after the model's entry) is sold in the model too («стоп на бирже сработал»).
+        `nosell` = the override (portfolio.run reads config/owner_overrides.json); None = no guard."""
+        rp = self.rp
+        if not hasattr(self, "_act0"):
+            self._act0 = rp._act
+        rp._act = self._act0
+        self._nosell = None
+        c = nosell                                   # the pipeline (portfolio.run) passes the live override; None = off
+        if not c or not c.get("on", True):
+            return
+        self._nosell = c
+        fired = {}
+        try:
+            with open(os.path.join("web", "public_real.json"), encoding="utf-8") as f:
+                for a in json.load(f).get("actions") or []:
+                    if a.get("kind") == "spot_stop_fired":
+                        fired[str(a.get("sym") or "").upper()] = max(fired.get(str(a.get("sym") or "").upper(), 0), int(a.get("t") or 0))
+        except Exception:  # noqa: BLE001
+            pass
+        for p in rp.positions():
+            t = fired.get(p["symbol"])
+            if t and p.get("entry_time") and t > int(p["entry_time"]):
+                px = rp._meta(f"px:{p['symbol']}") or p["entry"]
+                self._act0(now, p["symbol"], "SELL", 0, px, "Стоп на бирже сработал на реальном счёте — модель записывает ту же продажу "
+                           "(правило владельца 23.11: продаём только по биржевому стопу или разумной замене).")
+
+        def act(now_, sym, action, weight, price, reason, *a, **k):
+            if action in ("SELL", "TRIM"):
+                self.conn.execute(f"INSERT INTO {rp.T_ACT} VALUES(?,?,?,?,?,?)",
+                                  (now_, sym, "SKIP", weight, price, "Продажа заблокирована владельцем (23.11): " + str(reason)[:300]))
+                return {"time": now_, "symbol": sym, "action": "SKIP", "weight": round(weight, 3), "price": price,
+                        "reason": "Продажа заблокирована владельцем (23.11): " + str(reason)[:300]}
+            return self._act0(now_, sym, action, weight, price, reason, *a, **k)
+        rp._act = act
 
     def _meme_w(self, price: dict) -> float:
         """the meme sleeve's share of the model now"""
@@ -1351,6 +1396,8 @@ class IdeasPortfolio:
     def _idle_release(self, now: int, need: float, price: dict, live: set, actions: list, for_sym: str) -> float:
         """sell up to `need` (units) of the idle top-up — from each core coin in proportion to its part — before a buy"""
         rp, P = self.rp, IDEAS
+        if getattr(self, "_nosell", None):           # 23.11: the core is not sold to fund a buy while sells are blocked
+            return 0.0
         parts = {c: (rp._meta(f"idle_q:{c}") or 0.0) * price[c] for c in self.IDLE_CORE
                  if (rp._meta(f"idle_q:{c}") or 0.0) > 0 and price.get(c) and c in live}
         tot = sum(parts.values())

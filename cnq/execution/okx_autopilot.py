@@ -729,6 +729,27 @@ def build(cl: Okx, env=None, model=None) -> dict:
     buys.sort(key=lambda o: (not o["core"], -o["usd"]))           # the core first, then the bigger gaps
     # 21.11 07:46 (owner «аккуратно», all his money): while BTC is not in its bull regime the spot rebalance keeps a USDT buffer ≥
     # usdt_min_pct of the WHOLE account — a buy that would take the USDT under it waits (nothing is sold to reach it)
+    # 23.11 08:56 (owner): no system spot sells — only a sound swap into a better coin in the same pass (spot_sell_guard)
+    from . import owner_overrides as _ovm, spot_sell_guard as SG
+    _sg = SG.cfg(_ovm.load(env=env))
+    if _sg and sells:
+        from . import okx_futures as _fu0
+        web_ = _env(env).get("CNQ_WEB_DIR") or os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "web")
+
+        def _trend(c):
+            try:
+                d = cl.call("GET", "/api/v5/market/candles", {"instId": f"{c}-{quote}", "bar": "1D", "limit": "40"}, signed=False) or []
+                return SG.ema_ok([float(k[4]) for k in sorted(d, key=lambda k: int(k[0])) if len(k) < 9 or str(k[8]) == "1"])
+            except Exception:  # noqa: BLE001
+                return False
+        kept, sg_notes = SG.apply(sells, buys, sum(r["usd"] for r in rows_all), _sg, SG.ratings(web_), _trend,
+                                  SG.sold_today(LOG, int(time.time() * 1000)), _fu0.btc_bull())
+        for o in kept:
+            if o.get("_scale"):
+                q = floor_to(float(o["sz"]) * o["_scale"], float(o["lot"]))
+                o["sz"] = fmt(q, o["lot"])
+        sells = [o for o in kept if float(o["sz"]) >= float(o.get("min") or 0)]
+        diffs.extend(sg_notes)
     bmin = okx_restart.usdt_min(env)
     if bmin:                               # 21.11 07:06 UTC (BTC $88 sold while the buys it would fund waited): in this careful
         from . import okx_futures as _fu   # regime the core BTC / ETH / SOL is never trimmed — owner: never sell core to fund buys
@@ -1041,6 +1062,9 @@ def spot_stops(env=None, opener=None, model=None, now: int | None = None, sleep=
     from . import okx_restart              # 21.11: the owner's transferred coins we keep get exchange stops too
     from . import okx_spot_plan, owner_overrides as _ov        # 21.11 08:57: the plan's non-core coins get exchange stops too
     xs = {**okx_spot_plan.stops(st, _ov.load(env=env)), **okx_restart.keep_stops(env)}
+    from . import spot_sell_guard as SG       # 23.11 (owner): exchange stops STAY even when the model drops a coin it may not sell
+    if SG.cfg(_ov.load(env=env)):
+        xs = {**{c: float(k["px"]) for c, k in (st.get("spot_stops") or {}).items() if isinstance(k, dict) and k.get("px")}, **xs}
     r = ss.sync(cl, pf, st, now, log, pick_quote(cl, env) or "USDT", ss.totals(raw), lead_held, extra=xs)
     save_state(st, env)
     parts = [f"поставлен {x['ccy']} ≤ {x['px']:g}" for x in r["set"]] + [f"снят {c}" for c in r["cancelled"]] + [f"сработал {c}" for c in r["fired"]]

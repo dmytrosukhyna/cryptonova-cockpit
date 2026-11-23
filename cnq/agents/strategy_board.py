@@ -154,6 +154,10 @@ def markdown(b: dict) -> str:
     flagged = [r["name"] for r in b["rows"] if r["beats_source"]]
     L += ["", b["rule_ru"], "", ("Лучше источника: " + ", ".join(flagged) + " — предложить владельцу с цифрами.") if flagged
           else "Ни один стол пока не прошёл планку «лучше источника»."]
+    g = b.get("spot_gain50")
+    if g is not None:
+        L += ["", "Спот с прибылью ≥ +50% (фиксация прибыли выключена владельцем 23.11 — вынести ему на решение): "
+              + (", ".join(f"{x['sym']} {x['pnl_pct']:+.0f}%" for x in g) or "нет")]
     f = b.get("factory")
     if f:
         L += ["", f"## Фабрика экспериментов — живых спецификаций {f['live']} из {f['specs']}, закрытых сделок {f['closed']}, "
@@ -185,6 +189,12 @@ def write(web: str, data: str, now: int | None = None) -> dict:
     b = board(collect(web, data), now)
     src = next((r["d30"] for r in b["rows"] if r["key"] == "whales"), {})
     b["factory"] = factory_part(data, now, src)
+    try:                                   # 23.11 (owner): profit-taking is off — list the spot coins at ≥ +50 % for his decision
+        pf = _load(os.path.join(web, "portfolio.json")) or {}
+        b["spot_gain50"] = [{"sym": p["symbol"], "pnl_pct": p.get("pnl_pct")} for p in ((pf.get("portfolios") or {}).get("ideas") or {}).get("positions") or []
+                            if isinstance(p.get("pnl_pct"), (int, float)) and p["pnl_pct"] >= 50]
+    except Exception:  # noqa: BLE001
+        b["spot_gain50"] = []
     os.makedirs(data, exist_ok=True)
     with open(os.path.join(data, "strategy_board.json"), "w", encoding="utf-8") as f:
         json.dump(b, f, ensure_ascii=False)

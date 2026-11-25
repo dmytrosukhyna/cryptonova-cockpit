@@ -1,1 +1,1 @@
-{"asof": 1795613298853, "next_event": {"type": "PCE", "t": 1795613400000}, "hours_to": 0.0, "flag": false, "why_ru": null, "btc_4h_close": 58610.4, "ema20_4h": 60136.1, "lower_high": false, "funding": 6.66052999957e-05, "oi_24h_pct": -0.3}
+{"asof": 1795646645881, "next_event": {"type": "FOMC", "t": 1796842800000}, "hours_to": 332.3, "flag": false, "why_ru": null}

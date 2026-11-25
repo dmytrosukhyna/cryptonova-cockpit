@@ -1,5 +1,5 @@
 {
- "asof": 1795612169903,
+ "asof": 1795613086031,
  "name": "Настроение опционов",
  "source": "deribit",
  "error": null,
@@ -7,8 +7,8 @@
  "dvol_pct_1y": 97,
  "dvol_hist_days": 365,
  "put_call_oi": 0.806,
- "puts_oi": 194502.5,
- "calls_oi": 241427.7,
+ "puts_oi": 194711.3,
+ "calls_oi": 241614.0,
  "label": "fear",
  "label_ru": "страх",
  "label_en": "fear",

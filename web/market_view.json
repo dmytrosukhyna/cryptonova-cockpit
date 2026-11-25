@@ -1,38 +1,38 @@
 {
- "asof": 1795635000000,
- "updated": "2026-11-25T19:30Z",
+ "asof": 1795649252897,
+ "updated": "2026-11-25T23:30Z",
  "horizon": "24h / 72h",
- "summary_ru": "Крайний страх (13). После горячей инфляции PCE (3.8%) и новых пошлин акции США днём падали на 4%+, но к закрытию выкупили почти всё (Dow в плюсе). Биткоин отскочил от $57.3k до $60.2k (+5%), ETH и SOL +4–6% за 4 часа, ликвидировали в основном шорты. Склон «шорт» снят. Лонг тоже не дан: тренд медвежий, отскок сделан новым плечом (открытый интерес и фандинг растут, толпа снова в лонгах), ставку ФРС рынок по-прежнему ждёт выше. Праздники в США 26–27.11 и экспирация опционов 27.11 — тонкий рынок. Склон на сутки и на три дня — нейтрально (50). Выше $61–61.7k — склон к росту; ниже $58.6k — снова к падению, ниже $57.3k — к $56k и $55.1k. Проверка на истории 2023–2026: ни один из 9 публичных признаков не предсказывал направление надёжно — это наблюдение, не сигнал.",
+ "summary_ru": "Крайний страх (13). Акции США закрыли день почти без изменений после дневного обвала на горячей инфляции (PCE 3.8%) и новых пошлинах. Биткоин удерживает отскок у $60.0–60.5k, но выше не идёт. Склон на сутки и на три дня — нейтрально (50): за рост — плечо не наращивается, страх в опционах спадает; против — тренд медвежий, фандинг на максимуме недели и толпа снова в лонгах, оттоки из ETF около $4.9 млрд за ноябрь. Праздники в США 26–27.11 и экспирация опционов 27.11 — тонкий рынок. Выше $61–61.7k — склон к росту; ниже $59.5k — к падению, ниже $57.3k — к $56k и $55.1k. Проверка на истории 2023–2026: ни один из 9 публичных признаков не предсказывал направление надёжно — это наблюдение, не сигнал.",
  "assets": [
   {
    "asset": "BTC",
-   "price": 60184,
+   "price": 60175,
    "direction": "нейтрально",
    "direction_72h": "нейтрально",
    "confidence": 50,
    "confidence_72h": 50,
    "horizon": "24h",
-   "text_ru": "За рост: выкуп минимума вместе с акциями США, ликвидировали шорты, покупают тейкеры, защита от падения дешевеет. Против: медвежий тренд, отскок на новом плече (OI и фандинг растут, толпа в лонгах), макро не поменялось. Праздники в США — тонкий рынок."
+   "text_ru": "Отскок удержан у $60k, но не развит; фандинг на максимуме недели, тренд медвежий. Нейтрально до выхода из коридора $59.5–61.7k."
   }
  ],
  "features": {
   "fng": 13,
   "btc_dom": null,
-  "funding_btc_okx": 8.64e-05,
-  "oi_btc_chg24_pct": 2.69,
-  "oi_btc_chg4_pct": 1.97,
-  "taker_buy_share_4h_btc": 0.5201,
-  "put_call_oi_deribit": 0.807,
-  "put_call_vol24_deribit": 1.368,
-  "skew_10pct_deribit": 15.85,
-  "dvol": 54.5
+  "funding_btc_okx": 0.0001,
+  "oi_btc_chg24_pct": 2.2,
+  "oi_btc_chg4_pct": -0.65,
+  "taker_buy_share_4h_btc": 0.5254,
+  "put_call_oi_deribit": 0.809,
+  "put_call_vol24_deribit": 1.331,
+  "skew_10pct_deribit": 12.47,
+  "dvol": 52.4
  },
  "score": {
   "resolved_24h": 26,
   "hits_24h": 11,
-  "resolved_72h": 17,
-  "hits_72h": 11,
-  "note_ru": "На сутки: 11 из 26 верно; большинство промахов — «нейтрально» при ходе больше полосы ±1.5%; 7 направленных оценок (шорт) дали в среднем +3.1% по направлению. На 3 дня: 11 из 17 верно. Оценки соседних запусков перекрываются — до ~30 независимых дней выводов нет."
+  "resolved_72h": 18,
+  "hits_72h": 12,
+  "note_ru": "На сутки: 11 из 26 верно; большинство промахов — «нейтрально» при ходе больше полосы ±1.5%; 7 направленных оценок (шорт) дали в среднем +3.1% по направлению. На 3 дня: 12 из 18 верно. Оценки соседних запусков перекрываются — до ~30 независимых дней выводов нет."
  },
  "disclaimer_ru": "Оценка вероятности, не торговый сигнал. Направление на 1–3 дня на истории угадывается немногим лучше монетки.",
  "history_check": {
@@ -43,29 +43,29 @@
  },
  "news": [
   {
-   "t": "PCE inflation rises to 3.8% as stocks, gold and silver weaken (FXEmpire)",
-   "u": "https://www.fxempire.com/forecasts/article/pce-inflation-rises-to-3-8-as-stocks-gold-and-silver-weaken-1647180"
+   "t": "Stock Market Today, Nov 25: Dow erases 1,100-point loss in late-day comeback (Yahoo Finance / Motley Fool)",
+   "u": "https://finance.yahoo.com/markets/stocks/articles/stock-market-today-nov-25-221745503.html"
   },
   {
-   "t": "Stock market today: Dow, S&P 500, Nasdaq sink on hot inflation, new Trump tariffs as chip rout continues (Yahoo Finance)",
-   "u": "https://finance.yahoo.com/markets/live/stock-market-today-wednesday-november-25-dow-sp-500-nasdaq-pce-inflation-data-091428237.html"
+   "t": "Crypto Market Today, Nov 25: short liquidations fuel fragile rebound (Motley Fool)",
+   "u": "https://fool.com/coverage/stock-market-today/2026/11/25/crypto-market-today-nov-25-bitcoin-ethereum-and-solana-as-short-liquidations-fuel-fragile-rebound"
   },
   {
-   "t": "Bitcoin price slumps below $57,500 as Nasdaq sinks 4% at open (Bitcoin Magazine)",
-   "u": "https://bitcoinmagazine.com/markets/bitcoin-price-falls-57500-nasdaq"
+   "t": "Bitcoin ETF outflows near $5 billion as tariffs hit (Forbes)",
+   "u": "https://www.forbes.com/sites/murtuza-merchant/2026/11/25/bitcoin-etf-outflows-near-5-billion-as-tariffs-hit-what-to-do-now/"
   },
   {
-   "t": "Polymarket shows 94% odds of December Fed rate hike after inflation data (Crypto Briefing)",
-   "u": "https://cryptobriefing.com/polymarket-94-odds-december-fed-rate-hike/"
+   "t": "Before the bell: Bitcoin's Thanksgiving comes with a tariff bill (Yahoo Finance)",
+   "u": "https://finance.yahoo.com/markets/crypto/articles/bell-bitcoins-thanksgiving-comes-tariff-162405309.html"
   },
   {
-   "t": "Bitcoin falls below $58,000 after hot US inflation data (Crypto Briefing)",
-   "u": "https://cryptobriefing.com/bitcoin-falls-below-58000-us-inflation/"
+   "t": "Bitcoin stuck below $60,000 as inflation picks up, ETF outflows near $5 billion (Crypto Briefing)",
+   "u": "https://cryptobriefing.com/etf-outflows-impact-bitcoin/"
   }
  ],
  "events_48h": [
-  "25.11 13:30 UTC ВВП и PCE США (~2 ч)",
   "26.11 США закрыты (День благодарения), 27.11 короткий день",
-  "27.11 08:00 UTC экспирация Deribit (~45 ч)"
+  "27.11 08:00 UTC экспирация Deribit (~33 ч)",
+  "Решение ФРС в декабре — рынок закладывает повышение (~94% Polymarket)"
  ]
 }

@@ -1,31 +1,31 @@
 {
- "asof": 1795591800000,
- "updated": "2026-11-25T07:30Z",
+ "asof": 1795606200000,
+ "updated": "2026-11-25T11:30Z",
  "horizon": "24h / 72h",
- "summary_ru": "Крайний страх (13). Биткоин около $59.0k (−2.4% за сутки), у минимума недели $58.95k; весь рынок за сутки −4.5%. За падение: отток из биржевых фондов продолжается (≈ −$5 млрд за ноябрь), лонги платят повышенный фандинг и докупают в падение, за последние часы ликвидировали в основном лонги, на опционах покупают защиту от падения. Против: в стакане заметно больше покупателей, каскада ликвидаций нет, крайний страх часто бывает перед отскоками. Сегодня в 13:30 UTC инфляция PCE и ВВП США, затем праздники в США — возможен резкий ход в любую сторону. Склон на сутки — слабый шорт (55), на три дня — нейтрально (50). Ниже $58.8k — к $57.8k и $55.1k; выше $60.7k склон снимается. Проверка на истории 2023–2026: ни один из 9 публичных признаков не предсказывал направление надёжно — это наблюдение, не сигнал.",
+ "summary_ru": "Крайний страх (13). Биткоин около $58.7k (−2.8% за сутки), минимум 22.11 ($58.8k) пробит — утром $58.6k. За падение: лонги на деривативах докупают в падение и платят повышенный фандинг, тейкеры продают, ликвидируют почти только лонги, на опционах дорожает защита от падения, фьючерсы на акции США снижаются, отток из биржевых фондов шестой день. Против: в стакане больше покупателей, каскада ликвидаций нет, крайний страх часто бывает перед отскоками. Через ~2 ч (13:30 UTC) инфляция PCE и ВВП США, затем праздники в США — возможен резкий ход в любую сторону. Склон на сутки — слабый шорт (57), на три дня — нейтрально (50). Ниже $58.6k — к $57.8k и $55.1k; выше $59.5k склон ослабевает, выше $60.7k снимается. Проверка на истории 2023–2026: ни один из 9 публичных признаков не предсказывал направление надёжно — это наблюдение, не сигнал.",
  "assets": [
   {
    "asset": "BTC",
-   "price": 59003,
+   "price": 58740,
    "direction": "шорт",
    "direction_72h": "нейтрально",
-   "confidence": 55,
+   "confidence": 57,
    "confidence_72h": 50,
    "horizon": "24h",
-   "text_ru": "За падение: цена у минимума недели, отток из фондов, лонги платят фандинг и докупают в падение, ликвидируют лонги, спрос на путы. Против: в стакане больше покупателей, каскада нет, крайний страх. PCE сегодня 13:30 UTC — размах в обе стороны. Ниже $58.8k — к $57.8k и $55.1k; выше $60.7k склон снимается."
+   "text_ru": "За падение: пробит минимум 22.11, лонги докупают в падение и платят фандинг, тейкеры продают, ликвидируют лонги, растёт спрос на путы. Против: в стакане больше покупателей, каскада нет, крайний страх. PCE в 13:30 UTC — размах в обе стороны. Ни один признак на истории надёжно не работал."
   }
  ],
  "features": {
   "fng": 13,
-  "btc_dom": 57.71,
-  "funding_btc_okx": 6.61e-05,
-  "oi_btc_chg24_pct": -0.58,
-  "oi_btc_chg4_pct": 0.35,
-  "taker_buy_share_4h_btc": 0.52,
-  "put_call_oi_deribit": 0.809,
-  "put_call_vol24_deribit": 1.51,
-  "skew_10pct_deribit": 15.21,
-  "dvol": 53.6
+  "btc_dom": null,
+  "funding_btc_okx": 7.89e-05,
+  "oi_btc_chg24_pct": 1.04,
+  "oi_btc_chg4_pct": 1.7,
+  "taker_buy_share_4h_btc": 0.47,
+  "put_call_oi_deribit": 0.808,
+  "put_call_vol24_deribit": 1.303,
+  "skew_10pct_deribit": 19.47,
+  "dvol": 56.19
  },
  "score": {
   "resolved_24h": 26,
@@ -43,25 +43,29 @@
  },
  "news": [
   {
-   "t": "Bitcoin ETFs see another $570 million in net outflows as November total nears $5 billion (The Block)",
-   "u": "https://theblock.co/news/markets/2026-11-24-bitcoin-etfs-another-570-million-net-outflows-november-total-nears-5-billion-btc-dips-below-60k-445548"
+   "t": "Bitcoin Price Forecast: BTC risks fresh yearly low ahead of US PCE (FXStreet)",
+   "u": "https://www.fxstreet.com/cryptocurrencies/news/bitcoin-price-forecast-btc-risks-fresh-yearly-low-ahead-of-us-pce-202611250835"
   },
   {
-   "t": "Why is Bitcoin price down today? BTC struggles below $60K ahead of US economic data (crypto.news)",
-   "u": "https://crypto.news/bitcoin-price-prediction-etf-outflows-us-pce-gdp/"
+   "t": "Bitcoin price ahead of PCE: sixth straight ETF outflow day (CryptoTicker)",
+   "u": "https://cryptoticker.io/en/bitcoin-price-pce-sixth-etf-outflow-day/"
   },
   {
-   "t": "Forex Today: US Dollar rebounds ahead of critical PCE inflation data (FXStreet)",
-   "u": "https://fxstreet.com/news/forex-today-us-dollar-rebounds-ahead-of-critical-pce-inflation-data-202611250657"
+   "t": "Stock market today: Dow, S&P 500, Nasdaq futures fall ahead of inflation data (Yahoo Finance)",
+   "u": "https://finance.yahoo.com/markets/live/stock-market-today-wednesday-november-25-dow-sp-500-nasdaq-pce-inflation-data-091428237.html"
   },
   {
-   "t": "Dollar holds near 103.85 ahead of US PCE and GDP data (piqmarkets)",
-   "u": "https://piqmarkets.com/story/dollar-holds-near-103-85-ahead-of-us-pce-and-gdp-data"
+   "t": "Market Outlook Nov 25: key US data ahead of Thanksgiving; USD/JPY tests 159 (MQL5 blog)",
+   "u": "https://www.mql5.com/en/blogs/post/782092"
+  },
+  {
+   "t": "Bitcoin Risks Deeper Thanksgiving Drop Below $60K on PCE Data (DailyCoin)",
+   "u": "https://dailycoin.com/bitcoin-drops-below-60k-thanksgiving-2026-pce-inflation-data"
   }
  ],
  "events_48h": [
-  "25.11 13:30 UTC ВВП и PCE США (~10 ч)",
+  "25.11 13:30 UTC ВВП и PCE США (~2 ч)",
   "26.11 США закрыты (День благодарения), 27.11 короткий день",
-  "27.11 08:00 UTC экспирация Deribit (~52 ч)"
+  "27.11 08:00 UTC экспирация Deribit (~45 ч)"
  ]
 }

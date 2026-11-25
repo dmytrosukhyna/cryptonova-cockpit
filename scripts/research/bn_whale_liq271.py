@@ -206,7 +206,7 @@ def main():
         note(k + " $", OUT[k])
     for r in D:
         if r["flag"]:
-            print(f"::notice title=liq271 D row::{time.strftime('%m-%d %H:%M', time.gmtime(r['t'] / 1000))} {str(r['who'])[-10:]} {r['coin']} {r['side']} "
+            print(f"D row: {time.strftime('%m-%d %H:%M', time.gmtime(r['t'] / 1000))} {str(r['who'])[-10:]} {r['coin']} {r['side']} "
                   f"lev {r['lev']} thr {round(r['thr'], 2)}% | a {round(r['a'], 2)}% b {round(r['b'], 2)}% {'entry' if r['at_entry'] else ''} {r['why']}")
     print(f"::notice title=liq271 D meta::closed {len(desk['closed'])}, used {len(D)}, missing {len(miss)}: {', '.join(sorted(set(miss)))[:300]}")
     # ---- T: the trip book

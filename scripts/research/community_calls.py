@@ -90,7 +90,7 @@ def main():
         posts = [p for p in posts if p.get("t") and p["t"] >= now - 180 * DAY]
         cl = FC.calls(posts, coins)
         sig = [p["text"][:500] for p in posts if p.get("text") and re.search(r"\d", p["text"]) and SIGLIKE.search(p["text"])]
-        SAMPLES[k] = {"n_siglike": len(sig), "siglike": sig[-12:], "any": [p["text"][:300] for p in posts if p.get("text")][-6:]}
+        SAMPLES[k] = {"n_siglike": len(sig), "siglike": [x[:260] for x in sig[-4:]]}
         brag = sum(1 for p in posts if FC.RESULT.search(p.get("text") or ""))
         rows = []
         for c in cl:
@@ -122,14 +122,26 @@ def main():
         o["passes"] = bool(o["tp1"]["n"] >= 20 and (o["tp1"].get("pf") or 0) > 1.2 and h1.get("mean", -1) > 0 and h2.get("mean", -1) > 0)
         o["rows"] = [{k_: r[k_] for k_ in ("t", "coin", "side", "tp1", "trail")} for r in fills]
         res[k] = o
-        print(f"::notice title=cc {k}::" + json.dumps({k_: v for k_, v in o.items() if k_ != "rows"}, ensure_ascii=False)[:4000], flush=True)
+        print(f"cc {k} " + json.dumps({k_: v for k_, v in o.items() if k_ != "rows"}, ensure_ascii=False), flush=True)
     pk = os.environ.get("SAMPLE_PK", "").strip()
     if pk and SAMPLES:                                  # format check: post samples sealed to a one-off key of the researcher
         from cnq import sealed
-        json.dump(sealed.seal(pk, json.dumps(SAMPLES, ensure_ascii=False).encode()), open("community_samples.sealed.json", "w"))
+        import zlib
+        blob = json.dumps(sealed.seal(pk, zlib.compress(json.dumps(SAMPLES, ensure_ascii=False).encode(), 9)))
+        with open("community_samples.chunks", "w") as f_:                  # printed as annotations by the next step (≤ 10 × 4000)
+            for i in range(0, min(len(blob), 40000), 4000):
+                f_.write(blob[i:i + 4000] + "\n")
     rank = sorted([k for k in res if res[k]["passes"]], key=lambda k: -(res[k]["tp1"].get("pf") or 0))
     json.dump({"t": now, "channels": res, "rank": rank}, open(out, "w"), ensure_ascii=False, indent=1)
-    print("::notice title=cc rank::" + json.dumps({"pass": rank, "pf": {k: res[k]["tp1"].get("pf") for k in res}}))
+    line = {k: [o["posts"], o["days"], o["calls"], o["tp1"].get("n"), o["tp1"].get("win"), o["tp1"].get("pf"), o["tp1"].get("mean"),
+                o["tp1"].get("sum"), o["half1"].get("mean"), o["half2"].get("mean"), o["trail"].get("pf"), o["tp1_hit"], o["result_posts"],
+                o["calls_week"], o["last_call_d"], o["short"].get("n")] for k, o in res.items()}
+    print("::notice title=cc cols::posts, days, calls, fills, win, pf, mean %, sum %, half1 mean, half2 mean, trail pf, tp1 hit, "
+          "result posts, calls/week, last call d, shorts")
+    items = list(line.items())
+    for i in range(0, len(items), 7):
+        print(f"::notice title=cc stats {i // 7 + 1}::" + json.dumps(dict(items[i:i + 7]))[:4000])
+    print("::notice title=cc rank::" + json.dumps({"pass": rank}))
 
 
 if __name__ == "__main__":

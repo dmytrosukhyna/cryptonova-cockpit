@@ -7,6 +7,10 @@ on:
       src:
         description: "channel handles, comma separated, base64"
         required: true
+      pk:
+        description: "optional: a one-off public key (X25519, base64) — post samples are sealed to it for a format check"
+        required: false
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -22,11 +26,15 @@ jobs:
           SRC: ${{ inputs.src }}
         run: |
           for h in $(echo "$SRC" | base64 -d | tr ',' ' '); do echo "::add-mask::$h"; done
+      - run: pip install -q cryptography
       - run: python scripts/research/community_calls.py community.json
         env:
           INF_HANDLES_B64: ${{ inputs.src }}
+          SAMPLE_PK: ${{ inputs.pk }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: community
-          path: community.json
+          path: |
+            community.json
+            community_samples.sealed.json

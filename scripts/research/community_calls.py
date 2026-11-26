@@ -15,7 +15,7 @@ Pre-registered (26.11 ~19:30 Athens, before any result):
   halves of time (mean each), longs / shorts, calls a week and the last call's age, «result» posts vs calls (bragging ratio).
 - Rank: n ≥ 20 fills, PF > 1.2 and mean > 0 in BOTH halves; then by PF. The top 2–3 → PAPER desks in the experiment factory only.
 Usage: INF_HANDLES_B64=… community_calls.py OUT.json"""
-import base64, json, os, statistics as st, sys, time, urllib.request
+import base64, json, os, re, statistics as st, sys, time, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 from cnq.agents import fut_calls as FC, influencer as I  # noqa: E402
@@ -24,6 +24,8 @@ DAY, H = 86_400_000, 3_600_000
 OKX = "https://www.okx.com/api/v5"
 UA = {"User-Agent": "Mozilla/5.0 (cnq-research)"}
 KEYS = "BCDEFGHIJKLMNOPQRSTU"
+SAMPLES = {}
+SIGLIKE = re.compile(r"(long|short|buy|sell|entry|лонг|шорт|вход|stop|стоп|target|tp\b|тейк)", re.I)
 
 
 def get(url, raw=False):
@@ -87,6 +89,8 @@ def main():
         posts = I.fetch_channel(h, lambda u: get(u, raw=True), max_pages=120, stop_before_ms=now - 180 * DAY)
         posts = [p for p in posts if p.get("t") and p["t"] >= now - 180 * DAY]
         cl = FC.calls(posts, coins)
+        sig = [p["text"][:500] for p in posts if p.get("text") and re.search(r"\d", p["text"]) and SIGLIKE.search(p["text"])]
+        SAMPLES[k] = {"n_siglike": len(sig), "siglike": sig[-12:], "any": [p["text"][:300] for p in posts if p.get("text")][-6:]}
         brag = sum(1 for p in posts if FC.RESULT.search(p.get("text") or ""))
         rows = []
         for c in cl:
@@ -119,6 +123,10 @@ def main():
         o["rows"] = [{k_: r[k_] for k_ in ("t", "coin", "side", "tp1", "trail")} for r in fills]
         res[k] = o
         print(f"::notice title=cc {k}::" + json.dumps({k_: v for k_, v in o.items() if k_ != "rows"}, ensure_ascii=False)[:4000], flush=True)
+    pk = os.environ.get("SAMPLE_PK", "").strip()
+    if pk and SAMPLES:                                  # format check: post samples sealed to a one-off key of the researcher
+        from cnq import sealed
+        json.dump(sealed.seal(pk, json.dumps(SAMPLES, ensure_ascii=False).encode()), open("community_samples.sealed.json", "w"))
     rank = sorted([k for k in res if res[k]["passes"]], key=lambda k: -(res[k]["tp1"].get("pf") or 0))
     json.dump({"t": now, "channels": res, "rank": rank}, open(out, "w"), ensure_ascii=False, indent=1)
     print("::notice title=cc rank::" + json.dumps({"pass": rank, "pf": {k: res[k]["tp1"].get("pf") for k in res}}))

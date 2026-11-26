@@ -90,3 +90,13 @@ def test_okx_positions_reader_for_the_widened_pool():
     rows = [{"instId": "SOL-USDT-SWAP", "posSide": "long", "subPos": "3", "openAvgPx": "140", "margin": "10", "lever": "5", "upl": "0"}]
     got = E.Experiments._ws_positions("okx:AB", lambda url: {"data": rows} if "uniqueCode=AB" in url else {"data": []})
     assert got == [{"coin": "SOL", "side": "LONG", "entry": 140.0}]
+
+
+def test_real_channel_layouts_market_calls_and_listed_targets():
+    from cnq.agents import fut_calls as F
+    a = F.parse("🔥 VIP SIGNAL 🔥\n\n🔴 SOL/USD: SELL (market)\n\n🎯 Entry: 71.19\n\n🛑 Stop loss: 74.39\n\n✅ TP1: 67.99\n✅ TP2: 64.79\n\n"
+                "⏱ Timeframe: 24h\n\n📊 Signal score: 86.5/100")
+    assert a["side"] == "SHORT" and a["targets"] == [67.99, 64.79] and a["stop"] == 74.39            # «✅ TP1:» is a call, not a result
+    b = F.parse("#AKE Short setup \n\nTp 0.010$-0.005$ \n\nUse 2X\n\nStop lose 0.013$")
+    assert b["market"] and b["targets"] == [0.01, 0.005] and b["stop"] == 0.013
+    assert F.parse("✅ XRP/USD SELL from 1.0625: TP1 HIT at 1.0266 (+3.4%). Trade closed.") is None

@@ -29,13 +29,14 @@ NOT = {"USDT", "USDC", "USD", "PERP", "LONG", "SHORT", "BUY", "SELL", "TP", "SL"
        "LEVERAGE", "CROSS", "BINANCE", "BYBIT", "OKX", "FUTURES", "SPOT", "SIGNAL", "SIGNALS", "FREE", "PREMIUM", "UPDATE", "ALERT",
        "PROFIT", "CLOSED", "DONE", "HIT", "NEW", "TOP", "PUMP", "MEXC", "BINGX", "BITGET", "CORNIX", "ROI"}
 RESULT = re.compile(r"(target\s*\d?\s*(?:hit|done|reached|achieved)|all\s*targets|profit\s*[:\-]?\s*\+?\d|closed|stop(?:ped)?\s*(?:hit|out)|"
-                    r"выбило|достигнут|отработал|закрыт|✅\s*tp|tp\s*\d?\s*✅|period\s*:\s*\d)", re.I)
+                    r"выбило|достигнут|отработал|закрыт|tp\s*\d?\s*(?:hit|done|reached)|period\s*:\s*\d)", re.I)
 
 
 def _nums(s: str) -> list:
     s = re.sub(r"(?:^|\s)\d{1,2}\s*[).:]\s", " ", s)            # list markers «1) » «2. »
     s = re.sub(r"\b(?:tp|тп|target|цель)\s*\d\b", " ", s, flags=re.I)
-    s = re.sub(r"\d+(?:[.,]\d+)?\s*[xх×]\b|\d+(?:[.,]\d+)?\s*%", " ", s)
+    s = re.sub(r"\d+(?:[.,]\d+)?\s*[xх×]\b|\d+(?:[.,]\d+)?\s*%", " ", s, flags=re.I)
+    s = re.sub(r"\d+(?:[.,]\d+)?\s*/\s*100\b|\b\d+\s*(?:h|hr|hrs|hours?|ч|час\w*|m|min|mins|d|days?|дн\w*)\b", " ", s, flags=re.I)
     out = []
     for m in NUM.finditer(s.replace("$", " ")):
         try:
@@ -78,6 +79,8 @@ def parse(text: str, coins: set | None = None) -> dict | None:
             sec[k] += _nums(chunk)
     if not sec["entry"] and re.search(r"\b(market|cmp|по рынку)\b", text, re.I):
         market = True
+    if not sec["entry"] and sec["sl"] and sec["tp"]:
+        market = True                                          # «#LIT short · Tp 3.15-3.12 · Stop 3.22»: no entry = at the post
     if not sec["sl"] or not sec["tp"] or not (sec["entry"] or market):
         return None
     ent = sec["entry"][:2]

@@ -111,7 +111,7 @@ def main():
              "scored": len(rows), "no_fill": len(rows) - len(fills), "result_posts": brag,
              "calls_week": round(len(cl) / max(1, (now - min((p["t"] for p in posts), default=now)) / DAY / 7), 1),
              "last_call_d": round((now - max((c["t"] for c in cl), default=0)) / DAY, 1) if cl else None,
-             "tp1": stat(x1), "trail": stat(x2),
+             "calls_30d": sum(1 for c in cl if c["t"] >= now - 30 * DAY), "tp1": stat(x1), "trail": stat(x2),
              "tp1_hit": round(sum(r["tp1"]["kind"] == "tp" for r in fills) / len(fills), 3) if fills else None,
              "mean_r": round(st.mean(r["tp1"]["r"] for r in fills), 3) if fills else None,
              "half1": stat([r["tp1"]["pct"] for r in fills if r["t"] < mid]), "half2": stat([r["tp1"]["pct"] for r in fills if r["t"] >= mid]),
@@ -135,9 +135,9 @@ def main():
     json.dump({"t": now, "channels": res, "rank": rank}, open(out, "w"), ensure_ascii=False, indent=1)
     line = {k: [o["posts"], o["days"], o["calls"], o["tp1"].get("n"), o["tp1"].get("win"), o["tp1"].get("pf"), o["tp1"].get("mean"),
                 o["tp1"].get("sum"), o["half1"].get("mean"), o["half2"].get("mean"), o["trail"].get("pf"), o["tp1_hit"], o["result_posts"],
-                o["calls_week"], o["last_call_d"], o["short"].get("n")] for k, o in res.items()}
+                o["calls_week"], o["last_call_d"], o["short"].get("n"), o["calls_30d"]] for k, o in res.items()}
     print("::notice title=cc cols::posts, days, calls, fills, win, pf, mean %, sum %, half1 mean, half2 mean, trail pf, tp1 hit, "
-          "result posts, calls/week, last call d, shorts")
+          "result posts, calls/week, last call d, shorts, calls 30d")
     items = list(line.items())
     for i in range(0, len(items), 7):
         print(f"::notice title=cc stats {i // 7 + 1}::" + json.dumps(dict(items[i:i + 7]))[:4000])

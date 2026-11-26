@@ -1021,6 +1021,44 @@ ROT_RULE_RU = (f"Колонка A — {LOCK_N} копируемых трейде
                "только колонка B.")
 
 
+# 26.11 09:40 Kyiv (owner, explicit «включить сразу»): «3 дня подряд в плюсе» never lets in a trader who holds for days (a day with
+# nothing closed is «not plus»), so 5 of 7 seats stood empty. config/owner_overrides.json «rotation_soft_1126» → the B → A entry is
+# by his overall record instead: the full bar (copyable: ≥ 20 decisions, win ≥ 70 %, PF ≥ 2, 60 days plus, delayed-copy test, visible
+# positions) + over the last SOFT_DAYS full UTC days his closed decisions net ≥ 0 and his last 3 TRADED days are not all negative
+# (days with nothing closed do not count); he must be active (a closed decision in that window or an open position); at most one
+# new trader per UTC day; a trader moved out of A by a rule waits SOFT_COOL_MS in B first (so a fast exit is not undone the next run).
+# The exits from A are unchanged. Remove the key to return to the 3-plus-days rule.
+SOFT_KEY = "rotation_soft_1126"
+SOFT_DAYS = 14
+SOFT_COOL_MS = 7 * 86_400_000
+
+
+def soft_cfg() -> dict | None:
+    try:
+        c = (ov.load() or {}).get(SOFT_KEY)
+    except Exception:  # noqa: BLE001
+        return None
+    return c if isinstance(c, dict) and c.get("on") else None
+
+
+def soft_entry(q: dict | None, now: int, days_n: int = SOFT_DAYS) -> tuple[bool, str]:
+    """(passes the soft entry, Russian reason) from his own closed decisions per UTC day (day_pnl)"""
+    dp = (q or {}).get("day_pnl") or {}
+    today = now // DAY
+    vals = [(d, _f(dp.get(str(d)))) for d in range(today - days_n, today)]
+    traded = [(d, v) for d, v in vals if v != 0]
+    net = sum(v for _, v in vals)
+    if not traded and not (q or {}).get("positions"):
+        return False, f"нет закрытых сделок за {days_n} дней и открытых позиций"
+    if net < 0:
+        return False, f"за {days_n} дней итог {_usd(net).replace('$-', '−$')}"
+    last3 = traded[-3:]
+    if len(last3) == 3 and all(v < 0 for _, v in last3):
+        return False, "3 последних торговых дня в минусе"
+    plus = sum(1 for _, v in traded if v > 0)
+    return True, (f"за {days_n} дней итог +{_usd(net)}, {plus} из {len(traded)} торговых дней в плюсе, нет 3 минусовых подряд")
+
+
 def day_run(q: dict | None, now: int, sign: int, since: int | None = None) -> tuple[int, list]:
     """(how many of the last full UTC days in a row his own closed decisions were net > 0 (sign 1) / < 0 (sign −1), the last
     ROT_DAYS days as [[ISO day, pnl], …]); days before `since` (ms) do not count; a day with nothing closed is 0"""
@@ -1215,12 +1253,32 @@ def rotate(study: dict, rot: dict, ranked: list[dict], byaddr: dict, desk: dict 
             lock_t = now if now - lock_t >= LOCK_MS else lock_t
             rot = {**(rot or {}), "bench_t": now}
         have = {x["addr"] for x in top}
+        soft = soft_cfg()
+        soft_left = 0 if soft and now // DAY == int(_f((rot or {}).get("soft_day"), -1)) else 1
         for x in ranked:                                     # back-fill: best by PF in B, passing the bar, 3 plus days in a row
             if len(top) >= LOCK_N:
                 break
             a = x["addr"]
             if a not in bench or a in have or a in out_now or a in uncopyable or not copyable(byaddr.get(a)):
                 continue                                     # the full bar incl. the delayed-copy and fill-frequency checks
+            if soft:                                         # 26.11 (owner): the overall record instead of 3 plus days in a row
+                if soft_left <= 0:
+                    break
+                bv = bench.get(a) or {}
+                if bv.get("from_a") and now - int(_f(bv.get("since"))) < SOFT_COOL_MS:
+                    continue
+                okk, why_s = soft_entry(byaddr.get(a), now)
+                if not okk:
+                    continue
+                soft_left -= 1
+                rot = {**(rot or {}), "soft_day": now // DAY}
+                top.append(x); have.add(a)
+                joined[a] = now
+                close_now.pop(a, None)
+                b = bench.pop(a)
+                move(a, "B", "A", f"в A по общим показателям (правило владельца 26.11): проходит отбор (PF {_f(x.get('pf')):.2f}, "
+                     f"в плюсе {_f(x.get('win')) * 100:.0f}%), {why_s}" + (" — вернулся" if b.get("from_a") else ""), x)
+                continue
             n, days = day_run(byaddr.get(a), now, 1)
             if n < ROT_DAYS:
                 continue
@@ -1285,9 +1343,20 @@ def rotation_public(top: list, rot: dict, byaddr: dict, desk: dict | None, now: 
             b_rows[-1]["observe_only"] = True
             b_rows[-1]["observe_ru"] = "только наблюдение — скопировать нельзя" + (f" ({(uncopyable or {})[a]})" if a in (uncopyable or {}) else "")
     b_rows.sort(key=lambda r: -(r["pf"] if r["pf"] is not None else -99))
-    return {"rule": "rotation-v1", "n_a": LOCK_N, "n_b": ROT_B_N, "days": ROT_DAYS, "a": a_rows, "b": b_rows,
+    soft = soft_cfg()
+    if soft:                                                 # 26.11 (owner): B → A by the overall record — show each one's status
+        for r in b_rows:
+            okk, why_s = soft_entry(byaddr.get(r["addr"]), now)
+            cool = r["from_a"] and now - int(_f(r.get("since"))) < SOFT_COOL_MS
+            r["soft_ok"] = bool(okk and not cool and not r.get("observe_only") and r["studied"])
+            r["soft_ru"] = (f"ждёт 7 дней после выхода из A; " if cool else "") + why_s
+    ru = ROT_RULE_RU if not soft else ROT_RULE_RU.replace(
+        f"у кого {ROT_DAYS} последних дня подряд в плюсе",
+        f"у кого за {SOFT_DAYS} дней итог не в минусе, нет 3 минусовых торговых дней подряд и есть сделки или позиции "
+        "(дни без сделок не считаются; не больше одного нового трейдера в день; выбывший из A ждёт 7 дней — правило владельца 26.11)")
+    return {"rule": "rotation-v1" + ("-soft" if soft else ""), "n_a": LOCK_N, "n_b": ROT_B_N, "days": ROT_DAYS, "a": a_rows, "b": b_rows,
             "empty_seats": max(0, LOCK_N - len(top)), "moves": list(rot.get("moves") or [])[:30], "close_now": rot.get("close_now") or {},
-            "ru": ROT_RULE_RU}
+            "ru": ru}
 
 
 # 08.11 (owner via the coordinator): a whale dropped from the locked list by OUR bug (not by the rules) is reinstated once — only if he

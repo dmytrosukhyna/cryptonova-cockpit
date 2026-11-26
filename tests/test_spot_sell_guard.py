@@ -90,3 +90,21 @@ def test_model_swaps_only_into_a_better_rising_coin_within_the_day_cap():
     assert "TOP" in held                                                            # sold LOW (≤ the plan size of TOP) for TOP
     assert any(a["action"] in ("SELL", "TRIM") and a["symbol"] == "LOW" and a["reason"].startswith("Замена: LOW → TOP") for a in st["actions"])
     assert any(a["action"] == "BUY" and a["symbol"] == "TOP" for a in st["actions"])
+
+
+def test_problem_sells_let_a_non_core_problem_exit_through_and_keep_the_rest_blocked():
+    """26.11 (owner «если есть проблемы — продавать»): «problem_sells» — the model's problem exit of a non-core coin is repeated on
+    the account; trims, time / trailing exits and the core stay blocked"""
+    from cnq.execution import spot_sell_guard as G
+    assert G.problem("UNI", "Смарт-мани: кошельки продают UNI — выходим вместе с ними, −8%.")
+    assert G.problem("PEPE", "Мемы: стоп −25% — PEPE −26%.") and G.problem("X", "Таблица поставила «не брать»: тонкий оборот")
+    assert not G.problem("UNI", "Смарт-мани: 30 дней прошло — выходим по времени, UNI +3%.")
+    assert not G.problem("X", "Трейлинг: X на 20% ниже пика") and not G.problem("BTC", "Стоп −30%")
+    c = {"on": True, "problem_sells": True}
+    sells = [{"ccy": "UNI", "usd": 185.0, "act": "sell", "why": "портфель CRYPTO NOVA: " + G.PROBLEM_MARK + " (решение владельца 26.11): кошельки"},
+             {"ccy": "HYPE", "usd": 200.0, "act": "sell", "why": "этой монеты нет в портфеле CRYPTO NOVA"},
+             {"ccy": "BTC", "usd": 50.0, "act": "trim", "why": "портфель CRYPTO NOVA: " + G.PROBLEM_MARK}]
+    kept, notes = G.apply(sells, [], 11000.0, c, {}, lambda y: False, 0.0, False)
+    assert [o["ccy"] for o in kept] == ["UNI"] and "продажа при проблеме" in notes[0]
+    kept2, _ = G.apply(sells[:1], [], 11000.0, {"on": True}, {}, lambda y: False, 0.0, False)
+    assert kept2 == []                                                     # without the flag: blocked as before

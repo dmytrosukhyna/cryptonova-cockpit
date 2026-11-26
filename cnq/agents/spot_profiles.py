@@ -40,6 +40,7 @@ import sqlite3
 import time
 from datetime import datetime, timezone
 from . import entry_support as _es
+from ..execution import spot_sell_guard as _ssg
 
 PROFILES = {
     # 18.10 (owner: «всё больше верю в биткоин — самый надёжный актив»): BTC 60 / ETH 20 / SOL 10 (was 50 / 25 / 15). Test 2023-06 →
@@ -1265,6 +1266,11 @@ class IdeasPortfolio:
                            "(правило владельца 23.11: продаём только по биржевому стопу или разумной замене).")
 
         def act(now_, sym, action, weight, price, reason, *a, **k):
+            # 26.11 (owner: «если есть проблемы — продавать, запретов нет»): «problem_sells» lets a FULL exit of a non-core coin
+            # through when its reason is a problem (stop, smart-money wallets leaving, red flag, «не брать», no OKX pair);
+            # trims, time / trailing / weekly exits, take-profits and the core stay blocked (spot_sell_guard.problem)
+            if action == "SELL" and c.get("problem_sells") and _ssg.problem(sym, reason):
+                return self._act0(now_, sym, action, weight, price, "Продажа при проблеме (решение владельца 26.11): " + str(reason), *a, **k)
             if action in ("SELL", "TRIM"):
                 self.conn.execute(f"INSERT INTO {rp.T_ACT} VALUES(?,?,?,?,?,?)",
                                   (now_, sym, "SKIP", weight, price, "Продажа заблокирована владельцем (23.11): " + str(reason)[:300]))

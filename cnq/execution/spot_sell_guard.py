@@ -22,6 +22,25 @@ def cfg(ov: dict | None) -> dict | None:
     return c if isinstance(c, dict) and c.get("on") else None
 
 
+# 26.11 09:40 Kyiv (owner: «если есть проблемы — продавать; запретов нет»), «problem_sells»: true in the override — a FULL exit of a
+# non-core coin is allowed when the model leaves it because of a problem; the model marks such a sale «Продажа при проблеме», the
+# real account repeats only those (its order «why» carries the model's reason). Trims, time / trailing / weekly exits, take-profits
+# and every sale of the core BTC / ETH / SOL stay blocked (swaps as before).
+PROBLEM_MARK = "Продажа при проблеме"
+_PROBLEM = ("стоп", "кошельки", "красный флаг", "«не брать»", "не брать", "спот-пар")
+_NOT_PROBLEM = ("трейлинг", "дней прошло", "недельный пересмотр", "фиксац", "откат 35%")
+
+
+def problem(sym: str, reason: str) -> bool:
+    """is this model exit of `sym` a problem exit (not core, reason names a problem, not a time / trailing / profit exit)"""
+    r = str(reason or "").lower()
+    if str(sym or "").upper() in CORE or not r:
+        return False
+    if any(w in r for w in _NOT_PROBLEM):
+        return False
+    return any(w in r for w in _PROBLEM)
+
+
 def ratings(web: str) -> dict:
     try:
         with open(os.path.join(web, "research.json"), encoding="utf-8") as f:
@@ -70,6 +89,10 @@ def apply(sells: list, buys: list, total_usd: float, c: dict, rate: dict, trend_
         budget[b["ccy"]] = budget.get(b["ccy"], 0.0) + float(b["usd"])
     for o in sells:
         x = o["ccy"]
+        if c.get("problem_sells") and o.get("act") == "sell" and x not in CORE and PROBLEM_MARK in str(o.get("why") or ""):
+            kept.append(o)                                   # 26.11 (owner): the model left the coin because of a problem
+            notes.append(f"{x}: продажа при проблеме (решение владельца 26.11) — {str(o.get('why') or '')[:160]}")
+            continue
         best, why = None, None
         for y, u in budget.items():
             if y == x or u <= 1.0:

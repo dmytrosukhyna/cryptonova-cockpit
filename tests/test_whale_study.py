@@ -575,7 +575,16 @@ def _rq(a, days_pnl, now, pf=5.0):
 
 def test_rotation_fast_and_slow_exits_back_fill_from_b_and_empty_seat():
     """10.11 09:40 (owner): column A of 7 is changed only by the exit rules; the seat is back-filled at once by the best B trader
-    (PF) who passes the bar and has 3 plus days in a row; nobody qualifies → the seat stays empty"""
+    (PF) who passes the bar and has 3 plus days in a row; nobody qualifies → the seat stays empty (the rule without the
+    26.11 soft entry — that one is tested below)"""
+    soft0, W.soft_cfg = W.soft_cfg, lambda: None
+    try:
+        _rotation_v1_case()
+    finally:
+        W.soft_cfg = soft0
+
+
+def _rotation_v1_case():
     now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
     A = [_w(f"bn:{i}") for i in range(7)]
     st = {"rule": W.LOCK_RULE, "top": A, "lock_t": now - W.DAY, "joined": {x["addr"]: now - 2 * W.DAY for x in A},
@@ -606,6 +615,40 @@ def test_rotation_fast_and_slow_exits_back_fill_from_b_and_empty_seat():
     st2 = {**st, "top": R["top"], "joined": R["joined"], "passing": R["passing"]}
     R2 = W.rotate(st2, R["rot"], sorted(prof.values(), key=lambda x: -x["pf"]), prof, {"equity": 7000.0}, now + W.DAY)
     assert "bn:b2" in [x["addr"] for x in R2["top"]] and len(R2["top"]) == 7
+
+
+def test_rotation_soft_entry_by_the_overall_record_one_per_day_and_a_cool_off_after_exit():
+    """26.11 (owner, «rotation_soft_1126»): B → A by the overall record — days with nothing closed do not count, 14 days net ≥ 0,
+    the last 3 traded days not all negative, active; at most one new trader per UTC day; one moved out of A waits 7 days"""
+    soft0, W.soft_cfg = W.soft_cfg, lambda: {"on": True}
+    try:
+        now = (1_800_000_000_000 // W.DAY) * W.DAY + 3600_000
+        A = [_w(f"bn:{i}") for i in range(5)]
+        st = {"rule": W.LOCK_RULE, "top": A, "lock_t": now - W.DAY, "joined": {x["addr"]: now - 2 * W.DAY for x in A},
+              "passing": {x["addr"]: [now - 9 * W.DAY, now - 600_000] for x in A}}
+        prof = {x["addr"]: _rq(x["addr"], [1, 1, 1], now) for x in A}
+        hold = _rq("bn:hold", [5, 0, 0], now, 9.0)                         # 1 plus day + 2 empty days: v1 says no, soft says yes
+        red = _rq("bn:red", [-1, -2, -3], now, 8.0)                        # last 3 traded days all minus → no
+        cool = _rq("bn:cool", [4, 4, 4], now, 10.0)                        # best PF, but left A 2 days ago → waits
+        nxt = _rq("bn:next", [1, 1, 1], now, 7.0)                          # qualifies, but only one new per day
+        for q in (hold, red, cool, nxt):
+            prof[q["addr"]] = q
+        ranked = sorted(prof.values(), key=lambda x: -x["pf"])
+        rot = {"bench": {"bn:hold": {"since": now - W.DAY}, "bn:red": {"since": now - W.DAY}, "bn:next": {"since": now - W.DAY},
+                         "bn:cool": {"since": now - 2 * W.DAY, "from_a": True}}, "bench_t": now - W.DAY}
+        R = W.rotate(st, rot, ranked, prof, {"equity": 7000.0}, now)
+        top = [x["addr"] for x in R["top"]]
+        assert "bn:hold" in top and "bn:cool" not in top and "bn:red" not in top and "bn:next" not in top and len(top) == 6
+        assert "по общим показателям" in next(m for m in R["moves"] if m["addr"] == "bn:hold")["why_ru"]
+        pub = W.rotation_public(R["top"], R["rot"], prof, {"equity": 7000.0}, now, None, R["joined"])
+        b = {r["addr"]: r for r in pub["b"]}
+        assert pub["rule"] == "rotation-v1-soft" and b["bn:next"]["soft_ok"] and not b["bn:cool"]["soft_ok"] and not b["bn:red"]["soft_ok"]
+        # the next UTC day: one more seat goes to bn:next
+        st2 = {**st, "top": R["top"], "joined": R["joined"], "passing": R["passing"]}
+        R2 = W.rotate(st2, R["rot"], ranked, prof, {"equity": 7000.0}, now + W.DAY)
+        assert "bn:next" in [x["addr"] for x in R2["top"]] and len(R2["top"]) == 7
+    finally:
+        W.soft_cfg = soft0
 
 
 def test_rotation_review_refreshes_b_only_and_real_copies_count_for_the_fast_exit():

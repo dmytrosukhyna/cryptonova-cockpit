@@ -1,0 +1,32 @@
+name: research-community
+# 26.11 (owner 18:24): public Telegram futures-signal channels — every call parsed and backtested (scripts/research/community_calls.py).
+# The channels come as ONE base64 run input («h1,h2,…»), each handle masked; annotations and the artifact carry anonymous keys only.
+on:
+  workflow_dispatch:
+    inputs:
+      src:
+        description: "channel handles, comma separated, base64"
+        required: true
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Mask the input
+        env:
+          SRC: ${{ inputs.src }}
+        run: |
+          for h in $(echo "$SRC" | base64 -d | tr ',' ' '); do echo "::add-mask::$h"; done
+      - run: python scripts/research/community_calls.py community.json
+        env:
+          INF_HANDLES_B64: ${{ inputs.src }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: community
+          path: community.json

@@ -10,7 +10,7 @@ on:
       mode:
         description: "variants | families | btcevents | hlbtc | postmortem | global"
         type: choice
-        options: [variants, families, btcevents, hlbtc, postmortem, global, samples, ladder, pce]
+        options: [variants, families, btcevents, hlbtc, postmortem, global, samples, ladder, pce, hedge]
         default: variants
 permissions:
   contents: read
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: Restore the state cache (read only)
-        if: inputs.mode == 'variants' || inputs.mode == 'families' || inputs.mode == 'postmortem' || inputs.mode == 'ladder'
+        if: inputs.mode == 'variants' || inputs.mode == 'families' || inputs.mode == 'postmortem' || inputs.mode == 'ladder' || inputs.mode == 'hedge'
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -41,6 +41,8 @@ jobs:
         run: python scripts/research/postmortem_whales.py data/agents.sqlite postmortem.json
       - if: inputs.mode == 'ladder'
         run: python scripts/research/exp_ladder.py data/agents.sqlite exp_ladder.json
+      - if: inputs.mode == 'hedge'
+        run: python scripts/research/hedge_pool.py data/agents.sqlite hedge_pool.json
       - if: inputs.mode == 'pce'
         run: python scripts/research/pce_squeeze.py pce_squeeze.json
       - if: inputs.mode == 'samples'

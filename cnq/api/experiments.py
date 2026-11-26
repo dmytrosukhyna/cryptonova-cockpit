@@ -53,6 +53,12 @@ class Experiments:
 
                 def atr_of(coin):
                     return X.atr(X.candles(f"{coin}-USDT-SWAP", "1H", 30, get))
+
+                def lvl_of(coin):                        # 26.11: whale copies re-confirmed by our levels / Quasimodo (paper)
+                    from cnq.agents import levels_desk as LD
+                    return X.level_ctx(LD.hourly(coin))
+                if get is None:                          # tests pass a fake `get`: no level data there, the f_* variants skip
+                    ctx["lvl_of"] = lvl_of
                 sp = os.path.join(self.dir, "state.json")
                 st = self._load(sp) or {}
                 X.step(st, desk, now, ctx, atr_of)

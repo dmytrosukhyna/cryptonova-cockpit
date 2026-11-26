@@ -1,0 +1,790 @@
+{
+ "part_a": {
+  "qm|1h|L|2R": {
+   "is": {
+    "n": 450,
+    "mean": 0.06,
+    "median": -1.302,
+    "win": 0.342,
+    "pf": 1.04,
+    "worst": -8.05,
+    "stopped": 0.644,
+    "t": 0.31,
+    "t_daily": 1.87,
+    "days": 271
+   },
+   "oos": {
+    "n": 515,
+    "mean": -0.118,
+    "median": -1.401,
+    "win": 0.342,
+    "pf": 0.93,
+    "worst": -7.79,
+    "stopped": 0.635,
+    "t": -0.68,
+    "t_daily": 0.6,
+    "days": 269
+   },
+   "all": {
+    "n": 965,
+    "mean": -0.035,
+    "median": -1.359,
+    "win": 0.342,
+    "pf": 0.98,
+    "worst": -8.05,
+    "stopped": 0.639,
+    "t": -0.28,
+    "t_daily": 1.77,
+    "days": 540
+   },
+   "passed": false
+  },
+  "qm|1h|L|3R": {
+   "is": {
+    "n": 713,
+    "mean": -0.033,
+    "median": -1.377,
+    "win": 0.259,
+    "pf": 0.98,
+    "worst": -8.05,
+    "stopped": 0.734,
+    "t": -0.21,
+    "t_daily": 2.35,
+    "days": 339
+   },
+   "oos": {
+    "n": 799,
+    "mean": -0.113,
+    "median": -1.408,
+    "win": 0.277,
+    "pf": 0.93,
+    "worst": -7.79,
+    "stopped": 0.703,
+    "t": -0.78,
+    "t_daily": 2.23,
+    "days": 356
+   },
+   "all": {
+    "n": 1512,
+    "mean": -0.076,
+    "median": -1.393,
+    "win": 0.269,
+    "pf": 0.95,
+    "worst": -8.05,
+    "stopped": 0.718,
+    "t": -0.7,
+    "t_daily": 3.24,
+    "days": 695
+   },
+   "passed": false
+  },
+  "qm|1h|L|struct": {
+   "is": {
+    "n": 351,
+    "mean": 0.231,
+    "median": -1.303,
+    "win": 0.37,
+    "pf": 1.14,
+    "worst": -8.05,
+    "stopped": 0.613,
+    "t": 0.99,
+    "t_daily": 2.24,
+    "days": 224
+   },
+   "oos": {
+    "n": 407,
+    "mean": -0.222,
+    "median": -1.623,
+    "win": 0.329,
+    "pf": 0.87,
+    "worst": -7.79,
+    "stopped": 0.641,
+    "t": -1.09,
+    "t_daily": -0.08,
+    "days": 219
+   },
+   "all": {
+    "n": 758,
+    "mean": -0.013,
+    "median": -1.453,
+    "win": 0.348,
+    "pf": 0.99,
+    "worst": -8.05,
+    "stopped": 0.628,
+    "t": -0.08,
+    "t_daily": 1.61,
+    "days": 443
+   },
+   "passed": false
+  },
+  "qm|1h|S|2R": {
+   "is": {
+    "n": 414,
+    "mean": -0.312,
+    "median": -1.257,
+    "win": 0.336,
+    "pf": 0.81,
+    "worst": -8.01,
+    "stopped": 0.645,
+    "t": -1.79,
+    "t_daily": -1.17,
+    "days": 272
+   },
+   "oos": {
+    "n": 449,
+    "mean": -0.143,
+    "median": -1.466,
+    "win": 0.347,
+    "pf": 0.92,
+    "worst": -7.81,
+    "stopped": 0.639,
+    "t": -0.73,
+    "t_daily": -0.55,
+    "days": 282
+   },
+   "all": {
+    "n": 863,
+    "mean": -0.224,
+    "median": -1.373,
+    "win": 0.342,
+    "pf": 0.87,
+    "worst": -8.01,
+    "stopped": 0.642,
+    "t": -1.71,
+    "t_daily": -1.19,
+    "days": 554
+   },
+   "passed": false
+  },
+  "qm|1h|S|3R": {
+   "is": {
+    "n": 651,
+    "mean": -0.196,
+    "median": -1.284,
+    "win": 0.287,
+    "pf": 0.87,
+    "worst": -8.01,
+    "stopped": 0.699,
+    "t": -1.34,
+    "t_daily": -0.3,
+    "days": 370
+   },
+   "oos": {
+    "n": 713,
+    "mean": -0.047,
+    "median": -1.467,
+    "win": 0.292,
+    "pf": 0.97,
+    "worst": -7.81,
+    "stopped": 0.698,
+    "t": -0.29,
+    "t_daily": 0.09,
+    "days": 389
+   },
+   "all": {
+    "n": 1364,
+    "mean": -0.118,
+    "median": -1.373,
+    "win": 0.29,
+    "pf": 0.93,
+    "worst": -8.01,
+    "stopped": 0.699,
+    "t": -1.08,
+    "t_daily": -0.14,
+    "days": 759
+   },
+   "passed": false
+  },
+  "qm|1h|S|struct": {
+   "is": {
+    "n": 331,
+    "mean": -0.409,
+    "median": -1.334,
+    "win": 0.332,
+    "pf": 0.76,
+    "worst": -8.01,
+    "stopped": 0.644,
+    "t": -2.02,
+    "t_daily": -1.63,
+    "days": 230
+   },
+   "oos": {
+    "n": 365,
+    "mean": -0.201,
+    "median": -1.729,
+    "win": 0.345,
+    "pf": 0.9,
+    "worst": -7.81,
+    "stopped": 0.638,
+    "t": -0.89,
+    "t_daily": -0.75,
+    "days": 242
+   },
+   "all": {
+    "n": 696,
+    "mean": -0.3,
+    "median": -1.491,
+    "win": 0.339,
+    "pf": 0.84,
+    "worst": -8.01,
+    "stopped": 0.641,
+    "t": -1.97,
+    "t_daily": -1.64,
+    "days": 472
+   },
+   "passed": false
+  },
+  "qm|4h|L|2R": {
+   "is": {
+    "n": 138,
+    "mean": 0.987,
+    "median": -1.104,
+    "win": 0.457,
+    "pf": 1.53,
+    "worst": -8.11,
+    "stopped": 0.486,
+    "t": 2.02,
+    "t_daily": 2.36,
+    "days": 100
+   },
+   "oos": {
+    "n": 140,
+    "mean": 0.613,
+    "median": -1.509,
+    "win": 0.45,
+    "pf": 1.35,
+    "worst": -8.03,
+    "stopped": 0.521,
+    "t": 1.46,
+    "t_daily": 1.79,
+    "days": 97
+   },
+   "all": {
+    "n": 278,
+    "mean": 0.799,
+    "median": -1.311,
+    "win": 0.453,
+    "pf": 1.44,
+    "worst": -8.11,
+    "stopped": 0.504,
+    "t": 2.49,
+    "t_daily": 2.96,
+    "days": 197
+   },
+   "passed": false
+  },
+  "qm|4h|L|3R": {
+   "is": {
+    "n": 235,
+    "mean": 0.812,
+    "median": -1.526,
+    "win": 0.374,
+    "pf": 1.43,
+    "worst": -8.11,
+    "stopped": 0.591,
+    "t": 2.07,
+    "t_daily": 3.0,
+    "days": 155
+   },
+   "oos": {
+    "n": 224,
+    "mean": 0.751,
+    "median": -1.47,
+    "win": 0.397,
+    "pf": 1.43,
+    "worst": -8.03,
+    "stopped": 0.585,
+    "t": 2.07,
+    "t_daily": 3.01,
+    "days": 136
+   },
+   "all": {
+    "n": 459,
+    "mean": 0.782,
+    "median": -1.485,
+    "win": 0.386,
+    "pf": 1.43,
+    "worst": -8.11,
+    "stopped": 0.588,
+    "t": 2.92,
+    "t_daily": 4.26,
+    "days": 291
+   },
+   "null": {
+    "max": 0.588,
+    "mean": -0.402
+   },
+   "passed": 1.0
+  },
+  "qm|4h|L|struct": {
+   "is": {
+    "n": 103,
+    "mean": 1.037,
+    "median": -0.714,
+    "win": 0.466,
+    "pf": 1.54,
+    "worst": -8.11,
+    "stopped": 0.456,
+    "t": 1.76,
+    "t_daily": 1.9,
+    "days": 78
+   },
+   "oos": {
+    "n": 86,
+    "mean": 0.666,
+    "median": -1.472,
+    "win": 0.465,
+    "pf": 1.36,
+    "worst": -8.03,
+    "stopped": 0.512,
+    "t": 1.16,
+    "t_daily": 1.84,
+    "days": 63
+   },
+   "all": {
+    "n": 189,
+    "mean": 0.868,
+    "median": -1.078,
+    "win": 0.466,
+    "pf": 1.46,
+    "worst": -8.11,
+    "stopped": 0.481,
+    "t": 2.11,
+    "t_daily": 2.65,
+    "days": 141
+   },
+   "passed": false
+  },
+  "qm|4h|S|2R": {
+   "is": {
+    "n": 150,
+    "mean": -1.03,
+    "median": -2.272,
+    "win": 0.293,
+    "pf": 0.57,
+    "worst": -8.17,
+    "stopped": 0.647,
+    "t": -3.0,
+    "t_daily": -2.18,
+    "days": 119
+   },
+   "oos": {
+    "n": 157,
+    "mean": 0.27,
+    "median": -1.959,
+    "win": 0.389,
+    "pf": 1.13,
+    "worst": -7.33,
+    "stopped": 0.567,
+    "t": 0.63,
+    "t_daily": 0.14,
+    "days": 108
+   },
+   "all": {
+    "n": 307,
+    "mean": -0.365,
+    "median": -2.094,
+    "win": 0.342,
+    "pf": 0.84,
+    "worst": -8.17,
+    "stopped": 0.606,
+    "t": -1.31,
+    "t_daily": -1.33,
+    "days": 227
+   },
+   "passed": false
+  },
+  "qm|4h|S|3R": {
+   "is": {
+    "n": 238,
+    "mean": -0.604,
+    "median": -2.087,
+    "win": 0.277,
+    "pf": 0.72,
+    "worst": -8.17,
+    "stopped": 0.681,
+    "t": -2.05,
+    "t_daily": -0.36,
+    "days": 167
+   },
+   "oos": {
+    "n": 242,
+    "mean": -0.21,
+    "median": -2.067,
+    "win": 0.289,
+    "pf": 0.9,
+    "worst": -8.15,
+    "stopped": 0.665,
+    "t": -0.61,
+    "t_daily": 0.23,
+    "days": 159
+   },
+   "all": {
+    "n": 480,
+    "mean": -0.405,
+    "median": -2.085,
+    "win": 0.283,
+    "pf": 0.81,
+    "worst": -8.17,
+    "stopped": 0.673,
+    "t": -1.78,
+    "t_daily": -0.07,
+    "days": 326
+   },
+   "passed": false
+  },
+  "qm|4h|S|struct": {
+   "is": {
+    "n": 108,
+    "mean": -1.032,
+    "median": -2.505,
+    "win": 0.306,
+    "pf": 0.59,
+    "worst": -7.79,
+    "stopped": 0.63,
+    "t": -2.36,
+    "t_daily": -1.43,
+    "days": 87
+   },
+   "oos": {
+    "n": 111,
+    "mean": 0.386,
+    "median": -2.207,
+    "win": 0.396,
+    "pf": 1.17,
+    "worst": -7.82,
+    "stopped": 0.541,
+    "t": 0.69,
+    "t_daily": 0.43,
+    "days": 80
+   },
+   "all": {
+    "n": 219,
+    "mean": -0.313,
+    "median": -2.412,
+    "win": 0.352,
+    "pf": 0.87,
+    "worst": -7.82,
+    "stopped": 0.584,
+    "t": -0.88,
+    "t_daily": -0.6,
+    "days": 167
+   },
+   "passed": false
+  }
+ },
+ "part_b": {
+  "decisions": 610,
+  "traders": 13,
+  "all": {
+   "kept": {
+    "n": 610,
+    "mean": 0.338,
+    "median": 0.235,
+    "win": 0.598,
+    "pf": 1.42,
+    "worst": -10.5,
+    "stopped": 0.0,
+    "t": 2.51,
+    "t_daily": 0.96,
+    "days": 62
+   },
+   "dropped": {
+    "n": 0
+   },
+   "welch_t": null,
+   "h1": {
+    "kept": {
+     "n": 60,
+     "mean": 1.55,
+     "median": -0.21,
+     "win": 0.467,
+     "pf": 1.98,
+     "worst": -7.33,
+     "stopped": 0.0,
+     "t": 1.67,
+     "t_daily": 1.8,
+     "days": 24
+    },
+    "all": {
+     "n": 60,
+     "mean": 1.55,
+     "median": -0.21,
+     "win": 0.467,
+     "pf": 1.98,
+     "worst": -7.33,
+     "stopped": 0.0,
+     "t": 1.67,
+     "t_daily": 1.8,
+     "days": 24
+    }
+   },
+   "h2": {
+    "kept": {
+     "n": 550,
+     "mean": 0.206,
+     "median": 0.238,
+     "win": 0.613,
+     "pf": 1.28,
+     "worst": -10.5,
+     "stopped": 0.0,
+     "t": 1.88,
+     "t_daily": -0.36,
+     "days": 47
+    },
+    "all": {
+     "n": 550,
+     "mean": 0.206,
+     "median": 0.238,
+     "win": 0.613,
+     "pf": 1.28,
+     "worst": -10.5,
+     "stopped": 0.0,
+     "t": 1.88,
+     "t_daily": -0.36,
+     "days": 47
+    }
+   }
+  },
+  "F1_у_опоры": {
+   "kept": {
+    "n": 482,
+    "mean": 0.442,
+    "median": 0.27,
+    "win": 0.614,
+    "pf": 1.57,
+    "worst": -8.54,
+    "stopped": 0.0,
+    "t": 2.87,
+    "t_daily": 1.32,
+    "days": 60
+   },
+   "dropped": {
+    "n": 128,
+    "mean": -0.055,
+    "median": 0.1,
+    "win": 0.539,
+    "pf": 0.94,
+    "worst": -10.5,
+    "stopped": 0.0,
+    "t": -0.2,
+    "t_daily": -0.58,
+    "days": 41
+   },
+   "welch_t": 1.58,
+   "h1": {
+    "kept": {
+     "n": 43,
+     "mean": 2.068,
+     "median": -0.059,
+     "win": 0.488,
+     "pf": 2.38,
+     "worst": -7.12,
+     "stopped": 0.0,
+     "t": 1.74,
+     "t_daily": 1.65,
+     "days": 20
+    },
+    "all": {
+     "n": 60,
+     "mean": 1.55,
+     "median": -0.21,
+     "win": 0.467,
+     "pf": 1.98,
+     "worst": -7.33,
+     "stopped": 0.0,
+     "t": 1.67,
+     "t_daily": 1.8,
+     "days": 24
+    }
+   },
+   "h2": {
+    "kept": {
+     "n": 439,
+     "mean": 0.283,
+     "median": 0.271,
+     "win": 0.626,
+     "pf": 1.4,
+     "worst": -8.54,
+     "stopped": 0.0,
+     "t": 2.33,
+     "t_daily": 0.13,
+     "days": 47
+    },
+    "all": {
+     "n": 550,
+     "mean": 0.206,
+     "median": 0.238,
+     "win": 0.613,
+     "pf": 1.28,
+     "worst": -10.5,
+     "stopped": 0.0,
+     "t": 1.88,
+     "t_daily": -0.36,
+     "days": 47
+    }
+   },
+   "works": false
+  },
+  "F2_вето_в_стену": {
+   "kept": {
+    "n": 318,
+    "mean": 0.222,
+    "median": 0.23,
+    "win": 0.61,
+    "pf": 1.27,
+    "worst": -10.5,
+    "stopped": 0.0,
+    "t": 1.34,
+    "t_daily": -0.24,
+    "days": 52
+   },
+   "dropped": {
+    "n": 292,
+    "mean": 0.464,
+    "median": 0.236,
+    "win": 0.586,
+    "pf": 1.59,
+    "worst": -9.96,
+    "stopped": 0.0,
+    "t": 2.15,
+    "t_daily": 1.51,
+    "days": 51
+   },
+   "welch_t": -0.89,
+   "h1": {
+    "kept": {
+     "n": 35,
+     "mean": 0.124,
+     "median": -0.629,
+     "win": 0.4,
+     "pf": 1.06,
+     "worst": -7.12,
+     "stopped": 0.0,
+     "t": 0.15,
+     "t_daily": 0.75,
+     "days": 16
+    },
+    "all": {
+     "n": 60,
+     "mean": 1.55,
+     "median": -0.21,
+     "win": 0.467,
+     "pf": 1.98,
+     "worst": -7.33,
+     "stopped": 0.0,
+     "t": 1.67,
+     "t_daily": 1.8,
+     "days": 24
+    }
+   },
+   "h2": {
+    "kept": {
+     "n": 283,
+     "mean": 0.234,
+     "median": 0.254,
+     "win": 0.636,
+     "pf": 1.34,
+     "worst": -10.5,
+     "stopped": 0.0,
+     "t": 1.5,
+     "t_daily": -0.54,
+     "days": 43
+    },
+    "all": {
+     "n": 550,
+     "mean": 0.206,
+     "median": 0.238,
+     "win": 0.613,
+     "pf": 1.28,
+     "worst": -10.5,
+     "stopped": 0.0,
+     "t": 1.88,
+     "t_daily": -0.36,
+     "days": 47
+    }
+   },
+   "works": false
+  },
+  "F3_QM_за": {
+   "kept": {
+    "n": 324,
+    "mean": 0.545,
+    "median": 0.396,
+    "win": 0.633,
+    "pf": 1.69,
+    "worst": -10.5,
+    "stopped": 0.0,
+    "t": 2.61,
+    "t_daily": 1.09,
+    "days": 53
+   },
+   "dropped": {
+    "n": 286,
+    "mean": 0.103,
+    "median": 0.139,
+    "win": 0.559,
+    "pf": 1.12,
+    "worst": -8.17,
+    "stopped": 0.0,
+    "t": 0.63,
+    "t_daily": 0.71,
+    "days": 46
+   },
+   "welch_t": 1.67,
+   "h1": {
+    "kept": {
+     "n": 32,
+     "mean": 2.867,
+     "median": -0.21,
+     "win": 0.438,
+     "pf": 3.17,
+     "worst": -6.7,
+     "stopped": 0.0,
+     "t": 1.93,
+     "t_daily": 1.79,
+     "days": 15
+    },
+    "all": {
+     "n": 60,
+     "mean": 1.55,
+     "median": -0.21,
+     "win": 0.467,
+     "pf": 1.98,
+     "worst": -7.33,
+     "stopped": 0.0,
+     "t": 1.67,
+     "t_daily": 1.8,
+     "days": 24
+    }
+   },
+   "h2": {
+    "kept": {
+     "n": 292,
+     "mean": 0.29,
+     "median": 0.42,
+     "win": 0.654,
+     "pf": 1.4,
+     "worst": -10.5,
+     "stopped": 0.0,
+     "t": 1.81,
+     "t_daily": -0.15,
+     "days": 44
+    },
+    "all": {
+     "n": 550,
+     "mean": 0.206,
+     "median": 0.238,
+     "win": 0.613,
+     "pf": 1.28,
+     "worst": -10.5,
+     "stopped": 0.0,
+     "t": 1.88,
+     "t_daily": -0.36,
+     "days": 47
+    }
+   },
+   "works": false
+  }
+ }
+}

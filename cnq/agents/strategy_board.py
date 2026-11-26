@@ -96,7 +96,7 @@ def collect(web: str, data: str) -> dict:
         aid = os.path.basename(aid_p)[6:-5]
         D[f"ivan_{aid}"] = (f"Иван тест {aid}", norm(st.get("closed")), START)
     for key, nm, fn in (("reversal", "Разворот", "reversal/state.json"), ("smart_alts", "Альты от китов", "smart_alts/state.json"),
-                        ("levels", "Уровни", "levels/state.json"), ("hacks", "Взломы → шорт", "hacks/state.json"),
+                        ("levels", "Уровни", "levels/state.json"), ("qm", "Квазимодо 4ч · лонг", "qm/state.json"), ("hacks", "Взломы → шорт", "hacks/state.json"),
                         ("manual", "Ручной стол", "manual_desk/desk.json"), ("listing_short", "Шорт листингов", "listing_short/state.json")):
         st = _load(os.path.join(data, fn))
         if st:

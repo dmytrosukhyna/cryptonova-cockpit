@@ -10,6 +10,11 @@ the variants are apples to apples with the real source. Forward-logged from 22.1
   c_time48  exit after 48 h;   c_stop8  stop −8 %
   d_major2  only when ≥ 2 followed whales hold the coin on the same side (the desk's own open copies)
   e_majors  only BTC / ETH / SOL;   e_btc  only BTC
+  f_level   (owner 26.11 «сверять сделки китов с уровнями») only when the copy trades FROM a level: LONG with price − nearest support
+            ≤ 1 ATR(14, 1h), SHORT with nearest resistance − price ≤ 1 ATR (levels of cnq/agents/levels_desk.py at the last closed 1h bar)
+  f_qm      only when a same-side Quasimodo (1h swings, cnq/agents/qm_desk.py) broke in the last 72 1h bars
+            (both: filters F1 / F3 of scripts/research/levels_qm_study.py part B — better in both halves there, not yet significant;
+            no level data for the coin → that variant does not take the copy)
 Prices: the desk's own marks (updated every desk pass, minutes apart) — stops are checked at those marks, so a fast wick between two
 marks is missed (the same for every variant). Each paper trade = $1 000 notional, 0.11 % costs a round trip; results in % of notional.
 Promotion (owner 22.11): a variant is proposed for real only after ≥ 30 forward trades AND a better PF and drawdown than the real
@@ -21,10 +26,11 @@ import os
 import time
 import urllib.request
 
-VARIANTS = ("base", "a_regime", "b_smart", "c_be1r", "c_trail", "c_time48", "c_stop8", "d_major2", "e_majors", "e_btc")
+VARIANTS = ("base", "a_regime", "b_smart", "c_be1r", "c_trail", "c_time48", "c_stop8", "d_major2", "e_majors", "e_btc", "f_level", "f_qm")
 NAMES_RU = {"base": "Поток китов как есть", "a_regime": "Фильтр режима BTC (4ч EMA20)", "b_smart": "Вето смарт-мани",
             "c_be1r": "Стоп в безубыток после +1R", "c_trail": "Трейлинг 1,5 × ATR", "c_time48": "Выход через 48 ч",
-            "c_stop8": "Стоп −8 %", "d_major2": "≥ 2 кита на одной стороне", "e_majors": "Только BTC / ETH / SOL", "e_btc": "Только BTC"}
+            "c_stop8": "Стоп −8 %", "d_major2": "≥ 2 кита на одной стороне", "e_majors": "Только BTC / ETH / SOL", "e_btc": "Только BTC",
+            "f_level": "Кит от уровня", "f_qm": "Кит + квазимодо за"}
 STOP, STOP8, R_BE, TIME_H, ATR_K = 16.0, 8.0, 16.0, 48, 1.5
 COST, NOTIONAL = 0.11, 1000.0
 MAJORS = {"BTC", "ETH", "SOL"}
@@ -94,7 +100,28 @@ def allowed(v: str, coin: str, side: str, ctx: dict) -> bool:
         return coin in MAJORS
     if v == "e_btc":
         return coin == "BTC"
+    if v in ("f_level", "f_qm"):
+        lv = ctx.get("lv")
+        if not lv:
+            return False
+        return bool(lv["near_s"] if side == "LONG" else lv["near_r"]) if v == "f_level" else bool(lv["qm_l"] if side == "LONG" else lv["qm_s"])
     return True
+
+
+def level_ctx(K: list) -> dict | None:
+    """the level context at the last closed 1h bar of K = [[t, o, h, l, c, vol], …] (oldest first, ≥ 300 bars)"""
+    from . import levels_desk as LD, qm_desk as QD
+    if len(K) < 300:
+        return None
+    t, o, h, l, c, v = (list(x) for x in zip(*K))
+    P = LD.prep(t, o, h, l, c, v)
+    i = len(c) - 1
+    a, px = P["atr"][i], c[i]
+    if not a:
+        return None
+    S, R, _b, _a = LD.nearest(LD.levels_at(P, i), px)
+    return {"px": px, "atr": a, "S": S, "R": R, "near_s": S is not None and px - S <= a, "near_r": R is not None and R - px <= a,
+            "qm_l": QD.active(P, "L", i), "qm_s": QD.active(P, "S", i)}
 
 
 def _ret(side: str, a: float, b: float) -> float:
@@ -120,6 +147,11 @@ def step(st: dict, desk: dict, now: int, ctx: dict, atr_of=None) -> dict:
         coin, side = str(o["coin"]).upper(), str(o.get("side") or "").upper()
         same = sum(1 for x in opens if str(x.get("coin")).upper() == coin and str(x.get("side")).upper() == side)
         c = {**ctx, "same_side": same}
+        if ctx.get("lvl_of"):
+            try:
+                c["lv"] = ctx["lvl_of"](coin)
+            except Exception:  # noqa: BLE001 — no level data: the f_* variants skip this copy
+                c["lv"] = None
         a_ = None
         for v in VARIANTS:
             if not allowed(v, coin, side, c):
@@ -132,7 +164,8 @@ def step(st: dict, desk: dict, now: int, ctx: dict, atr_of=None) -> dict:
             px = float(o.get("price") or o["entry"])
             st["open"].append({"v": v, "key": k, "coin": coin, "side": side, "entry": px, "opened_t": now, "best": px,
                                "stop_pct": STOP8 if v == "c_stop8" else STOP, "atr": a_ if v == "c_trail" else None,
-                               "be": False, "whale": o.get("whale")})
+                               "be": False, "whale": o.get("whale"),
+                               **({"lv": {k: c["lv"].get(k) for k in ("px", "atr", "S", "R")}} if v.startswith("f_") and c.get("lv") else {})})
             res["opened"] += 1
     keep = []
     for p in st["open"]:

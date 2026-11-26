@@ -49,6 +49,7 @@ def sid(s: dict) -> str:
     return (f"{s['src']}|{s.get('side', 'follow')}|{f}|{s.get('entry', 'now')}|s{s.get('stop')}|tp{s.get('tp') or '-'}|"
             f"h{s.get('hold') or '-'}|{s.get('size', 'fixed')}" + (f"|ds{s['daystop']}" if s.get("daystop") else "")
             + ("|tpown" if s.get("tp_own") else "")
+            + ("|sown" if s.get("stop_own") else "")
             + (f"|{s['sub']}" if s.get("sub") else ""))
 
 
@@ -143,6 +144,8 @@ def passes(spec: dict, coin: str, side: str, ctx: dict, ev: dict) -> bool:
             return False
         if f == "liquid" and (ctx.get("vol24") or {}).get(coin, 0) < 5e6:       # 22.11 22:36: ≥ $5M a day on OKX
             return False
+        if f == "nohedge" and str(ev.get("whale") or "").lower() in (ctx.get("hedge") or ()):   # 26.11: «хедж» traders out
+            return False
         if f == "ivan" and not str(ev.get("whale") or "").startswith("ivan"):   # 22.11 17:55: Ivan's copies only
             return False
         if f == "cap2side" and ev.get("side_open", 0) >= 2:         # 22.11 post-mortem: no 3rd copy on the same side (baskets)
@@ -174,7 +177,7 @@ def passes(spec: dict, coin: str, side: str, ctx: dict, ev: dict) -> bool:
 
 # ── events from the sources ──────────────────────────────────────────────────────────────────────────────────────────────
 def desk_events(desk: dict, src: str) -> list:
-    opens = [o for o in desk.get("open") or [] if isinstance(o, dict) and (o.get("coin") or o.get("symbol")) and (o.get("entry") or src == "tgc")]
+    opens = [o for o in desk.get("open") or [] if isinstance(o, dict) and (o.get("coin") or o.get("symbol")) and (o.get("entry") or src in ("tgc", "tgf"))]
     out = []
     for o in opens:
         coin = str(o.get("coin") or o.get("symbol")).upper().replace("-USDT-SWAP", "").replace("USDT", "")
@@ -187,7 +190,8 @@ def desk_events(desk: dict, src: str) -> list:
         out.append({"key": f"{src}|{o.get('whale') or o.get('id')}|{coin}|{t}", "src": src, "coin": coin, "side": side, "t": t,
                     "entry": float(o.get("entry") or 0) or None, "agree": agree, "side_open": side_open, "whale": str(o.get("whale") or ""),
                     "targets_x": o.get("targets_x") or [], "targets_px": o.get("targets_px") or [],
-                    **({"sub": str(o.get("whale"))} if src == "hlw" else {})})
+                    **({"sub": str(o.get("whale"))} if src in ("hlw", "wsw", "tgf") else {}),
+                    **({"stop_px": o.get("stop_px"), "zone": o.get("zone")} if src == "tgf" else {})})
     return out
 
 
@@ -244,6 +248,10 @@ def _ret(side, a, b):
 
 def _open(st, spec, ev, side, px, now, atrp):
     stop = 2 * atrp if spec["stop"] == "atr2" and atrp else (16.0 if spec["stop"] == "atr2" else float(spec["stop"]))
+    if spec.get("stop_own") and ev.get("stop_px"):                  # 26.11: the channel's own stop (its distance from our fill)
+        d_ = (float(ev["stop_px"]) / px - 1) * 100 * (-1 if side == "LONG" else 1)
+        if 0.2 <= d_ <= 30:
+            stop = d_
     size = BASE_USD
     if spec.get("size") == "vol" and atrp:
         size = BASE_USD * min(3.0, max(0.25, 2.0 / atrp))
@@ -264,8 +272,13 @@ def _open(st, spec, ev, side, px, now, atrp):
         size = float(spec["size"][4:]) / 100 * float(st.get("fut_budget") or 1000.0) / (stop / 100)
     tpx = None
     if spec.get("tp_own") and (ev.get("targets_x") or ev.get("targets_px")):        # 22.11 22:36: his own first target
-        c_ = [px * x for x in ev.get("targets_x") or []] + [x for x in ev.get("targets_px") or [] if x > px * 1.02]
-        tpx = min(c_) if c_ else None
+        if side == "SHORT":                                         # 26.11: futures channels call shorts too
+            c_ = [x for x in ev.get("targets_px") or [] if x < px * 0.998]
+            tpx = max(c_) if c_ else None
+        else:
+            c_ = [px * x for x in ev.get("targets_x") or []] + [x for x in ev.get("targets_px") or []
+                                                                 if x > px * (1.002 if spec.get("src") == "tgf" else 1.02)]
+            tpx = min(c_) if c_ else None
     st["open"].append({"spec": spec["id"], "key": ev["key"], "coin": ev["coin"], "side": side, "entry": px, "t": now, "best": px,
                        "stop_pct": round(stop, 3), "usd": round(size, 2), "src_entry": ev.get("entry"), "tp_px": tpx})
 
@@ -346,6 +359,13 @@ def step(st: dict, now: int, ctx: dict, sources: dict, marks: dict, trend_of=Non
             if sgn * (px / q["px0"] - 1) * 100 >= 1.0:
                 _open(st, s, q["ev"], q["side"], px, now, q.get("atrp")); new += 1; continue
             if now - q["t"] < 12 * H:
+                keep.append(q)
+        elif s["entry"] == "zone":                                # 26.11: a futures call's entry zone, ≤ 48 h (no zone = market)
+            z = q["ev"].get("zone")
+            if not z or (z[0] * 0.998 <= px <= z[1] * 1.002) or (sgn > 0 and px < z[0] and px >= z[0] * 0.99) \
+                    or (sgn < 0 and px > z[1] and px <= z[1] * 1.01):
+                _open(st, s, q["ev"], q["side"], px, now, q.get("atrp")); new += 1; continue
+            if now - q["t"] < 48 * H:
                 keep.append(q)
         elif s["entry"] == "retest":
             ref = q["ev"].get("entry") or q["px0"]
@@ -522,18 +542,18 @@ def hl_book(prev: dict | None, wallets: list, positions_of, now: int, marks: dic
     return book, {"open": opens, "closed": closed}
 
 
-def ensure_watch_specs(st: dict, wallets: list, now: int) -> list:
+def ensure_watch_specs(st: dict, wallets: list, now: int, src: str = "hlw", family: str = "global") -> list:
     """one follow spec per watched wallet + the group specs (≥ 2 watched wallets on the same coin and side); returns the new ids"""
     have = {s["id"] for s in st.get("specs") or []}
     new = []
     base = {"side": "follow", "filt": [], "entry": "now", "stop": 16, "tp": None, "hold": None, "size": "fixed"}
     for a in wallets:
-        s = {**base, "src": "hlw", "family": "global", "sub": a}
+        s = {**base, "src": src, "family": family, "sub": a}
         s["id"] = sid(s)
         if s["id"] not in have:
             new.append(s)
     for g in ({"filt": ["agree2"]}, {"filt": ["agree2"], "entry": "retest"}, {"filt": ["agree2", "major"]}):
-        s = {**base, **g, "src": "hlw", "family": "global·группа"}
+        s = {**base, **g, "src": src, "family": f"{family}·группа"}
         s["id"] = sid(s)
         if s["id"] not in have:
             new.append(s)
@@ -634,3 +654,34 @@ TG_SPECS = [
     {"src": "tgc", "family": "телеграм", "stop": 30, "tp_own": True, "hold": 2160, "filt": ["liquid", "reg1d200"]},
     {"src": "tgc", "family": "телеграм", "stop": 30, "hold": 720},
 ]
+
+
+# ── 26.11 18:24 (owner): the hedge / carry filter and the widened pool (scripts/research/hedge_pool.py) — PAPER ─────────────────
+HEDGE_SPECS = [
+    {"src": "whales", "family": "без хеджей", "filt": ["nohedge"]},                         # the real copy stream without «хедж» traders
+    {"src": "whales", "family": "без хеджей", "filt": ["nohedge"], "size": "risk1", "daystop": 2},
+    {"src": "hlw", "family": "global·группа без хеджей", "filt": ["agree2", "nohedge"]},
+]
+
+
+def fut_events(posts: list, coins: set, key: str, born: int) -> dict:
+    """26.11: a public futures-signal channel's NEW calls (cnq/agents/fut_calls) as desk-like opens; both sides, own stop / targets"""
+    from . import fut_calls as FC
+    opens = []
+    for c in FC.calls([p for p in posts or [] if p.get("t") and p["t"] >= born], coins):
+        z = [c["entry_lo"], c["entry_hi"]] if c.get("entry_lo") else None
+        opens.append({"whale": key, "coin": c["coin"], "side": c["side"], "entry": (sum(z) / 2) if z else 0.0, "opened_t": c["t"],
+                      "zone": z, "stop_px": c["stop"], "targets_px": c["targets"], "id": c["id"]})
+    return {"open": opens, "closed": []}
+
+
+def fut_specs(keys: list) -> list:
+    """one paper desk per futures channel (its zone, its stop, its first target, ≤ 7 days) + all channels together, size = risk 1 %"""
+    out = []
+    for k in keys:
+        out.append({"src": "tgf", "sub": k, "family": "телеграм·фьючерсы", "entry": "zone", "stop": 16, "stop_own": True, "tp_own": True,
+                    "hold": 168, "size": "risk1"})
+    if len(keys) >= 2:
+        out.append({"src": "tgf", "family": "телеграм·фьючерсы·все", "entry": "zone", "stop": 16, "stop_own": True, "tp_own": True,
+                    "hold": 168, "size": "risk1"})
+    return out

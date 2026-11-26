@@ -111,8 +111,10 @@ class Experiments:
         except Exception:  # noqa: BLE001
             st["macro_bias"] = {"active": False}
         # 22.11 17:19: watched Hyperliquid wallets (config/exp_watch_traders.json, from scripts/research/global_traders.py) — paper
-        wl = self._load(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config",
-                                     "exp_watch_traders.json")) or {}
+        cfg = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config")
+        wl = self._load(os.path.join(cfg, "exp_watch_traders.json")) or {}
+        hf = self._load(os.path.join(cfg, "hedge_flags.json")) or {}       # 26.11: «хедж» traders (scripts/research/hedge_pool.py)
+        ctx["hedge"] = {str(x).lower() for x in hf.get("flagged") or []}
         wallets = [str(w["addr"]).lower() for w in wl.get("hl") or [] if isinstance(w, dict) and str(w.get("addr", "")).startswith("0x")][:30]
         if wallets:
             hp = getattr(self, "_hl_post", None) or self._hl
@@ -129,10 +131,42 @@ class Experiments:
             if st.get("specs"):
                 F.ensure_watch_specs(st, wallets, now)
             st["hl_book"], sources["hlw"] = F.hl_book(st.get("hl_book"), wallets, pos_of, now, marks)
+        # 26.11: Binance / OKX lead traders of the relaxed bar (paper only) — their public positions, one read per 5-min pass
+        ws = [str(w["addr"]) for w in wl.get("ws") or [] if isinstance(w, dict) and str(w.get("addr", "")).split(":")[0] in ("bn", "okx")][:10]
+        if ws:
+            wp = getattr(self, "_ws_pos", None) or self._ws_positions
+            if st.get("specs"):
+                F.ensure_watch_specs(st, ws, now, src="wsw", family="широкий пул")
+            st["ws_book"], sources["wsw"] = F.hl_book(st.get("ws_book"), ws, lambda a: wp(a, g), now, marks)
         if st.get("specs"):
             F.ensure_specs(st, F.POSTMORTEM_SPECS, now, "postmortem")
+            F.ensure_specs(st, F.HEDGE_SPECS, now, "hedge")
         # 22.11 22:36: a trader's public Telegram calls — the handle lives ONLY in <run>/data/influencers/channels.json (owner-only)
-        ch = self.channels()
+        allch = self.channels()
+        ch = [c for c in allch if c.get("kind", "spot") != "fut"]
+        fch = [c for c in allch if c.get("kind") == "fut"][:5]
+        if fch and st.get("specs"):                    # 26.11: public futures-signal channels (sealed handles) — paper desks
+            F.ensure_specs(st, F.fut_specs([c["key"] for c in fch]), now, "telegram·фьючерсы")
+            if not st.get("swap_coins") or now - int(st.get("tgf_t") or 0) >= 30 * 60_000:
+                st["swap_coins"] = sorted(marks)
+            if now - int(st.get("tgf_t") or 0) >= 30 * 60_000:
+                st["tgf_t"] = now
+                for c in fch:
+                    try:
+                        book = st.setdefault("tgf_posts", {}).setdefault(c["key"], {})
+                        from cnq.agents import influencer as I
+                        for p_ in I.parse_page(self._tg_get(f"https://t.me/s/{c['handle']}")):
+                            book[str(p_["id"])] = p_
+                        if len(book) > 400:
+                            for k_ in sorted(book, key=int)[:-400]:
+                                book.pop(k_, None)
+                    except Exception:  # noqa: BLE001
+                        pass
+            fe = {"open": [], "closed": []}
+            for c in fch:
+                fe["open"] += F.fut_events(list((st.get("tgf_posts") or {}).get(c["key"], {}).values()), set(st.get("swap_coins") or []),
+                                           c["key"], int(st["born"]))["open"]
+            sources["tgf"] = fe
         if ch and st.get("specs"):
             from cnq.agents import influencer as I
             F.ensure_specs(st, F.TG_SPECS, now, "telegram")
@@ -232,6 +266,18 @@ class Experiments:
         d["channels"] = [c for c in d.get("channels") or [] if c.get("key") != key] + [{"key": key, "handle": handle}]
         self._save(p, d)
         return 200, {"ok": True, "channels": [c["key"] for c in d["channels"]]}
+
+    @staticmethod
+    def _ws_positions(addr: str, g) -> list:
+        """26.11: current positions of a Binance / OKX lead trader → [{coin, side, entry}] (public copy-trading pages)"""
+        src, code = addr.split(":", 1)
+        if src == "bn":
+            from cnq.agents import whale_sources as WS
+            return [{"coin": p["coin"], "side": p["side"], "entry": p["entry"]}
+                    for p in WS.bn_positions(WS.bn_current(WS.bn_get, {"code": code})) if p.get("coin") and p.get("entry")]
+        from cnq.agents import whale_study as W
+        rows = g(f"https://www.okx.com/api/v5/copytrading/public-current-subpositions?instType=SWAP&uniqueCode={code}&limit=100").get("data") or []
+        return [{"coin": p["coin"], "side": p["side"], "entry": p["entry"]} for p in W.okx_positions({"okx": rows}) if p.get("coin") and p.get("entry")]
 
     @staticmethod
     def _hl(body: dict):

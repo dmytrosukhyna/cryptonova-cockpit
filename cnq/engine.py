@@ -283,35 +283,52 @@ def sync(push: bool = True) -> dict:
     pull_inputs()
     if not push:
         return {"pulled": ok, "pushed": False}
-    changed = []
-    for f in OWNED:
-        a, b = os.path.join(RUN, "web", f), os.path.join(REPO, "web", f)
-        if os.path.exists(a):
-            shutil.copy2(a, b)
-            changed.append(f"web/{f}")
-    sh(git + ["add"] + changed, REPO, 30)
-    data_changed = copy_out_data()
-    if data_changed:                                        # separate «git add»: a problem with these never blocks the desks' files
-        sh(git + ["add"] + data_changed, REPO, 30)
+
+    def stage() -> tuple[bool, list[str]]:
+        """copy the engine's own files into the checkout, stage and commit them; returns (committed, the engine's own paths)"""
+        changed = []
+        for f in OWNED:
+            a, b = os.path.join(RUN, "web", f), os.path.join(REPO, "web", f)
+            if os.path.exists(a):
+                shutil.copy2(a, b)
+                changed.append(f"web/{f}")
+        sh(git + ["add"] + changed, REPO, 30)
+        data_changed = copy_out_data()
+        if data_changed:                                    # separate «git add»: a problem with these never blocks the desks' files
+            sh(git + ["add"] + data_changed, REPO, 30)
+        paths = changed + data_changed
+        c_ok, _t, _o = sh(git + ["commit", "-q", "-m", f"engine: desks {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}"],
+                          REPO, 30)
+        return c_ok, paths
+
     # 14.11: a plain «pull --rebase -X theirs» after a rejected push replayed more than the engine's own commit and rolled a file
-    # pushed seconds earlier back (21a8413 reverted .github/workflows/research-bn-whales.yml from 77e1645) — the same mechanism as
-    # site.yml on 10.11. The retry replays ONLY our commit onto the fresh origin/main.
-    b_ok, _t, base = sh(git + ["rev-parse", "HEAD"], REPO, 30)
-    ok_c, _t, out_c = sh(git + ["commit", "-q", "-m", f"engine: desks {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}"], REPO, 30)
+    # pushed seconds earlier back (21a8413 reverted .github/workflows/research-bn-whales.yml from 77e1645).
+    # 26.11: the «rebase --onto origin/main base» retry did it again — 51f7a63b (15:49:49 UTC) re-pushed the tree of the engine's
+    # already-pushed c8fc0f1 on top of c823c98 and deleted the line c823c98 had added to docs/research/watch_log.md 37 s earlier.
+    # The retry no longer rebases at all: it resets to the fresh origin/main, copies the engine's own files in again and commits
+    # only those paths; if nothing differs (the earlier push did land), there is nothing to push. Before every push the commit
+    # must touch only the engine's own paths, otherwise it is dropped.
+    ok_c, paths = stage()
     pushed = False
     if ok_c:
+        allowed = set(paths)
         for _ in range(3):
-            p_ok, _t, _o = sh(git + ["push", "-q", "origin", "HEAD:main"], REPO, 60)
-            if p_ok:
-                pushed = True
-                break
+            d_ok, _t, names = sh(git + ["diff", "--name-only", "HEAD~1", "HEAD"], REPO, 30)
+            foreign = [n for n in (names or "").splitlines() if n.strip() and n.strip() not in allowed
+                       and not any(n.startswith(a.rstrip("/") + "/") for a in allowed)]
+            if d_ok and not foreign:
+                p_ok, _t, _o = sh(git + ["push", "-q", "origin", "HEAD:main"], REPO, 60)
+                if p_ok:
+                    pushed = True
+                    break
             f_ok, _t, _o = sh(git + ["fetch", "-q", "origin", "main"], REPO, 60)
-            if b_ok and base and f_ok:
-                r_ok, _t, _o = sh(git + ["rebase", "-q", "-X", "theirs", "--onto", "origin/main", base.strip()], REPO, 60)
-                if not r_ok:
-                    sh(git + ["rebase", "--abort"], REPO, 30)
-            else:
-                sh(git + ["pull", "-q", "--rebase", "-X", "theirs"], REPO, 60)
+            if not f_ok:
+                continue
+            sh(git + ["reset", "-q", "--hard", "origin/main"], REPO, 30)
+            c2, paths = stage()
+            allowed = set(paths)
+            if not c2:                                      # nothing of ours differs from origin/main → already published
+                break
     return {"pulled": ok, "pushed": pushed, "committed": ok_c}
 
 

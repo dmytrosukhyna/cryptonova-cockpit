@@ -95,10 +95,24 @@ def step(st: dict | None, desk: dict, now: int, candles, c15=None) -> dict:
     import numpy as np
     st = st or {"key": desk["key"], "started": now, "closed": {}, "open": [], "errors": []}
     st.setdefault("closed", {})
+    st["spec"] = {k: desk.get(k) for k in ("variant", "coins", "risk", "skip_coin", "skip_regime", "parent", "fix") if desk.get(k) is not None}
+    btc4 = None
+    if desk.get("skip_regime"):                    # 27.11 improver child: skip events in one BTC 4h regime
+        from . import desk_improver as DI
+        try:
+            Kb = candles("BTC")
+            g = {}
+            for k in Kb:
+                g[k[0] - k[0] % (4 * H)] = k[4]
+            btc4 = sorted(g.items())
+        except Exception:  # noqa: BLE001
+            btc4 = None
     risk = float(desk.get("risk") or 0.01)
     opened = []
     errs = []
     for coin in desk.get("coins") or LD.COINS:
+        if desk.get("skip_coin") and coin == desk["skip_coin"]:
+            continue
         try:
             K = [k for k in candles(coin) if k[0] + H <= now]
             if len(K) < 400:
@@ -115,6 +129,8 @@ def step(st: dict | None, desk: dict, now: int, candles, c15=None) -> dict:
             else:
                 raw15 = (np.zeros(0, dtype=np.int64),) + tuple(np.zeros(0) for _ in range(4))
             for tr in trades(P, desk["variant"], raw15, int(st["started"])):
+                if btc4 is not None and DI.regime_at(btc4, tr["t"]) == desk["skip_regime"]:
+                    continue
                 k = f"{coin}|{tr['key']}"
                 if tr["open"]:
                     opened.append({**tr, "coin": coin, "key": k})

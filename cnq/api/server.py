@@ -60,6 +60,7 @@ from . import ivan_tests as ivan_tests_api, peter as peter_desk, peter_cloud, re
 from . import levels as levels_api
 from . import qm as qm_api
 from . import levels_lab as levels_lab_api
+from . import improver as improver_api
 from . import experiments as experiments_api
 from . import hacks as hacks_api
 from .auth import AuthError, FirebaseVerifier
@@ -162,6 +163,8 @@ class Api:
         self.qm = qm_api.QM(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "qm"))
         # 27.11 (owner): «Уровни · лаборатория» — paper variants of the levels desk, owner-only, <run>/data/levels_lab
         self.levels_lab = levels_lab_api.LevelsLab(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "levels_lab"))
+        # 27.11 (owner 09:38): the daily desk improver (diagnosis → logical fixes → tested children), paper only
+        self.improver = improver_api.Improver(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data"))
         # 22.11 (owner 16:18): the experiment program — paper variants of the whale stream + the daily strategy board, owner-only
         self.experiments = experiments_api.Experiments(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data"), web_dir)
         # 20.11: the paper test desk «Взломы → шорт» — owner-only, kept in <run>/data/hacks (cnq/api/hacks.py)
@@ -361,6 +364,11 @@ class Api:
             res["levels_lab"] = {"age_sec": round(now - os.path.getmtime(os.path.join(ll.dir, "levels_lab.json")))
                                  if os.path.exists(os.path.join(ll.dir, "levels_lab.json")) else None, "err": ll.last_err,
                                  "desks": {k: {"trades": v.get("trades"), "open": v.get("open")} for k, v in (d.get("desks") or {}).items()}}
+        im = getattr(self, "improver", None)
+        if im is not None:
+            s_ = self._read(os.path.join(im.root, "improver", "status.json")) or {}
+            res["improver"] = {k: s_.get(k) for k in ("day", "desks_seen", "diagnosed", "symptoms", "fixes_tested", "spawned", "killed", "children_alive")}
+            res["improver"]["err"] = im.last_err
         ex = getattr(self, "experiments", None)
         if ex is not None:
             p = os.path.join(ex.dir, "state.json")
@@ -1099,7 +1107,8 @@ def main() -> int:
     api.experiments.start()                  # 22.11: experiment desks (paper, every 5 min) + the strategy board (hourly), owner-only
     api.levels.start()                       # 19.11: «Торговля от уровней (тест)» — paper, every 10 minutes, owner-only output
     api.qm.start()
-    api.levels_lab.start()                   # 27.11: «Уровни · лаборатория (тест)» — paper, every 10 minutes, owner-only output                           # 26.11: «Квазимодо 4ч · лонг · 3R (тест)» — paper, every 10 minutes, owner-only output
+    api.levels_lab.start()
+    api.improver.start()                     # 27.11: the desk improver — once a UTC day, a separate low-priority process                   # 27.11: «Уровни · лаборатория (тест)» — paper, every 10 minutes, owner-only output                           # 26.11: «Квазимодо 4ч · лонг · 3R (тест)» — paper, every 10 minutes, owner-only output
     api.hacks.start()                        # 20.11: «Взломы → шорт (тест)» — paper, every 5 minutes, owner-only output
     api.peter_cloud.start()                  # 11.11: «Питер» through MetaApi — polls only while the owner has connected it
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))

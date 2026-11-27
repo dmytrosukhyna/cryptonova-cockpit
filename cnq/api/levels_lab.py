@@ -61,12 +61,13 @@ class LevelsLab:
         with self.lock:
             try:
                 out = {}
-                for d in (desks if desks is not None else LL.cfg()):
+                ch = [c for c in (self._load("children.json") or []) if isinstance(c, dict) and c.get("alive", True) and c.get("variant")]
+                for d in (desks if desks is not None else LL.cfg() + ch):     # 27.11: + the improver's children (lineage)
                     name = f"desk_{d['key']}.json"
                     st = LL.step(self._load(name), d, now, cd, q15)
                     self._save(name, st)
                     out[d["key"]] = {"name_ru": d.get("name_ru"), "label_ru": d.get("label_ru"), "variant": d["variant"], "risk": d.get("risk"),
-                                     "coins": d.get("coins"), "started": st["started"], "equity": st["equity"], "trades": st["trades"],
+                                     "coins": d.get("coins"), "started": st["started"], "parent": d.get("parent"), "fix": d.get("fix"), "equity": st["equity"], "trades": st["trades"],
                                      "wins": st["wins"], "open": len(st["open"]), "errors": st["errors"], "backtest": d.get("backtest")}
                 doc = {"asof": now, "desks": out, "test": True, "owner_only": True}
                 self._save("levels_lab.json", doc)

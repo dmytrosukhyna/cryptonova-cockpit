@@ -147,6 +147,13 @@ class Experiments:
         if st.get("specs"):
             F.ensure_specs(st, F.POSTMORTEM_SPECS, now, "postmortem")
             F.ensure_specs(st, F.HEDGE_SPECS, now, "hedge")
+            ch = self._load(os.path.join(d, "children.json")) or []          # 27.11: the desk improver's children (lineage)
+            F.ensure_specs(st, [c["spec"] for c in ch if isinstance(c, dict) and c.get("alive", True) and isinstance(c.get("spec"), dict)], now, "improver")
+            dead = {F.sid({**{"side": "follow", "filt": [], "entry": "now", "stop": 16, "tp": None, "hold": None, "size": "fixed"}, **c["spec"]})
+                    for c in ch if isinstance(c, dict) and c.get("alive") is False and isinstance(c.get("spec"), dict)}
+            for s_ in st["specs"]:
+                if s_["id"] in dead:
+                    s_["alive"] = False
         # 22.11 22:36: a trader's public Telegram calls — the handle lives ONLY in <run>/data/influencers/channels.json (owner-only)
         allch = self.channels()
         ch = [c for c in allch if c.get("kind", "spot") != "fut"]

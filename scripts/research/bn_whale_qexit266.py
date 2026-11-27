@@ -21,7 +21,7 @@ Pre-registered (written before any result was seen):
 - pass (only as a candidate for the owner): b or c beats a in the sum of BOTH halves (split by close time) AND the
   worst single copy of b/c is not worse than the worst of a. 2 variants → noted; n is small, t shown for reference.
 Usage: bn_whale_qexit266.py DB OUT.json"""
-import json, math, os, statistics as st, sys, time, urllib.request
+import json, math, os, statistics as st, sys, time, urllib.parse, urllib.request
 from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bn_whale_stops as B
@@ -38,7 +38,7 @@ def okx_tail(coin, t0):
     inst = f"{coin}-USDT-SWAP"
     out, after = {}, None
     for _ in range(60):
-        url = f"https://www.okx.com/api/v5/market/history-candles?instId={inst}&bar=5m&limit=100"
+        url = f"https://www.okx.com/api/v5/market/history-candles?instId={urllib.parse.quote(inst)}&bar=5m&limit=100"
         if after:
             url += f"&after={after}"
         try:

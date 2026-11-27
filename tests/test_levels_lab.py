@@ -47,3 +47,30 @@ def test_lab_desks_config_is_paper_and_labelled():
     assert ds, "config/levels_lab_desks.json has desks"
     for d in ds:
         assert len(d["variant"].split("|")) == 6 and 0.005 <= d["risk"] <= 0.02 and d.get("label_ru")
+
+
+def test_wide_stop_copies_of_the_exact_desk(tmp_path):
+    from cnq.agents import levels_desk as LD, levels_wide as LW
+    from cnq.api import levels as LA
+    K = _walk(1700, seed=9)
+    v = "range|L|sym"
+    sts = {m: None for m in LW.MODES}
+    base = None
+    for j in range(900, 1700, 3):
+        f = (lambda c, j=j: K[:j + 1])
+        base = LD.step(base, K[j][0] + H + 1, v, candles=f, coins=["BTC"])
+        for m in LW.MODES:
+            sts[m] = LW.step(sts[m], K[j][0] + H + 1, v, m, candles=f, coins=["BTC"])
+    for m, st in sts.items():
+        for tr in st["closed"] + st["open"]:
+            assert tr["stop0"] < tr["entry"] < tr["tgt"]
+            if m in ("a1.5", "a2", "a3"):
+                assert abs((tr["level"] - tr["stop0"])) > 1.0 * 0                         # stop below the level
+            assert tr["notional"] <= 0.2 * 10_000 * 1.6
+        if m == "swing24":
+            assert all(tr["maxb"] == 24 for tr in st["closed"] + st["open"])
+    assert any(sts[m]["closed"] for m in LW.MODES)
+    # wider stop → at the same 1 % risk a smaller (or capped) position than the desk's 0.5 ATR stop on the same signal
+    q = LA.Levels(str(tmp_path / "lv"))
+    doc = q.tick(now=K[-1][0] + H, candles=lambda c: K, coins=["BTC"])
+    assert doc and sorted(q._load("wide.json")) == sorted(LW.MODES)

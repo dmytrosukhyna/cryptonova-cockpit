@@ -1,0 +1,18 @@
+name: research-levels-wide
+# 27.11 (owner 09:38): the exact «Уровни» desk with wider stops (scripts/research/levels_wide_study.py). Research only.
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: curl -sSL -o alt100.npz https://github.com/dmytrosukhyna/cryptonova-cockpit/releases/download/lab-data-core18/alt100.npz
+      - run: PYTHONPATH=scripts CORE18=alt100.npz python scripts/research/levels_v2_study.py fetch new12.npz
+      - run: PYTHONPATH=scripts python scripts/research/levels_wide_study.py alt100.npz new12.npz levels_wide.json

@@ -36,6 +36,13 @@ class Levels:
     def tick(self, now: int | None = None, **kw) -> dict | None:
         from cnq.agents import levels_desk as LD
         now = int(now or time.time() * 1000)
+        cache, base = {}, kw.get("candles") or LD.hourly
+
+        def cd(coin):                              # one read per coin per pass, shared with the wide-stop copies
+            if coin not in cache:
+                cache[coin] = base(coin)
+            return cache[coin]
+        kw = {**kw, "candles": cd}
         with self.lock:
             try:
                 c = LD.cfg()
@@ -44,17 +51,32 @@ class Levels:
                 self._save("state.json", st)
                 doc = LD.public(st, v, now, c.get("backtest"))
                 self._save("levels_desk.json", doc)
+                self._wide(now, v, kw)
                 self.last_err = None
                 return doc
             except Exception as e:  # noqa: BLE001
                 self.last_err = type(e).__name__
                 return None
 
+    def _wide(self, now, v, kw):
+        """27.11 (owner 09:38): the same desk with wider stops (cnq/agents/levels_wide.py) — separate paper states, one candle read"""
+        from cnq.agents import levels_wide as LW
+        out = {}
+        for m in LW.MODES:
+            name = f"wide_{m}.json"
+            st = LW.step(self._load(name), now, v, m, **kw)
+            self._save(name, st)
+            cl = st["closed"]
+            out[m] = {"trades": len(cl), "wins": sum(1 for x in cl if x["usd"] > 0), "equity": st["equity"], "open": len(st["open"]),
+                      "started": st["started"]}
+        self._save("wide.json", out)
+        return out
+
     def desk(self) -> tuple[int, dict]:
         d = self._load("levels_desk.json")
         if d is None:
             return 503, {"error": "no_data", "detail": "the desk has not run on the server yet", "last_error": self.last_err}
-        return 200, {"name": "levels", "title": d.get("name"), "asof": d.get("asof"), "data": d}
+        return 200, {"name": "levels", "title": d.get("name"), "asof": d.get("asof"), "data": d, "wide_stops": self._load("wide.json")}
 
     def start(self) -> None:
         def loop():

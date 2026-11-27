@@ -330,7 +330,40 @@ class Api:
                 out[name + "_age_sec"] = round(time.time() - os.path.getmtime(os.path.join(self.web, name)))
             except OSError:
                 pass
+        try:                                        # 27.11: is each paper test desk ticking? counts and ages only — no prices, no P&L
+            out["paper_pulse"] = self._paper_pulse()
+        except Exception:  # noqa: BLE001
+            pass
         return out
+
+    def _paper_pulse(self) -> dict:
+        now = time.time()
+        res = {}
+        for key, obj in (("levels", getattr(self, "levels", None)), ("qm", getattr(self, "qm", None))):
+            if obj is None:
+                continue
+            p = os.path.join(obj.dir, "state.json")
+            st = self._read(p) or {}
+            res[key] = {"age_sec": round(now - os.path.getmtime(p)) if os.path.exists(p) else None, "err": getattr(obj, "last_err", None),
+                        "started": st.get("started"), "signals": len(st.get("seen") or []), "pending": len(st.get("pending") or []),
+                        "open": len(st.get("open") or []), "closed": len(st.get("closed") or [])}
+        ex = getattr(self, "experiments", None)
+        if ex is not None:
+            p = os.path.join(ex.dir, "state.json")
+            st = self._read(p) or {}
+            cnt: dict = {}
+            for c in (st.get("open") or []) + (st.get("closed") or []):
+                if isinstance(c, dict):
+                    cnt[c.get("v")] = cnt.get(c.get("v"), 0) + 1
+            res["exp_desks"] = {"age_sec": round(now - os.path.getmtime(p)) if os.path.exists(p) else None, "err": ex.last_err,
+                                "trades": {k: cnt.get(k, 0) for k in ("base", "f_level", "f_qm")}}
+            fp = os.path.join(ex.root, "exp_factory", "state.json")
+            fs = self._read(fp) or {}
+            res["factory"] = {"age_sec": round(now - os.path.getmtime(fp)) if os.path.exists(fp) else None,
+                              "live_specs": sum(1 for x in fs.get("specs") or [] if x.get("alive")),
+                              "trades_by_src": {k: sum(1 for c in (fs.get("open") or []) + (fs.get("closed") or []) if str(c.get("spec", "")).startswith(k + "|"))
+                                                for k in ("tgf", "wsw", "hlw", "lvl2", "qmr")}}
+        return res
 
     def _uid(self, headers: dict) -> dict:
         h = headers.get("authorization") or ""

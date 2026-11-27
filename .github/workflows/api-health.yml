@@ -49,6 +49,10 @@ jobs:
           code=$(echo "$el" | tail -n 1)
           summary=$(echo "$el" | sed '$d' | jq -c '{lang, greeting: ((.greeting // "") | .[0:90]), greeting_vip: ((.greeting_vip // "") | .[0:90]), suggest: ((.suggest // []) | .[0:3]), topics: [(.topics // [])[] | "\(.title) (\(.qs | length))"]}' 2>/dev/null || echo "not JSON")
           echo "::notice title=nova feed el::GET /v2/feed/nova?lang=el → HTTP $code · $summary"
+      - name: paper desks pulse (27.11 — counts and ages only)
+        run: |
+          pp=$(curl -sS -m 20 https://app.crypto-capital.app/v2/diag | jq -c '.paper_pulse' 2>/dev/null || echo "not JSON")
+          echo "::notice title=paper pulse::$(echo "$pp" | cut -c1-3800)"
       - name: build 46 home (a step of its own — GitHub keeps 10 notices a step)
         run: |
           # 28.10 (build 46): the PUBLIC mode's real account, the market in plain words, the spot actions, the demo stats

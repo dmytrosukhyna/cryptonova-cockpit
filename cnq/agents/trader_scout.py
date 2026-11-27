@@ -177,7 +177,8 @@ def main(db: str):
             w = HP.hl_wallet(a, now)
         except Exception:  # noqa: BLE001
             continue
-        active[a] = now - int((w.get("last_d") or 999) * DAY)
+        if w.get("last_d") is not None:                  # no fills read (an empty / failed answer) is not «inactive»
+            active[a] = now - int(w["last_d"] * DAY)
         if w.get("flags"):
             flags[a] = w["flags"]
         if w.get("n", 0) >= 15 and w.get("win", 0) >= 0.6 and w.get("pf", 0) >= 1.5 and (w.get("last_d") or 99) <= 7 and w["h1"] > 0 and w["h2"] > 0 \

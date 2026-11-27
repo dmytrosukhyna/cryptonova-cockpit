@@ -1,0 +1,204 @@
+{
+ "about_ru": "27.11 (владелец 08:59 / 09:00): бумажные столы-«наблюдение» из scripts/research/levels_lab_study.py (run 45956460807). НИ ОДИН вариант не прошёл тест (0 из 19 656 при z ≥ 4,75): это 5 лучших по walk-forward + лучший только-BTC и только-ETH — НЕ ДОКАЗАНО, только для сбора данных вперёд. Риск 1 %, бумага, на реальный счёт не попадают.",
+ "desks": [
+  {
+   "key": "o1",
+   "name_ru": "Уровни · BTC+ETH+SOL · вход как у стола, стоп за свингом, цель — уровень, до 24 ч",
+   "label_ru": "наблюдение — не доказано",
+   "variant": "desk|L|E_close|swing|opp|t24",
+   "coins": [
+    "BTC",
+    "ETH",
+    "SOL"
+   ],
+   "universe": "BES",
+   "risk": 0.01,
+   "backtest": {
+    "is": {
+     "n": 142,
+     "mean": 0.224,
+     "pf": 1.22
+    },
+    "oos": {
+     "n": 148,
+     "mean": 0.202,
+     "pf": 1.23
+    },
+    "passed": false,
+    "run": 45956460807
+   }
+  },
+  {
+   "key": "o2",
+   "name_ru": "Уровни · топ-10 · лимит за уровнем (ловим вынос), стоп за свингом, 3R",
+   "label_ru": "наблюдение — не доказано",
+   "variant": "touch|L|E_limit|swing|3R|none",
+   "coins": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "BNB",
+    "XRP",
+    "DOGE",
+    "ADA",
+    "TRX",
+    "AVAX",
+    "LINK"
+   ],
+   "universe": "top10",
+   "risk": 0.01,
+   "backtest": {
+    "is": {
+     "n": 443,
+     "mean": 0.361,
+     "pf": 1.23
+    },
+    "oos": {
+     "n": 445,
+     "mean": 0.189,
+     "pf": 1.12
+    },
+    "passed": false,
+    "run": 45956460807
+   }
+  },
+  {
+   "key": "o3",
+   "name_ru": "Ордерблок · SOL · лонг, зона с тенью, стоп 3 ATR, ½ на 1R + до уровня",
+   "label_ru": "наблюдение — не доказано",
+   "variant": "ob_w|L|E_ob|a3|opp|part",
+   "coins": [
+    "SOL"
+   ],
+   "universe": "SOL",
+   "risk": 0.01,
+   "backtest": {
+    "is": {
+     "n": 218,
+     "mean": 0.164,
+     "pf": 1.09
+    },
+    "oos": {
+     "n": 205,
+     "mean": 0.333,
+     "pf": 1.22
+    },
+    "passed": false,
+    "run": 45956460807
+   }
+  },
+  {
+   "key": "o4",
+   "name_ru": "Уровни · топ-10 · лимит за уровнем, стоп за свингом, 2R",
+   "label_ru": "наблюдение — не доказано",
+   "variant": "touch|L|E_limit|swing|2R|none",
+   "coins": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "BNB",
+    "XRP",
+    "DOGE",
+    "ADA",
+    "TRX",
+    "AVAX",
+    "LINK"
+   ],
+   "universe": "top10",
+   "risk": 0.01,
+   "backtest": {
+    "is": {
+     "n": 443,
+     "mean": 0.207,
+     "pf": 1.14
+    },
+    "oos": {
+     "n": 445,
+     "mean": 0.154,
+     "pf": 1.1
+    },
+    "passed": false,
+    "run": 45956460807
+   }
+  },
+  {
+   "key": "o5",
+   "name_ru": "Уровни · топ-5 · вход как у стола, стоп за свингом, безубыток на 1R, цель — уровень",
+   "label_ru": "наблюдение — не доказано",
+   "variant": "desk|L|E_close|swing|opp|be",
+   "coins": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "BNB",
+    "XRP"
+   ],
+   "universe": "top5",
+   "risk": 0.01,
+   "backtest": {
+    "is": {
+     "n": 240,
+     "mean": 0.256,
+     "pf": 1.21
+    },
+    "oos": {
+     "n": 239,
+     "mean": 0.13,
+     "pf": 1.1
+    },
+    "passed": false,
+    "run": 45956460807
+   }
+  },
+  {
+   "key": "btc",
+   "name_ru": "Ордерблок · только BTC · лонг, зона по телу, стоп за свингом, 3R",
+   "label_ru": "наблюдение — не доказано",
+   "variant": "ob_b|L|E_ob|swing|3R|none",
+   "coins": [
+    "BTC"
+   ],
+   "universe": "BTC",
+   "risk": 0.01,
+   "backtest": {
+    "is": {
+     "n": 333,
+     "mean": 0.152,
+     "pf": 1.21
+    },
+    "oos": {
+     "n": 367,
+     "mean": 0.065,
+     "pf": 1.09
+    },
+    "passed": false,
+    "run": 45956460807
+   }
+  },
+  {
+   "key": "eth",
+   "name_ru": "Ордерблок · только ETH · шорт, зона с тенью, стоп 3 ATR, ½ на 1R + до уровня",
+   "label_ru": "наблюдение — не доказано",
+   "variant": "ob_w|S|E_ob|a3|opp|part",
+   "coins": [
+    "ETH"
+   ],
+   "universe": "ETH",
+   "risk": 0.01,
+   "backtest": {
+    "is": {
+     "n": 235,
+     "mean": 0.24,
+     "pf": 1.24
+    },
+    "oos": {
+     "n": 200,
+     "mean": 0.098,
+     "pf": 1.07
+    },
+    "passed": false,
+    "run": 45956460807
+   }
+  }
+ ]
+}

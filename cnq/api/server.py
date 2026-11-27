@@ -59,6 +59,7 @@ from . import manual_desk as manual_desk_api
 from . import ivan_tests as ivan_tests_api, peter as peter_desk, peter_cloud, reversal as reversal_api, listing_short as listing_short_api, smart_alts as smart_alts_api
 from . import levels as levels_api
 from . import qm as qm_api
+from . import levels_lab as levels_lab_api
 from . import experiments as experiments_api
 from . import hacks as hacks_api
 from .auth import AuthError, FirebaseVerifier
@@ -159,6 +160,8 @@ class Api:
         self.levels = levels_api.Levels(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "levels"))
         # 26.11 (owner «да»): the paper test desk «Квазимодо 4ч · лонг · 3R» — owner-only, kept in <run>/data/qm (cnq/api/qm.py)
         self.qm = qm_api.QM(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "qm"))
+        # 27.11 (owner): «Уровни · лаборатория» — paper variants of the levels desk, owner-only, <run>/data/levels_lab
+        self.levels_lab = levels_lab_api.LevelsLab(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data", "levels_lab"))
         # 22.11 (owner 16:18): the experiment program — paper variants of the whale stream + the daily strategy board, owner-only
         self.experiments = experiments_api.Experiments(os.path.join(os.path.dirname(os.path.abspath(web_dir)), "data"), web_dir)
         # 20.11: the paper test desk «Взломы → шорт» — owner-only, kept in <run>/data/hacks (cnq/api/hacks.py)
@@ -352,6 +355,12 @@ class Api:
             rc = self._read(os.path.join(obj.dir, "risk_copies.json"))
             if rc:
                 res[key]["risk_copies"] = {k: {"trades": v.get("trades"), "open": v.get("open")} for k, v in rc.items()}
+        ll = getattr(self, "levels_lab", None)
+        if ll is not None:
+            d = self._read(os.path.join(ll.dir, "levels_lab.json")) or {}
+            res["levels_lab"] = {"age_sec": round(now - os.path.getmtime(os.path.join(ll.dir, "levels_lab.json")))
+                                 if os.path.exists(os.path.join(ll.dir, "levels_lab.json")) else None, "err": ll.last_err,
+                                 "desks": {k: {"trades": v.get("trades"), "open": v.get("open")} for k, v in (d.get("desks") or {}).items()}}
         ex = getattr(self, "experiments", None)
         if ex is not None:
             p = os.path.join(ex.dir, "state.json")
@@ -497,6 +506,9 @@ class Api:
         if path == "/v2/admin/hacks":                                    # 20.11: «Взломы → шорт (тест)» in «Управление»
             deny = self.console.check(headers)
             return deny if deny else ((405, {"error": "method"}) if method != "GET" else self.hacks.desk())
+        if path == "/v2/admin/levels_lab":                               # 27.11: «Уровни · лаборатория (тест)» in «Управление»
+            deny = self.console.check(headers)
+            return deny if deny else ((405, {"error": "method"}) if method != "GET" else self.levels_lab.desk())
         if path == "/v2/admin/qm":                                       # 26.11: «Квазимодо 4ч (тест)» in «Управление»
             deny = self.console.check(headers)
             return deny if deny else ((405, {"error": "method"}) if method != "GET" else self.qm.desk())
@@ -705,6 +717,8 @@ class Api:
             return self.smart_alts.desk()
         if path == "/v2/owner/levels":                                 # 19.11: «Торговля от уровней (тест)», owner only
             return self.levels.desk()
+        if path == "/v2/owner/levels_lab":                             # 27.11: «Уровни · лаборатория (тест)», owner only
+            return self.levels_lab.desk()
         if path == "/v2/owner/qm":                                     # 26.11: «Квазимодо 4ч (тест)», owner only
             return self.qm.desk()
         if path == "/v2/owner/exp_desks":                              # 22.11: experiment desks (paper), owner only
@@ -1084,7 +1098,8 @@ def main() -> int:
     api.smart_alts.start()                   # 13.11: «Альты от китов (тест)» — paper, every 10 minutes, owner-only output
     api.experiments.start()                  # 22.11: experiment desks (paper, every 5 min) + the strategy board (hourly), owner-only
     api.levels.start()                       # 19.11: «Торговля от уровней (тест)» — paper, every 10 minutes, owner-only output
-    api.qm.start()                           # 26.11: «Квазимодо 4ч · лонг · 3R (тест)» — paper, every 10 minutes, owner-only output
+    api.qm.start()
+    api.levels_lab.start()                   # 27.11: «Уровни · лаборатория (тест)» — paper, every 10 minutes, owner-only output                           # 26.11: «Квазимодо 4ч · лонг · 3R (тест)» — paper, every 10 minutes, owner-only output
     api.hacks.start()                        # 20.11: «Взломы → шорт (тест)» — paper, every 5 minutes, owner-only output
     api.peter_cloud.start()                  # 11.11: «Питер» through MetaApi — polls only while the owner has connected it
     srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(api))
@@ -1094,7 +1109,7 @@ def main() -> int:
         here = os.path.dirname(os.path.realpath(__file__))
         agents = os.path.join(os.path.dirname(here), "agents")            # what the API imports from the engine's package
         files = lambda: [os.path.join(here, f) for f in os.listdir(here) if f.endswith(".py")] + \
-            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py", "qm_desk.py", "hack_desk.py", "exp_desks.py", "strategy_board.py", "exp_factory.py", "influencer.py") if os.path.exists(os.path.join(agents, f))]
+            [os.path.join(agents, f) for f in ("i18n.py", "llm.py", "reversal_desk.py", "listing_short_desk.py", "smart_alts_desk.py", "ivan_study.py", "levels_desk.py", "qm_desk.py", "levels_lab_desk.py", "hack_desk.py", "exp_desks.py", "strategy_board.py", "exp_factory.py", "influencer.py") if os.path.exists(os.path.join(agents, f))]
         stamp = lambda: max(os.path.getmtime(p) for p in files())
         first = stamp()
         while True:

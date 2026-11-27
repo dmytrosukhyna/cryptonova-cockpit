@@ -38,7 +38,7 @@ def run(root: str, now: int | None = None, candles=None, hist=None, publish=None
     from cnq.agents import exp_factory as F
     now = int(now or time.time() * 1000)
     day = time.strftime("%Y-%m-%d", time.gmtime(now / 1000))
-    cache, hcache, pcache = {}, {}, {}
+    cache, hcache, pcache, hist_info = {}, {}, {}, {}
 
     def cd(c):
         if c not in cache:
@@ -69,10 +69,13 @@ def run(root: str, now: int | None = None, candles=None, hist=None, publish=None
         for c in coins:
             try:
                 K = (hist or (lambda x: LD.hourly(x, pages=30)))(c)
+                hist_info[c] = len(K)
                 if len(K) >= 600:
                     pcache[c] = LL.prep(K)
-            except Exception:  # noqa: BLE001
-                pass
+                if not hist:
+                    time.sleep(0.5)                    # OKX public rate limit
+            except Exception as e:  # noqa: BLE001
+                hist_info[c] = type(e).__name__
 
         def regime_of(t):
             return DI.regime_at(btc4, t)
@@ -127,7 +130,11 @@ def run(root: str, now: int | None = None, candles=None, hist=None, publish=None
     killed = DI.kill_check(lab_ch + fac_ch, perf)
     _save(lab_ch_p, lab_ch)
     _save(fac_ch_p, fac_ch)
-    status = {"t": now, "day": day, "desks_seen": len(D), "diagnosed": list(diag), "symptoms": {k: v["symptoms"] for k, v in diag.items()},
+    prev = _load(os.path.join(root, "improver", "status.json"), {}) or {}
+    status = {"t": now, "day": day, "runs_today": (int(prev.get("runs_today") or 0) + 1) if prev.get("day") == day else 1,
+              "retry": bool(lab_need and not any(tests.get(k) for k in lab_need)),
+              "history": {"coins": len(pcache), "bars": hist_info, "parent_trades": {k: len(DI.history_trades(
+                  {c: pcache[c] for c in (d.get("coins") or LD.COINS) if c in pcache}, d["variant"], {})) for k, (_x, _f, d) in lab_need.items()}}, "desks_seen": len(D), "diagnosed": list(diag), "symptoms": {k: v["symptoms"] for k, v in diag.items()},
               "fixes_tested": m_total, "spawned": [c["key"] for c in spawned], "killed": [c["key"] for c in killed],
               "children_alive": sum(1 for c in lab_ch + fac_ch if c.get("alive", True))}
     d_ = os.path.join(root, "improver")
@@ -192,7 +199,10 @@ class Improver:
 
     def due(self, now: int) -> bool:
         st = _load(os.path.join(self.root, "improver", "status.json"), {}) or {}
-        return st.get("day") != time.strftime("%Y-%m-%d", time.gmtime(now / 1000)) and time.gmtime(now / 1000).tm_hour >= 5
+        today = time.strftime("%Y-%m-%d", time.gmtime(now / 1000))
+        if st.get("day") == today:                  # a run whose history tests came back empty is retried (≤ 3 runs a day)
+            return bool(st.get("retry")) and int(st.get("runs_today") or 0) < 3
+        return time.gmtime(now / 1000).tm_hour >= 5
 
     def start(self) -> None:
         def loop():

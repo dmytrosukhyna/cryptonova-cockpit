@@ -333,6 +333,8 @@ def log_md(day: str, diag: dict, tests: dict, spawned: list, killed: list, old: 
         sy = ", ".join(d["symptoms"]) or "нет"
         L.append(f"- **{k}**: {d['n']} сделок, средн. {d['mean']:+.2f}%, PF {d['pf']}, стоп→цель {d['stop_then_target']}/{d['stops']}, "
                  f"отдали прибыль {d['giveback']}, ровные {d['flat_share'] * 100:.0f}%, держим {d['hold_med_h']} ч; симптомы: {sy}")
+        if k in tests and not tests[k]:
+            L.append("  - проверка на истории: мало сделок родителя на истории (< 20) — исправления не проверены, детей нет")
         for r in tests.get(k) or []:
             h1, h2 = r["h1"], r["h2"]
             L.append(f"  - {r['fix']}: история {h1[1]}+{h2[1]} сделок, {h1[0]:+.2f}% / {h2[0]:+.2f}% против родителя "

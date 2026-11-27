@@ -367,7 +367,7 @@ class Api:
         im = getattr(self, "improver", None)
         if im is not None:
             s_ = self._read(os.path.join(im.root, "improver", "status.json")) or {}
-            res["improver"] = {k: s_.get(k) for k in ("day", "desks_seen", "diagnosed", "symptoms", "fixes_tested", "spawned", "killed", "children_alive")}
+            res["improver"] = {k: s_.get(k) for k in ("day", "desks_seen", "diagnosed", "symptoms", "fixes_tested", "spawned", "killed", "children_alive", "runs_today", "retry", "history")}
             res["improver"]["err"] = im.last_err
         ex = getattr(self, "experiments", None)
         if ex is not None:

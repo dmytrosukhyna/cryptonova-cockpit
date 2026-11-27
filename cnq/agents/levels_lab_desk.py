@@ -21,6 +21,7 @@ MAX_OPEN = 5
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CFG = os.path.join(ROOT, "config", "levels_lab_desks.json")
 _M = None
+_PC: dict = {}
 
 
 def lab():
@@ -102,7 +103,12 @@ def step(st: dict | None, desk: dict, now: int, candles, c15=None) -> dict:
             K = [k for k in candles(coin) if k[0] + H <= now]
             if len(K) < 400:
                 continue
-            P = prep(K)
+            ck = (coin, len(K), K[-1][0])
+            P = _PC.get(ck)
+            if P is None:                          # one build per coin and candle set, shared by all desks of the pass
+                P = prep(K)
+                _PC.clear() if len(_PC) > 40 else None
+                _PC[ck] = P
             if "E_15m" in desk["variant"] and c15:
                 r15 = c15(coin)
                 raw15 = tuple(np.asarray([x[j] for x in r15], dtype=(np.int64 if j == 0 else float)) for j in range(5))

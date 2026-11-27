@@ -201,7 +201,7 @@ class Improver:
         st = _load(os.path.join(self.root, "improver", "status.json"), {}) or {}
         today = time.strftime("%Y-%m-%d", time.gmtime(now / 1000))
         if st.get("day") == today:                  # a run whose history tests came back empty is retried (≤ 3 runs a day)
-            return bool(st.get("retry")) and int(st.get("runs_today") or 0) < 3
+            return ("runs_today" not in st) or (bool(st.get("retry")) and int(st.get("runs_today") or 0) < 3)
         return time.gmtime(now / 1000).tm_hour >= 5
 
     def start(self) -> None:

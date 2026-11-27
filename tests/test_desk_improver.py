@@ -41,7 +41,7 @@ def test_improver_run_end_to_end_spawns_children_with_lineage_and_writes_the_log
                        "pct": 2.9 if win else -1.1, "usd": 1.0, "why": "цель" if win else "стоп", "level": e * 0.995})
     json.dump({"closed": closed}, open(root / "levels" / "state.json", "w"))
     pub = []
-    st = IM.run(str(root), now=K[-1][0] + H, candles=lambda c: K, hist=lambda c: K, publish=lambda md, day, env: pub.append(md) or True)
+    st = IM.run(str(root), now=K[-1][0] + H, candles=lambda c: K, hist=lambda c: K, publish=lambda md, day, env, *a: pub.append(md) or True)
     assert st["desks_seen"] == 1 and "levels" in st["diagnosed"]
     log = (root / "improver" / "log.md").read_text()
     assert pub and log.startswith("# Журнал улучшателя") and "**levels**" in log
@@ -52,3 +52,34 @@ def test_improver_run_end_to_end_spawns_children_with_lineage_and_writes_the_log
     from cnq.api import server
     import inspect
     assert "api.improver.start()" in inspect.getsource(server)
+
+
+def test_scout_columns_promotion_demotion_and_watch_sources():
+    from cnq.agents import trader_scout as TS
+    now = 1_800_000_000_000
+    wt = {"top": [{"addr": "bn:1", "name": "a", "eligible": True, "pf": 3.0}, {"addr": "bn:2", "eligible": True, "pf": 5.0},
+                  {"addr": "bn:3", "eligible": False, "pf": 9.0}], "others": []}
+    A = TS.column_a(wt, {"bn:2": ["offset"]}, now)
+    assert [x["addr"] for x in A] == ["bn:1"] and A[0]["stable"]                        # the «хедж» gate holds column A too
+    state = {"B": {"bn:7": {"src": "bn"}, "bn:8": {"src": "bn"}, "bn:9": {"src": "bn"}, "0xab": {"src": "hl"}}}
+    fwd = {"bn:7": {"n": 31, "pf": 1.8, "max_dd": 2.0, "gain": 10.0}, "bn:8": {"n": 25, "pf": 0.7}}
+    prom, dem = TS.promote_demote(state, fwd, {"bn:9": ["carry"]}, {"bn:7": now, "bn:8": now, "0xab": now - 15 * TS.DAY}, {}, now)
+    assert [p["addr"] for p in prom] == ["bn:7"] and state["B"]["bn:7"]["promoted"] == now
+    assert {d["addr"] for d in dem} == {"bn:8", "bn:9", "0xab"} and set(state["B"]) == {"bn:7"}
+    state["B"]["0xcd"] = {"src": "hl", "why_ru": "x"}
+    w = TS.apply_watch({"ws": [], "hl": [{"addr": "0xold", "keep": True}]}, state)
+    assert [x["addr"] for x in w["ws"]] == ["bn:7"] and {x["addr"] for x in w["hl"]} == {"0xold", "0xcd"}
+    md = TS.log_md("2026-11-27", {"screened_ws": 284, "screened_hl": 80, "a_n": 1, "a_stable": 1, "a_names": ["a"], "b_n": 2, "added": ["0xcd"],
+                                  "promoted": prom, "demoted": dem, "venues": {}, "weekly": False})
+    assert md.startswith("# Журнал поиска трейдеров") and "ежедневно" in md
+
+
+def test_scout_forward_from_factory_solo_specs(tmp_path):
+    from cnq.api import improver as IM
+    root = tmp_path / "data"
+    (root / "exp_factory").mkdir(parents=True)
+    json.dump({"specs": [{"id": "s1", "src": "hlw", "sub": "0xaa", "filt": []}, {"id": "s2", "src": "hlw", "filt": ["agree2"]}],
+               "closed": [{"spec": "s1", "pct": 2.0, "closed_t": 1}, {"spec": "s1", "pct": -1.0, "closed_t": 2}, {"spec": "s2", "pct": 5.0}]},
+              open(root / "exp_factory" / "state.json", "w"))
+    fw = IM.scout_forward(str(root), 0)
+    assert fw["traders"] == {"0xaa": {"n": 2, "pf": 2.0, "mean": 0.5, "gain": 1.0, "max_dd": 1.0}}

@@ -141,19 +141,46 @@ def run(root: str, now: int | None = None, candles=None, hist=None, publish=None
     with open(os.path.join(d_, "log.md"), "w", encoding="utf-8") as f:
         f.write(md)
     (publish or _publish)(md, day, env)
+    fw = scout_forward(root, now)                      # 27.11 (owner 09:39): the trader scout's promotion / demotion input
+    (publish or _publish)(json.dumps(fw, ensure_ascii=False, indent=1), day, env, "docs/research/scout_forward.json")
+    status["scout_forward"] = len(fw["traders"])
+    _save(os.path.join(d_, "status.json"), status)
     return status
 
 
-def _publish(md: str, day: str, env=None) -> bool:
+def scout_forward(root: str, now: int) -> dict:
+    """{traders: {addr: {n, pf, mean, gain, max_dd}}} from the factory's solo paper specs of the watched traders (src hlw / wsw)"""
+    fs = _load(os.path.join(root, "exp_factory", "state.json"), {}) or {}
+    solo = {s_["id"]: s_.get("sub") for s_ in fs.get("specs") or [] if s_.get("src") in ("hlw", "wsw") and s_.get("sub") and not s_.get("filt")
+            and s_.get("entry", "now") == "now"}
+    by: dict = {}
+    for c in sorted(fs.get("closed") or [], key=lambda x: x.get("closed_t") or 0):
+        a = solo.get(c.get("spec"))
+        if a:
+            by.setdefault(a, []).append(float(c.get("pct") or 0))
+    out = {}
+    for a, xs in by.items():
+        cum = peak = dd = 0.0
+        for x in xs:
+            cum += x
+            peak = max(peak, cum)
+            dd = max(dd, peak - cum)
+        gp, gl = sum(x for x in xs if x > 0), -sum(x for x in xs if x < 0)
+        out[a] = {"n": len(xs), "pf": round(gp / gl, 2) if gl else (99.0 if gp else None), "mean": round(sum(xs) / len(xs), 3),
+                  "gain": round(cum, 2), "max_dd": round(dd, 2)}
+    return {"t": now, "about_ru": "бумажные копии наблюдаемых трейдеров (фабрика, одиночные спецификации); вход для разведчика", "traders": out}
+
+
+def _publish(md: str, day: str, env=None, path: str = "docs/research/improver_log.md") -> bool:
     from cnq.execution import ivan_watch
     e = env if env is not None else os.environ
     tok, repo = e.get("CNQ_GH_TOKEN", ""), e.get("CNQ_GH_REPO") or ivan_watch.DEFAULT_REPO
     if not tok:
         return False
-    url = f"https://api.github.com/repos/{repo}/contents/docs/research/improver_log.md"
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
     hdr = {"Authorization": f"Bearer {tok}", "Accept": "application/vnd.github+json", "User-Agent": "cnq-improver"}
     try:
-        return bool(ivan_watch.put_contents(url, hdr, base64.b64encode(md.encode()).decode(), f"improver log {day}"))
+        return bool(ivan_watch.put_contents(url, hdr, base64.b64encode(md.encode()).decode(), f"{os.path.basename(path)} {day}"))
     except Exception:  # noqa: BLE001
         return False
 

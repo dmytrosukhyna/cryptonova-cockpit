@@ -1,0 +1,36 @@
+name: trader-scout
+# 27.11 (owner 09:39): the standing trader scout (cnq/agents/trader_scout.py) — daily until column A holds ≥ 5 stable traders, then the
+# script itself runs only weekly. Column B → paper sources (config/exp_watch_traders.json); the real follow list stays with whale_study.
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: { group: trader-scout, cancel-in-progress: false }
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Restore the state cache (read only)
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/agents.sqlite
+          key: cnq-state-none
+          restore-keys: |
+            cnq-state-
+      - run: python -m cnq.agents.trader_scout data/agents.sqlite
+      - name: commit if changed
+        run: |
+          git config user.name "cnq-bot"; git config user.email "cnq-bot@users.noreply.github.com"
+          git add config/hedge_flags.json config/scout_state.json config/exp_watch_traders.json docs/research/scout_log.md
+          git diff --cached --quiet && exit 0
+          git commit -m "trader scout: $(date -u +'%Y-%m-%d')"
+          base=$(git rev-parse HEAD~1)
+          for i in 1 2 3; do git fetch origin main && git rebase --onto origin/main "$base" && git push origin HEAD:main && break || { git rebase --abort || true; sleep 10; }; done

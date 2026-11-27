@@ -68,7 +68,7 @@ def run(root: str, now: int | None = None, candles=None, hist=None, publish=None
         coins = sorted({c for _k, (_x, _f, d) in lab_need.items() for c in (d.get("coins") or LD.COINS)})
         for c in coins:
             try:
-                K = (hist or (lambda x: LD.hourly(x, pages=30)))(c)
+                K = (hist or _hist)(c)
                 hist_info[c] = len(K)
                 if len(K) >= 600:
                     pcache[c] = LL.prep(K)
@@ -176,6 +176,28 @@ def scout_forward(root: str, now: int) -> dict:
         out[a] = {"n": len(xs), "pf": round(gp / gl, 2) if gl else (99.0 if gp else None), "mean": round(sum(xs) / len(xs), 3),
                   "gain": round(cum, 2), "max_dd": round(dd, 2)}
     return {"t": now, "about_ru": "бумажные копии наблюдаемых трейдеров (фабрика, одиночные спецификации); вход для разведчика", "traders": out}
+
+
+def _hist(coin: str, pages: int = 30) -> list:
+    """~125 days of OKX hourly swap candles, paged slowly (a failed page ends the read, the rows so far are kept)"""
+    from cnq.agents import levels_desk as LD
+    rows, after = {}, None
+    for _ in range(pages):
+        d = None
+        for k in range(3):
+            try:
+                d = LD._http("/api/v5/market/history-candles", instId=f"{coin}-USDT-SWAP", bar="1H", limit=100, **({"after": after} if after else {}))
+                break
+            except Exception:  # noqa: BLE001 — 429 / a hiccup: wait and retry the page
+                time.sleep(2 + 2 * k)
+        if not d:
+            break
+        for r in d:
+            if str(r[8] if len(r) > 8 else "1") == "1":
+                rows[int(r[0])] = [int(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[7] if len(r) > 7 else r[5])]
+        after = d[-1][0]
+        time.sleep(0.25)
+    return [rows[k] for k in sorted(rows)]
 
 
 def _publish(md: str, day: str, env=None, path: str = "docs/research/improver_log.md") -> bool:

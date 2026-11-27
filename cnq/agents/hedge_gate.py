@@ -38,4 +38,4 @@ def reason(addr, overrides: dict | None, fl: dict | None = None) -> str | None:
     f = (flags() if fl is None else fl).get(str(addr).lower())
     if not f:
         return None
-    return "хедж: " + ", ".join(WHY.get(x, x) for x in f) + " — не копируем на реальный счёт (решение владельца 27.11)"
+    return "хедж: " + ", ".join(WHY.get(x, x) for x in f) + " — новые копии не открываются (правило с 27.11)"

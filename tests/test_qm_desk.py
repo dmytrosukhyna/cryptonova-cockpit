@@ -62,7 +62,7 @@ def test_paper_desk_runs_bar_by_bar_and_never_looks_ahead():
             assert abs((tr["tgt"] - tr["level"]) - 3 * (tr["level"] - tr["stop"])) < 1e-6
             assert tr["notional"] <= 0.2 * 10_000 * 1.5
         assert len(st["open"]) <= 5 and st["errors"] == []
-    assert st["equity"] == round(st["cash"], 2) and st["last_bar"]["BTC"] == K[2397][0]
+    assert st["equity"] == round(st["cash"], 2) and st["last_bar"]["BTC"] == K[2398][0]   # the last pass: j = 2398
     assert len(st["closed"]) >= 2 and all(c["why"] in ("стоп", "цель", "время") for c in st["closed"])
     assert {c["why"] for c in st["closed"]} >= {"стоп", "цель"}
 
@@ -105,4 +105,5 @@ def test_api_tick_keeps_state_out_of_web(tmp_path):
     assert doc and doc["test"] and doc["owner_only"] and doc["backtest"]["passed"]
     code, body = q.desk()
     assert code == 200 and body["name"] == "qm"
-    assert sorted(os.listdir(tmp_path / "qm")) == ["qm_desk.json", "state.json"]
+    assert sorted(os.listdir(tmp_path / "qm")) == ["qm_desk.json", "risk_copies.json", "risk_ladder.json", "risk_r0.5.json", "risk_r1.5.json",
+                                                   "risk_r2.json", "state.json"]                       # 27.11: + the risk-sheet copies

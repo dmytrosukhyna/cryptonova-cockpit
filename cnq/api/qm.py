@@ -40,23 +40,57 @@ class QM:
     def tick(self, now: int | None = None, **kw) -> dict | None:
         from cnq.agents import qm_desk as QD
         now = int(now or time.time() * 1000)
+        from cnq.agents import levels_desk as LD
+        cache, base = {}, kw.get("candles") or LD.hourly
+
+        def cached(coin):                      # one read per coin per pass, shared by the desk and its risk copies
+            if coin not in cache:
+                cache[coin] = base(coin)
+            return cache[coin]
+        kw = {**kw, "candles": cached}
         with self.lock:
             try:
                 st = QD.step(self._load("state.json"), now, **kw)
                 self._save("state.json", st)
                 doc = QD.public(st, now, BACKTEST)
                 self._save("qm_desk.json", doc)
+                self._risk_copies(now, kw)
                 self.last_err = None
                 return doc
             except Exception as e:  # noqa: BLE001
                 self.last_err = type(e).__name__
                 return None
 
+    # 27.11 (owner 07:52): the same desk at 0.5 / 1.5 / 2 % risk (a position up to 1× the equity) and on the ladder 1 → 1.5 → 2 %
+    RISKS = {"r0.5": 0.005, "r1.5": 0.015, "r2": 0.02, "ladder": None}
+
+    def _risk_copies(self, now, kw):
+        from cnq.agents import qm_desk as QD
+        from cnq.execution import risk_ladder as RL
+        kw2 = kw
+        out = {}
+        for k, r in self.RISKS.items():
+            name = f"risk_{k}.json"
+            st = self._load(name)
+            if st is None:                     # a copy starts now — no replay of old candles counts (QD._fwd)
+                st = {"start": QD.START, "cash": QD.START, "open": [], "closed": [], "pending": [], "started": now, "last_bar": {}, "seen": []}
+            if r is None:
+                S = st.setdefault("ladder", {})
+                RL.decide(S, [(c["closed_t"], c["usd"]) for c in st["closed"] if QD._fwd(c, st)], 0.0, float(st.get("start") or QD.START), now)
+                r = RL.level(S)
+            st = QD.step(st, now, risk=r, pos_cap=1.0, **kw2)
+            st["risk_now"] = r
+            self._save(name, st)
+            cl = [c for c in st["closed"] if QD._fwd(c, st)]
+            out[k] = {"risk": r, "equity": st.get("equity"), "trades": len(cl), "open": len(st["open"]), "pending": len(st["pending"])}
+        self._save("risk_copies.json", out)
+        return out
+
     def desk(self) -> tuple[int, dict]:
         d = self._load("qm_desk.json")
         if d is None:
             return 503, {"error": "no_data", "detail": "the desk has not run on the server yet", "last_error": self.last_err}
-        return 200, {"name": "qm", "title": d.get("name"), "asof": d.get("asof"), "data": d}
+        return 200, {"name": "qm", "title": d.get("name"), "asof": d.get("asof"), "data": d, "risk_copies": self._load("risk_copies.json")}
 
     def start(self) -> None:
         def loop():

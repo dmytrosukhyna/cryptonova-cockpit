@@ -75,7 +75,9 @@ def active(P, side: str, i: int, tf="1h", within=72) -> bool:
     return any(b <= i < b + within and s == side for (b, s, *_x) in setups(P, tf))
 
 
-def step(st, now, candles=LD.hourly, coins=LD.COINS):
+def step(st, now, candles=LD.hourly, coins=LD.COINS, risk=None, pos_cap=None):
+    """risk / pos_cap (27.11, owner 07:52): the risk-sheet copies of this desk — 0.5 / 1.5 / 2 % (and the ladder level the API picks
+    from this copy's own closes) with a position up to 1× the equity. Default = the 1 % desk."""
     st = st or {"start": START, "cash": START, "open": [], "closed": [], "pending": [], "started": now, "last_bar": {}, "seen": []}
     for k in ("open", "closed", "pending", "seen"):
         st.setdefault(k, [])
@@ -102,7 +104,7 @@ def step(st, now, candles=LD.hourly, coins=LD.COINS):
                 if l[i] <= pd["px"]:
                     st["pending"].remove(pd)
                     if len(st["open"]) < MAX_OPEN:
-                        _open(st, coin, min(o[i], pd["px"]), pd, t[i])
+                        _open(st, coin, min(o[i], pd["px"]), pd, t[i], risk, pos_cap)
                 elif h[i] >= pd["tgt"] or t[i] - pd["t"] >= WAIT * H:
                     st["pending"].remove(pd)                              # ran to the target without a retest / expired
             for tr in [x for x in st["open"] if x["coin"] == coin]:       # 2. open positions
@@ -125,7 +127,7 @@ def step(st, now, candles=LD.hourly, coins=LD.COINS):
                 if any(x["coin"] == coin for x in st["open"] + st["pending"]):
                     continue
                 st["pending"].append({"coin": coin, "side": "L", "px": lvl, "stop": stop, "tgt": lvl + TGT_R * risk, "risk": risk,
-                                      "t": t[i], "head_stop": stop})
+                                      "t": t[i], "head_stop": stop, **({"replay": True} if t[i] + H <= int(st["started"]) else {})})
         st["last_bar"][coin] = t[new[-1]]
     st["equity"] = round(st["cash"], 2)
     st["errors"] = errs[:5]
@@ -135,26 +137,34 @@ def step(st, now, candles=LD.hourly, coins=LD.COINS):
     return st
 
 
-def _open(st, coin, entry, pd, t):
+def _open(st, coin, entry, pd, t, rk=None, cap=None):
     eq = st["cash"]
     risk = entry - pd["stop"]
     if risk <= 0:
         return
-    want = RISK * eq / (risk / entry)
-    notional = min(want, POS_CAP * eq)
+    r_ = rk or RISK
+    want = r_ * eq / (risk / entry)
+    notional = min(want, (cap or POS_CAP) * eq)
     capped = notional < want - 1e-9
     st["open"].append({"coin": coin, "side": "L", "entry": entry, "opened_t": t, "fill_t": t, "stop": pd["stop"], "stop0": pd["stop"],
                        "tgt": pd["tgt"], "maxb": MAXB, "trail": False, "risk": risk, "bars": 0, "notional": round(notional, 2),
                        "risk_usd": round(notional * risk / entry, 2), "capped": capped, **({"capped_ru": LD.CAPPED_RU} if capped else {}),
-                       "level": pd["px"], "break_t": pd["t"]})
+                       "level": pd["px"], "break_t": pd["t"], "risk_pct": round(r_ * 100, 2),
+                       **({"replay": True} if pd.get("replay") or t + H <= int(st.get("started") or 0) else {})})
 
 
 def public(st, now, bt=None):
     cl = st.get("closed") or []
     return {"name": "Квазимодо 4ч · лонг · 3R · CRYPTO NOVA AI (тест)", "test": True, "owner_only": True, "asof": now, "variant": VARIANT,
             "start": START, "equity": st.get("equity", START), "pnl_usd": round(st.get("equity", START) - START, 2),
-            "open": st.get("open") or [], "pending": st.get("pending") or [], "closed": list(reversed(cl[-50:])), "trades": len(cl),
-            "wins": sum(1 for x in cl if x["usd"] > 0), "started": st.get("started"), "errors": st.get("errors") or [], "backtest": bt,
+            "open": st.get("open") or [], "pending": st.get("pending") or [], "closed": list(reversed(cl[-50:])),
+            "trades": sum(1 for x in cl if _fwd(x, st)), "wins": sum(1 for x in cl if x["usd"] > 0 and _fwd(x, st)),
+            "replay_trades": sum(1 for x in cl if not _fwd(x, st)), "started": st.get("started"), "errors": st.get("errors") or [], "backtest": bt,
             "rule_ru": ("ТЕСТ, бумажные $10 000. Паттерн «квазимодо» на 4-часовых свечах: низ → вершина → более низкий низ → закрытие выше "
                         "вершины; покупка лимитом на первом низу («левое плечо»), стоп ниже нижнего низа, цель — 3 риска, до 5 суток. "
                         "Риск 1% счёта, позиция ≤ 20% счёта, ≤ 5 позиций, одна на монету. На реальный счёт сделки не попадают.")}
+
+
+def _fwd(x, st) -> bool:
+    """27.11: a forward trade = opened after the desk started (the first pass replays ~33 days of candles — those are history)"""
+    return not x.get("replay") and int(x.get("opened_t") or 0) + H > int(st.get("started") or 0)

@@ -346,7 +346,12 @@ class Api:
             st = self._read(p) or {}
             res[key] = {"age_sec": round(now - os.path.getmtime(p)) if os.path.exists(p) else None, "err": getattr(obj, "last_err", None),
                         "started": st.get("started"), "signals": len(st.get("seen") or []), "pending": len(st.get("pending") or []),
-                        "open": len(st.get("open") or []), "closed": len(st.get("closed") or [])}
+                        "open": len(st.get("open") or []), "closed": len(st.get("closed") or []),
+                        "closed_fwd": sum(1 for c in st.get("closed") or [] if not c.get("replay")
+                                          and int(c.get("opened_t") or 0) + 3_600_000 > int(st.get("started") or 0))}
+            rc = self._read(os.path.join(obj.dir, "risk_copies.json"))
+            if rc:
+                res[key]["risk_copies"] = {k: {"trades": v.get("trades"), "open": v.get("open")} for k, v in rc.items()}
         ex = getattr(self, "experiments", None)
         if ex is not None:
             p = os.path.join(ex.dir, "state.json")

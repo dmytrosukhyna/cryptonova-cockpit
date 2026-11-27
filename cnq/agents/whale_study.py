@@ -932,8 +932,19 @@ def whale_desk_pnl(desk: dict | None, addr: str, since: int) -> float:
     return pnl + sum(_f(o.get("upnl")) for o in d.get("open") or [] if o.get("whale") == addr)
 
 
+def _hedge(addr) -> str | None:
+    try:
+        from . import hedge_gate as HG
+        return HG.reason(addr, ov.load())
+    except Exception:  # noqa: BLE001 — a broken gate never blocks the study
+        return None
+
+
 def lock_hard(a: str, q: dict | None, passing: dict, desk: dict | None, since: int, share: float, now: int) -> list[str]:
     """06.11: the hard reasons a locked whale leaves the list before the review ([] = he stays)"""
+    hg = _hedge(a)                             # 27.11 (owner «да»): a «хедж» trader leaves at once; his open copies run to his exit
+    if hg:
+        return [hg]
     if q is not None:
         if hidden(q.get("positions") or []):
             return ["скрыл открытые позиции"]
@@ -2265,6 +2276,10 @@ def run(conn: sqlite3.Connection, now: int | None = None, post=_post, get_lb=_ge
                      site_perf=lb_.get("perf"))
             p["excluded_ru"] = p["excluded_ru"] + WS.record_gate(p, n90)
             p["eligible"] = not p["excluded_ru"]
+        hg = _hedge(p.get("addr"))                 # 27.11 (owner «да»): «хедж» traders are not eligible for the real follow list
+        if hg:
+            p["excluded_ru"] = list(p.get("excluded_ru") or []) + [hg]
+            p["eligible"] = False
         profs.append(p)
     if profs:                                  # the 60-day record per whale (incl. open), read by the next run's desk (preference order)
         kv_set(conn, "quality", {p["addr"]: {"win": p.get("win"), "pf": p.get("pf"), "pnl_30d": p.get("pnl_30d"), "pnl_60d": p.get("pnl_60d"),

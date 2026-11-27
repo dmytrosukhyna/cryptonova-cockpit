@@ -100,3 +100,21 @@ def test_real_channel_layouts_market_calls_and_listed_targets():
     b = F.parse("#AKE Short setup \n\nTp 0.010$-0.005$ \n\nUse 2X\n\nStop lose 0.013$")
     assert b["market"] and b["targets"] == [0.01, 0.005] and b["stop"] == 0.013
     assert F.parse("✅ XRP/USD SELL from 1.0625: TP1 HIT at 1.0266 (+3.4%). Trade closed.") is None
+
+
+def test_nohedge_real_gate_owner_key_drops_flagged_traders_and_blocks_only_new_copies(monkeypatch):
+    import inspect
+    from cnq.agents import hedge_gate as HG, whale_study as W
+    from cnq.execution import okx_futures as OF, owner_overrides as ov
+    on = {HG.KEY: {"armed": True}}
+    fl = {"bn:1": ["offset"]}
+    assert HG.reason("bn:1", on, fl).startswith("хедж: двусторонняя книга")
+    assert HG.reason("bn:2", on, fl) is None and HG.reason("bn:1", {}, fl) is None              # key off → nothing changes
+    assert HG.armed(ov.load()) and "bn:5219234690161308161" in HG.flags()                       # the owner's «да» of 27.11 is on
+    monkeypatch.setattr(ov, "load", lambda *a, **k: on)
+    monkeypatch.setattr(HG, "flags", lambda path=None: fl)
+    assert W.lock_hard("bn:1", {"positions": [], "pnl_60d": 5.0}, {}, None, 0, 0.0, 0)[0].startswith("хедж")
+    assert W.lock_hard("bn:2", {"positions": [], "pnl_60d": 5.0}, {}, None, 0, 0.0, 0) == []
+    src = inspect.getsource(OF)
+    assert "HG.reason(t.get(\"whale\"), ov_all, hfl)" in src and "continue" in src.split("HG.reason(t.get(\"whale\")")[1][:300]
+    assert "close" not in inspect.getsource(HG).split('"""', 2)[2]                              # the gate never closes anything

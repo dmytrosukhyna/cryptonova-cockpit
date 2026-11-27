@@ -1323,7 +1323,16 @@ def step(env=None, opener=None, desks: list | None = None, now: int | None = Non
         pos = ctx.positions(fresh=True)
         avail = ctx.avail_usdt() if fresh else 0.0
         parts = desk_parts(ds, bud["usd"], st.get("sel"))
+        try:                                   # 27.11 (owner «да»): no NEW real copy of a «хедж» trader; open ones run to their exit
+            from ..agents import hedge_gate as HG
+            ov_all, hfl = ov.load(env=env), HG.flags()
+        except Exception:  # noqa: BLE001
+            HG, ov_all, hfl = None, {}, {}
         for tid, (t, deq, dk) in sorted(fresh, key=lambda x: int(x[1][0].get("opened") or 0)):
+            hg = HG.reason(t.get("whale"), ov_all, hfl) if HG else None
+            if hg:
+                res["skipped"].append({"id": tid, "inst": t.get("inst") or t.get("coin"), "why": hg})
+                continue
             part = parts.get(dk, bud["usd"] / max(1, len(ds)))
             dcs = decide(ctx, t, deq, part, bud["usd"], cap, pos, avail, slip, start, now, join_gap(env))
             if dcs.get("skip"):

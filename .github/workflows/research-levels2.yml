@@ -1,0 +1,25 @@
+name: research-levels2
+# 27.11 (owner 07:48 / 07:51 / 07:52): levels v2 — false breakouts, retests, bounces, Quasimodo + combos on 30 coins
+# (scripts/research/levels_v2_study.py, rules committed before the run). Research only; results as annotations.
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - name: lab-data-core18 (release asset)
+        run: curl -sSL -o alt100.npz https://github.com/dmytrosukhyna/cryptonova-cockpit/releases/download/lab-data-core18/alt100.npz && ls -la alt100.npz
+      - name: the 12 new coins (Binance archive, same window)
+        run: PYTHONPATH=scripts CORE18=alt100.npz python scripts/research/levels_v2_study.py fetch new12.npz
+      - name: study
+        run: PYTHONPATH=scripts python scripts/research/levels_v2_study.py run alt100.npz new12.npz levels_v2.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: levels-v2, path: levels_v2.json }

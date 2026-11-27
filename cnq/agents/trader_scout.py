@@ -188,8 +188,8 @@ def main(db: str):
     a_set = {x["addr"] for x in A}
     added = []
     for tid, b in sorted(cand.items(), key=lambda kv: -kv[1]["pf"]):
-        if tid.lower() in flags or tid in a_set or tid in state["B"]:
-            continue
+        if tid.lower() in flags or tid in a_set or tid in state["B"] or (recent_pf.get(tid) is not None and recent_pf[tid] < 1):
+            continue                                       # flagged, already in A / B, or decaying right now → not added
         state["B"][tid] = {"src": tid.split(":")[0], "added": now, "why_ru": f"{day} разведчик: 30 дн {b['n']} решений, {b['win'] * 100:.0f}% прибыльных, PF {b['pf']}"}
         added.append(tid)
     for a, w in sorted(hl_ok.items(), key=lambda kv: -kv[1]["pf"]):

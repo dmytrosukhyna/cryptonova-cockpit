@@ -1,6 +1,84 @@
 {
  "about_ru": "26.11 (владелец 18:24): трейдеры с флагом «хедж» (scripts/research/hedge_pool.py, run 45860166004). carry — фандинг ≥ 40 % P&L; offset — ≥ 25 % решений открыты при встречной позиции той же монеты (или дельта-нейтральная книга / спот против шорта на Hyperliquid); bigmiss — крупные входы ушли в его сторону через 24 ч и 72 ч реже 45 %. Фабрика экспериментов (бумага) исключает их в спецификациях «без хеджей»; реальный список следования не меняется без «да» владельца.",
  "flags": {
+  "0x016b8816db87f0a0f8190e3f2ca88357809984a9": [
+   "bigbook"
+  ],
+  "0x08bf75d17046412ae08c95b6106993f714487872": [
+   "bigbook"
+  ],
+  "0x1e771e1b95c86491299d6e2a5c3b3842d03b552e": [
+   "offset"
+  ],
+  "0x218a65e21eddeece7a9df38c6bbdd89f692b7da2": [
+   "bigbook"
+  ],
+  "0x27c9fa86c91b84ddfa15de58c482ff662498d65d": [
+   "carry",
+   "offset",
+   "bigbook"
+  ],
+  "0x404ca2035b37bf2e83505134ebcf8d03babb5f03": [
+   "carry",
+   "offset",
+   "bigbook"
+  ],
+  "0x4b1c09fa8322548360a76a3747e32a60a864bc38": [
+   "offset"
+  ],
+  "0x4c226d5a21ae3b9883f98cbda1a3be63e565f308": [
+   "carry",
+   "bigbook"
+  ],
+  "0x541e077ac38c56d7bf590924d249c60b0c80071d": [
+   "offset"
+  ],
+  "0x5e9eadc22514f35af45de3ea4c3c9e56d21435ee": [
+   "bigbook"
+  ],
+  "0x7fdafde5cfb5465924316eced2d3715494c517d1": [
+   "carry",
+   "bigbook"
+  ],
+  "0x880ac484a1743862989a441d6d867238c7aa311c": [
+   "carry"
+  ],
+  "0x944b5f7d8eece040aae1895c7fed03202aedf123": [
+   "bigbook"
+  ],
+  "0x972b0f9cde1266e860e546ac92e783741769400f": [
+   "bigbook"
+  ],
+  "0x9a3bf39506de3fd281cebbab9dd52fbab37e696a": [
+   "bigbook"
+  ],
+  "0x9e9f3f4e9d8361e1d916e6ccbc323f645454174d": [
+   "bigmiss"
+  ],
+  "0xa189fea7d8be09e7a644d0e5ca19c548524894d7": [
+   "bigbook"
+  ],
+  "0xb695651daa495f59dd2725c6fe98322d8b51a92d": [
+   "bigbook"
+  ],
+  "0xba5d9cc840745aeeeeedac5712e32f13ab8ea352": [
+   "bigbook"
+  ],
+  "0xd4c1f7e8d876c4749228d515473d36f919583d1d": [
+   "carry"
+  ],
+  "0xd83687a8ad139688f5d0eaa9fc352a10f532c2af": [
+   "bigbook"
+  ],
+  "0xdfe5195e7cc1a2eca9b0df09d4646472a8c4a402": [
+   "bigbook"
+  ],
+  "0xf6f371fb269f8e7c078e340fb8d3a253463247f8": [
+   "bigbook"
+  ],
+  "0xfeec88b13fc0be31695069f02bac18538a154e9c": [
+   "bigbook"
+  ],
   "bn:5125452663940092928": [
    "bigmiss"
   ],
@@ -19,21 +97,41 @@
   "bn:5303152603950345985": [
    "offset"
   ],
-  "okx:CB312175A85C9B68": [
+  "okx:cb312175a85c9b68": [
    "bigmiss"
-  ],
-  "0x1e771e1b95c86491299d6e2a5c3b3842d03b552e": [
-   "offset"
   ]
  },
  "flagged": [
+  "0x016b8816db87f0a0f8190e3f2ca88357809984a9",
+  "0x08bf75d17046412ae08c95b6106993f714487872",
   "0x1e771e1b95c86491299d6e2a5c3b3842d03b552e",
+  "0x218a65e21eddeece7a9df38c6bbdd89f692b7da2",
+  "0x27c9fa86c91b84ddfa15de58c482ff662498d65d",
+  "0x404ca2035b37bf2e83505134ebcf8d03babb5f03",
+  "0x4b1c09fa8322548360a76a3747e32a60a864bc38",
+  "0x4c226d5a21ae3b9883f98cbda1a3be63e565f308",
+  "0x541e077ac38c56d7bf590924d249c60b0c80071d",
+  "0x5e9eadc22514f35af45de3ea4c3c9e56d21435ee",
+  "0x7fdafde5cfb5465924316eced2d3715494c517d1",
+  "0x880ac484a1743862989a441d6d867238c7aa311c",
+  "0x944b5f7d8eece040aae1895c7fed03202aedf123",
+  "0x972b0f9cde1266e860e546ac92e783741769400f",
+  "0x9a3bf39506de3fd281cebbab9dd52fbab37e696a",
+  "0x9e9f3f4e9d8361e1d916e6ccbc323f645454174d",
+  "0xa189fea7d8be09e7a644d0e5ca19c548524894d7",
+  "0xb695651daa495f59dd2725c6fe98322d8b51a92d",
+  "0xba5d9cc840745aeeeeedac5712e32f13ab8ea352",
+  "0xd4c1f7e8d876c4749228d515473d36f919583d1d",
+  "0xd83687a8ad139688f5d0eaa9fc352a10f532c2af",
+  "0xdfe5195e7cc1a2eca9b0df09d4646472a8c4a402",
+  "0xf6f371fb269f8e7c078e340fb8d3a253463247f8",
+  "0xfeec88b13fc0be31695069f02bac18538a154e9c",
   "bn:5125452663940092928",
   "bn:5195371262516037377",
   "bn:5200577810959877121",
   "bn:5219234690161308161",
   "bn:5268457791561958145",
   "bn:5303152603950345985",
-  "okx:CB312175A85C9B68"
+  "okx:cb312175a85c9b68"
  ]
 }

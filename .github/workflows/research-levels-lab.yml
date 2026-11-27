@@ -1,0 +1,29 @@
+name: research-levels-lab
+# 27.11 (owner 08:59 / 09:00): the «Уровни» lab — exact desk replay, exit / stop / entry grid, order blocks, the v2 families per coin
+# universe, walk-forward (scripts/research/levels_lab_study.py, rules committed before the run); and the desk's forward trades
+# replayed on OKX candles. Research only; results as annotations.
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  forward:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: PYTHONPATH=scripts python scripts/research/levels_lab_study.py forward levels_fwd.json
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: curl -sSL -o alt100.npz https://github.com/dmytrosukhyna/cryptonova-cockpit/releases/download/lab-data-core18/alt100.npz
+      - run: PYTHONPATH=scripts CORE18=alt100.npz python scripts/research/levels_v2_study.py fetch new12.npz
+      - run: PYTHONPATH=scripts python scripts/research/levels_lab_study.py run alt100.npz new12.npz levels_lab.json

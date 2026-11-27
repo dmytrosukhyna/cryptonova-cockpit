@@ -21,11 +21,15 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
+            data/cnq.sqlite
             data/agents.sqlite
+            data/whales_ext.sqlite
           key: cnq-state-none
           restore-keys: |
             cnq-state-
       - run: python -m cnq.agents.trader_scout data/agents.sqlite
+        env:
+          SCOUT_FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
       - name: commit if changed
         run: |
           git config user.name "cnq-bot"; git config user.email "cnq-bot@users.noreply.github.com"

@@ -43,14 +43,20 @@ def _load(p, d=None):
         return d
 
 
-def column_a(wt: dict, flags: dict, now: int) -> list:
+def column_a(wt: dict, flags: dict, now: int, active: dict | None = None) -> list:
+    """the strict bar (whale_study «eligible») minus «хедж»; stable = also passing the bar 3+ days in a row (follow_lock «passing»),
+    PF ≥ 2 and a trade in the last 7 days (ws_trips)"""
+    passing = (wt.get("follow_lock") or {}).get("passing") or {}
     out = []
     for x in (wt.get("top") or []) + (wt.get("others") or []):
         if not isinstance(x, dict) or not x.get("eligible") or str(x.get("addr", "")).lower() in flags:
             continue
-        last = max([int(r.get("t") or r.get("open_t") or 0) for r in x.get("recent") or [] if isinstance(r, dict)] or [0])
-        out.append({"addr": x["addr"], "name": x.get("name"), "win": x.get("win"), "pf": x.get("pf"), "decisions": x.get("decisions"),
-                    "pnl_60d": x.get("pnl_60d"), "stable": bool((x.get("pf") or 0) >= 2 and (not last or now - last <= 7 * DAY))})
+        a = x["addr"]
+        p0 = (passing.get(a) or [None])[0]
+        last = (active or {}).get(a)
+        stable = bool((x.get("pf") or 0) >= 2 and p0 and now - int(p0) >= 3 * DAY and last and now - last <= 7 * DAY)
+        out.append({"addr": a, "name": x.get("name"), "win": x.get("win"), "pf": x.get("pf"), "decisions": x.get("decisions"),
+                    "pnl_60d": x.get("pnl_60d"), "stable": stable})
     return out
 
 
@@ -118,7 +124,7 @@ def main(db: str):
             state["B"].setdefault(x["addr"], {"src": x["addr"].split(":")[0], "added": now, "why_ru": x.get("why_ru", "")})
         state["seeded"] = now
     a_prev = state.get("a_stable", 0)
-    if a_prev >= STABLE_TARGET and now - int(state.get("last_run") or 0) < 7 * DAY - 3_600_000:
+    if a_prev >= STABLE_TARGET and now - int(state.get("last_run") or 0) < 7 * DAY - 3_600_000 and not os.environ.get("SCOUT_FORCE"):
         print("::notice title=scout::weekly mode — not due")
         return
     hfl = _load(FLAGS, {}) or {}
@@ -177,7 +183,7 @@ def main(db: str):
         if w.get("n", 0) >= 15 and w.get("win", 0) >= 0.6 and w.get("pf", 0) >= 1.5 and (w.get("last_d") or 99) <= 7 and w["h1"] > 0 and w["h2"] > 0 \
                 and not w.get("flags"):
             hl_ok[a] = w
-    A = column_a(wt, flags, now)
+    A = column_a(wt, flags, now, active)
     a_set = {x["addr"] for x in A}
     added = []
     for tid, b in sorted(cand.items(), key=lambda kv: -kv[1]["pf"]):

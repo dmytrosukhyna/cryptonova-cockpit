@@ -59,8 +59,10 @@ def test_scout_columns_promotion_demotion_and_watch_sources():
     now = 1_800_000_000_000
     wt = {"top": [{"addr": "bn:1", "name": "a", "eligible": True, "pf": 3.0}, {"addr": "bn:2", "eligible": True, "pf": 5.0},
                   {"addr": "bn:3", "eligible": False, "pf": 9.0}], "others": []}
-    A = TS.column_a(wt, {"bn:2": ["offset"]}, now)
-    assert [x["addr"] for x in A] == ["bn:1"] and A[0]["stable"]                        # the «хедж» gate holds column A too
+    wt["follow_lock"] = {"passing": {"bn:1": [now - 4 * TS.DAY, now]}}
+    A = TS.column_a(wt, {"bn:2": ["offset"]}, now, {"bn:1": now - TS.DAY})
+    assert [x["addr"] for x in A] == ["bn:1"] and A[0]["stable"]
+    assert not TS.column_a(wt, {}, now, {"bn:1": now - 9 * TS.DAY})[0]["stable"]          # no trade for 9 days → not stable                        # the «хедж» gate holds column A too
     state = {"B": {"bn:7": {"src": "bn"}, "bn:8": {"src": "bn"}, "bn:9": {"src": "bn"}, "0xab": {"src": "hl"}}}
     fwd = {"bn:7": {"n": 31, "pf": 1.8, "max_dd": 2.0, "gain": 10.0}, "bn:8": {"n": 25, "pf": 0.7}}
     prom, dem = TS.promote_demote(state, fwd, {"bn:9": ["carry"]}, {"bn:7": now, "bn:8": now, "0xab": now - 15 * TS.DAY}, {}, now)

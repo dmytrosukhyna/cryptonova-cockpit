@@ -1,6 +1,7 @@
 """26.11 (owner «да»): «Квазимодо 4ч · лонг · 3R (тест)» — PAPER, owner-only (cnq/agents/qm_desk.py, cnq/api/qm.py) and the whale
 filters «Кит от уровня» / «Кит + квазимодо за» (cnq/agents/exp_desks.py f_level / f_qm). Every price here is made up; no API is called."""
 import inspect
+import json
 import os
 import random
 import sys
@@ -107,3 +108,20 @@ def test_api_tick_keeps_state_out_of_web(tmp_path):
     assert code == 200 and body["name"] == "qm"
     assert sorted(os.listdir(tmp_path / "qm")) == ["qm_desk.json", "risk_copies.json", "risk_ladder.json", "risk_r0.5.json", "risk_r1.5.json",
                                                    "risk_r2.json", "state.json"]                       # 27.11: + the risk-sheet copies
+
+
+def test_levels_pilot_is_off_and_needs_a_passed_variant_the_owner_key_and_10_forward_trades():
+    from cnq.agents import levels_pilot as LP
+    sp = LP.spec()
+    ok, why = LP.ready(sp, {}, [1.0] * 12)
+    assert not ok and sp.get("variant") is None and len(why) >= 2                 # today: no variant, no key → OFF
+    good = {"variant": "x", "study_passed": True, "pilot_eligible": True}
+    assert not LP.ready(good, {LP.KEY: {"armed": True}}, [1.0, -0.5] * 4)[0]         # 8 forward trades < 10
+    assert not LP.ready(good, {LP.KEY: {"armed": True}}, [1.0, -1.0] * 6)[0]         # PF 1.0 ≤ 1.2
+    assert not LP.ready(good, {}, [2.0, -1.0] * 6)[0]                                 # no owner key
+    assert LP.ready(good, {LP.KEY: {"armed": True}}, [2.0, -1.0] * 6) == (True, [])
+    assert LP.RULES["risk_pct"] == 0.5 and LP.RULES["max_positions"] == 2 and LP.RULES["day_stop_pct"] == 1.0
+    import inspect
+    body = inspect.getsource(LP).split('"""', 2)[2]
+    assert "okx_futures" not in body and "whales:" not in body
+    assert LP.KEY not in json.load(open(os.path.join(os.path.dirname(LP.CFG), "owner_overrides.json")))

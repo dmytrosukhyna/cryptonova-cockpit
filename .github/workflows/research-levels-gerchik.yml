@@ -1,0 +1,19 @@
+name: research-levels-gerchik
+# 28.11 (owner 16:03): Gerchik-style levels — quality (БСУ/БПУ, mirror, sharp, round), break → second break → retest, squeeze, false
+# breakouts, near retest; stops incl. FVG; filters incl. запас хода (scripts/research/levels_gerchik_study.py). Research only.
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q numpy
+      - run: curl -sSL -o alt100.npz https://github.com/dmytrosukhyna/cryptonova-cockpit/releases/download/lab-data-core18/alt100.npz
+      - run: PYTHONPATH=scripts CORE18=alt100.npz python scripts/research/levels_v2_study.py fetch new12.npz
+      - run: PYTHONPATH=scripts python scripts/research/levels_gerchik_study.py alt100.npz new12.npz levels_gerchik.json

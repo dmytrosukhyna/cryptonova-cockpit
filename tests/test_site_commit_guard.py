@@ -109,3 +109,40 @@ def test_engine_sync_never_pushes_foreign_paths(tmp_path, monkeypatch):
     subprocess.run(["git", "clone", "-q", str(origin), str(chk)], check=True)
     assert (chk / "docs" / "log.md").read_text() == "a\nb\n"
     assert (chk / "web" / "paper.json").read_text() == '{"x": 2}'
+
+
+def _rebase_cmd(path: pathlib.Path) -> str:
+    """the «git rebase …» part of a workflow's push-retry loop"""
+    loop = next(l for l in path.read_text(encoding="utf-8").splitlines() if "git rebase" in l and "for i in" in l)
+    return re.search(r"(git rebase [^&]*?)\s*&&", loop).group(1)
+
+
+def test_workflow_retry_rebases_only_our_commit(tmp_path):
+    """28.11: site.yml attempt 1 rebased fine but its push was rejected; attempt 2 rebased base..HEAD, which by then held the
+    engine commit fetched in attempt 1, and -X theirs replayed it over newer main (02ad618 rolled docs/research/backlog.md and
+    watch_log.md back to before a691cb3). End to end on a shallow clone, with the exact commands from the workflows."""
+    import subprocess
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+           "PATH": __import__("os").environ.get("PATH", "/usr/bin:/bin"), "HOME": str(tmp_path)}
+
+    def sh(cmd, cwd):
+        return subprocess.run(["bash", "-c", cmd], cwd=cwd, env=env, check=True, capture_output=True, text=True).stdout
+
+    for wf in ("site.yml", "autolab.yml", "macro-flag.yml"):
+        d = tmp_path / wf
+        d.mkdir()
+        sh("git init -q --bare -b main o && git clone -q o w && cd w && echo 1 > X && echo 1 > D && git add . && "
+           "git commit -qm init && git push -q origin HEAD:main", d)
+        sh(f"git clone -q --depth 1 -b main file://{d}/o a", d)
+        a, w = d / "a", d / "w"
+        sh("echo ours > D && git commit -qam ours", a)
+        base, mine = sh("git rev-parse HEAD~1", a).strip(), sh("git rev-parse HEAD", a).strip()
+        cmd = _rebase_cmd(WF.parent / wf)
+        run = f'base={base}; mine={mine}; git fetch -q origin main && {cmd}'
+        sh("echo E > X && git commit -qam engine && git push -q origin HEAD:main", w)   # the engine pushes …
+        sh(run, a)                                                                      # attempt 1 (its push «rejected»)
+        sh("echo R > X && git commit -qam research && git push -q origin HEAD:main", w)  # … a research commit lands
+        sh(run, a)                                                                      # attempt 2
+        assert (a / "X").read_text() == "R\n", wf
+        assert (a / "D").read_text() == "ours\n", wf
+        assert sh("git rev-list --count origin/main..HEAD", a).strip() == "1", wf

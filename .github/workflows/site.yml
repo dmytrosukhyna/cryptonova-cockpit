@@ -335,7 +335,11 @@ jobs:
           # commit and with -X theirs rolled engine.json / risk.json / whales_live.json back by minutes (4× on 10.11). Replay only our commit.
           base=$(git rev-parse HEAD)
           git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
-          for i in 1 2 3; do git fetch origin main && git rebase --autostash -X theirs --onto origin/main "$base" && git push origin HEAD:main && break || { echo "::warning title=push::attempt $i failed"; git rebase --abort || true; sleep 15; }; done
+          # 28.11: after attempt 1 rebased fine but its push was rejected, attempt 2 rebased base..HEAD — that range now held the
+          # commits fetched in attempt 1 too, and -X theirs replayed them over newer main (02ad618 rolled backlog.md / watch_log.md
+          # back to before a691cb3, 07:13 UTC). Every attempt rebases exactly our own commit ($mine), never the moved HEAD.
+          mine=$(git rev-parse HEAD)
+          for i in 1 2 3; do git fetch origin main && git rebase --autostash -X theirs --onto origin/main "$base" "$mine" && git push origin HEAD:main && break || { echo "::warning title=push::attempt $i failed"; git rebase --abort || true; sleep 15; }; done
       # 04.11 23:20: also when the run STARTED from an already-stale fallback cache (a hit, but not the pinned key): saving cannot make
       # the newest cache any older, and the whale study's refetched history (it runs on a stale database, never_backwards) survives.
       # A cache miss on a stale database is still never saved.

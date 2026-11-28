@@ -37,4 +37,5 @@ jobs:
           git add web/autolab.json
           base=$(git rev-parse HEAD)   # 10.11: shallow checkout — replay only our commit (see site.yml)
           git commit -m "autolab: nightly $(date -u +'%Y-%m-%d %H:%M UTC')" || echo "nothing to commit"
-          for i in 1 2 3 4; do git fetch origin main && git rebase -X theirs --onto origin/main "$base" && git push origin HEAD:main && break || { git rebase --abort || true; sleep 20; }; done
+          mine=$(git rev-parse HEAD)   # 28.11: a retry rebases only our commit, not commits fetched by an earlier attempt (see site.yml)
+          for i in 1 2 3 4; do git fetch origin main && git rebase -X theirs --onto origin/main "$base" "$mine" && git push origin HEAD:main && break || { git rebase --abort || true; sleep 20; }; done

@@ -224,6 +224,9 @@ def lab_fixes(variant: str, sy: list, conc: dict | None) -> list:
             out.append(("стоп за свингом", f"{stream}|{side}|{ent}|swing|{tn}|{mg}", {}))
         if stream in ("desk", "touch") and ent != "E_limit":
             out.append(("вход после выноса (лимит за уровнем)", f"touch|{side}|E_limit|{sn}|{tn}|{mg}", {}))
+        # 28.11 (owner): Gerchik's confirmation — enter only after a second break and a retest, or on the false breakout itself
+        out.append(("Герчик: пробой → повторный пробой → ретест", f"g|p1|{side}|h1|g10|r3|none|1", {}))
+        out.append(("Герчик: ложный пробой одним баром", f"g|p3a|{side}|h1|bar|r3|none|1", {}))
     if "giveback" in sy:
         for m, nm in (("be", "безубыток на +1R"), ("trail", "трейл 1,5 ATR после +1R"), ("part", "половина на +1R")):
             if m != mg:

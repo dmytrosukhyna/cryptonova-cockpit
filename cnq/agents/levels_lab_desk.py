@@ -38,6 +38,23 @@ def lab():
     return _M
 
 
+_G = None
+
+
+def gerchik():
+    """the Gerchik study module (scripts/research/levels_gerchik_study.py) — variants «g|…» (28.11)"""
+    global _G
+    if _G is None:
+        d = os.path.join(ROOT, "scripts", "research")
+        if d not in sys.path:
+            sys.path.insert(0, d)
+        spec = importlib.util.spec_from_file_location("levels_gerchik_study", os.path.join(d, "levels_gerchik_study.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        _G = m
+    return _G
+
+
 def cfg(path=None) -> list:
     try:
         with open(path or CFG, encoding="utf-8") as f:
@@ -56,9 +73,14 @@ def prep(K):
     return P
 
 
-def trades(P, variant: str, raw15, since: int) -> list:
+def trades(P, variant: str, raw15, since: int, regime=None) -> list:
     """[{key, coin?, side, t, fill_t, entry, stop, tgt, pct?, why?, open}] for events at or after `since`"""
     import numpy as np
+    if variant.startswith("g|"):                   # 28.11: a Gerchik variant — the Gerchik study's own code
+        G = gerchik()
+        if "_piv" not in P:
+            G.prep(P)
+        return G.trades_variant(P, variant, raw15, since, regime)
     M = lab()
     stream, side, ent, sn, tn, mg = variant.split("|")
     o, h, l, c = (np.asarray(P[k]) for k in ("o", "h", "l", "c"))
@@ -123,12 +145,12 @@ def step(st: dict | None, desk: dict, now: int, candles, c15=None) -> dict:
                 P = prep(K)
                 _PC.clear() if len(_PC) > 40 else None
                 _PC[ck] = P
-            if "E_15m" in desk["variant"] and c15:
+            if ("E_15m" in desk["variant"] or "|m15|" in desk["variant"]) and c15:
                 r15 = c15(coin)
                 raw15 = tuple(np.asarray([x[j] for x in r15], dtype=(np.int64 if j == 0 else float)) for j in range(5))
             else:
                 raw15 = (np.zeros(0, dtype=np.int64),) + tuple(np.zeros(0) for _ in range(4))
-            for tr in trades(P, desk["variant"], raw15, int(st["started"])):
+            for tr in trades(P, desk["variant"], raw15, int(st["started"]), _regime(desk, candles)):
                 if btc4 is not None and DI.regime_at(btc4, tr["t"]) == desk["skip_regime"]:
                     continue
                 k = f"{coin}|{tr['key']}"
@@ -150,3 +172,16 @@ def step(st: dict | None, desk: dict, now: int, candles, c15=None) -> dict:
     st["errors"] = errs[:5]
     st["t"] = now
     return st
+
+
+def _regime(desk, candles):
+    """the BTC 4h regime function for Gerchik «reg» variants (None otherwise)"""
+    if not desk["variant"].startswith("g|") or "|reg|" not in desk["variant"]:
+        return None
+    try:
+        K = [k for k in candles("BTC")]
+        P = prep(K)
+        G = gerchik()
+        return G.btc_regime(P)
+    except Exception:  # noqa: BLE001
+        return None

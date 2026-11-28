@@ -74,3 +74,16 @@ def test_wide_stop_copies_of_the_exact_desk(tmp_path):
     q = LA.Levels(str(tmp_path / "lv"))
     doc = q.tick(now=K[-1][0] + H, candles=lambda c: K, coins=["BTC"])
     assert doc and sorted(q._load("wide.json")) == sorted(LW.MODES)
+
+
+def test_gerchik_variants_run_through_the_lab_desk_with_the_study_code():
+    from cnq.agents import levels_lab_desk as LL, desk_improver as DI
+    K = _walk(1800, seed=5)
+    d = {"key": "g1", "variant": "g|p1|L|h1|g10|r3|none|1", "coins": ["BTC"]}
+    st = LL.step(None, d, K[999][0] + H, lambda c: K[:1000])
+    assert st["trades"] == 0                                                   # nothing before the start
+    st = LL.step(st, d, K[-1][0] + H, lambda c: K)
+    assert st["trades"] + len(st["open"]) >= 1 and not st["errors"]
+    assert all(x["t"] >= st["started"] and x["side"] == "L" for x in st["closed"].values())
+    fx = [f[1] for f in DI.lab_fixes("desk|L|E_close|a0.5|opp|none", ["stop_then_target"], None)]
+    assert "g|p1|L|h1|g10|r3|none|1" in fx and "g|p3a|L|h1|bar|r3|none|1" in fx

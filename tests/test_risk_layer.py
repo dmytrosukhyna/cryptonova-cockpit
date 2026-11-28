@@ -332,7 +332,8 @@ def test_paper_desk_records_the_skip_and_never_reopens_that_signal():
     from cnq.agents import paper_desk as pd
     d = tempfile.mkdtemp()
     with risk_dir(d):
-        now = _wall()
+        w = _wall()                          # 28.11 (backlog 293): a half hour in the past, so «+60 s» never crosses into the next hour
+        now = w // 3_600_000 * 3_600_000 + (1_800_000 if w % 3_600_000 >= 1_800_000 else -1_800_000)
         conn = sqlite3.connect(":memory:")
         c = _coin("SOL-USDT", now)
         c["basis_1h"] = -0.003                                                           # rule D fires

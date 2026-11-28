@@ -1638,12 +1638,18 @@ def desk_step(desk: dict | None, follow: list[str], states: dict, mids: dict, no
             skip_once(f"{addr}|{c}|both", {"t": now, "kind": "skip", "coin": c, "whale": addr,
                                              "why": "у трейдера в этой монете видны обе стороны — берём большую по объёму"})
         conf = d.setdefault("confirm", {}).setdefault(addr, {})
+        # 28.11 bug fix (Herzi, okx:7E27…, joined A 02:18 Athens): on a FIRST or stale look every position he already holds was
+        # recorded as «new» here, so 2 polls later the desk opened his old SOL/DOGE/BCH longs +8…12 % above his entries, past the
+        # −3 %…+1 % join window (the real account refused them). A first / stale look records «join» (the window then decides).
+        first_look = now - int((d.get("seen_t") or {}).get(addr) or 0) > SEEN_MAX_MS
+        if first_look:
+            conf.clear()
         for c, p in cur.items():                            # polls in a row on the same side (+ the kind at first sight)
             k0 = conf.get(c)
             if k0 and k0[0] == p["side"]:
                 k0[1] += 1
             else:
-                conf[c] = [p["side"], 1, "join" if prev_seen.get(c) == p["side"] else "new"]
+                conf[c] = [p["side"], 1, "join" if first_look or prev_seen.get(c) == p["side"] else "new"]
             ps = prev_seen.get(c)
             if ps and ps != p["side"]:                      # a flip since the previous poll
                 fk = f"{addr}|{c}"

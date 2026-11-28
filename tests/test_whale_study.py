@@ -777,6 +777,23 @@ def test_okx_phantom_sides_dominant_side_two_poll_confirmation_and_flip_freeze()
     assert [(o["coin"], o["side"]) for o in d["open"]] == [("ADA", "LONG")]
 
 
+def test_okx_first_look_positions_are_joins_judged_by_the_window_not_new():
+    """28.11 (Herzi): an OKX trader seen for the first time already holds positions — they are joins (window −3 %…+1 % of his entry),
+    never «new»: one far above his entry is not copied, one inside the window is; a position opened after the first look is new"""
+    now = 1_800_000_000_000
+    a = "okx:H"
+    mids = {"SOL": 110.0, "BNB": 100.5, "ADA": 100.0}
+    held = [_pos("SOL", "LONG", 5000.0, entry=100.0), _pos("BNB", "LONG", 5000.0, entry=100.0)]
+    d = W.desk_step(_deskd(now), [a], {a: held}, mids, now)                     # first look: baseline, nothing opened
+    assert d["open"] == []
+    d = W.desk_step(d, [a], {a: held}, mids, now + 30_000)                      # 2nd poll: SOL +10 % → wait, BNB +0.5 % → joined
+    assert [(o["coin"], o["join"]) for o in d["open"]] == [("BNB", True)]
+    assert any(e.get("kind") == "join_wait" and e.get("coin") == "SOL" for e in d["events"])
+    d = W.desk_step(d, [a], {a: held + [_pos("ADA", "LONG", 5000.0)]}, mids, now + 60_000)
+    d = W.desk_step(d, [a], {a: held + [_pos("ADA", "LONG", 5000.0)]}, mids, now + 90_000)
+    assert sorted((o["coin"], o["join"]) for o in d["open"]) == [("ADA", False), ("BNB", True)]
+
+
 def test_hyperliquid_opens_at_once_but_a_reversal_needs_two_polls_and_skips_are_logged_once():
     now = 1_800_000_000_000
     h, h2 = "0x" + "a" * 40, "0x" + "b" * 40

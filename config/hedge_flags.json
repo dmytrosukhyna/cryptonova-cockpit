@@ -15,13 +15,18 @@
   ],
   "0x27c9fa86c91b84ddfa15de58c482ff662498d65d": [
    "carry",
-   "offset",
+   "bigbook"
+  ],
+  "0x392b3aa013bca178ae7f466e12a879044cec0d92": [
    "bigbook"
   ],
   "0x404ca2035b37bf2e83505134ebcf8d03babb5f03": [
    "carry",
    "offset",
    "bigbook"
+  ],
+  "0x41d3becb24ca37fc4f620b2738eb74a6e56c89f0": [
+   "bigmiss"
   ],
   "0x4b1c09fa8322548360a76a3747e32a60a864bc38": [
    "offset"
@@ -74,6 +79,9 @@
   "0xdfe5195e7cc1a2eca9b0df09d4646472a8c4a402": [
    "bigbook"
   ],
+  "0xe1c08667421e480e63edda9b37b8405aa51ed19b": [
+   "offset"
+  ],
   "0xf6f371fb269f8e7c078e340fb8d3a253463247f8": [
    "bigbook"
   ],
@@ -111,7 +119,9 @@
   "0x1e771e1b95c86491299d6e2a5c3b3842d03b552e",
   "0x218a65e21eddeece7a9df38c6bbdd89f692b7da2",
   "0x27c9fa86c91b84ddfa15de58c482ff662498d65d",
+  "0x392b3aa013bca178ae7f466e12a879044cec0d92",
   "0x404ca2035b37bf2e83505134ebcf8d03babb5f03",
+  "0x41d3becb24ca37fc4f620b2738eb74a6e56c89f0",
   "0x4b1c09fa8322548360a76a3747e32a60a864bc38",
   "0x4c226d5a21ae3b9883f98cbda1a3be63e565f308",
   "0x541e077ac38c56d7bf590924d249c60b0c80071d",
@@ -128,6 +138,7 @@
   "0xd4c1f7e8d876c4749228d515473d36f919583d1d",
   "0xd83687a8ad139688f5d0eaa9fc352a10f532c2af",
   "0xdfe5195e7cc1a2eca9b0df09d4646472a8c4a402",
+  "0xe1c08667421e480e63edda9b37b8405aa51ed19b",
   "0xf6f371fb269f8e7c078e340fb8d3a253463247f8",
   "0xfeec88b13fc0be31695069f02bac18538a154e9c",
   "bn:5125452663940092928",
